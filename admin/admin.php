@@ -440,6 +440,10 @@ function gtm4wp_admin_output_section( $args ) {
 			_e( "Here you can check what data is needed to be included in the dataLayer to be able to access them in Google Tag Manager", 'duracelltomi-google-tag-manager' );
 			echo "<br />";
 			printf( __( '* Browser, OS and Device data is provided using <a href="%s">WhichBrowser</a> library.', 'duracelltomi-google-tag-manager' ), "http://whichbrowser.net/" );
+			if ( version_compare( PHP_VERSION, '5.4.0' ) < 0 ) {
+				echo "<br />";
+				_e( 'You are using an <strong>outdated</strong> version of PHP (5.3 or less). You <strong>should not turn on</strong> browser/device/os tracking as this can hurt your site. Please talk to your hosting and upgrade to PHP 5.4 or newer.', 'duracelltomi-google-tag-manager' );
+			}
 
 			break;        
 		}
