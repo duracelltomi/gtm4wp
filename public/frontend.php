@@ -242,7 +242,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		$dataLayer["postCountTotal"]  = (int) $wp_query->found_posts;
 	}
 
-  if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTID ] ) {
+  if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTID ] && is_singular() === true) {
     $dataLayer["postID"]  = (int) get_the_ID();
   }
 
