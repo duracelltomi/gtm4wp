@@ -144,7 +144,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$dataLayer["ecomm_totalvalue"] = (float)$cart_total;
 		}
 	} else if ( is_order_received_page() ) {
-		$order_id  = apply_filters( 'woocommerce_thankyou_order_id', empty( $_GET['order'] ) ? ($GLOBALS["wp"]->query_vars["order-received"] ? $GLOBALS["wp"]->query_vars["order-received"] : 0) : absint( $_GET['order'] ) );
+		$order_id          = empty( $_GET['order'] ) ? ($GLOBALS["wp"]->query_vars["order-received"] ? $GLOBALS["wp"]->query_vars["order-received"] : 0) : absint( $_GET['order'] );
+		$order_id_filtered = apply_filters( 'woocommerce_thankyou_order_id', $order_id );
+		if ( "" != $order_id_filtered ) {
+			$order_id = $order_id_filtered;
+		}
+
 		$order_key = apply_filters( 'woocommerce_thankyou_order_key', empty( $_GET['key'] ) ? '' : woocommerce_clean( $_GET['key'] ) );
 
 		if ( $order_id > 0 ) {
