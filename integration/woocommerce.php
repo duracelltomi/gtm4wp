@@ -125,7 +125,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			foreach( $products as $oneproduct ) {
 				$remarketing_id = $oneproduct['product_id'];
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETINGSKU ] ) {
-					$product_sku = $oneproduct['product_sku'];
+					$product_sku = isset( $oneproduct['product_sku'] ) ? $oneproduct['product_sku'] : "";
 					if ( "" != $product_sku ) {
 						$remarketing_id = $product_sku;
 					}
@@ -336,8 +336,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
                 }
               });
             }
-
-            return false;
           });");
       }
 		}
