@@ -55,9 +55,16 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		}
 	}
 	
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] ) {
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] ) {
 		$current_user = wp_get_current_user();
-		$dataLayer["visitorType"] = ( empty( $current_user->roles[0] ) ? "visitor-logged-out" : $current_user->roles[0] );
+		
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] ) {
+			$dataLayer["visitorType"] = ( empty( $current_user->roles[0] ) ? "visitor-logged-out" : $current_user->roles[0] );
+		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] ) {
+			$dataLayer["visitorEmail"] = ( empty( $current_user->user_email ) ? "" : $current_user->user_email );
+		}
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERID ] ) {
