@@ -3,8 +3,8 @@ Contributors: duracelltomi
 Donate link: https://duracelltomi.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
-Tested up to: 4.6
-Stable tag: 1.4.0
+Tested up to: 4.6.1
+Stable tag: 1.5.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -273,6 +273,20 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.5 =
+
+Lots of WooCommerce ecommerce codes has been changed and extended, please double check your measurement after upgrading to this version!
+
+* Added: warning message if you are using PHP 5.3 or older. Browser/OS/Device tracking needs 5.4 or newer
+* Added: tracking of HTML5 media players
+* Added: Email address of the logged in user into the visitorEmail dataLayer variable. Remember: to comply with GTM TOS you are not allowed to pass this data towards any Google tag but you can use this in any other 3rd party tag.
+* Added: gtm4wp_eec_product_array WordPress filter so that plugin and theme authors can add their own data for enhanced ecommere product arrays
+* Fixed: JavaScript error in WooCommerce stores when enhanced ecommerce enabled and a product being clicked in a widget area
+* Fixed: Order data not present in some cases on the order received page
+* Changed: Extended "User SKUs instead of IDs for remarketing" option to be also applied to ecommerce product data arrays
+* Changed: Use wc_clean instead of the deprecated function woocommerce_clean
+* Changed: New, divided GTM container implemented - a fixed part in the <head> and an iframe part placed using the container placement option you've set earlier
+
 = 1.4 =
 
 * Fixed: WP CLI error message
@@ -454,6 +468,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.5 =
+
+Lots of WooCommerce ecommerce codes has been changed and extended, please double check your measurement after upgrading to this version!
 
 = 1.4 =
 
