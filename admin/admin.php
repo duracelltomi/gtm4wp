@@ -423,9 +423,9 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"phase"         => GTM4WP_PHASE_STABLE,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
-	GTM4WP_OPTION_INTEGRATE_WCREMARKETINGSKU => array(
+	GTM4WP_OPTION_INTEGRATE_WCUSESKU => array(
 		"label"         => __( "Use SKU instead of ID", 'duracelltomi-google-tag-manager' ),
-		"description"   => __( "Check this to use product SKU in the dynamic remarketing variables instead of the ID of the products. Will fallback to ID if no SKU is set.", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.", 'duracelltomi-google-tag-manager' ),
 		"phase"         => GTM4WP_PHASE_EXPERIMENTAL,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	)
