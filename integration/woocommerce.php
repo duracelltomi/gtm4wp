@@ -40,7 +40,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			} else {
 				$product_cat = "";
 			}
-			
+
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ) {
 				$product_sku = $product->get_sku();
 				if ( "" != $product_sku ) {
@@ -409,7 +409,7 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	if ( ! is_single() ) {
 		return;
 	}
-	
+
 	// exit early if there is nothing to do
 	if ( ( false === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) && ( false === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) ) {
 		return;
@@ -681,7 +681,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 		"name"         => $product->post_title,
 		"category"     => $product_cat,
 		"price"        => $product->get_price(),
-		"productlink"  => get_permalink(),
+		"productlink"  => apply_filters( 'the_permalink', get_permalink() ),
 		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) ),
 		"listname"     => $list_name;
 	);
@@ -703,7 +703,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 $GLOBALS["gtm4wp_cart_item_proddata"] = '';
 function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 	global $gtm4wp_options;
-	
+
 	$_product_cats = get_the_terms($product->id, 'product_cat');
 	if ( ( is_array( $_product_cats ) ) && ( count( $_product_cats ) > 0 ) ) {
 		$product_cat = array_pop( $_product_cats );
@@ -723,7 +723,7 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 		"name"        => $product->post_title,
 		"price"       => $product->get_price(),
 		"category"    => $product_cat,
-		"productlink" => get_permalink()
+		"productlink" => apply_filters( 'the_permalink', get_permalink() ),
 	);
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "cart" );
 	$GLOBALS["gtm4wp_cart_item_proddata"] = $eec_product_array;
@@ -796,7 +796,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			"name"         => $product->post_title,
 			"price"        => $product->get_price(),
 			"category"     => $product_cat,
-			"productlink"  => get_permalink(),
+			"productlink"  => apply_filters( 'the_permalink', get_permalink() ),
 			"listname"     => $gtm4wp_last_widget_title,
 			"listposition" => $gtm4wp_product_counter
 		);
@@ -906,7 +906,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		"name"         => $product->post_title,
 		"price"        => $product->get_price(),
 		"category"     => $product_cat,
-		"productlink"  => get_permalink(),
+		"productlink"  => apply_filters( 'the_permalink', get_permalink() ),
 		"listname"     => $list_name,
 		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) )
 	);
