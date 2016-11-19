@@ -305,7 +305,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$gtm4wp_checkout_products[] = $eec_product_array;
 
 				$gtm4wp_checkout_products_remarketing[] = $remarketing_id;
-				$gtm4wp_totalvalue += $eec_product_array[ "quantity" ]; * $eec_product_array[ "price" ];
+				$gtm4wp_totalvalue += $eec_product_array[ "quantity" ] * $eec_product_array[ "price" ];
 			} // end foreach cart item
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
@@ -433,7 +433,7 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 
 	$_temp_productdata = array(
 		"id"       => $remarketing_id,
-		"name"     => $product->post_title,
+		"name"     => $product->post->post_title,
 		"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product->id,
 		"category" => $product_cat,
 		"price"    => $product->get_price(),
@@ -639,7 +639,8 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 					} else {
 						document.location.href = productdata.data( 'gtm4wp_product_url' )
 					}
-				}
+				},
+				'eventTimeout': 2000
 			});
 		});
 	");
@@ -665,7 +666,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 	}
 
 	$paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
-	$posts_per_page = $wp_query->posts_per_page;
+	$posts_per_page = get_query_var('posts_per_page');
 	if ( $posts_per_page < 1 ) {
 		$posts_per_page = 1;
 	}
@@ -678,12 +679,12 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 
 	$_temp_productdata = array(
 		"id"           => $remarketing_id,
-		"name"         => $product->post_title,
+		"name"         => $product->post->post_title,
 		"category"     => $product_cat,
 		"price"        => $product->get_price(),
 		"productlink"  => get_permalink(),
 		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) ),
-		"listname"     => $list_name;
+		"listname"     => $list_name
 	);
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "addtocartproductlist" );
 
@@ -720,7 +721,7 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 
 	$_temp_productdata = array(
 		"id"          => $remarketing_id,
-		"name"        => $product->post_title,
+		"name"        => $product->post->post_title,
 		"price"       => $product->get_price(),
 		"category"    => $product_cat,
 		"productlink" => get_permalink()
@@ -793,7 +794,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 
 		$_temp_productdata = array(
 			"id"           => $remarketing_id,
-			"name"         => $product->post_title,
+			"name"         => $product->post->post_title,
 			"price"        => $product->get_price(),
 			"category"     => $product_cat,
 			"productlink"  => get_permalink(),
@@ -890,7 +891,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 	}
 
 	$paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
-	$posts_per_page = $wp_query->posts_per_page;
+	$posts_per_page = get_query_var('posts_per_page');
 	if ( $posts_per_page < 1 ) {
 		$posts_per_page = 1;
 	}
@@ -903,7 +904,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 
 	$_temp_productdata = array(
 		"id"           => $remarketing_id,
-		"name"         => $product->post_title,
+		"name"         => $product->post->post_title,
 		"price"        => $product->get_price(),
 		"category"     => $product_cat,
 		"productlink"  => get_permalink(),
