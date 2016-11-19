@@ -103,7 +103,6 @@ The plugin can track user interaction with your embeded media:
 * YouTube
 * Vimeo
 * Soundcloud
-* Generic HTML5 player of the browser
 
 It fires dataLayer events when a media player was being loaded on the page, when the media is being played, paused or stopped.
 It can fire dataLayer events when the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
@@ -277,7 +276,6 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 Lots of WooCommerce ecommerce codes has been changed and extended, please double check your measurement after upgrading to this version!
 
 * Added: warning message if you are using PHP 5.3 or older. Browser/OS/Device tracking needs 5.4 or newer
-* Added: tracking of HTML5 media players
 * Added: Email address of the logged in user into the visitorEmail dataLayer variable. Remember: to comply with GTM TOS you are not allowed to pass this data towards any Google tag but you can use this in any other 3rd party tag.
 * Added: gtm4wp_eec_product_array WordPress filter so that plugin and theme authors can add their own data for enhanced ecommere product arrays
 * Fixed: JavaScript error in WooCommerce stores when enhanced ecommerce enabled and a product being clicked in a widget area
