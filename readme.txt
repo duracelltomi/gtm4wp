@@ -12,16 +12,38 @@ The first Google Tag Manager plugin for WordPress with business goals in mind.
 
 == Description ==
 
-Google Tag Manager (GTM) is Google's free tool to everyone to be able to manage your analyitcs, PPC and other code snipetts
-using an intuitive web UI.
+Google Tag Manager (GTM) is Google's free tool for everyone to be able to manage your analyitcs, PPC and other code snipets
+using an intuitive web UI. To learn more about this tool, visit the [official website](https://www.google.com/analytics/tag-manager/).
 
-This plugin can place the necessary container code snippet into your website so that you do not need to edit your theme files.
+This plugin can place the necessary container code snippet into your website so that you do not need to add this manually.
 Multiple containers are supported!
 
-= Basic data included =
+The plugin can support your GTM setups by adding lots of meta data about the visited page and about the user into the so called data layer.
+GTM help center incluldes [more details about this data layer](https://developers.google.com/tag-manager/devguide#datalayer).
 
-Google Tag Manager for WordPress (aka GTM4WP or GTM 4 WP) builds a so called dataLayer variable for you. Using this you can manage your tags
-very easily since you can fire them using rules that include
+**Some parts of the plugin requires PHP 5.3 newer.
+PHP 5.4 or newer is recommended.**
+
+Please note that PHP 5.x is nearing its end of life cycle thus it is recommended to upgrade. If you are not sure which version you are using, please contact
+your hosting provider for support.
+
+= GTM container code placement =
+
+GTM container code snippet is currently divided into two parts: the most important part will be added to the <head> tag of your website every time. The second part is
+called the iframe tag and it is only being used when users do not have JavaScript enabled. Code placement option only controls this second code snippet. For best
+performance this should be just after the opening body tag but it might be also safe to use the footer option in plugin settings as the worst case.
+
+Yaniv Friedensohn showed me a solution that can add the GTM container code after the opening body tag
+for almost every theme without modifying the theme files:
+
+http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
+
+I added this solution to the plugin, currently as an experimental option.
+
+Users of the Genisis Framework should use the "Custom" option but without altering the theme.
+The Google Tag Manager container code will be added automatically.
+
+= Basic data included =
 
 * post/page titles
 * post/page dates
@@ -34,25 +56,9 @@ very easily since you can fire them using rules that include
 * logged in status
 * logged in user role
 * logged in user ID (to track cross device behavior in Google Analytics)
+* logged in user email address (to comply with [GTM terms of service](https://www.google.com/analytics/tag-manager/use-policy/) do not pass this towards Google tags)
 * search data
-
-Use search data to generate Analytics events when an empty search result is being shown.
-This is useful to see what people are searching for that is not available on your site (for example a product).
-
-Use post count to generate Analytics events when an empty result is being shown.
-This can be useful to catch empty (product) categories.
-
-= Codeless container code injection =
-
-Yaniv Friedensohn showed me a solution that can add the GTM container code after the opening body tag
-for almost every theme without modifying the theme files:
-
-http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
-
-I added this solution to the plugin, currently as an experimental option.
-
-Users of the Genisis Framework should use the "Custom" option but without altering the theme.
-The Google Tag Manager container code will be added automatically.
+* site name and id for WordPress multisite instances
 
 = Browser / OS / Device data =
 
@@ -88,16 +94,6 @@ Depending on your websites traffic, additional fees may be applied:
 
 http://www.geoplugin.com/premium
 
-= Tag Manager Events =
-
-This plugin can fire several Tag Manager event so that you can include special tags when
-
-* the visitor moves between elements of a form (comment, contact, etc.)
-* the visitor clicks on a Facebook like/share (limited feature) or Twitter button
-* the visitor clicks on an outbound link (deprecated)
-* the visitor clicks on a download link (deprecated)
-* the visitor clicks on an email link (deprecated)
-
 = Media player events =
 
 (experimental)
@@ -107,11 +103,13 @@ The plugin can track user interaction with your embeded media:
 * YouTube
 * Vimeo
 * Soundcloud
+* Generic HTML5 player of the browser
 
 It fires dataLayer events when a media player was being loaded on the page, when the media is being played, paused or stopped.
 It can fire dataLayer events when the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
 
 Tracking should work with embedded media using the oEmbed feauture of WordPress and it should also work with other plugins or even with copy/pasted codes.
+Currently, players injected into the website after page load are not being tracked.
 
 = Scroll tracking =
 
@@ -161,6 +159,7 @@ Google Tag Manager for WordPress can integrate with several popular plugins.
 	* Enhanced e-commerce (beta):
 		*	implementation of [Enhanced E-commerce](https://developers.google.com/tag-manager/enhanced-ecommerce)
 		* Does not include tracking of promotions since WooCommerce does not have such a feature (yet)
+		* Does not currently support refunds
 
 More integration to come!
 
