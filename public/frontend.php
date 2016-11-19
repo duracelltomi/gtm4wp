@@ -598,6 +598,7 @@ function gtm4wp_wp_header_begin() {
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
 		$_gtm_codes = explode( ",", str_replace( array(";"," "), array(",",""), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 
+		$_gtm_tag = '';
 		foreach( $_gtm_codes as $one_gtm_code ) {
 			$_gtm_tag .= '
 <script data-cfasync="false">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
@@ -611,6 +612,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 <!-- End Google Tag Manager -->';
 
     $_gtm_tag = apply_filters( GTM4WP_WPFILTER_GETTHEGTMTAG, $_gtm_tag );
+    $_gtm_header_content .= $_gtm_tag;
 	}
 
 	$_gtm_header_content .= '
