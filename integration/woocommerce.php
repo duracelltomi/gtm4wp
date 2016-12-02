@@ -604,10 +604,10 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 				var productdata = _productdata.find( '.gtm4wp_productdata' );
 			} else {
 				var productdata = jQuery( this );
+			}
 
-				if ( '' == productdata.data( 'gtm4wp_product_id' ) ) {
-					return true;
-				}
+			if ( ( 'undefined' == typeof productdata.data( 'gtm4wp_product_id' ) ) || ( '' == productdata.data( 'gtm4wp_product_id' ) ) ) {
+				return true;
 			}
 
 			var ctrl_key_pressed = event.ctrlKey;
