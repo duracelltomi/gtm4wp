@@ -600,10 +600,20 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 	gtm4wp_woocommerce_addjs("
 		$( '.products li:not(.product-category) a:not(.add_to_cart_button),.widget-product-item' ).click(function( event ) {
 			var _productdata = $( this ).closest( '.product' );
+
 			if ( _productdata.length > 0 ) {
 				var productdata = _productdata.find( '.gtm4wp_productdata' );
+
 			} else {
-				var productdata = jQuery( this );
+				var _productdata = $( this ).closest( 'ul.products li' );
+
+				if ( _productdata.length > 0 ) {
+					var productdata = _productdata.find( '.gtm4wp_productdata' );
+
+				} else {
+					var productdata = jQuery( this );
+
+				}
 			}
 
 			if ( ( 'undefined' == typeof productdata.data( 'gtm4wp_product_id' ) ) || ( '' == productdata.data( 'gtm4wp_product_id' ) ) ) {
