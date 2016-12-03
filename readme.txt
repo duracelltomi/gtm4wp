@@ -4,7 +4,7 @@ Donate link: https://duracelltomi.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Tested up to: 4.6.1
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -271,6 +271,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.5.1 =
+
+Fixed: clicks on products in product list pages redirected to undefined URLs with some themes.
+
 = 1.5 =
 
 Lots of WooCommerce ecommerce codes has been changed and extended, please double check your measurement after upgrading to this version!
@@ -465,6 +469,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.5.1 =
+
+Fixed: clicks on products in product list pages redirected to undefined URLs with some themes.
 
 = 1.5 =
 
