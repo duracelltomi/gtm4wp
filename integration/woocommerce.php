@@ -406,6 +406,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 }
 
 function gtm4wp_woocommerce_single_add_to_cart_tracking() {
+	global $product, $woocommerce, $gtm4wp_datalayer_name, $gtm4wp_options;
+
 	if ( ! is_single() ) {
 		return;
 	}
@@ -414,8 +416,6 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	if ( ( false === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) && ( false === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) ) {
 		return;
 	}
-
-	global $product, $woocommerce, $gtm4wp_datalayer_name, $gtm4wp_options;
 
 	$_product_cats = get_the_terms($product->id, 'product_cat');
 	if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
@@ -879,6 +879,10 @@ function gtm4wp_before_related_products_loop() {
 function gtm4wp_woocommerce_before_shop_loop_item() {
 	global $product, $woocommerce_loop, $wp_query, $gtm4wp_options;
 
+	if ( !isset( $product ) ) {
+		return;
+	}
+	
 	$product_cat = "";
 	if ( is_product_category() ) {
 		global $wp_query;
