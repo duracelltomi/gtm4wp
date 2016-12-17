@@ -599,6 +599,10 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 
 	gtm4wp_woocommerce_addjs("
 		$( '.products li:not(.product-category) a:not(.add_to_cart_button),.widget-product-item' ).click(function( event ) {
+			if ( 'undefined' == typeof google_tag_manager ) {
+				return true;
+			}
+		
 			var _productdata = $( this ).closest( '.product' );
 
 			if ( _productdata.length > 0 ) {
@@ -617,6 +621,11 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 			}
 
 			if ( ( 'undefined' == typeof productdata.data( 'gtm4wp_product_id' ) ) || ( '' == productdata.data( 'gtm4wp_product_id' ) ) ) {
+				return true;
+			}
+
+			// only act on links pointing to the product detail page
+			if ( productdata.data( 'gtm4wp_product_url' ) != $( this ).attr( 'href' ) ) {
 				return true;
 			}
 
