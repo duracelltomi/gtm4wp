@@ -537,6 +537,16 @@ function gtm4wp_wp_body_open() {
 	}
 }
 
+function gtm4wp_filter_visitor_keys( $dataLayer ) {
+	foreach( $dataLayer as $dl_key => $dl_value ) {
+		if ( strpos( $dl_key, "visitor" ) !== false ) {
+			unset( $dataLayer[ $dl_key ] );
+		}
+	}
+  
+	return $dataLayer;
+}
+
 function gtm4wp_wp_header_begin() {
 	global $gtm4wp_datalayer_name, $gtm4wp_options;
 
@@ -564,6 +574,7 @@ function gtm4wp_wp_header_begin() {
 			// add adwords remarketing tags as suggested here:
 			// https://support.google.com/tagmanager/answer/3002580?hl=en
 
+			add_filter( GTM4WP_WPFILTER_COMPILE_REMARKTING, "gtm4wp_filter_visitor_keys" );
 			$gtm4wp_remarketing_tags = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_REMARKTING, $gtm4wp_datalayer_data );
 
 			$_gtm_header_content .= '
