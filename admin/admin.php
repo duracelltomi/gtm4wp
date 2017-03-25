@@ -1063,21 +1063,21 @@ function gtm4wp_show_warning() {
 			$woo_ga_options = get_option( "woocommerce_google_analytics_settings" );
 			if ( $woo_ga_options ) {
 				if ( "" != $woo_ga_options["ga_id"] ) {
-					echo '<div class="notice notice-error is-dismissible"><p><strong>' . __( 'Notice: you should disable Google Analytics tracking <a href="admin.php?page=woocommerce_settings&tab=integration&section=google_analytics">in WooCommerce settings</a> by leaving Google Analytics ID field empty if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong> <a href="?wc-ga-plugin-warning" class="gtm4wp-dismiss-notice"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
+					echo '<div class="notice notice-warning is-dismissible"><p><strong>' . __( 'Notice: you should disable Google Analytics tracking <a href="admin.php?page=woocommerce_settings&tab=integration&section=google_analytics">in WooCommerce settings</a> by leaving Google Analytics ID field empty if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong> <a href="?wc-ga-plugin-warning" class="gtm4wp-dismiss-notice"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
 				}
 			}
 		}
 
 		if ( ( false === $gtm4wp_user_notices_dismisses["wc-ga-plugin-warning"] ) && $is_wc_active && is_plugin_active( "woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php" ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p><strong>' . __( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong> <a href="?wc-ga-plugin-warning" class="gtm4wp-dismiss-notice notice-dismiss"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
+			echo '<div class="notice notice-warning is-dismissible"><p><strong>' . __( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong> <a href="?wc-ga-plugin-warning" class="gtm4wp-dismiss-notice notice-dismiss"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
 		}
 
 		if ( ( false === $gtm4wp_user_notices_dismisses["wc-gayoast-plugin-warning"] ) && $is_wc_active && is_plugin_active( "google-analytics-for-wordpress/googleanalytics.php" ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p><strong>' . __( 'Notice: you should deactivate the plugin "Google Analytics for WordPress by Yoast" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong> <a href="?wc-gayoast-plugin-warning" class="gtm4wp-dismiss-notice notice-dismiss"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
+			echo '<div class="notice notice-warning is-dismissible"><p><strong>' . __( 'Notice: you should deactivate the plugin "Google Analytics for WordPress by Yoast" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong> <a href="?wc-gayoast-plugin-warning" class="gtm4wp-dismiss-notice notice-dismiss"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
 		}
 
 		if ( $is_wc_active && ( false === $gtm4wp_user_notices_dismisses["wc-1-3-upgrade-info"] ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p><strong>' . sprintf( __( 'Warning: Using WooCommerce and upgrading to v1.3 of the GTM plugin? <a href="%s" target="_blank">Check this important blog post.</a>', 'duracelltomi-google-tag-manager' ), "https://duracelltomi.com/google-tag-manager-for-wordpress/how-to-articles/upgrading-woocommerce-settings-for-v1-3" ) . '</strong> <a href="?wc-1-3-upgrade-info" class="gtm4wp-dismiss-notice notice-dismiss"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
+			echo '<div class="notice notice-warning is-dismissible"><p><strong>' . sprintf( __( 'Warning: Using WooCommerce and upgrading to v1.3 of the GTM plugin? <a href="%s" target="_blank">Check this important blog post.</a>', 'duracelltomi-google-tag-manager' ), "https://duracelltomi.com/google-tag-manager-for-wordpress/how-to-articles/upgrading-woocommerce-settings-for-v1-3" ) . '</strong> <a href="?wc-1-3-upgrade-info" class="gtm4wp-dismiss-notice notice-dismiss"><span class="screen-reader-text">' . __( 'Dismiss', 'duracelltomi-google-tag-manager' ) . '</span></a></p></div>';
 		}
 	}
 }
