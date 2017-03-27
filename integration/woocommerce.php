@@ -29,8 +29,9 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
     }
 	} else if ( is_product() ) {
 		if ( ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) || ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) ) {
-			$prodid        = get_the_ID();
-			$product       = get_product( $prodid );
+			$postid     = get_the_ID();
+			$product    = get_product( $postid );
+			$product_id = $product->get_id();
 
 			$_product_cats = get_the_terms( $product->id, 'product_cat' );
 			if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
@@ -45,20 +46,20 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ) {
 					$product_sku = $product->get_sku();
 					if ( "" != $product_sku ) {
-						$prodid = $product_sku;
+						$product_id = $product_sku;
 					}
 				}
 
 				$_temp_productdata = array(
 					"name"     => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
-					"id"       => $prodid,
+					"id"       => $product_id,
 					"price"    => $product_price,
 					"category" => $product_cat,
 				);
 				$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "productdetail" );
 
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
-					$remarketing_id = (string)$prodid;
+					$remarketing_id = (string)$product_id;
 
 					$dataLayer["ecomm_prodid"] = $remarketing_id;
 					$dataLayer["ecomm_pagetype"] = "product";
@@ -73,7 +74,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					);
 				}
 			} else {
-			gtm4wp_woocommerce_addjs("
+				$dataLayer["ecomm_prodid"] = array();
+				$dataLayer["ecomm_pagetype"] = "product";
+				$dataLayer["ecomm_totalvalue"] = 0;
+
+				gtm4wp_woocommerce_addjs("
 	var gtm4wp_product_detail_data = {
 		name: '" . gtm4wp_woocommerce_html_entity_decode( get_the_title() ) . "',
 		id: 0,
@@ -97,7 +102,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			'event': 'gtm4wp.changeDetailViewEEC',
 			'ecommerce': {
 				'currencyCode': '".get_woocommerce_currency()."',
-				'detail': current_product_detail_data
+				'detail': current_product_detail_data,
+				'ecomm_prodid': current_product_detail_data.id,
+				'ecomm_pagetype': 'product',
+				'ecomm_totalvalue': 0
 			}
 		});
 	});
@@ -132,6 +140,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 												'id':       productdata.data( 'gtm4wp_product_id' ),
 												'price':    productdata.data( 'gtm4wp_product_price' ),
 												'category': productdata.data( 'gtm4wp_product_cat' ),
+												'variant':  productdata.data( 'gtm4wp_product_variant' ),
 												'quantity': _current_value - _original_value
 											}]
 										}
@@ -148,6 +157,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 												'id':       productdata.data( 'gtm4wp_product_id' ),
 												'price':    productdata.data( 'gtm4wp_product_price' ),
 												'category': productdata.data( 'gtm4wp_product_cat' ),
+												'variant':  productdata.data( 'gtm4wp_product_variant' ),
 												'quantity': _original_value - _current_value
 											}]
 										}
@@ -164,12 +174,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$products = $woocommerce->cart->get_cart();
 			$product_ids = array();
 			foreach( $products as $oneproduct ) {
-				$remarketing_id = $oneproduct['product_id'];
-				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ) {
-					$product_sku = isset( $oneproduct['product_sku'] ) ? $oneproduct['product_sku'] : "";
-					if ( "" != $product_sku ) {
-						$remarketing_id = $product_sku;
-					}
+				$remarketing_id = ( isset( $oneproduct[ "variation_id" ] ) && ($oneproduct[ "variation_id" ]>0) ) ? $oneproduct[ "variation_id" ] : $oneproduct[ "product_id" ];
+				$product_sku    = $oneproduct["data"]->get_sku();
+				if ( ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ) && ( "" != $product_sku ) ) {
+					$remarketing_id = $product_sku;
 				}
 
 				$product_ids[] = $remarketing_id;
@@ -240,20 +248,29 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $order->get_items() ) {
 				foreach ( $order->get_items() as $item ) {
-					$_product = $order->get_product_from_item( $item );
+					$product = $order->get_product_from_item( $item );
 
+					$product_id = $product->get_id();
+					$_product_cats = get_the_terms($product->id, 'product_cat');
+					if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
+						$product_cat = array_pop( $_product_cats );
+						$product_cat = $product_cat->name;
+					} else {
+						$product_cat = "";
+					}
+/*
           $variation_data = null;
-          if (get_class($_product) == "WC_Product_Variation") {
-            $variation_data = $_product->get_variation_attributes();
+          if (get_class($product) == "WC_Product_Variation") {
+            $variation_data = $product->get_variation_attributes();
           }
 
           if ( isset( $variation_data ) ) {
 
-						$_category = woocommerce_get_formatted_variation( $_product->variation_data, true );
+						$_category = woocommerce_get_formatted_variation( $product->variation_data, true );
 
 					} else {
 						$out = array();
-						$categories = get_the_terms( $_product->id, 'product_cat' );
+						$categories = get_the_terms( $product->id, 'product_cat' );
 						if ( $categories ) {
 							foreach ( $categories as $category ) {
 								$out[] = $category->name;
@@ -262,27 +279,33 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 						$_category = implode( " / ", $out );
 					}
+*/
 
-					$remarketing_id = $_product->id;
-					$product_sku    = $_product->get_sku();
+					$remarketing_id = $product_id;
+					$product_sku    = $product->get_sku();
 					if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 						$remarketing_id = $product_sku;
 					}
 
-					$_prodprice = $order->get_item_total( $item );
+					$product_price = $order->get_item_total( $item );
 					$_temp_productdata = array(
 					  "id"       => $remarketing_id,
 					  "name"     => $item['name'],
-					  "sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $_product->id,
-					  "category" => $_category,
-					  "price"    => $_prodprice,
+					  "sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product_id,
+					  "category" => $product_cat,
+					  "price"    => $product_price,
 					  "currency" => get_woocommerce_currency(),
 					  "quantity" => $item['qty']
 					);
+	
+					if ( "variation" == $product->get_type() ) {
+						$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
+					}
+
 					$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "purchase" );
 					$_products[] = $eec_product_array;
 
-					$_sumprice += $eec_product_array[ "price" ] * $eec_product_array[ "quantity" ];
+					$_sumprice += $product_price * $eec_product_array[ "quantity" ];
 					$_product_ids[] = $remarketing_id;
 				}
 			}
@@ -314,6 +337,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			foreach( $woocommerce->cart->get_cart() as $cart_item_id => $cart_item_data) {
 				$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data["data"], $cart_item_data, $cart_item_id );
 
+				$product_id = $product->get_id();
+				
 				$_product_cats = get_the_terms($product->id, 'product_cat');
 				if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
 					$product_cat = array_pop( $_product_cats );
@@ -322,7 +347,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$product_cat = "";
 				}
 
-				$remarketing_id = $product->id;
+				$remarketing_id = $product_id;
 				$product_sku    = $product->get_sku();
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 					$remarketing_id = $product_sku;
@@ -335,6 +360,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					"category" => $product_cat,
 					"quantity" => $cart_item_data["quantity"]
 				);
+
+				if ( "variation" == $product->get_type() ) {
+					$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
+				}
+
 				$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "checkout" );
 				$gtm4wp_checkout_products[] = $eec_product_array;
 
@@ -427,6 +457,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						'id':       productdata.data( 'gtm4wp_product_id' ),
 						'price':    productdata.data( 'gtm4wp_product_price' ),
 						'category': productdata.data( 'gtm4wp_product_cat' ),
+						'variant':  productdata.data( 'gtm4wp_product_variant' ),
 						'quantity': qty
 					}]
 				}
@@ -459,7 +490,8 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 		$product_cat = "";
 	}
 
-	$remarketing_id = $product->id;
+	$product_id     = $product->get_id();
+	$remarketing_id = $product_id;
 	$product_sku    = $product->get_sku();
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 		$remarketing_id = $product_sku;
@@ -468,7 +500,7 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	$_temp_productdata = array(
 		"id"       => $remarketing_id,
 		"name"     => $product->post->post_title,
-		"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product->id,
+		"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product_id,
 		"category" => $product_cat,
 		"price"    => $product->get_price(),
 		"currency" => get_woocommerce_currency()
@@ -501,6 +533,10 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 
 				_product_form_variations.forEach( function( product_var ) {
 					if ( product_var.variation_id == _product_var_id_val ) {
+						_product_var_sku = product_var.sku;
+						if ( ! _product_var_sku ) {
+							_product_var_sku = _product_var_id_val;
+						}
 
 						var _tmp = [];
 						for( var attrib_key in product_var.attributes ) {
@@ -513,7 +549,7 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 								'currencyCode': '".get_woocommerce_currency()."',
 								'add': {
 									'products': [{
-										'id': _product_var_id_val,
+										'id': " . ($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ? "_product_var_sku" : "_product_var_id_val") . ",
 										'name': '". esc_js( $eec_product_array[ "name" ] ) ."',
 										'price': product_var.display_price,
 										'category': '". esc_js( $eec_product_array[ "category" ] ) ."',
@@ -738,6 +774,7 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 	global $product, $woocommerce_loop, $wp_query, $gtm4wp_options;
 
+	$product_id    = $product->get_id();
 	$_product_cats = get_the_terms($product->id, 'product_cat');
 	if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
 		$product_cat = array_pop( $_product_cats );
@@ -760,7 +797,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 		$posts_per_page = 1;
 	}
 
-	$remarketing_id = $product->id;
+	$remarketing_id = $product_id;
 	$product_sku    = $product->get_sku();
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 		$remarketing_id = $product_sku;
@@ -775,16 +812,24 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) ),
 		"listname"     => $list_name
 	);
+
+	if ( "variation" == $product->product_type ) {
+		$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
+	} else {
+		$_temp_productdata[ "variant" ] = "";
+	}
+	
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "addtocartproductlist" );
 
-	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" href="',
+	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_variant="%s" href="',
 		esc_attr( $eec_product_array[ "id" ] ),
 		esc_attr( $eec_product_array[ "name" ] ),
 		esc_attr( $eec_product_array[ "price" ] ),
 		esc_attr( $eec_product_array[ "category" ] ),
 		esc_url( $eec_product_array[ "productlink" ] ),
 		esc_attr( $eec_product_array[ "listposition" ] ),
-		esc_attr( $eec_product_array[ "listname" ] )
+		esc_attr( $eec_product_array[ "listname" ] ),
+		esc_attr( $eec_product_array[ "variant" ] )
 	);
 
 	return str_replace( 'href="', $cartlink_with_data, $add_to_cart_link );
@@ -794,6 +839,7 @@ $GLOBALS["gtm4wp_cart_item_proddata"] = '';
 function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 	global $gtm4wp_options;
 	
+	$product_id    = $product->get_id();
 	$_product_cats = get_the_terms($product->id, 'product_cat');
 	if ( ( is_array( $_product_cats ) ) && ( count( $_product_cats ) > 0 ) ) {
 		$product_cat = array_pop( $_product_cats );
@@ -802,7 +848,7 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 		$product_cat = "";
 	}
 
-	$remarketing_id = $product->id;
+	$remarketing_id = $product_id;
 	$product_sku    = $product->get_sku();
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 		$remarketing_id = $product_sku;
@@ -815,6 +861,13 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 		"category"    => $product_cat,
 		"productlink" => get_permalink()
 	);
+
+	if ( "variation" == $product->product_type ) {
+		$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
+	} else {
+		$_temp_productdata[ "variant" ] = "";
+	}
+	
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "cart" );
 	$GLOBALS["gtm4wp_cart_item_proddata"] = $eec_product_array;
 
@@ -830,12 +883,13 @@ function gtm4wp_woocommerce_cart_item_remove_link_filter( $remove_from_cart_link
     return $remove_from_cart_link;
   }
 
-	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" href="',
+	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_variant="%s" href="',
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["id"] ),
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["name"] ),
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["price"] ),
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["category"] ),
-		esc_url( $GLOBALS["gtm4wp_cart_item_proddata"]["productlink"] )
+		esc_url( $GLOBALS["gtm4wp_cart_item_proddata"]["productlink"] ),
+		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["variant"] )
 	);
 	$GLOBALS["gtm4wp_cart_item_proddata"] = '';
 
@@ -867,6 +921,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 	ob_end_clean();
 
 	if ( "content-widget-product.php" == $template_name ) {
+	  $product_id    = $product->get_id();
 		$_product_cats = get_the_terms($product->id, 'product_cat');
 		if ( ( is_array( $_product_cats ) ) && ( count( $_product_cats ) > 0 ) ) {
 			$product_cat = array_pop( $_product_cats );
@@ -875,7 +930,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			$product_cat = "";
 		}
 
-		$remarketing_id = $product->id;
+		$remarketing_id = $product_id;
 		$product_sku    = $product->get_sku();
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 			$remarketing_id = $product_sku;
@@ -962,6 +1017,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		return;
 	}
 	
+	$product_id  = $product->get_id();
 	$product_cat = "";
 	if ( is_product_category() ) {
 		global $wp_query;
@@ -989,7 +1045,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		$posts_per_page = 1;
 	}
 
-	$remarketing_id = $product->id;
+	$remarketing_id = $product_id;
 	$product_sku    = $product->get_sku();
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 		$remarketing_id = $product_sku;
