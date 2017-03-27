@@ -808,7 +808,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 		"name"         => $product->post->post_title,
 		"category"     => $product_cat,
 		"price"        => $product->get_price(),
-		"productlink"  => get_permalink(),
+		"productlink"  => apply_filters( 'the_permalink', get_permalink(), 0),
 		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) ),
 		"listname"     => $list_name
 	);
@@ -859,7 +859,7 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
 		"name"        => $product->post->post_title,
 		"price"       => $product->get_price(),
 		"category"    => $product_cat,
-		"productlink" => get_permalink()
+		"productlink" => apply_filters( 'the_permalink', get_permalink(), 0)
 	);
 
 	if ( "variation" == $product->product_type ) {
@@ -941,7 +941,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			"name"         => $product->post->post_title,
 			"price"        => $product->get_price(),
 			"category"     => $product_cat,
-			"productlink"  => get_permalink(),
+			"productlink"  => apply_filters( 'the_permalink', get_permalink(), 0),
 			"listname"     => $gtm4wp_last_widget_title,
 			"listposition" => $gtm4wp_product_counter
 		);
@@ -1056,7 +1056,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		"name"         => $product->post->post_title,
 		"price"        => $product->get_price(),
 		"category"     => $product_cat,
-		"productlink"  => get_permalink(),
+		"productlink"  => apply_filters( 'the_permalink', get_permalink(), 0),
 		"listname"     => $list_name,
 		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) )
 	);
