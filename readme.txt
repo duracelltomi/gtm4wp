@@ -3,8 +3,8 @@ Contributors: duracelltomi
 Donate link: https://duracelltomi.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
-Tested up to: 4.7
-Stable tag: 1.5.1
+Tested up to: 4.7.3
+Stable tag: 1.6
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -271,11 +271,12 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
-= 1.5.2 =
+= 1.6 =
 
 * Fixed: do not block product list item clicks if ad blocker is enabled
 * Fixed: only track product clicks in product lists if link points to the product detail page URL
 * Fixed: PHP warning in backlogs 'Undefined variable: gtm4wp_options'
+* Updated: product variation support in WooCommerce integration
 
 = 1.5.1 =
 
@@ -475,6 +476,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.6 =
+
+If you are using WooCommerce and enhanced ecommerce, please add gtm4wp.changeDetailViewEEC to the ecommerce helper trigger
 
 = 1.5.1 =
 
