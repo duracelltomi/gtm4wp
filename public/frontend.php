@@ -552,7 +552,7 @@ function gtm4wp_wp_header_begin() {
 
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by DuracellTomi - http://duracelltomi.com -->
-<script data-cfasync="false" type="text/javascript">
+<script data-cfasync="false" type="javascript">
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 	
