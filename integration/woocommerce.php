@@ -30,7 +30,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 	} else if ( is_product() ) {
 		if ( ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) || ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) ) {
 			$postid     = get_the_ID();
-			$product    = get_product( $postid );
+			$product    = wc_get_product( $postid );
 			$product_id = $product->get_id();
 
 			$_product_cats = get_the_terms( $product->id, 'product_cat' );
@@ -248,7 +248,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $order->get_items() ) {
 				foreach ( $order->get_items() as $item ) {
-					$product = $order->get_product_from_item( $item );
+					$product = $item->get_product();
 
 					$product_id = $product->get_id();
 					$_product_cats = get_the_terms($product->id, 'product_cat');
@@ -258,28 +258,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					} else {
 						$product_cat = "";
 					}
-/*
-          $variation_data = null;
-          if (get_class($product) == "WC_Product_Variation") {
-            $variation_data = $product->get_variation_attributes();
-          }
-
-          if ( isset( $variation_data ) ) {
-
-						$_category = woocommerce_get_formatted_variation( $product->variation_data, true );
-
-					} else {
-						$out = array();
-						$categories = get_the_terms( $product->id, 'product_cat' );
-						if ( $categories ) {
-							foreach ( $categories as $category ) {
-								$out[] = $category->name;
-							}
-						}
-
-						$_category = implode( " / ", $out );
-					}
-*/
 
 					$remarketing_id = $product_id;
 					$product_sku    = $product->get_sku();
@@ -836,7 +814,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 }
 
 $GLOBALS["gtm4wp_cart_item_proddata"] = '';
-function gtm4wp_woocommerce_cart_item_product_filter( $product ) {
+function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item, $cart_id ) {
 	global $gtm4wp_options;
 	
 	$product_id    = $product->get_id();
