@@ -276,7 +276,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Fixed: do not block product list item clicks if ad blocker is enabled
 * Fixed: only track product clicks in product lists if link points to the product detail page URL
 * Fixed: PHP warning in backlogs 'Undefined variable: gtm4wp_options'
-* Updated: product variation support in WooCommerce integration
+* Added: product variation support in WooCommerce integration (enhanced ecommerce implementations should add the GTM event gtm4wp.changeDetailViewEEC to the ecommerce event trigger)
+* Updated: better WooCommerce 3.0 compatibility
 
 = 1.5.1 =
 
