@@ -814,7 +814,7 @@ function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
 }
 
 $GLOBALS["gtm4wp_cart_item_proddata"] = '';
-function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item, $cart_id ) {
+function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item="", $cart_id="" ) {
 	global $gtm4wp_options;
 	
 	$product_id    = $product->get_id();
