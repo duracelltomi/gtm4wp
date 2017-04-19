@@ -248,7 +248,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $order->get_items() ) {
 				foreach ( $order->get_items() as $item ) {
-					$product = $item->get_product();
+					if ( version_compare( $woocommerce->version, "3.0", ">=" ) ) {
+						$product = $item->get_product();
+					} else {
+						$product = $order->get_product_from_item( $item );
+					}
 
 					$product_id = $product->get_id();
 					$_product_cats = get_the_terms($product->id, 'product_cat');
