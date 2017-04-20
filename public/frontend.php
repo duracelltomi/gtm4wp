@@ -21,7 +21,7 @@ function gtm4wp_is_assoc($arr) {
 
 if ( !function_exists( "getallheaders") ) { 
 	function getallheaders() { 
-		$headers = ""; 
+		$headers = []; 
 		foreach ( $_SERVER as $name => $value ) { 
 			if ( substr($name, 0, 5) == "HTTP_" ) { 
 				$headers[ str_replace(' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $name, 5 ) ) ) ) ) ] = $value; 
@@ -599,7 +599,7 @@ function gtm4wp_wp_header_begin() {
 	' . $gtm4wp_datalayer_name . '.push(' . str_replace(
 			array( '"-~-', '-~-"' ),
 			array( "", "" ),
-			str_replace( "–", "-", $dl_json_data )
+			str_replace( "Â–", "-", $dl_json_data )
 		) . ');';
 	}
 
