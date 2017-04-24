@@ -398,13 +398,6 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"phase"       => GTM4WP_PHASE_STABLE,
 		"plugintocheck" => "contact-form-7/wp-contact-form-7.php"
 	),
-/*
-	GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE => array(
-		"label"         => __( "WooCommerce", 'duracelltomi-google-tag-manager' ),
-		"description"   => __( "Enable this and you will get:<br /> - Add-to-cart events<br /> - E-commerce transaction data ready to be used with Google Analytics and Universal Analytics tags<br /> - Google AdWords dynamic remarketing tags", 'duracelltomi-google-tag-manager' ),
-		"plugintocheck" => "woocommerce/woocommerce.php"
-	)
-*/
 	GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC => array(
 		"label"         => __( "Track classic e-commerce", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( sprintf( __( "Choose this option if you would like to track e-commerce data using <a href=\"%s\" target=\"_blank\">classic transaction data</a>.", 'duracelltomi-google-tag-manager'  ) , 'https://developers.google.com/analytics/devguides/collection/analyticsjs/ecommerce'), 'duracelltomi-google-tag-manager' ),
@@ -428,6 +421,18 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"description"   => __( "Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.", 'duracelltomi-google-tag-manager' ),
 		"phase"         => GTM4WP_PHASE_EXPERIMENTAL,
 		"plugintocheck" => "woocommerce/woocommerce.php"
+	),
+	
+	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS => array(
+		"label"         => __( "Google Optimize page-hiding snippet ID list", 'duracelltomi-google-tag-manager' ),
+		"description"   => sprintf( __( "Enter a comma separated list of Google Optimizie container IDs that you would like to use on your site using Google Tag Manager. This plugin will add the <a href=\"%s\">page-hiding snippet</a> to your pages.", 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/optimize/#the_page-hiding_snippet_code' ) .
+			'<br /><span class="goid_validation_error">' . __( "This does not seems to be a valid Google Optimize ID! Valid format: GTM-XXXXXX where X can be numbers and capital letters. Use comma without any space (,) to enter multpile IDs.", 'duracelltomi-google-tag-manager' ) . '</span>',
+		"phase"         => GTM4WP_PHASE_EXPERIMENTAL
+	),
+	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => array(
+		"label"         => __( "Google Optimize page-hiding timeout", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Enter here the amount of time in milliseconds that the page-hiding snippet should wait before page content gets visible even if Google Optimize has not been completely loaded yet.", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_EXPERIMENTAL
 	)
 );
 
@@ -634,6 +639,29 @@ function gtm4wp_sanitize_options($options) {
 				}
 			}
 
+		// Google Optimize settings
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ) {
+			$_goid_val  = trim($newoptionvalue);
+			if ( "" == $_goid_val ) {
+				$_goid_list = array();
+			} else {
+				$_goid_list = explode( ",", $_goid_val );
+			}
+			$_goid_haserror = false;
+
+			foreach( $_goid_list as $one_go_id ) {
+				$_goid_haserror = $_goid_haserror || !preg_match( "/^GTM-[A-Z0-9]+$/", $one_go_id );
+			}
+
+			if ( $_goid_haserror && (count($_goid_list) > 0) ) {
+				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS . ']', __( "Invalid Google Optimize ID. Valid ID format: GTM-XXXXX. Use comma without additional space (,) to enter more than one ID.", 'duracelltomi-google-tag-manager' ) );
+			} else {
+				$output[$optionname] = $newoptionvalue;
+			}
+
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT ) {
+			$output[$optionname] = (int) $newoptionvalue;
+
 		// integrations
 		} else if ( substr($optionname, 0, 10) == "integrate-" ) {
 			$output[$optionname] = (boolean) $newoptionvalue;
@@ -642,8 +670,6 @@ function gtm4wp_sanitize_options($options) {
 		} else if ( ( $optionname == GTM4WP_OPTION_GTM_CODE ) || ( $optionname == GTM4WP_OPTION_DATALAYER_NAME ) ) {
 			$newoptionvalue = trim($newoptionvalue);
 			
-//			if ( ( $optionname == GTM4WP_OPTION_GTM_CODE ) && ( ! preg_match( "/^GTM-[A-Z0-9]+$/", $newoptionvalue ) ) ) {
-//				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']', __( "Invalid Google Tag Manager ID. Valid ID format: GTM-XXXXX", 'duracelltomi-google-tag-manager' ) );
 			if ( $optionname == GTM4WP_OPTION_GTM_CODE ) {
 				$_gtmid_list = explode( ",", $newoptionvalue );
 				$_gtmid_haserror = false;
@@ -674,6 +700,7 @@ function gtm4wp_sanitize_options($options) {
 		// scroll tracking content ID
 		} else if ( $optionname == GTM4WP_OPTION_SCROLLER_CONTENTID ) {
 			$output[$optionname] = trim( str_replace( "#", "", $newoptionvalue ) );
+
 		// anything else
 		} else {
 			switch( gettype($optionvalue)) {
@@ -952,6 +979,7 @@ function gtm4wp_add_admin_js($hook) {
 			"blockmacrostabtitle" => __( "Blacklist macros" , 'duracelltomi-google-tag-manager' ),
 			"wpcf7tabtitle" => __( "Contact Form 7" , 'duracelltomi-google-tag-manager' ),
 			"wctabtitle" => __( "WooCommerce" , 'duracelltomi-google-tag-manager' ),
+			"gotabtitle" => __( "Google Optimize" , 'duracelltomi-google-tag-manager' ),
 			"weathertabtitle" => __( "Weather data" , 'duracelltomi-google-tag-manager' ),
 			"generaleventstabtitle" => __( "General events" , 'duracelltomi-google-tag-manager' ),
 			"mediaeventstabtitle" => __( "Media events" , 'duracelltomi-google-tag-manager' ),
@@ -971,6 +999,7 @@ function gtm4wp_admin_head() {
 	echo '
 <style type="text/css">
 	.gtmid_validation_error,
+	.goid_validation_error,
 	.datalayername_validation_error {
 		display: none;
 		color: #c00;
@@ -982,7 +1011,7 @@ function gtm4wp_admin_head() {
 		jQuery( "#gtm4wp-options\\\\[gtm-code\\\\]" )
 			.bind( "blur", function() {
 				var gtmid_regex = /^GTM-[A-Z0-9]+$/;
-				var gtmid_list = jQuery( this ).val().split( "," );
+				var gtmid_list = jQuery( this ).val().trim().split( "," );
 
 				var gtmid_haserror = false;
 				for( var i=0; i<gtmid_list.length; i++ ) {
@@ -994,6 +1023,30 @@ function gtm4wp_admin_head() {
 						.show();
 				} else {
 					jQuery( ".gtmid_validation_error" )
+						.hide();
+				}
+			});
+
+		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-idlist\\\\]" )
+			.bind( "blur", function() {
+				var goid_regex = /^GTM-[A-Z0-9]+$/;
+				var goid_val  = jQuery( this ).val().trim();
+				if ( "" == goid_val ) {
+					goid_list = [];
+				} else {
+					var goid_list = goid_val.split( "," );
+				}
+
+				var goid_haserror = false;
+				for( var i=0; i<goid_list.length; i++ ) {
+					goid_haserror = goid_haserror || !goid_regex.test( goid_list[ i ] );
+				}
+
+				if ( goid_haserror && (goid_list.length > 0) ) {
+					jQuery( ".goid_validation_error" )
+						.show();
+				} else {
+					jQuery( ".goid_validation_error" )
 						.hide();
 				}
 			});

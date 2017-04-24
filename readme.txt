@@ -4,7 +4,7 @@ Donate link: https://duracelltomi.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Tested up to: 4.7.3
-Stable tag: 1.6.1
+Stable tag: 1.7
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -271,6 +271,11 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.7 =
+
+* Updated: even better WooCommerce 3.0 compatibility
+* Added: Google Optimize page hiding snippet under Integrations tab
+
 = 1.6.1 =
 
 Fixed: PHP warning message on WooCommerce cart page
@@ -482,6 +487,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.7 =
+
+Better WooCommerce 3.x compatibility and new features
 
 = 1.6.1 =
 
