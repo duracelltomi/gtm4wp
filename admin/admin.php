@@ -416,6 +416,12 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"phase"         => GTM4WP_PHASE_STABLE,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
+	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX => array(
+		"label"         => __( "Product ID prefix", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Some product feed generator plugins prefix product IDs with a fixed text like 'woocommerce_gpf'. You can enter this prefix here so that tags in your website include this prefix as well.", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_EXPERIMENTAL,
+		"plugintocheck" => "woocommerce/woocommerce.php"
+	),
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU => array(
 		"label"         => __( "Use SKU instead of ID", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.", 'duracelltomi-google-tag-manager' ),
@@ -661,6 +667,9 @@ function gtm4wp_sanitize_options($options) {
 
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT ) {
 			$output[$optionname] = (int) $newoptionvalue;
+			
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) {
+			$output[$optionname] = trim( (string) $newoptionvalue );
 
 		// integrations
 		} else if ( substr($optionname, 0, 10) == "integrate-" ) {
@@ -884,7 +893,7 @@ function gtm4wp_admin_init() {
 				"label_for" => "gtm4wp-options[" . $fieldid . "]",
 				"description" => $fielddata["description"],
 				"optionfieldid" => $fieldid,
-				"plugintocheck" => $fielddata["plugintocheck"]
+				"plugintocheck" => isset( $fielddata["plugintocheck"] ) ? $fielddata["plugintocheck"] : ""
 			)
 		);
 	}

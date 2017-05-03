@@ -85,6 +85,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC',      'integrate-woocommerce-
 define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC',     'integrate-woocommerce-track-enhanced-ecommerce' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCREMARKETING',         'integrate-woocommerce-remarketing' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSESKU',              'integrate-woocommerce-remarketing-usesku' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX',     'integrate-woocommerce-remarketing-productidprefix' );
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS',     'integrate-google-optimize-idlist' );
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT', 'integrate-google-optimize-timeout' );
 
@@ -184,6 +185,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC => false,
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING     => false,
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU          => false,
+	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX => "",
 
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS     => "",
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => 4000,

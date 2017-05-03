@@ -275,6 +275,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Updated: even better WooCommerce 3.0 compatibility
 * Added: Google Optimize page hiding snippet under Integrations tab
+* Added: add to cart data for WooCommerce enhanced ecommerce tracking if user undos a cart item removal (no need to update GTM tags)
 
 = 1.6.1 =
 
