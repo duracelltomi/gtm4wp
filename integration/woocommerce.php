@@ -228,7 +228,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer["transactionType"]           = "sale";
 				$dataLayer["transactionAffiliation"]    = gtm4wp_woocommerce_html_entity_decode( get_bloginfo( 'name' ) );
 				$dataLayer["transactionTotal"]          = $order->get_total();
-				$dataLayer["transactionShipping"]       = $order->get_total_shipping();
+				$dataLayer["transactionShipping"]       = $order->get_shipping_total();
 				$dataLayer["transactionTax"]            = $order->get_total_tax();
 				$dataLayer["transactionPaymentType"]    = $order->payment_method_title;
 				$dataLayer["transactionCurrency"]       = get_woocommerce_currency();
@@ -245,7 +245,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 							"affiliation" => gtm4wp_woocommerce_html_entity_decode( get_bloginfo( 'name' ) ),
 							"revenue"     => $order->get_total(),
 							"tax"         => $order->get_total_tax(),
-							"shipping"    => $order->get_total_shipping(),
+							"shipping"    => $order->get_shipping_total(),
 							"coupon"      => implode( ", ", $order->get_used_coupons() )
 						)
 					)
