@@ -112,7 +112,9 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			'event': 'gtm4wp.changeDetailViewEEC',
 			'ecommerce': {
 				'currencyCode': '".get_woocommerce_currency()."',
-				'detail': current_product_detail_data,
+				'detail': {
+					'products': [current_product_detail_data]
+				},
 				'ecomm_prodid': '".gtm4wp_prefix_productid("")."' + current_product_detail_data.id,
 				'ecomm_pagetype': 'product',
 				'ecomm_totalvalue': 0
