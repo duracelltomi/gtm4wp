@@ -93,7 +93,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		name: '" . gtm4wp_woocommerce_html_entity_decode( get_the_title() ) . "',
 		id: 0,
 		price: 0,
-		category: '" . $product_cat . "',
+		category: '" . esc_js( $product_cat ) . "',
 		variant: ''
 	};
 
@@ -258,7 +258,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 		if ( $order_id > 0 ) {
 			$order = new WC_Order( $order_id );
-			if ( $order->order_key != $order_key )
+			if ( version_compare( $woocommerce->version, "3.0", ">=" ) ) {
+				$this_order_key = $order->get_order_key();
+			} else {
+				$this_order_key = $order->order_key;
+			}
+
+			if ( $this_order_key != $order_key )
 				unset( $order );
 		}
 
@@ -275,7 +281,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer["transactionTotal"]          = $order->get_total();
 				$dataLayer["transactionShipping"]       = $order->get_shipping_total();
 				$dataLayer["transactionTax"]            = $order->get_total_tax();
-				$dataLayer["transactionPaymentType"]    = $order->payment_method_title;
+				$dataLayer["transactionPaymentType"]    = $order->get_payment_method_title();
 				$dataLayer["transactionCurrency"]       = get_woocommerce_currency();
 				$dataLayer["transactionShippingMethod"] = $order->get_shipping_method();
 				$dataLayer["transactionPromoCode"]      = implode( ", ", $order->get_used_coupons() );
