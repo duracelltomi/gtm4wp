@@ -276,7 +276,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			unset( $order );
 		}
 
-		if ( isset( $order ) ) {
+		if ( isset( $order ) && $order->is_paid() ) { // only if Order has paid status
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
 				$dataLayer["transactionId"]             = $order->get_order_number();
 				$dataLayer["transactionDate"]           = date("c");
