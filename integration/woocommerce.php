@@ -1,8 +1,9 @@
 <?php
 define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
 
-$gtm4wp_product_counter = 0;
+$gtm4wp_product_counter   = 0;
 $gtm4wp_last_widget_title = "Sidebar Products";
+$gtm4wp_is_woocommerce3   = version_compare( $woocommerce->version, "3.0", ">=" );
 
 function gtm4wp_woocommerce_addjs( $js ) {
   global $woocommerce;
@@ -29,7 +30,7 @@ function gtm4wp_prefix_productid( $product_id ) {
 }
 
 function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
-	global $woocommerce, $gtm4wp_options, $wp_query, $gtm4wp_datalayer_name, $gtm4wp_product_counter;
+	global $woocommerce, $gtm4wp_options, $wp_query, $gtm4wp_datalayer_name, $gtm4wp_product_counter, $gtm4wp_is_woocommerce3;
 
 	if ( is_product_category() || is_product_tag() || is_front_page() || is_shop() ) {
     if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
@@ -119,10 +120,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				'detail': {
 					'products': [current_product_detail_data]
 				},
-				'ecomm_prodid': '".gtm4wp_prefix_productid("")."' + current_product_detail_data.id,
-				'ecomm_pagetype': 'product',
-				'ecomm_totalvalue': 0
-			}
+			},
+			'ecomm_prodid': '".gtm4wp_prefix_productid("")."' + current_product_detail_data.id,
+			'ecomm_pagetype': 'product',
+			'ecomm_totalvalue': 0
 		});
 	});
 
@@ -262,7 +263,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 		if ( $order_id > 0 ) {
 			$order = new WC_Order( $order_id );
-			if ( version_compare( $woocommerce->version, "3.0", ">=" ) ) {
+			if ( $gtm4wp_is_woocommerce3 ) {
 				$this_order_key = $order->get_order_key();
 			} else {
 				$this_order_key = $order->order_key;
@@ -283,7 +284,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer["transactionType"]           = "sale";
 				$dataLayer["transactionAffiliation"]    = gtm4wp_woocommerce_html_entity_decode( get_bloginfo( 'name' ) );
 				$dataLayer["transactionTotal"]          = $order->get_total();
-				$dataLayer["transactionShipping"]       = $order->get_shipping_total();
+				if ( $gtm4wp_is_woocommerce3 ) {
+					$dataLayer["transactionShipping"]       = $order->get_shipping_total();
+				} else {
+					$dataLayer["transactionShipping"]       = $order->get_total_shipping();
+				}
 				$dataLayer["transactionTax"]            = $order->get_total_tax();
 				$dataLayer["transactionPaymentType"]    = $order->get_payment_method_title();
 				$dataLayer["transactionCurrency"]       = get_woocommerce_currency();
@@ -300,7 +305,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 							"affiliation" => gtm4wp_woocommerce_html_entity_decode( get_bloginfo( 'name' ) ),
 							"revenue"     => $order->get_total(),
 							"tax"         => $order->get_total_tax(),
-							"shipping"    => $order->get_shipping_total(),
+							"shipping"    => ( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping()),
 							"coupon"      => implode( ", ", $order->get_used_coupons() )
 						)
 					)
@@ -313,7 +318,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $order->get_items() ) {
 				foreach ( $order->get_items() as $item ) {
-					if ( version_compare( $woocommerce->version, "3.0", ">=" ) ) {
+					if ( $gtm4wp_is_woocommerce3 ) {
 						$product = $item->get_product();
 					} else {
 						$product = $order->get_product_from_item( $item );
@@ -534,7 +539,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$remarketing_id = $product_sku;
 			}
 
-		  $dataLayer["ecommerce"]["add"] = array(
+		  $dataLayer["ecommerce"]["add"]["products"][] = array(
 		    "name"     => $product->get_title(),
 		    "id"       => $remarketing_id,
 		    "price"    => $product->get_price(),
