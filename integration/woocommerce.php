@@ -3,7 +3,7 @@ define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
 
 $gtm4wp_product_counter   = 0;
 $gtm4wp_last_widget_title = "Sidebar Products";
-$gtm4wp_is_woocommerce3   = version_compare( $woocommerce->version, "3.0", ">=" );
+$gtm4wp_is_woocommerce3   = version_compare( $GLOBALS["woocommerce"]->version, "3.0", ">=" );
 
 function gtm4wp_woocommerce_addjs( $js ) {
   global $woocommerce;
