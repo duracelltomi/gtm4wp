@@ -28,7 +28,8 @@ $GLOBALS["gtm4wp_def_user_notices_dismisses"] = array(
 	"enter-gtm-code" => false,
 	"wc-ga-plugin-warning" => false,
 	"wc-gayoast-plugin-warning" => false,
-	"wc-1-3-upgrade-info" => false
+	"wc-1-3-upgrade-info" => false,
+	"php53-warning" => false
 );
 
 $GLOBALS["gtm4wp_includefieldtexts"] = array(
@@ -464,7 +465,7 @@ function gtm4wp_admin_output_section( $args ) {
 			printf( __( '* Browser, OS and Device data is provided using <a href="%s">WhichBrowser</a> library.', 'duracelltomi-google-tag-manager' ), "http://whichbrowser.net/" );
 			if ( version_compare( PHP_VERSION, '5.4.0' ) < 0 ) {
 				echo "<br />";
-				_e( 'You are using an <strong>outdated</strong> version of PHP (5.3 or less). You <strong>should not turn on</strong> browser/device/os tracking as this can hurt your site. Please talk to your hosting and upgrade to PHP 5.4 or newer.', 'duracelltomi-google-tag-manager' );
+				_e( 'You are using an <strong>outdated</strong> version of PHP (v' . PHP_VERSION . '). You <strong>should not turn on</strong> browser/device/os tracking as this can hurt your site. Please talk to your hosting and upgrade to PHP 5.4 or newer.', 'duracelltomi-google-tag-manager' );
 			}
 
 			break;
@@ -1140,6 +1141,10 @@ function gtm4wp_show_warning() {
 		if ( $is_wc_active && ( false === $gtm4wp_user_notices_dismisses["wc-1-3-upgrade-info"] ) ) {
 			echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-1-3-upgrade-info"><p><strong>' . sprintf( __( 'Warning: Using WooCommerce and upgrading to v1.3 of the GTM plugin? <a href="%s" target="_blank">Check this important blog post.</a>', 'duracelltomi-google-tag-manager' ), "https://duracelltomi.com/google-tag-manager-for-wordpress/how-to-articles/upgrading-woocommerce-settings-for-v1-3" ) . '</strong></p></div>';
 		}
+	}
+
+	if ( ( false === $gtm4wp_user_notices_dismisses["php53-warning"] ) && ( version_compare( PHP_VERSION, '5.4.0' ) < 0 ) ) {
+		echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?php53-warning"><p><strong>' . __( 'Warning: You are using an outdated version of PHP (v' . PHP_VERSION . ') that can cause issues with the plugin Google Tag Manager for WordPress. Please consider to upgrade your PHP.', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
 	}
 }
 
