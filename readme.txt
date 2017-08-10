@@ -274,6 +274,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.7.1 =
 
 * Fixed: PHP 5.3 compatible syntax in frontend.php
+* Fixed: PHP error using classic ecommerce with WooCommerce 2.6.x
 * Added: Warning for users of PHP 5.4 or older to consier upgrade (FYI: PHP 5.5 and older versions do not get even security fixes)
 
 = 1.7 =
