@@ -290,7 +290,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$dataLayer["transactionShipping"]       = $order->get_total_shipping();
 				}
 				$dataLayer["transactionTax"]            = $order->get_total_tax();
-				$dataLayer["transactionPaymentType"]    = $order->get_payment_method_title();
+				$dataLayer["transactionPaymentType"]    = ( $gtm4wp_is_woocommerce3 ? $order->get_payment_method_title() : $order->payment_method_title);
 				$dataLayer["transactionCurrency"]       = get_woocommerce_currency();
 				$dataLayer["transactionShippingMethod"] = $order->get_shipping_method();
 				$dataLayer["transactionPromoCode"]      = implode( ", ", $order->get_used_coupons() );
