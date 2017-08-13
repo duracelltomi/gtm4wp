@@ -275,6 +275,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Fixed: PHP 5.3 compatible syntax in frontend.php
 * Fixed: PHP error using classic ecommerce with WooCommerce 2.6.x
+* Updated: Added data-cfasync='false' to all <script> elements to prevent ClourFlare to load scripts async
 * Added: Warning for users of PHP 5.4 or older to consier upgrade (FYI: PHP 5.5 and older versions do not get even security fixes)
 
 = 1.7 =
@@ -501,7 +502,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.7.1 =
 
-Bugfix release
+Bugfix release: better PHP 5.3 and WooCommerce 2.6.x compatibility
 
 = 1.7 =
 
