@@ -438,7 +438,7 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS => array(
 		"label"         => __( "Google Optimize page-hiding snippet ID list", 'duracelltomi-google-tag-manager' ),
-		"description"   => sprintf( __( "Enter a comma separated list of Google Optimizie container IDs that you would like to use on your site using Google Tag Manager. This plugin will add the <a href=\"%s\">page-hiding snippet</a> to your pages.", 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/optimize/#the_page-hiding_snippet_code' ) .
+		"description"   => sprintf( __( "Enter a comma separated list of Google Optimize container IDs that you would like to use on your site using Google Tag Manager. This plugin will add the <a href=\"%s\">page-hiding snippet</a> to your pages.", 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/optimize/#the_page-hiding_snippet_code' ) .
 			'<br /><span class="goid_validation_error">' . __( "This does not seems to be a valid Google Optimize ID! Valid format: GTM-XXXXXX where X can be numbers and capital letters. Use comma without any space (,) to enter multpile IDs.", 'duracelltomi-google-tag-manager' ) . '</span>',
 		"phase"         => GTM4WP_PHASE_EXPERIMENTAL
 	),
