@@ -3,7 +3,7 @@ define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
 
 $gtm4wp_product_counter   = 0;
 $gtm4wp_last_widget_title = "Sidebar Products";
-$gtm4wp_is_woocommerce3   = version_compare( $GLOBALS["woocommerce"]->version, "3.0", ">=" );
+$GLOBALS["gtm4wp_is_woocommerce3"]   = version_compare( $GLOBALS["woocommerce"]->version, "3.0", ">=" );
 
 function gtm4wp_woocommerce_addjs( $js ) {
   global $woocommerce;
@@ -27,6 +27,13 @@ function gtm4wp_prefix_productid( $product_id ) {
 	} else {
 		return $product_id;
 	}
+}
+
+// from https://stackoverflow.com/questions/1252693/using-str-replace-so-that-it-only-acts-on-the-first-match
+function gtm4wp_str_replace_first($from, $to, $subject) {
+    $from = '/'.preg_quote($from, '/').'/';
+
+    return preg_replace($from, $to, $subject, 1);
 }
 
 function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
@@ -692,7 +699,7 @@ function gtm4wp_woocommerce_wp_footer() {
 		");
 	}
 
-	if ( ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) && ( ! is_cart() ) ) {
+	if ( ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) && ( ! is_cart() ) && ( ! is_product() ) ) {
 		echo "
 <script data-cfasync='false' type='text/javascript'>
 	(function($) {
@@ -861,70 +868,6 @@ function gtm4wp_woocommerce_enhanced_ecom_product_click() {
 	");
 }
 
-function gtm4wp_woocommerce_add_prod_data( $add_to_cart_link ) {
-	global $product, $woocommerce_loop, $wp_query, $gtm4wp_options;
-
-	$product_id    = $product->get_id();
-	$_product_cats = get_the_terms($product_id, 'product_cat');
-	if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
-		$product_cat = array_pop( $_product_cats );
-		$product_cat = $product_cat->name;
-	} else {
-		$product_cat = "";
-	}
-
-	if ( is_search() ) {
-		$list_name = __( "Search Results", "duracelltomi-google-tag-manager" );
-	} else if ( isset( $woocommerce_loop[ "listtype" ] ) && ( $woocommerce_loop[ "listtype" ] != '' ) ) {
-		$list_name = $woocommerce_loop[ "listtype" ];
-	} else {
-		$list_name = __( "General Product List", "duracelltomi-google-tag-manager" );
-	}
-
-	$paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
-	$posts_per_page = get_query_var('posts_per_page');
-	if ( $posts_per_page < 1 ) {
-		$posts_per_page = 1;
-	}
-
-	$remarketing_id = $product_id;
-	$product_sku    = $product->get_sku();
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
-		$remarketing_id = $product_sku;
-	}
-
-	$_temp_productdata = array(
-		"id"           => $remarketing_id,
-		"name"         => $product->get_title(),
-		"category"     => $product_cat,
-		"price"        => $product->get_price(),
-		"productlink"  => apply_filters( 'the_permalink', get_permalink(), 0),
-		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) ),
-		"listname"     => $list_name
-	);
-
-	if ( "variation" == $product->get_type() ) {
-		$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
-	} else {
-		$_temp_productdata[ "variant" ] = "";
-	}
-	
-	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "addtocartproductlist" );
-
-	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_variant="%s" href="',
-		esc_attr( $eec_product_array[ "id" ] ),
-		esc_attr( $eec_product_array[ "name" ] ),
-		esc_attr( $eec_product_array[ "price" ] ),
-		esc_attr( $eec_product_array[ "category" ] ),
-		esc_url( $eec_product_array[ "productlink" ] ),
-		esc_attr( $eec_product_array[ "listposition" ] ),
-		esc_attr( $eec_product_array[ "listname" ] ),
-		esc_attr( $eec_product_array[ "variant" ] )
-	);
-
-	return str_replace( 'href="', $cartlink_with_data, $add_to_cart_link );
-}
-
 $GLOBALS["gtm4wp_cart_item_proddata"] = '';
 function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item="", $cart_id="" ) {
 	global $gtm4wp_options;
@@ -983,7 +926,7 @@ function gtm4wp_woocommerce_cart_item_remove_link_filter( $remove_from_cart_link
 	);
 	$GLOBALS["gtm4wp_cart_item_proddata"] = '';
 
-	return str_replace( 'href="', $cartlink_with_data, $remove_from_cart_link );
+	return gtm4wp_str_replace_first( 'href="', $cartlink_with_data, $remove_from_cart_link );
 }
 
 function gtp4wp_woocommerce_reset_loop() {
@@ -996,6 +939,22 @@ function gtm4wp_woocommerce_add_related_to_loop( $arg ) {
 	global $woocommerce_loop;
 
 	$woocommerce_loop[ "listtype" ] = __( "Related Products", "duracelltomi-google-tag-manager" );
+
+	return $arg;
+}
+
+function gtm4wp_woocommerce_add_cross_sell_to_loop( $arg ) {
+	global $woocommerce_loop;
+
+	$woocommerce_loop[ "listtype" ] = __( "Cross-Sell Products", "duracelltomi-google-tag-manager" );
+
+	return $arg;
+}
+
+function gtm4wp_woocommerce_add_upsells_to_loop( $arg ) {
+	global $woocommerce_loop;
+
+	$woocommerce_loop[ "listtype" ] = __( "Upsell Products", "duracelltomi-google-tag-manager" );
 
 	return $arg;
 }
@@ -1177,7 +1136,6 @@ if ( isset ( $GLOBALS["woocommerce"] ) ) {
 
 	add_action( "woocommerce_before_shop_loop_item", "gtm4wp_woocommerce_before_shop_loop_item" );
 
-//	add_filter( "woocommerce_loop_add_to_cart_link", "gtm4wp_woocommerce_add_prod_data" );
 	add_action( "woocommerce_after_add_to_cart_button", "gtm4wp_woocommerce_single_add_to_cart_tracking" );
 	add_action( "wp_footer", "gtm4wp_woocommerce_wp_footer" );
 
@@ -1187,10 +1145,13 @@ if ( isset ( $GLOBALS["woocommerce"] ) ) {
 		add_action( 'woocommerce_after_template_part', 'gtm4wp_woocommerce_after_template_part' );
 		add_filter( 'widget_title', 'gtm4wp_widget_title_filter' );
 
-		add_filter( "woocommerce_cart_item_product", "gtm4wp_woocommerce_cart_item_product_filter" );
+		add_filter( "woocommerce_cart_item_product",     "gtm4wp_woocommerce_cart_item_product_filter" );
 		add_filter( "woocommerce_cart_item_remove_link", "gtm4wp_woocommerce_cart_item_remove_link_filter" );
 
-		add_filter( "woocommerce_related_products_args", "gtm4wp_woocommerce_add_related_to_loop" );
+		add_filter( "woocommerce_related_products_args",    "gtm4wp_woocommerce_add_related_to_loop" );
+		add_filter( "woocommerce_related_products_columns", "gtm4wp_woocommerce_add_related_to_loop" );
+		add_filter( "woocommerce_cross_sells_columns",      "gtm4wp_woocommerce_add_cross_sell_to_loop" );
+		add_filter( "woocommerce_upsells_columns",          "gtm4wp_woocommerce_add_upsells_to_loop" );
 
 		add_action( 'woocommerce_shortcode_before_recent_products_loop',       'gtm4wp_before_recent_products_loop' );
 		add_action( 'woocommerce_shortcode_before_sale_products_loop',         'gtm4wp_before_sale_products_loop' );
