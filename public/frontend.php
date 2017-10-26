@@ -55,7 +55,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		}
 	}
 	
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] ) {
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
 		$current_user = wp_get_current_user();
 		
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] ) {
@@ -64,6 +64,10 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] ) {
 			$dataLayer["visitorEmail"] = ( empty( $current_user->user_email ) ? "" : $current_user->user_email );
+		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
+			$dataLayer["visitorRegistrationDate"] = ( empty( $current_user->user_registered ) ? "" : strtotime($current_user->user_registered) );
 		}
 	}
 
