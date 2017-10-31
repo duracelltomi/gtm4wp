@@ -467,7 +467,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
                 'ecommerce': {
                   'checkout_option': {
                     'actionField': {
-                      'step': 1,
+                      'step': 1 + " . (int)$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] . ",
                       'option': _checkout_option.join( ', ' )
                     }
                   }
