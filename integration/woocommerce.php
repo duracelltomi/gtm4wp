@@ -201,9 +201,15 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			foreach( $woocommerce->cart->get_cart() as $cart_item_id => $cart_item_data) {
 				$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data["data"], $cart_item_data, $cart_item_id );
 
-				$product_id = $product->get_id();
+				$product_id   = $product->get_id();
+				$product_type = $product->get_type();
 				
-				$_product_cats = get_the_terms($product_id, 'product_cat');
+				if ( "variation" == $product_type ) {
+					$parent_product_id = $product->get_parent_id();
+					$_product_cats = get_the_terms($parent_product_id, 'product_cat');
+				} else {
+					$_product_cats = get_the_terms($product_id, 'product_cat');
+				}
 				if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
 					$product_cat = array_pop( $_product_cats );
 					$product_cat = $product_cat->name;
@@ -226,7 +232,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						"quantity" => $cart_item_data["quantity"]
 					);
 
-					if ( "variation" == $product->get_type() ) {
+					if ( "variation" == $product_type ) {
 						$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
 					}
 
@@ -397,8 +403,14 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data["data"], $cart_item_data, $cart_item_id );
 
 				$product_id = $product->get_id();
+				$product_type = $product->get_type();
 				
-				$_product_cats = get_the_terms($product_id, 'product_cat');
+				if ( "variation" == $product_type ) {
+					$parent_product_id = $product->get_parent_id();
+					$_product_cats = get_the_terms($parent_product_id, 'product_cat');
+				} else {
+					$_product_cats = get_the_terms($product_id, 'product_cat');
+				}
 				if ( ( is_array($_product_cats) ) && ( count( $_product_cats ) > 0 ) ) {
 					$product_cat = array_pop( $_product_cats );
 					$product_cat = $product_cat->name;
@@ -420,7 +432,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					"quantity" => $cart_item_data["quantity"]
 				);
 
-				if ( "variation" == $product->get_type() ) {
+				if ( "variation" == $product_type ) {
 					$_temp_productdata[ "variant" ] = implode(",", $product->get_variation_attributes());
 				}
 
