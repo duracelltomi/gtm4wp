@@ -382,6 +382,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		$dataLayer[ "weatherPressure" ] = 0;
 		$dataLayer[ "weatherWindSpeed" ] = 0;
 		$dataLayer[ "weatherWindDeg" ] = 0;
+		$dataLayer[ "weatherDataStatus" ] = "Initialized with empty data";
 
 		$gtm4wp_sessionid = array_key_exists( "gtm4wp_sessoionid", $_COOKIE ) ? $_COOKIE[ "gtm4wp_sessoionid" ] : "";
 		// this is needed so that nobody can do a hack by editing our cookie
@@ -397,6 +398,9 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 				$dataLayer[ "weatherPressure" ] = $weatherdata->main->pressure;
 				$dataLayer[ "weatherWindSpeed" ] = $weatherdata->wind->speed;
 				$dataLayer[ "weatherWindDeg" ] = $weatherdata->wind->deg;
+				$dataLayer[ "weatherDataStatus" ] = "Read from cache";
+			} else {
+				$dataLayer[ "weatherDataStatus" ] = "GTM4WP session active but no weather data in cache (" . $gtm4wp_sessionid . ")";
 			}
 		}
 	}
@@ -420,22 +424,32 @@ function gtm4wp_wp_loaded() {
 		$weatherdata = get_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid );
 
 		if ( false === $weatherdata ) {
-			$gtm4wp_geodata = wp_remote_get( 'http://www.geoplugin.net/php.gp?ip='.$_SERVER['REMOTE_ADDR'] );
+//			$gtm4wp_geodata = wp_remote_get( 'http://www.geoplugin.net/php.gp?ip='.$_SERVER['REMOTE_ADDR'] );
+			$gtm4wp_geodata = @wp_remote_get( 'https://freegeoip.net/json/'.$_SERVER['REMOTE_ADDR'] );
 
 			if ( is_array( $gtm4wp_geodata ) && ( 200 == $gtm4wp_geodata[ "response" ][ "code" ] ) ) {
-				$gtm4wp_geodata = unserialize( $gtm4wp_geodata[ "body" ] );
+//				$gtm4wp_geodata = unserialize( $gtm4wp_geodata[ "body" ] );
+				$gtm4wp_geodata = @json_decode( $gtm4wp_geodata[ "body" ] );
 
-				if ( array_key_exists( 'geoplugin_latitude', $gtm4wp_geodata ) && array_key_exists( 'geoplugin_longitude', $gtm4wp_geodata ) ) {
-					$weatherdata = wp_remote_get( 'http://api.openweathermap.org/data/2.5/weather?appid=' . $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI ] . '&lat=' . $gtm4wp_geodata[ "geoplugin_latitude" ] . '&lon=' . $gtm4wp_geodata[ "geoplugin_longitude" ] . '&units=' . ($gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] == 0 ? 'metric' : 'imperial') );
+				if ( is_object( $gtm4wp_geodata ) ) {
+					$weatherdata = wp_remote_get( 'http://api.openweathermap.org/data/2.5/weather?appid=' . $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI ] . '&lat=' . $gtm4wp_geodata->latitude . '&lon=' . $gtm4wp_geodata->longitude . '&units=' . ($gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] == 0 ? 'metric' : 'imperial') );
 
 					if ( is_array( $weatherdata ) && ( 200 == $weatherdata[ "response" ][ "code" ] ) ) {
 						$weatherdata = @json_decode( $weatherdata[ "body" ] );
 
 						if ( is_object( $weatherdata ) ) {
 							set_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid, $weatherdata, 60 * 60 );
+						} else {
+							echo "<!-- GTM4WP weather data status: Openweathermap.org did not return processable data: " . var_dump( $weatherdata, true ) . " -->";
 						}
+					} else {
+						echo "<!-- GTM4WP weather data status: Openweathermap.org returned status code: " . $weatherdata[ "response" ][ "code" ] . " -->";
 					}
+				} else {
+					echo "<!-- GTM4WP weather data status: freegeoip.net did not return lat-lng data: " . var_dump( $gtm4wp_geodata, true ) . " -->";
 				}
+			} else {
+				echo "<!-- GTM4WP weather data status: freegeoip.net returned status code: " . $gtm4wp_geodata[ "response" ][ "code" ] . " -->";
 			}
 		}
 	}
