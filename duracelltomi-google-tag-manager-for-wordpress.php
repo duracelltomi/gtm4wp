@@ -8,6 +8,9 @@ Author: Thomas Geiger
 Author URI: https://gtm4wp.com/
 Text Domain: duracelltomi-google-tag-manager
 Domain Path: /languages
+
+WC requires at least: 2.6
+WC tested up to: 3.2
 */
 
 define( 'GTM4WP_VERSION',    '1.7.2' );
