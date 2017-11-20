@@ -10,7 +10,7 @@
  *
  * Google Tag Manager dataLayer events added by:
  *   Thomas Geiger
- *   duracelltomi.com
+ *   gtm4wp.com
  */
 
 if ( "undefined" == typeof console ) {

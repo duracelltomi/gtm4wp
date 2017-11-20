@@ -1,6 +1,6 @@
 === DuracellTomi's Google Tag Manager for WordPress ===
 Contributors: duracelltomi
-Donate link: https://duracelltomi.com/
+Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Tested up to: 4.9.0
@@ -173,7 +173,7 @@ More integration to come!
 = How can I ... =
 
 I created some step by step guides so that you can create the proper settings in Google Tag Manager:
-http://duracelltomi.com/google-tag-manager-for-wordpress/how-to-articles/
+https://gtm4wp.com/how-to-articles/
 
 = PayPal / 3rd party payment gateway transactions in WooCommerce are not being tracked in Google Analyics =
 
@@ -413,7 +413,7 @@ From now on each version will include features labeled as:
 * Deprecated: this feature will be removed in a future version
 
 If you see any issue with beta or experimental functions just disable the checkbox. Using this error messages should disappear.
-Please report all bugs found in my plugin using the [contact form on my website](https://duracelltomi.com/contact).
+Please report all bugs found in my plugin using the [contact form on my website](https://gtm4wp.com/contact).
 
 * Fixed: wrong GTM container code when renaming default dataLayer variable name (thx Vassilis Papavassiliou)
 * Fixed: Enhanced Ecommerce product click data was "undefined" in some cases (thx Sergio Alen)
