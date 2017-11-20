@@ -3,8 +3,8 @@ Contributors: duracelltomi
 Donate link: https://duracelltomi.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
-Tested up to: 4.8.1
-Stable tag: 1.7.1
+Tested up to: 4.9.0
+Stable tag: 1.7.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -271,6 +271,18 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.7.2 =
+
+* Fixed: in some cases, the remove item from cart link in a WooCommerce cart was not altered properly with additional tracking codes
+* Fixed: product categories were empty in the cart, on the checkout pages and on the order received page for product variations
+* Fixed: checkout option data included checkout step #1 if cart page was setup to be the first
+* Fixed: even more WooCommerce 3.x compatibility
+* Added: registration date of the logged in user can be added to the data layer
+* Updated: geoplugin.net has been replaced by freegeoip.net for weather tracking which has far better quota for free usage
+* Updated: AdWords dynamic remarketing data layer items on a WooCommerce product page will be shown for the root product as well on variable product pages
+* Updated: Selecting a product variation will include the price of the product in AdWords dynamic remarketing data layer items
+* Updated: minor code cleanup
+
 = 1.7.1 =
 
 * Fixed: PHP 5.3 compatible syntax in frontend.php
@@ -499,6 +511,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.7.2 =
+
+Bugfix release: many little fixes, event better WooCommerce 3.x compatibility
 
 = 1.7.1 =
 
