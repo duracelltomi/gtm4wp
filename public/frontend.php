@@ -443,13 +443,21 @@ function gtm4wp_wp_loaded() {
 							echo "<!-- GTM4WP weather data status: Openweathermap.org did not return processable data: " . var_dump( $weatherdata, true ) . " -->";
 						}
 					} else {
-						echo "<!-- GTM4WP weather data status: Openweathermap.org returned status code: " . $weatherdata[ "response" ][ "code" ] . " -->";
+            if ( is_wp_error( $weatherdata ) ) {
+              echo "<!-- GTM4WP weather data status: Openweathermap.org request error: " . $weatherdata->get_error_message() . " -->";
+            } else {
+              echo "<!-- GTM4WP weather data status: Openweathermap.org returned status code: " . $weatherdata[ "response" ][ "code" ] . " -->";
+            }
 					}
 				} else {
 					echo "<!-- GTM4WP weather data status: freegeoip.net did not return lat-lng data: " . var_dump( $gtm4wp_geodata, true ) . " -->";
 				}
 			} else {
-				echo "<!-- GTM4WP weather data status: freegeoip.net returned status code: " . $gtm4wp_geodata[ "response" ][ "code" ] . " -->";
+				if ( is_wp_error( $gtm4wp_geodata ) ) {
+          echo "<!-- GTM4WP weather data status: freegeoip.net request error: " . $gtm4wp_geodata->get_error_message() . " -->";
+				} else {
+          echo "<!-- GTM4WP weather data status: freegeoip.net returned status code: " . $gtm4wp_geodata[ "response" ][ "code" ] . " -->";
+        }
 			}
 		}
 	}
@@ -569,7 +577,7 @@ function gtm4wp_wp_header_begin() {
 	global $gtm4wp_datalayer_name, $gtm4wp_options;
 
 	$_gtm_header_content = '
-<!-- Google Tag Manager for WordPress by DuracellTomi - http://gtm4wp.com -->
+<!-- Google Tag Manager for WordPress by DuracellTomi - http://duracelltomi.com -->
 <script data-cfasync="false" type="text/javascript">
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
