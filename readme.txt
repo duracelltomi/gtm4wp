@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Tested up to: 4.9.0
-Stable tag: 1.7.2
+Stable tag: 1.7.3
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -89,7 +89,7 @@ http://openweathermap.org/price
 
 It is also required to obtain a free API key from OpenWeatherMap on the page above.
 
-To determine to current location of your visitor, this plugin uses geoplugin.net.
+To determine to current location of your visitor, this plugin uses freegeoip.net.
 Depending on your websites traffic, additional fees may be applied:
 
 http://www.geoplugin.com/premium
@@ -270,6 +270,11 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.7.3 =
+
+* Fixed: Updated weather data tracking codes could result in fatal PHP error
+* Changed: links to plugin website updated
 
 = 1.7.2 =
 
@@ -511,6 +516,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.7.3 =
+
+Bugfix release
 
 = 1.7.2 =
 
