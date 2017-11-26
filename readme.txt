@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Tested up to: 4.9.0
-Stable tag: 1.7.3
+Stable tag: 1.8
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -12,16 +12,16 @@ The first Google Tag Manager plugin for WordPress with business goals in mind.
 
 == Description ==
 
-Google Tag Manager (GTM) is Google's free tool for everyone to be able to manage your analyitcs, PPC and other code snipets
+Google Tag Manager (GTM) is Google's free tool for everyone to manage and deploy analytics and marketing tags as well as other code snippets
 using an intuitive web UI. To learn more about this tool, visit the [official website](https://www.google.com/analytics/tag-manager/).
 
-This plugin can place the necessary container code snippet into your website so that you do not need to add this manually.
-Multiple containers are supported!
+This plugin places the GTM container code snippets onto your wordpress website so that you do not need to add this manually.
+Multiple containers are also supported!
 
-The plugin can support your GTM setups by adding lots of meta data about the visited page and about the user into the so called data layer.
-GTM help center incluldes [more details about this data layer](https://developers.google.com/tag-manager/devguide#datalayer).
+The plugin complements your GTM setup by pushing page meta data and user information into the so called data layer.
+Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-manager/devguide#datalayer).
 
-**Some parts of the plugin requires PHP 5.3 newer.
+**Some parts of the plugin require PHP 5.3 newer.
 PHP 5.4 or newer is recommended.**
 
 Please note that PHP 5.x is nearing its end of life cycle thus it is recommended to upgrade. If you are not sure which version you are using, please contact
@@ -29,19 +29,20 @@ your hosting provider for support.
 
 = GTM container code placement =
 
-GTM container code snippet is currently divided into two parts: the most important part will be added to the <head> tag of your website every time. The second part is
-called the iframe tag and it is only being used when users do not have JavaScript enabled. Code placement option only controls this second code snippet. For best
-performance this should be just after the opening body tag but it might be also safe to use the footer option in plugin settings as the worst case.
-
-Yaniv Friedensohn showed me a solution that can add the GTM container code after the opening body tag
-for almost every theme without modifying the theme files:
+The original GTM container code is divided into two parts: The first part is a javascript code snippet that is added to the `<head>`
+section of every page of the website. This part is critical to enable all features of GTM, and this plugin helps to place this part
+correctly on your site. The second part is an iframe snippet that is used a failsafe/fallback should users' JavaScript be disabled.
+Recommended by Google, for best performance, this code snippet should be placed directly after the opening `<body>` tag on each page.
+It will work when placed lower in the code as well, albeit not ideal. This plugin provides a code placement option for the second code snippet.
+Inherently, Wordpress does not offer a straight-forward solution to achieve this, however Yaniv Friedensohn showed me a solution for this,
+that works with most themes without modification:
 
 http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
 
 I added this solution to the plugin, currently as an experimental option.
 
-Users of the Genisis Framework should use the "Custom" option but without altering the theme.
-The Google Tag Manager container code will be added automatically.
+Sites using the Genesis Framework should choose the "Custom" placement option. No theme modification is needed for this theme
+however, the Google Tag Manager container code will be added automatically.
 
 = Basic data included =
 
@@ -55,15 +56,15 @@ The Google Tag Manager container code will be added automatically.
 * post count on the current page + in the current category/tag/taxonomy
 * logged in status
 * logged in user role
-* logged in user ID (to track cross device behavior in Google Analytics)
-* logged in user email address (to comply with [GTM terms of service](https://www.google.com/analytics/tag-manager/use-policy/) do not pass this towards Google tags)
-* search data
+* logged in user ID (to track cross device behaviour in Google Analytics)
+* logged in user email address (to comply with [GTM terms of service](https://www.google.com/analytics/tag-manager/use-policy/) do not pass this on to Google tags)
+* site search data
 * site name and id for WordPress multisite instances
 
 = Browser / OS / Device data =
 
 (beta)
- 
+
 * browser data (name, version, engine)
 * OS data (name, version)
 * device data (type, manufacturer, model)
@@ -73,48 +74,45 @@ Data is provided using the WhichBrowser library: http://whichbrowser.net/
 = Weather data =
 
 (beta)
- 
+
 Add the current weather conditions into the dataLayer so that you can use this information to generate special
 remarketing lists and additional segmentation in your web analytics solution:
 
-* weather category like clouds, rain, snow, etc.
+* weather category (clouds, rain, snow, etc.)
 * weather description: more detailed data
 * temperature in Celsius or Fahrenheit
 * air pressure
 * wind speed and degrees
 
-Weather data is queried from Open Weather Map. Depending on your websites traffic, additional fees may be applied:
+Weather data is queried from Open Weather Map. Depending on your websites traffic, additional fees may apply:
 
 http://openweathermap.org/price
 
 It is also required to obtain a free API key from OpenWeatherMap on the page above.
 
-To determine to current location of your visitor, this plugin uses freegeoip.net.
-Depending on your websites traffic, additional fees may be applied:
-
-http://www.geoplugin.com/premium
+To determine the current location of your visitor, this plugin uses freegeoip.net.
 
 = Media player events =
 
 (experimental)
 
-The plugin can track user interaction with your embeded media:
+The plugin can track user interaction with your embedded media:
 
 * YouTube
 * Vimeo
 * Soundcloud
 
-It fires dataLayer events when a media player was being loaded on the page, when the media is being played, paused or stopped.
-It can fire dataLayer events when the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
+DataLayer events are fired when a media player loads on the page, media is being played, paused or stopped and optionally when
+the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
 
-Tracking should work with embedded media using the oEmbed feauture of WordPress and it should also work with other plugins or even with copy/pasted codes.
+Tracking is supported for embedded media using the oEmbed feature of WordPress as well as other plugins and copy/pasted codes.
 Currently, players injected into the website after page load are not being tracked.
 
 = Scroll tracking =
 
 Fire tags based on how the visitor scrolls from the top to the bottom of a page.
-You can track this as Analytics events and/or fire remarketing/conversion tags to if you want to track micro conversions.
-Separate readers (who spend a specified amount of time on a page) from scrollers (who only scroll through within seconds)
+You can track this as Analytics events and/or fire remarketing/conversion tags if you want to track micro conversions.
+An example would be to isolate "readers" (who spend a specified amount of time on a page) from "scrollers" (who only scroll through within seconds).
 
 Scroll tracking is based on the solution originally created by
 
@@ -130,31 +128,29 @@ http://cutroni.com/blog/2012/02/21/advanced-content-tracking-with-google-analyti
 
 = Google AdWords remarketing =
 
-Google Tag Manager for WordPress can add every dataLayer variable as an AdWords remarketing custom parameter list.
-Using this you can create more sophisticated remarketing lists.
+Google Tag Manager for WordPress can add each dataLayer variable as an AdWords remarketing custom parameter list.
+This enables you to build sophisticated remarketing lists.
 
 = Blacklist & Whitelist Tag Manager tags and variables =
 
-To increase security on your website, you can whitelist and blacklist tags and variables.
-This means you can disable certain tags from being fired or prevent the use of certain variable types
-from being used regardless of your current Tag Manager setup.
+To increase security on your website, this plugin has the capability to white- and blacklist tags/variables.
+You can prevent specific tags from firing or the use of certain variable types regardless of your GTM setup.
 
 If your Google account is being hacked that is associated with your Google Tag Manager account,
 an attacker could easily execute malware on your website without accessing its code on your hosting server.
 
-By blacklisting custom HTML tags and/or custom JavaScript variables for example you can have a more secure Tag Manager container
-if you do not use those kind of elements.
+By blacklisting custom HTML tags and/or custom JavaScript variables you can secure the Tag Manager container.
 
 = Integration =
 
-Google Tag Manager for WordPress can integrate with several popular plugins.
+Google Tag Manager for WordPress integrates with several popular plugins.
 
-* Contact Form 7: fire an event after a successful form submission
+* Contact Form 7: fire an event upon successful form submission
 * WooCommerce:
 	* Classic e-commerce:
-		* fire event when visitors ads a product to your cart
-		* include transaction data to be sent to Google/Universal Analytics
-		* include necessary remarketing tags for Google AdWords Dynamic Remarketing
+		* fire event when visitors adds a product to their cart
+		* capture transaction data to be sent to Google/Universal Analytics
+		* capture necessary remarketing tags for Google AdWords Dynamic Remarketing
 	* Enhanced e-commerce (beta):
 		*	implementation of [Enhanced E-commerce](https://developers.google.com/tag-manager/enhanced-ecommerce)
 		* Does not include tracking of promotions since WooCommerce does not have such a feature (yet)
@@ -166,23 +162,22 @@ More integration to come!
 
 1. Upload `duracelltomi-google-tag-manager-for-wordpress` to the `/wp-content/plugins/` directory
 1. Activate the plugin through the 'Plugins' menu in WordPress
-1. Go to Settings / Google Tag Manager and enter your Google Tag Manager container ID and setup additional options
+1. Go to Settings / Google Tag Manager and enter your Google Tag Manager container ID and set additional options
 
 == Frequently Asked Questions ==
 
 = How can I ... =
 
-I created some step by step guides so that you can create the proper settings in Google Tag Manager:
+I created tutorials for proper Google Tag Manager settings:
 https://gtm4wp.com/how-to-articles/
 
-= PayPal / 3rd party payment gateway transactions in WooCommerce are not being tracked in Google Analyics =
+= PayPal / 3rd party payment gateway transactions in WooCommerce are not being tracked in Google Analytics =
 
-PayPal and some other 3rd party payment gateways does not redirect the user back to your website by default
-after a successful transaction.
-It offers the route back for your customer but it can happen that users simply close the browser
-before they get back to your thankyou page (aka. order received page)
+PayPal and some other 3rd party payment gateways do not redirect the user back to your website by default after a successful transaction.
+It offers the route back for your customer but it can happen that users simply closes the browser
+before arrive at your thankyou page (aka. order received page).
 
-This means that neither Google Analyics tags or any other tags are being fired.
+This means that neither Google Analytics tags or any other tags will fire.
 
 Enable auto return in your payment gateway settings. This will instruct them to show a quick
 info page after payment and then redirect the user back to your site. This will
@@ -191,7 +186,7 @@ increase the number of tracked transactions.
 = Why isn't there an option to blacklist tag/variable classes =
 
 Although Google recommends to blacklist tags and variables using classes, I found it is complicated for people to understand
-what tags and variables are being blacklisted/whitelisted automatically using classses. Therefore I decided to include
+what tags and variables are being blacklisted/whitelisted automatically using classes. Therefore I decided to include
 individual tags and variables on the blacklist tabs.
 
 Please remember that tags are useless without variables so only blacklist variables if you are certain that you do not use them
@@ -199,12 +194,12 @@ with any tags in your container.
 
 = How can I track scroll events in Google Tag Manager? =
 
-To track scrolling of your visitor you need to setup some tag in Google Tag Manager.
+To track scrolling of your visitor you need to create tags in Google Tag Manager.
 
 What type of tags?
 In most cases you will need Google/Universal Analytics event tags but you can use AdWords remarketing
-or conversion tags as well to collect micro conversions or to focus only on visitors who spend more time
-reading your contents.
+or conversion tags as well to track micro conversions or to focus only on visitors who spend more time
+reading your content.
 
 There are five dataLayer events you can use in your rule definitions:
 
@@ -212,42 +207,36 @@ There are five dataLayer events you can use in your rule definitions:
 * gtm4wp.reading.startReading: the visitor started to scroll. You can use the dataLayer variable `timeToScroll` to see how many seconds have passed since the article has been loaded
 * gtm4wp.reading.contentBottom: the visitor reached the end of the content (not the page!). `timeToScroll` dataLayer variable updated
 * gtm4wp.reading.pagebottom: the visitor reached the end of the page. `timeToScroll` dataLayer variable updated
-* gtm4wp.reading.readerType: at this point we are confident whether the visitor is a 'scanner' or 'reader' depending on how much time have passed since the content has been loaded. `readerType` dataLayer variable holds the type of the visitor
+* gtm4wp.reading.readerType: at this point we are confident whether the visitor is a 'scanner' or 'reader' depending on how much time have passed since the content has been loaded. `readerType` dataLayer variable captures the type of the visitor
 
 = Can I exclude certain user roles from being tracked? =
 
-Google Tag Manager is not just about visitor tracking.
-The ability to include a Google/Universal Analytics tag is only one feature you can manage.
+This is easily managed through GTM itself. If you want to exclude logged in users or users with certain user roles,
+use the corresponding dataLayer variable (visitorType) and an exclude filter in Google Tag Manager.
 
-Therefore there is no need to have an option to exclude the container code snippet on certain cases.
-
-If you want to exclude logged in users or certain user roles, use the corresponding dataLayer variable (visitorType)
-and an exclude filter in Google Tag Manager.
+https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked/
 
 = How do I put the Google Tag Manager container code next to the opening body tag? =
 
-Go to the admin section of the plugin and select "Custom" from the placement settings.
-This way my plugin does not put the code snippet into the footer of the page.
+By default the plugin places the iframe tag in the footer of the page. To change it, go to the plugin's admin section and select "Custom" from the placement settings. Unless using the Genesis Framework, you will also need to edit your template files.
 
-In this case you have to edit your template files.
-Go to `wp-content/plugins/themes/<your theme dir>` and edit `header.php`.
+Go to `wp-content/plugins/themes/<your theme dir>` and edit `header.php`. If you can not find it, contact the author of the theme and ask for instructions.
 In most cases you will find the opening `<body>` tag here.
 
-If you can not find it, contact the author of the theme and ask for instructions.
+Open a new line just after it and insert this line of code:
 
-In case you found the opening `<body>` tag, open a new line just after it and insert this line of code:
 `<?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?>`
 
 Be careful not to include this line inside any `<div>`, `<p>`, `<header>`, `<article>` and so on.
-It can break you theme.
+It may break your theme.
 
-There is also a solution named "Codeless" which tries to add the container code to the right place but
-without additional theme tweaking. This is still experimental, use it wisely.
+There is also a solution named "Codeless" which attempts to place the container code correctly
+without this additional theme tweak. It may or may not work, this is still experimental, use it wisely.
 
 = Why can not this plugin insert the container snippet after the opening body tag automatically? =
 
 Currently WordPress has two 'commands' or 'hooks' that a programmer can use: one for the `<head>` section and
-one for the bottom of `<body>`. There is no way to inject any content after the opening body tag without manually editing your template files.
+one for the bottom of `<body>`. There is no way to inject any content after the opening `<body>` tag without manually editing your template files.
 
 Fortunately some theme authors already resolved this so in some cases you do not need to edit your template.
 I suggest first to select the Custom placement and use Google Tag Assistant Chrome browser extension to check
@@ -271,10 +260,15 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
-= 1.7.3 =
+= 1.8 =
 
-* Fixed: Updated weather data tracking codes could result in fatal PHP error
+* Fixed: Weather data tracking codes could result in fatal PHP error
+* Fixed: Cart events did to fire while user pressed the Enter key in quantity fields
 * Changed: links to plugin website updated
+* Added: [WooCommerce compatibility headers](https://docs.woocommerce.com/document/create-a-plugin/#section-10)
+* Added: Admin warning for WooCommerce 2.x users. This plugin will drop support for WooCommerce 2.x soon
+* Updated: Description of code placement options to clarify what this option does
+* Updated: cleanup of readme.txt, spelling and grammar improvements
 
 = 1.7.2 =
 
@@ -517,9 +511,9 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
-= 1.7.3 =
+= 1.8 =
 
-Bugfix release
+TODO
 
 = 1.7.2 =
 
@@ -626,7 +620,7 @@ Bug fix release for WooCommerce users.
 Besides of some fixes this version includes scroll tracking events for Google Tag Manager.
 
 = 0.4 =
-Important change: Tag Manager event name of a WooCommerce successful order has been changed. 
+Important change: Tag Manager event name of a WooCommerce successful order has been changed.
 See changelog for details.
 
 = 0.3 =
