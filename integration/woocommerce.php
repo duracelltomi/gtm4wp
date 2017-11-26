@@ -141,6 +141,14 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 			gtm4wp_woocommerce_addjs("
 				$( document ).on( 'click', '[name=update_cart]', function() {
+					gtm4wp_handle_cart_qty_change();
+				});
+				
+				$( document ).on( 'keypress', '.woocommerce-cart-form input[type=number]', function() {
+					gtm4wp_handle_cart_qty_change();
+				});
+				
+				function gtm4wp_handle_cart_qty_change() {
 					$( '.product-quantity input.qty' ).each(function() {
 						var _original_value = $( this ).prop( 'defaultValue' );
 
@@ -187,9 +195,9 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 									}
 								});
 							}
-						}
-					});
-				});
+						} // end if qty changed
+					}); // end each qty field
+				}; // end gtm4wp_handle_cart_qty_change()
 			");
 		}
 
@@ -1023,7 +1031,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 		);
 		$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "widgetproduct" );
 
-		$productlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" class="widget-product-item" href="',
+		$productlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" href="',
 			esc_attr( $eec_product_array[ "id" ] ),
 			esc_attr( $eec_product_array[ "name" ] ),
 			esc_attr( $eec_product_array[ "price" ] ),
