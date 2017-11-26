@@ -28,7 +28,8 @@ $GLOBALS["gtm4wp_def_user_notices_dismisses"] = array(
 	"enter-gtm-code" => false,
 	"wc-ga-plugin-warning" => false,
 	"wc-gayoast-plugin-warning" => false,
-	"php53-warning" => false
+	"php53-warning" => false,
+	"woo2x-warning" => false
 );
 
 $GLOBALS["gtm4wp_includefieldtexts"] = array(
@@ -1147,6 +1148,11 @@ function gtm4wp_show_warning() {
 	if ( ( false === $gtm4wp_user_notices_dismisses["php53-warning"] ) && ( version_compare( PHP_VERSION, '5.4.0' ) < 0 ) ) {
 		echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?php53-warning"><p><strong>' . __( 'Warning: You are using an outdated version of PHP (v' . PHP_VERSION . ') that can cause issues with the plugin Google Tag Manager for WordPress. Please consider to upgrade your PHP.', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
 	}
+	
+	if ( ( false === $gtm4wp_user_notices_dismisses["woo2x-warning"] ) && ( $woocommerce ) && ( version_compare( $woocommerce->version, "3.0", "<" ) ) ) {
+		echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?woo2x-warning"><p><strong>' . __( 'Warning: You are using an outdated version of WooCommerce (v' . $woocommerce->version . '). Google Tag Manager for WordPress will drop support for this version in the near future. Please consider to upgrade.', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
+	}
+	
 }
 
 function gtm4wp_dismiss_notice() {
