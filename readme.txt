@@ -69,7 +69,7 @@ however, the Google Tag Manager container code will be added automatically.
 * OS data (name, version)
 * device data (type, manufacturer, model)
 
-Data is fetched from the WhichBrowser library: http://whichbrowser.net/
+Data is provided using the WhichBrowser library: http://whichbrowser.net/
 
 = Weather data =
 
@@ -187,12 +187,8 @@ Regarding variables; ensure they are not part of any critical tags as blacklisti
 
 = How can I track scroll events in Google Tag Manager? =
 
-Google Tag Manager does not have tracking features in itself, it is a tool that helps to execute tags.
-To track/view such user events, you will need to refer to your web analytics platform documentation. Many users
-opt for the free version of Google Analytics which is supported natively in GTM. Create Google Universal Analytics
-event tags for each scroll event you wish to track and use the below events as your firing trigger.
-You can use scroll events to fire AdWords remarketing or conversion tags report micro conversions or to serve ads only
-to visitors who spend more time reading your content.
+Google Tag Manager supports basic scroll depth tracking based on percentage or pixels natively. This plugin adds
+additional scroll tracking events, more focused on capturing the users' intent and/or engagement.
 
 There are five dataLayer events you can use in your rule definitions:
 
@@ -201,6 +197,9 @@ There are five dataLayer events you can use in your rule definitions:
 * gtm4wp.reading.contentBottom: the visitor reached the end of the content (not the page!). `timeToScroll` dataLayer variable updated
 * gtm4wp.reading.pagebottom: the visitor reached the end of the page. `timeToScroll` dataLayer variable updated
 * gtm4wp.reading.readerType: based on time spent since article loaded we determine whether the user is a 'scanner' or 'reader' and store this in the `readerType` dataLayer variable
+
+Example use cases: using these events as triggers, you can fire Google Universal Analytics and/or AdWords remarketing/conversion tags
+to report micro conversions and/or to serve ads only to visitors who spend more time reading your content.
 
 = Can I exclude certain user roles from being tracked? =
 
