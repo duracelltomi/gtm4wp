@@ -45,6 +45,37 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 	$woo = WC();
 
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA ] && $gtm4wp_is_woocommerce3 ) {
+		// we need to use this instead of $woo->customer as this will load proper total order number and value from the database instead of the session
+		$woo_customer = new WC_Customer( $woo->customer->get_id() );
+
+		$dataLayer["customerTotalOrders"]      = $woo_customer->get_order_count();
+		$dataLayer["customerTotalOrderValue"]  = $woo_customer->get_total_spent();
+
+		$dataLayer["customerFirstName"]        = $woo_customer->get_first_name();
+		$dataLayer["customerLastName"]         = $woo_customer->get_last_name();
+
+		$dataLayer["customerBillingFirstName"] = $woo_customer->get_billing_first_name();
+		$dataLayer["customerBillingLastName"]  = $woo_customer->get_billing_last_name();
+		$dataLayer["customerBillingCompany"]   = $woo_customer->get_billing_company();
+		$dataLayer["customerBillingAddress1"]  = $woo_customer->get_billing_address_1();
+		$dataLayer["customerBillingAddress2"]  = $woo_customer->get_billing_address_2();
+		$dataLayer["customerBillingCity"]      = $woo_customer->get_billing_city();
+		$dataLayer["customerBillingPostcode"]  = $woo_customer->get_billing_postcode();
+		$dataLayer["customerBillingCountry"]   = $woo_customer->get_billing_country();
+		$dataLayer["customerBillingEmail"]     = $woo_customer->get_billing_email();
+		$dataLayer["customerBillingPhone"]     = $woo_customer->get_billing_phone();
+
+		$dataLayer["customerShippingFirstName"] = $woo_customer->get_shipping_first_name();
+		$dataLayer["customerShippingLastName"]  = $woo_customer->get_shipping_last_name();
+		$dataLayer["customerShippingCompany"]   = $woo_customer->get_shipping_company();
+		$dataLayer["customerShippingAddress1"]  = $woo_customer->get_shipping_address_1();
+		$dataLayer["customerShippingAddress2"]  = $woo_customer->get_shipping_address_2();
+		$dataLayer["customerShippingCity"]      = $woo_customer->get_shipping_city();
+		$dataLayer["customerShippingPostcode"]  = $woo_customer->get_shipping_postcode();
+		$dataLayer["customerShippingCountry"]   = $woo_customer->get_shipping_country();
+	}
+
 	if ( is_product_category() || is_product_tag() || is_front_page() || is_shop() ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
 			$dataLayer["ecomm_prodid"] = array();
