@@ -4,7 +4,7 @@ var adminsubtabs = {
   1: {
     "posts": {
       tabtext: gtm4wp.posttabtitle,
-      numitems: 9
+      numitems: 10
     },
     "search": {
       tabtext: gtm4wp.searchtabtitle,

@@ -78,6 +78,11 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"description" => __( "Check this option to include the post id.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	),
+	GTM4WP_OPTION_INCLUDE_POSTFORMAT => array(
+		"label"       => __( "Post Format", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Check this option to include the post format.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
 	GTM4WP_OPTION_INCLUDE_SEARCHDATA  => array(
 		"label"       => __( "Search data", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Check this option to include the search term, referring page URL and number of results on the search page.", 'duracelltomi-google-tag-manager' ),

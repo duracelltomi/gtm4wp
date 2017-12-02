@@ -257,6 +257,10 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
     $dataLayer["postID"]  = (int) get_the_ID();
   }
 
+  if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTFORMAT ] && is_singular() === true) {
+    $dataLayer["postFormat"]  = get_post_format() ? : 'standard';
+  }
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 ) {
 		$_gtmrestrictlistitems = array();
 		
