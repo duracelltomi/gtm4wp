@@ -379,33 +379,62 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		$dataLayer[ "gtm.blacklist" ] = $_gtmblacklist;
 	}
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
-		$dataLayer[ "weatherCategory" ] = __( "(no weather data available)", 'duracelltomi-google-tag-manager' );
-		$dataLayer[ "weatherDescription" ] = __( "(no weather data available)", 'duracelltomi-google-tag-manager' );
-		$dataLayer[ "weatherTemp" ] = 0;
-		$dataLayer[ "weatherPressure" ] = 0;
-		$dataLayer[ "weatherWindSpeed" ] = 0;
-		$dataLayer[ "weatherWindDeg" ] = 0;
-		$dataLayer[ "weatherDataStatus" ] = "Initialized with empty data";
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO  ]) {
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
+			$dataLayer[ "weatherCategory" ] = __( "(no weather data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "weatherDescription" ] = __( "(no weather data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "weatherTemp" ] = 0;
+			$dataLayer[ "weatherPressure" ] = 0;
+			$dataLayer[ "weatherWindSpeed" ] = 0;
+			$dataLayer[ "weatherWindDeg" ] = 0;
+			$dataLayer[ "weatherDataStatus" ] = "Initialized with empty data";
+		}
 
-		$gtm4wp_sessionid = array_key_exists( "gtm4wp_sessoionid", $_COOKIE ) ? $_COOKIE[ "gtm4wp_sessoionid" ] : "";
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
+			$dataLayer[ "geoCountryCode" ] = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoCountryName" ] = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoRegionCode" ]  = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoRegionName" ]  = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoCity" ]        = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoZipcode" ]     = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoLatitude" ]    = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+			$dataLayer[ "geoLongitude" ]   = __( "(no geo data available)", 'duracelltomi-google-tag-manager' );
+		}
+
+		$gtm4wp_sessionid = array_key_exists( "gtm4wp_sessionid", $_COOKIE ) ? $_COOKIE[ "gtm4wp_sessionid" ] : "";
 		// this is needed so that nobody can do a hack by editing our cookie
 		$gtm4wp_sessionid = str_replace( "'", "", trim( basename( $gtm4wp_sessionid ) ) );
 
 		if ( "" !== $gtm4wp_sessionid ) {
-			$weatherdata = get_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid );
+			if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
+				$weatherdata = get_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid );
 
-			if ( false !== $weatherdata ) {
-				$dataLayer[ "weatherCategory" ] = $weatherdata->weather[0]->main;
-				$dataLayer[ "weatherDescription" ] = $weatherdata->weather[0]->description;
-				$dataLayer[ "weatherTemp" ] = $weatherdata->main->temp;
-				$dataLayer[ "weatherPressure" ] = $weatherdata->main->pressure;
-				$dataLayer[ "weatherWindSpeed" ] = $weatherdata->wind->speed;
-				$dataLayer[ "weatherWindDeg" ] = $weatherdata->wind->deg;
-				$dataLayer[ "weatherDataStatus" ] = "Read from cache";
-			} else {
-				$dataLayer[ "weatherDataStatus" ] = "GTM4WP session active but no weather data in cache (" . $gtm4wp_sessionid . ")";
+				if ( false !== $weatherdata ) {
+					$dataLayer[ "weatherCategory" ]    = $weatherdata->weather[0]->main;
+					$dataLayer[ "weatherDescription" ] = $weatherdata->weather[0]->description;
+					$dataLayer[ "weatherTemp" ]        = $weatherdata->main->temp;
+					$dataLayer[ "weatherPressure" ]    = $weatherdata->main->pressure;
+					$dataLayer[ "weatherWindSpeed" ]   = $weatherdata->wind->speed;
+					$dataLayer[ "weatherWindDeg" ]     = $weatherdata->wind->deg;
+					$dataLayer[ "weatherDataStatus" ]  = "Read from cache";
+				} else {
+					$dataLayer[ "weatherDataStatus" ]  = "GTM4WP session active but no weather data in cache (" . $gtm4wp_sessionid . ")";
+				}
 			}
+
+			if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
+				$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
+
+				$dataLayer[ "geoCountryCode" ] = $geodata->country_code;
+				$dataLayer[ "geoCountryName" ] = $geodata->country_name;
+				$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
+				$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
+				$dataLayer[ "geoCity" ]        = $geodata->city;
+				$dataLayer[ "geoZipcode" ]     = $geodata->zip_code;
+				$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
+				$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
+			}
+
 		}
 	}
 	
@@ -415,44 +444,48 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 function gtm4wp_wp_loaded() {
 	global $gtm4wp_options;
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
-		$gtm4wp_sessionid = array_key_exists( "gtm4wp_sessoionid", $_COOKIE ) ? $_COOKIE[ "gtm4wp_sessoionid" ] : "";
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
+		$gtm4wp_sessionid = array_key_exists( "gtm4wp_sessionid", $_COOKIE ) ? $_COOKIE[ "gtm4wp_sessionid" ] : "";
 		// this is needed so that nobody can do a hack by editing our cookie
 		$gtm4wp_sessionid = str_replace( "'", "", trim( basename( $gtm4wp_sessionid ) ) );
 
 		if ( "" === $gtm4wp_sessionid ) {
 			$gtm4wp_sessionid = substr( md5( date( "Ymd_His" ).rand() ), 0, 20 );
-			setcookie( "gtm4wp_sessoionid", $gtm4wp_sessionid, time()+(60*60*24*365*2) );
+			setcookie( "gtm4wp_sessionid", $gtm4wp_sessionid, time()+(60*60*24*365*2) );
 		}
 
-		$weatherdata = get_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid );
+		$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
 
-		if ( false === $weatherdata ) {
-//			$gtm4wp_geodata = wp_remote_get( 'http://www.geoplugin.net/php.gp?ip='.$_SERVER['REMOTE_ADDR'] );
+		if ( false === $geodata ) {
 			$gtm4wp_geodata = @wp_remote_get( 'https://freegeoip.net/json/'.$_SERVER['REMOTE_ADDR'] );
 
 			if ( is_array( $gtm4wp_geodata ) && ( 200 == $gtm4wp_geodata[ "response" ][ "code" ] ) ) {
-//				$gtm4wp_geodata = unserialize( $gtm4wp_geodata[ "body" ] );
 				$gtm4wp_geodata = @json_decode( $gtm4wp_geodata[ "body" ] );
 
 				if ( is_object( $gtm4wp_geodata ) ) {
-					$weatherdata = wp_remote_get( 'http://api.openweathermap.org/data/2.5/weather?appid=' . $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI ] . '&lat=' . $gtm4wp_geodata->latitude . '&lon=' . $gtm4wp_geodata->longitude . '&units=' . ($gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] == 0 ? 'metric' : 'imperial') );
+					set_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid, $gtm4wp_geodata, 60 * 60 );
 
-					if ( is_array( $weatherdata ) && ( 200 == $weatherdata[ "response" ][ "code" ] ) ) {
-						$weatherdata = @json_decode( $weatherdata[ "body" ] );
+					$weatherdata = get_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid );
+					if ( false === $weatherdata) {
 
-						if ( is_object( $weatherdata ) ) {
-							set_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid, $weatherdata, 60 * 60 );
-							setcookie( "gtm4wp_last_weatherstatus", "Weather data loaded." );
+						$weatherdata = wp_remote_get( 'http://api.openweathermap.org/data/2.5/weather?appid=' . $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI ] . '&lat=' . $gtm4wp_geodata->latitude . '&lon=' . $gtm4wp_geodata->longitude . '&units=' . ($gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] == 0 ? 'metric' : 'imperial') );
+
+						if ( is_array( $weatherdata ) && ( 200 == $weatherdata[ "response" ][ "code" ] ) ) {
+							$weatherdata = @json_decode( $weatherdata[ "body" ] );
+
+							if ( is_object( $weatherdata ) ) {
+								set_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid, $weatherdata, 60 * 60 );
+								setcookie( "gtm4wp_last_weatherstatus", "Weather data loaded." );
+							} else {
+								setcookie( "gtm4wp_last_weatherstatus", "Openweathermap.org did not return processable data: " . var_dump( $weatherdata, true ) );
+							}
 						} else {
-							setcookie( "gtm4wp_last_weatherstatus", "Openweathermap.org did not return processable data: " . var_dump( $weatherdata, true ) );
+							if ( is_wp_error( $weatherdata ) ) {
+								setcookie( "gtm4wp_last_weatherstatus", "Openweathermap.org request error: " . $weatherdata->get_error_message() );
+							} else {
+								setcookie( "gtm4wp_last_weatherstatus", "Openweathermap.org returned status code: " . $weatherdata[ "response" ][ "code" ] );
+							}
 						}
-					} else {
-            if ( is_wp_error( $weatherdata ) ) {
-              setcookie( "gtm4wp_last_weatherstatus", "Openweathermap.org request error: " . $weatherdata->get_error_message() );
-            } else {
-              setcookie( "gtm4wp_last_weatherstatus", "Openweathermap.org returned status code: " . $weatherdata[ "response" ][ "code" ] );
-            }
 					}
 				} else {
 					setcookie( "gtm4wp_last_weatherstatus", "freegeoip.net did not return lat-lng data: " . var_dump( $gtm4wp_geodata, true ) );

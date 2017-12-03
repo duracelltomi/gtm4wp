@@ -29,6 +29,7 @@ define( 'GTM4WP_OPTION_INCLUDE_WEATHERUNITS',  'weather-weatherunits' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI', 'weather-openweathermap-apikey' );
 define( 'GTM4WP_OPTION_INCLUDE_SITEID',        'include-siteid' );
 define( 'GTM4WP_OPTION_INCLUDE_SITENAME',      'include-sitename' );
+define( 'GTM4WP_OPTION_INCLUDE_MISCGEO',       'include-miscgeo' );
 
 define( 'GTM4WP_OPTION_EVENTS_OUTBOUND',       'event-outbound' );
 define( 'GTM4WP_OPTION_EVENTS_DOWNLOADS',      'event-downloads' );
@@ -131,9 +132,10 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_WEATHER       => false,
 	GTM4WP_OPTION_INCLUDE_WEATHERUNITS  => 0,
 	GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI => '',
-  GTM4WP_OPTION_INCLUDE_SITEID        => false,
-  GTM4WP_OPTION_INCLUDE_SITENAME      => false,
-	
+	GTM4WP_OPTION_INCLUDE_SITEID        => false,
+	GTM4WP_OPTION_INCLUDE_SITENAME      => false,
+	GTM4WP_OPTION_INCLUDE_MISCGEO       => false,
+
 	GTM4WP_OPTION_EVENTS_OUTBOUND    => false,
 	GTM4WP_OPTION_EVENTS_DOWNLOADS   => false,
 	GTM4WP_OPTION_EVENTS_DWLEXT      => "pdf,doc,docx,xls,xlsx,ppt,pptx,zip,rar,gz,tar",

@@ -157,7 +157,12 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"label"       => __( "Site name", 'duracelltomi-google-tag-manager' ),
 		"description" => __( 'Name of the current site in a WordPress Multisite environment', 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
-	)
+	),
+	GTM4WP_OPTION_INCLUDE_MISCGEO => array(
+		"label"       => __( "Geo data", 'duracelltomi-google-tag-manager' ),
+		"description" => __( 'Add geo data (latitude, longitude, country, city, etc) of the current visitor (based on freegeoip.net)', 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
+	),
 );
 
 $GLOBALS["gtm4wp_eventfieldtexts"] = array(
@@ -1017,7 +1022,8 @@ function gtm4wp_add_admin_js($hook) {
 			"generaleventstabtitle" => __( "General events" , 'duracelltomi-google-tag-manager' ),
 			"mediaeventstabtitle" => __( "Media events" , 'duracelltomi-google-tag-manager' ),
 			"depecratedeventstabtitle" => __( "Deprecated" , 'duracelltomi-google-tag-manager' ),
-			"sitetabtitle" => __( "Site" , 'duracelltomi-google-tag-manager' )
+			"sitetabtitle" => __( "Site" , 'duracelltomi-google-tag-manager' ),
+			"misctabtitle" => __( "Misc" , 'duracelltomi-google-tag-manager' )
 		);
 		wp_localize_script( "admin-subtabs", 'gtm4wp', $subtabtexts );
 		wp_enqueue_script( "admin-subtabs" );

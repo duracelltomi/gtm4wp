@@ -29,6 +29,10 @@ var adminsubtabs = {
     "site": {
       tabtext: gtm4wp.sitetabtitle,
       numitems: 2
+    },
+    "misc": {
+      tabtext: gtm4wp.misctabtitle,
+      numitems: 1
     }
   },
   2: {
