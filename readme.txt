@@ -269,6 +269,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: Admin warning for WooCommerce 2.x users. This plugin will drop support for WooCommerce 2.x soon
 * Added: postFormat data layer variable on singular pages
 * Added: customer* data layer variables with stored billing and shipping data, total number of orders and total value of those orders (needs WooCommerce 3.x)
+* Added: geo* data layer variables to get country, city, lat-lon coordinates of the visitor
 * Updated: Description of code placement options to clarify what this option does
 * Updated: cleanup of readme.txt, spelling and grammar improvements
 
