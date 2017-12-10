@@ -3,6 +3,7 @@ Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
+Requires PHP: 5.3
 Tested up to: 4.9.0
 Stable tag: 1.8
 License: GPLv3
@@ -264,8 +265,12 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: postFormat data layer variable on singular pages
 * Added: customer* data layer variables with stored billing and shipping data, total number of orders and total value of those orders (needs WooCommerce 3.x)
 * Added: geo* data layer variables to get country, city, lat-lon coordinates of the visitor
+* Added: more detailed checkout reporting for WooCommerce sites
+  * Add gtm4wp.checkoutStepEEC to your Ecommerce Helper trigger
+  * Change a typo: gtm4wp.checkoutOptionE**C**C => gtm4wp.checkoutOptionE**E**C
 * Updated: Description of code placement options to clarify what this option does
 * Updated: cleanup of readme.txt, spelling and grammar improvements
+
 
 = 1.7.2 =
 
