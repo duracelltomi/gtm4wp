@@ -31,10 +31,10 @@ your hosting provider for support.
 
 The original GTM container code is divided into two parts: The first part is a javascript code snippet that is added to the `<head>`
 section of every page of the website. This part is critical to enable all features of GTM, and this plugin helps to place this part
-correctly on your site. The second part is an iframe snippet that is used a failsafe/fallback should users' JavaScript be disabled.
-Recommended by Google, for best performance, this code snippet should be placed directly after the opening `<body>` tag on each page.
-It will work when placed lower in the code as well, albeit not ideal. This plugin provides a code placement option for the second code snippet.
-Inherently, Wordpress does not offer a straight-forward solution to achieve this, however Yaniv Friedensohn showed me a solution for this,
+correctly on your site. The second part is an iframe snippet that acts as a failsafe/fallback should users' JavaScript be disabled.
+Google recommends – for best performance – to place this code snippet directly after the opening `<body>` tag on each page.
+Albeit not ideal, it will work when placed lower in the code. This plugin provides a code placement option for the second code snippet.
+Inherently, Wordpress does not offer a straight-forward solution to achieve this, however Yaniv Friedensohn showed me a solution
 that works with most themes without modification:
 
 http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
@@ -59,7 +59,7 @@ however, the Google Tag Manager container code will be added automatically.
 * logged in user ID (to track cross device behaviour in Google Analytics)
 * logged in user email address (to comply with [GTM terms of service](https://www.google.com/analytics/tag-manager/use-policy/) do not pass this on to Google tags)
 * site search data
-* site name and id for WordPress multisite instances
+* site name and id (for WordPress multisite instances)
 
 = Browser / OS / Device data =
 
@@ -75,8 +75,8 @@ Data is provided using the WhichBrowser library: http://whichbrowser.net/
 
 (beta)
 
-Add the current weather conditions into the dataLayer so that you can use this information to generate special
-remarketing lists and additional segmentation in your web analytics solution:
+Push data about users' current weather conditions into the dataLayer. This can be used to generate weather-related
+audience/remarketing lists on ad platforms and allows for user segmentation in your web analytics solutions:
 
 * weather category (clouds, rain, snow, etc.)
 * weather description: more detailed data
@@ -85,34 +85,34 @@ remarketing lists and additional segmentation in your web analytics solution:
 * wind speed and degrees
 
 Weather data is queried from Open Weather Map. Depending on your websites traffic, additional fees may apply:
-
 http://openweathermap.org/price
 
-It is also required to obtain a free API key from OpenWeatherMap on the page above.
+An (free) API key from OpenWeatherMap is required for this feature to work.
 
-To determine the current location of your visitor, this plugin uses freegeoip.net.
+freegeoip.net is used to determine the site visitor's location.
 
 = Media player events =
 
 (experimental)
 
-The plugin can track user interaction with your embedded media:
+Track users' interaction with any embedded media:
 
 * YouTube
 * Vimeo
 * Soundcloud
 
-DataLayer events are fired when a media player loads on the page, media is being played, paused or stopped and optionally when
+DataLayer events can be chosen to fire upon media player load, media is being played, paused/stopped and optionally when
 the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
 
-Tracking is supported for embedded media using the oEmbed feature of WordPress as well as other plugins and copy/pasted codes.
-Currently, players injected into the website after page load are not being tracked.
+Tracking is supported for embedded media using the built-in oEmbed feature of WordPress as well as most other media plugins
+and copy/pasted codes. Players injected into the website after page load are not currently supported.
 
 = Scroll tracking =
 
 Fire tags based on how the visitor scrolls from the top to the bottom of a page.
-You can track this as Analytics events and/or fire remarketing/conversion tags if you want to track micro conversions.
-An example would be to isolate "readers" (who spend a specified amount of time on a page) from "scrollers" (who only scroll through within seconds).
+An example would be to separate "readers" (who spend a specified amount of time on a page) from "scrollers"
+(who only scroll through within seconds). You can use these events to fire Analytics tags and/or remarketing/conversion tags
+(for micro conversions).
 
 Scroll tracking is based on the solution originally created by
 
@@ -133,30 +133,27 @@ This enables you to build sophisticated remarketing lists.
 
 = Blacklist & Whitelist Tag Manager tags and variables =
 
-To increase security on your website, this plugin has the capability to white- and blacklist tags/variables.
+To increase website security, you have the option to white- and blacklist tags/variables.
 You can prevent specific tags from firing or the use of certain variable types regardless of your GTM setup.
 
-If your Google account is being hacked that is associated with your Google Tag Manager account,
-an attacker could easily execute malware on your website without accessing its code on your hosting server.
-
-By blacklisting custom HTML tags and/or custom JavaScript variables you can secure the Tag Manager container.
+If the Google account associated with your GTM account is being hacked, an attacker could easily
+execute malware on your website without accessing its code on your hosting server. By blacklisting custom HTML tags
+and/or custom JavaScript variables you can secure the Tag Manager container.
 
 = Integration =
 
-Google Tag Manager for WordPress integrates with several popular plugins.
+Google Tag Manager for WordPress integrates with several popular plugins. More integration to come!
 
 * Contact Form 7: fire an event upon successful form submission
 * WooCommerce:
 	* Classic e-commerce:
-		* fire event when visitors adds a product to their cart
-		* capture transaction data to be sent to Google/Universal Analytics
-		* capture necessary remarketing tags for Google AdWords Dynamic Remarketing
+		* fire an event when visitors add products to their cart
+		* capture transaction data to be passed to your ad platforms and/or Analytics
+		* capture necessary remarketing parameters for Google AdWords Dynamic Remarketing
 	* Enhanced e-commerce (beta):
 		*	implementation of [Enhanced E-commerce](https://developers.google.com/tag-manager/enhanced-ecommerce)
-		* Does not include tracking of promotions since WooCommerce does not have such a feature (yet)
-		* Does not currently support refunds
-
-More integration to come!
+		* Does not support promotions since WooCommerce does not have such a feature (yet)
+		* Does not support refunds
 
 == Installation ==
 
@@ -168,46 +165,41 @@ More integration to come!
 
 = How can I ... =
 
-I created tutorials for proper Google Tag Manager settings:
+Tutorials for various Google Tag Manager settings and implementation are available on my website:
 https://gtm4wp.com/how-to-articles/
 
 = PayPal / 3rd party payment gateway transactions in WooCommerce are not being tracked in Google Analytics =
 
-PayPal and some other 3rd party payment gateways do not redirect the user back to your website by default after a successful transaction.
-It offers the route back for your customer but it can happen that users simply closes the browser
-before arrive at your thankyou page (aka. order received page).
+PayPal and some other 3rd party payment gateways do not redirect users back to your website upon successful transaction by default.
+It offers the route back for your customer but it can happen that users close the browser before arriving at your thankyou page
+(aka. order received page). This means that neither Google Analytics tags or any other tags have the chance to fire.
 
-This means that neither Google Analytics tags or any other tags will fire.
-
-Enable auto return in your payment gateway settings. This will instruct them to show a quick
-info page after payment and then redirect the user back to your site. This will
-increase the number of tracked transactions.
+Enable auto-return in your payment gateway settings. This will instruct them to show a quick info page after payment
+and redirect the user back to your site. This will improve the accuracy and frequency of tracked transactions.
 
 = Why isn't there an option to blacklist tag/variable classes =
 
-Although Google recommends to blacklist tags and variables using classes, I found it is complicated for people to understand
-what tags and variables are being blacklisted/whitelisted automatically using classes. Therefore I decided to include
-individual tags and variables on the blacklist tabs.
+Although Google recommends to blacklist tags and variables using classes, people struggle to know
+which tags/variables gets affected. Therefore I opted for individual tags and variables rather than classes
+on the blacklist tabs.
 
-Please remember that tags are useless without variables so only blacklist variables if you are certain that you do not use them
-with any tags in your container.
+Regarding variables; ensure they are not part of any critical tags as blacklisting such variables will render said tags useless.
 
 = How can I track scroll events in Google Tag Manager? =
 
-To track scrolling of your visitor you need to create tags in Google Tag Manager.
-
-What type of tags?
-In most cases you will need Google/Universal Analytics event tags but you can use AdWords remarketing
-or conversion tags as well to track micro conversions or to focus only on visitors who spend more time
-reading your content.
+Google Tag Manager supports basic scroll depth tracking based on percentage or pixels natively. This plugin adds
+additional scroll tracking events, more focused on capturing the users' intent and/or engagement.
 
 There are five dataLayer events you can use in your rule definitions:
 
 * gtm4wp.reading.articleLoaded: the content has been loaded
-* gtm4wp.reading.startReading: the visitor started to scroll. You can use the dataLayer variable `timeToScroll` to see how many seconds have passed since the article has been loaded
+* gtm4wp.reading.startReading: the visitor started to scroll. The `timeToScroll` dataLayer variable stores duration since the article loaded (in seconds)
 * gtm4wp.reading.contentBottom: the visitor reached the end of the content (not the page!). `timeToScroll` dataLayer variable updated
 * gtm4wp.reading.pagebottom: the visitor reached the end of the page. `timeToScroll` dataLayer variable updated
-* gtm4wp.reading.readerType: at this point we are confident whether the visitor is a 'scanner' or 'reader' depending on how much time have passed since the content has been loaded. `readerType` dataLayer variable captures the type of the visitor
+* gtm4wp.reading.readerType: based on time spent since article loaded we determine whether the user is a 'scanner' or 'reader' and store this in the `readerType` dataLayer variable
+
+Example use cases: using these events as triggers, you can fire Google Universal Analytics and/or AdWords remarketing/conversion tags
+to report micro conversions and/or to serve ads only to visitors who spend more time reading your content.
 
 = Can I exclude certain user roles from being tracked? =
 
@@ -218,35 +210,37 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 = How do I put the Google Tag Manager container code next to the opening body tag? =
 
-By default the plugin places the iframe tag in the footer of the page. To change it, go to the plugin's admin section and select "Custom" from the placement settings. Unless using the Genesis Framework, you will also need to edit your template files.
+By default the plugin places the iframe tag in the footer of the page. To change it, go to the plugin's admin section
+and select "Custom" from the placement settings. Unless you use the Genesis Framework theme, you will also need to
+edit your template files.
 
-Go to `wp-content/plugins/themes/<your theme dir>` and edit `header.php`. If you can not find it, contact the author of the theme and ask for instructions.
-In most cases you will find the opening `<body>` tag here.
+Go to `wp-content/plugins/themes/<your theme dir>` and edit `header.php`.
+In most cases you will find the opening `<body>` tag here. If you can not find it, contact the author of the theme and
+ask for instructions.
 
-Open a new line just after it and insert this line of code:
+Create a new line right below the `body` tag and insert this line of code:
 
 `<?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?>`
 
-Be careful not to include this line inside any `<div>`, `<p>`, `<header>`, `<article>` and so on.
+Be careful not to place this line within any `<div>`, `<p>`, `<header>`, `<article>` tags.
 It may break your theme.
 
-There is also a solution named "Codeless" which attempts to place the container code correctly
-without this additional theme tweak. It may or may not work, this is still experimental, use it wisely.
+There is also an option named "Codeless" which attempts to place the container code correctly
+without additional theme tweaks. It may or may not work, this is an experimental feature, use it accordingly.
 
-= Why can not this plugin insert the container snippet after the opening body tag automatically? =
+= Why can't this plugin insert the container snippet after the opening body tag automatically? =
 
 Currently WordPress has two 'commands' or 'hooks' that a programmer can use: one for the `<head>` section and
-one for the bottom of `<body>`. There is no way to inject any content after the opening `<body>` tag without manually editing your template files.
+one for the bottom of `<body>`. There is no way to inject any content after the opening `<body>` tag without manually
+editing your template files. Fortunately some theme authors already resolved this so in some cases you do not need
+to edit your template.
 
-Fortunately some theme authors already resolved this so in some cases you do not need to edit your template.
-I suggest first to select the Custom placement and use Google Tag Assistant Chrome browser extension to check
-whether the container code is placed as expected.
-
-If it shows an error, go and edit your theme manually.
+I suggest that try the Custom placement (easiest) and use Google Tag Assistant Chrome browser extension to check
+whether the container code is placed as expected. If it shows an error, go ahead and edit your theme manually.
 
 = Facebook like/share/send button events do not fire for me, why? =
 
-It is a limitation of Facebook. Click event tracking is only available for html5/xfbml buttons.
+It is a Facebook limitation. Click event tracking is only available for html5/xfbml buttons.
 If you or your social plugin inserts the Facebook buttons using IFRAMEs (like Sociable), it is not possible to track likes.
 
 == Screenshots ==
@@ -289,8 +283,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Fixed: PHP 5.3 compatible syntax in frontend.php
 * Fixed: PHP error using classic ecommerce with WooCommerce 2.6.x
-* Updated: Added data-cfasync='false' to all <script> elements to prevent ClourFlare to load scripts async
-* Added: Warning for users of PHP 5.4 or older to consier upgrade (FYI: PHP 5.5 and older versions do not get even security fixes)
+* Updated: Added data-cfasync='false' to all <script> elements to prevent CloudFlare to load scripts async
+* Added: Warning for users of PHP 5.4 or older to consider upgrade (FYI: PHP 5.5 and older versions do not get even security fixes)
 
 = 1.7 =
 
@@ -596,20 +590,20 @@ Bugfix release for WooCommerce users with Enhanced Ecommerce enabled
 
 = 0.8 =
 
-This version instroduces Enhanced E-commerce implementation for WooCommerce. Please note that this
+This version introduces Enhanced E-commerce implementation for WooCommerce. Please note that this
 feature of the plugin is still experimental and the feature of Google Analytics is still in beta.
 Read the plugin FAQ for details.
 
 = 0.7.1 =
 
-If you are using WooCommerce and updated to 2.1.x you SHOULD update immediatelly.
+If you are using WooCommerce and updated to 2.1.x you SHOULD update immediately.
 This release includes a fix so that transaction data can be passed to GTM.
 
 = 0.7 =
 
 Improved code so that Webmaster Tools verification can work using your GTM container tag.
 Blacklist or whitelist tags and macros to increase security of your Tag Manager setup.
-Fixed: WhichBroswer library was missing from 0.6
+Fixed: WhichBrowser library was missing from 0.6
 
 = 0.6 =
 
