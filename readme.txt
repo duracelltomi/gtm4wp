@@ -265,6 +265,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: postFormat data layer variable on singular pages
 * Added: customer* data layer variables with stored billing and shipping data, total number of orders and total value of those orders (needs WooCommerce 3.x)
 * Added: geo* data layer variables to get country, city, lat-lon coordinates of the visitor
+* Added: visitorUsername data layer variable with the username of the logged in user
 * Added: more detailed checkout reporting for WooCommerce sites
   * Add gtm4wp.checkoutStepEEC to your Ecommerce Helper trigger
   * Change a typo: gtm4wp.checkoutOptionE**C**C => gtm4wp.checkoutOptionE**E**C

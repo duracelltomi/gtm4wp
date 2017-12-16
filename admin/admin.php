@@ -103,6 +103,11 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"description" => __( "Check this option to include the ID of the logged in user.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	),
+	GTM4WP_OPTION_INCLUDE_USERNAME   => array(
+		"label"       => __( "Logged in user name", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Check this option to include the username of the logged in user.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
 	GTM4WP_OPTION_INCLUDE_USEREMAIL   => array(
 		"label"       => __( "Logged in user email", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Check this option to include the email address of the logged in user.", 'duracelltomi-google-tag-manager' ),
