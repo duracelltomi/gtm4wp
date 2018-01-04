@@ -257,11 +257,11 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 = 1.8 =
 
-* Fixed: Weather data tracking codes could result in fatal PHP error
-* Fixed: Cart events did to fire while user pressed the Enter key in quantity fields
+* Fixed: weather data tracking codes could result in fatal PHP error
+* Fixed: cart events did to fire while user pressed the Enter key in quantity fields
 * Changed: links to plugin website updated
 * Added: [WooCommerce compatibility headers](https://docs.woocommerce.com/document/create-a-plugin/#section-10)
-* Added: Admin warning for WooCommerce 2.x users. This plugin will drop support for WooCommerce 2.x soon
+* Added: admin warning for WooCommerce 2.x users. This plugin will drop support for WooCommerce 2.x soon
 * Added: postFormat data layer variable on singular pages
 * Added: customer* data layer variables with stored billing and shipping data, total number of orders and total value of those orders (needs WooCommerce 3.x)
 * Added: geo* data layer variables to get country, city, lat-lon coordinates of the visitor
@@ -269,7 +269,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: more detailed checkout reporting for WooCommerce sites
   * Add gtm4wp.checkoutStepEEC to your Ecommerce Helper trigger
   * Change a typo: gtm4wp.checkoutOptionE**C**C => gtm4wp.checkoutOptionE**E**C
-* Updated: Description of code placement options to clarify what this option does
+* Added: option to include full product category path in enhanced ecommerce reporting (can cause performance issues on large sites!)
+* Updated: description of code placement options to clarify what this option does
 * Updated: cleanup of readme.txt, spelling and grammar improvements
 
 

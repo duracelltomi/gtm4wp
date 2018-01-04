@@ -446,7 +446,7 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING  => array(
 		"label"         => __( "AdWords Remarketing", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "Enable this to add Google AdWords dynamic remarketing variables to the dataLayer", 'duracelltomi-google-tag-manager' ),
-		"phase"         => GTM4WP_PHASE_STABLE,
+		"phase"         => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX => array(
@@ -458,6 +458,12 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU => array(
 		"label"         => __( "Use SKU instead of ID", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_BETA,
+		"plugintocheck" => "woocommerce/woocommerce.php"
+	),
+	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => array(
+		"label"         => __( "Include full category path.", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Check this to inclulde the full category path of each product in enhanced ecommerce tracking. WARNING! This can lead to performance issues on large sites with lots of traffic!", 'duracelltomi-google-tag-manager' ),
 		"phase"         => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
