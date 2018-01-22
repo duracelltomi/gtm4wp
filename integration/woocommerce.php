@@ -377,7 +377,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer["transactionId"]             = $order->get_order_number();
 				$dataLayer["transactionDate"]           = date("c");
 				$dataLayer["transactionType"]           = "sale";
-				$dataLayer["transactionAffiliation"]    = gtm4wp_woocommerce_html_entity_decode( get_bloginfo( 'name' ) );
+				$dataLayer["transactionAffiliation"]    = "";
 				$dataLayer["transactionTotal"]          = $order->get_total();
 				if ( $gtm4wp_is_woocommerce3 ) {
 					$dataLayer["transactionShipping"]       = $order->get_shipping_total();
@@ -397,7 +397,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					"purchase" => array(
 						"actionField" => array(
 							"id"          => $order->get_order_number(),
-							"affiliation" => gtm4wp_woocommerce_html_entity_decode( get_bloginfo( 'name' ) ),
+							"affiliation" => "",
 							"revenue"     => $order->get_total(),
 							"tax"         => $order->get_total_tax(),
 							"shipping"    => ( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping()),
