@@ -520,7 +520,7 @@ function gtm4wp_get_the_gtm_tag() {
 
 		foreach( $_gtm_codes as $one_gtm_code ) {
 			$_gtm_tag .= '
-<noscript><iframe src="//www.googletagmanager.com/ns.html?id=' . $one_gtm_code . '"
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' . $one_gtm_code . '"
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>';
 		}
 
@@ -683,7 +683,7 @@ function gtm4wp_wp_header_begin() {
 <script data-cfasync="false">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
-\'//www.googletagmanager.com/gtm.\''.'+\'js?id=\'+i+dl;f.parentNode.insertBefore(j,f);
+\'https://www.googletagmanager.com/gtm.\''.'+\'js?id=\'+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,\'script\',\'' . $gtm4wp_datalayer_name . '\',\'' . $one_gtm_code . '\');</script>';
 		}
 
