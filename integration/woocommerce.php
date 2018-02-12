@@ -1,5 +1,7 @@
 <?php
 define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
+define( 'GTM4WP_WPFILTER_EEC_CART_ITEM',     'gtm4wp_eec_cart_item' );
+define( 'GTM4WP_WPFILTER_EEC_ORDER_ITEM',    'gtm4wp_eec_order_item' );
 
 $gtm4wp_product_counter   = 0;
 $gtm4wp_last_widget_title = "Sidebar Products";
@@ -280,6 +282,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			foreach( $woo->cart->get_cart() as $cart_item_id => $cart_item_data) {
 				$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data["data"], $cart_item_data, $cart_item_id );
 
+				if ( ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item_data ) ) {
+					continue;
+				}
+
 				$product_id   = $product->get_id();
 				$product_type = $product->get_type();
 				
@@ -413,6 +419,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $order->get_items() ) {
 				foreach ( $order->get_items() as $item ) {
+
+					if ( ! apply_filters( GTM4WP_WPFILTER_EEC_ORDER_ITEM, true, $item ) ) {
+						continue;
+					}
+
 					$product = ( $gtm4wp_is_woocommerce3 ? $item->get_product() : $order->get_product_from_item( $item ) ) ;
 
 					$product_id   = $product->get_id();
@@ -489,6 +500,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			foreach( $woo->cart->get_cart() as $cart_item_id => $cart_item_data) {
 				$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data["data"], $cart_item_data, $cart_item_id );
+
+				if ( ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item_data ) ) {
+					continue;
+				}
 
 				$product_id = $product->get_id();
 				$product_type = $product->get_type();
