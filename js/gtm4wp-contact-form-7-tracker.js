@@ -1,14 +1,20 @@
 jQuery( function() {
 	jQuery( ".wpcf7" )
-		.on( 'wpcf7:mailsent', function(e) {
+		.on( 'wpcf7mailsent', function( e ) {
 			var gtm4wp_cf7formid = '(not set)';
-			if ( e && e.target && e.target.id ) {
-				gtm4wp_cf7formid = e.target.id;
+			if ( e && e.detail && e.detail.contactFormId ) {
+				gtm4wp_cf7formid = e.detail.contactFormId;
 			}
 			
+			var gtm4wp_cf7forminputs = [];
+			if ( e && e.detail && e.detail.inputs ) {
+				gtm4wp_cf7forminputs = e.detail.inputs;
+			}
+
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.contactForm7Submitted',
-				'gtm4wp.cf7formid': gtm4wp_cf7formid
+				'gtm4wp.cf7formid': gtm4wp_cf7formid,
+				'gtm4wp.cf7inputs': gtm4wp_cf7forminputs
 			});
 		});
 });
