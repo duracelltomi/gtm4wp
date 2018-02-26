@@ -724,7 +724,8 @@ add_action( "body_open", "gtm4wp_wp_body_open" );
 
 // compatibility with existing themes that natively support code injection after opening body tag
 add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
-add_action( "generate_before_header", "gtm4wp_wp_body_open" ); // GeneratePress theme
+add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme
+add_action( "elementor/page_templates/canvas/before_content", "gtm4wp_wp_body_open" ); // Elementor
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/woocommerce.php" );
