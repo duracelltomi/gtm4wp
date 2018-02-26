@@ -723,7 +723,8 @@ add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, "gtm4wp_add_basic_datalayer_data"
 add_action( "body_open", "gtm4wp_wp_body_open" );
 
 // compatibility with existing themes that natively support code injection after opening body tag
-add_action( "genesis_before", "gtm4wp_wp_body_open" );
+add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
+add_action( "generate_before_header", "gtm4wp_wp_body_open" ); // GeneratePress theme
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/woocommerce.php" );
