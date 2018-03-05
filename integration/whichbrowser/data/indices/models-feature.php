@@ -3,6 +3,14 @@
 namespace WhichBrowser\Data;
 
 DeviceModels::$FEATURE_INDEX = array (
+  '@AM' => 
+  array (
+    0 => 'Amstrad Gamma',
+  ),
+  '@BE' => 
+  array (
+    0 => 'Benefon Q',
+  ),
   '@CK' => 
   array (
     0 => 'CK13[ai]?$!',
@@ -102,6 +110,12 @@ DeviceModels::$FEATURE_INDEX = array (
   array (
     0 => 'KU990i',
   ),
+  '@LG' => 
+  array (
+    0 => 'LG-KU380',
+    1 => 'LG-KU580',
+    2 => 'LG-KU990',
+  ),
   '@LI' => 
   array (
     0 => 'Lightpipe',
@@ -141,10 +155,15 @@ DeviceModels::$FEATURE_INDEX = array (
   ),
   '@SC' => 
   array (
-    0 => 'SCP-5500',
-    1 => 'SCP-6600',
-    2 => 'SCH-W169',
-    3 => 'SCH-W279',
+    0 => 'SCP-5300',
+    1 => 'SCP-5500',
+    2 => 'SCP-6600',
+    3 => 'SCH-W169',
+    4 => 'SCH-W279',
+  ),
+  '@SE' => 
+  array (
+    0 => 'Sendo Wap',
   ),
   '@SG' => 
   array (
@@ -154,20 +173,26 @@ DeviceModels::$FEATURE_INDEX = array (
     3 => 'SGH-A927',
     4 => 'SGH-A997',
     5 => 'SGH-D880',
-    6 => 'SGH-G600',
-    7 => 'SGH-J700V',
-    8 => 'SGH-S390G',
-    9 => 'SGH-T189N',
-    10 => 'SGHX660V',
-    11 => 'SGH-Z107!',
-    12 => 'SGH-Z130!',
-    13 => 'SGH-Z500!',
+    6 => 'SGH-E250i',
+    7 => 'SGH-E250V',
+    8 => 'SGH-G600',
+    9 => 'SGH-J700i',
+    10 => 'SGH-J700V',
+    11 => 'SGH-M200',
+    12 => 'SGH-S150G',
+    13 => 'SGH-S390G',
+    14 => 'SGH-T189N',
+    15 => 'SGHX660V',
+    16 => 'SGH-Z107!',
+    17 => 'SGH-Z130!',
+    18 => 'SGH-Z500!',
   ),
   '@SM' => 
   array (
     0 => 'SM-B313E',
     1 => 'SM-B350E',
-    2 => 'SM-B780(A|W)!',
+    2 => 'SM-B360E',
+    3 => 'SM-B780(A|W)!',
   ),
   '@TE' => 
   array (
@@ -190,6 +215,10 @@ DeviceModels::$FEATURE_INDEX = array (
   '@W2' => 
   array (
     0 => 'W20i?$!',
+  ),
+  '@WI' => 
+  array (
+    0 => 'WIDETEL WCX150',
   ),
   '@WT' => 
   array (

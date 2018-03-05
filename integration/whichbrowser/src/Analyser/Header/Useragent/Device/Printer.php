@@ -8,7 +8,7 @@ trait Printer
 {
     private function detectPrinter($ua)
     {
-        if (!preg_match('/(TASKalfa|CanonIJCL|PrintSmart)/ui', $ua)) {
+        if (!preg_match('/(TASKalfa|CanonIJCL|IR-S|PrintSmart|EpsonHello)/ui', $ua)) {
             return;
         }
 
@@ -33,12 +33,32 @@ trait Printer
             ]);
         }
 
+        /* Canon iR S */
+
+        if (preg_match('/IR-S/iu', $ua, $match)) {
+            $this->data->device->setIdentification([
+                'manufacturer'  =>  'Canon',
+                'model'         =>  'imageRUNNER',
+                'type'          =>  Constants\DeviceType::PRINTER
+            ]);
+        }
+
         /* HP Web PrintSmart */
 
         if (preg_match('/HP Web PrintSmart/iu', $ua, $match)) {
             $this->data->device->setIdentification([
                 'manufacturer'  =>  'HP',
                 'model'         =>  'Web PrintSmart',
+                'type'          =>  Constants\DeviceType::PRINTER
+            ]);
+        }
+
+        /* Epson Hello */
+
+        if (preg_match('/EpsonHello\//iu', $ua, $match)) {
+            $this->data->device->setIdentification([
+                'manufacturer'  =>  'Epson',
+                'model'         =>  'Hello',
                 'type'          =>  Constants\DeviceType::PRINTER
             ]);
         }

@@ -2,7 +2,11 @@
 
 namespace WhichBrowser\Data;
 
+use WhichBrowser\Constants\DeviceType;
+
 DeviceModels::$FEATURE_MODELS = [
+    'Amstrad Gamma'                             => [ 'Amstrad', 'E-m@iler Plus', DeviceType::DESKTOP ],
+    'Benefon Q'                                 => [ 'Benefon', 'Q' ],
     'EF71'                                      => [ 'BenQ-Siemens', 'EF71' ],
     'Lightpipe'                                 => [ 'Kyocera', 'E1100 Neo' ],
     'K612'                                      => [ 'Kyocera', 'K612 Strobe' ],
@@ -17,6 +21,9 @@ DeviceModels::$FEATURE_MODELS = [
     'KC910i'                                    => [ 'LG', 'KC910i Renoir' ],
     'KP500!'                                    => [ 'LG', 'KP500 Cookie' ],
     'KP570!'                                    => [ 'LG', 'KP570 Cookie' ],
+    'LG-KU380'                                  => [ 'LG', 'KU380' ],
+    'LG-KU580'                                  => [ 'LG', 'KU580 Hero' ],
+    'LG-KU990'                                  => [ 'LG', 'KU990 Viewty' ],
     'KU990i'                                    => [ 'LG', 'KU990 Viewty' ],
     'GM360'                                     => [ 'LG', 'GM360 Viewty Snap' ],
     'GR700'                                     => [ 'LG', 'GR700 Vu Plus' ],
@@ -29,6 +36,7 @@ DeviceModels::$FEATURE_MODELS = [
     'P9020'                                     => [ 'Pantech', 'Pursuit' ],
     'P9050'                                     => [ 'Pantech', 'Laser' ],
     'PM-8200'                                   => [ 'Sanyo', 'PM-8200' ],
+    'SCP-5300'                                  => [ 'Sanyo', 'SCP-5300' ],
     'SCP-5500'                                  => [ 'Sanyo', 'VM4500' ],
     'SCP-6600'                                  => [ 'Sanyo', 'Katana' ],
     'PLS6600KJ'                                 => [ 'Sanyo', 'Katana' ],
@@ -65,8 +73,13 @@ DeviceModels::$FEATURE_MODELS = [
     'SGH-A927'                                  => [ 'Samsung', 'A927 Flight II' ],
     'SGH-A997'                                  => [ 'Samsung', 'Rugby III' ],
     'SGH-D880'                                  => [ 'Samsung', 'D880 Duos' ],
+    'SGH-E250i'                                 => [ 'Samsung', 'E250' ],
+    'SGH-E250V'                                 => [ 'Samsung', 'E250' ],
     'SGH-G600'                                  => [ 'Samsung', 'G600' ],
+    'SGH-J700i'                                 => [ 'Samsung', 'J700' ],
     'SGH-J700V'                                 => [ 'Samsung', 'J700' ],
+    'SGH-M200'                                  => [ 'Samsung', 'M200' ],
+    'SGH-S150G'                                 => [ 'Samsung', 'S150 TracFone' ],
     'SGH-S390G'                                 => [ 'Samsung', 'S390 TracFone' ],
     'SGH-T189N'                                 => [ 'Samsung', 'Freeform M'],
     'SGHX660V'                                  => [ 'Samsung', 'X660' ],
@@ -75,9 +88,11 @@ DeviceModels::$FEATURE_MODELS = [
     'SGH-Z500!'                                 => [ 'Samsung', 'Z500' ],
     'SM-B313E'                                  => [ 'Samsung', 'Metro 313' ],
     'SM-B350E'                                  => [ 'Samsung', 'Metro 350' ],
+    'SM-B360E'                                  => [ 'Samsung', 'Metro 360' ],
     'SM-B780(A|W)!'                             => [ 'Samsung', 'Rugby 4' ],
     'S7350'                                     => [ 'Samsung', 'S7350 Ultra S' ],
     'sam-r560'                                  => [ 'Samsung', 'Messenger II R560' ],
+    'Sendo Wap'                                 => [ 'Sendo', 'Z100' ],
     'CK13[ai]?$!'                               => [ 'Sony Ericsson', 'txt' ],
     'CK15[ai]?$!'                               => [ 'Sony Ericsson', 'txt Pro' ],
     'F100[ai]?$!'                               => [ 'Sony Ericsson', 'Jalou' ],
@@ -97,4 +112,5 @@ DeviceModels::$FEATURE_MODELS = [
     'GT-I6410!'                                 => [ 'Vodafone', '360 M1' ],
     'GT-I8320!'                                 => [ 'Vodafone', '360 H1' ],
     'GT-I8330!'                                 => [ 'Vodafone', '360 H2' ],
+    'WIDETEL WCX150'                            => [ 'Widetel', 'WCX150' ],
 ];

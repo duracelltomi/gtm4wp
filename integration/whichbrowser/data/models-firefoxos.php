@@ -28,4 +28,15 @@ DeviceModels::$FIREFOXOS_MODELS = [
     'Open C'                                    => [ 'ZTE', 'Open C' ],
     'OPENC2'                                    => [ 'ZTE', 'Open C2' ],
     'OPEN2'                                     => [ 'ZTE', 'Open II' ],
+
+    'ALCATEL4044[MNOTVW]!'                      => [ 'Alcatel', 'Go Flip' ],
+    '.LYF\/.F30C!'                              => [ 'Jio', 'JioPhone F30C' ],
+    '.LYF\/.F101K!'                             => [ 'Jio', 'JioPhone F101K' ],
+    'LYF\/F30C!'                                => [ 'Jio', 'JioPhone F30C' ],
+    'LYF\/F41T!'                                => [ 'Jio', 'JioPhone F41T' ],
+    'LYF\/F50Y!'                                => [ 'Jio', 'JioPhone F50Y' ],
+    'LYF\/F61F!'                                => [ 'Jio', 'JioPhone F61F' ],
+    'LYF\/F81E!'                                => [ 'Jio', 'JioPhone F81E' ],
+    'LYF\/F90M!'                                => [ 'Jio', 'JioPhone F90M' ],
+    'LYF\/F101K!'                               => [ 'Jio', 'JioPhone F101K' ],
 ];

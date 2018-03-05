@@ -40,6 +40,7 @@ Applications::$OTHERS = [
     Constants\BrowserType::APP_NEWS => [
         [ 'name' => 'Daum',                 'id'    => 'daum',      'regexp' =>'/DaumApps\/([0-9.]*)/u' ],
         [ 'name' => 'Daum',                 'id'    => 'daum',      'regexp' =>'/daumcafe\/([0-9.]*)/u' ],
+        [ 'name' => 'Flipboard',            'id'    => 'flipboard',      'regexp' =>'/Flipboard\/([0-9.]+)/u' ],
     ],
 
     Constants\BrowserType::APP_FEEDREADER => [
@@ -69,8 +70,10 @@ Applications::$OTHERS = [
 
     Constants\BrowserType::APP_CHAT => [
         [ 'name' => 'Facebook Messenger',   'id'    => 'messenger',      'regexp' =>'/FBAN\/MessengerForiOS/u' ],
-        [ 'name' => 'Kik',                  'id'    => 'kik',      'regexp' =>'/Kik\/([0-9.]*)/u' ],
+        [ 'name' => 'Facebook Messenger',   'id'    => 'messenger',      'regexp' =>'/FB_IAB\/MESSENGER/u' ],
+        [ 'name' => 'Kik',                  'id'    => 'kik',      'regexp' =>'/Kik\/([0-9.]*?)(\.0)?\.[0-9]{3,4}/u' ],
         [ 'name' => 'WeChat',               'id'    => 'messenger',      'regexp' =>'/MicroMessenger\/([0-9.]*)/u' ],
+        [ 'name' => 'Wire',                 'id'    => 'wire',      'regexp' =>'/Wire\/([0-9.]*)/u' ],
         [ 'name' => 'Yahoo Messenger',      'id'    => 'yahoo',      'regexp' =>'/YahooMobile\/1.0 \(im; ([0-9.]+)\)/u', 'details' => 3 ],
         [ 'name' => 'Yammer',               'id'    => 'yammer',      'regexp' =>'/Yammer\/([0-9.]*)/u', 'details' => 2 ],
     ],
@@ -81,6 +84,8 @@ Applications::$OTHERS = [
         [ 'name' => 'Facebook',             'id'    => 'fb4a',      'regexp' =>'/FB_IAB\/FB4A/u' ],
         [ 'name' => 'Google+',              'id'    => 'googleplus',      'regexp' =>'/com.google.GooglePlus/u'  ],
         [ 'name' => 'Instagram',            'id'    => 'instagram',      'regexp' =>'/Instagram ([0-9.]+)/u' ],
+        [ 'name' => 'Pinterest',            'id'    => 'pinterest',      'regexp' =>'/\[Pinterest\/(Android|iOS)\]/u' ],
+        [ 'name' => 'Pinterest',            'id'    => 'pinterest',      'regexp' =>'/Pinterest\/[0-9.]+/u' ],
         [ 'name' => 'Sina Weibo',           'id'    => 'weibo',      'regexp' =>'/weibo__([0-9.]*)/u' ],
         [ 'name' => 'Tumblr',               'id'    => 'tumblr',      'regexp' =>'/Tumblr\/([0-9.]*)/u' ],
         [ 'name' => 'Twitter',              'id'    => 'twitter',      'regexp' =>'/TwitterAndroid/u' ],
@@ -100,9 +105,12 @@ Applications::$OTHERS = [
     ],
 
     Constants\BrowserType::APP_SEARCH => [
+        [ 'name' => 'Bing Search',          'id'    => 'bingweb',      'regexp' =>'/BingWeb\/([0-9.]*)/u', 'details' => 3 ],
         [ 'name' => 'Baidu Hao123',         'id'    => 'hao123',      'regexp' =>'/hao123\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Google Search',        'id'    => 'gsa',      'regexp' =>'/GSA\/([0-9.]*)/u', 'details' => 3 ],
         [ 'name' => 'NAVER',                'id'    => 'naver',      'regexp' =>'/NAVER\(inapp; search; [0-9]+; ([0-9.]*)\)/u' ],
+        [ 'name' => 'Sogou Search',         'id'    => 'sogousearch',      'regexp' =>'/SogouSearch Android(?:[0-9.]*) version([0-9.]*)/u' ],
+        [ 'name' => 'Yandex Search',        'id'    => 'yandex',      'regexp' =>'/YandexSearch\/([0-9.]*)/u' ],
     ],
 
     Constants\BrowserType::APP_EDITOR => [
@@ -112,10 +120,12 @@ Applications::$OTHERS = [
         [ 'name' => 'iWeb',                 'id'    => 'iweb',      'regexp' =>'/(?:^| )iWeb\/([0-9])/u' ],
         [ 'name' => 'Microsoft FrontPage',  'id'    => 'frontpage',      'regexp' =>'/MS ?FrontPage[ \/]([0-9.]*)/u', 'details' => 2, 'type' => Constants\DeviceType::DESKTOP ],
         [ 'name' => 'W3C Amaya',            'id'    => 'amaya',      'regexp' =>'/amaya\/([0-9.]*)/u' ],
+        [ 'name' => 'IBM WebSphere Homepage Builder', 'id' => 'websphere', 'regexp' =>'/IBM WebSphere Homepage Builder V([0-9.]*)/u' ],
     ],
 
     Constants\BrowserType::APP_DOWNLOAD => [
         [ 'name' => 'Download Manager',     'id'    => 'download',      'regexp' =>'/AndroidDownloadManager\//u' ],
+        [ 'name' => 'Tanso Download Manager',     'id'    => 'tansodl',      'regexp' =>'/TansoDL/u' ],
     ],
 
     Constants\BrowserType::APP_GAME => [
@@ -126,6 +136,7 @@ Applications::$OTHERS = [
     ],
 
     Constants\BrowserType::APP => [
+        [ 'name' => 'AliPay',               'id'    => 'alipay',      'regexp' =>'/AlipayClient\/([0-9.]*)/u', 'details' => 3 ],
         [ 'name' => 'Cooliris',             'id'    => 'cooliris',      'regexp' =>'/Cooliris\/([0-9.]*)/u' ],
         [ 'name' => 'Google Earth',         'id'    => 'google',      'regexp' =>'/Google Earth\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Google Desktop',       'id'    => 'google',      'regexp' =>'/Google Desktop\/([0-9.]*)/u', 'details' => 2 ],

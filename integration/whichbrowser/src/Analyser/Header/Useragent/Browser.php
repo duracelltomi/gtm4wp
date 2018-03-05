@@ -20,6 +20,9 @@ trait Browser
         $this->detectEdge($ua);
         $this->detectOpera($ua);
 
+        /* Detect WAP browsers */
+        $this->detectWapBrowsers($ua);
+
         /* Detect other various mobile browsers */
         $this->detectNokiaBrowser($ua);
         $this->detectSilk($ua);
@@ -230,13 +233,41 @@ trait Browser
                     $this->data->browser->channel = null;
                     $this->data->browser->stock = true;
                     $this->data->browser->version = new Version([ 'value' => $match[1] ]);
-                    
+
                     if (preg_match('/Mobile VR/', $ua)) {
                         $this->data->device->manufacturer = 'Samsung';
                         $this->data->device->model = 'Gear VR';
                         $this->data->device->type = Constants\DeviceType::HEADSET;
                     }
                 }
+
+                /* Oculus Chromium based browsers */
+                if (preg_match('/OculusBrowser\/([0-9.]*)/u', $ua, $match)) {
+                    $this->data->browser->name = "Oculus Internet";
+                    $this->data->browser->channel = null;
+                    $this->data->browser->stock = true;
+                    $this->data->browser->version = new Version([ 'value' => $match[1], 'details' => 2 ]);
+
+                    if (preg_match('/Mobile VR/', $ua)) {
+                        $this->data->device->manufacturer = 'Samsung';
+                        $this->data->device->model = 'Gear VR';
+                        $this->data->device->type = Constants\DeviceType::HEADSET;
+                    }
+                }
+            } elseif (isset($this->data->os->name) && $this->data->os->name == 'Linux' && preg_match('/SamsungBrowser\/([0-9.]*)/u', $ua, $match)) {
+                $this->data->browser->name = "Samsung Internet";
+                $this->data->browser->channel = null;
+                $this->data->browser->stock = true;
+                $this->data->browser->version = new Version([ 'value' => $match[1] ]);
+
+                $this->data->os->name = 'Android';
+                $this->data->os->version = null;
+
+                $this->data->device->manufacturer = 'Samsung';
+                $this->data->device->model = 'DeX';
+                $this->data->device->identifier = '';
+                $this->data->device->identified |= Constants\Id::PATTERN;
+                $this->data->device->type = Constants\DeviceType::DESKTOP;
             } else {
                 $channel = Data\Chrome::getChannel('desktop', $version);
 
@@ -417,6 +448,14 @@ trait Browser
             $this->data->browser->version = new Version([ 'value' => $match[1] . '.' . $match[2] ]);
             $this->data->browser->type = Constants\BrowserType::BROWSER;
             $this->data->device->type = Constants\DeviceType::MOBILE;
+
+            if (preg_match('/MMEF[0-9]+; ([^;]+); ([^\)\/]+)/u', $ua, $match)) {
+                $device = Data\DeviceModels::identify('feature', $match[1] == 'CellPhone' ? $match[2] : $match[1] . ' ' . $match[2]);
+                if ($device->identified) {
+                    $device->identified |= $this->data->device->identified;
+                    $this->data->device = $device;
+                }
+            }
         }
 
 
@@ -437,13 +476,14 @@ trait Browser
             $this->data->browser->type = Constants\BrowserType::BROWSER;
             $this->data->browser->channel = '';
             $this->data->browser->version = new Version([ 'value' => $match[1], 'details' => 1 ]);
+
+            unset($this->data->browser->family);
         }
 
-
-        /* Set the browser family */
-
-        if ($this->data->isBrowser('Edge')) {
-            unset($this->data->browser->family);
+        if (preg_match('/Edg(iOS|A)\/([0-9.]*)/u', $ua, $match)) {
+            $this->data->browser->name = 'Edge';
+            $this->data->browser->version = new Version([ 'value' => $match[2], 'details' => 1, 'hidden' => true ]);
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
         }
     }
 
@@ -542,11 +582,6 @@ trait Browser
 
             if ($this->data->browser->name == 'Opera' && $this->data->device->type == Constants\DeviceType::MOBILE) {
                 $this->data->browser->name = 'Opera Mobile';
-
-                if (preg_match('/BER/u', $ua)) {
-                    $this->data->browser->name = 'Opera Mini';
-                    $this->data->browser->version = null;
-                }
             }
 
             if (preg_match('/InettvBrowser/u', $ua)) {
@@ -652,8 +687,11 @@ trait Browser
                     $device = Data\DeviceModels::identify('firefoxos', $match[1]);
                     if ($device->identified) {
                         $device->identified |= $this->data->device->identified;
-                        $this->data->os->reset([ 'name' => 'Firefox OS' ]);
                         $this->data->device = $device;
+
+                        if (!$this->data->isOs('KaiOS')) {
+                            $this->data->os->reset([ 'name' => 'Firefox OS' ]);
+                        }
                     }
                 }
             }
@@ -714,6 +752,11 @@ trait Browser
             $this->data->browser->name = 'Firefox';
             $this->data->browser->version = new Version([ 'value' => $match[1] ]);
             $this->data->browser->type = Constants\BrowserType::BROWSER;
+        }
+
+        if (preg_match('/Servo\/1.0 Firefox\//u', $ua)) {
+            $this->data->browser->name = 'Servo Nightly Build';
+            $this->data->browser->version = null;
         }
 
 
@@ -1086,6 +1129,15 @@ trait Browser
             unset($this->data->browser->channel);
         }
 
+        if (preg_match('/UCLite\/([0-9.]*)/u', $ua, $match)) {
+            $this->data->browser->stock = false;
+            $this->data->browser->name = 'UC Browser';
+            $this->data->browser->version = new Version([ 'value' => $match[1], 'details' => 2 ]);
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
+
+            unset($this->data->browser->channel);
+        }
+
         /* U2 is the Proxy service used by UC Browser on low-end phones */
         if (preg_match('/U2\//u', $ua)) {
             $this->data->browser->stock = false;
@@ -1195,6 +1247,10 @@ trait Browser
                 $this->data->device->type = Constants\DeviceType::TELEVISION;
             }
 
+            if (preg_match('/VCC/u', $ua)) {
+                $this->data->device->type = Constants\DeviceType::CAR;
+            }
+
             if (preg_match('/Kindle/u', $ua)) {
                 $this->data->device->type = Constants\DeviceType::EREADER;
             }
@@ -1265,7 +1321,7 @@ trait Browser
 
         /* Netfront NX */
 
-        if (preg_match('/NX\/([0-9.]*)/u', $ua, $match)) {
+        if (preg_match('/NX[\/ ]([0-9.]+)/u', $ua, $match)) {
             $this->data->browser->name = 'NetFront NX';
             $this->data->browser->version = new Version([ 'value' => $match[1], 'details' => 2 ]);
             $this->data->browser->type = Constants\BrowserType::BROWSER;
@@ -1714,8 +1770,8 @@ trait Browser
             }
         }
     }
-    
-    
+
+
     /* OmniWeb */
 
     private function detectOmniWeb($ua)
@@ -1736,13 +1792,13 @@ trait Browser
             $this->data->device->reset([
                 'type' => Constants\DeviceType::DESKTOP
             ]);
-            
+
             if (!empty($this->data->browser->version)) {
                 if ($this->data->browser->version->is('<', 3)) {
                     $this->data->os->name = 'NextStep';
                     $this->data->os->version = null;
                 }
-                
+
                 if ($this->data->browser->version->is('>=', 4)) {
                     if (empty($this->data->os->name) || $this->data->os->name != 'OS X') {
                         $this->data->os->name = 'OS X';
@@ -1859,8 +1915,25 @@ trait Browser
 
     private function detectMobileBrowsers($ua)
     {
-        if (!preg_match('/(Ninesky|Skyfire|Dolphin|QQ|360|QHBrowser|Mercury|iBrowser|Puffin|MiniB|MxNitro|Sogou|Xiino|Palmscape|WebPro|Vision)/ui', $ua)) {
+        if (!preg_match('/(Ninesky|Skyfire|Dolphin|QQ|360|QHBrowser|Mercury|iBrowser|Puffin|MiniB|MxNitro|Sogou|Xiino|Palmscape|WebPro|Vision|MiuiBrowser)/ui', $ua)) {
             return;
+        }
+
+        /* Xiaomi MIUI Browser */
+
+        if (preg_match('/MiuiBrowser\/([0-9.]*)/u', $ua, $match)) {
+            $this->data->browser->name = 'MIUI Browser';
+            $this->data->browser->version = new Version([ 'value' => $match[1] ]);
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
+
+            if (!$this->data->os->isFamily('Android')) {
+                $this->data->os->reset();
+                $this->data->os->name = 'Android';
+
+                $this->data->device->manufacturer = 'Xiaomi';
+                $this->data->device->model = null;
+                $this->data->device->type = Constants\DeviceType::MOBILE;
+            }
         }
 
         /* NineSky */
@@ -1898,7 +1971,7 @@ trait Browser
 
         /* Dolphin HD */
 
-        if (preg_match('/Dolphin(?:HDCN)?\/(?:INT|CN)?-?([0-9.]*)/u', $ua, $match)) {
+        if (preg_match('/Dolphin(?:HD|Browser)?(?:INT|CN)?\/(?:INT|CN)?-?([0-9.]*)/u', $ua, $match)) {
             $this->data->browser->name = 'Dolphin';
             $this->data->browser->version = new Version([ 'value' => $match[1] ]);
             $this->data->browser->type = Constants\BrowserType::BROWSER;
@@ -1975,6 +2048,13 @@ trait Browser
         }
 
         /* 360 Phone Browser */
+
+        if (preg_match('/360 (?:Aphone|Android Phone) Browser/u', $ua, $match)) {
+            $this->data->browser->name = 'Qihoo 360 Browser';
+            $this->data->browser->family = null;
+            $this->data->browser->channel = '';
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
+        }
 
         if (preg_match('/360 (?:Aphone|Android Phone) Browser \((?:Version |V)?([0-9.]*)(?:beta)?\)/u', $ua, $match)) {
             $this->data->browser->name = 'Qihoo 360 Browser';
@@ -2306,6 +2386,40 @@ trait Browser
             if (!empty($data['device'])) {
                 $this->data->device->set($data['device']);
             }
+        }
+    }
+
+    private function detectWapBrowsers($ua)
+    {
+        if (!preg_match('/(Dorado|MAUI)/ui', $ua, $match)) {
+            return;
+        }
+
+        if (preg_match('/Browser\/Dorado([0-9.]*)/ui', $ua, $match)) {
+            $this->data->browser->name = 'Dorado WAP';
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
+            $this->data->browser->version = new Version([ 'value' => $match[1], 'details' => 2 ]);
+        }
+
+        if (preg_match('/Dorado WAP-Browser\/([0-9.]*)/ui', $ua, $match)) {
+            $this->data->browser->name = 'Dorado WAP';
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
+            $this->data->browser->version = new Version([ 'value' => $match[1], 'details' => 2 ]);
+        }
+
+        if (preg_match('/MAUI[ _]WAP[ _]Browser(?:\/([0-9.]*))?/ui', $ua, $match)) {
+            $this->data->browser->name = 'MAUI WAP';
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
+
+            if (isset($match[1])) {
+                $this->data->browser->version = new Version([ 'value' => $match[1] ]);
+            }
+
+        }
+
+        if (preg_match('/WAP Browser\/MAUI/ui', $ua, $match)) {
+            $this->data->browser->name = 'MAUI WAP';
+            $this->data->browser->type = Constants\BrowserType::BROWSER;
         }
     }
 }

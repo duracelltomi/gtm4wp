@@ -306,7 +306,7 @@ trait Television
 
     private function detectSamsungTelevision($ua)
     {
-        if (preg_match('/(SMART-TV|SmartHub)/u', $ua)) {
+        if (preg_match('/(SMART-TV;|SmartHub;)/u', $ua)) {
             $this->data->device->manufacturer = 'Samsung';
             $this->data->device->series = 'Smart TV';
             $this->data->device->type = Constants\DeviceType::TELEVISION;
@@ -418,7 +418,7 @@ trait Television
             $this->data->device->type = Constants\DeviceType::TELEVISION;
             $this->data->device->identified |= Constants\Id::MATCH_UA;
 
-            if (preg_match('/Panasonic\.tv\.(?:mid\.)?([0-9]+)/u', $ua, $match)) {
+            if (preg_match('/Panasonic\.tv\.(?:mid\.|pro4\.)?([0-9]+)/u', $ua, $match)) {
                 $this->data->device->series = 'Viera ' . $match[1];
             }
 
@@ -813,6 +813,7 @@ trait Television
                                 $this->data->device->series = 'NetCast TV 2012';
                                 break;
                             case 'LGwebOSTV':
+                            case 'webOSTV3_0':
                                 $this->data->device->series = 'webOS TV';
                                 break;
                         }
@@ -874,7 +875,7 @@ trait Television
                 $found = true;
             }
 
-            if (in_array($vendorName, [ 'Access', 'ANT', 'EMSYS', 'Em-Sys', 'Opera', 'Opera Software', 'Seraphic', 'Vendor' ])) {
+            if (in_array($vendorName, [ 'Access', 'ANT', 'EMSYS', 'Em-Sys', 'Ocean Blue Software', 'Opera', 'Opera Software', 'Seraphic', 'ST', 'Vendor' ])) {
                 $found = false;
             }
 
@@ -894,6 +895,8 @@ trait Television
                             case 'GLOBAL-PLAT4':
                                 $this->data->device->series = 'NetCast TV 2013';
                                 break;
+                            case 'WEBOS1':
+                            case 'WEBOS2.0':
                             case 'WEBOS3':
                                 $this->data->device->series = 'webOS TV';
                                 break;
@@ -916,6 +919,12 @@ trait Television
                                 break;
                             case 'SmartTV2015':
                                 $this->data->device->series = 'Smart TV 2015';
+                                break;
+                            case 'SmartTV2016':
+                                $this->data->device->series = 'Smart TV 2016';
+                                break;
+                            case 'SmartTV2017':
+                                $this->data->device->series = 'Smart TV 2017';
                                 break;
                             case 'OTV-SMT-E5015':
                                 $this->data->device->model = 'Olleh SkyLife Smart Settopbox';
@@ -945,8 +954,23 @@ trait Television
                             case 'Viera2015.mid':
                                 $this->data->device->series = 'Viera 2015';
                                 break;
+                            case 'VIERA 2016':
+                                $this->data->device->series = 'Viera 2016';
+                                break;
+                            case 'VIERA 2017':
+                                $this->data->device->series = 'Viera 2017';
+                                break;
+                            case 'SmartTV2018mid':
+                                $this->data->device->series = 'Viera 2018';
+                                break;
                             default:
                                 $this->data->device->model = $modelName;
+        
+                                if (substr($modelName, 0, 4) == 'DIGA') {
+                                    $this->data->device->series = 'Diga';
+                                    $this->data->device->model = null;
+                                }
+
                                 break;
                         }
 

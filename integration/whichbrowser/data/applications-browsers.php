@@ -31,6 +31,7 @@ Applications::$BROWSERS = [
         [ 'name' => 'AvantGo',              'id'    => 'avant',      'regexp' =>'/AvantGo ([0-9.]+)/u' ],
         [ 'name' => 'Avant Browser',        'id'    => 'avant',      'regexp' =>'/Avant Browser/u' ],
         [ 'name' => 'Avant Browser',        'id'    => 'avant',      'regexp' =>'/Avant TriCore/u' ],
+        [ 'name' => 'Avast SafeZone',       'id'    => 'asw',      'regexp' =>'/ASW\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Aviator',              'id'    => 'aviator',      'regexp' =>'/Aviator\/([0-9.]*)/u', 'details' => 1 ],                                              // see: https://github.com/WhiteHatSecurity/Aviator
         [ 'name' => 'Baidu Browser',        'id'    => 'flyflow',      'regexp' =>'/FlyFlow\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Baidu Browser',        'id'    => 'bdbrowser',      'regexp' =>'/bdbrowser\/([0-9.]*)/i' ],
@@ -60,7 +61,7 @@ Applications::$BROWSERS = [
         [ 'name' => 'Galeon',               'id'    => 'galeon',      'regexp' =>'/Galeon\/([0-9.]*)/u', 'details' => 3 ],
         [ 'name' => 'GNOME Web',            'id'    => 'epiphany',      'regexp' =>'/Epiphany\/([0-9.]*)/u', 'type' => Constants\DeviceType::DESKTOP ],
         [ 'name' => 'IBrowse',              'id'    => 'ibrowse',      'regexp' =>'/IBrowse[\/ ]([0-9.]*)/u', 'type' => Constants\DeviceType::DESKTOP ],
-        [ 'name' => 'iCab',                 'id'    => 'icab',      'regexp' =>'/iCab(?: J)?\/([0-9.]*)/u' ],
+        [ 'name' => 'iCab',                 'id'    => 'icab',      'regexp' =>'/iCab(?: J)?[\/ ](?:Pre)?([0-9.]*)/u' ],
         [ 'name' => 'Iceape',               'id'    => 'iceape',      'regexp' =>'/Iceape\/([0-9.]*)/u' ],
         [ 'name' => 'IceCat',               'id'    => 'icecat',      'regexp' =>'/IceCat[ \/]([0-9.]*)/u', 'type' => Constants\DeviceType::DESKTOP ],                   // see: https://www.gnu.org/software/gnuzilla/
         [ 'name' => 'Iceweasel',            'id'    => 'iceweasel',      'regexp' =>'/Iceweasel\/([0-9.]*)/iu', 'type' => Constants\DeviceType::DESKTOP ],
@@ -117,17 +118,21 @@ Applications::$BROWSERS = [
         [ 'name' => 'Baidu Browser',        'id'    => 'bdmobile',      'regexp' =>'/BdMobile\/([0-9.]*)/i' ],
         [ 'name' => 'Baidu Browser',        'id'    => 'bidu',      'regexp' =>'/BIDUBrowser[ \/]([0-9.]*)/u' ],
         [ 'name' => 'Baidu Browser',        'id'    => 'baidu',      'regexp' =>'/BaiduHD\/([0-9.]*)/u', 'details' => 2, 'type' => Constants\DeviceType::MOBILE ],
+        [ 'name' => 'Baidu Browser',        'id'    => 'baiduboxapp',      'regexp' =>'/baiduboxapp\/([0-9.]*)/i' ],
+        [ 'name' => 'Baidu Browser',        'id'    => 'browser',      'regexp' =>'/ browser\/([0-9.]*) \(; P1/i' ],
         [ 'name' => 'Blazer',               'id'    => 'blazer',      'regexp' =>'/Blazer\/([0-9.]*)/u' ],
+        [ 'name' => 'CM Browser',           'id'    => 'acheetahi',      'regexp' =>'/ACHEETAHI\//u' ],
         [ 'name' => 'Cornowser',            'id'    => 'cornowser',      'regexp' =>'/Cornowser\/([0-9.]*)/u' ],
+        [ 'name' => 'Cool Market',          'id'    => 'coolmarket',      'regexp' =>'/CoolMarket\/([0-9.]*)/u' ],
         [ 'name' => 'CuteBrowser',          'id'    => 'cute',      'regexp' =>'/CuteBrowser\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Digia @Web',           'id'    => 'digia',      'regexp' =>'/Digia @Web\/([0-9.]*)/u' ],
-        [ 'name' => 'Dorado',               'id'    => 'dorado',      'regexp' =>'/Browser\/Dorado([0-9.]*)/u' ],
-        [ 'name' => 'Dorado',               'id'    => 'dorado',      'regexp' =>'/Dorado WAP-Browser\/([0-9.]*)/u' ],
         [ 'name' => 'Doris',                'id'    => 'doris',      'regexp' =>'/Doris\/([0-9.]*)/u' ],
         [ 'name' => 'Dorothy',              'id'    => 'doroty',      'regexp' =>'/Dorothy$/u' ],
         [ 'name' => 'EMOBILE Browser',      'id'    => 'www browser',      'regexp' =>'/WWW Browser\/ver([0-9.]*)/u' ],
+        [ 'name' => 'EUI Browser',          'id'    => 'eui',      'regexp' =>'/EUI Browser\/[^0-9\s]*([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Go.Web',               'id'    => 'go\.web',      'regexp' =>'/Go\.Web\/([0-9.]*)/u' ],                                                              // used on early Blackberry, by GoAmerica
         [ 'name' => 'Helium',               'id'    => 'helium',      'regexp' =>'/HeliumMobileBrowser\/([0-9.]*)/u' ],
+        [ 'name' => 'Huohou Browser',       'id'    => 'huohoubrowser',      'regexp' =>'/HuohouBrowser\/([0-9.]*)/u' ],
         [ 'name' => 'iCab',                 'id'    => 'icab',      'regexp' =>'/iCabMobile\/([0-9.]*)/u' ],
         [ 'name' => 'iLunascape',           'id'    => 'lunascape',      'regexp' =>'/iLunascape\/([0-9.]*)/u', 'details' => 3 ],                                           // see: http://www.lunascape.tv
         [ 'name' => 'InternetSurfboard',    'id'    => 'surfboard',      'regexp' =>'/InternetSurfboard\/([0-9.]*)/u' ],
@@ -135,16 +140,18 @@ Applications::$BROWSERS = [
         [ 'name' => 'Jig Browser',          'id'    => 'jig browser',      'regexp' =>'/jig browser(?: web| core|9i?)?;? ?([0-9.]+)?/u', 'type' => Constants\DeviceType::MOBILE ],
         [ 'name' => 'Jumanji',              'id'    => 'jumanji',      'regexp' =>'/jumanji/u' ],                                                                         // see: jumanji browser ubuntu
         [ 'name' => 'Kiosk',                'id'    => 'kiosk',      'regexp' =>'/Kiosk\/([0-9.]*)/u' ],                                                                // see: http://www.kioskbrowser.net
+        [ 'name' => 'LeBrowser',            'id'    => 'lebrowser',      'regexp' =>'/LeBrowser\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'LieBaoFast',           'id'    => 'liebao',      'regexp' =>'/LieBaoFast\/([0-9.]*)/u' ],                                                           // see: http://www.liebao.cn
         [ 'name' => 'MaCross Mobile',       'id'    => 'macross',      'regexp' =>'/MaCross\/([0-9.]*)/u' ],
         [ 'name' => 'Mammoth',              'id'    => 'mammoth',      'regexp' =>'/Mammoth\/([0-9.]*)/u' ],                                                              // see: https://itunes.apple.com/cn/app/meng-ma-liu-lan-qi/id403760998?mt=8
+        [ 'name' => 'mCent Browser',        'id'    => 'mcent',      'regexp' =>'/mCent\/([0-9.]*)/u' ],
         [ 'name' => 'Motorola Internet Browser', 'id'    => 'mib',      'regexp' =>'/MIB\/([0-9.]*)/u' ],
         [ 'name' => 'Motorola Internet Browser', 'id'    => 'mib',      'regexp' =>'/MIB([0-9.]+)\//u' ],
         [ 'name' => 'Motorola Internet Browser', 'id'    => 'cmcs',      'regexp' =>'/Browser\/CMCS([0-9.]*)/u' ],
         [ 'name' => 'Motorola WebKit',      'id'    => 'motorola',      'regexp' =>'/MotorolaWebKit(?:\/([0-9.]*))?/u', 'details' => 3 ],
-        [ 'name' => 'MIUI Browser',         'id'    => 'miui',      'regexp' =>'/MiuiBrowser\/([0-9.]*)/u' ],
         [ 'name' => 'NetFront Life Browser', 'id'    => 'netfrontlife',      'regexp' =>'/NetFrontLifeBrowser\/([0-9.]*)/u' ],
         [ 'name' => 'OneBrowser',           'id'    => 'onebrowser',      'regexp' =>'/OneBrowser\/([0-9.]*)/u' ],
+        [ 'name' => 'PocketLink',           'id'    => 'plink',      'regexp' =>'/PLink ([0-9.]+)/iu', 'details' => 2 ],
         [ 'name' => 'Polaris',              'id'    => 'polaris',      'regexp' =>'/Polaris[\/ ]v?([0-9.]*)/iu', 'details' => 2 ],
         [ 'name' => 'Polaris',              'id'    => 'polaris',      'regexp' =>'/POLARIS([0-9.]+)/u', 'details' => 2 ],
         [ 'name' => 'Openwave',             'id'    => 'openwave',      'regexp' =>'/Open[Ww]ave\/([0-9.]*)/u', 'details' => 2, 'type' => Constants\DeviceType::MOBILE ],
@@ -153,10 +160,13 @@ Applications::$BROWSERS = [
         [ 'name' => 'Openwave',             'id'    => 'up',      'regexp' =>'/UP\. ?Browser(?:\/([a-z0-9.]*))?/iu', 'details' => 2, 'type' => Constants\DeviceType::MOBILE ],
         [ 'name' => 'Openwave',             'id'    => 'km',      'regexp' =>'/KM\.Browser\/([0-9.]+)/iu', 'details' => 2, 'type' => Constants\DeviceType::MOBILE ],
         [ 'name' => 'Openwave',             'id'    => 'up',      'regexp' =>'/UP\/([0-9.]+)/u', 'details' => 2, 'type' => Constants\DeviceType::MOBILE ],
+        [ 'name' => 'Quark Browser',         'id'    => 'quark',      'regexp' =>'/Quark\/([0-9.]*)/u', 'details' => 3 ],
         [ 'name' => 'SEMC Browser',         'id'    => 'semc',      'regexp' =>'/SEMC-Browser\/([0-9.]*)/u' ],
+        [ 'name' => 'STNC HitchHiker' ,     'id'    => 'stnc',      'regexp' =>'/STNC-WTL\/[0-9.]*/u' ],
         [ 'name' => 'Sogou Mobile',         'id'    => 'sogou',      'regexp' =>'/SogouMobileBrowser\/([0-9.]*)/u', 'details' => 2 ],
         [ 'name' => 'Swing Browser',        'id'    => 'swing',      'regexp' =>'/Swing\(And\)\/([0-9.]*)/u', 'details' => 3 ],
         [ 'name' => 'Symphony',             'id'    => 'symphony',      'regexp' =>'/Symphony ([0-9.]+)$/u' ],
+        [ 'name' => 'TinY',                 'id'    => 'ucpro',      'regexp' =>'/ucpro\/([0-9.]+)/iu' ],
         [ 'name' => 'WebLite',              'id'    => 'weblite',      'regexp' =>'/WebLite\/([0-9.]*)/u', 'type' => Constants\DeviceType::MOBILE ],
 
         /* Television browsers */

@@ -36,7 +36,7 @@ trait Mobile
 
     private function detectGenericMobile($ua)
     {
-        if (preg_match('/(MIDP|CLDC|UNTRUSTED\/|3gpp-gba)/u', $ua)) {
+        if (preg_match('/(MIDP|CLDC|UNTRUSTED\/|3gpp-gba|[Ww][Aa][Pp]2.0|[Ww][Aa][Pp][ _-]?[Bb]rowser)/u', $ua)) {
             $this->data->device->type = Constants\DeviceType::MOBILE;
         }
     }
@@ -148,6 +148,10 @@ trait Mobile
         }
 
         if (preg_match('/(?:SAMSUNG; )?SAMSUNG ?[-\/]?([^;\/\)_,]+)/ui', $ua, $match)) {
+            if ($match[1] === 'Browser') {
+                return;
+            }
+
             $this->data->device->manufacturer = 'Samsung';
             $this->data->device->model = Data\DeviceModels::cleanup($match[1]);
             $this->data->device->identifier = $match[0];
@@ -248,8 +252,8 @@ trait Mobile
         if (isset($this->data->device->manufacturer)) {
             return;
         }
-        
-        if (!preg_match('/(T-Mobile|Danger|HPiPAQ|Acer|Amoi|AIRNESS|ASUS|BenQ|maui|ALCATEL|Bird|COOLPAD|CELKON|Coship|Cricket|DESAY|Diamond|dopod|Ericsson|FLY|GIONEE|Haier|HIKe|Hisense|HS|HTC|T[0-9]{4,4}|HUAWEI|Karbonn|KWC|KONKA|KTOUCH|K-Touch|Lenovo|Lephone|LG|Micromax|MOT|Nexian|NEC|NGM|OPPO|Panasonic|Pantech|Philips|Sagem|Sanyo|Sam|SEC|SGH|SCH|SIE|Sony|SE|SHARP|Spice|Tecno|T-smart|TCL|Tiphone|Toshiba|UTStar|vk|Vodafone|Xiaomi|ZTE|WAP)/ui', $ua)) {
+
+        if (!preg_match('/(T-Mobile|Danger|HPiPAQ|Acer|Amoi|AIRNESS|ASUS|BenQ|maui|ALCATEL|Bird|COOLPAD|CELKON|Coship|Cricket|DESAY|Diamond|dopod|Ericsson|FLY|GIONEE|GT-|Haier|HIKe|Hisense|HS|HTC|T[0-9]{4,4}|HUAWEI|Karbonn|KWC|KONKA|KTOUCH|K-Touch|Lenovo|Lephone|LG|Micromax|MOT|Nexian|NEC|NGM|OPPO|Panasonic|Pantech|Philips|Sagem|Sanyo|Sam|SEC|SGH|SCH|SIE|Sony|SE|SHARP|Spice|Tecno|T-smart|TCL|Tiphone|Toshiba|UTStar|Videocon|vk|Vodafone|VSUN|Wynncom|Xiaomi|YUANDA|Zen|Ziox|ZTE|WAP)/ui', $ua)) {
             return;
         }
 
@@ -418,7 +422,7 @@ trait Mobile
             'manufacturer'  => 'Huawei'
         ]);
 
-        $this->data->device->identifyModel('/Karbonn ([^\s]+)/ui', $ua, [
+        $this->data->device->identifyModel('/Karbonn ([a-z0-9]+(?: ?Star| ?Plus|\+)?)/ui', $ua, [
             'type'          => Constants\DeviceType::MOBILE,
             'manufacturer'  => 'Karbonn'
         ]);
@@ -491,7 +495,7 @@ trait Mobile
             }
         ]);
 
-        $this->data->device->identifyModel('/Motorola[_ ]([^\/_;]+)/ui', $ua, [
+        $this->data->device->identifyModel('/Motorola[_ ]([^\/_;\)]+)/ui', $ua, [
             'type'          => Constants\DeviceType::MOBILE,
             'manufacturer'  => 'Motorola'
         ]);
@@ -679,18 +683,47 @@ trait Mobile
             }
         ]);
 
+        $this->data->device->identifyModel('/Videocon[-_ \/]([A-Z0-9\.]+)/iu', $ua, [
+            'type'          => Constants\DeviceType::MOBILE,
+            'manufacturer'  => 'Videocon'
+        ]);
+
+        $this->data->device->identifyModel('/Vodafone(?:[ _-]Chat)?[ _-]?([0-9]+)/ui', $ua, [
+            'type'          => Constants\DeviceType::MOBILE,
+            'manufacturer'  => 'Vodafone'
+        ]);
+
         $this->data->device->identifyModel('/Vodafone\/[0-9.]+\/(v[0-9]+)[^\/]*\//u', $ua, [
             'type'          => Constants\DeviceType::MOBILE,
             'manufacturer'  => 'Vodafone'
         ]);
 
-        $this->data->device->identifyModel('/Xiaomi[_]?([^\s]+)/ui', $ua, [
+        $this->data->device->identifyModel('/^VSUN([0-9]+[A-Z]?)/ui', $ua, [
             'type'          => Constants\DeviceType::MOBILE,
-            'manufacturer'  => 'Xiaomi'
+            'manufacturer'  => 'Vsun'
         ]);
 
+        $this->data->device->identifyModel('/Wynncom[\-\s]([A-Z0-9\s]+\+?)/ui', $ua, [
+            'type'          => Constants\DeviceType::MOBILE,
+            'manufacturer'  => 'Wynncom'
+        ]);
 
-        $this->data->device->identifyModel('/ZTE[-_\s]?([^\s\/\)]+)/ui', $ua, [
+        $this->data->device->identifyModel('/^YUANDA([0-9]+[A-Z]?)/ui', $ua, [
+            'type'          => Constants\DeviceType::MOBILE,
+            'manufacturer'  => 'Yuanda'
+        ]);
+
+        $this->data->device->identifyModel('/^ZEN[_\s]([A-Z0-9\s\+]+)\*?[\s_]?($|\/|-|;|Dorado|MAUI|WAP|R2AE|Q03C)/uiU', $ua, [
+            'type'          => Constants\DeviceType::MOBILE,
+            'manufacturer'  => 'Zen'
+        ]);
+
+        $this->data->device->identifyModel('/^(?:Ziox[_\s])?Ziox[_\s](ZX?[0-9]+)/ui', $ua, [
+            'type'          => Constants\DeviceType::MOBILE,
+            'manufacturer'  => 'Ziox'
+        ]);
+
+        $this->data->device->identifyModel('/ZTE[-_\s]?([^\s\/\(\);,]+)/ui', $ua, [
             'type'          => Constants\DeviceType::MOBILE,
             'manufacturer'  => 'ZTE',
             'model'         => function ($model) {
