@@ -5,7 +5,7 @@ define( 'GTM4WP_ADMIN_GROUP',             'gtm4wp-admin-group' );
 define( 'GTM4WP_ADMIN_GROUP_GENERAL',     'gtm4wp-admin-group-general' );
 define( 'GTM4WP_ADMIN_GROUP_GTMID',       'gtm4wp-admin-group-gtm-id' );
 define( 'GTM4WP_ADMIN_GROUP_PLACEMENT',   'gtm4wp-admin-code-placement' );
-define( 'GTM4WP_ADMIN_GROUP_DATALAYER',   'gtm4wp-admin-group-datalayer-name' );
+//define( 'GTM4WP_ADMIN_GROUP_DATALAYER',   'gtm4wp-admin-group-datalayer-name' );
 define( 'GTM4WP_ADMIN_GROUP_INFO',        'gtm4wp-admin-group-datalayer-info' );
 
 define( 'GTM4WP_ADMIN_GROUP_INCLUDES',    'gtm4wp-admin-group-includes' );
@@ -481,6 +481,24 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	)
 );
 
+$GLOBALS["gtm4wp_advancedfieldtexts"] = array(
+	GTM4WP_OPTION_DATALAYER_NAME  => array(
+		"label"       => __( "dataLayer variable name", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "In some cases you need to rename the dataLayer variable. You can enter your name here. Leave black for default name: dataLayer", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
+	GTM4WP_OPTION_ENV_GTM_AUTH    => array(
+		"label"       => __( "Environment gtm_auth parameter", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
+	GTM4WP_OPTION_ENV_GTM_PREVIEW => array(
+		"label"       => __( "Environment gtm_preview parameter", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	)
+);
+
 function gtm4wp_admin_output_section( $args ) {
 	echo '<span class="tabinfo">';
 
@@ -574,9 +592,23 @@ function gtm4wp_admin_output_field( $args ) {
 			break;
 		}
 
-		case GTM4WP_ADMIN_GROUP_DATALAYER: {
+		case GTM4WP_OPTIONS . "[" . GTM4WP_OPTION_DATALAYER_NAME . "]": {
 			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']" value="' . $gtm4wp_options[GTM4WP_OPTION_DATALAYER_NAME] . '" /><br />' . $args["description"];
 			echo '<br /><span class="datalayername_validation_error">' . __( "This does not seems to be a valid JavaScript variable name! Please check and try again", 'duracelltomi-google-tag-manager' ) . '</span>';
+			
+			break;
+		}
+
+		case GTM4WP_OPTIONS . "[" . GTM4WP_OPTION_ENV_GTM_AUTH . "]": {
+			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']" value="' . $gtm4wp_options[GTM4WP_OPTION_ENV_GTM_AUTH] . '" /><br />' . $args["description"];
+			echo '<br /><span class="gtmauth_validation_error">' . __( "This does not seems to be a valid gtm_auth parameter! It should only contain letters, number and the &quot;-&quot; character. Please check and try again", 'duracelltomi-google-tag-manager' ) . '</span>';
+			
+			break;
+		}
+
+		case GTM4WP_OPTIONS . "[" . GTM4WP_OPTION_ENV_GTM_PREVIEW . "]": {
+			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']" value="' . $gtm4wp_options[GTM4WP_OPTION_ENV_GTM_PREVIEW] . '" /><br />' . $args["description"];
+			echo '<br /><span class="gtmpreview_validation_error">' . __( "This does not seems to be a valid gtm_preview parameter! It should have the format &quot;env-NN&quot; where NN is an integer number. Please check and try again", 'duracelltomi-google-tag-manager' ) . '</span>';
 			
 			break;
 		}
@@ -715,7 +747,7 @@ function gtm4wp_sanitize_options($options) {
 			$output[$optionname] = (boolean) $newoptionvalue;
 
 		// GTM code or dataLayer variable name
-		} else if ( ( $optionname == GTM4WP_OPTION_GTM_CODE ) || ( $optionname == GTM4WP_OPTION_DATALAYER_NAME ) ) {
+		} else if ( ( $optionname == GTM4WP_OPTION_GTM_CODE ) || ( $optionname == GTM4WP_OPTION_DATALAYER_NAME ) || ( $optionname == GTM4WP_OPTION_ENV_GTM_AUTH ) || ( $optionname == GTM4WP_OPTION_ENV_GTM_PREVIEW ) ) {
 			$newoptionvalue = trim($newoptionvalue);
 
 			if ( $optionname == GTM4WP_OPTION_GTM_CODE ) {
@@ -733,6 +765,12 @@ function gtm4wp_sanitize_options($options) {
 				}
 			} else if ( ( $optionname == GTM4WP_OPTION_DATALAYER_NAME ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^[a-zA-Z][a-zA-Z0-9_-]*$/", $newoptionvalue ) ) ) {
 				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']', __( "Invalid dataLayer variable name. Please start with a character from a-z or A-Z followed by characters from a-z, A-Z, 0-9 or '_' or '-'!", 'duracelltomi-google-tag-manager' ) );
+
+			} else if ( ( $optionname == GTM4WP_OPTION_ENV_GTM_AUTH ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^[a-zA-Z0-9-]+$/", $newoptionvalue ) ) ) {
+				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']', __( "Invalid gtm_auth environment parameter value. It should only contain letters, number and the '-' character.", 'duracelltomi-google-tag-manager' ) );
+
+			} else if ( ( $optionname == GTM4WP_OPTION_ENV_GTM_PREVIEW ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^env-[0-9]+$/", $newoptionvalue ) ) ) {
+				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']', __( "Invalid gtm_preview environment parameter value. It should have the format 'env-NN' where NN is an integer number.", 'duracelltomi-google-tag-manager' ) );
 
 			} else {
 				$output[$optionname] = $newoptionvalue;
@@ -776,7 +814,7 @@ function gtm4wp_sanitize_options($options) {
 
 function gtm4wp_admin_init() {
 	global $gtm4wp_includefieldtexts, $gtm4wp_eventfieldtexts, $gtm4wp_integratefieldtexts, $gtm4wp_scrollerfieldtexts,
-		$gtm4wp_blacklistfieldtexts, $gtm4wp_blacklistmfieldtexts;
+		$gtm4wp_blacklistfieldtexts, $gtm4wp_blacklistmfieldtexts, $gtm4wp_advancedfieldtexts;
 
 	register_setting( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS, "gtm4wp_sanitize_options" );
 
@@ -945,6 +983,23 @@ function gtm4wp_admin_init() {
 		GTM4WP_ADMINSLUG
 	);
 
+	foreach($gtm4wp_advancedfieldtexts as $fieldid => $fielddata) {
+		add_settings_field(
+			"gtm4wp-admin-" . $fieldid . "-id",
+			$fielddata["label"].'<span class="'.$fielddata["phase"].'"></span>',
+			'gtm4wp_admin_output_field',
+			GTM4WP_ADMINSLUG,
+			GTM4WP_ADMIN_GROUP_ADVANCED,
+			array(
+				"label_for" => "gtm4wp-options[" . $fieldid . "]",
+				"description" => $fielddata["description"],
+				"optionfieldid" => $fieldid,
+				"plugintocheck" => isset( $fielddata["plugintocheck"] ) ? $fielddata["plugintocheck"] : ""
+			)
+		);
+	}
+
+/*
 	add_settings_field(
 		GTM4WP_ADMIN_GROUP_DATALAYER,
 		__( 'dataLayer variable name', 'duracelltomi-google-tag-manager' ),
@@ -956,6 +1011,7 @@ function gtm4wp_admin_init() {
 			"description" => __( "In some cases you need to rename the dataLayer variable. You can enter your name here. Leave black for default name: dataLayer", 'duracelltomi-google-tag-manager' )
 		)
 	);
+*/
 
 	add_settings_section(
 		GTM4WP_ADMIN_GROUP_CREDITS,
@@ -1050,7 +1106,9 @@ function gtm4wp_admin_head() {
 <style type="text/css">
 	.gtmid_validation_error,
 	.goid_validation_error,
-	.datalayername_validation_error {
+	.datalayername_validation_error,
+	.gtmauth_validation_error,
+	.gtmpreview_validation_error {
 		display: none;
 		color: #c00;
 		font-weight: bold;
@@ -1118,6 +1176,38 @@ function gtm4wp_admin_head() {
 				}
 			});
 
+		jQuery( "#gtm4wp-options\\\\[gtm-env-gtm-auth\\\\]" )
+			.bind( "blur", function() {
+				var currentval = jQuery( this ).val();
+
+				jQuery( ".gtmauth_validation_error" )
+					.hide();
+
+				if ( currentval != "" ) {
+					var gtmauth_regex = /^[a-zA-Z0-9-]+$/;
+					if ( ! gtmauth_regex.test( currentval ) ) {
+						jQuery( ".gtmauth_validation_error" )
+							.show();
+					}
+				}
+			});
+
+		jQuery( "#gtm4wp-options\\\\[gtm-env-gtm-preview\\\\]" )
+			.bind( "blur", function() {
+				var currentval = jQuery( this ).val();
+
+				jQuery( ".gtmpreview_validation_error" )
+					.hide();
+
+				if ( currentval != "" ) {
+					var gtmpreview_regex = /^env-[0-9]+$/;
+					if ( ! gtmpreview_regex.test( currentval ) ) {
+						jQuery( ".gtmpreview_validation_error" )
+							.show();
+					}
+				}
+			});
+
 		jQuery( document )
 			.on( "click", ".gtm4wp-notice .notice-dismiss", function( e ) {
 				jQuery.post(ajaxurl, {
@@ -1155,6 +1245,14 @@ function gtm4wp_show_warning() {
 	
 	if ( ( trim( $gtm4wp_options[GTM4WP_OPTION_GTM_CODE] ) == "" ) && ( false === $gtm4wp_user_notices_dismisses["enter-gtm-code"] ) ) {
 		echo '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code"><p><strong>' . sprintf( __( 'To start using Google Tag Manager for WordPress, please <a href="%s">enter your GTM ID</a>', 'duracelltomi-google-tag-manager' ), "options-general.php?page=" . GTM4WP_ADMINSLUG ) . '</strong></p></div>';
+	}
+
+	if ((
+		("" != $gtm4wp_options[GTM4WP_OPTION_ENV_GTM_AUTH]) && ("" == $gtm4wp_options[GTM4WP_OPTION_ENV_GTM_PREVIEW])
+	) || (
+		("" == $gtm4wp_options[GTM4WP_OPTION_ENV_GTM_AUTH]) && ("" != $gtm4wp_options[GTM4WP_OPTION_ENV_GTM_PREVIEW])
+	)) {
+		echo '<div class="gtm4wp-notice notice notice-error" data-href="?incomplete-gtm-env-config"><p><strong>' . sprintf( __( 'Incomplete Google Tag Manager environment configuration: either gtm_preview or gtm_auth parameter value is missing!', 'duracelltomi-google-tag-manager' ), "options-general.php?page=" . GTM4WP_ADMINSLUG ) . '</strong></p></div>';
 	}
 
 	if ( ( false === $gtm4wp_user_notices_dismisses["wc-ga-plugin-warning"] ) || ( false === $gtm4wp_user_notices_dismisses["wc-gayoast-plugin-warning"] ) ) {

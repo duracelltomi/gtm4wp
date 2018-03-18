@@ -419,7 +419,8 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 					$dataLayer[ "weatherTemp" ]        = $weatherdata->main->temp;
 					$dataLayer[ "weatherPressure" ]    = $weatherdata->main->pressure;
 					$dataLayer[ "weatherWindSpeed" ]   = $weatherdata->wind->speed;
-					$dataLayer[ "weatherWindDeg" ]     = $weatherdata->wind->deg;
+					$dataLayer[ "weatherWindDeg" ]     = ($weatherdata->wind->deg ? $weatherdata->wind->deg : "");
+					$dataLayer[ "weatherFullWeatherData" ] = $weatherdata;
 					$dataLayer[ "weatherDataStatus" ]  = "Read from cache";
 				} else {
 					$dataLayer[ "weatherDataStatus" ]  = "GTM4WP session active but no weather data in cache (" . $gtm4wp_sessionid . ")";
@@ -518,9 +519,15 @@ function gtm4wp_get_the_gtm_tag() {
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) && ( ! $gtm4wp_container_code_written ) ) {
 		$_gtm_codes = explode( ",", str_replace( array(";"," "), array(",",""), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 
+		if ( ("" != $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ]) && ("" != $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ]) ) {
+			$_gtm_env = "&gtm_auth=" . $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] . "&gtm_preview=" . $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] . "&gtm_cookies_win=x";
+		} else {
+			$_gtm_env = '';
+		}
+
 		foreach( $_gtm_codes as $one_gtm_code ) {
 			$_gtm_tag .= '
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' . $one_gtm_code . '"
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' . $one_gtm_code . $_gtm_env . '"
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>';
 		}
 
@@ -615,14 +622,24 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 	return $dataLayer;
 }
 
+function gtm4wp_wp_header_top() {
+	global $gtm4wp_datalayer_name;
+
+	echo '
+<!-- Google Tag Manager for WordPress by DuracellTomi -->
+<script data-cfasync="false" type="text/javascript">
+	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
+	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];
+</script>
+<!-- End Google Tag Manager for WordPress by DuracellTomi -->';
+}
+
 function gtm4wp_wp_header_begin() {
 	global $gtm4wp_datalayer_name, $gtm4wp_options;
 
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by DuracellTomi -->
-<script data-cfasync="false" type="text/javascript">
-	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
-	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
+<script data-cfasync="false" type="text/javascript">';
 	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_header_content .= '
@@ -679,11 +696,17 @@ function gtm4wp_wp_header_begin() {
 
 		$_gtm_tag = '';
 		foreach( $_gtm_codes as $one_gtm_code ) {
+			if ( ("" != $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ]) && ("" != $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ]) ) {
+				$_gtm_env = "+'&gtm_auth=" . $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] . "&gtm_preview=" . $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] . "&gtm_cookies_win=x'";
+			} else {
+				$_gtm_env = '';
+			}
+			
 			$_gtm_tag .= '
 <script data-cfasync="false">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
-\'https://www.googletagmanager.com/gtm.\''.'+\'js?id=\'+i+dl;f.parentNode.insertBefore(j,f);
+\'//www.googletagmanager.com/gtm.\''.'+\'js?id=\'+i+dl' . $_gtm_env . ';f.parentNode.insertBefore(j,f);
 })(window,document,\'script\',\'' . $gtm4wp_datalayer_name . '\',\'' . $one_gtm_code . '\');</script>';
 		}
 
@@ -714,6 +737,7 @@ function gtm4wp_body_class( $classes ) {
 
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
 add_action( "wp_head", "gtm4wp_wp_header_begin" );
+add_action( "wp_head", "gtm4wp_wp_header_top", 1 );
 add_action( "wp_footer", "gtm4wp_wp_footer" );
 add_action( "wp_loaded", "gtm4wp_wp_loaded" );
 add_filter( "body_class", "gtm4wp_body_class", 10000 );
@@ -724,7 +748,7 @@ add_action( "body_open", "gtm4wp_wp_body_open" );
 
 // compatibility with existing themes that natively support code injection after opening body tag
 add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
-add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme
+add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme		
 add_action( "elementor/page_templates/canvas/before_content", "gtm4wp_wp_body_open" ); // Elementor
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
