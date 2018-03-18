@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Requires PHP: 5.3
-Tested up to: 4.9.0
+Tested up to: 4.9.4
 Stable tag: 1.8
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
@@ -259,7 +259,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Fixed: weather data tracking codes could result in fatal PHP error
 * Fixed: cart events did to fire while user pressed the Enter key in quantity fields
+* Fixed: contact form 7 changed some code which prevented successful form submission tracking
 * Changed: links to plugin website updated
+* Changed: gtm4wp.cf7formid data layer variable now includes the ID of the form in WordPress
+* Added: gtm4wp.cf7inputs includes data that has been filled in the form
 * Added: [WooCommerce compatibility headers](https://docs.woocommerce.com/document/create-a-plugin/#section-10)
 * Added: admin warning for WooCommerce 2.x users. This plugin will drop support for WooCommerce 2.x soon
 * Added: postFormat data layer variable on singular pages
@@ -270,8 +273,11 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
   * Add gtm4wp.checkoutStepEEC to your Ecommerce Helper trigger
   * Change a typo: gtm4wp.checkoutOptionE**C**C => gtm4wp.checkoutOptionE**E**C
 * Added: option to include full product category path in enhanced ecommerce reporting (can cause performance issues on large sites!)
+* Added: initial support for [Google Tag Manager Environments](https://support.google.com/tagmanager/answer/6311518?hl=en)
+* Added: support for [WooCommerce Quick View plugin](https://woocommerce.com/products/woocommerce-quick-view/)
 * Updated: description of code placement options to clarify what this option does
 * Updated: cleanup of readme.txt, spelling and grammar improvements
+* Updated: bundled WhichBrowser lib v2.0.32
 
 
 = 1.7.2 =
@@ -517,7 +523,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.8 =
 
-TODO
+Lots of new features and some important changes, please read the changelog to ensure your measurement does not break
 
 = 1.7.2 =
 
