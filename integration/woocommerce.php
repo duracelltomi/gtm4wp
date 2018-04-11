@@ -754,7 +754,7 @@ function gtm4wp_woocommerce_wp_footer() {
 
 	if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
 		gtm4wp_woocommerce_addjs("
-		$( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped)' ).click(function() {
+		$( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)' ).click(function() {
 			var productdata = $( this ).closest( '.product' ).find( '.gtm4wp_productdata' );
 
 			". $gtm4wp_datalayer_name .".push({
@@ -842,7 +842,7 @@ function gtm4wp_woocommerce_wp_footer() {
 </script>";
 
 		gtm4wp_woocommerce_addjs("
-		$( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped)' ).click(function() {
+		$( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)' ).click(function() {
 			var productdata = $( this ).closest( '.product' ).find( '.gtm4wp_productdata' );
 
 			". $gtm4wp_datalayer_name .".push({
