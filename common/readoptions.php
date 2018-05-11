@@ -101,6 +101,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT', 'integrate-google-optim
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE',   'integrate-wp-e-commerce' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_AMPID',     'integrate-amp-id' );
 
 define( 'GTM4WP_PLACEMENT_FOOTER',        0 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN',      1 );
@@ -208,7 +209,10 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS     => "",
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => 4000,
 
-	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE => false
+	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE => false,
+
+	GTM4WP_OPTION_INTEGRATE_AMPID => ""
+
 );
 
 function gtm4wp_reload_options() {
