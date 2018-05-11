@@ -758,3 +758,7 @@ if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GT
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] != "" ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/google-optimize.php" );
 }
+
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] != "" ) ) {
+	require_once( dirname( __FILE__ ) . "/../integration/amp.php" );
+}
