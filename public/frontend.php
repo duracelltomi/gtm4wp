@@ -625,13 +625,15 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 function gtm4wp_wp_header_top() {
 	global $gtm4wp_datalayer_name;
 
-	echo '
+	if(!gtm4wp_amp_running()){
+		echo '
 <!-- Google Tag Manager for WordPress by DuracellTomi -->
 <script data-cfasync="false" type="text/javascript">
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];
 </script>
 <!-- End Google Tag Manager for WordPress by DuracellTomi -->';
+	}
 }
 
 function gtm4wp_wp_header_begin() {
@@ -680,12 +682,16 @@ function gtm4wp_wp_header_begin() {
 			$dl_json_data = json_encode( $gtm4wp_datalayer_data );
 		}
 
-		$_gtm_header_content .= '
-	' . $gtm4wp_datalayer_name . '.push(' . str_replace(
+		// Clean up and then push datalayer to AMP
+		$dl_json_data = str_replace(
 			array( '"-~-', '-~-"' ),
 			array( "", "" ),
 			str_replace( "", "-", $dl_json_data )
-		) . ');';
+		);
+		$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPCODE_DATALAYER ] = $dl_json_data;
+
+		$_gtm_header_content .= '
+	' . $gtm4wp_datalayer_name . '.push(' . $dl_json_data . ');';
 	}
 
 	$_gtm_header_content .= '
@@ -720,7 +726,10 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	$_gtm_header_content .= '
 <!-- End Google Tag Manager for WordPress by DuracellTomi -->';
 
-	echo $_gtm_header_content;
+	if(!gtm4wp_amp_running()){
+		echo $_gtm_header_content;
+	}
+
 }
 
 function gtm4wp_body_class( $classes ) {
