@@ -46,7 +46,7 @@ before_install:
   - pushd ${HOME}
 
 script:
-  - vendor/bin/phpunit --coverage-clover=coverage.xml
+  - phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec test.rb
 
 after_success:
