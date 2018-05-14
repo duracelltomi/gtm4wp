@@ -39,7 +39,7 @@ before_script:
 
   # Install composer packages before trying to activate themes or plugins
   # - composer install
-  - git clone https://github.com/Seravo/wordpress-test-template wp-tests
+  - git clone https://github.com/fergbrain/wordpress-test-template wp-tests
   - bash wp-tests/bin/install-wp-tests.sh test root '' localhost $WP_VERSION
 
 before_install:
@@ -48,6 +48,7 @@ before_install:
 script:
   - phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec test.rb
+  - phpcs --standard=WordPress ./**/*.php
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
