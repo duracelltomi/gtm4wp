@@ -597,7 +597,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						var _shipping_el = $( '#shipping_method input:checked' );
 						if ( _shipping_el.length > 0 ) {
 							". $gtm4wp_datalayer_name .".push({
-								'event': 'gtm4wp.checkoutOptionECC',
+								'event': 'gtm4wp.checkoutOptionEEC',
 								'ecommerce': {
 									'checkout_option': {
 										'actionField': {
@@ -612,7 +612,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						var _payment_el = $( '.payment_methods input:checked' );
 						if ( _payment_el.length > 0 ) {
 							". $gtm4wp_datalayer_name .".push({
-								'event': 'gtm4wp.checkoutOptionECC',
+								'event': 'gtm4wp.checkoutOptionEEC',
 								'ecommerce': {
 									'checkout_option': {
 										'actionField': {
@@ -744,8 +744,8 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	);
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "addtocartsingle" );
 
-	foreach( $eec_product_array as $ecc_product_array_key => $ecc_product_array_value ) {
-		echo '<input type="hidden" name="gtm4wp_' . esc_attr( $ecc_product_array_key ). '" value="' . esc_attr( $ecc_product_array_value ). '" />'."\n";
+	foreach( $eec_product_array as $eec_product_array_key => $eec_product_array_value ) {
+		echo '<input type="hidden" name="gtm4wp_' . esc_attr( $eec_product_array_key ). '" value="' . esc_attr( $eec_product_array_value ). '" />'."\n";
 	}
 }
 
