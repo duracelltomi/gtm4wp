@@ -5,6 +5,11 @@ language: php
 #  only:
 #    - master
 
+notifications:
+  on_success: never
+  on_failure: change
+  email: false
+
 env:
   global:
     - WP_VERSION=latest
@@ -23,7 +28,7 @@ matrix:
     - php: 7.0
     - php: 7.1
     - hhvm
-    
+    - nightly
   allow_failures:
     - php: nightly
 
@@ -39,16 +44,10 @@ before_script:
   - git clone https://github.com/fergbrain/wordpress-test-template wp-tests
   - bash wp-tests/bin/install-wp-tests.sh test root '' localhost $WP_VERSION
 
-before_install:
-  - pushd ${HOME}
-
 script:
+  - phpcs --standard=WordPress ./**/*.php
   - phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec test.rb
-  - phpcs --standard=WordPress ./**/*.php
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
-  
-notifications:
-  email: false
