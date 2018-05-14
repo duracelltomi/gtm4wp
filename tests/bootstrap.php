@@ -5,7 +5,7 @@ if ( ! $_tests_dir ) {
 	$_tests_dir = '/tmp/wordpress-tests-lib';
 }
 
-define('PLUGIN_NAME','your-plugin-name-here.php');
+define('PLUGIN_NAME','duracelltomi-google-tag-manager-for-wordpress.php');
 define('PLUGIN_FOLDER',basename(dirname( __DIR__ )));
 define('PLUGIN_PATH',PLUGIN_FOLDER.'/'.PLUGIN_NAME);
 
