@@ -5,6 +5,12 @@ tools:
   sensiolabs_security_checker: true
   external_code_coverage:
     timeout: 2500
+build:
+    nodes:
+        analysis:
+            dependencies:
+                before:
+                    - composer require --dev johnpbloch/wordpress
 checks:
     php:
         fix_php_opening_tag: false
@@ -21,3 +27,5 @@ checks:
 filter:
   excluded_paths:
     - tests/
+  dependency_paths:
+    - wordpress/
