@@ -5,6 +5,8 @@
   convertErrorsToExceptions="true"
   convertNoticesToExceptions="true"
   convertWarningsToExceptions="true"
+ 	verbose="true"
+	syntaxCheck="true"
   >
   <testsuites>
     <testsuite>
