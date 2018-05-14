@@ -34,6 +34,8 @@ before_script:
   # Composer support
   # - travis_retry composer self-update
   # - travis_retry composer install --no-interaction
+  # - composer require --dev johnpbloch/wordpress
+
 
   # Install composer packages before trying to activate themes or plugins
   # - composer install
