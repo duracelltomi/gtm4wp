@@ -10,21 +10,15 @@ notifications:
   on_failure: change
   email: false
 
-env:
-  global:
-    - WP_VERSION=latest
-    - WP_MULTISITE=0
-    - TEST_BUILD_DIR=${TRAVIS_BUILD_DIR}
-    - INSTALL_PHPUNIT=true
-    - WP_TEST_URL=http://localhost:12000
-    - WP_TEST_USER=test
-    - WP_TEST_USER_PASS=test
-    - WP_PROJECT_TYPE=plugin
+env: WP_PROJECT_TYPE=plugin WP_VERSION=latest WP_MULTISITE=0 WP_TEST_URL=http://localhost:12000 WP_TEST_USER=test WP_TEST_USER_PASS=test
 
+
+TEST_BUILD_DIR=${TRAVIS_BUILD_DIR} INSTALL_PHPUNIT=true
 matrix:
   fast_finish: true
   include:
     - php: 5.6
+      dist: precise
     - php: 7.0
     - php: 7.1
     - hhvm
