@@ -47,7 +47,7 @@ before_script:
 script:
   - phpcs --standard=WordPress ./**/*.php
   - phpunit --coverage-clover=coverage.xml
-  - cd wp-tests/spec && bundle exec rspec test.rb
+  - cd tests/spec && bundle exec rspec test.rb
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

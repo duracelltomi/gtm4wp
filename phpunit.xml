@@ -17,6 +17,7 @@
     <log type="coverage-clover" target="coverage.xml"/>
   </logging>
   <php>
+    <env name="PLUGIN_FILE" value="duracelltomi-google-tag-manager-for-wordpress.php"/>
     <ini name="display_errors" value="true"/>
     <ini name="display_startup_errors" value="true"/>
   </php>
