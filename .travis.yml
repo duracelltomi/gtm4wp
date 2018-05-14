@@ -1,10 +1,6 @@
 sudo: false
 language: php
 
-#branches:
-#  only:
-#    - master
-
 notifications:
   on_success: never
   on_failure: change
@@ -17,6 +13,10 @@ matrix:
   include:
     - php: 5.6
       dist: precise
+    - php: 5.5
+      dist: precise
+    - php: 5.4
+      dist: precise
     - php: 7.0
     - php: 7.1
     - hhvm
@@ -25,21 +25,24 @@ matrix:
     - php: nightly
 
 before_script:
-  # Composer support
-  # - travis_retry composer self-update
-  # - travis_retry composer install --no-interaction
-  # - composer require --dev johnpbloch/wordpress
-
-
   # Install composer packages before trying to activate themes or plugins
   # - composer install
-  - git clone https://github.com/koconder/wordpress-test-template wp-tests
+  - git clone https://github.com/Koodimonni/wordpress-test-template wp-tests
   - bash wp-tests/bin/install-wp-tests.sh test root '' localhost $WP_VERSION
+  # Test wordpress
+  - curl -i http://localhost:12000
+  # Install gems for rspec tests
+  - gem install bundler
+  - bundle install --gemfile=tests-rspec/Gemfile
 
 script:
-  - phpcs --standard=WordPress ./**/*.php
+  #- phpcs --standard=WordPress ./**/*.php
   - phpunit --coverage-clover=coverage.xml
-  - cd spec && bundle exec rspec test.rb
+  - cd tests-rspec && bundle exec rspec *.rb
+
+after_script:
+  - wget https://scrutinizer-ci.com/ocular.phar
+  - php ocular.phar code-coverage:upload --format=php-clover coverage.xml
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
