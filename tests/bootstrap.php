@@ -5,9 +5,12 @@ if ( ! $_tests_dir ) {
 	$_tests_dir = '/tmp/wordpress-tests-lib';
 }
 
-define('PLUGIN_NAME','duracelltomi-google-tag-manager-for-wordpress.php');
-define('PLUGIN_FOLDER',basename(dirname( __DIR__ )));
-define('PLUGIN_PATH',PLUGIN_FOLDER.'/'.PLUGIN_NAME);
+/**
+ * change PLUGIN_FILE env in phpunit.xml
+ */
+define('PLUGIN_FILE', getenv('PLUGIN_FILE') );
+define('PLUGIN_FOLDER', basename( dirname( __DIR__ ) ) );
+define('PLUGIN_PATH', PLUGIN_FOLDER.'/'.PLUGIN_FILE);
 
 // Activates this plugin in WordPress so it can be tested.
 $GLOBALS['wp_tests_options'] = array(
@@ -16,10 +19,12 @@ $GLOBALS['wp_tests_options'] = array(
 
 require_once $_tests_dir . '/includes/functions.php';
 
-function _manually_load_plugin() {
-	require dirname( __DIR__ ) . '/'.PLUGIN_NAME;
-}
-
+/*
+ * Activate this plugin automatically
+ */
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );
+function _manually_load_plugin() {
+	require dirname( __DIR__ ) . '/'. PLUGIN_FILE;
+}
 
 require $_tests_dir . '/includes/bootstrap.php';

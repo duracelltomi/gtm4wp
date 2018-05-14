@@ -18,7 +18,17 @@
   </logging>
   <php>
     <env name="PLUGIN_FILE" value="duracelltomi-google-tag-manager-for-wordpress.php"/>
-    <ini name="display_errors" value="true"/>
+    <ini name="display_errors" value="false"/>
     <ini name="display_startup_errors" value="true"/>
   </php>
+  <filter>
+    <whitelist processUncoveredFilesFromWhitelist="true">
+      <directory suffix=".php">./</directory>
+      <file>/path/to/file</file>
+      <exclude>
+        <directory suffix=".php">./</directory>
+        <file>/path/to/file</file>
+      </exclude>
+    </whitelist>
+  </filter>
 </phpunit>
