@@ -30,6 +30,10 @@ matrix:
     - php: nightly
 
 before_script:
+  # Composer support
+  - travis_retry composer self-update
+  - travis_retry composer install --no-interaction --prefer-source --dev
+
   # Install composer packages before trying to activate themes or plugins
   # - composer install
   - git clone https://github.com/Seravo/wordpress-test-template wp-tests
@@ -39,5 +43,8 @@ before_install:
   - pushd ${HOME}
 
 script:
-  - phpunit
+  - vendor/bin/phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec test.rb
+
+after_success:
+    - bash <(curl -s https://codecov.io/bash)
