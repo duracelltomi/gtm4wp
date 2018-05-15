@@ -8,21 +8,22 @@ notifications:
 
 env: WP_PROJECT_TYPE=plugin WP_VERSION=latest WP_MULTISITE=0 WP_TEST_URL=http://localhost:12000 WP_TEST_USER=test WP_TEST_USER_PASS=test
 
-matrix:
-  fast_finish: true
-  include:
-    - php: 5.6
-      dist: precise
-    - php: 5.5
-      dist: precise
-    - php: 5.4
-      dist: precise
-    - php: 7.0
-    - php: 7.1
+php:
+    - 5.4
+    - 5.5
+    - 5.6
+    - 7.0
+    - 7.1
     - hhvm
     - nightly
+
+matrix:
+  fast_finish: true
   allow_failures:
     - php: nightly
+    - php: hhvm
+
+cache: bundler
 
 before_script:
   # Install composer packages before trying to activate themes or plugins
@@ -35,17 +36,14 @@ before_script:
   # Test wordpress
   - curl -i http://localhost:12000
 
-  # Install gems for rspec tests and run
-  - gem install bundler
-  - bundle install --gemfile=wp-tests/spec/Gemfile
-
 script:
   #- phpcs --standard=WordPress ./**/*.php
   - phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec *.rb
+
 after_script:
   - wget https://scrutinizer-ci.com/ocular.phar
   - php ocular.phar code-coverage:upload --format=php-clover coverage.xml
-
+  
 after_success:
   - bash <(curl -s https://codecov.io/bash)
