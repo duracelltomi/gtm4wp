@@ -496,6 +496,11 @@ $GLOBALS["gtm4wp_advancedfieldtexts"] = array(
 		"label"       => __( "Environment gtm_preview parameter", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
+	),
+	GTM4WP_OPTION_REMOTE_IP => array(
+		"label"       => __( "Push the Visitors IP into the dataLayer", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Push the Clients IP into the dataLayer for filtering internal Traffic. This is usefull for example to add IP Filtering in GTM in stead of in Google Analytics.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
 	)
 );
 
