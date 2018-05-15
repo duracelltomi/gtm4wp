@@ -499,7 +499,7 @@ $GLOBALS["gtm4wp_advancedfieldtexts"] = array(
 	),
 	GTM4WP_OPTION_REMOTE_IP => array(
 		"label"       => __( "Push the Visitors IP into the dataLayer", 'duracelltomi-google-tag-manager' ),
-		"description" => __( "Push the Clients IP into the dataLayer for filtering internal Traffic. This is usefull for example to add IP Filtering in GTM in stead of in Google Analytics.", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Push the Clients IP into the dataLayer for filtering internal Traffic. Possible usecase: add IP Filtering in GTM instead of in Google Analytics. Under GDPR its not allowed to send full IP addresses to GA without explicit consent. You are allowed to use GA without explicit consent if you use the anonimizeip option in GTM. Only problem is that it will break your IP Filtering in GA. Enabling this option gives you the ability to move the IP Filtering to GTM. Be aware: saving/storing the visitor IP anywhere requires explicit consent under GDPR.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	)
 );
