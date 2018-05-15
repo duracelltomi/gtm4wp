@@ -40,6 +40,8 @@ script:
   #- phpcs --standard=WordPress ./**/*.php
   - phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec *.rb
+  # Syntax check all php files and fail for any error text in STDERR
+  - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
 
 after_script:
   - wget https://scrutinizer-ci.com/ocular.phar
