@@ -3,6 +3,7 @@ define( 'GTM4WP_OPTIONS',                      'gtm4wp-options' );
 define( 'GTM4WP_OPTION_GTM_CODE',              'gtm-code' );
 define( 'GTM4WP_OPTION_GTM_PLACEMENT',         'gtm-code-placement' );
 define( 'GTM4WP_OPTION_DATALAYER_NAME',        'gtm-datalayer-variable-name' );
+define( 'GTM4WP_OPTION_REMOTE_IP',             'gtm-remote-ip' );
 define( 'GTM4WP_OPTION_ENV_GTM_AUTH',          'gtm-env-gtm-auth' );
 define( 'GTM4WP_OPTION_ENV_GTM_PREVIEW',       'gtm-env-gtm-preview' );
 
@@ -112,6 +113,7 @@ $gtm4wp_options = array();
 $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_GTM_CODE        => "",
 	GTM4WP_OPTION_DATALAYER_NAME  => "",
+	GTM4WP_OPTION_REMOTE_IP       => false,
 	GTM4WP_OPTION_GTM_PLACEMENT   => GTM4WP_PLACEMENT_FOOTER,
 	GTM4WP_OPTION_ENV_GTM_AUTH    => "",
 	GTM4WP_OPTION_ENV_GTM_PREVIEW => "",
