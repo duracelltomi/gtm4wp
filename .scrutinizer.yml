@@ -1,0 +1,31 @@
+tools:
+  php_code_sniffer:
+    config:
+      standard: WordPress
+  sensiolabs_security_checker: true
+  external_code_coverage:
+    timeout: 2500
+build:
+    nodes:
+        analysis:
+            dependencies:
+                before:
+                    - composer require --dev johnpbloch/wordpress
+checks:
+    php:
+        fix_php_opening_tag: false
+        remove_php_closing_tag: false
+        no_mixed_inline_html: false
+        require_braces_around_control_structures: false
+        psr2_control_structure_declaration: false
+        avoid_superglobals: false
+        security_vulnerabilities: false
+        no_exit: false
+        coding_standard:
+            name: WordPress
+    javascript: true
+filter:
+  excluded_paths:
+    - tests/
+  dependency_paths:
+    - wordpress/
