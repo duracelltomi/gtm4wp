@@ -1184,7 +1184,7 @@ function gtm4wp_admin_head() {
 					.hide();
 
 				if ( currentval != "" ) {
-					var gtmauth_regex = /^[a-zA-Z0-9-]+$/;
+					var gtmauth_regex = /^[a-zA-Z0-9-_]+$/;
 					if ( ! gtmauth_regex.test( currentval ) ) {
 						jQuery( ".gtmauth_validation_error" )
 							.show();
