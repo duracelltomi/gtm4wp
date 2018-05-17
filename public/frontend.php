@@ -13,6 +13,16 @@ if ( empty($GLOBALS[ "gtm4wp_options" ] ) || ($GLOBALS[ "gtm4wp_options" ][ GTM4
 	$GLOBALS[ "gtm4wp_datalayer_name" ] = $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_DATALAYER_NAME ];
 }
 
+// Moving include to top due to hierarchy of includes
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] != "" ) ) {
+	require_once( dirname( __FILE__ ) . "/../integration/amp.php" );
+}
+if (!function_exists('gtm4wp_amp_running')){
+	function gtm4wp_amp_running(){
+		return false;
+	}
+}
+
 function gtm4wp_is_assoc($arr) {
 	// borrowed from
 	// http://stackoverflow.com/questions/173400/php-arrays-a-good-way-to-check-if-an-array-is-associative-or-sequential
@@ -766,8 +776,4 @@ if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GT
 
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] != "" ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/google-optimize.php" );
-}
-
-if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] != "" ) ) {
-	require_once( dirname( __FILE__ ) . "/../integration/amp.php" );
 }

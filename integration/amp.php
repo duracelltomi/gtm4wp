@@ -44,7 +44,7 @@ function gtm4wp_amp_gtmvariables(){
 
 // Check AMP Analytics has not been included already
 // https://github.com/Automattic/amp-wp/blob/develop/includes/amp-post-template-actions.php
-function gtm4wo_amp_gtmampcode_check($data){
+function gtm4wp_amp_gtmampcode_check($data){
 	if ( ! empty( $data['amp_analytics'] ) && !$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPCODE_AMP] ) {
 		$data['amp_component_scripts']['amp-analytics'] = 'https://cdn.ampproject.org/v0/amp-analytics-0.1.js';
 		define('GTM4WP_PLACEMENT_AMP_TAG', true);
@@ -53,7 +53,7 @@ function gtm4wo_amp_gtmampcode_check($data){
 }
 
 // Some injection for AMP code
-add_action( 'amp_post_template_data', 'gtm4wo_amp_gtmampcode_check' );
+add_action( 'amp_post_template_data', 'gtm4wp_amp_gtmampcode_check' );
 
 // Load up the gtm4wp plugin when AMP loads
 add_action( 'amp_post_template_head', 'gtm4wp_wp_header_begin');
