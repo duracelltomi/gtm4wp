@@ -795,8 +795,8 @@ function gtm4wp_sanitize_options($options) {
 			} else if ( ( $optionname == GTM4WP_OPTION_DATALAYER_NAME ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^[a-zA-Z][a-zA-Z0-9_-]*$/", $newoptionvalue ) ) ) {
 				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']', __( "Invalid dataLayer variable name. Please start with a character from a-z or A-Z followed by characters from a-z, A-Z, 0-9 or '_' or '-'!", 'duracelltomi-google-tag-manager' ) );
 
-			} else if ( ( $optionname == GTM4WP_OPTION_ENV_GTM_AUTH ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^[a-zA-Z0-9-]+$/", $newoptionvalue ) ) ) {
-				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']', __( "Invalid gtm_auth environment parameter value. It should only contain letters, number and the '-' character.", 'duracelltomi-google-tag-manager' ) );
+			} else if ( ( $optionname == GTM4WP_OPTION_ENV_GTM_AUTH ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^[a-zA-Z0-9-_]+$/", $newoptionvalue ) ) ) {
+				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']', __( "Invalid gtm_auth environment parameter value. It should only contain letters, numbers or the '-' and '_' characters.", 'duracelltomi-google-tag-manager' ) );
 
 			} else if ( ( $optionname == GTM4WP_OPTION_ENV_GTM_PREVIEW ) && ( $newoptionvalue != "" ) && ( ! preg_match( "/^env-[0-9]+$/", $newoptionvalue ) ) ) {
 				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']', __( "Invalid gtm_preview environment parameter value. It should have the format 'env-NN' where NN is an integer number.", 'duracelltomi-google-tag-manager' ) );
@@ -1101,7 +1101,7 @@ function gtm4wp_add_admin_js($hook) {
 	global $gtp4wp_plugin_url;
 	
 	if ( $hook == "settings_page_" . GTM4WP_ADMINSLUG ) {
-		wp_register_script( "admin-subtabs", $gtp4wp_plugin_url . "js/admin-subtabs.js" );
+		wp_register_script( "admin-subtabs", $gtp4wp_plugin_url . "js/admin-subtabs.js", array(), "1.1.1" );
 
 		$subtabtexts = array(
 			"posttabtitle" => __( "Posts" , 'duracelltomi-google-tag-manager' ),
@@ -1123,7 +1123,8 @@ function gtm4wp_add_admin_js($hook) {
 			"misctabtitle" => __( "Misc" , 'duracelltomi-google-tag-manager' )
 		);
 		wp_localize_script( "admin-subtabs", 'gtm4wp', $subtabtexts );
-		wp_enqueue_script( "admin-subtabs" );
+
+		wp_enqueue_script( "admin-subtabs", array(), '1.1.1' );
 
 		wp_enqueue_script( "admin-tabcreator", $gtp4wp_plugin_url . "js/admin-tabcreator.js", array( "jquery-core" ), "1.0" );
 
@@ -1239,7 +1240,7 @@ function gtm4wp_admin_head() {
 					.hide();
 
 				if ( currentval != "" ) {
-					var gtmauth_regex = /^[a-zA-Z0-9-]+$/;
+					var gtmauth_regex = /^[a-zA-Z0-9-_]+$/;
 					if ( ! gtmauth_regex.test( currentval ) ) {
 						jQuery( ".gtmauth_validation_error" )
 							.show();
