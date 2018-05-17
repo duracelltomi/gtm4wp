@@ -478,6 +478,14 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"label"         => __( "Google Optimize page-hiding timeout", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "Enter here the amount of time in milliseconds that the page-hiding snippet should wait before page content gets visible even if Google Optimize has not been completely loaded yet.", 'duracelltomi-google-tag-manager' ),
 		"phase"         => GTM4WP_PHASE_EXPERIMENTAL
+	),
+
+	GTM4WP_OPTION_INTEGRATE_AMPID => array(
+		"label"         => __( "Google Tag Manager 'AMP' Container ID", 'duracelltomi-google-tag-manager' ),
+		"description"   => sprintf( __( "Enter a comma separated list of Google Tag Manager container IDs that you would like to use on your site. This plugin will add the <a href=\"%s\">AMP GTM snippet</a> to your AMP pages.", 'duracelltomi-google-tag-manager' ), 'https://support.google.com/tagmanager/answer/6103696?hl=en' ) .
+			'<br /><span class="ampid_validation_error">' . __( "This does not seems to be a valid Google Tag Manager Container ID! Valid format: GTM-XXXXXX where X can be numbers and capital letters. Use comma without any space (,) to enter multpile IDs.", 'duracelltomi-google-tag-manager' ) . '</span>',
+		"phase"         => GTM4WP_PHASE_EXPERIMENTAL,
+		"plugintocheck" => "amp/amp.php"
 	)
 );
 
@@ -741,6 +749,27 @@ function gtm4wp_sanitize_options($options) {
 			
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) {
 			$output[$optionname] = trim( (string) $newoptionvalue );
+
+		// Accelerated Mobile Pages settings
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_AMPID ) {
+			$_ampid_val  = trim($newoptionvalue);
+			if ( "" == $_ampid_val ) {
+				$_ampid_list = array();
+			} else {
+				$_ampid_list = explode( ",", $_ampid_val );
+			}
+			$_ampid_haserror = false;
+
+			foreach( $_ampid_list as $one_amp_id ) {
+				$_ampid_haserror = $_ampid_haserror || !preg_match( "/^GTM-[A-Z0-9]+$/", $one_amp_id );
+			}
+
+			if ( $_ampid_haserror && (count($_ampid_list) > 0) ) {
+				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_AMPID . ']', __( "Invalid AMP Google Tag Manager Container ID. Valid ID format: GTM-XXXXX. Use comma without additional space (,) to enter more than one ID.", 'duracelltomi-google-tag-manager' ) );
+			} else {
+				$output[$optionname] = $newoptionvalue;
+			}
+
 
 		// integrations
 		} else if ( substr($optionname, 0, 10) == "integrate-" ) {
@@ -1085,6 +1114,7 @@ function gtm4wp_add_admin_js($hook) {
 			"wpcf7tabtitle" => __( "Contact Form 7" , 'duracelltomi-google-tag-manager' ),
 			"wctabtitle" => __( "WooCommerce" , 'duracelltomi-google-tag-manager' ),
 			"gotabtitle" => __( "Google Optimize" , 'duracelltomi-google-tag-manager' ),
+			"amptabtitle" => __( "Accelerated Mobile Pages" , 'duracelltomi-google-tag-manager' ),
 			"weathertabtitle" => __( "Weather data" , 'duracelltomi-google-tag-manager' ),
 			"generaleventstabtitle" => __( "General events" , 'duracelltomi-google-tag-manager' ),
 			"mediaeventstabtitle" => __( "Media events" , 'duracelltomi-google-tag-manager' ),
@@ -1106,6 +1136,7 @@ function gtm4wp_admin_head() {
 <style type="text/css">
 	.gtmid_validation_error,
 	.goid_validation_error,
+	.ampid_validation_error,
 	.datalayername_validation_error,
 	.gtmauth_validation_error,
 	.gtmpreview_validation_error {
@@ -1155,6 +1186,30 @@ function gtm4wp_admin_head() {
 						.show();
 				} else {
 					jQuery( ".goid_validation_error" )
+						.hide();
+				}
+			});
+
+		jQuery( "#gtm4wp-options\\\\[integrate-amp-gtm\\\\]" )
+			.bind( "blur", function() {
+				var ampid_regex = /^GTM-[A-Z0-9]+$/;
+				var ampid_val  = jQuery( this ).val().trim();
+				if ( "" == ampid_val ) {
+					ampid_list = [];
+				} else {
+					var ampid_list = ampid_val.split( "," );
+				}
+
+				var ampid_haserror = false;
+				for( var i=0; i<ampid_list.length; i++ ) {
+					ampid_haserror = ampid_haserror || !ampid_regex.test( goid_list[ i ] );
+				}
+
+				if ( ampid_haserror && (ampid_list.length > 0) ) {
+					jQuery( ".ampid_validation_error" )
+						.show();
+				} else {
+					jQuery( ".ampid_validation_error" )
 						.hide();
 				}
 			});
