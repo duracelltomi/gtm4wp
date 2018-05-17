@@ -1101,7 +1101,7 @@ function gtm4wp_add_admin_js($hook) {
 	global $gtp4wp_plugin_url;
 	
 	if ( $hook == "settings_page_" . GTM4WP_ADMINSLUG ) {
-		wp_register_script( "admin-subtabs", $gtp4wp_plugin_url . "js/admin-subtabs.js" );
+		wp_register_script( "admin-gotabtitle", $gtp4wp_plugin_url . "js/admin-subtabs.js");
 
 		$subtabtexts = array(
 			"posttabtitle" => __( "Posts" , 'duracelltomi-google-tag-manager' ),
@@ -1123,7 +1123,7 @@ function gtm4wp_add_admin_js($hook) {
 			"misctabtitle" => __( "Misc" , 'duracelltomi-google-tag-manager' )
 		);
 		wp_localize_script( "admin-subtabs", 'gtm4wp', $subtabtexts );
-		wp_enqueue_script( "admin-subtabs" );
+		wp_enqueue_script( "admin-subtabs", '', '20180517' );
 
 		wp_enqueue_script( "admin-tabcreator", $gtp4wp_plugin_url . "js/admin-tabcreator.js", array( "jquery-core" ), "1.0" );
 
