@@ -12,27 +12,18 @@ function gtm4wp_amp_running(){
 function gtm4wp_amp_gtmcode(){
 	global $gtm4wp_options;
 
-	// Checks to make sure we can only run once.
-	if($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPCODE_GTM ]){
-		return false;
+	// Documentation for schema: https://developers.google.com/analytics/devguides/collection/amp-analytics/
+	$gtm4wp_ampids = explode( ",", $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPID ] );
+	$gtm4wp_ampid_list = array();
+		
+	if ( count( $gtm4wp_ampids ) > 0 ) {
 
-	}else{
-		// Run once
-		$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPCODE_GTM ] = true;
+		foreach( $gtm4wp_ampids as $gtm4wp_oneampid ) {
 
-		// Documentation for schema: https://developers.google.com/analytics/devguides/collection/amp-analytics/
-		$gtm4wp_ampids = explode( ",", $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPID ] );
-		$gtm4wp_ampid_list = array();
-			
-		if ( count( $gtm4wp_ampids ) > 0 ) {
+			// Based on examples from https://www.simoahava.com/analytics/accelerated-mobile-pages-via-google-tag-manager/#creating-custom-amp-variables
+			echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id='.$gtm4wp_oneampid.'&gtm.url=SOURCE_URL" data-credentials="include">'.gtm4wp_amp_gtmvariables().'</amp-analytics>';
+		}
 
-			foreach( $gtm4wp_ampids as $gtm4wp_oneampid ) {
-
-				// Based on examples from https://www.simoahava.com/analytics/accelerated-mobile-pages-via-google-tag-manager/#creating-custom-amp-variables
-				echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id='.$gtm4wp_oneampid.'&gtm.url=SOURCE_URL" data-credentials="include">'.gtm4wp_amp_gtmvariables().'</amp-analytics>';
-			}
-
-		}//Finished GTM Container loading		
 	}
 }
 
@@ -61,5 +52,5 @@ add_action( 'amp_post_template_head', 'gtm4wp_wp_header_top', 1 );
 
 // Inject the Google Tag Manager to the page
 // Try amp_post_template_body (https://github.com/Automattic/amp-wp/pull/1143)
-add_action( 'amp_post_template_body', 'gtm4wp_amp_gtmcode');
+//add_action( 'amp_post_template_body', 'gtm4wp_amp_gtmcode');
 add_action( 'amp_post_template_footer', 'gtm4wp_amp_gtmcode');
