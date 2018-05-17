@@ -1,24 +1,51 @@
+sudo: false
 language: php
 
-branches:
-  only:
-    - master
+notifications:
+  on_success: never
+  on_failure: change
+  email: false
 
-env:
-  global:
-    - WP_VERSION=latest
-    - WP_MULTISITE=0
-    - TEST_BUILD_DIR=${TRAVIS_BUILD_DIR}
-    - INSTALL_PHPUNIT=true
-    - DB_HOST=localhost
-    - PATH=${HOME}/bin:${PATH}
+env: WP_PROJECT_TYPE=plugin WP_VERSION=latest WP_MULTISITE=0 WP_TEST_URL=http://localhost:12000 WP_TEST_USER=test WP_TEST_USER_PASS=test WP_PLUGINLIST=woocommerce;amp
+
+php:
+    #- 5.4
+    - 5.5
+    - 5.6
+    - 7.0
+    - 7.1
+    - hhvm
+    - nightly
 
 matrix:
-  include:
-    - php: 5.6
-      env: RUN_CS_FIXER=true
-    - php: 7.0
-    - php: 7.1
+  fast_finish: true
+  allow_failures:
+    - php: nightly
+    - php: hhvm
 
-before_install:
-  - pushd ${HOME}
+cache: bundler
+
+before_script:
+  # Install composer packages before trying to activate themes or plugins
+  # - composer install
+
+  # Install Wordpress testing suite and run wordpress
+  - git clone https://github.com/koconder/wordpress-test-template wp-tests
+  - bash wp-tests/bin/install-wp-tests.sh test root '' localhost $WP_VERSION
+
+  # Test wordpress
+  - curl -i http://localhost:12000
+
+script:
+  #- phpcs --standard=WordPress ./**/*.php
+  - phpunit --coverage-clover=coverage.xml
+  - cd wp-tests/spec && bundle exec rspec *.rb
+  # Syntax check all php files and fail for any error text in STDERR
+  - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
+
+after_script:
+  - wget https://scrutinizer-ci.com/ocular.phar
+  - php ocular.phar code-coverage:upload --format=php-clover coverage.xml
+  
+after_success:
+  - bash <(curl -s https://codecov.io/bash)https://developer.wordpress.org/cli/commands/plugin/install/in
