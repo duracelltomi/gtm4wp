@@ -634,7 +634,7 @@ function gtm4wp_wp_header_top() {
 <!-- End Google Tag Manager for WordPress by DuracellTomi -->';
 }
 
-function gtm4wp_wp_header_begin() {
+function gtm4wp_wp_header_begin($echo = true) {
 	global $gtm4wp_datalayer_name, $gtm4wp_options;
 
 	$_gtm_header_content = '
@@ -720,7 +720,11 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	$_gtm_header_content .= '
 <!-- End Google Tag Manager for WordPress by DuracellTomi -->';
 
-	echo $_gtm_header_content;
+    if($echo) {
+      echo $_gtm_header_content;
+    }
+  
+    return $_gtm_header_content;
 }
 
 function gtm4wp_body_class( $classes ) {
