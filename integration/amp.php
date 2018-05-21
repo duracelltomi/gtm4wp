@@ -36,7 +36,7 @@ function gtm4wp_amp_running(){
 }
 
 /**
- * Check and inject AMP Project's AMP Analytics tag
+ * Pre-injection Check AMP Project's AMP Analytics tag, using amp-wp hook
  *
  * @link https://github.com/Automattic/amp-wp/blob/develop/includes/amp-post-template-actions.php
  * @author Vincent Koc <https://github.com/koconder/>
@@ -49,14 +49,29 @@ function gtm4wp_amp_gtmampcode_check($data){
 	if ( ! empty( $data['amp_analytics'] ) ) {
 		// Inject into AMP Plugin to load
 		$data['amp_component_scripts']['amp-analytics'] = 'https://cdn.ampproject.org/v0/amp-analytics-0.1.js';
+		$gtm4wp_amp_headerinjected = true;
+
+	// Manually load into AMP-WP Plugin
 	}else{
-		// Push code onto the page manually
-		echo '<script async custom-element="amp-analytics" src="https://cdn.ampproject.org/v0/amp-analytics-0.1.js"></script>';
+		// Inject manually based on AMP <head> hook
+		add_action( 'amp_post_template_head', 'gtm4wp_amp_gtmampcode_injecthead');
 	}
 
-	// Set global status for us to expand to other plugins
-	$gtm4wp_amp_headerinjected = true;
+	// Return the $data back to amp-wp hook
 	return $data;
+}
+
+/**
+ * Post-check AMP Project's AMP Analytics tag, using amp-wp hook
+ *
+ * @link https://github.com/Automattic/amp-wp/blob/develop/includes/amp-post-template-actions.php
+ * @author Vincent Koc <https://github.com/koconder/>
+ */
+function gtm4wp_amp_gtmampcode_injecthead(){
+	global $gtm4wp_amp_headerinjected;
+
+	$gtm4wp_amp_headerinjected = true;
+	echo '<script async custom-element="amp-analytics" src="https://cdn.ampproject.org/v0/amp-analytics-0.1.js"></script>';
 }
 
 /**
