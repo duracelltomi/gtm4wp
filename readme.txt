@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adw
 Requires at least: 3.4.0
 Requires PHP: 5.3
 Tested up to: 4.9.5
-Stable tag: 1.8
+Stable tag: 1.8.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -254,6 +254,13 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.8.1 =
+
+* Fixed: JavaScript error around the variable gtm4wp_use_sku_instead
+* Fixed: Added _ as a valid character for gtm_auth GTM environment variable
+* Fixed: Corrected typo - gtm4wp.checkoutStepE**E**C
+* Updated: added CDATA markup around container code for better DOM compatibility 
 
 = 1.8 =
 
@@ -520,6 +527,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.8.1 =
+
+Bugfix version fixing some issues around WooCommerce tracking and GTM environments
 
 = 1.8 =
 
