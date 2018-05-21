@@ -118,6 +118,11 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"description" => __( "Check this option to include the date of creation (registration) of the logged in user.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	),
+	GTM4WP_OPTION_INCLUDE_VISITOR_IP => array(
+		"label"       => __( "Visitors IP", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Check this option to include the IP address of the visitor. You might use this to filter internal traffic inside your GTM container. Please be aware that per GDPR its not allowed to transmit this full IP address to Google Analytics or to any other measurement system without explicit consent from the visitor.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
 	GTM4WP_OPTION_INCLUDE_REMARKETING => array(
 		"label"       => __( "Remarketing variable", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Check this option to include a dataLayer variable where all dataLayer values are stored to be included in your AdWords remarketing tag as a custom variable field", 'duracelltomi-google-tag-manager' ),
@@ -495,11 +500,6 @@ $GLOBALS["gtm4wp_advancedfieldtexts"] = array(
 	GTM4WP_OPTION_ENV_GTM_PREVIEW => array(
 		"label"       => __( "Environment gtm_preview parameter", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.", 'duracelltomi-google-tag-manager' ),
-		"phase"       => GTM4WP_PHASE_STABLE
-	),
-	GTM4WP_OPTION_REMOTE_IP => array(
-		"label"       => __( "Push the Visitors IP into the dataLayer", 'duracelltomi-google-tag-manager' ),
-		"description" => __( "Push the Clients IP into the dataLayer for filtering internal Traffic. Possible usecase: add IP Filtering in GTM instead of in Google Analytics. Under GDPR its not allowed to send full IP addresses to GA without explicit consent. You are allowed to use GA without explicit consent if you use the anonimizeip option in GTM. Only problem is that it will break your IP Filtering in GA. Enabling this option gives you the ability to move the IP Filtering to GTM. Be aware: saving/storing the visitor IP anywhere requires explicit consent under GDPR.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	)
 );
