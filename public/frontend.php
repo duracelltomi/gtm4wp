@@ -82,7 +82,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
     }
 	}
 
-	if($gtm4wp_options[ GTM4WP_OPTION_REMOTE_IP ]){
+	if($gtm4wp_options[ GTM4WP_OPTION_VISITOR_IP ]){
 		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
 			//check ip from share internet
 			$ip = $_SERVER['HTTP_CLIENT_IP'];
@@ -93,7 +93,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$ip = $_SERVER['REMOTE_ADDR'];
 		}
 
-		$dataLayer["remoteIP"] = $ip; 
+		$dataLayer["visitorIP"] = $ip; 
 	}
 	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
