@@ -3,7 +3,6 @@ define( 'GTM4WP_OPTIONS',                      'gtm4wp-options' );
 define( 'GTM4WP_OPTION_GTM_CODE',              'gtm-code' );
 define( 'GTM4WP_OPTION_GTM_PLACEMENT',         'gtm-code-placement' );
 define( 'GTM4WP_OPTION_DATALAYER_NAME',        'gtm-datalayer-variable-name' );
-define( 'GTM4WP_OPTION_VISITOR_IP',             'gtm-visitor-ip' );
 define( 'GTM4WP_OPTION_ENV_GTM_AUTH',          'gtm-env-gtm-auth' );
 define( 'GTM4WP_OPTION_ENV_GTM_PREVIEW',       'gtm-env-gtm-preview' );
 
@@ -14,6 +13,7 @@ define( 'GTM4WP_OPTION_INCLUDE_USERID',        'include-userid' );
 define( 'GTM4WP_OPTION_INCLUDE_USEREMAIL',     'include-useremail' );
 define( 'GTM4WP_OPTION_INCLUDE_USERREGDATE',   'include-userregdate' );
 define( 'GTM4WP_OPTION_INCLUDE_USERNAME',      'include-username' );
+define( 'GTM4WP_OPTION_INCLUDE_VISITOR_IP',    'include-visitor-ip' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTTYPE',      'include-posttype' );
 define( 'GTM4WP_OPTION_INCLUDE_CATEGORIES',    'include-categories' );
 define( 'GTM4WP_OPTION_INCLUDE_TAGS',          'include-tags' );
@@ -113,7 +113,6 @@ $gtm4wp_options = array();
 $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_GTM_CODE        => "",
 	GTM4WP_OPTION_DATALAYER_NAME  => "",
-	GTM4WP_OPTION_VISITOR_IP       => false,
 	GTM4WP_OPTION_GTM_PLACEMENT   => GTM4WP_PLACEMENT_FOOTER,
 	GTM4WP_OPTION_ENV_GTM_AUTH    => "",
 	GTM4WP_OPTION_ENV_GTM_PREVIEW => "",
@@ -125,6 +124,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_USEREMAIL     => false,
 	GTM4WP_OPTION_INCLUDE_USERREGDATE   => false,
 	GTM4WP_OPTION_INCLUDE_USERNAME      => false,
+	GTM4WP_OPTION_INCLUDE_VISITOR_IP    => false,
 	GTM4WP_OPTION_INCLUDE_POSTTYPE      => true,
 	GTM4WP_OPTION_INCLUDE_CATEGORIES    => true,
 	GTM4WP_OPTION_INCLUDE_TAGS          => true,

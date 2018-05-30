@@ -83,12 +83,12 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
     }
 	}
 
-	if($gtm4wp_options[ GTM4WP_OPTION_VISITOR_IP ]){
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_VISITOR_IP ] ) {
 		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-			//check ip from share internet
+			//check ip from shared internet
 			$ip = $_SERVER['HTTP_CLIENT_IP'];
 		} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			//to check ip is pass from proxy
+			//to check ip is passed from proxy
 			$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
 		} else {
 			$ip = $_SERVER['REMOTE_ADDR'];
