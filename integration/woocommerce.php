@@ -395,7 +395,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$product_price = $order->get_item_total( $item );
 					$_temp_productdata = array(
 						"id"       => $remarketing_id,
-						"name"     => $item['name'],
+						"name"     => $product->get_title(),
 						"sku"      => $product_sku ? $product_sku : $product_id,
 						"category" => $product_cat,
 						"price"    => $product_price,
