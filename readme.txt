@@ -259,9 +259,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Added: new visitorIP data layer variable to support post-GDPR implementations where for example internal traffic exclusion has to be made inside the browser
 * Fixed: JavaScript error around the variable gtm4wp_use_sku_instead
-* Fixed: Added _ as a valid character for gtm_auth GTM environment variable
-* Fixed: Corrected typo - gtm4wp.checkoutStepE**E**C
-* Fixed: Two strings were not recognized by WordPress Translate on the admin page
+* Fixed: added _ as a valid character for gtm_auth GTM environment variable
+* Fixed: corrected typo - gtm4wp.checkoutStepE**E**C
+* Fixed: two strings were not recognized by WordPress Translate on the admin page
+* Fixed: some other plugins call found_variation event of WooCommerce without product variation data being included
 * Updated: added CDATA markup around container code for better DOM compatibility
 * Updated: removed 'SKU:' prefix text from classic ecommerce dimension as it broke some enhanced ecommerce reports
 
