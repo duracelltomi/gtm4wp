@@ -64,6 +64,11 @@
 	});
 
 	jQuery(document).on( 'found_variation', function( event, product_variation ) {
+		if ( "undefined" == typeof product_variation ) {
+			// some ither plugins trigger this event without variation data
+			return;
+		}
+	
 	  var _product_form     = event.target;
 	  var _product_var_id   = jQuery( '[name=variation_id]', _product_form );
 	  var _product_id       = jQuery( '[name=gtm4wp_id]', _product_form ).val();
