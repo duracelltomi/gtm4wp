@@ -263,6 +263,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Fixed: corrected typo - gtm4wp.checkoutStepE**E**C
 * Fixed: two strings were not recognized by WordPress Translate on the admin page
 * Fixed: some other plugins call found_variation event of WooCommerce without product variation data being included
+* Fixed: product name included variation name on order received page which broke GA product reports
 * Updated: added CDATA markup around container code for better DOM compatibility
 * Updated: removed 'SKU:' prefix text from classic ecommerce dimension as it broke some enhanced ecommerce reports
 
