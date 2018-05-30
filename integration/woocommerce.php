@@ -396,7 +396,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$_temp_productdata = array(
 						"id"       => $remarketing_id,
 						"name"     => $item['name'],
-						"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product_id,
+						"sku"      => $product_sku ? $product_sku : $product_id,
 						"category" => $product_cat,
 						"price"    => $product_price,
 						"currency" => get_woocommerce_currency(),
@@ -741,7 +741,7 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	$_temp_productdata = array(
 		"id"       => $remarketing_id,
 		"name"     => $product->get_title(),
-		"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product_id,
+		"sku"      => $product_sku ? $product_sku : $product_id,
 		"category" => $product_cat,
 		"price"    => $product->get_price(),
 		"currency" => get_woocommerce_currency()
