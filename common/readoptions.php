@@ -13,6 +13,7 @@ define( 'GTM4WP_OPTION_INCLUDE_USERID',        'include-userid' );
 define( 'GTM4WP_OPTION_INCLUDE_USEREMAIL',     'include-useremail' );
 define( 'GTM4WP_OPTION_INCLUDE_USERREGDATE',   'include-userregdate' );
 define( 'GTM4WP_OPTION_INCLUDE_USERNAME',      'include-username' );
+define( 'GTM4WP_OPTION_INCLUDE_VISITOR_IP',    'include-visitor-ip' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTTYPE',      'include-posttype' );
 define( 'GTM4WP_OPTION_INCLUDE_CATEGORIES',    'include-categories' );
 define( 'GTM4WP_OPTION_INCLUDE_TAGS',          'include-tags' );
@@ -124,6 +125,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_USEREMAIL     => false,
 	GTM4WP_OPTION_INCLUDE_USERREGDATE   => false,
 	GTM4WP_OPTION_INCLUDE_USERNAME      => false,
+	GTM4WP_OPTION_INCLUDE_VISITOR_IP    => false,
 	GTM4WP_OPTION_INCLUDE_POSTTYPE      => true,
 	GTM4WP_OPTION_INCLUDE_CATEGORIES    => true,
 	GTM4WP_OPTION_INCLUDE_TAGS          => true,

@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
 Requires PHP: 5.3
-Tested up to: 4.9.4
-Stable tag: 1.8
+Tested up to: 4.9.6
+Stable tag: 1.8.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -254,6 +254,19 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.8.1 =
+
+* Added: new visitorIP data layer variable to support post-GDPR implementations where for example internal traffic exclusion has to be made inside the browser
+* Fixed: JavaScript error around the variable gtm4wp_use_sku_instead
+* Fixed: added _ as a valid character for gtm_auth GTM environment variable
+* Fixed: corrected typo - gtm4wp.checkoutStepE**E**C
+* Fixed: two strings were not recognized by WordPress Translate on the admin page
+* Fixed: some other plugins call found_variation event of WooCommerce without product variation data being included
+* Fixed: product name included variation name on order received page which broke GA product reports
+* Fixed: in some cases, no contact form 7 data was being passed to the gtm4wp.contactForm7Submitted event
+* Updated: added CDATA markup around container code for better DOM compatibility
+* Updated: removed 'SKU:' prefix text from classic ecommerce dimension as it broke some enhanced ecommerce reports
 
 = 1.8 =
 
@@ -520,6 +533,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.8.1 =
+
+Bugfix version fixing some issues around WooCommerce tracking and GTM environments. Also adds IP address into the data layer.
 
 = 1.8 =
 

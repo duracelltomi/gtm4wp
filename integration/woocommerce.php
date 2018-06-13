@@ -75,14 +75,18 @@ function gtm4wp_get_product_category( $product_id, $fullpath = false) {
 	return $product_cat;
 }
 
+function gtm4wp_woocommerce_addglobalvars() {
+  global $gtm4wp_options;
+
+  echo "
+	var gtm4wp_use_sku_instead = " . (int)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ]) . ";
+	var gtm4wp_id_prefix       = '" . esc_js( gtm4wp_prefix_productid("") ) . "';";
+}
+
 function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 	global $gtm4wp_options, $wp_query, $gtm4wp_datalayer_name, $gtm4wp_product_counter, $gtm4wp_is_woocommerce3;
 
 	$woo = WC();
-
-	gtm4wp_woocommerce_addjs("
-	window[ 'gtm4wp_use_sku_instead' ] = " . (int)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ]) . ";
-	window[ 'gtm4wp_id_prefix' ]       = '" . esc_js( gtm4wp_prefix_productid("") ) . "';");
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA ] && $gtm4wp_is_woocommerce3 ) {
 		// we need to use this instead of $woo->customer as this will load proper total order number and value from the database instead of the session
@@ -391,8 +395,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$product_price = $order->get_item_total( $item );
 					$_temp_productdata = array(
 						"id"       => $remarketing_id,
-						"name"     => $item['name'],
-						"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product_id,
+						"name"     => $product->get_title(),
+						"sku"      => $product_sku ? $product_sku : $product_id,
 						"category" => $product_cat,
 						"price"    => $product_price,
 						"currency" => get_woocommerce_currency(),
@@ -597,7 +601,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						var _shipping_el = $( '#shipping_method input:checked' );
 						if ( _shipping_el.length > 0 ) {
 							". $gtm4wp_datalayer_name .".push({
-								'event': 'gtm4wp.checkoutOptionECC',
+								'event': 'gtm4wp.checkoutOptionEEC',
 								'ecommerce': {
 									'checkout_option': {
 										'actionField': {
@@ -612,7 +616,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						var _payment_el = $( '.payment_methods input:checked' );
 						if ( _payment_el.length > 0 ) {
 							". $gtm4wp_datalayer_name .".push({
-								'event': 'gtm4wp.checkoutOptionECC',
+								'event': 'gtm4wp.checkoutOptionEEC',
 								'ecommerce': {
 									'checkout_option': {
 										'actionField': {
@@ -737,15 +741,15 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	$_temp_productdata = array(
 		"id"       => $remarketing_id,
 		"name"     => $product->get_title(),
-		"sku"      => $product_sku ? __( 'SKU:', 'duracelltomi-google-tag-manager' ) . ' ' . $product_sku : $product_id,
+		"sku"      => $product_sku ? $product_sku : $product_id,
 		"category" => $product_cat,
 		"price"    => $product->get_price(),
 		"currency" => get_woocommerce_currency()
 	);
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "addtocartsingle" );
 
-	foreach( $eec_product_array as $ecc_product_array_key => $ecc_product_array_value ) {
-		echo '<input type="hidden" name="gtm4wp_' . esc_attr( $ecc_product_array_key ). '" value="' . esc_attr( $ecc_product_array_value ). '" />'."\n";
+	foreach( $eec_product_array as $eec_product_array_key => $eec_product_array_value ) {
+		echo '<input type="hidden" name="gtm4wp_' . esc_attr( $eec_product_array_key ). '" value="' . esc_attr( $eec_product_array_value ). '" />'."\n";
 	}
 }
 
@@ -1271,6 +1275,8 @@ if ( function_exists ( "WC" ) ) {
 
 	add_action( "wp_footer", "gtm4wp_woocommerce_wp_footer" );
 	add_action( "wp_enqueue_scripts", "gtm4wp_woocommerce_enqueue_scripts" );
+	
+	add_action( GTM4WP_WPACTION_ADDGLOBALVARS, "gtm4wp_woocommerce_addglobalvars" );
 
 	if ( true === $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 		add_action( 'wp_footer', 'gtm4wp_woocommerce_enhanced_ecom_product_click' );
