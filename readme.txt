@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adw
 Requires at least: 3.4.0
 Requires PHP: 5.3
 Tested up to: 4.9.6
-Stable tag: 1.8.1
+Stable tag: 1.9
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -254,6 +254,11 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.9 =
+
+* Added: initial support for AMP plugin from Automattic (thx koconder for the contribution!)
+* Fixed: wrong ecomm_pagetype on product search result pages
 
 = 1.8.1 =
 
@@ -533,6 +538,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.9 =
+
+New AMP GTM support...
 
 = 1.8.1 =
 
