@@ -120,9 +120,16 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 	}
 
 	if ( is_product_category() || is_product_tag() || is_front_page() || is_shop() ) {
+		$ecomm_pagetype = "category";
+		if ( is_front_page() ) {
+			$ecomm_pagetype = "home";
+		} else if ( is_search() ) {
+			$ecomm_pagetype = "searchresults";
+		}
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
 			$dataLayer["ecomm_prodid"] = array();
-			$dataLayer["ecomm_pagetype"] = ( is_front_page() ? "home" : "category" );
+			$dataLayer["ecomm_pagetype"] = $ecomm_pagetype;
 			$dataLayer["ecomm_totalvalue"] = 0;
 		}
 	} else if ( is_product() ) {
