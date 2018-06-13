@@ -75,7 +75,7 @@ var adminsubtabs = {
     },
     "int-amp": {
       tabtext: gtm4wp.amptabtitle,
-      numitems: 2
+      numitems: 1
     }
   }
 };

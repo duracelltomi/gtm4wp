@@ -85,7 +85,7 @@ define( 'GTM4WP_OPTION_BLACKLIST_MACRO_REFERRER',    'blacklist-macro-referrer' 
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_URL',         'blacklist-macro-url' );
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT',   'blacklist-macro-autoevent-variable' );
 
-define( 'GTM4WP_OPTION_INTEGRATE_WPCF7',         'integrate-wpcf7' );
+define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE',           'integrate-woocommerce' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC',      'integrate-woocommerce-track-classic-ecommerce' );
@@ -100,9 +100,9 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA',        'integrate-woocommerce-
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS',     'integrate-google-optimize-idlist' );
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT', 'integrate-google-optimize-timeout' );
 
-define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE',   'integrate-wp-e-commerce' );
+define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
-define( 'GTM4WP_OPTION_INTEGRATE_AMPID',     'integrate-amp-id' );
+define( 'GTM4WP_OPTION_INTEGRATE_AMPID', 'integrate-amp-id' );
 
 define( 'GTM4WP_PLACEMENT_FOOTER',        0 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN',      1 );
@@ -213,13 +213,7 @@ $gtm4wp_defaultoptions = array(
 
 	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE => false,
 
-	GTM4WP_OPTION_INTEGRATE_AMPID => "",
-	GTM4WP_OPTION_INTEGRATE_AMPID_INJECTED => false,
-	GTM4WP_OPTION_INTEGRATE_AMPCODE_AMP => false,
-	GTM4WP_OPTION_INTEGRATE_AMPCODE_GTM => false,
-	GTM4WP_OPTION_INTEGRATE_AMPCODE_DATALAYER => false,
-
-	GTM4WP_PLACEMENT_AMP => false
+	GTM4WP_OPTION_INTEGRATE_AMPID => ""
 );
 
 function gtm4wp_reload_options() {

@@ -29,9 +29,10 @@
  * @return bool Returns true if we are running on an AMP page
  */ 
 function gtm4wp_amp_running(){
-	if (function_exists( 'is_amp_endpoint' ) && is_amp_endpoint()) {
+	if ( function_exists( 'is_amp_endpoint' ) && is_amp_endpoint() ) {
 		return true;
 	}
+
 	return false;
 }
 
@@ -42,19 +43,19 @@ function gtm4wp_amp_running(){
  * @author Vincent Koc <https://github.com/koconder/>
  * @return array Returns AMP Analytics array used by amp-wp
  */
-function gtm4wp_amp_gtmampcode_check($data){
+function gtm4wp_amp_gtmampcode_check( $data ) {
 	global $gtm4wp_amp_headerinjected;
 
 	// AMP-WP Plugin
 	if ( ! empty( $data['amp_analytics'] ) ) {
 		// Inject into AMP Plugin to load
-		$data['amp_component_scripts']['amp-analytics'] = 'https://cdn.ampproject.org/v0/amp-analytics-0.1.js';
+		$data[ 'amp_component_scripts' ][ 'amp-analytics' ] = 'https://cdn.ampproject.org/v0/amp-analytics-0.1.js';
 		$gtm4wp_amp_headerinjected = true;
 
 	// Manually load into AMP-WP Plugin
-	}else{
+	} else {
 		// Inject manually based on AMP <head> hook
-		add_action( 'amp_post_template_head', 'gtm4wp_amp_gtmampcode_injecthead');
+		add_action( 'amp_post_template_head', 'gtm4wp_amp_gtmampcode_injecthead' );
 	}
 
 	// Return the $data back to amp-wp hook
@@ -67,7 +68,7 @@ function gtm4wp_amp_gtmampcode_check($data){
  * @link https://github.com/Automattic/amp-wp/blob/develop/includes/amp-post-template-actions.php
  * @author Vincent Koc <https://github.com/koconder/>
  */
-function gtm4wp_amp_gtmampcode_injecthead(){
+function gtm4wp_amp_gtmampcode_injecthead() {
 	global $gtm4wp_amp_headerinjected;
 
 	$gtm4wp_amp_headerinjected = true;
@@ -80,11 +81,11 @@ function gtm4wp_amp_gtmampcode_injecthead(){
  * @author Vincent Koc <https://github.com/koconder/>
  * @return int Returns number of injected snippets, false if no injection
  */
-function gtm4wp_amp_gtmcode(){
-	global $gtm4wp_datalayer_json;
+function gtm4wp_amp_gtmcode() {
+	global $gtm4wp_datalayer_json, $gtm4wp_options;
 
 	// Check dataLayer is loaded from the plugin
-	if(!empty($gtm4wp_datalayer_json)){
+	if( !empty( $gtm4wp_datalayer_json ) ) {
 
 		// Builds a list of GTM id's
 		$gtm4wp_ampids = explode( ",", $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPID ] );
@@ -127,7 +128,7 @@ function gtm4wp_amp_gtmcode(){
  * @author Vincent Koc <https://github.com/koconder/>
  * @return string Returns json dataLayer for AMP code
  */
-function gtm4wp_amp_gtmvariables(){
+function gtm4wp_amp_gtmvariables() {
 	global $gtm4wp_datalayer_json;
 	return '{"vars":{'.$gtm4wp_datalayer_json."} }";
 }

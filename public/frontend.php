@@ -15,13 +15,13 @@ if ( empty($GLOBALS[ "gtm4wp_options" ] ) || ($GLOBALS[ "gtm4wp_options" ][ GTM4
 }
 
 // Setting Global Variable to Store JSON based Datalayer for Intergrations
-$gtm4wp_datalayer_json = '';
+$GLOBALS[ "gtm4wp_datalayer_json" ] = '';
 
 // Moving include to top due to hierarchy of includes
-if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] != "" ) ) {
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( "" != $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/amp.php" );
 }
-if (!function_exists('gtm4wp_amp_running')){
+if ( !function_exists('gtm4wp_amp_running') ) {
 	function gtm4wp_amp_running(){
 		return false;
 	}
@@ -651,29 +651,16 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 }
 
 function gtm4wp_wp_header_top() {
-	global $gtm4wp_datalayer_name;
+	global $gtm4wp_options, $gtm4wp_datalayer_name;
 
-	if(!gtm4wp_amp_running()){
+	if( !gtm4wp_amp_running() ) {
 		echo '
-<!-- Google Tag Manager for WordPress by DuracellTomi -->
+<!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <script data-cfasync="false" type="text/javascript">//<![CDATA[
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];//]]>';
 	
 	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
-	
-  echo '	
-</script>
-<!-- End Google Tag Manager for WordPress by DuracellTomi -->';
-	}
-}
-
-function gtm4wp_wp_header_begin( $echo = true ) {
-	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options;
-
-  $_gtm_header_content = '
-<!-- Google Tag Manager for WordPress by DuracellTomi -->
-<script data-cfasync="false" type="text/javascript">//<![CDATA[';
 	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_header_content .= '
@@ -685,6 +672,19 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	var gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
 	}
 
+  echo '	
+</script>
+<!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
+	}
+}
+
+function gtm4wp_wp_header_begin( $echo = true ) {
+	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options;
+
+	$_gtm_header_content = '
+<!-- Google Tag Manager for WordPress by gtm4wp.com -->
+<script data-cfasync="false" type="text/javascript">//<![CDATA[';
+	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) {
 		$gtm4wp_datalayer_data = array();
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
@@ -757,7 +757,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	$_gtm_header_content .= '
-<!-- End Google Tag Manager for WordPress by DuracellTomi -->';
+<!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
 
 	if ( !gtm4wp_amp_running() ) {
     if ( $echo ) {
