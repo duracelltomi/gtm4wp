@@ -14,6 +14,19 @@ if ( empty($GLOBALS[ "gtm4wp_options" ] ) || ($GLOBALS[ "gtm4wp_options" ][ GTM4
 	$GLOBALS[ "gtm4wp_datalayer_name" ] = $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_DATALAYER_NAME ];
 }
 
+// Setting Global Variable to Store JSON based Datalayer for Intergrations
+$gtm4wp_datalayer_json = '';
+
+// Moving include to top due to hierarchy of includes
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] != "" ) ) {
+	require_once( dirname( __FILE__ ) . "/../integration/amp.php" );
+}
+if (!function_exists('gtm4wp_amp_running')){
+	function gtm4wp_amp_running(){
+		return false;
+	}
+}
+
 function gtm4wp_is_assoc($arr) {
 	// borrowed from
 	// http://stackoverflow.com/questions/173400/php-arrays-a-good-way-to-check-if-an-array-is-associative-or-sequential
@@ -640,7 +653,8 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 function gtm4wp_wp_header_top() {
 	global $gtm4wp_datalayer_name;
 
-	echo '
+	if(!gtm4wp_amp_running()){
+		echo '
 <!-- Google Tag Manager for WordPress by DuracellTomi -->
 <script data-cfasync="false" type="text/javascript">//<![CDATA[
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
@@ -651,12 +665,13 @@ function gtm4wp_wp_header_top() {
   echo '	
 </script>
 <!-- End Google Tag Manager for WordPress by DuracellTomi -->';
+	}
 }
 
 function gtm4wp_wp_header_begin( $echo = true ) {
-	global $gtm4wp_datalayer_name, $gtm4wp_options;
+	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options;
 
-	$_gtm_header_content = '
+  $_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by DuracellTomi -->
 <script data-cfasync="false" type="text/javascript">//<![CDATA[';
 	
@@ -694,17 +709,20 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		}
 
 		if ( version_compare( PHP_VERSION, '5.4.0' ) >= 0 ) {
-			$dl_json_data = json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE );
+			$gtm4wp_datalayer_json = json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE );
 		} else {
-			$dl_json_data = json_encode( $gtm4wp_datalayer_data );
+			$gtm4wp_datalayer_json = json_encode( $gtm4wp_datalayer_data );
 		}
 
-		$_gtm_header_content .= '
-	' . $gtm4wp_datalayer_name . '.push(' . str_replace(
+		// Clean up and then push datalayer to AMP
+		$gtm4wp_datalayer_json = str_replace(
 			array( '"-~-', '-~-"' ),
 			array( "", "" ),
-			str_replace( "", "-", $dl_json_data )
-		) . ');';
+			str_replace( "", "-", $gtm4wp_datalayer_json )
+		);
+
+		$_gtm_header_content .= '
+	' . $gtm4wp_datalayer_name . '.push(' . $gtm4wp_datalayer_json . ');';
 	}
 
 	$_gtm_header_content .= '//]]>
@@ -741,11 +759,13 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	$_gtm_header_content .= '
 <!-- End Google Tag Manager for WordPress by DuracellTomi -->';
 
+	if ( !gtm4wp_amp_running() ) {
     if ( $echo ) {
       echo $_gtm_header_content;
     } else {
       return $_gtm_header_content;
     }
+  }
 }
 
 function gtm4wp_body_class( $classes ) {
