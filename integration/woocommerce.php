@@ -155,10 +155,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( "variable" != $product->get_type() ) {
 				$_temp_productdata = array(
-					"name"     => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
-					"id"       => $product_id,
-					"price"    => $product_price,
-					"category" => $product_cat,
+					"name"       => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
+					"id"         => $product_id,
+					"price"      => $product_price,
+					"category"   => $product_cat,
+					"stocklevel" => $product->get_stock_quantity()
 				);
 				$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "productdetail" );
 
@@ -277,11 +278,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] ) {
 					$_temp_productdata = array(
-						"id"       => $remarketing_id,
-						"name"     => $product->get_title(),
-						"price"    => $product->get_price(),
-						"category" => $product_cat,
-						"quantity" => $cart_item_data["quantity"]
+						"id"         => $remarketing_id,
+						"name"       => $product->get_title(),
+						"price"      => $product->get_price(),
+						"category"   => $product_cat,
+						"stocklevel" => $product->get_stock_quantity(),
+						"quantity"   => $cart_item_data["quantity"]
 					);
 
 					if ( "variation" == $product_type ) {
@@ -414,13 +416,14 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 					$product_price = $order->get_item_total( $item );
 					$_temp_productdata = array(
-						"id"       => $remarketing_id,
-						"name"     => $product->get_title(),
-						"sku"      => $product_sku ? $product_sku : $product_id,
-						"category" => $product_cat,
-						"price"    => $product_price,
-						"currency" => get_woocommerce_currency(),
-						"quantity" => $item['qty']
+						"id"         => $remarketing_id,
+						"name"       => $product->get_title(),
+						"sku"        => $product_sku ? $product_sku : $product_id,
+						"category"   => $product_cat,
+						"price"      => $product_price,
+						"currency"   => get_woocommerce_currency(),
+						"stocklevel" => $product->get_stock_quantity(),
+						"quantity"   => $item['qty']
 					);
 	
 					if ( "variation" == $product_type ) {
@@ -483,11 +486,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				}
 
 				$_temp_productdata = array(
-					"id"       => $remarketing_id,
-					"name"     => $product->get_title(),
-					"price"    => $product->get_price(),
-					"category" => $product_cat,
-					"quantity" => $cart_item_data["quantity"]
+					"id"         => $remarketing_id,
+					"name"       => $product->get_title(),
+					"price"      => $product->get_price(),
+					"category"   => $product_cat,
+					"stocklevel" => $product->get_stock_quantity(),
+					"quantity"   => $cart_item_data["quantity"]
 				);
 
 				if ( "variation" == $product_type ) {
@@ -731,11 +735,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 
 			$dataLayer["ecommerce"]["add"]["products"][] = array(
-				"name"     => $product->get_title(),
-				"id"       => $remarketing_id,
-				"price"    => $product->get_price(),
-				"category" => $product_cat,
-				"quantity" => $cart_item["quantity"]
+				"name"       => $product->get_title(),
+				"id"         => $remarketing_id,
+				"price"      => $product->get_price(),
+				"category"   => $product_cat,
+				"stocklevel" => $product->get_stock_quantity(),
+				"quantity"   => $cart_item["quantity"]
 			);
 
 			if ( "variation" == $product_type ) {
@@ -769,12 +774,13 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	}
 
 	$_temp_productdata = array(
-		"id"       => $remarketing_id,
-		"name"     => $product->get_title(),
-		"sku"      => $product_sku ? $product_sku : $product_id,
-		"category" => $product_cat,
-		"price"    => $product->get_price(),
-		"currency" => get_woocommerce_currency()
+		"id"         => $remarketing_id,
+		"name"       => $product->get_title(),
+		"sku"        => $product_sku ? $product_sku : $product_id,
+		"category"   => $product_cat,
+		"price"      => $product->get_price(),
+		"currency"   => get_woocommerce_currency(),
+		"stocklevel" => $product->get_stock_quantity()
 	);
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "addtocartsingle" );
 
@@ -1002,7 +1008,8 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item="", $
 		"price"       => $product->get_price(),
 		"category"    => $product_cat,
 		"productlink" => apply_filters( 'the_permalink', get_permalink(), 0),
-		"variant"     => ""
+		"variant"     => "",
+		"stocklevel"  => $product->get_stock_quantity()
 	);
 
 	if ( "variation" == $product_type ) {
@@ -1024,13 +1031,14 @@ function gtm4wp_woocommerce_cart_item_remove_link_filter( $remove_from_cart_link
 		return $remove_from_cart_link;
 	}
 
-	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_variant="%s" href="',
+	$cartlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_variant="%s" data-gtm4wp_product_stocklevel="%s" href="',
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["id"] ),
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["name"] ),
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["price"] ),
 		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["category"] ),
-		esc_url( $GLOBALS["gtm4wp_cart_item_proddata"]["productlink"] ),
-		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["variant"] )
+		esc_url(  $GLOBALS["gtm4wp_cart_item_proddata"]["productlink"] ),
+		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["variant"] ),
+		esc_attr( $GLOBALS["gtm4wp_cart_item_proddata"]["stocklevel"] )
 	);
 	$GLOBALS["gtm4wp_cart_item_proddata"] = '';
 
@@ -1094,18 +1102,20 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			"category"     => $product_cat,
 			"productlink"  => apply_filters( 'the_permalink', get_permalink(), 0),
 			"listname"     => $gtm4wp_last_widget_title,
-			"listposition" => $gtm4wp_product_counter
+			"listposition" => $gtm4wp_product_counter,
+			"stocklevel"   => $product->get_stock_quantity()
 		);
 		$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "widgetproduct" );
 
-		$productlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" href="',
+		$productlink_with_data = sprintf('data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_product_stocklevel="%s" href="',
 			esc_attr( $eec_product_array[ "id" ] ),
 			esc_attr( $eec_product_array[ "name" ] ),
 			esc_attr( $eec_product_array[ "price" ] ),
 			esc_attr( $eec_product_array[ "category" ] ),
-			esc_url( $eec_product_array[ "productlink" ] ),
+			esc_url(  $eec_product_array[ "productlink" ] ),
 			esc_attr( $eec_product_array[ "listname" ] ),
-			esc_attr( $eec_product_array[ "listposition" ] )
+			esc_attr( $eec_product_array[ "listposition" ] ),
+			esc_attr( $eec_product_array[ "stocklevel" ] )
 		);
 
 		$gtm4wp_product_counter++;
@@ -1210,18 +1220,20 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		"category"     => $product_cat,
 		"productlink"  => apply_filters( 'the_permalink', get_permalink(), 0),
 		"listname"     => $list_name,
-		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) )
+		"listposition" => $woocommerce_loop[ "loop" ] + ( $posts_per_page * ($paged-1) ),
+		"stocklevel"   => $product->get_stock_quantity()
 	);
 	$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "productlist" );
 
-	printf('<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s"></span>',
+	printf('<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s"></span>',
 		esc_attr( $eec_product_array[ "id" ] ),
 		esc_attr( $eec_product_array[ "name" ] ),
 		esc_attr( $eec_product_array[ "price" ] ),
 		esc_attr( $eec_product_array[ "category" ] ),
-		esc_url( $eec_product_array[ "productlink" ] ),
+		esc_url(  $eec_product_array[ "productlink" ] ),
 		esc_attr( $eec_product_array[ "listposition" ] ),
-		esc_attr( $eec_product_array[ "listname" ] )
+		esc_attr( $eec_product_array[ "listname" ] ),
+		esc_attr( $eec_product_array[ "stocklevel" ] )
 	);
 }
 
@@ -1268,10 +1280,11 @@ function gtm4wp_wc_quick_view_before_single_product() {
 
 		if ( "variable" != $product->get_type() ) {
 			$_temp_productdata = array(
-				"name"     => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
-				"id"       => $product_id,
-				"price"    => $product_price,
-				"category" => $product_cat,
+				"name"       => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
+				"id"         => $product_id,
+				"price"      => $product_price,
+				"category"   => $product_cat,
+				"stocklevel" => $product->get_stock_quantity()
 			);
 			$eec_product_array = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, "productdetail" );
 
