@@ -446,6 +446,12 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"phase"         => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
+	GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => array(
+		"label"         => __( "Exclude tax from revenue", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Enable this to exclude tax from the revenue variable while generating the purchase data", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_BETA,
+		"plugintocheck" => "woocommerce/woocommerce.php"
+	),
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING  => array(
 		"label"         => __( "AdWords Remarketing", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "Enable this to add Google AdWords dynamic remarketing variables to the dataLayer", 'duracelltomi-google-tag-manager' ),

@@ -258,6 +258,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.9 =
 
 * Added: initial support for AMP plugin from Automattic (thx koconder for the contribution!)
+* Added: option to remove tax from revenue data on order received page of WooCommerce
+* Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
 
 = 1.8.1 =

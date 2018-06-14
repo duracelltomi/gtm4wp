@@ -343,12 +343,18 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		}
 
 		if ( isset( $order ) ) {
+		  if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
+		  	$order_revenue = $order->get_total() - $order->get_total_tax();
+			} else {
+		  	$order_revenue = $order->get_total();
+			}
+			
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
 				$dataLayer["transactionId"]             = $order->get_order_number();
 				$dataLayer["transactionDate"]           = date("c");
 				$dataLayer["transactionType"]           = "sale";
 				$dataLayer["transactionAffiliation"]    = "";
-				$dataLayer["transactionTotal"]          = $order->get_total();
+				$dataLayer["transactionTotal"]          = $order_revenue;
 				if ( $gtm4wp_is_woocommerce3 ) {
 					$dataLayer["transactionShipping"]       = $order->get_shipping_total();
 				} else {
@@ -368,7 +374,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						"actionField" => array(
 							"id"          => $order->get_order_number(),
 							"affiliation" => "",
-							"revenue"     => $order->get_total(),
+							"revenue"     => $order_revenue,
 							"tax"         => $order->get_total_tax(),
 							"shipping"    => ( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping()),
 							"coupon"      => implode( ", ", $order->get_used_coupons() )
