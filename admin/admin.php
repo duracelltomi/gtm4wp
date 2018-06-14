@@ -5,14 +5,12 @@ define( 'GTM4WP_ADMIN_GROUP',             'gtm4wp-admin-group' );
 define( 'GTM4WP_ADMIN_GROUP_GENERAL',     'gtm4wp-admin-group-general' );
 define( 'GTM4WP_ADMIN_GROUP_GTMID',       'gtm4wp-admin-group-gtm-id' );
 define( 'GTM4WP_ADMIN_GROUP_PLACEMENT',   'gtm4wp-admin-code-placement' );
-//define( 'GTM4WP_ADMIN_GROUP_DATALAYER',   'gtm4wp-admin-group-datalayer-name' );
 define( 'GTM4WP_ADMIN_GROUP_INFO',        'gtm4wp-admin-group-datalayer-info' );
 
 define( 'GTM4WP_ADMIN_GROUP_INCLUDES',    'gtm4wp-admin-group-includes' );
 define( 'GTM4WP_ADMIN_GROUP_EVENTS',      'gtm4wp-admin-group-events' );
 define( 'GTM4WP_ADMIN_GROUP_SCROLLER',    'gtm4wp-admin-group-scroller' );
 define( 'GTM4WP_ADMIN_GROUP_BLACKLIST',   'gtm4wp-admin-group-blacklist-tags' );
-//define( 'GTM4WP_ADMIN_GROUP_BLACKLISTM',  'gtm4wp-admin-group-blacklist-macro' );
 define( 'GTM4WP_ADMIN_GROUP_INTEGRATION', 'gtm4wp-admin-group-integration' );
 define( 'GTM4WP_ADMIN_GROUP_ADVANCED',    'gtm4wp-admin-group-advanced' );
 define( 'GTM4WP_ADMIN_GROUP_CREDITS',     'gtm4wp-admin-group-credits' );
@@ -118,6 +116,11 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"description" => __( "Check this option to include the date of creation (registration) of the logged in user.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	),
+	GTM4WP_OPTION_INCLUDE_VISITOR_IP => array(
+		"label"       => __( "Visitor IP", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Check this option to include the IP address of the visitor. You might use this to filter internal traffic inside your GTM container. Please be aware that per GDPR its not allowed to transmit this full IP address to Google Analytics or to any other measurement system without explicit consent from the visitor.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
 	GTM4WP_OPTION_INCLUDE_REMARKETING => array(
 		"label"       => __( "Remarketing variable", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Check this option to include a dataLayer variable where all dataLayer values are stored to be included in your AdWords remarketing tag as a custom variable field", 'duracelltomi-google-tag-manager' ),
@@ -140,7 +143,7 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHER => array(
 		"label"       => __( "Weather data", 'duracelltomi-google-tag-manager' ),
-		"description" => sprintf( __( "Check this option to include the current weather conditions around the current visitor.<br /><strong>Attention!</strong> This feature uses <a href=\"%s\" target=\"_blank\">geoplugin.com</a> and <a href=\"%s\" target=\"_blank\">openweathermap.org</a> to collect data.<br />Depending on your website's traffic, additional fees may apply!<br />This plugin caches weather data for 1 hour to lower the need to access those services.", 'duracelltomi-google-tag-manager' ), "http://www.geoplugin.com/premium?utm_source=gtm4wp&utm_medium=link&utm_campaign=duracelltomi-google-tag-manager-for-wordpress", "http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=duracelltomi-google-tag-manager-for-wordpress" ),
+		"description" => sprintf( __( "Check this option to include the current weather conditions around the current visitor.<br /><strong>Attention!</strong> This feature uses <a href=\"%s\" target=\"_blank\">geoplugin.com</a> and <a href=\"%s\" target=\"_blank\">openweathermap.org</a> to collect data.<br />Depending on your website's traffic, additional fees may apply!<br />This plugin caches weather data for 1 hour to lower the need to access those services.", 'duracelltomi-google-tag-manager' ), "http://www.geoplugin.com/premium?utm_source=gtm4wp&utm_medium=link&utm_caign=duracelltomi-google-tag-manager-for-wordpress", "http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=duracelltomi-google-tag-manager-for-wordpress" ),
 		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHERUNITS => array(
@@ -421,13 +424,13 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	),
 	GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC => array(
 		"label"         => __( "Track classic e-commerce", 'duracelltomi-google-tag-manager' ),
-		"description"   => __( sprintf( __( "Choose this option if you would like to track e-commerce data using <a href=\"%s\" target=\"_blank\">classic transaction data</a>.", 'duracelltomi-google-tag-manager'  ) , 'https://developers.google.com/analytics/devguides/collection/analyticsjs/ecommerce'), 'duracelltomi-google-tag-manager' ),
+		"description"   => sprintf( __( "Choose this option if you would like to track e-commerce data using <a href=\"%s\" target=\"_blank\">classic transaction data</a>.", 'duracelltomi-google-tag-manager'  ) , 'https://developers.google.com/analytics/devguides/collection/analyticsjs/ecommerce' ),
 		"phase"       => GTM4WP_PHASE_STABLE,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
 	GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC => array(
 		"label"         => __( "Track enhanced e-commerce", 'duracelltomi-google-tag-manager' ),
-		"description"   => __( sprintf( __( "Choose this option if you would like to track e-commerce data using <a href=\"%s\" target=\"_blank\">enhanced ecommerce tracking</a>.", 'duracelltomi-google-tag-manager'  ) , 'https://developers.google.com/analytics/devguides/collection/analyticsjs/enhanced-ecommerce'), 'duracelltomi-google-tag-manager' ),
+		"description"   => sprintf( __( "Choose this option if you would like to track e-commerce data using <a href=\"%s\" target=\"_blank\">enhanced ecommerce tracking</a>.", 'duracelltomi-google-tag-manager'  ) , 'https://developers.google.com/analytics/devguides/collection/analyticsjs/enhanced-ecommerce' ),
 		"phase"       => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
@@ -1101,7 +1104,7 @@ function gtm4wp_add_admin_js($hook) {
 	global $gtp4wp_plugin_url;
 	
 	if ( $hook == "settings_page_" . GTM4WP_ADMINSLUG ) {
-		wp_register_script( "admin-subtabs", $gtp4wp_plugin_url . "js/admin-subtabs.js", array(), "1.1.1" );
+		wp_register_script( "admin-subtabs", $gtp4wp_plugin_url . "js/admin-subtabs.js", array(), GTM4WP_VERSION );
 
 		$subtabtexts = array(
 			"posttabtitle" => __( "Posts" , 'duracelltomi-google-tag-manager' ),
@@ -1124,11 +1127,10 @@ function gtm4wp_add_admin_js($hook) {
 		);
 		wp_localize_script( "admin-subtabs", 'gtm4wp', $subtabtexts );
 
-		wp_enqueue_script( "admin-subtabs", array(), '1.1.1' );
+		wp_enqueue_script( "admin-subtabs", array(), GTM4WP_VERSION );
+		wp_enqueue_script( "admin-tabcreator", $gtp4wp_plugin_url . "js/admin-tabcreator.js", array( "jquery-core" ), GTM4WP_VERSION );
 
-		wp_enqueue_script( "admin-tabcreator", $gtp4wp_plugin_url . "js/admin-tabcreator.js", array( "jquery-core" ), "1.0" );
-
-		wp_enqueue_style( "gtm4wp-validate", $gtp4wp_plugin_url . "css/admin-gtm4wp.css", array(), "1.0" );
+		wp_enqueue_style( "gtm4wp-validate", $gtp4wp_plugin_url . "css/admin-gtm4wp.css", array(), GTM4WP_VERSION );
 	}
 }
 

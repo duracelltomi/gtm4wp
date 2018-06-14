@@ -1,7 +1,8 @@
 <?php
-define( 'GTM4WP_WPFILTER_COMPILE_DATALAYER', 'gtm4wp_compile_datalayer' );
+define( 'GTM4WP_WPFILTER_COMPILE_DATALAYER',  'gtm4wp_compile_datalayer' );
 define( 'GTM4WP_WPFILTER_COMPILE_REMARKTING', 'gtm4wp_compile_remarkering' );
-define( 'GTM4WP_WPFILTER_GETTHEGTMTAG', 'gtm4wp_get_the_gtm_tag' );
+define( 'GTM4WP_WPFILTER_GETTHEGTMTAG',       'gtm4wp_get_the_gtm_tag' );
+define( 'GTM4WP_WPACTION_ADDGLOBALVARS',      'gtm4wp_add_global_vars' );
 
 $GLOBALS[ "gtm4wp_container_code_written" ] = false;
 
@@ -13,11 +14,14 @@ if ( empty($GLOBALS[ "gtm4wp_options" ] ) || ($GLOBALS[ "gtm4wp_options" ][ GTM4
 	$GLOBALS[ "gtm4wp_datalayer_name" ] = $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_DATALAYER_NAME ];
 }
 
+// Setting Global Variable to Store JSON based Datalayer for Intergrations
+$GLOBALS[ "gtm4wp_datalayer_json" ] = '';
+
 // Moving include to top due to hierarchy of includes
-if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] != "" ) ) {
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( "" != $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/amp.php" );
 }
-if (!function_exists('gtm4wp_amp_running')){
+if ( !function_exists('gtm4wp_amp_running') ) {
 	function gtm4wp_amp_running(){
 		return false;
 	}
@@ -92,6 +96,20 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
     }
 	}
 
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_VISITOR_IP ] ) {
+		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
+			//check ip from shared internet
+			$ip = $_SERVER['HTTP_CLIENT_IP'];
+		} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+			//to check ip is passed from proxy
+			$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+		} else {
+			$ip = $_SERVER['REMOTE_ADDR'];
+		}
+
+		$dataLayer["visitorIP"] = $ip; 
+	}
+	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
 		$dataLayer["pageTitle"] = strip_tags( wp_title( "|", false, "right" ) );
 	}
@@ -633,25 +651,16 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 }
 
 function gtm4wp_wp_header_top() {
-	global $gtm4wp_datalayer_name;
+	global $gtm4wp_options, $gtm4wp_datalayer_name;
 
-	if(!gtm4wp_amp_running()){
+	if( !gtm4wp_amp_running() ) {
 		echo '
-<!-- Google Tag Manager for WordPress by DuracellTomi -->
-<script data-cfasync="false" type="text/javascript">
+<!-- Google Tag Manager for WordPress by gtm4wp.com -->
+<script data-cfasync="false" type="text/javascript">//<![CDATA[
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
-	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];
-</script>
-<!-- End Google Tag Manager for WordPress by DuracellTomi -->';
-	}
-}
-
-function gtm4wp_wp_header_begin() {
-	global $gtm4wp_datalayer_name, $gtm4wp_options;
-
-	$_gtm_header_content = '
-<!-- Google Tag Manager for WordPress by DuracellTomi -->
-<script data-cfasync="false" type="text/javascript">';
+	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];//]]>';
+	
+	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
 	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_header_content .= '
@@ -663,6 +672,19 @@ function gtm4wp_wp_header_begin() {
 	var gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
 	}
 
+  echo '	
+</script>
+<!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
+	}
+}
+
+function gtm4wp_wp_header_begin( $echo = true ) {
+	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options;
+
+	$_gtm_header_content = '
+<!-- Google Tag Manager for WordPress by gtm4wp.com -->
+<script data-cfasync="false" type="text/javascript">//<![CDATA[';
+	
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) {
 		$gtm4wp_datalayer_data = array();
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
@@ -687,24 +709,23 @@ function gtm4wp_wp_header_begin() {
 		}
 
 		if ( version_compare( PHP_VERSION, '5.4.0' ) >= 0 ) {
-			$dl_json_data = json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE );
+			$gtm4wp_datalayer_json = json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE );
 		} else {
-			$dl_json_data = json_encode( $gtm4wp_datalayer_data );
+			$gtm4wp_datalayer_json = json_encode( $gtm4wp_datalayer_data );
 		}
 
 		// Clean up and then push datalayer to AMP
-		$dl_json_data = str_replace(
+		$gtm4wp_datalayer_json = str_replace(
 			array( '"-~-', '-~-"' ),
 			array( "", "" ),
-			str_replace( "", "-", $dl_json_data )
+			str_replace( "", "-", $gtm4wp_datalayer_json )
 		);
-		$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPCODE_DATALAYER ] = $dl_json_data;
 
 		$_gtm_header_content .= '
-	' . $gtm4wp_datalayer_name . '.push(' . $dl_json_data . ');';
+	' . $gtm4wp_datalayer_name . '.push(' . $gtm4wp_datalayer_json . ');';
 	}
 
-	$_gtm_header_content .= '
+	$_gtm_header_content .= '//]]>
 </script>';
 
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
@@ -719,11 +740,13 @@ function gtm4wp_wp_header_begin() {
 			}
 			
 			$_gtm_tag .= '
-<script data-cfasync="false">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
+<script data-cfasync="false">//<![CDATA[
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 \'//www.googletagmanager.com/gtm.\''.'+\'js?id=\'+i+dl' . $_gtm_env . ';f.parentNode.insertBefore(j,f);
-})(window,document,\'script\',\'' . $gtm4wp_datalayer_name . '\',\'' . $one_gtm_code . '\');</script>';
+})(window,document,\'script\',\'' . $gtm4wp_datalayer_name . '\',\'' . $one_gtm_code . '\');//]]>
+</script>';
 		}
 
 		$_gtm_tag .= '
@@ -734,12 +757,15 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	$_gtm_header_content .= '
-<!-- End Google Tag Manager for WordPress by DuracellTomi -->';
+<!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
 
-	if(!gtm4wp_amp_running()){
-		echo $_gtm_header_content;
-	}
-
+	if ( !gtm4wp_amp_running() ) {
+    if ( $echo ) {
+      echo $_gtm_header_content;
+    } else {
+      return $_gtm_header_content;
+    }
+  }
 }
 
 function gtm4wp_body_class( $classes ) {
@@ -755,7 +781,7 @@ function gtm4wp_body_class( $classes ) {
 }
 
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
-add_action( "wp_head", "gtm4wp_wp_header_begin" );
+add_action( "wp_head", "gtm4wp_wp_header_begin", 10, 0 );
 add_action( "wp_head", "gtm4wp_wp_header_top", 1 );
 add_action( "wp_footer", "gtm4wp_wp_footer" );
 add_action( "wp_loaded", "gtm4wp_wp_loaded" );
