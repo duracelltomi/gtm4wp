@@ -3,7 +3,7 @@ Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
 Requires at least: 3.4.0
-Requires PHP: 5.3
+Requires PHP: 5.6
 Tested up to: 4.9.6
 Stable tag: 1.9
 License: GPLv3
@@ -22,10 +22,10 @@ Multiple containers are also supported!
 The plugin complements your GTM setup by pushing page meta data and user information into the so called data layer.
 Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-manager/devguide#datalayer).
 
-**Some parts of the plugin require PHP 5.3 newer.
-PHP 5.4 or newer is recommended.**
+**Some parts of the plugin require PHP 5.6 newer.
+PHP 7.0 or newer is recommended.**
 
-Please note that PHP 5.x is nearing its end of life cycle thus it is recommended to upgrade. If you are not sure which version you are using, please contact
+Please note that PHP 5.6 is nearing its end of life cycle thus it is recommended to upgrade. If you are not sure which version you are using, please contact
 your hosting provider for support.
 
 = GTM container code placement =
@@ -259,8 +259,15 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Added: initial support for AMP plugin from Automattic (thx koconder for the contribution!)
 * Added: option to remove tax from revenue data on order received page of WooCommerce
+* Added: WooCommerce enhanced ecommerce datasets now include stock levels
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
+* Warning: some plugin features will be remove from v1.10, most of them can be tracked now using pure Google Tag Manager triggers:
+  * Social actions
+  * Outbound link click events
+  * Download click events
+  * Email click events
+* Warning: PHP 5.6 is now the minimum recommended version to use this plugin. I advise to move to PHP 7.x
 
 = 1.8.1 =
 
