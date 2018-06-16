@@ -30,7 +30,7 @@ before_script:
   # Install composer packages before trying to activate themes or plugins
   # - composer install
   - composer dump-autoload
-  - composer self-update
+  # - composer self-update
   - composer update --prefer-source $PREFER_LOWEST
 
   # Install Wordpress testing suite and run wordpress
