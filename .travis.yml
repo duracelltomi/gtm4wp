@@ -29,6 +29,9 @@ cache: bundler
 before_script:
   # Install composer packages before trying to activate themes or plugins
   # - composer install
+  - composer dump-autoload
+  - composer self-update
+  - composer update --prefer-source $PREFER_LOWEST
 
   # Install Wordpress testing suite and run wordpress
   - git clone https://github.com/duracelltomi/wordpress-test-template wp-tests
@@ -39,7 +42,7 @@ before_script:
 
 script:
   #- phpcs --standard=WordPress ./**/*.php
-  - phpunit --coverage-clover=coverage.xml
+  - bin/phpunit --coverage-clover=coverage.xml
   - cd wp-tests/spec && bundle exec rspec *.rb
   # Syntax check all php files and fail for any error text in STDERR
   - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
