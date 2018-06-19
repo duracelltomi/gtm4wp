@@ -33,34 +33,34 @@ function gtm4wp_is_assoc($arr) {
 	return array_keys($arr) !== range(0, count($arr) - 1);
 }
 
-if ( !function_exists( "getallheaders") ) { 
-	function getallheaders() { 
-		$headers = array(); 
-		foreach ( $_SERVER as $name => $value ) { 
-			if ( substr($name, 0, 5) == "HTTP_" ) { 
-				$headers[ str_replace(' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $name, 5 ) ) ) ) ) ] = $value; 
-			} 
-		} 
-		
-		return $headers; 
-	} 
+if ( !function_exists( "getallheaders") ) {
+	function getallheaders() {
+		$headers = array();
+		foreach ( $_SERVER as $name => $value ) {
+			if ( substr($name, 0, 5) == "HTTP_" ) {
+				$headers[ str_replace(' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $name, 5 ) ) ) ) ) ] = $value;
+			}
+		}
+
+		return $headers;
+	}
 }
 
 function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 	global $wp_query, $gtm4wp_options;
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITEID ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITENAME ] ) {
 		$dataLayer["siteID"]   = 0;
 		$dataLayer["siteName"] = "";
 
     if ( function_exists( 'get_blog_details' ) ) {
       $gtm4wp_blogdetails = get_blog_details();
-      
+
       $dataLayer["siteID"]   = $gtm4wp_blogdetails->blog_id;
       $dataLayer["siteName"] = $gtm4wp_blogdetails->blogname;
     }
 	}
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] ) {
 		if ( is_user_logged_in() ) {
 			$dataLayer["visitorLoginState"] = "logged-in";
@@ -68,10 +68,10 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$dataLayer["visitorLoginState"] = "logged-out";
 		}
 	}
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
 		$current_user = wp_get_current_user();
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] ) {
 			$dataLayer["visitorType"] = ( empty( $current_user->roles[0] ) ? "visitor-logged-out" : $current_user->roles[0] );
 		}
@@ -83,7 +83,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
 			$dataLayer["visitorRegistrationDate"] = ( empty( $current_user->user_registered ) ? "" : strtotime($current_user->user_registered) );
 		}
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERNAME ] ) {
 			$dataLayer["visitorUsername"] = ( empty( $current_user->user_login  ) ? "" : $current_user->user_login );
 		}
@@ -107,9 +107,9 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$ip = $_SERVER['REMOTE_ADDR'];
 		}
 
-		$dataLayer["visitorIP"] = $ip; 
+		$dataLayer["visitorIP"] = $ip;
 	}
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
 		$dataLayer["pageTitle"] = strip_tags( wp_title( "|", false, "right" ) );
 	}
@@ -142,7 +142,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHORID ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHOR ] ) {
 			$postuser = get_userdata( $GLOBALS["post"]->post_author );
-			
+
 			if ( false !== $postuser ) {
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHORID ] ) {
           $dataLayer["pagePostAuthorID"] = $postuser->ID;
@@ -227,21 +227,21 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$dataLayer["pagePostAuthor"] = get_the_author();
 		}
 	}
-	
+
 	if ( is_search() ) {
 		$dataLayer["siteSearchTerm"] = get_search_query();
 		$dataLayer["siteSearchFrom"] = ( isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : "" );
 		$dataLayer["siteSearchResults"] = $wp_query->post_count;
 	}
-	
+
 	if ( is_front_page() && $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTYPE ] ) {
 		$dataLayer["pagePostType"] = "frontpage";
 	}
-	
+
 	if ( !is_front_page() && is_home() && $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTYPE ] ) {
 		$dataLayer["pagePostType"] = "bloghome";
 	}
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_BROWSERDATA ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_OSDATA ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_DEVICEDATA ] ) {
 		spl_autoload_register( function( $class ) {
 			$class_parts = explode( "\\", $class );
@@ -295,7 +295,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 ) {
 		$_gtmrestrictlistitems = array();
-		
+
 		// IDs from https://developers.google.com/tag-manager/devguide#security
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ADADVISOR ] ) {
 			$_gtmrestrictlistitems[] = "ta";
@@ -354,7 +354,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_UA ] ) {
 			$_gtmrestrictlistitems[] = "ua";
 		}
-		
+
 		$_gtmwhitelist = array();
 		$_gtmblacklist = array();
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] == 1 ) {
@@ -362,7 +362,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		} else {
 			$_gtmwhitelist = array_merge($_gtmwhitelist, $_gtmrestrictlistitems);
 		}
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_DOMELEMENT ] ) {
 			$_gtmwhitelist[] = "d";
 		}
@@ -470,7 +470,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 		}
 	}
-	
+
 	return $dataLayer;
 }
 
@@ -536,14 +536,14 @@ function gtm4wp_wp_loaded() {
 
 function gtm4wp_get_the_gtm_tag() {
 	global $gtm4wp_options, $gtm4wp_datalayer_name, $gtm4wp_container_code_written;
-	
+
 	$_gtm_tag = '
 <!-- Google Tag Manager (noscript) -->';
-	
+
 	if ( GTM4WP_PLACEMENT_OFF == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
     $gtm4wp_container_code_written = true;
 	}
-	
+
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) && ( ! $gtm4wp_container_code_written ) ) {
 		$_gtm_codes = explode( ",", str_replace( array(";"," "), array(",",""), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 
@@ -575,7 +575,7 @@ function gtm4wp_the_gtm_tag() {
 
 function gtm4wp_enqueue_scripts() {
 	global $gtm4wp_options, $gtp4wp_plugin_url;
-		
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_OUTBOUND ] ) {
     $in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_OUTBOUND, false);
 		wp_enqueue_script( "gtm4wp-outbound-click-tracker", $gtp4wp_plugin_url . "js/gtm4wp-outbound-click-tracker.js", array( "jquery" ), GTM4WP_VERSION, $in_footer );
@@ -646,24 +646,24 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 			unset( $dataLayer[ $dl_key ] );
 		}
 	}
-  
+
 	return $dataLayer;
 }
 
-function gtm4wp_wp_header_top() {
+function gtm4wp_wp_header_top( $echo = true ) {
 	global $gtm4wp_options, $gtm4wp_datalayer_name;
 
 	if( !gtm4wp_amp_running() ) {
-		echo '
+		$_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <script data-cfasync="false" type="text/javascript">//<![CDATA[
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];//]]>';
-	
+
 	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
-		$_gtm_header_content .= '
+		$_gtm_top_content .= '
 
 	var gtm4wp_scrollerscript_debugmode         = ' . ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_DEBUGMODE ] ? 'true' : 'false' ) . ';
 	var gtm4wp_scrollerscript_callbacktime      = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_CALLBACKTIME ] . ';
@@ -672,9 +672,15 @@ function gtm4wp_wp_header_top() {
 	var gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
 	}
 
-  echo '	
+  $_gtm_top_content .= '
 </script>
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
+  if ( $echo ) {
+    echo $_gtm_header_content;
+  } else {
+    return $_gtm_header_content;
+  }
+
 	}
 }
 
@@ -684,11 +690,11 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <script data-cfasync="false" type="text/javascript">//<![CDATA[';
-	
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) {
 		$gtm4wp_datalayer_data = array();
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_REMARKETING ] ) {
 			// add adwords remarketing tags as suggested here:
 			// https://support.google.com/tagmanager/answer/3002580?hl=en
@@ -738,7 +744,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			} else {
 				$_gtm_env = '';
 			}
-			
+
 			$_gtm_tag .= '
 <script data-cfasync="false">//<![CDATA[
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
@@ -770,7 +776,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 
 function gtm4wp_body_class( $classes ) {
   global $gtm4wp_options;
-  
+
   // solution is based on the code of Yaniv Friedensohn
   // http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
   if ( GTM4WP_PLACEMENT_BODYOPEN_AUTO == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
@@ -782,7 +788,7 @@ function gtm4wp_body_class( $classes ) {
 
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
 add_action( "wp_head", "gtm4wp_wp_header_begin", 10, 0 );
-add_action( "wp_head", "gtm4wp_wp_header_top", 1 );
+add_action( "wp_head", "gtm4wp_wp_header_top", 1, 0 );
 add_action( "wp_footer", "gtm4wp_wp_footer" );
 add_action( "wp_loaded", "gtm4wp_wp_loaded" );
 add_filter( "body_class", "gtm4wp_body_class", 10000 );
@@ -793,7 +799,7 @@ add_action( "body_open", "gtm4wp_wp_body_open" );
 
 // compatibility with existing themes that natively support code injection after opening body tag
 add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
-add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme		
+add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme
 add_action( "elementor/page_templates/canvas/before_content", "gtm4wp_wp_body_open" ); // Elementor
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
