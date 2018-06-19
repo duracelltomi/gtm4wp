@@ -232,6 +232,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		$dataLayer["siteSearchTerm"] = get_search_query();
 		$dataLayer["siteSearchFrom"] = ( isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : "" );
 		$dataLayer["siteSearchResults"] = $wp_query->post_count;
+		$dataLayer["event"] = "gtm4wp.search";
 	}
 	
 	if ( is_front_page() && $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTYPE ] ) {
