@@ -650,31 +650,37 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 	return $dataLayer;
 }
 
-function gtm4wp_wp_header_top() {
+function gtm4wp_wp_header_top( $echo = true ) {
 	global $gtm4wp_options, $gtm4wp_datalayer_name;
 
-	if( !gtm4wp_amp_running() ) {
-		echo '
+  $_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <script data-cfasync="false" type="text/javascript">//<![CDATA[
-	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
-	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];//]]>';
-	
-	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
-	
-	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
-		$_gtm_header_content .= '
+  var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
+  var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];//]]>';
+  
+  do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
+  
+  if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
+    $_gtm_top_content .= '
 
-	var gtm4wp_scrollerscript_debugmode         = ' . ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_DEBUGMODE ] ? 'true' : 'false' ) . ';
-	var gtm4wp_scrollerscript_callbacktime      = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_CALLBACKTIME ] . ';
-	var gtm4wp_scrollerscript_readerlocation    = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_DISTANCE ] . ';
-	var gtm4wp_scrollerscript_contentelementid  = "' . $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_CONTENTID ] . '";
-	var gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
-	}
+  var gtm4wp_scrollerscript_debugmode         = ' . ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_DEBUGMODE ] ? 'true' : 'false' ) . ';
+  var gtm4wp_scrollerscript_callbacktime      = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_CALLBACKTIME ] . ';
+  var gtm4wp_scrollerscript_readerlocation    = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_DISTANCE ] . ';
+  var gtm4wp_scrollerscript_contentelementid  = "' . $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_CONTENTID ] . '";
+  var gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
+  }
 
-  echo '	
+  $_gtm_top_content .= '  
 </script>
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
+
+	if( !gtm4wp_amp_running() ) {
+    if ( $echo ) {
+      echo $_gtm_top_content;
+    } else {
+      return $_gtm_top_content;
+    }
 	}
 }
 
