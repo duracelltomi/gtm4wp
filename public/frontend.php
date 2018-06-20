@@ -788,7 +788,7 @@ function gtm4wp_body_class( $classes ) {
 
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
 add_action( "wp_head", "gtm4wp_wp_header_begin", 10, 0 );
-add_action( "wp_head", "gtm4wp_wp_header_top", 1 );
+add_action( "wp_head", "gtm4wp_wp_header_top", 1, 0 );
 add_action( "wp_footer", "gtm4wp_wp_footer" );
 add_action( "wp_loaded", "gtm4wp_wp_loaded" );
 add_filter( "body_class", "gtm4wp_body_class", 10000 );
