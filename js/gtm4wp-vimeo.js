@@ -4,19 +4,19 @@ var gtm4wp_vimeo_percentage_tracking_marks = {};
 ;jQuery(function() {
 	jQuery( 'iframe[src*="vimeo.com"]' ).each(function() {
 		var vimeoapi = new Vimeo.Player( this ),
-		    jqframe  = jQuery( this ),
-		    videourl = jqframe
+				jqframe  = jQuery( this ),
+				videourl = jqframe
 					.attr( "src" )
 					.split( "?" )
 					.shift(),
-		    videoid = videourl.split( "/" ).pop();
-		
+				videoid = videourl.split( "/" ).pop();
+
 		jqframe.attr( "data-player_id", videoid );
 		jqframe.attr( "data-player_url", videourl );
 
 		vimeoapi.getVideoTitle().then( function( title ) {
 			jqframe.attr( "data-player_title", title );
-			
+
 			vimeoapi.getDuration().then( function( duration ) {
 
 				jqframe.attr( "data-player_duration", duration );
@@ -87,11 +87,11 @@ var gtm4wp_vimeo_percentage_tracking_marks = {};
 		vimeoapi.on( 'seeked', function( data ) {
 			gtm4wp_onVimeoPlayerStateChange( 'seeked', data );
 		});
-		
+
 		vimeoapi.on( 'texttrackchange', function( data ) {
 
 			vimeoapi.getCurrentTime().then( function( seconds ) {
-			
+
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.mediaPlayerEvent',
 					'mediaType': 'vimeo',
@@ -128,11 +128,11 @@ var gtm4wp_vimeo_percentage_tracking_marks = {};
 			});
 
 		});
-		
+
 		vimeoapi.on( 'volumechange', function( data ) {
 
 			vimeoapi.getCurrentTime().then( function( seconds ) {
-			
+
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.mediaPlayerEvent',
 					'mediaType': 'vimeo',
@@ -169,11 +169,11 @@ var gtm4wp_vimeo_percentage_tracking_marks = {};
 			});
 
 		});
-		
+
 		vimeoapi.on( 'error', function( data ) {
 
 			vimeoapi.getCurrentTime().then( function( seconds ) {
-			
+
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.mediaPlayerEvent',
 					'mediaType': 'vimeo',

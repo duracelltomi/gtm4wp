@@ -46,27 +46,27 @@
 .gtm4wp-phase-beta,
 .gtm4wp-phase-experimental,
 .gtm4wp-phase-deprecated {
-  display: inline-block;
-  background-color: #f00;
-  color: #fff;
-  font-size: 9px;
-  padding: 2px;
-  margin-left: 5px;
+	display: inline-block;
+	background-color: #f00;
+	color: #fff;
+	font-size: 9px;
+	padding: 2px;
+	margin-left: 5px;
 }
 
 .gtm4wp-phase-beta:before {
-  content: "beta";
+	content: "beta";
 }
 
 .gtm4wp-phase-deprecated {
-  background-color: #ddd;
-  color: #000;
+	background-color: #ddd;
+	color: #000;
 }
 
 .gtm4wp-phase-experimental:before {
-  content: "experimental";
+	content: "experimental";
 }
 
 .gtm4wp-phase-deprecated:before {
-  content: "deprecated";
+	content: "deprecated";
 }

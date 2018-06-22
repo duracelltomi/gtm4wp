@@ -1,9 +1,9 @@
 <?php
 function gtm4wp_youtube( $return, $url, $data ) {
-  if ( false !== strpos( $return, "youtube.com" ) ) {
-	  return str_replace( "feature=oembed", "feature=oembed&enablejsapi=1&origin=" . site_url(), $return );
+	if ( false !== strpos( $return, "youtube.com" ) ) {
+		return str_replace( "feature=oembed", "feature=oembed&enablejsapi=1&origin=" . site_url(), $return );
 	} else {
-	  return $return;
+		return $return;
 	}
 }
 

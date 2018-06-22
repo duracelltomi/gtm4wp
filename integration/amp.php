@@ -5,14 +5,14 @@
 * This intergration added AMP support when using amp-wp, the existing dataLayer used
 * for Google Tag Manager on HTML is loaded and built into AMP compatible code.
 *
-* @author 	Vincent Koc <https://github.com/koconder/> 
+* @author 	Vincent Koc <https://github.com/koconder/>
 * @package	gtm4wp
 */
 
 /**
 *
 * Todo's
-* 
+*
 * - Better handling of gtm4wp_amp_gtmampcode_check() to allow for other plugins
 * - Develop array's into strings as AMP GTM dose not allow custom js variables
 * - Better Client ID support (https://github.com/Automattic/amp-wp/issues/775)
@@ -27,7 +27,7 @@
  *
  * @author Vincent Koc <https://github.com/koconder/>
  * @return bool Returns true if we are running on an AMP page
- */ 
+ */
 function gtm4wp_amp_running(){
 	if ( function_exists( 'is_amp_endpoint' ) && is_amp_endpoint() ) {
 		return true;
@@ -90,9 +90,9 @@ function gtm4wp_amp_gtmcode() {
 		// Builds a list of GTM id's
 		$gtm4wp_ampids = explode( ",", $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AMPID ] );
 		$gtm4wp_ampid_list = array();
-		
+
 		// Counter used for status return
-		$x = 0;	
+		$x = 0;
 
 		// Check we have more than one valid Google Tag Manager ID
 		if ( count( $gtm4wp_ampids ) > 0 ) {
