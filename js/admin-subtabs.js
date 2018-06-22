@@ -38,7 +38,7 @@ var adminsubtabs = {
   2: {
     "generalevents": {
       tabtext: gtm4wp.generaleventstabtitle,
-      numitems: 2
+      numitems: 1
     },
     "mediaevents": {
       tabtext: gtm4wp.mediaeventstabtitle,
@@ -46,7 +46,7 @@ var adminsubtabs = {
     },
     "depecratedevents": {
       tabtext: gtm4wp.depecratedeventstabtitle,
-      numitems: 8
+      numitems: 4
     }
   },
   3: {},
@@ -67,7 +67,7 @@ var adminsubtabs = {
     },
     "int-wc": {
       tabtext: gtm4wp.wctabtitle,
-      numitems: 8
+      numitems: 9
     },
     "int-google-optimize": {
       tabtext: gtm4wp.gotabtitle,
