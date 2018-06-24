@@ -660,9 +660,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 
 	if ( function_exists ( "WC" ) ) {
-		$_gtm_top_globalvars = '';
-		apply_filters( GTM4WP_WPACTION_ADDGLOBALVARS, $_gtm_top_globalvars );
-		$_gtm_top_content .= $_gtm_top_globalvars;
+		$_gtm_top_content .= gtm4wp_woocommerce_addglobalvars();
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
