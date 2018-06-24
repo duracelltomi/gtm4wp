@@ -1,7 +1,7 @@
 var gtm4wp_vimeo_percentage_tracking = 10;
 var gtm4wp_vimeo_percentage_tracking_marks = {};
 
-;jQuery(function() {
+jQuery(function() {
 	jQuery( 'iframe[src*="vimeo.com"]' ).each(function() {
 		var vimeoapi = new Vimeo.Player( this ),
 				jqframe  = jQuery( this ),
@@ -230,7 +230,7 @@ var gtm4wp_vimeo_percentage_tracking_marks = {};
 				'mediaCurrentTime': data.seconds
 			});
 
-		}
+		};
 
 		var gtm4wp_onVimeoPercentageChange = function( data ) {
 
@@ -262,7 +262,7 @@ var gtm4wp_vimeo_percentage_tracking_marks = {};
 
 				}
 			}
-		}
+		};
 
 	});
 });
