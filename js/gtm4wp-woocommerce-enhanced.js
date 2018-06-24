@@ -55,7 +55,7 @@ function gtm4wp_handle_cart_qty_change() {
 jQuery(function() {
 	var is_cart     = jQuery( 'body' ).hasClass( 'woocommerce-cart' );
 	var is_checkout = jQuery( 'body' ).hasClass( 'woocommerce-checkout' );
-	
+
 	// track impressions of products in product lists
 	if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
 		for( var i=0; i<window[ gtm4wp_datalayer_name ].length; i++ ) {
@@ -184,7 +184,7 @@ jQuery(function() {
 		}
 	});
 
-	// track remove links in mini cart widget and on cart page	
+	// track remove links in mini cart widget and on cart page
 	jQuery( document ).on( 'click', '.mini_cart_item a.remove,.product-remove a.remove', function() {
 		var productdata = jQuery( this );
 
@@ -231,7 +231,7 @@ jQuery(function() {
 		if ( 'undefined' == typeof google_tag_manager ) {
 			return true;
 		}
-	
+
 		var _productdata = jQuery( this ).closest( '.product' );
 
 		if ( _productdata.length > 0 ) {
@@ -297,14 +297,14 @@ jQuery(function() {
 			'eventTimeout': 2000
 		});
 	});
-	
+
 	// track variable products on their detail pages
 	jQuery( document ).on( 'found_variation', function( event, product_variation ) {
 		if ( "undefined" == typeof product_variation ) {
 			// some ither plugins trigger this event without variation data
 			return;
 		}
-	
+
 		var _product_form       = event.target;
 		var _product_var_id     = jQuery( '[name=variation_id]', _product_form );
 		var _product_id         = jQuery( '[name=gtm4wp_id]', _product_form ).val();
@@ -351,7 +351,7 @@ jQuery(function() {
 	});
 	jQuery( '.variations select' ).trigger( 'change' );
 
-  // initiate codes in WooCommere Quick View
+	// initiate codes in WooCommere Quick View
 	jQuery( document ).ajaxSuccess( function( event, xhr, settings ) {
 		if ( settings.url.indexOf( 'wc-api=WC_Quick_View' ) > -1 ) {
 		  setTimeout( function() {
@@ -361,13 +361,13 @@ jQuery(function() {
 			}, 500);
 		}
 	});
-	
+
 	// codes for enhanced ecommerce events on cart page
 	if ( is_cart ) {
 		jQuery( document ).on( 'click', '[name=update_cart]', function() {
 			gtm4wp_handle_cart_qty_change();
 		});
-		
+
 		jQuery( document ).on( 'keypress', '.woocommerce-cart-form input[type=number]', function() {
 			gtm4wp_handle_cart_qty_change();
 		});
@@ -375,8 +375,8 @@ jQuery(function() {
 
 	// codes for enhanced ecommerce events on checkout page
 	if ( is_checkout ) {
-	  window[ 'gtm4wp_checkout_step_offset' ] = window[ 'gtm4wp_checkout_step_offset' ] || 0;
-	  window[ 'gtm4wp_checkout_products' ]    = window[ 'gtm4wp_checkout_products' ] || [];
+		window[ 'gtm4wp_checkout_step_offset' ] = window[ 'gtm4wp_checkout_step_offset' ] || 0;
+		window[ 'gtm4wp_checkout_products' ]    = window[ 'gtm4wp_checkout_products' ] || [];
 		var gtm4wp_checkout_step_fired          = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
 
 		jQuery( document ).on( 'blur', 'input[name^=shipping_]:not(input[name=shipping_method])', function() {

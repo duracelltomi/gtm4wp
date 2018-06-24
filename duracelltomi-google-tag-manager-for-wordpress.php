@@ -1,4 +1,4 @@
-<?php 
+<?php
 /*
 Plugin Name: Google Tag Manager for Wordpress
 Version: 1.9

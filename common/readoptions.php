@@ -157,7 +157,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_EVENTS_YOUTUBE     => false,
 	GTM4WP_OPTION_EVENTS_VIMEO       => false,
 	GTM4WP_OPTION_EVENTS_SOUNDCLOUD  => false,
-	
+
 	GTM4WP_OPTION_SCROLLER_ENABLED      => false,
 	GTM4WP_OPTION_SCROLLER_DEBUGMODE    => false,
 	GTM4WP_OPTION_SCROLLER_CALLBACKTIME => 100,
@@ -220,7 +220,7 @@ $gtm4wp_defaultoptions = array(
 
 function gtm4wp_reload_options() {
 	global $gtm4wp_defaultoptions;
-	
+
 	$storedoptions = (array) get_option( GTM4WP_OPTIONS );
 	if ( ! is_array( $gtm4wp_defaultoptions ) ) {
 		$gtm4wp_defaultoptions = array();
@@ -234,7 +234,7 @@ function gtm4wp_reload_options() {
 
 		unset( $storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ] );
 	}
-	
+
 	return array_merge( $gtm4wp_defaultoptions, $storedoptions );
 }
 

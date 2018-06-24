@@ -10,7 +10,7 @@ jQuery( function() {
 			var formID    = form.attr("id") || "(no form ID)";
 			var formName  = form.attr("name") || "(no form name)";
 			var formClass = form.attr("class") || "(no form class)";
-			
+
 			window[ gtm4wp_datalayer_name ].push({
 				'event'    : 'gtm4wp.formElementEnter',
 
@@ -23,7 +23,7 @@ jQuery( function() {
 				'formClass': formClass
 			});
 		})
-		
+
 		.on( "blur", function() {
 			var input      = jQuery(this);
 			var inputID    = input.attr("id") || "(no input ID)";
@@ -34,7 +34,7 @@ jQuery( function() {
 			var formID    = form.attr("id") || "(no form ID)";
 			var formName  = form.attr("name") || "(no form name)";
 			var formClass = form.attr("class") || "(no form class)";
-			
+
 			window[ gtm4wp_datalayer_name ].push({
 				'event'    : 'gtm4wp.formElementLeave',
 

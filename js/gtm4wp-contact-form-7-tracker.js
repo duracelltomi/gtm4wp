@@ -7,7 +7,7 @@ jQuery( function() {
 			} else if ( e && e.originalEvent && e.originalEvent.detail && e.originalEvent.detail.contactFormId ) {
 				gtm4wp_cf7formid = e.originalEvent.detail.contactFormId;
 			}
-			
+
 			var gtm4wp_cf7forminputs = [];
 			if ( e && e.detail && e.detail.inputs ) {
 				gtm4wp_cf7forminputs = e.detail.inputs;

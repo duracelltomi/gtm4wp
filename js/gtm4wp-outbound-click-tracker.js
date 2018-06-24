@@ -1,6 +1,6 @@
 jQuery( function() {
 	var gtm4wp_localdomain = window.location.hostname.replace( "www.", "" );
-	
+
 	jQuery( "a[href^=http]" )
 		.each( function() {
 			var gtm4wp_linkhref = jQuery( this ).attr( "href" );
