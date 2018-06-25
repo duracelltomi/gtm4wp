@@ -1,4 +1,4 @@
-;jQuery(function() {
+jQuery(function() {
 	jQuery( document ).on( 'click', '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)', function() {
 		var productdata = jQuery( this ).closest( '.product' ).find( '.gtm4wp_productdata' );
 

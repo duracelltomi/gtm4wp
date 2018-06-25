@@ -1,4 +1,3 @@
-;
 var gtm4wp_soundclound_percentage_tracking = 10;
 var gtm4wp_soundclound_percentage_tracking_marks = {};
 
@@ -86,7 +85,7 @@ jQuery(function() {
 				'mediaCurrentTime': eventData.currentPosition,
 				'mediaPlayerState': playerState
 			});
-		}
+		};
 
 		var gtm4wp_onSoundCloudPercentageChange = function( eventData ) {
 			var mediaPercentage  = Math.floor( eventData.currentPosition / sound.duration * 100 );
@@ -114,7 +113,7 @@ jQuery(function() {
 					});
 				}
 			}
-		}
+		};
 
 		var gtm4wp_onSoundCloudPlayerEvent = function( eventName ) {
 			widget.getPosition(function( currentPosition ) {
@@ -132,7 +131,7 @@ jQuery(function() {
 					'mediaPlayerEvent': eventName
 				});
 			});
-		}
+		};
 
 	});
 });
