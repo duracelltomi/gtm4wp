@@ -9,7 +9,7 @@ jQuery( function() {
 		jQuery(this)
 			.remove();
 
-		if ( adminsubtabsdata.length > 0 ) {
+		if ( adminsubtabsdata[ i ] ) {
 			var _subtabs = [];
 			var _startrow = 0;
          
