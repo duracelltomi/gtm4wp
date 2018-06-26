@@ -665,6 +665,13 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 	return $dataLayer;
 }
 
+/**
+ * GTM4WP global JS variables Wordpress filter
+ *
+ * @author Vincent Koc <https://github.com/koconder/>
+ * @link https://github.com/duracelltomi/gtm4wp/issues/34
+ * @return mixed returns the 
+ */
 function gtm4wp_add_global_vars( $vars, $return = false ){
 	if(!$return){
 		if(function_exists($vars)){
