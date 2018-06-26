@@ -28,6 +28,12 @@ if ( !function_exists('gtm4wp_amp_running') ) {
 	}
 }
 
+/**
+ * Converts bool false to string false for JS
+ *
+ * @author Vincent Koc <https://github.com/koconder/>
+ * @return mixed Returs object or string false
+ */
 function gtm4wp_escjs_boolean($obj){
 	if(empty($obj) || is_null($obj) || !$obj){
 		return 'false';
