@@ -81,9 +81,9 @@ function gtm4wp_woocommerce_addglobalvars($return = '') {
   $return .= "
 	var gtm4wp_use_sku_instead = " . (int)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ]) . ";
 	var gtm4wp_id_prefix       = '" . esc_js( gtm4wp_prefix_productid("") ) . "';
-	var gtm4wp_remarketing     = " . (boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ]) . ";
-	var gtm4wp_eec             = " . (boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ]) . ";
-	var gtm4wp_classicec       = " . (boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ]) . ";
+	var gtm4wp_remarketing     = " . gtm4wp_escjs_boolean((boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ])) . ";
+	var gtm4wp_eec             = " . gtm4wp_escjs_boolean((boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ])) . ";
+	var gtm4wp_classicec       = " . gtm4wp_escjs_boolean((boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ])) . ";
 	var gtm4wp_currency        = '" . esc_js( get_woocommerce_currency() ) . "';";
   return $return;
 }

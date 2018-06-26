@@ -28,6 +28,14 @@ if ( !function_exists('gtm4wp_amp_running') ) {
 	}
 }
 
+function gtm4wp_escjs_boolean($obj){
+	if(empty($obj) || is_null($obj) || !$obj){
+		return 'false';
+	}else{
+		return $obj;
+	}
+}
+
 function gtm4wp_is_assoc($arr) {
 	// borrowed from
 	// http://stackoverflow.com/questions/173400/php-arrays-a-good-way-to-check-if-an-array-is-associative-or-sequential
