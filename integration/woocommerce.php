@@ -1325,6 +1325,7 @@ if ( function_exists ( "WC" ) ) {
 
 //	add_action( "wp_footer", "gtm4wp_woocommerce_wp_footer" );
 	add_action( "wp_enqueue_scripts", "gtm4wp_woocommerce_enqueue_scripts" );
+	add_filter( GTM4WP_WPACTION_ADDGLOBALVARS, "gtm4wp_woocommerce_addglobalvars" );
 	
 	if ( true === $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 //		add_action( "wp_footer", "gtm4wp_woocommerce_enhanced_ecom_product_click" );

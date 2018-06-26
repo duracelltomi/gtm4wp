@@ -2,7 +2,7 @@
 define( 'GTM4WP_WPFILTER_COMPILE_DATALAYER',  'gtm4wp_compile_datalayer' );
 define( 'GTM4WP_WPFILTER_COMPILE_REMARKTING', 'gtm4wp_compile_remarkering' );
 define( 'GTM4WP_WPFILTER_GETTHEGTMTAG',       'gtm4wp_get_the_gtm_tag' );
-define( 'GTM4WP_WPACTION_ADDGLOBALVARS',      'gtm4wp_woocommerce_addglobalvars' );
+define( 'GTM4WP_WPACTION_ADDGLOBALVARS',      'gtm4wp_add_global_vars' );
 
 $GLOBALS[ "gtm4wp_container_code_written" ] = false;
 
@@ -16,6 +16,7 @@ if ( empty($GLOBALS[ "gtm4wp_options" ] ) || ($GLOBALS[ "gtm4wp_options" ][ GTM4
 
 // Setting Global Variable to Store JSON based Datalayer for Intergrations
 $GLOBALS[ "gtm4wp_datalayer_json" ] = '';
+$GLOBALS[ "gtm4wp_datalayer_globalvars" ] = '';
 
 // Moving include to top due to hierarchy of includes
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( "" != $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] ) ) {
@@ -650,6 +651,16 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 	return $dataLayer;
 }
 
+function gtm4wp_add_global_vars( $vars, $return = false ){
+	if(!$return){
+		if(function_exists($vars)){
+			$vars = $vars();	
+		}
+		$GLOBALS[ "gtm4wp_datalayer_globalvars" ] = $GLOBALS[ "gtm4wp_datalayer_globalvars" ].' '.$vars;
+	}
+	return $GLOBALS[ "gtm4wp_datalayer_globalvars" ];
+}
+
 function gtm4wp_wp_header_top( $echo = true ) {
 	global $gtm4wp_options, $gtm4wp_datalayer_name;
 
@@ -659,9 +670,8 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 
-	if ( function_exists ( "WC" ) ) {
-		$_gtm_top_content .= gtm4wp_woocommerce_addglobalvars();
-	}
+	// Load in the global variables from gtm4wp_add_global_vars / GTM4WP_WPACTION_ADDGLOBALVARS filter
+	$_gtm_top_content .= apply_filters(GTM4WP_WPACTION_ADDGLOBALVARS, '', true);
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_top_content .= '
