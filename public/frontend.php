@@ -16,6 +16,7 @@ if ( empty($GLOBALS[ "gtm4wp_options" ] ) || ($GLOBALS[ "gtm4wp_options" ][ GTM4
 
 // Setting Global Variable to Store JSON based Datalayer for Intergrations
 $GLOBALS[ "gtm4wp_datalayer_json" ] = '';
+$GLOBALS[ "gtm4wp_datalayer_globalvars" ] = '';
 
 // Moving include to top due to hierarchy of includes
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( "" != $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_AMPID ] ) ) {
@@ -24,6 +25,20 @@ if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( "" != $GLOBALS[ "gtm4wp_options"
 if ( !function_exists('gtm4wp_amp_running') ) {
 	function gtm4wp_amp_running(){
 		return false;
+	}
+}
+
+/**
+ * Converts bool false to string false for JS
+ *
+ * @author Vincent Koc <https://github.com/koconder/>
+ * @return mixed Returs object or string false
+ */
+function gtm4wp_escjs_boolean($obj){
+	if(empty($obj) || is_null($obj) || !$obj){
+		return 'false';
+	}else{
+		return $obj;
 	}
 }
 
@@ -650,6 +665,23 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
 	return $dataLayer;
 }
 
+/**
+ * GTM4WP global JS variables Wordpress filter
+ *
+ * @author Vincent Koc <https://github.com/koconder/>
+ * @link https://github.com/duracelltomi/gtm4wp/issues/34
+ * @return mixed returns the 
+ */
+function gtm4wp_add_global_vars( $vars, $return = false ){
+	if(!$return){
+		if(function_exists($vars)){
+			$vars = $vars();	
+		}
+		$GLOBALS[ "gtm4wp_datalayer_globalvars" ] = $GLOBALS[ "gtm4wp_datalayer_globalvars" ].' '.$vars;
+	}
+	return $GLOBALS[ "gtm4wp_datalayer_globalvars" ];
+}
+
 function gtm4wp_wp_header_top( $echo = true ) {
 	global $gtm4wp_options, $gtm4wp_datalayer_name;
 
@@ -659,8 +691,9 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 
-	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
-  
+	// Load in the global variables from gtm4wp_add_global_vars / GTM4WP_WPACTION_ADDGLOBALVARS filter
+	$_gtm_top_content .= apply_filters(GTM4WP_WPACTION_ADDGLOBALVARS, '', true);
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_top_content .= '
 
@@ -672,7 +705,8 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	}
 
 	$_gtm_top_content .= '  
-//]]></script>
+//]]>
+</script>
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
 
 	if( !gtm4wp_amp_running() ) {
@@ -702,8 +736,9 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			add_filter( GTM4WP_WPFILTER_COMPILE_REMARKTING, "gtm4wp_filter_visitor_keys" );
 			$gtm4wp_remarketing_tags = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_REMARKTING, $gtm4wp_datalayer_data );
 
-			$_gtm_header_content .= '
-	var google_tag_params = ' . json_encode( $gtm4wp_remarketing_tags ) . ';';
+			$_gtm_header_content .= 'var google_tag_params = ';
+			$_gtm_header_content .= json_encode( $gtm4wp_remarketing_tags );
+			$_gtm_header_content .= ';';
 			$gtm4wp_datalayer_data["google_tag_params"] = "-~-window.google_tag_params-~-";
 		}
 
