@@ -48,17 +48,17 @@ function gtm4wp_is_assoc($arr) {
 	return array_keys($arr) !== range(0, count($arr) - 1);
 }
 
-if ( !function_exists( "getallheaders") ) { 
-	function getallheaders() { 
-		$headers = array(); 
-		foreach ( $_SERVER as $name => $value ) { 
-			if ( substr($name, 0, 5) == "HTTP_" ) { 
-				$headers[ str_replace(' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $name, 5 ) ) ) ) ) ] = $value; 
-			} 
-		} 
-		
-		return $headers; 
-	} 
+if ( !function_exists( "getallheaders") ) {
+	function getallheaders() {
+		$headers = array();
+		foreach ( $_SERVER as $name => $value ) {
+			if ( substr($name, 0, 5) == "HTTP_" ) {
+				$headers[ str_replace(' ', '-', ucwords( strtolower( str_replace( '_', ' ', substr( $name, 5 ) ) ) ) ) ] = $value;
+			}
+		}
+
+		return $headers;
+	}
 }
 
 function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
@@ -86,7 +86,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
 		$current_user = wp_get_current_user();
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERROLE ] ) {
 			$dataLayer["visitorType"] = ( empty( $current_user->roles[0] ) ? "visitor-logged-out" : $current_user->roles[0] );
 		}
@@ -98,7 +98,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
 			$dataLayer["visitorRegistrationDate"] = ( empty( $current_user->user_registered ) ? "" : strtotime($current_user->user_registered) );
 		}
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERNAME ] ) {
 			$dataLayer["visitorUsername"] = ( empty( $current_user->user_login  ) ? "" : $current_user->user_login );
 		}
@@ -122,7 +122,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$ip = $_SERVER['REMOTE_ADDR'];
 		}
 
-		$dataLayer["visitorIP"] = $ip; 
+		$dataLayer["visitorIP"] = $ip;
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
@@ -157,7 +157,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHORID ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHOR ] ) {
 			$postuser = get_userdata( $GLOBALS["post"]->post_author );
-			
+
 			if ( false !== $postuser ) {
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHORID ] ) {
           $dataLayer["pagePostAuthorID"] = $postuser->ID;
@@ -310,7 +310,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 ) {
 		$_gtmrestrictlistitems = array();
-		
+
 		// IDs from https://developers.google.com/tag-manager/devguide#security
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ADADVISOR ] ) {
 			$_gtmrestrictlistitems[] = "ta";
@@ -369,7 +369,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_UA ] ) {
 			$_gtmrestrictlistitems[] = "ua";
 		}
-		
+
 		$_gtmwhitelist = array();
 		$_gtmblacklist = array();
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] == 1 ) {
@@ -377,7 +377,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		} else {
 			$_gtmwhitelist = array_merge($_gtmwhitelist, $_gtmrestrictlistitems);
 		}
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_DOMELEMENT ] ) {
 			$_gtmwhitelist[] = "d";
 		}
@@ -473,14 +473,16 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
 				$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
 
-				$dataLayer[ "geoCountryCode" ] = $geodata->country_code;
-				$dataLayer[ "geoCountryName" ] = $geodata->country_name;
-				$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
-				$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
-				$dataLayer[ "geoCity" ]        = $geodata->city;
-				$dataLayer[ "geoZipcode" ]     = $geodata->zip_code;
-				$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
-				$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
+				if ( false !== $geodata ) {
+					$dataLayer[ "geoCountryCode" ] = $geodata->country_code;
+					$dataLayer[ "geoCountryName" ] = $geodata->country_name;
+					$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
+					$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
+					$dataLayer[ "geoCity" ]        = $geodata->city;
+					$dataLayer[ "geoZipcode" ]     = $geodata->zip_code;
+					$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
+					$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
+				}
 			}
 
 		}
@@ -590,7 +592,7 @@ function gtm4wp_the_gtm_tag() {
 
 function gtm4wp_enqueue_scripts() {
 	global $gtm4wp_options, $gtp4wp_plugin_url;
-		
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_OUTBOUND ] ) {
 		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_OUTBOUND, false);
 		wp_enqueue_script( "gtm4wp-outbound-click-tracker", $gtp4wp_plugin_url . "js/gtm4wp-outbound-click-tracker.js", array( "jquery" ), GTM4WP_VERSION, $in_footer );
@@ -670,12 +672,12 @@ function gtm4wp_filter_visitor_keys( $dataLayer ) {
  *
  * @author Vincent Koc <https://github.com/koconder/>
  * @link https://github.com/duracelltomi/gtm4wp/issues/34
- * @return mixed returns the 
+ * @return mixed returns the
  */
 function gtm4wp_add_global_vars( $vars, $return = false ){
 	if(!$return){
 		if(function_exists($vars)){
-			$vars = $vars();	
+			$vars = $vars();
 		}
 		$GLOBALS[ "gtm4wp_datalayer_globalvars" ] = $GLOBALS[ "gtm4wp_datalayer_globalvars" ].' '.$vars;
 	}
@@ -704,7 +706,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	var gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
 	}
 
-	$_gtm_top_content .= '  
+	$_gtm_top_content .= '
 //]]>
 </script>
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
@@ -728,7 +730,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) {
 		$gtm4wp_datalayer_data = array();
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
-		
+
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_REMARKETING ] ) {
 			// add adwords remarketing tags as suggested here:
 			// https://support.google.com/tagmanager/answer/3002580?hl=en
@@ -779,7 +781,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			} else {
 				$_gtm_env = '';
 			}
-			
+
 			$_gtm_tag .= '
 <script data-cfasync="false">//<![CDATA[
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
@@ -834,7 +836,7 @@ add_action( "body_open", "gtm4wp_wp_body_open" );
 
 // compatibility with existing themes that natively support code injection after opening body tag
 add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
-add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme		
+add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme
 add_action( "elementor/page_templates/canvas/before_content", "gtm4wp_wp_body_open" ); // Elementor
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
