@@ -334,15 +334,21 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		$order_key = apply_filters( 'woocommerce_thankyou_order_key', empty( $_GET[ "key" ] ) ? "" : wc_clean( $_GET[ "key" ] ) );
 
 		if ( $order_id > 0 ) {
-			$order = new WC_Order( $order_id );
-			if ( $gtm4wp_is_woocommerce3 ) {
-				$this_order_key = $order->get_order_key();
-			} else {
-				$this_order_key = $order->order_key;
-			}
+			$order = wc_get_order( $order_id );
 
-			if ( $this_order_key != $order_key )
+			if ( $order instanceof WC_Order ) {
+				if ( $gtm4wp_is_woocommerce3 ) {
+					$this_order_key = $order->get_order_key();
+				} else {
+					$this_order_key = $order->order_key;
+				}
+
+				if ( $this_order_key != $order_key ) {
+					unset( $order );
+				}
+			} else {
 				unset( $order );
+			}
 		}
 
 		if ( 1 == get_post_meta( $order_id, '_ga_tracked', true ) ) {
