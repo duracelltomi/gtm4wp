@@ -11,4 +11,4 @@ function gtm4wp_track_downloads(track_extensions) {
 			})
 			.attr( "target", "_blank" );
 	} // end for i
-};
+}

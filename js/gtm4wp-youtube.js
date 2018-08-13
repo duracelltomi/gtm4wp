@@ -13,11 +13,11 @@ if ( typeof onYouTubeIframeAPIReady === "undefined" ) {
 			var gtm4wp_jqthis = jQuery( this );
 			var playerID = gtm4wp_jqthis.attr( "id" );
 
-			if ( ( playerID == undefined ) || ( playerID == "" ) ) {
+			if ( ( playerID === undefined ) || ( playerID === "" ) ) {
 				var _gtm4wp_temp  = gtm4wp_jqthis.attr( "src" ).split( "?" );
 				var _gtm4wp_temp2 = _gtm4wp_temp[ 0 ].split( "/" );
 
-				var playerID = "youtubeplayer_" + _gtm4wp_temp2[ _gtm4wp_temp2.length-1 ];
+				playerID = "youtubeplayer_" + _gtm4wp_temp2[ _gtm4wp_temp2.length-1 ];
 				gtm4wp_jqthis.attr( "id", playerID );
 			}
 
@@ -43,7 +43,7 @@ if ( typeof onYouTubeIframeAPIReady === "undefined" ) {
 				}
 			});
 		});
-	}
+	};
 
 	var tag = document.createElement( 'script' );
 	tag.src = "//www.youtube.com/iframe_api";
@@ -191,7 +191,7 @@ function gtm4wp_onYouTubePercentageChange( event ) {
 	var videoId          = event.target.getVideoData().video_id;
 	var videoCurrentTime = event.target.getCurrentTime();
 	var videoDuration    = event.target.getDuration();
-	var videoPercentage  = Math.floor( videoCurrentTime / videoDuration * 100 )
+	var videoPercentage  = Math.floor( videoCurrentTime / videoDuration * 100 );
 
 	if ( typeof gtm4wp_youtube_percentage_tracking_marks[ videoId ] == "undefined" ) {
 		gtm4wp_youtube_percentage_tracking_marks[ videoId ] = [];

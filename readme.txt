@@ -260,8 +260,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: initial support for AMP plugin from Automattic (thx koconder for the contribution!)
 * Added: option to remove tax from revenue data on order received page of WooCommerce
 * Added: WooCommerce enhanced ecommerce datasets now include stock levels
+* Added: new productIsVariable data layer variable is set to 1 on variable WooCommerce product pages
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
+* Fixed: PHP notice in some cases when geo data was not loaded properly
 * Warning: some plugin features will be remove from v1.10, most of them can be tracked now using pure Google Tag Manager triggers:
   * Social actions
   * Outbound link click events

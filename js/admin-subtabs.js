@@ -1,4 +1,4 @@
-;
+
 var adminsubtabs = {
 	0: {},
 	1: {
