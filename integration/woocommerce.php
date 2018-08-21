@@ -327,8 +327,9 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 		}
 	} else if ( is_order_received_page() ) {
-		$order_id          = empty( $_GET[ "order" ] ) ? ( $GLOBALS[ "wp" ]->query_vars[ "order-received" ] ? $GLOBALS[ "wp" ]->query_vars[ "order-received" ] : 0 ) : absint( $_GET[ "order" ] );
-		$order_id_filtered = apply_filters( 'woocommerce_thankyou_order_id', $order_id );
+		$do_not_flag_tracked_order = (boolean)($gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ]);
+		$order_id                  = empty( $_GET[ "order" ] ) ? ( $GLOBALS[ "wp" ]->query_vars[ "order-received" ] ? $GLOBALS[ "wp" ]->query_vars[ "order-received" ] : 0 ) : absint( $_GET[ "order" ] );
+		$order_id_filtered         = apply_filters( 'woocommerce_thankyou_order_id', $order_id );
 		if ( "" != $order_id_filtered ) {
 			$order_id = $order_id_filtered;
 		}
@@ -353,7 +354,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 		}
 
-		if ( 1 == get_post_meta( $order_id, '_ga_tracked', true ) ) {
+		if ( ( 1 == get_post_meta( $order_id, '_ga_tracked', true ) ) && !$do_not_flag_tracked_order ) {
 			unset( $order );
 		}
 
@@ -467,7 +468,9 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer["ecomm_totalvalue"] = (float)$_sumprice;
 			}
 
-			update_post_meta( $order_id, '_ga_tracked', 1 );
+			if ( !$do_not_flag_tracked_order ) {
+				update_post_meta( $order_id, '_ga_tracked', 1 );
+			}
 		}
 	} else if ( is_checkout() ) {
 		if ( ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) || ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) ) {
