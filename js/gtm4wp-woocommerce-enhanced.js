@@ -56,42 +56,38 @@ jQuery(function() {
 	var is_checkout = jQuery( 'body' ).hasClass( 'woocommerce-checkout' );
 
 	// track impressions of products in product lists
-	if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
-		for( var i=0; i<window[ gtm4wp_datalayer_name ].length; i++ ) {
-			if ( window[ gtm4wp_datalayer_name ][ i ].ecommerce ) {
+    if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
+        var products = [];
+        jQuery( '.gtm4wp_productdata,.widget-product-item' ).each( function() {
 
-				if ( ! window[ gtm4wp_datalayer_name ][ i ].ecommerce.impressions ) {
-					window[ gtm4wp_datalayer_name ][ i ].ecommerce.impressions = [];
-				}
+            productdata = jQuery( this );
+            products.push({
+                'name':     productdata.data( 'gtm4wp_product_name' ),
+                'id':       productdata.data( 'gtm4wp_product_id' ),
+                'price':    productdata.data( 'gtm4wp_product_price' ),
+                'category': productdata.data( 'gtm4wp_product_cat' ),
+                'position': productdata.data( 'gtm4wp_product_listposition' ),
+                'list':     productdata.data( 'gtm4wp_productlist_name' )
+            });
 
-				break;
-			}
-		}
+        });
 
-		if ( i == window[ gtm4wp_datalayer_name ].length ) {
-			// no existing ecommerce data found in the datalayer
-			i = 0;
-			window[ gtm4wp_datalayer_name ][ i ].ecommerce = {};
-			window[ gtm4wp_datalayer_name ][ i ].ecommerce.impressions = [];
-		}
+        // Need to split the product submissions up into chunks in order to avoid the GA 8kb submission limit
+        var maxProducts = 35;
+        while ( products.length ) {
+            var chunk = products.splice( 0, maxProducts );
 
-		window[ gtm4wp_datalayer_name ][ i ].ecommerce.currencyCode = gtm4wp_currency;
-
-		var productdata;
-		jQuery( '.gtm4wp_productdata,.widget-product-item' ).each( function() {
-			productdata = jQuery( this );
-
-			window[ gtm4wp_datalayer_name ][ i ].ecommerce.impressions.push({
-				'name':       productdata.data( 'gtm4wp_product_name' ),
-				'id':         productdata.data( 'gtm4wp_product_id' ),
-				'price':      productdata.data( 'gtm4wp_product_price' ),
-				'category':   productdata.data( 'gtm4wp_product_cat' ),
-				'position':   productdata.data( 'gtm4wp_product_listposition' ),
-				'list':       productdata.data( 'gtm4wp_productlist_name' ),
-				'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' )
-			});
-		});
-	}
+            window[ gtm4wp_datalayer_name ].push({
+                event: 'gtm4wp.addImpressions',
+                eventCategory: 'Ecommerce',
+                eventAction: 'Impression',
+                ecommerce: {
+                    currencyCode: '".get_woocommerce_currency()."',
+                    impressions: chunk,
+                },
+            });
+        };
+    }
 
 	// track add to cart events for simple products in product lists
 	jQuery( document ).on( 'click', '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)', function() {
@@ -233,7 +229,7 @@ jQuery(function() {
 
 		var _productdata = jQuery( this ).closest( '.product' );
 		var productdata = '';
-    
+
 		if ( _productdata.length > 0 ) {
 			productdata = _productdata.find( '.gtm4wp_productdata' );
 
