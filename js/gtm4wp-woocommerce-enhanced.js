@@ -3,7 +3,7 @@ function gtm4wp_handle_cart_qty_change() {
 		var _original_value = jQuery( this ).prop( 'defaultValue' );
 
 		var _current_value  = parseInt( jQuery( this ).val() );
-		if ( isNaN( _current_value ) ) {
+		if ( Number.isNaN( _current_value ) ) {
 			_current_value = _original_value;
 		}
 
@@ -56,38 +56,61 @@ jQuery(function() {
 	var is_checkout = jQuery( 'body' ).hasClass( 'woocommerce-checkout' );
 
 	// track impressions of products in product lists
-    if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
-        var products = [];
-        jQuery( '.gtm4wp_productdata,.widget-product-item' ).each( function() {
+	if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
+		var products = [];
+		var productdata;
+		jQuery( '.gtm4wp_productdata,.widget-product-item' ).each( function() {
 
-            productdata = jQuery( this );
-            products.push({
-                'name':     productdata.data( 'gtm4wp_product_name' ),
-                'id':       productdata.data( 'gtm4wp_product_id' ),
-                'price':    productdata.data( 'gtm4wp_product_price' ),
-                'category': productdata.data( 'gtm4wp_product_cat' ),
-                'position': productdata.data( 'gtm4wp_product_listposition' ),
-                'list':     productdata.data( 'gtm4wp_productlist_name' )
-            });
+			productdata = jQuery( this );
+			products.push({
+				'name':       productdata.data( 'gtm4wp_product_name' ),
+				'id':         productdata.data( 'gtm4wp_product_id' ),
+				'price':      productdata.data( 'gtm4wp_product_price' ),
+				'category':   productdata.data( 'gtm4wp_product_cat' ),
+				'position':   productdata.data( 'gtm4wp_product_listposition' ),
+				'list':       productdata.data( 'gtm4wp_productlist_name' ),
+				'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' )
+			});
 
-        });
+		});
 
-        // Need to split the product submissions up into chunks in order to avoid the GA 8kb submission limit
-        var maxProducts = 35;
-        while ( products.length ) {
-            var chunk = products.splice( 0, maxProducts );
+		if ( gtm4wp_product_per_impression > 0 ) {
+			// Need to split the product submissions up into chunks in order to avoid the GA 8kb submission limit
+			var chunk;
+			while ( products.length ) {
+				chunk = products.splice( 0, gtm4wp_product_per_impression );
 
-            window[ gtm4wp_datalayer_name ].push({
-                event: 'gtm4wp.addImpressions',
-                eventCategory: 'Ecommerce',
-                eventAction: 'Impression',
-                ecommerce: {
-                    currencyCode: '".get_woocommerce_currency()."',
-                    impressions: chunk,
-                },
-            });
-        };
-    }
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'gtm4wp.productImpressionEEC',
+					'ecommerce': {
+						'currencyCode': gtm4wp_currency,
+						'impressions': chunk
+					}
+				});
+			}
+		} else {
+			for( var i=0; i<window[ gtm4wp_datalayer_name ].length; i++ ) {
+				if ( window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ] ) {
+
+					if ( ! window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] ) {
+						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = [];
+					}
+
+					break;
+				}
+			}
+
+			if ( i == window[ gtm4wp_datalayer_name ].length ) {
+				// no existing ecommerce data found in the datalayer
+				i = 0;
+				window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ] = {};
+				window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = products;
+			}
+
+			window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'currencyCode' ] = gtm4wp_currency;
+
+		}
+	}
 
 	// track add to cart events for simple products in product lists
 	jQuery( document ).on( 'click', '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)', function() {
@@ -190,7 +213,7 @@ jQuery(function() {
 			if ( qty_element.length > 0 ) {
 				qty = parseInt( qty_element.text() );
 
-				if ( isNaN( qty ) ) {
+				if ( Number.isNaN( qty ) ) {
 					qty = 0;
 				}
 			}

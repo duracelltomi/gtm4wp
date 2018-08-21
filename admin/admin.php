@@ -477,6 +477,15 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 		"phase"         => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
+	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION => array(
+		"label"         => __( "Products per impression", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "If you have many products shown on product category pages and/or on your site home, you could miss pageviews in Google Analytics due to the ".
+		                       "amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by ".
+		                       "entering a number here (minimum 10-15 recommended) and adding gtm4wp.productImpressionEEC into your Google Analytics ecommerce event helper ".
+		                       "tag's trigger.<br /><br />Leave this value 0 to include product impression data in your pageview hit.", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_BETA,
+		"plugintocheck" => "woocommerce/woocommerce.php"
+	),
 
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS => array(
 		"label"         => __( "Google Optimize page-hiding snippet ID list", 'duracelltomi-google-tag-manager' ),

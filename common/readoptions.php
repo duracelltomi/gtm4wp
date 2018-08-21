@@ -97,6 +97,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX',     'integrate-woocommerce-
 define( 'GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP',  'integrate-woocommerce-cart-as-first-step' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA',        'integrate-woocommerce-customer-data' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX',          'integrate-woocommerce-exclude-tax' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION',   'integrate-woocommerce-product-per-impression' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS',     'integrate-google-optimize-idlist' );
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT', 'integrate-google-optimize-timeout' );
@@ -209,6 +210,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP  => false,
 	GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA        => false,
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX          => false,
+	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION   => 0,
 
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS     => "",
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => 4000,
