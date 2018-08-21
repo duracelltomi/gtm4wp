@@ -261,6 +261,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: option to remove tax from revenue data on order received page of WooCommerce
 * Added: WooCommerce enhanced ecommerce datasets now include stock levels
 * Added: new productIsVariable data layer variable is set to 1 on variable WooCommerce product pages
+* Added: product impressions can now be split into multiple chunks to prevent data loss on large product category and site home pages
 * Added: uninstalling the plugin will now remove configured plugin options from database
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
