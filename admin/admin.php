@@ -531,6 +531,11 @@ $GLOBALS["gtm4wp_advancedfieldtexts"] = array(
 		"label"       => __( "Environment gtm_preview parameter", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
+	),
+	GTM4WP_OPTION_DONOTTRACK => array(
+		"label"       => __( "Include browser 'Do not track' setting", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Add into the data layer whether the user has asked not to track any website interaction. You may want to respect this and disable all tags if this variable is set in the data layer.", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
 	)
 );
 
