@@ -64,8 +64,12 @@ if ( !function_exists( "getallheaders") ) {
 function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 	global $wp_query, $gtm4wp_options;
 
-	if ( ( $gtm4wp_options[ GTM4WP_OPTION_DONOTTRACK ] ) && ( !empty( $_SERVER['HTTP_DNT'] ) ) ) {
-		$dataLayer["visitorDoNotTrack"] = (int)($_SERVER['HTTP_DNT']);
+	if ( $gtm4wp_options[ GTM4WP_OPTION_DONOTTRACK ] ) {
+		if ( !empty( $_SERVER['HTTP_DNT'] ) ) {
+			$dataLayer["visitorDoNotTrack"] = (int)($_SERVER['HTTP_DNT']);
+		} else {
+			$dataLayer["visitorDoNotTrack"] = 0;
+		}
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITEID ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITENAME ] ) {

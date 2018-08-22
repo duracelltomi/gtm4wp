@@ -261,7 +261,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: option to remove tax from revenue data on order received page of WooCommerce
 * Added: WooCommerce enhanced ecommerce datasets now include stock levels
 * Added: new productIsVariable data layer variable is set to 1 on variable WooCommerce product pages
-* Added: product impressions can now be split into multiple chunks to prevent data loss on large product category and site home pages
+* Added: product impressions can now be split into multiple chunks to prevent data loss on large product category and site home pages  (thx Tim Zook for the contribution!)
 * Added: you can now disable flagging of WooCommerce orders as being already tracked once. In same cases (with iDeal for example) you may need this to make purchase tracking to work.
 * Added: uninstalling the plugin will now remove configured plugin options from database
 * Added: new data layer variable visitorDoNotTrack will include 1 if the user has set the [do not track flag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/DNT) in his/her browser

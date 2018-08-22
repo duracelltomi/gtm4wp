@@ -688,11 +688,11 @@ function gtm4wp_admin_output_field( $args ) {
 				case "boolean": {
 					echo '<input type="checkbox" id="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" name="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" value="1" ' . checked( 1, $optval, false ) . ' /><br />' . $args["description"];
 
-					if ( isset( $args["plugintocheck"] ) ) {
+					if ( isset( $args["plugintocheck"] ) && ( $args["plugintocheck"] != "" ) ) {
 						if ( is_plugin_active( $args["plugintocheck"] ) ) {
 							echo "<br />" . __( 'This plugin is <strong class="gtm4wp-plugin-active">active</strong>, it is strongly recommended to enable this integration!', 'duracelltomi-google-tag-manager' );
 						} else {
-							echo "<br />" . __( 'This plugin is <strong class="gtm4wp-plugin-not-active">not active</strong>, enabling this integration could cause issues on frontend!', 'duracelltomi-google-tag-manager' );
+							echo "<br />" . __( 'This plugin ('.$args["plugintocheck"].') is <strong class="gtm4wp-plugin-not-active">not active</strong>, enabling this integration could cause issues on frontend!', 'duracelltomi-google-tag-manager' );
 						}
 					}
 
@@ -702,7 +702,7 @@ function gtm4wp_admin_output_field( $args ) {
 				case "integer": {
 					echo '<input type="number" step="1" min="1" class="small-text" id="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" name="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" value="' . esc_attr( $optval ) . '" /><br />' . $args["description"];
 
-					if ( isset( $args["plugintocheck"] ) ) {
+					if ( isset( $args["plugintocheck"] ) && ( $args["plugintocheck"] != "" ) ) {
 						if ( is_plugin_active( $args["plugintocheck"] ) ) {
 							echo "<br />" . __( 'This plugin is <strong class="gtm4wp-plugin-active">active</strong>, it is strongly recommended to enable this integration!', 'duracelltomi-google-tag-manager' );
 						} else {
@@ -715,6 +715,14 @@ function gtm4wp_admin_output_field( $args ) {
 
 				default : {
 					echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" name="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" value="' . esc_attr( $optval ) . '" size="80" /><br />' . $args["description"];
+
+					if ( isset( $args["plugintocheck"] ) && ( $args["plugintocheck"] != "" ) ) {
+						if ( is_plugin_active( $args["plugintocheck"] ) ) {
+							echo "<br />" . __( 'This plugin is <strong class="gtm4wp-plugin-active">active</strong>, it is strongly recommended to enable this integration!', 'duracelltomi-google-tag-manager' );
+						} else {
+							echo "<br />" . __( 'This plugin is <strong class="gtm4wp-plugin-not-active">not active</strong>, enabling this integration could cause issues on frontend!', 'duracelltomi-google-tag-manager' );
+						}
+					}
 				}
 			} // end switch gettype optval
 		}
@@ -777,6 +785,9 @@ function gtm4wp_sanitize_options($options) {
 			}
 
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT ) {
+			$output[$optionname] = (int) $newoptionvalue;
+
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ) {
 			$output[$optionname] = (int) $newoptionvalue;
 
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) {
