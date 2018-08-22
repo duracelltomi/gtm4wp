@@ -1,6 +1,7 @@
 <?php
 define( 'GTM4WP_WPFILTER_COMPILE_DATALAYER',  'gtm4wp_compile_datalayer' );
 define( 'GTM4WP_WPFILTER_COMPILE_REMARKTING', 'gtm4wp_compile_remarkering' );
+define( 'GTM4WP_WPFILTER_AFTER_DATALAYER',    'gtm4wp_after_datalayer' );
 define( 'GTM4WP_WPFILTER_GETTHEGTMTAG',       'gtm4wp_get_the_gtm_tag' );
 define( 'GTM4WP_WPACTION_ADDGLOBALVARS',      'gtm4wp_add_global_vars' );
 
@@ -779,6 +780,8 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	$_gtm_header_content .= '//]]>
 </script>';
+
+	$_gtm_header_content .= apply_filters( GTM4WP_WPFILTER_AFTER_DATALAYER, "" );
 
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
 		$_gtm_codes = explode( ",", str_replace( array(";"," "), array(",",""), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );

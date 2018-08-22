@@ -1,7 +1,7 @@
 === DuracellTomi's Google Tag Manager for WordPress ===
 Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
-Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
+Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 4.9.6
@@ -9,7 +9,7 @@ Stable tag: 1.9
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
-The first Google Tag Manager plugin for WordPress with business goals in mind.
+The first Google Tag Manager plugin for WordPress with business goals in mind. Includes full support for Google Optimize as well.
 
 == Description ==
 
@@ -21,6 +21,8 @@ Multiple containers are also supported!
 
 The plugin complements your GTM setup by pushing page meta data and user information into the so called data layer.
 Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-manager/devguide#datalayer).
+
+You can also add your Google Optimize container with the [recommended code setup](https://support.google.com/optimize/answer/7359264?hl=en)
 
 **Some parts of the plugin require PHP 5.6 newer.
 PHP 7.0 or newer is recommended.**
@@ -90,7 +92,8 @@ http://openweathermap.org/price
 
 An (free) API key from OpenWeatherMap is required for this feature to work.
 
-freegeoip.net is used to determine the site visitor's location.
+ipstack.com is used to determine the site visitor's location. A (free) API key from IPStack.com is required for this feature to work:
+https://ipstack.com/product
 
 = Media player events =
 
@@ -268,6 +271,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: new data layer event when a user has logged in on the frontend: gtm4wp.userLoggedIn
 * Added: new data layer event when a new user has registered on the frontend: gtm4wp.userRegistered
 * Added: new advanced plugin option: move data layer declaration and Google Tag Manager container as close as possible to the beginning of the HTML document
+* Updated: Full Google Optimize support. Now the plugin can load your Google Optimize container with the [recommended code placement](https://support.google.com/optimize/answer/7359264?hl=en)
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
 * Fixed: PHP notice in some cases when geo data was not loaded properly

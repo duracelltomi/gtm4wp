@@ -109,6 +109,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG',  'integrate-woocommerce-
 
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS',     'integrate-google-optimize-idlist' );
 define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT', 'integrate-google-optimize-timeout' );
+define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEGAID',    'integrate-google-optimize-gaid' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
@@ -230,6 +231,7 @@ $gtm4wp_defaultoptions = array(
 
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS     => "",
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => 4000,
+	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEGAID    => "",
 
 	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE => false,
 
