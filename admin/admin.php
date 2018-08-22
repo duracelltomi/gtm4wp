@@ -194,6 +194,16 @@ $GLOBALS["gtm4wp_eventfieldtexts"] = array(
 		"description" => __( "Check this option to include a Tag Manager event when a visitor moves between elements of a form (comment, contact, etc).", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
 	),
+	GTM4WP_OPTION_EVENTS_NEWUSERREG => array(
+		"label"       => __( "New user registration", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Check this option to include a Tag Manager event when a new user registration has been completed on the frontend of your site (admin events not included)", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
+	GTM4WP_OPTION_EVENTS_USERLOGIN => array(
+		"label"       => __( "User logged in", 'duracelltomi-google-tag-manager' ),
+		"description" => __( "Check this option to include a Tag Manager event when an existing user has been logged in on the frontend of your site (admin events not included)", 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_STABLE
+	),
 	GTM4WP_OPTION_EVENTS_YOUTUBE => array(
 		"label"       => __( "YouTube video events", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Check this option to include a Tag Manager event when a visitor interacts with a YouTube video embeded on your site.", 'duracelltomi-google-tag-manager' ),

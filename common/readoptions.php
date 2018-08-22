@@ -41,8 +41,12 @@ define( 'GTM4WP_OPTION_EVENTS_OUTBOUND',       'event-outbound' );
 define( 'GTM4WP_OPTION_EVENTS_DOWNLOADS',      'event-downloads' );
 define( 'GTM4WP_OPTION_EVENTS_DWLEXT',         'event-download-extensions' );
 define( 'GTM4WP_OPTION_EVENTS_EMAILCLICKS',    'event-email-clicks' );
-define( 'GTM4WP_OPTION_EVENTS_FORMMOVE',       'event-form-move' );
 define( 'GTM4WP_OPTION_EVENTS_SOCIAL',         'event-social' );
+
+define( 'GTM4WP_OPTION_EVENTS_FORMMOVE',       'event-form-move' );
+define( 'GTM4WP_OPTION_EVENTS_NEWUSERREG',     'event-new-user-registration' );
+define( 'GTM4WP_OPTION_EVENTS_USERLOGIN',      'event-user-logged-in' );
+
 define( 'GTM4WP_OPTION_EVENTS_YOUTUBE',        'event-youtube' );
 define( 'GTM4WP_OPTION_EVENTS_VIMEO',          'event-vimeo' );
 define( 'GTM4WP_OPTION_EVENTS_SOUNDCLOUD',     'event-soundcloud' );
@@ -158,8 +162,12 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_EVENTS_DOWNLOADS   => false,
 	GTM4WP_OPTION_EVENTS_DWLEXT      => "pdf,doc,docx,xls,xlsx,ppt,pptx,zip,rar,gz,tar",
 	GTM4WP_OPTION_EVENTS_EMAILCLICKS => false,
-	GTM4WP_OPTION_EVENTS_FORMMOVE    => true,
 	GTM4WP_OPTION_EVENTS_SOCIAL      => false,
+
+	GTM4WP_OPTION_EVENTS_FORMMOVE    => true,
+	GTM4WP_OPTION_EVENTS_NEWUSERREG => false,
+	GTM4WP_OPTION_EVENTS_USERLOGIN  => false,
+
 	GTM4WP_OPTION_EVENTS_YOUTUBE     => false,
 	GTM4WP_OPTION_EVENTS_VIMEO       => false,
 	GTM4WP_OPTION_EVENTS_SOUNDCLOUD  => false,

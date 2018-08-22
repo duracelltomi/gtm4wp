@@ -38,7 +38,7 @@ var adminsubtabs = {
 	2: {
 		"generalevents": {
 			tabtext: gtm4wp.generaleventstabtitle,
-			numitems: 1
+			numitems: 3
 		},
 		"mediaevents": {
 			tabtext: gtm4wp.mediaeventstabtitle,

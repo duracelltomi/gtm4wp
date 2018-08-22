@@ -832,6 +832,21 @@ function gtm4wp_body_class( $classes ) {
 	return $classes;
 }
 
+function gtm4wp_wp_login() {
+	setcookie( 'gtm4wp_user_logged_in', "1", 0, "/" );
+}
+
+function gtm4wp_user_register() {
+	setcookie( 'gtm4wp_user_registered', "1", 0, "/" );
+}
+
+function gtm4wp_user_reg_login_script() {
+	global $gtp4wp_plugin_url;
+
+	$in_footer = apply_filters( 'gtm4wp_user_reg_login_script', true);
+	wp_enqueue_script( "gtm4wp-user-reg-login-script", $gtp4wp_plugin_url . "js/gtm4wp-users.js", array( "jquery" ), GTM4WP_VERSION, $in_footer );
+}
+
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
 add_action( "wp_head", "gtm4wp_wp_header_begin", 10, 0 );
 add_action( "wp_head", "gtm4wp_wp_header_top", 1, 0 );
@@ -854,4 +869,14 @@ if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GT
 
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] != "" ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/google-optimize.php" );
+}
+
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) ) {
+	add_action( "wp_login", "gtm4wp_wp_login" );
+	add_action( "wp_enqueue_scripts", "gtm4wp_user_reg_login_script" );
+}
+
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) ) {
+	add_action( "user_register", "gtm4wp_user_register" );
+	add_action( "wp_enqueue_scripts", "gtm4wp_user_reg_login_script" );
 }
