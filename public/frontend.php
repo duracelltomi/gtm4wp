@@ -488,7 +488,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 					$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
 					$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
 					$dataLayer[ "geoCity" ]        = $geodata->city;
-					$dataLayer[ "geoZipcode" ]     = $geodata->zip_code;
+					$dataLayer[ "geoZipcode" ]     = $geodata->zip;
 					$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
 					$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
 					$dataLayer[ "geoFullGeoData" ] = $geodata;
