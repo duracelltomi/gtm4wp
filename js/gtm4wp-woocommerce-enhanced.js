@@ -1,3 +1,5 @@
+var gtm4wp_last_selected_product_variation;
+
 function gtm4wp_handle_cart_qty_change() {
 	jQuery( '.product-quantity input.qty' ).each(function() {
 		var _original_value = jQuery( this ).prop( 'defaultValue' );
@@ -147,6 +149,18 @@ jQuery(function() {
 		var _product_stocklevel = jQuery( '[name=gtm4wp_stocklevel]', _product_form ).val();
 
 		if ( _product_var_id.length > 0 ) {
+			if ( gtm4wp_last_selected_product_variation ) {
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'gtm4wp.addProductToCartEEC',
+					'ecommerce': {
+						'currencyCode': _product_currency,
+						'add': {
+							'products': [gtm4wp_last_selected_product_variation]
+						}
+					}
+				});
+			}
+/*
 			_product_var_id_val = _product_var_id.val();
 			_product_form_variations = _product_form.data( 'product_variations' );
 
@@ -182,6 +196,7 @@ jQuery(function() {
 
 				}
 			});
+*/
 		} else {
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.addProductToCartEEC',
@@ -354,6 +369,7 @@ jQuery(function() {
 			_tmp.push( product_variation.attributes[ attrib_key ] );
 		}
 		current_product_detail_data.variant = _tmp.join(',');
+		gtm4wp_last_selected_product_variation = current_product_detail_data;
 
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.changeDetailViewEEC',
