@@ -264,9 +264,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: product impressions can now be split into multiple chunks to prevent data loss on large product category and site home pages  (thx Tim Zook for the contribution!)
 * Added: you can now disable flagging of WooCommerce orders as being already tracked once. In same cases (with iDeal for example) you may need this to make purchase tracking to work.
 * Added: uninstalling the plugin will now remove configured plugin options from database
-* Added: new data layer variable visitorDoNotTrack will include 1 if the user has set the [do not track flag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/DNT) in his/her browser
+* Added: new advanced plugin option: data layer variable visitorDoNotTrack will include 1 if the user has set the [do not track flag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/DNT) in his/her browser
 * Added: new data layer event when a user has logged in on the frontend: gtm4wp.userLoggedIn
 * Added: new data layer event when a new user has registered on the frontend: gtm4wp.userRegistered
+* Added: new advanced plugin option: move data layer declaration and Google Tag Manager container as close as possible to the beginning of the HTML document
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
 * Fixed: PHP notice in some cases when geo data was not loaded properly

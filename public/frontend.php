@@ -848,7 +848,7 @@ function gtm4wp_user_reg_login_script() {
 }
 
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
-add_action( "wp_head", "gtm4wp_wp_header_begin", 10, 0 );
+add_action( "wp_head", "gtm4wp_wp_header_begin", ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_LOADEARLY ] ? 2 : 10), 0 );
 add_action( "wp_head", "gtm4wp_wp_header_top", 1, 0 );
 add_action( "wp_footer", "gtm4wp_wp_footer" );
 add_action( "wp_loaded", "gtm4wp_wp_loaded" );
