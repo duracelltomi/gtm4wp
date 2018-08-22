@@ -737,7 +737,7 @@ function gtm4wp_admin_output_field( $args ) {
 				}
 
 				case "integer": {
-					echo '<input type="number" step="1" min="1" class="small-text" id="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" name="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" value="' . esc_attr( $optval ) . '" /><br />' . $args["description"];
+					echo '<input type="number" step="1" min="0" class="small-text" id="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" name="' . GTM4WP_OPTIONS . '[' . $args["optionfieldid"] . ']" value="' . esc_attr( $optval ) . '" /><br />' . $args["description"];
 
 					if ( isset( $args["plugintocheck"] ) && ( $args["plugintocheck"] != "" ) ) {
 						if ( is_plugin_active( $args["plugintocheck"] ) ) {
