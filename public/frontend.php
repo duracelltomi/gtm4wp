@@ -850,6 +850,13 @@ function gtm4wp_user_reg_login_script() {
 	wp_enqueue_script( "gtm4wp-user-reg-login-script", $gtp4wp_plugin_url . "js/gtm4wp-users.js", array( "jquery" ), GTM4WP_VERSION, $in_footer );
 }
 
+function gtm4wp_rocket_excluded_inline_js_content( $pattern ) {
+	$pattern[] = "dataLayer";
+	$pattern[] = "gtm4wp";
+
+	return $pattern;
+}
+
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
 add_action( "wp_head", "gtm4wp_wp_header_begin", ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_LOADEARLY ] ? 2 : 10), 0 );
 add_action( "wp_head", "gtm4wp_wp_header_top", 1, 0 );
@@ -865,6 +872,7 @@ add_action( "body_open", "gtm4wp_wp_body_open" );
 add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
 add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme
 add_action( "elementor/page_templates/canvas/before_content", "gtm4wp_wp_body_open" ); // Elementor
+add_filter( "rocket_excluded_inline_js_content", "gtm4wp_rocket_excluded_inline_js_content" ); // WP Rocket
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/woocommerce.php" );
