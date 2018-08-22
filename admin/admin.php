@@ -142,9 +142,28 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"description" => __( "Check this option to include the type of device the user is currently using (desktop, tablet or mobile) including manufacturer and model data.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_BETA
 	),
+	GTM4WP_OPTION_INCLUDE_MISCGEO => array(
+		"label"       => __( "Geo data", 'duracelltomi-google-tag-manager' ),
+		"description" => __( 'Add geo data (latitude, longitude, country, city, etc) of the current visitor (provided by ipstack.com)', 'duracelltomi-google-tag-manager' ),
+		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
+	),
+	GTM4WP_OPTION_INCLUDE_MISCGEOAPI => array(
+		"label"       => __( "IPStack.com API key", 'duracelltomi-google-tag-manager' ),
+		"description" => sprintf( __( 'Enter your IPStack.com API key here. <a href="%s" target="_blank">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), "https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress" ),
+		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
+	),
 	GTM4WP_OPTION_INCLUDE_WEATHER => array(
 		"label"       => __( "Weather data", 'duracelltomi-google-tag-manager' ),
-		"description" => sprintf( __( "Check this option to include the current weather conditions around the current visitor.<br /><strong>Attention!</strong> This feature uses <a href=\"%s\" target=\"_blank\">geoplugin.com</a> and <a href=\"%s\" target=\"_blank\">openweathermap.org</a> to collect data.<br />Depending on your website's traffic, additional fees may apply!<br />This plugin caches weather data for 1 hour to lower the need to access those services.", 'duracelltomi-google-tag-manager' ), "http://www.geoplugin.com/premium?utm_source=gtm4wp&utm_medium=link&utm_caign=duracelltomi-google-tag-manager-for-wordpress", "http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=duracelltomi-google-tag-manager-for-wordpress" ),
+		"description" => sprintf( __( "Check this option to include the current weather conditions around the current visitor.<br /><br />".
+		                              "<strong>Attention!</strong> This feature uses <a href=\"%s\" target=\"_blank\">ipstack.com</a> and ".
+		                              "<a href=\"%s\" target=\"_blank\">openweathermap.org</a> to collect data.<br />".
+		                              "Depending on your website's traffic, additional fees may apply!<br />".
+		                              "This plugin caches weather data for 1 hour to lower the need to access those services.<br /><br />".
+		                              "If you activate weather data, <strong>you will need</strong> to add an IPStack.com API key regardless of whether you ".
+		                              "activate the 'Geo data' option!", 'duracelltomi-google-tag-manager' ),
+		                              "https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress",
+		                              "http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress"
+		),
 		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHERUNITS => array(
@@ -154,7 +173,7 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI => array(
 		"label"       => __( "OpenWeatherMap API key", 'duracelltomi-google-tag-manager' ),
-		"description" => __( 'Enter your OpenWeatherMap API key here. <a href="http://openweathermap.org/price" target="_blank">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ),
+		"description" => sprintf( __( 'Enter your OpenWeatherMap API key here. <a href="%s" target="_blank">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), "http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress" ),
 		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
 	),
 	GTM4WP_OPTION_INCLUDE_SITEID => array(
@@ -166,12 +185,7 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 		"label"       => __( "Site name", 'duracelltomi-google-tag-manager' ),
 		"description" => __( 'Name of the current site in a WordPress Multisite environment', 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
-	),
-	GTM4WP_OPTION_INCLUDE_MISCGEO => array(
-		"label"       => __( "Geo data", 'duracelltomi-google-tag-manager' ),
-		"description" => __( 'Add geo data (latitude, longitude, country, city, etc) of the current visitor (based on freegeoip.net)', 'duracelltomi-google-tag-manager' ),
-		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
-	),
+	)
 );
 
 $GLOBALS["gtm4wp_eventfieldtexts"] = array(

@@ -24,16 +24,16 @@ var adminsubtabs = {
 		},
 		"weather": {
 			tabtext: gtm4wp.weathertabtitle,
-			numitems: 3
+			numitems: 5
 		},
 		"site": {
 			tabtext: gtm4wp.sitetabtitle,
 			numitems: 2
-		},
+		}/*,
 		"misc": {
 			tabtext: gtm4wp.misctabtitle,
 			numitems: 1
-		}
+		}*/
 	},
 	2: {
 		"generalevents": {

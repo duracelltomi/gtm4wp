@@ -268,6 +268,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
 * Fixed: PHP notice in some cases when geo data was not loaded properly
+* Fixed / Added: freegeoip.net was rebranded to ipstack.com and an API key is needed now even for free usage. You can now add your API key so that weather data and geo data can be added into the data layer
 * Warning: some plugin features will be remove from v1.10, most of them can be tracked now using pure Google Tag Manager triggers:
   * Social actions
   * Outbound link click events

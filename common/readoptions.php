@@ -29,12 +29,13 @@ define( 'GTM4WP_OPTION_INCLUDE_SEARCHDATA',    'include-searchdata' );
 define( 'GTM4WP_OPTION_INCLUDE_BROWSERDATA',   'include-browserdata' );
 define( 'GTM4WP_OPTION_INCLUDE_OSDATA',        'include-osdata' );
 define( 'GTM4WP_OPTION_INCLUDE_DEVICEDATA',    'include-devicedata' );
+define( 'GTM4WP_OPTION_INCLUDE_MISCGEO',       'include-miscgeo' );
+define( 'GTM4WP_OPTION_INCLUDE_MISCGEOAPI',    'geo-apikey' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHER',       'include-weather' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHERUNITS',  'weather-weatherunits' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI', 'weather-openweathermap-apikey' );
 define( 'GTM4WP_OPTION_INCLUDE_SITEID',        'include-siteid' );
 define( 'GTM4WP_OPTION_INCLUDE_SITENAME',      'include-sitename' );
-define( 'GTM4WP_OPTION_INCLUDE_MISCGEO',       'include-miscgeo' );
 
 define( 'GTM4WP_OPTION_EVENTS_OUTBOUND',       'event-outbound' );
 define( 'GTM4WP_OPTION_EVENTS_DOWNLOADS',      'event-downloads' );
@@ -145,12 +146,13 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_BROWSERDATA   => false,
 	GTM4WP_OPTION_INCLUDE_OSDATA        => false,
 	GTM4WP_OPTION_INCLUDE_DEVICEDATA    => false,
+	GTM4WP_OPTION_INCLUDE_MISCGEO       => false,
+	GTM4WP_OPTION_INCLUDE_MISCGEOAPI    => '',
 	GTM4WP_OPTION_INCLUDE_WEATHER       => false,
 	GTM4WP_OPTION_INCLUDE_WEATHERUNITS  => 0,
 	GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI => '',
 	GTM4WP_OPTION_INCLUDE_SITEID        => false,
 	GTM4WP_OPTION_INCLUDE_SITENAME      => false,
-	GTM4WP_OPTION_INCLUDE_MISCGEO       => false,
 
 	GTM4WP_OPTION_EVENTS_OUTBOUND    => false,
 	GTM4WP_OPTION_EVENTS_DOWNLOADS   => false,

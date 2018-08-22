@@ -490,6 +490,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 					$dataLayer[ "geoZipcode" ]     = $geodata->zip_code;
 					$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
 					$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
+					$dataLayer[ "geoFullGeoData" ] = $geodata;
 				}
 			}
 
@@ -515,7 +516,7 @@ function gtm4wp_wp_loaded() {
 		$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
 
 		if ( false === $geodata ) {
-			$gtm4wp_geodata = @wp_remote_get( 'https://freegeoip.net/json/'.$_SERVER['REMOTE_ADDR'] );
+			$gtm4wp_geodata = @wp_remote_get( sprintf( 'http://api.ipstack.com/%s?access_key=%s&format=1', $_SERVER['REMOTE_ADDR'], $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOAPI ] ) );
 
 			if ( is_array( $gtm4wp_geodata ) && ( 200 == $gtm4wp_geodata[ "response" ][ "code" ] ) ) {
 				$gtm4wp_geodata = @json_decode( $gtm4wp_geodata[ "body" ] );
