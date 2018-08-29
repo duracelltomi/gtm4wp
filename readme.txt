@@ -1,7 +1,7 @@
 === DuracellTomi's Google Tag Manager for WordPress ===
 Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
-Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, adwords remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel
+Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 4.9.6
@@ -9,7 +9,7 @@ Stable tag: 1.9
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
-The first Google Tag Manager plugin for WordPress with business goals in mind.
+The first Google Tag Manager plugin for WordPress with business goals in mind. Includes full support for Google Optimize as well.
 
 == Description ==
 
@@ -21,6 +21,8 @@ Multiple containers are also supported!
 
 The plugin complements your GTM setup by pushing page meta data and user information into the so called data layer.
 Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-manager/devguide#datalayer).
+
+You can also add your Google Optimize container with the [recommended code setup](https://support.google.com/optimize/answer/7359264?hl=en)
 
 **Some parts of the plugin require PHP 5.6 newer.
 PHP 7.0 or newer is recommended.**
@@ -90,7 +92,8 @@ http://openweathermap.org/price
 
 An (free) API key from OpenWeatherMap is required for this feature to work.
 
-freegeoip.net is used to determine the site visitor's location.
+ipstack.com is used to determine the site visitor's location. A (free) API key from IPStack.com is required for this feature to work:
+https://ipstack.com/product
 
 = Media player events =
 
@@ -261,9 +264,18 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: option to remove tax from revenue data on order received page of WooCommerce
 * Added: WooCommerce enhanced ecommerce datasets now include stock levels
 * Added: new productIsVariable data layer variable is set to 1 on variable WooCommerce product pages
+* Added: product impressions can now be split into multiple chunks to prevent data loss on large product category and site home pages  (thx Tim Zook for the contribution!)
+* Added: you can now disable flagging of WooCommerce orders as being already tracked once. In same cases (with iDeal for example) you may need this to make purchase tracking to work.
+* Added: uninstalling the plugin will now remove configured plugin options from database
+* Added: new advanced plugin option: data layer variable visitorDoNotTrack will include 1 if the user has set the [do not track flag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/DNT) in his/her browser
+* Added: new data layer event when a user has logged in on the frontend: gtm4wp.userLoggedIn
+* Added: new data layer event when a new user has registered on the frontend: gtm4wp.userRegistered
+* Added: new advanced plugin option: move data layer declaration and Google Tag Manager container as close as possible to the beginning of the HTML document
+* Updated: Full Google Optimize support. Now the plugin can load your Google Optimize container with the [recommended code placement](https://support.google.com/optimize/answer/7359264?hl=en)
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
 * Fixed: PHP notice in some cases when geo data was not loaded properly
+* Fixed / Added: freegeoip.net was rebranded to ipstack.com and an API key is needed now even for free usage. You can now add your API key so that weather data and geo data can be added into the data layer
 * Warning: some plugin features will be remove from v1.10, most of them can be tracked now using pure Google Tag Manager triggers:
   * Social actions
   * Outbound link click events

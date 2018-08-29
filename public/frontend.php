@@ -1,6 +1,7 @@
 <?php
 define( 'GTM4WP_WPFILTER_COMPILE_DATALAYER',  'gtm4wp_compile_datalayer' );
 define( 'GTM4WP_WPFILTER_COMPILE_REMARKTING', 'gtm4wp_compile_remarkering' );
+define( 'GTM4WP_WPFILTER_AFTER_DATALAYER',    'gtm4wp_after_datalayer' );
 define( 'GTM4WP_WPFILTER_GETTHEGTMTAG',       'gtm4wp_get_the_gtm_tag' );
 define( 'GTM4WP_WPACTION_ADDGLOBALVARS',      'gtm4wp_add_global_vars' );
 
@@ -63,6 +64,14 @@ if ( !function_exists( "getallheaders") ) {
 
 function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 	global $wp_query, $gtm4wp_options;
+
+	if ( $gtm4wp_options[ GTM4WP_OPTION_DONOTTRACK ] ) {
+		if ( !empty( $_SERVER['HTTP_DNT'] ) ) {
+			$dataLayer["visitorDoNotTrack"] = (int)($_SERVER['HTTP_DNT']);
+		} else {
+			$dataLayer["visitorDoNotTrack"] = 0;
+		}
+	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITEID ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITENAME ] ) {
 		$dataLayer["siteID"]   = 0;
@@ -479,9 +488,10 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 					$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
 					$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
 					$dataLayer[ "geoCity" ]        = $geodata->city;
-					$dataLayer[ "geoZipcode" ]     = $geodata->zip_code;
+					$dataLayer[ "geoZipcode" ]     = $geodata->zip;
 					$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
 					$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
+					$dataLayer[ "geoFullGeoData" ] = $geodata;
 				}
 			}
 
@@ -507,7 +517,7 @@ function gtm4wp_wp_loaded() {
 		$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
 
 		if ( false === $geodata ) {
-			$gtm4wp_geodata = @wp_remote_get( 'https://freegeoip.net/json/'.$_SERVER['REMOTE_ADDR'] );
+			$gtm4wp_geodata = @wp_remote_get( sprintf( 'http://api.ipstack.com/%s?access_key=%s&format=1', $_SERVER['REMOTE_ADDR'], $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOAPI ] ) );
 
 			if ( is_array( $gtm4wp_geodata ) && ( 200 == $gtm4wp_geodata[ "response" ][ "code" ] ) ) {
 				$gtm4wp_geodata = @json_decode( $gtm4wp_geodata[ "body" ] );
@@ -771,6 +781,8 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	$_gtm_header_content .= '//]]>
 </script>';
 
+	$_gtm_header_content .= apply_filters( GTM4WP_WPFILTER_AFTER_DATALAYER, "" );
+
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != "" ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
 		$_gtm_codes = explode( ",", str_replace( array(";"," "), array(",",""), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 
@@ -823,8 +835,30 @@ function gtm4wp_body_class( $classes ) {
 	return $classes;
 }
 
+function gtm4wp_wp_login() {
+	setcookie( 'gtm4wp_user_logged_in', "1", 0, "/" );
+}
+
+function gtm4wp_user_register() {
+	setcookie( 'gtm4wp_user_registered', "1", 0, "/" );
+}
+
+function gtm4wp_user_reg_login_script() {
+	global $gtp4wp_plugin_url;
+
+	$in_footer = apply_filters( 'gtm4wp_user_reg_login_script', true);
+	wp_enqueue_script( "gtm4wp-user-reg-login-script", $gtp4wp_plugin_url . "js/gtm4wp-users.js", array( "jquery" ), GTM4WP_VERSION, $in_footer );
+}
+
+function gtm4wp_rocket_excluded_inline_js_content( $pattern ) {
+	$pattern[] = "dataLayer";
+	$pattern[] = "gtm4wp";
+
+	return $pattern;
+}
+
 add_action( "wp_enqueue_scripts", "gtm4wp_enqueue_scripts" );
-add_action( "wp_head", "gtm4wp_wp_header_begin", 10, 0 );
+add_action( "wp_head", "gtm4wp_wp_header_begin", ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_LOADEARLY ] ? 2 : 10), 0 );
 add_action( "wp_head", "gtm4wp_wp_header_top", 1, 0 );
 add_action( "wp_footer", "gtm4wp_wp_footer" );
 add_action( "wp_loaded", "gtm4wp_wp_loaded" );
@@ -838,6 +872,7 @@ add_action( "body_open", "gtm4wp_wp_body_open" );
 add_action( "genesis_before", "gtm4wp_wp_body_open" ); // Genisis theme
 add_action( "generate_before_header", "gtm4wp_wp_body_open", 0 ); // GeneratePress theme
 add_action( "elementor/page_templates/canvas/before_content", "gtm4wp_wp_body_open" ); // Elementor
+add_filter( "rocket_excluded_inline_js_content", "gtm4wp_rocket_excluded_inline_js_content" ); // WP Rocket
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
 	&& isset ( $GLOBALS["woocommerce"] ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/woocommerce.php" );
@@ -845,4 +880,14 @@ if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GT
 
 if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] != "" ) ) {
 	require_once( dirname( __FILE__ ) . "/../integration/google-optimize.php" );
+}
+
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) ) {
+	add_action( "wp_login", "gtm4wp_wp_login" );
+	add_action( "wp_enqueue_scripts", "gtm4wp_user_reg_login_script" );
+}
+
+if ( isset( $GLOBALS[ "gtm4wp_options" ] ) && ( $GLOBALS[ "gtm4wp_options" ][ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) ) {
+	add_action( "user_register", "gtm4wp_user_register" );
+	add_action( "wp_enqueue_scripts", "gtm4wp_user_reg_login_script" );
 }

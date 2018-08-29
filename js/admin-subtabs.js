@@ -24,21 +24,21 @@ var adminsubtabs = {
 		},
 		"weather": {
 			tabtext: gtm4wp.weathertabtitle,
-			numitems: 3
+			numitems: 5
 		},
 		"site": {
 			tabtext: gtm4wp.sitetabtitle,
 			numitems: 2
-		},
+		}/*,
 		"misc": {
 			tabtext: gtm4wp.misctabtitle,
 			numitems: 1
-		}
+		}*/
 	},
 	2: {
 		"generalevents": {
 			tabtext: gtm4wp.generaleventstabtitle,
-			numitems: 1
+			numitems: 3
 		},
 		"mediaevents": {
 			tabtext: gtm4wp.mediaeventstabtitle,
@@ -67,11 +67,11 @@ var adminsubtabs = {
 		},
 		"int-wc": {
 			tabtext: gtm4wp.wctabtitle,
-			numitems: 9
+			numitems: 11
 		},
 		"int-google-optimize": {
 			tabtext: gtm4wp.gotabtitle,
-			numitems: 2
+			numitems: 3
 		},
 		"int-amp": {
 			tabtext: gtm4wp.amptabtitle,
