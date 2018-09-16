@@ -259,7 +259,7 @@ jQuery(function() {
 	});
 
 	// track clicks in product lists
-	jQuery( document ).on( 'click', '.products li:not(.product-category) a:not(.add_to_cart_button),.products>div:not(.product-category) a:not(.add_to_cart_button),.widget-product-item', function( event ) {
+	jQuery( document ).on( 'click', '.products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),.widget-product-item', function( event ) {
 		// do nothing if GTM is blocked for some reason
 		if ( 'undefined' == typeof google_tag_manager ) {
 			return true;
