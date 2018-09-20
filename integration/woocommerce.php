@@ -21,8 +21,30 @@ function gtm4wp_woocommerce_addjs( $js ) {
 	}
 }
 
+// from https://snippets.webaware.com.au/ramblings/php-really-doesnt-unicode/
+function gtm4wp_untexturize($fancy) {
+	$fixes = false;
+
+	if ( $fixes === false ) {
+		$fixes = array(
+			json_decode('"\u201C"') => '"',     // left  double quotation mark
+			json_decode('"\u201D"') => '"',     // right double quotation mark
+			json_decode('"\u2018"') => "'",     // left  single quotation mark
+			json_decode('"\u2019"') => "'",     // right single quotation mark
+			json_decode('"\u2032"') => "'",     // prime (minutes, feet)
+			json_decode('"\u2033"') => '"',     // double prime (seconds, inches)
+			json_decode('"\u2013"') => '-',     // en dash
+			json_decode('"\u2014"') => '--',    // em dash
+		);
+	}
+
+	$normal = strtr($fancy, $fixes);
+
+	return $normal;
+}
+
 function gtm4wp_woocommerce_html_entity_decode( $val ) {
-	return html_entity_decode( $val, ENT_QUOTES, "utf-8" );
+	return gtm4wp_untexturize( html_entity_decode( $val, ENT_QUOTES, "utf-8" ) );
 }
 
 function gtm4wp_prefix_productid( $product_id ) {
