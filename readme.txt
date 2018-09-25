@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize
 Requires at least: 3.4.0
 Requires PHP: 5.6
-Tested up to: 4.9.6
+Tested up to: 4.9.8
 Stable tag: 1.9
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
@@ -272,6 +272,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: new data layer event when a user has logged in on the frontend: gtm4wp.userLoggedIn
 * Added: new data layer event when a new user has registered on the frontend: gtm4wp.userRegistered
 * Added: new advanced plugin option: move data layer declaration and Google Tag Manager container as close as possible to the beginning of the HTML document
+* Added: better WP Rocket support
 * Updated: Full Google Optimize support. Now the plugin can load your Google Optimize container with the [recommended code placement](https://support.google.com/optimize/answer/7359264?hl=en)
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
@@ -565,7 +566,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.9 =
 
-New AMP GTM support...
+New AMP GTM support, full Google Optimize support, lots of WooCommerce tracking improvements.
 
 = 1.8.1 =
 
