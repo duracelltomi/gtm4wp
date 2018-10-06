@@ -254,7 +254,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 	if ( is_search() ) {
 		$dataLayer["siteSearchTerm"] = get_search_query();
-		$dataLayer["siteSearchFrom"] = ( isset($_SERVER["HTTP_REFERER"]) ? $_SERVER["HTTP_REFERER"] : "" );
+		$dataLayer["siteSearchFrom"] = ( isset($_SERVER["HTTP_REFERER"]) ? esc_url_raw( $_SERVER["HTTP_REFERER"] ) : "" );
 		$dataLayer["siteSearchResults"] = $wp_query->post_count;
 	}
 
@@ -483,18 +483,20 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 				$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
 
 				if ( false !== $geodata ) {
-					$dataLayer[ "geoCountryCode" ] = $geodata->country_code;
-					$dataLayer[ "geoCountryName" ] = $geodata->country_name;
-					$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
-					$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
-					$dataLayer[ "geoCity" ]        = $geodata->city;
-					$dataLayer[ "geoZipcode" ]     = $geodata->zip;
-					$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
-					$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
 					$dataLayer[ "geoFullGeoData" ] = $geodata;
+
+					if ( isset( $geodata->latitude ) ) {
+						$dataLayer[ "geoCountryCode" ] = $geodata->country_code;
+						$dataLayer[ "geoCountryName" ] = $geodata->country_name;
+						$dataLayer[ "geoRegionCode" ]  = $geodata->region_code;
+						$dataLayer[ "geoRegionName" ]  = $geodata->region_name;
+						$dataLayer[ "geoCity" ]        = $geodata->city;
+						$dataLayer[ "geoZipcode" ]     = $geodata->zip;
+						$dataLayer[ "geoLatitude" ]    = $geodata->latitude;
+						$dataLayer[ "geoLongitude" ]   = $geodata->longitude;
+					}
 				}
 			}
-
 		}
 	}
 
@@ -526,7 +528,7 @@ function gtm4wp_wp_loaded() {
 					set_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid, $gtm4wp_geodata, 60 * 60 );
 
 					$weatherdata = get_transient( 'gtm4wp-weatherdata-'.$gtm4wp_sessionid );
-					if ( false === $weatherdata) {
+					if ( false === $weatherdata && isset( $gtm4wp_geodata->latitude ) ) {
 
 						$weatherdata = wp_remote_get( 'http://api.openweathermap.org/data/2.5/weather?appid=' . $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI ] . '&lat=' . $gtm4wp_geodata->latitude . '&lon=' . $gtm4wp_geodata->longitude . '&units=' . ($gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] == 0 ? 'metric' : 'imperial') );
 
