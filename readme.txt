@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 4.9.8
-Stable tag: 1.9
+Stable tag: 1.9.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -257,6 +257,11 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.9.1 =
+
+* Fixed: possible cross site scripting vulnerability if site search tracking was enabled due to not properly escaped referrer url tracking
+* Fixed: handle out of quota cases with ipstack queries properly
 
 = 1.9 =
 
@@ -563,6 +568,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.9.1 =
+
+Bugfix version
 
 = 1.9 =
 
