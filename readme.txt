@@ -262,6 +262,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Fixed: possible cross site scripting vulnerability if site search tracking was enabled due to not properly escaped referrer url tracking
 * Fixed: handle out of quota cases with ipstack queries properly
+* Fixed: proper YouTube tracking for WordPress sites and WordPress multisites installed in a subdirectory
+* Changed: code cleanup in WooCommerce integration
 
 = 1.9 =
 
