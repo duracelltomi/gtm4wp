@@ -264,6 +264,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Fixed: handle out of quota cases with ipstack queries properly
 * Fixed: proper YouTube tracking for WordPress sites and WordPress multisites installed in a subdirectory
 * Fixed: properly detect client IP address and also properly escape this data while using it
+* Fixed: WooCommerce checkout steps after page load did not include products in the cart
+* Fixed: checkout step events for payment mode and shipping type not always fired
 * Changed: code cleanup in WooCommerce integration
 
 = 1.9 =
