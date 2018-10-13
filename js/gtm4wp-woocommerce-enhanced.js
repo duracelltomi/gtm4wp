@@ -450,7 +450,7 @@ jQuery(function() {
 			gtm4wp_checkout_step_fired.push( 'shipping' );
 		});
 
-		jQuery( document ).on( 'click', 'input[name=shipping_method]', function() {
+		jQuery( document ).on( 'change', 'input[name=shipping_method]', function() {
 			// do not report checkout step if already reported
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) > -1 ) {
 				return;
@@ -476,7 +476,7 @@ jQuery(function() {
 			gtm4wp_checkout_step_fired.push( 'shipping_method' );
 		});
 
-		jQuery( document ).on( 'click', 'input[name=payment_method]', function() {
+		jQuery( document ).on( 'change', 'input[name=payment_method]', function() {
 			// do not report checkout step if already reported
 			if ( gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) > -1 ) {
 				return;
