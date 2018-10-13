@@ -49,6 +49,70 @@ function gtm4wp_is_assoc($arr) {
 	return array_keys($arr) !== range(0, count($arr) - 1);
 }
 
+/**
+ * Original copyright:
+ * By Grant Burton @ BURTONTECH.COM (11-30-2008): IP-Proxy-Cluster Fix
+ *
+ * Code improved by Thomas Geiger
+ */
+function gtm4wp_ip_is_private( $ip ) {
+	$int_ip = ip2long($ip);
+	if ( !empty($ip) && $int_ip!=-1 && $int_ip!==false ) {
+		$private_ips = array (
+			array('0.0.0.0',      '2.255.255.255'),
+			array('10.0.0.0',     '10.255.255.255'),
+			array('127.0.0.0',    '127.255.255.255'),
+			array('169.254.0.0',  '169.254.255.255'),
+			array('172.16.0.0',   '172.31.255.255'),
+			array('192.0.2.0',    '192.0.2.255'),
+			array('192.168.0.0',  '192.168.255.255'),
+			array('255.255.255.0','255.255.255.255')
+		);
+
+		foreach ($private_ips as $private_ip) {
+			$min_int_ip = ip2long( $private_ip[0] );
+			$max_int_ip = ip2long( $private_ip[1] );
+			if ( ($int_ip >= $min) && ($int_ip <= $max) ) {
+				return true;
+			}
+		}
+
+		return false;
+	} else {
+		return true;
+	}
+}
+
+/**
+ * Original copyright:
+ * By Grant Burton @ BURTONTECH.COM (11-30-2008): IP-Proxy-Cluster Fix
+ *
+ * Code improved by Thomas Geiger
+ */
+function gtm4wp_get_user_ip() {
+	if ( !gtm4wp_ip_is_private($_SERVER["HTTP_CLIENT_IP"]) ) {
+		return $_SERVER["HTTP_CLIENT_IP"];
+	}
+
+	foreach (explode(",",$_SERVER["HTTP_X_FORWARDED_FOR"]) as $ip) {
+		if ( !gtm4wp_ip_is_private(trim($ip)) ) {
+			return $ip;
+		}
+	}
+
+	if ( !gtm4wp_ip_is_private($_SERVER["HTTP_X_FORWARDED"]) ) {
+		return $_SERVER["HTTP_X_FORWARDED"];
+	} elseif ( !gtm4wp_ip_is_private($_SERVER["HTTP_X_CLUSTER_CLIENT_IP"]) ) {
+		return $_SERVER["HTTP_X_CLUSTER_CLIENT_IP"];
+	} elseif ( !gtm4wp_ip_is_private($_SERVER["HTTP_FORWARDED_FOR"]) ) {
+		return $_SERVER["HTTP_FORWARDED_FOR"];
+	} elseif ( !gtm4wp_ip_is_private($_SERVER["HTTP_FORWARDED"]) ) {
+		return $_SERVER["HTTP_FORWARDED"];
+	} else {
+		return $_SERVER["REMOTE_ADDR"];
+	}
+}
+
 if ( !function_exists( "getallheaders") ) {
 	function getallheaders() {
 		$headers = array();
@@ -121,17 +185,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_VISITOR_IP ] ) {
-		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-			//check ip from shared internet
-			$ip = $_SERVER['HTTP_CLIENT_IP'];
-		} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			//to check ip is passed from proxy
-			$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-		} else {
-			$ip = $_SERVER['REMOTE_ADDR'];
-		}
-
-		$dataLayer["visitorIP"] = $ip;
+		$dataLayer["visitorIP"] = esc_js( gtm4wp_get_user_ip() );
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
@@ -519,7 +573,7 @@ function gtm4wp_wp_loaded() {
 		$geodata = get_transient( 'gtm4wp-geodata-'.$gtm4wp_sessionid );
 
 		if ( false === $geodata ) {
-			$gtm4wp_geodata = @wp_remote_get( sprintf( 'http://api.ipstack.com/%s?access_key=%s&format=1', $_SERVER['REMOTE_ADDR'], $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOAPI ] ) );
+			$gtm4wp_geodata = @wp_remote_get( sprintf( 'http://api.ipstack.com/%s?access_key=%s&format=1', urlencode( gtm4wp_get_user_ip() ), $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOAPI ] ) );
 
 			if ( is_array( $gtm4wp_geodata ) && ( 200 == $gtm4wp_geodata[ "response" ][ "code" ] ) ) {
 				$gtm4wp_geodata = @json_decode( $gtm4wp_geodata[ "body" ] );
