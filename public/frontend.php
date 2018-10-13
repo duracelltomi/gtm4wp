@@ -85,28 +85,30 @@ function gtm4wp_ip_is_private( $ip ) {
 
 /**
  * Original copyright:
- * By Grant Burton @ BURTONTECH.COM (11-30-2008): IP-Proxy-Cluster Fix
+ * By Grant Burton @ BURTONTECH.COM
  *
  * Code improved by Thomas Geiger
  */
 function gtm4wp_get_user_ip() {
-	if ( !gtm4wp_ip_is_private($_SERVER["HTTP_CLIENT_IP"]) ) {
+	if ( !empty($_SERVER["HTTP_CLIENT_IP"]) && !gtm4wp_ip_is_private($_SERVER["HTTP_CLIENT_IP"]) ) {
 		return $_SERVER["HTTP_CLIENT_IP"];
 	}
 
-	foreach (explode(",",$_SERVER["HTTP_X_FORWARDED_FOR"]) as $ip) {
-		if ( !gtm4wp_ip_is_private(trim($ip)) ) {
-			return $ip;
+	if ( !empty($_SERVER["HTTP_X_FORWARDED_FOR"]) ) {
+		foreach (explode(",",$_SERVER["HTTP_X_FORWARDED_FOR"]) as $ip) {
+			if ( !gtm4wp_ip_is_private(trim($ip)) ) {
+				return $ip;
+			}
 		}
 	}
 
-	if ( !gtm4wp_ip_is_private($_SERVER["HTTP_X_FORWARDED"]) ) {
+	if ( !empty($_SERVER["HTTP_X_FORWARDED"]) && !gtm4wp_ip_is_private($_SERVER["HTTP_X_FORWARDED"]) ) {
 		return $_SERVER["HTTP_X_FORWARDED"];
-	} elseif ( !gtm4wp_ip_is_private($_SERVER["HTTP_X_CLUSTER_CLIENT_IP"]) ) {
+	} elseif ( !empty($_SERVER["HTTP_X_CLUSTER_CLIENT_IP"]) && !gtm4wp_ip_is_private($_SERVER["HTTP_X_CLUSTER_CLIENT_IP"]) ) {
 		return $_SERVER["HTTP_X_CLUSTER_CLIENT_IP"];
-	} elseif ( !gtm4wp_ip_is_private($_SERVER["HTTP_FORWARDED_FOR"]) ) {
+	} elseif ( !empty($_SERVER["HTTP_FORWARDED_FOR"]) && !gtm4wp_ip_is_private($_SERVER["HTTP_FORWARDED_FOR"]) ) {
 		return $_SERVER["HTTP_FORWARDED_FOR"];
-	} elseif ( !gtm4wp_ip_is_private($_SERVER["HTTP_FORWARDED"]) ) {
+	} elseif ( !empty($_SERVER["HTTP_FORWARDED"]) && !gtm4wp_ip_is_private($_SERVER["HTTP_FORWARDED"]) ) {
 		return $_SERVER["HTTP_FORWARDED"];
 	} else {
 		return $_SERVER["REMOTE_ADDR"];
