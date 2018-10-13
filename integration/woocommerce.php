@@ -494,8 +494,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				);
 
 				gtm4wp_woocommerce_addjs("
-					var gtm4wp_checkout_products    = " . json_encode($gtm4wp_checkout_products) . ";
-					var gtm4wp_checkout_step_offset = " . (int)$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] . ";"
+					window.gtm4wp_checkout_products    = " . json_encode($gtm4wp_checkout_products) . ";
+					window.gtm4wp_checkout_step_offset = " . (int)$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] . ";"
 				);
 			}
 		}
