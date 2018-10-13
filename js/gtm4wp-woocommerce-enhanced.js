@@ -1,4 +1,5 @@
 var gtm4wp_last_selected_product_variation;
+var gtm4wp_changedetail_fired_during_pageload=false;
 
 function gtm4wp_handle_cart_qty_change() {
 	jQuery( '.product-quantity input.qty' ).each(function() {
@@ -339,6 +340,11 @@ jQuery(function() {
 			return;
 		}
 
+		if ( (document.readyState === "interactive") && gtm4wp_changedetail_fired_during_pageload ) {
+			// some custom attribute rendering plugins fire this event multiple times during page load
+			return;
+		}
+
 		var _product_form       = event.target;
 		var _product_var_id     = jQuery( '[name=variation_id]', _product_form );
 		var _product_id         = jQuery( '[name=gtm4wp_id]', _product_form ).val();
@@ -381,8 +387,12 @@ jQuery(function() {
 			},
 			'ecomm_prodid': gtm4wp_id_prefix + current_product_detail_data.id,
 			'ecomm_pagetype': 'product',
-			'ecomm_totalvalue': current_product_detail_data.price
+			'ecomm_totalvalue': current_product_detail_data.price,
 		});
+
+		if ( document.readyState === "interactive" ) {
+			gtm4wp_changedetail_fired_during_pageload = true;
+		}
 	});
 	jQuery( '.variations select' ).trigger( 'change' );
 
