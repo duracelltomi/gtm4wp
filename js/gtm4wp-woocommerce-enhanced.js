@@ -298,7 +298,7 @@ jQuery(function() {
 			return true;
 		}
 
-		var ctrl_key_pressed = event.ctrlKey;
+		var ctrl_key_pressed = event.ctrlKey || event.metaKey;
 
 		event.preventDefault();
 		if ( ctrl_key_pressed ) {

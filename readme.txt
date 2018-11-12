@@ -1,7 +1,7 @@
 === DuracellTomi's Google Tag Manager for WordPress ===
 Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
-Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize
+Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 4.9.8
@@ -9,7 +9,7 @@ Stable tag: 1.9.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
-The first Google Tag Manager plugin for WordPress with business goals in mind. Includes full support for Google Optimize as well.
+Advanced measurement/advertising tag management and site personalisation for WordPress with Google Tag Manager and Google Optimize
 
 == Description ==
 
@@ -266,6 +266,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Fixed: properly detect client IP address and also properly escape this data while using it
 * Fixed: WooCommerce checkout steps after page load did not include products in the cart
 * Fixed: checkout step events for payment mode and shipping type not always fired
+* Fixed: the CMD on Mac will be treated just like the Ctrl key on Windows while processing the product click event in the WooCommerce integration (thy for luzinis)
 * Changed: code cleanup in WooCommerce integration
 
 = 1.9 =
