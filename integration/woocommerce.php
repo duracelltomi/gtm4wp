@@ -198,6 +198,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 				if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 					$dataLayer["ecommerce"] = array(
+						"currencyCode" => get_woocommerce_currency(),
 						"detail" => array(
 							"products" => array($eec_product_array)
 						)
@@ -273,6 +274,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] ) {
 				$dataLayer["ecommerce"] = array(
+					"currencyCode" => get_woocommerce_currency(),
 					"checkout" => array(
 						"actionField" => array(
 							"step" => 1
@@ -485,6 +487,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 				$dataLayer["ecommerce"] = array(
+					"currencyCode" => get_woocommerce_currency(),
 					"checkout" => array(
 						"actionField" => array(
 							"step" => 1 + (int)$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ]
@@ -526,6 +529,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$remarketing_id = $product_sku;
 			}
 
+			$dataLayer["ecommerce"]["currencyCode"] = get_woocommerce_currency();
 			$dataLayer["ecommerce"]["add"]["products"][] = array(
 				"name"       => $product->get_title(),
 				"id"         => $remarketing_id,
@@ -895,6 +899,7 @@ function gtm4wp_wc_quick_view_before_single_product() {
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 				$dataLayer["ecommerce"] = array(
+					"currencyCode" => get_woocommerce_currency(),
 					"detail" => array(
 						"products" => array($eec_product_array)
 					)
