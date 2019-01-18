@@ -225,7 +225,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 			if ( false !== $postuser ) {
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHORID ] ) {
-          $dataLayer["pagePostAuthorID"] = $postuser->ID;
+					$dataLayer["pagePostAuthorID"] = $postuser->ID;
 				}
 
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_AUTHOR ] ) {

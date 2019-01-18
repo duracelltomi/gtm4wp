@@ -155,14 +155,14 @@ $GLOBALS["gtm4wp_includefieldtexts"] = array(
 	GTM4WP_OPTION_INCLUDE_WEATHER => array(
 		"label"       => __( "Weather data", 'duracelltomi-google-tag-manager' ),
 		"description" => sprintf( __( "Check this option to include the current weather conditions around the current visitor.<br /><br />".
-		                              "<strong>Attention!</strong> This feature uses <a href=\"%s\" target=\"_blank\">ipstack.com</a> and ".
-		                              "<a href=\"%s\" target=\"_blank\">openweathermap.org</a> to collect data.<br />".
-		                              "Depending on your website's traffic, additional fees may apply!<br />".
-		                              "This plugin caches weather data for 1 hour to lower the need to access those services.<br /><br />".
-		                              "If you activate weather data, <strong>you will need</strong> to add an IPStack.com API key regardless of whether you ".
-		                              "activate the 'Geo data' option!", 'duracelltomi-google-tag-manager' ),
-		                              "https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress",
-		                              "http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress"
+			"<strong>Attention!</strong> This feature uses <a href=\"%s\" target=\"_blank\">ipstack.com</a> and ".
+			"<a href=\"%s\" target=\"_blank\">openweathermap.org</a> to collect data.<br />".
+			"Depending on your website's traffic, additional fees may apply!<br />".
+			"This plugin caches weather data for 1 hour to lower the need to access those services.<br /><br />".
+			"If you activate weather data, <strong>you will need</strong> to add an IPStack.com API key regardless of whether you ".
+			"activate the 'Geo data' option!", 'duracelltomi-google-tag-manager' ),
+			"https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress",
+			"http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress"
 		),
 		"phase"       => GTM4WP_PHASE_EXPERIMENTAL
 	),
@@ -504,17 +504,17 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION => array(
 		"label"         => __( "Products per impression", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "If you have many products shown on product category pages and/or on your site home, you could miss pageviews in Google Analytics due to the ".
-		                       "amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by ".
-		                       "entering a number here (minimum 10-15 recommended) and adding gtm4wp.productImpressionEEC into your Google Analytics ecommerce event helper ".
-		                       "tag's trigger.<br /><br />Leave this value 0 to include product impression data in your pageview hit.", 'duracelltomi-google-tag-manager' ),
+			"amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by ".
+			"entering a number here (minimum 10-15 recommended) and adding gtm4wp.productImpressionEEC into your Google Analytics ecommerce event helper ".
+			"tag's trigger.<br /><br />Leave this value 0 to include product impression data in your pageview hit.", 'duracelltomi-google-tag-manager' ),
 		"phase"         => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => array(
 		"label"         => __( "Do not flag orders as being tracked", 'duracelltomi-google-tag-manager' ),
 		"description"   => __( "Check this to prevent the plugin to flag orders as being already tracked.<br /><br />This ensures that no order data will be tracked ".
-		                       "multiple times in any ad or measurement system so please only enable this feature if you really need it (with iDeal you might need this)!",
-		                       'duracelltomi-google-tag-manager' ),
+			"multiple times in any ad or measurement system so please only enable this feature if you really need it (with iDeal you might need this)!",
+			'duracelltomi-google-tag-manager' ),
 		"phase"         => GTM4WP_PHASE_BETA,
 		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
@@ -522,8 +522,8 @@ $GLOBALS["gtm4wp_integratefieldtexts"] = array(
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS => array(
 		"label"         => __( "Google Optimize container ID list", 'duracelltomi-google-tag-manager' ),
 		"description"   => sprintf( __( "Enter a comma separated list of Google Optimize container IDs that you would like to use on your site.<br />".
-		                   "This plugin will add the <a href=\"%s\">page-hiding snippet</a> to your pages.<br /><br />".
-		                   "The Google Optimize container will be only loaded if you provide your Google Analytics property ID bellow as well.", 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/optimize/#the_page-hiding_snippet_code' ) .
+			"This plugin will add the <a href=\"%s\">page-hiding snippet</a> to your pages.<br /><br />".
+			"The Google Optimize container will be only loaded if you provide your Google Analytics property ID bellow as well.", 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/optimize/#the_page-hiding_snippet_code' ) .
 			'<br /><span class="goid_validation_error">' . __( "This does not seems to be a valid Google Optimize ID! Valid format: GTM-XXXXXX where X can be numbers and capital letters. Use comma without any space (,) to enter multpile IDs.", 'duracelltomi-google-tag-manager' ) . '</span>',
 		"phase"         => GTM4WP_PHASE_EXPERIMENTAL
 	),
@@ -883,7 +883,7 @@ function gtm4wp_sanitize_options($options) {
 				$_gtmid_haserror = false;
 
 				foreach( $_gtmid_list as $one_gtm_id ) {
-				  $_gtmid_haserror = $_gtmid_haserror || !preg_match( "/^GTM-[A-Z0-9]+$/", $one_gtm_id );
+					$_gtmid_haserror = $_gtmid_haserror || !preg_match( "/^GTM-[A-Z0-9]+$/", $one_gtm_id );
 				}
 
 				if ( $_gtmid_haserror ) {
@@ -1143,9 +1143,9 @@ function gtm4wp_admin_init() {
 		array(
 			"label_for" => GTM4WP_ADMIN_GROUP_INFO,
 			"description" => '<strong>Thomas Geiger</strong><br />
-			                  Website: <a href="https://gtm4wp.com/" target="_blank">gtm4wp.com</a><br />
-			                  <a href="https://www.linkedin.com/in/duracelltomi" target="_blank">Me on LinkedIn</a><br />
-			                  <a href="http://www.linkedin.com/company/jabjab-online-marketing-ltd-" target="_blank">JabJab Online Marketing on LinkedIn</a>'
+				Website: <a href="https://gtm4wp.com/" target="_blank">gtm4wp.com</a><br />
+				<a href="https://www.linkedin.com/in/duracelltomi" target="_blank">Me on LinkedIn</a><br />
+				<a href="http://www.linkedin.com/company/jabjab-online-marketing-ltd-" target="_blank">JabJab Online Marketing on LinkedIn</a>'
 		)
 	);
 

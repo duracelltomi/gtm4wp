@@ -14,7 +14,7 @@ define('PLUGIN_PATH', PLUGIN_FOLDER.'/'.PLUGIN_FILE);
 
 // Activates this plugin in WordPress so it can be tested.
 $GLOBALS['wp_tests_options'] = array(
-  'active_plugins' => array( PLUGIN_PATH ),
+	'active_plugins' => array( PLUGIN_PATH ),
 );
 
 require_once $_tests_dir . '/includes/functions.php';

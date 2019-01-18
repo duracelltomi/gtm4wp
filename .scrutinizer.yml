@@ -1,10 +1,10 @@
 tools:
-  php_code_sniffer:
-    config:
-      standard: WordPress
-  sensiolabs_security_checker: true
-  external_code_coverage:
-    timeout: 2500
+    php_code_sniffer:
+        config:
+            standard: WordPress
+        sensiolabs_security_checker: true
+        external_code_coverage:
+        timeout: 2500
 build:
     nodes:
         analysis:
@@ -25,8 +25,8 @@ checks:
             name: WordPress
     javascript: true
 filter:
-  excluded_paths:
-    - tests/
-    - integration/whichbrowser/
-  dependency_paths:
-    - wordpress/
+    excluded_paths:
+        - tests/
+        - integration/whichbrowser/
+    dependency_paths:
+        - wordpress/
