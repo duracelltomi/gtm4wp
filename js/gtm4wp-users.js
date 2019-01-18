@@ -8,10 +8,10 @@ function gtm4wp_set_cookie( cookiename, cookievalue, expiredays ) {
 
 function gtm4wp_get_cookie( cookiename ) {
 	var decoded_cookie_list = decodeURIComponent(document.cookie).split(';');
-	var onecookie;
+	var onecookie = '';
 
 	for( var i=0; i<decoded_cookie_list.length; i++ ) {
-		var onecookie = decoded_cookie_list[i].trim();
+		onecookie = decoded_cookie_list[i].trim();
 		if ( 0 == onecookie.indexOf( cookiename ) ) {
 			return onecookie.substring( cookiename.length+1, onecookie.length );
 		}

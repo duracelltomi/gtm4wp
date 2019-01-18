@@ -14,14 +14,12 @@ php:
     - 7.0
     - 7.1
     - 7.2
-    - hhvm
     - nightly
 
 matrix:
   fast_finish: true
   allow_failures:
     - php: nightly
-    - php: hhvm
     - php: 5.5
 
 cache: bundler

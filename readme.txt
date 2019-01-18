@@ -1,15 +1,15 @@
 === DuracellTomi's Google Tag Manager for WordPress ===
 Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
-Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize
+Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 5.6
-Tested up to: 4.9.6
-Stable tag: 1.9
+Tested up to: 5.0.3
+Stable tag: 1.9.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
-The first Google Tag Manager plugin for WordPress with business goals in mind. Includes full support for Google Optimize as well.
+Advanced measurement/advertising tag management and site personalisation for WordPress with Google Tag Manager and Google Optimize
 
 == Description ==
 
@@ -258,6 +258,18 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.9.1 =
+
+* Fixed: handle out of quota cases with ipstack queries properly
+* Fixed: proper YouTube tracking for WordPress sites and WordPress multisites installed in a subdirectory
+* Fixed: properly detect client IP address and also properly escape this data while using it
+* Fixed: WooCommerce checkout steps after page load did not include products in the cart
+* Fixed: checkout step events for payment mode and shipping type not always fired
+* Fixed: the CMD on Mac will be treated just like the Ctrl key on Windows while processing the product click event in the WooCommerce integration (thy for luzinis)
+* Fixed: add currencyCode to every ecommerce action in WooCommerce integration
+* Fixed: possible cross site scripting vulnerability if site search tracking was enabled due to not properly escaped referrer url tracking
+* Changed: code cleanup in WooCommerce integration
+
 = 1.9 =
 
 * Added: initial support for AMP plugin from Automattic (thx koconder for the contribution!)
@@ -265,12 +277,14 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: WooCommerce enhanced ecommerce datasets now include stock levels
 * Added: new productIsVariable data layer variable is set to 1 on variable WooCommerce product pages
 * Added: product impressions can now be split into multiple chunks to prevent data loss on large product category and site home pages  (thx Tim Zook for the contribution!)
+  * IMPORTANT! You will need to update your GTM setup, please read the new Step 9 section of the [setup tutorial page](https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking).
 * Added: you can now disable flagging of WooCommerce orders as being already tracked once. In same cases (with iDeal for example) you may need this to make purchase tracking to work.
 * Added: uninstalling the plugin will now remove configured plugin options from database
 * Added: new advanced plugin option: data layer variable visitorDoNotTrack will include 1 if the user has set the [do not track flag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/DNT) in his/her browser
 * Added: new data layer event when a user has logged in on the frontend: gtm4wp.userLoggedIn
 * Added: new data layer event when a new user has registered on the frontend: gtm4wp.userRegistered
 * Added: new advanced plugin option: move data layer declaration and Google Tag Manager container as close as possible to the beginning of the HTML document
+* Added: better WP Rocket support
 * Updated: Full Google Optimize support. Now the plugin can load your Google Optimize container with the [recommended code placement](https://support.google.com/optimize/answer/7359264?hl=en)
 * Updated: moved most of the inline JavaScript codes into separate .js files which should help cache plugins to do their job much better when my plugin is active
 * Fixed: wrong ecomm_pagetype on product search result pages
@@ -562,9 +576,13 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
+= 1.9.1 =
+
+Bugfix version
+
 = 1.9 =
 
-New AMP GTM support...
+New AMP GTM support, full Google Optimize support, lots of WooCommerce tracking improvements.
 
 = 1.8.1 =
 
