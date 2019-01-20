@@ -398,7 +398,7 @@ jQuery(function() {
 
 	// initiate codes in WooCommere Quick View
 	jQuery( document ).ajaxSuccess( function( event, xhr, settings ) {
-		if ( settings.url.indexOf( 'wc-api=WC_Quick_View' ) > -1 ) {
+		if (settings != undefined && settings.url.indexOf( 'wc-api=WC_Quick_View' ) > -1 ) {
 		  setTimeout( function() {
 				jQuery( ".woocommerce.quick-view" ).parent().find( "script" ).each( function(i) {
 					eval( jQuery( this ).text() );
