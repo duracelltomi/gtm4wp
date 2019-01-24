@@ -1,53 +1,147 @@
-sudo: false
+# Travis CI Configuration file
+# @link https://github.com/koconder/wordpress-test-template
 language: php
+dist: trusty
+sudo: false
 
+# Silence notifications
 notifications:
   on_success: never
   on_failure: change
   email: false
 
-env: WP_PROJECT_TYPE=plugin WP_VERSION=latest WP_MULTISITE=0 WP_TEST_URL=http://localhost:12000 WP_TEST_USER=test WP_TEST_USER_PASS=test WP_PLUGINLIST=woocommerce;amp
+# Cache buildss to speed things up
+cache:
+  bundler: true
+  apt: true
+  directories:
+    # Cache directory for older Composer versions.
+    - $HOME/.composer/cache/files
+    # Cache directory for more recent Composer versions.
+    - $HOME/.cache/composer/files
 
-php:
-    - 5.5
-    - 5.6
-    - 7.0
-    - 7.1
-    - 7.2
-    - nightly
-
+# Default configuration variables
+env:
+  global:
+    - PATH=~/.composer/vendor/bin:vendor/bin:$PATH
+    - WP_PROJECT_TYPE=plugin
+    - WP_VERSION=latest
+    - WP_MULTISITE=0
+    - WP_TEST_URL=http://localhost:12000
+    - WP_TEST_USER=test
+    - WP_TEST_USER_PASS=test
+    - COVERALLS_VERSION="notset"
+    - PHPUNIT_VERSION="travis"
+    - PHPCS_VERSION="2.3.0"
+    - LINT=1
+    - SNIFF=0
+    
 matrix:
   fast_finish: true
+  include:
+    # Note: Coverage is only checked on the lowest and highest stable PHP versions for all PHPCS versions.
+    - php: 7.3
+      env: WP_VERSION=5.0 WP_MULTISITE=1 PHPLINT=1 SNIFF=1 PHPCS_VERSION="3.3.*" PHPUNIT_VERSION="^6.1.0"
+    - php: 7.3
+      env: WP_VERSION=5.0 WP_MULTISITE=1 PHPCS_VERSION="2.3.0" COVERALLS_VERSION="^2.0" PHPUNIT_VERSION="^6.1.0"
+    - php: 7.2
+      env: WP_VERSION=5.0 PHPCS_VERSION="2.3.0" PHPUNIT_VERSION="^6.1.0"
+    - php: 7.1
+      env: WP_VERSION=5.0
+    - php: 7.0
+      env: WP_VERSION=5.0 PHPUNIT_VERSION="^6.1.0"
+    - php: 5.6
+      env: WP_VERSION=5.0
+    - php: 5.5
+      env: WP_VERSION=5.0
+    - php: 5.4
+      env: WP_VERSION=5.0
+    # WP-Cli Minimum PHP version 5.4 and above
+    - php: nightly
+      env: WP_VERSION=latest PHPCS_VERSION=">=2.0,<3.0" PHPUNIT_VERSION="^6.1.0"
+    - php: hhvm
+      env: WP_VERSION=latest PHPCS_VERSION=">=2.0,<3.0" PHPUNIT_VERSION="^6.1.0"
+  # Allow un-stable PHP or Wordpress versions to fail
   allow_failures:
     - php: nightly
-    - php: 5.5
+    - php: hhvm
+    - env: WP_VERSION=latest
 
-cache: bundler
+# Install XML Tools for Codecoverage and PHPUnit
+addons:
+  apt:
+    packages:
+      - libxml2-utils
+
+# Stop Travis CI Git from pulling old commits
+git:
+  depth: 1
+
+before_install:
+  # Increase PHP Memory
+  - echo "memory_limit=512M" >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
+
+  # Install PHPCS, Coveralls and PHPUnit
+  - if [[ $COVERALLS_VERSION != "notset" ]]; then composer require php-coveralls/php-coveralls:${COVERALLS_VERSION}; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer require --dev dealerdirect/phpcodesniffer-composer-installer; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer require --dev squizlabs/php_codesniffer:${PHPCS_VERSION}; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer require --dev wp-coding-standards/wpcs; fi
+  #- if [[ "$SNIFF" == "1" ]]; then composer require --dev automattic/vipwpcs; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer require --dev phpcompatibility/php-compatibility; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer require --dev phpcompatibility/phpcompatibility-paragonie; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer require --dev phpcompatibility/phpcompatibility-wp; fi
+  - if [[ $PHPUNIT_VERSION != "travis" ]]; then composer require phpunit/phpunit:${PHPUNIT_VERSION}; fi
+
+  # Install Composer Packages and Load PHPCS Libraries if testing
+  - if [[ "$SNIFF" == "1" ]]; then travis_wait composer install --prefer-dist --no-suggest; fi
+  - if [[ "$SNIFF" != "1" ]]; then travis_wait composer install --no-dev --prefer-dist --no-suggest; fi
+  - if [[ "$SNIFF" == "1" ]]; then composer run-script install-codestandards; fi
+
+  # Echo Location and Files
+  - echo $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  - if [[ "$SNIFF" == "1" ]]; then ls -lah; fi
+  - if [[ "$SNIFF" == "1" ]]; then ls -lah vendor; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs -i; fi
 
 before_script:
-  # Install composer packages before trying to activate themes or plugins
-  # - composer install
-  - composer dump-autoload
-  # - composer self-update
-  - composer update --prefer-source $PREFER_LOWEST
+  # Reload PHP Configuration
+  - phpenv rehash
 
-  # Install Wordpress testing suite and run wordpress
-  - git clone https://github.com/duracelltomi/wordpress-test-template wp-tests
-  - bash wp-tests/bin/install-wp-tests.sh test root '' localhost $WP_VERSION
-
-  # Test wordpress
-  - curl -i http://localhost:12000
+  # Install Wordpress testing suite, copy tests if none and run wordpress
+  - git clone https://github.com/koconder/wordpress-test-template wptest
+  - if [ ! -d ./tests ]; then cp -Rf ./wptest/tests ./tests; fi
+  - bash wptest/bin/install-wp-tests.sh test root '' localhost $WP_VERSION
 
 script:
-  #- phpcs --standard=WordPress ./**/*.php
-  - bin/phpunit --coverage-clover=coverage.xml
-  - cd wp-tests/spec && bundle exec rspec *.rb
-  # Syntax check all php files and fail for any error text in STDERR
-  - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
+  # Validate the composer.json file.
+  - if [[ "$PHPLINT" == "1" ]]; then composer validate --no-check-all --strict; fi
 
-#after_script:
-#  - wget https://scrutinizer-ci.com/ocular.phar
-#  - php ocular.phar code-coverage:upload --format=php-clover coverage.xml
-  
-#after_success:
-#  - bash <(curl -s https://codecov.io/bash)https://developer.wordpress.org/cli/commands/plugin/install/in
+  # Lint all PHP files against parse errors.
+  #- if [[ "$PHPLINT" == "1" ]]; then find -L . -path ./PHPCompatibility/Tests/Keywords/ForbiddenNames -prune -o -path ./vendor -prune -o -path ./wptest -prune -o -path ./wpcs -prune -o -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l; fi
+  - if [[ "$PHPLINT" == "1" ]]; then find -L . -type f -name '*.php' -print | grep -v -e ./vendor -e /wpcs -e /docker -e /spec; fi
+  - if [[ "$PHPLINT" == "1" ]]; then find -L . -type f -name '*.php' -print | grep -v -e ./vendor -e /wpcs -e /docker -e /spec | awk '{printf "%s%c", $0, 0}' | xargs -0 -n1 -P4 php -l -n | (! grep -v "No syntax errors detected" ); fi
+
+  # Run rspec tests
+  #- cd wp-tests/spec && bundle exec rspec baseline.rb
+
+  # Run the unit tests.
+  - if [[ $PHPUNIT_VERSION == "travis" && $COVERALLS_VERSION != "notset" ]]; then phpunit --configuration phpunit.xml --coverage-clover clover.xml; fi
+  - if [[ $PHPUNIT_VERSION != "travis" && $COVERALLS_VERSION != "notset" ]]; then vendor/bin/phpunit --configuration phpunit.xml --coverage-clover clover.xml; fi
+  - if [[ $PHPUNIT_VERSION == "travis" && $COVERALLS_VERSION == "notset" ]]; then phpunit; fi
+  - if [[ $PHPUNIT_VERSION != "travis" && $COVERALLS_VERSION == "notset" ]]; then vendor/bin/phpunit; fi
+
+  # Run PHP Coding Standards Checks.
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set ignore_warnings_on_exit 1; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set colors 1; fi
+  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=Wordpress; fi
+  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=Wordpress-Extra; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=PHPCompatibility; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=PHPCompatibilityWP; fi
+
+after_success:
+  # Submit Code Coverage and 3rd party reports
+  - if [[ "$SNIFF" == "1" ]]; then wget https://scrutinizer-ci.com/ocular.phar; fi
+  - if [[ $COVERALLS_VERSION == "^1.0" ]]; then php vendor/bin/coveralls -v -x clover.xml; fi
+  - if [[ $COVERALLS_VERSION == "^2.0" ]]; then php vendor/bin/php-coveralls -v -x clover.xml; fi
+  - if [[ "$SNIFF" == "1" ]]; then php ocular.phar code-coverage:upload --format=php-clover clover.xml; fi
+  - if [[ "$SNIFF" == "1" ]]; then bash <(curl -s https://codecov.io/bash); fi

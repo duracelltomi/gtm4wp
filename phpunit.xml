@@ -1,34 +1,39 @@
 <phpunit
-  bootstrap="tests/bootstrap.php"
   backupGlobals="false"
+	backupStaticAttributes="false"
+  bootstrap="tests/bootstrap.php"
   colors="true"
   convertErrorsToExceptions="true"
   convertNoticesToExceptions="true"
   convertWarningsToExceptions="true"
-  verbose="true"
-  syntaxCheck="true"
+	verbose="true"
   >
+  
+  <logging>
+      <log type="coverage-clover" target="clover.xml"/>
+  </logging>
+
+  <php>
+    <!-- Enter the name of your main plugin file here -->
+    <env name="PLUGIN_FILE" value="duracelltomi-google-tag-manager-for-wordpress.php"/>
+  </php>
+  
   <testsuites>
     <testsuite>
       <directory prefix="test-" suffix=".php">./tests/</directory>
     </testsuite>
   </testsuites>
-  <logging>
-    <log type="coverage-clover" target="coverage.xml"/>
-  </logging>
-  <php>
-    <env name="PLUGIN_FILE" value="duracelltomi-google-tag-manager-for-wordpress.php"/>
-    <ini name="display_errors" value="false"/>
-    <ini name="display_startup_errors" value="true"/>
-  </php>
-  <filter>
-    <whitelist processUncoveredFilesFromWhitelist="true">
-      <directory suffix=".php">./</directory>
-      <file>/path/to/file</file>
-      <exclude>
-        <directory suffix=".php">./</directory>
-        <file>/path/to/file</file>
-      </exclude>
-    </whitelist>
-  </filter>
+
+	<filter>
+		<whitelist>
+			<directory>./</directory>
+			<exclude>
+				<directory suffix=".php">./wptesst</directory>
+				<directory suffix=".php">./vendor</directory>
+				<directory suffix=".php">./spec</directory>
+				<directory suffix=".php">./docker</directory>
+				<directory suffix=".php">./wpcs</directory>
+			</exclude>
+		</whitelist>
+	</filter>
 </phpunit>

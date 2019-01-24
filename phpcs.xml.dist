@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<ruleset name="WordPress Coding Standards for Plugins">
+	<description>Generally-applicable sniffs for WordPress plugins and theme development</description>
+
+    <!-- Default Rules -->
+	<rule ref="WordPress" />
+	<rule ref="WordPress-Core" />
+	<rule ref="WordPress-Extra" />
+	<rule ref="PHPCompatibility" />
+	<rule ref="PHPCompatibilityWP" />
+
+	<!-- Exclude Common Paths. -->
+    <exclude-pattern>*/wptest/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/PHPCompatibility/Tests/Keywords/ForbiddenNames/*\.php</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/spec/*</exclude-pattern>
+    <exclude-pattern>*/wpcs/*</exclude-pattern>
+
+    <!-- Check up to 8 files simultanously. -->
+    <arg name="parallel" value="8"/>
+</ruleset>

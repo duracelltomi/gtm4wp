@@ -10,10 +10,9 @@
             "email": "messenger@gtm4wp.com"
         }
     ],
-    "config": {
-      "bin-dir": "bin"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^4.8.35 || 5.* || 6.*"
+    "scripts": {
+        "install-codestandards": [
+            "Dealerdirect\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\Plugin::run"
+        ]
     }
 }
