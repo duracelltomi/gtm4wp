@@ -19,17 +19,16 @@ build:
             - composer require --dev phpunit/phpunit
             - composer install --prefer-dist --no-suggest
             - composer run-script install-codestandards
-    tests:
-        override:
-        -
-            command: phpcs-run
-            use_website_config: true
-        - php-scrutinizer-run
-        -
-            command: 'php ./vendor/bin/phpunit --configuration phpunit.xml --testsuite scrutinizer --coverage-clover=/home/scrutinizer/build/clover.xml'
-            coverage:
-                file: /home/scrutinizer/build/clover.xml
-                format: php-clover
+    nodes:
+        analysis:
+            tests:
+                override:
+                -
+                    command: phpcs-run
+                    use_website_config: true
+                - php-scrutinizer-run
+                -
+                    command: 'php ./vendor/bin/phpunit --configuration phpunit.xml --testsuite scrutinizer'
 checks:
     php:
         avoid_closing_tag: false
