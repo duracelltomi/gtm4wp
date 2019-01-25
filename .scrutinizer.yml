@@ -2,28 +2,34 @@ tools:
     php_code_sniffer:
         config:
             standard: WordPress
-        sensiolabs_security_checker: true
-        external_code_coverage:
-        timeout: 2500
+    sensiolabs_security_checker: true
 build:
-    nodes:
-        analysis:
-            dependencies:
-                before:
-                    - composer require johnpbloch/wordpress
-                    - composer require dealerdirect/phpcodesniffer-composer-installer
-                    - composer require squizlabs/php_codesniffer
-                    - composer require wp-coding-standards/wpcs
-                    - composer require phpcompatibility/php-compatibility
-                    - composer require phpcompatibility/phpcompatibility-paragonie
-                    - composer require phpcompatibility/phpcompatibility
-                    - composer require phpunit/phpunit:^6.1.0
-                tests:
-                    override:
-                    -
-                        command: phpcs-run
-                        use_website_config: true
-                    - php-scrutinizer-run
+    environment:
+        php:
+            version: 7.2
+    dependencies:
+        before:
+            - composer require --dev johnpbloch/wordpress
+            - composer require --dev dealerdirect/phpcodesniffer-composer-installer
+            - composer require --dev squizlabs/php_codesniffer
+            - composer require --dev wp-coding-standards/wpcs
+            - composer require --dev phpcompatibility/php-compatibility
+            - composer require --dev phpcompatibility/phpcompatibility-paragonie
+            - composer require --dev phpcompatibility/phpcompatibility-wp
+            - composer require --dev phpunit/phpunit
+            - composer install --prefer-dist --no-suggest
+            - composer run-script install-codestandards
+    tests:
+        override:
+        -
+            command: phpcs-run
+            use_website_config: true
+        - php-scrutinizer-run
+        -
+            command: 'php ./vendor/bin/phpunit --configuration phpunit.xml --testsuite scrutinizer --coverage-clover=/home/scrutinizer/build/clover.xml'
+            coverage:
+                file: /home/scrutinizer/build/clover.xml
+                format: php-clover
 checks:
     php:
         avoid_closing_tag: false
@@ -42,13 +48,12 @@ checks:
         coding_standard:
             name: WordPress
     javascript: true
-    external_code_coverage: true
 filter:
     excluded_paths:
         - tests/
         - integration/whichbrowser/
         - docker/
-        - vendor/
         - spec/
     dependency_paths:
         - wordpress/
+        - vendor/
