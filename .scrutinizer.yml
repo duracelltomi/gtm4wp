@@ -50,9 +50,7 @@ checks:
 filter:
     excluded_paths:
         - tests/
-        - integration/whichbrowser/
-        - docker/
-        - spec/
     dependency_paths:
         - wordpress/
         - vendor/
+        - integration/whichbrowser/
