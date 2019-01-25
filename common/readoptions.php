@@ -241,28 +241,28 @@ $gtm4wp_defaultoptions = array(
 function gtm4wp_reload_options() {
     global $gtm4wp_defaultoptions;
 
-    $storedoptions = (array) get_option( GTM4WP_OPTIONS );
-    if ( ! is_array( $gtm4wp_defaultoptions ) ) {
+    $storedoptions = (array) get_option(GTM4WP_OPTIONS);
+    if (!is_array($gtm4wp_defaultoptions)) {
         $gtm4wp_defaultoptions = array();
     }
 
     // update WooCommerce settings from 0.7.x to 0.8
-    if ( isset( $storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ] ) && ! isset( $storedoptions[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) ) {
+    if (isset($storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ]) && !isset($storedoptions[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ])) {
         $storedoptions[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ]  = $storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ];
         $storedoptions[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] = false;
         $storedoptions[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ]     = $storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ];
 
-        unset( $storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ] );
+        unset($storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ]);
     }
 
-    return array_merge( $gtm4wp_defaultoptions, $storedoptions );
+    return array_merge($gtm4wp_defaultoptions, $storedoptions);
 }
 
-function gtp4wp_debug_file( $debug_data ) {
-    $fp = fopen( dirname( __FILE__ ) . "/" . date("Y-m-d-H-i-s-u") . ".txt", "w" );
-    if ( $fp ) {
-        fwrite( $fp, $debug_data );
-        fclose( $fp );
+function gtp4wp_debug_file($debug_data) {
+    $fp = fopen(dirname(__FILE__) . "/" . date("Y-m-d-H-i-s-u") . ".txt", "w");
+    if ($fp) {
+        fwrite($fp, $debug_data);
+        fclose($fp);
     }
 }
 
