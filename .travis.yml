@@ -133,10 +133,10 @@ script:
   # Run PHP Coding Standards Checks.
   - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set ignore_warnings_on_exit 1; fi
   - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set colors 1; fi
-  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress; fi
   #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress-Extra; fi
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibility; fi
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibilityWP; fi
+  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibility; fi
+  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibilityWP; fi
 
 after_success:
   # Submit Code Coverage and 3rd party reports
