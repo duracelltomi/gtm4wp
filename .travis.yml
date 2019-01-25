@@ -41,7 +41,7 @@ matrix:
   include:
     # Note: Coverage is only checked on the lowest and highest stable PHP versions for all PHPCS versions.
     - php: 7.3
-      env: WP_VERSION=5.0 WP_MULTISITE=1 PHPLINT=1 SNIFF=1 PHPCS_VERSION="3.3.*" PHPUNIT_VERSION="^6.1.0"
+      env: WP_VERSION=5.0 WP_MULTISITE=1 PHPLINT=1 SNIFF=1 PHPCS_VERSION="3.4" PHPUNIT_VERSION="^6.1.0"
     - php: 7.3
       env: WP_VERSION=5.0 WP_MULTISITE=1 PHPCS_VERSION="2.3.0" COVERALLS_VERSION="^2.0" PHPUNIT_VERSION="^6.1.0"
     - php: 7.2
@@ -131,12 +131,12 @@ script:
   - if [[ $PHPUNIT_VERSION != "travis" && $COVERALLS_VERSION == "notset" ]]; then vendor/bin/phpunit; fi
 
   # Run PHP Coding Standards Checks.
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set ignore_warnings_on_exit 1; fi
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set colors 1; fi
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress; fi
-  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress-Extra; fi
-  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibility; fi
-  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibilityWP; fi
+  - if [[ "$SNIFF" == "1" ]]; then bash -c "vendor/bin/phpcs --config-set ignore_warnings_on_exit 1"; fi
+  - if [[ "$SNIFF" == "1" ]]; then bash -c "vendor/bin/phpcs --config-set colors 1"; fi
+  #- if [[ "$SNIFF" == "1" ]]; then bash -c "vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/wordpress/*,*/whichbrowser/*,*.css,*.js --standard=Wordpress -v"; fi
+  #- if [[ "$SNIFF" == "1" ]]; then bash -c "vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/wordpress/*,*/whichbrowser/*,*.css,*.js --standard=Wordpress-Extra -v"; fi
+  - if [[ "$SNIFF" == "1" ]]; then bash -c "vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/wordpress/*,*/whichbrowser/*,*.css,*.js --standard=PHPCompatibility -v"; fi
+  - if [[ "$SNIFF" == "1" ]]; then bash -c "vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/wordpress/*,*/whichbrowser/*,*.css,*.js --standard=PHPCompatibilityWP -v"; fi
 
 after_success:
   # Submit Code Coverage and 3rd party reports
