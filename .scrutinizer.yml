@@ -3,7 +3,8 @@ tools:
         config:
             standard: WordPress
     sensiolabs_security_checker: true
-    external_code_coverage: true
+    external_code_coverage:
+        timeout: 600
 build:
     environment:
         php:
@@ -22,12 +23,16 @@ build:
             - composer run-script install-codestandards
     nodes:
         analysis:
+            cache:
+                directories:
+                    - vendor/
             tests:
                 override:
-                -
-                    command: phpcs-run
-                    use_website_config: true
-                - php-scrutinizer-run
+                    -
+                        command: phpcs-run
+                        use_website_config: true
+                    - php-scrutinizer-run
+                    - js-scrutinizer-run
 checks:
     php:
         avoid_closing_tag: false
@@ -47,6 +52,8 @@ checks:
             name: WordPress
     javascript: true
 filter:
+    paths:
+        - ./
     excluded_paths:
         - tests/
         - wpcs/
