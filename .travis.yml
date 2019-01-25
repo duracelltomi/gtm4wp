@@ -118,8 +118,8 @@ script:
 
   # Lint all PHP files against parse errors.
   #- if [[ "$PHPLINT" == "1" ]]; then find -L . -path ./PHPCompatibility/Tests/Keywords/ForbiddenNames -prune -o -path ./vendor -prune -o -path ./wptest -prune -o -path ./wpcs -prune -o -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l; fi
-  - if [[ "$PHPLINT" == "1" ]]; then find -L . -type f -name '*.php' -print | grep -v -e ./vendor -e /wpcs -e /docker -e /spec; fi
-  - if [[ "$PHPLINT" == "1" ]]; then find -L . -type f -name '*.php' -print | grep -v -e ./vendor -e /wpcs -e /docker -e /spec | awk '{printf "%s%c", $0, 0}' | xargs -0 -n1 -P4 php -l -n | (! grep -v "No syntax errors detected" ); fi
+  - if [[ "$PHPLINT" == "1" ]]; then find -L . -type f -name '*.php' -print | grep -v -e ./vendor -e /wpcs -e /wptest; fi
+  - if [[ "$PHPLINT" == "1" ]]; then find -L . -type f -name '*.php' -print | grep -v -e ./vendor -e /wpcs -e /wptest | awk '{printf "%s%c", $0, 0}' | xargs -0 -n1 -P4 php -l -n | (! grep -v "No syntax errors detected" ); fi
 
   # Run rspec tests
   #- cd wp-tests/spec && bundle exec rspec baseline.rb
@@ -133,10 +133,10 @@ script:
   # Run PHP Coding Standards Checks.
   - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set ignore_warnings_on_exit 1; fi
   - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs --config-set colors 1; fi
-  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=Wordpress; fi
-  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=Wordpress-Extra; fi
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=PHPCompatibility; fi
-  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/docker/*,*/spec/* --standard=PHPCompatibilityWP; fi
+  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress; fi
+  #- if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=Wordpress-Extra; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibility; fi
+  - if [[ "$SNIFF" == "1" ]]; then vendor/bin/phpcs . -p --ignore=*/wptest/*,*/vendor/*,*/wpcs/*,*/intergration/whichbrowser/*,*/spec/* --standard=PHPCompatibilityWP; fi
 
 after_success:
   # Submit Code Coverage and 3rd party reports
