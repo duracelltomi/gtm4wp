@@ -48,6 +48,7 @@ checks:
 filter:
     excluded_paths:
         - tests/
+        - wpcs/
     dependency_paths:
         - wordpress/
         - vendor/
