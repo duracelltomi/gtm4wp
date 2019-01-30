@@ -267,6 +267,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Fixed: checkout step events for payment mode and shipping type not always fired
 * Fixed: the CMD on Mac will be treated just like the Ctrl key on Windows while processing the product click event in the WooCommerce integration (thy for luzinis)
 * Fixed: add currencyCode to every ecommerce action in WooCommerce integration
+* Fixed: better WooCommere Quick View integration
 * Fixed: possible cross site scripting vulnerability if site search tracking was enabled due to not properly escaped referrer url tracking
 * Changed: code cleanup in WooCommerce integration
 
