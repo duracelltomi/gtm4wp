@@ -573,11 +573,6 @@ function gtm4wp_wp_loaded() {
 		$geodata   = get_transient( 'gtm4wp-geodata-' . esc_attr( $client_ip ) );
 
 		if ( false === $geodata ) {
-			$log  =
-				"User: ".gtm4wp_get_user_ip()." - ".date("F j, Y, g:i a")." - Session ID: " . esc_attr( $client_ip ) . " - ".
-				"URL: ".sprintf( 'http://api.ipstack.com/%s?access_key=%s&format=1', urlencode( gtm4wp_get_user_ip() ), $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOAPI ] ).PHP_EOL;
-			file_put_contents(dirname(__FILE__).'/ipstack_log/'.date("Y-m-d").'.log', $log, FILE_APPEND);
-
 			$gtm4wp_geodata = @wp_remote_get( sprintf( 'http://api.ipstack.com/%s?access_key=%s&format=1', urlencode( $client_ip ), $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOAPI ] ) );
 
 			if ( is_array( $gtm4wp_geodata ) && ( 200 == $gtm4wp_geodata[ "response" ][ "code" ] ) ) {
