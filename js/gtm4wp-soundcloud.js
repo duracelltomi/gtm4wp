@@ -4,10 +4,10 @@ var gtm4wp_soundclound_percentage_tracking_marks = {};
 jQuery(function() {
 //	jQuery( '[id^="soundcloudplayer_"]' ).each(function() {
 	jQuery( 'iframe[src*="soundcloud.com"]' ).each(function() {
-	  var iframe  = this,
-				widget  = SC.Widget( this ),
-				jqframe = jQuery( iframe ),
-				sound   = {};
+		var iframe  = this,
+		widget  = SC.Widget( this ),
+		jqframe = jQuery( iframe ),
+		sound   = {};
 
 		widget.bind( SC.Widget.Events.READY, function() {
 			widget.getCurrentSound(function( soundData ) {
@@ -35,7 +35,7 @@ jQuery(function() {
 			}); // end of api call getDuration
 
 			widget.bind( SC.Widget.Events.PLAY_PROGRESS, function( eventData ) {
-			  gtm4wp_onSoundCloudPercentageChange( eventData );
+				gtm4wp_onSoundCloudPercentageChange( eventData );
 			});
 
 			widget.bind( SC.Widget.Events.PLAY, function( eventData ) {

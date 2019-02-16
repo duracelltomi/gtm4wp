@@ -34,7 +34,7 @@ jQuery(function() {
 			}); // end of api call getDuration
 
 			vimeoapi.addEvent( 'playProgress', function( value, player_id ) {
-			  gtm4wp_onVimeoPercentageChange( value );
+				gtm4wp_onVimeoPercentageChange( value );
 			});
 
 			vimeoapi.addEvent( 'play', function( player_id ) {

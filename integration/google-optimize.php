@@ -2,10 +2,10 @@
 function gtm4wp_go_pagehiding_snippet() {
 	global $gtm4wp_options;
 
-	$gtm4wp_goids = explode( ",", $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] );
+	$gtm4wp_goids                = explode( ',', $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] );
 	$gtm4wp_goid_pagehiding_list = array();
 	if ( count( $gtm4wp_goids ) > 0 ) {
-		foreach( $gtm4wp_goids as $gtm4wp_onegoid ) {
+		foreach ( $gtm4wp_goids as $gtm4wp_onegoid ) {
 			$gtm4wp_goid_pagehiding_list[] = "'" . $gtm4wp_onegoid . "': true";
 		}
 
@@ -21,23 +21,23 @@ function gtm4wp_go_pagehiding_snippet() {
 (function(a,s,y,n,c,h,i,d,e){s.className+=' '+y;h.start=1*new Date;
 h.end=i=function(){s.className=s.className.replace(RegExp(' ?'+y),'')};
 (a[n]=a[n]||[]).hide=h;setTimeout(function(){i();h.end=null},c);h.timeout=c;})
-(window,document.documentElement,'google-optimize-hide','dataLayer'," . $gtm4wp_gotimeout . ",{" . implode( ", ", $gtm4wp_goid_pagehiding_list ) . "});
+(window,document.documentElement,'google-optimize-hide','dataLayer'," . $gtm4wp_gotimeout . ',{' . implode( ', ', $gtm4wp_goid_pagehiding_list ) . '});
 </script>
-<!-- GTM4WP: End of Google Optimize Page Hiding snippet -->";
+<!-- GTM4WP: End of Google Optimize Page Hiding snippet -->';
 	}
 }
 
 function gtm4wp_go_snippet( $content ) {
 	global $gtm4wp_options;
 
-	if ( "" == $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEGAID ] ) {
+	if ( '' == $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEGAID ] ) {
 		return $content;
 	}
 
-	$gtm4wp_goids = explode( ",", $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] );
+	$gtm4wp_goids     = explode( ',', $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] );
 	$gtm4wp_goid_list = array();
 	if ( count( $gtm4wp_goids ) > 0 ) {
-		foreach( $gtm4wp_goids as $gtm4wp_onegoid ) {
+		foreach ( $gtm4wp_goids as $gtm4wp_onegoid ) {
 			$gtm4wp_goid_list[] = "ga('require', '" . $gtm4wp_onegoid . "');";
 		}
 
@@ -49,13 +49,13 @@ function gtm4wp_go_snippet( $content ) {
 m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 ga('create', '" . $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEGAID ] . "', 'auto');
-" . implode( "\n", $gtm4wp_goid_list ) . "
+" . implode( "\n", $gtm4wp_goid_list ) . '
 </script>
-<!-- GTM4WP: End of Load Google Optimize containers -->";
+<!-- GTM4WP: End of Load Google Optimize containers -->';
 	}
 
 	return $content;
 }
 
-add_action( "wp_head", "gtm4wp_go_pagehiding_snippet", 1 );
-add_filter( GTM4WP_WPFILTER_AFTER_DATALAYER, "gtm4wp_go_snippet" );
+add_action( 'wp_head', 'gtm4wp_go_pagehiding_snippet', 1 );
+add_filter( GTM4WP_WPFILTER_AFTER_DATALAYER, 'gtm4wp_go_snippet' );

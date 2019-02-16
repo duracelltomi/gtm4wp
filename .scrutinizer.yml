@@ -1,32 +1,63 @@
 tools:
-  php_code_sniffer:
-    config:
-      standard: WordPress
-  sensiolabs_security_checker: true
-  external_code_coverage:
-    timeout: 2500
+    php_code_sniffer:
+        config:
+            standard: WordPress
+    sensiolabs_security_checker: true
+    external_code_coverage:
+        timeout: 600
 build:
+    environment:
+        php:
+            version: 7.2
+    dependencies:
+        before:
+            - composer require --dev johnpbloch/wordpress
+            - composer require --dev dealerdirect/phpcodesniffer-composer-installer
+            - composer require --dev squizlabs/php_codesniffer
+            - composer require --dev wp-coding-standards/wpcs
+            - composer require --dev phpcompatibility/php-compatibility
+            - composer require --dev phpcompatibility/phpcompatibility-paragonie
+            - composer require --dev phpcompatibility/phpcompatibility-wp
+            - composer require --dev phpunit/phpunit
+            - composer install --prefer-dist --no-suggest
+            - composer run-script install-codestandards
     nodes:
         analysis:
-            dependencies:
-                before:
-                    - composer require --dev johnpbloch/wordpress
+            cache:
+                directories:
+                    - vendor/
+            tests:
+                override:
+                    -
+                        command: phpcs-run
+                        use_website_config: true
+                    - php-scrutinizer-run
+                    - js-scrutinizer-run
 checks:
     php:
+        avoid_closing_tag: false
+        avoid_superglobals: false
+        no_exit: false
+        psr2_control_structure_declaration: false
+        variable_existence: false
+        verify_access_scope_valid: false
+        verify_argument_usable_as_reference: false
+        verify_property_names: false
         fix_php_opening_tag: false
         remove_php_closing_tag: false
         no_mixed_inline_html: false
         require_braces_around_control_structures: false
-        psr2_control_structure_declaration: false
-        avoid_superglobals: false
         security_vulnerabilities: false
-        no_exit: false
         coding_standard:
             name: WordPress
     javascript: true
 filter:
-  excluded_paths:
-    - tests/
-    - integration/whichbrowser/
-  dependency_paths:
-    - wordpress/
+    paths:
+        - ./
+    excluded_paths:
+        - tests/
+        - wpcs/
+    dependency_paths:
+        - wordpress/
+        - vendor/
+        - integration/whichbrowser/
