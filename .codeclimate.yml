@@ -13,3 +13,5 @@ engines:
       languages:
       - php
       - javascript
+exclude_paths:
+- "intergration/whichbrowser/"
