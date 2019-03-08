@@ -72,7 +72,7 @@ function gtm4wp_ip_is_private( $ip ) {
 		foreach ( $private_ips as $private_ip ) {
 			$min_int_ip = ip2long( $private_ip[0] );
 			$max_int_ip = ip2long( $private_ip[1] );
-			if ( ( $int_ip >= $min ) && ( $int_ip <= $max ) ) {
+			if ( ( $int_ip >= $min_int_ip ) && ( $int_ip <= $max_int_ip ) ) {
 				return true;
 			}
 		}
