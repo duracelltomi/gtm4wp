@@ -771,7 +771,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 
 	$_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
-<script data-cfasync="false" type="text/javascript">//<![CDATA[
+<script data-cfasync="false" data-pagespeed-no-defer type="text/javascript">//<![CDATA[
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 
@@ -807,7 +807,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
-<script data-cfasync="false" type="text/javascript">//<![CDATA[';
+<script data-cfasync="false" data-pagespeed-no-defer type="text/javascript">//<![CDATA[';
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) {
 		$gtm4wp_datalayer_data = array();
