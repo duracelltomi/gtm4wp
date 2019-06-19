@@ -82,7 +82,7 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 		'description' => __( 'Check this option to include the post format.', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
-	GTM4WP_OPTION_INCLUDE_POSTTERMLIST => array(
+	GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => array(
 		"label"       => __( "Post Terms", 'duracelltomi-google-tag-manager' ),
 		"description" => __( "Check this option to include taxonomy values associated with a given post.", 'duracelltomi-google-tag-manager' ),
 		"phase"       => GTM4WP_PHASE_STABLE
@@ -468,11 +468,41 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'         => GTM4WP_PHASE_BETA,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
+	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION   => array(
+		'label'         => __( 'Products per impression', 'duracelltomi-google-tag-manager' ),
+		'description'   => __(
+			'If you have many products shown on product category pages and/or on your site home, you could miss pageviews in Google Analytics due to the ' .
+			'amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by ' .
+			'entering a number here (minimum 10-15 recommended) and adding gtm4wp.productImpressionEEC into your Google Analytics ecommerce event helper ' .
+			"tag's trigger.<br /><br />Leave this value 0 to include product impression data in your pageview hit.",
+			'duracelltomi-google-tag-manager'
+		),
+		'phase'         => GTM4WP_PHASE_BETA,
+		'plugintocheck' => 'woocommerce/woocommerce.php',
+	),
 	GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP  => array(
 		'label'         => __( 'Cart as 1st checkout step', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( 'Enable this to track the cart page as the first checkout step in enhanced ecommerce instead of the checkout page itself', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_BETA,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
+	),
+	GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL    => array(
+		"label"         => __( "Cart content in data layer", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Enable this option to include the content of the cart in the data layer on each page. Needs WooCommerce v3.2 or newer. Especially useful for site personalization with Google Optimize.", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_BETA,
+		"plugintocheck" => "woocommerce/woocommerce.php"
+	),
+	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => array(
+		'label'         => __( 'Include full category path.', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'Check this to inclulde the full category path of each product in enhanced ecommerce tracking. WARNING! This can lead to performance issues on large sites with lots of traffic!', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_BETA,
+		'plugintocheck' => 'woocommerce/woocommerce.php',
+	),
+	GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY    => array(
+		"label"         => __( "Taxonomy to be used for product brands", 'duracelltomi-google-tag-manager' ),
+		"description"   => __( "Select which custom taxonomy is being used to add the brand of products", 'duracelltomi-google-tag-manager' ),
+		"phase"         => GTM4WP_PHASE_BETA,
+		"plugintocheck" => "woocommerce/woocommerce.php"
 	),
 	GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA        => array(
 		'label'         => __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
@@ -501,24 +531,6 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU              => array(
 		'label'         => __( 'Use SKU instead of ID', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( 'Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.', 'duracelltomi-google-tag-manager' ),
-		'phase'         => GTM4WP_PHASE_BETA,
-		'plugintocheck' => 'woocommerce/woocommerce.php',
-	),
-	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => array(
-		'label'         => __( 'Include full category path.', 'duracelltomi-google-tag-manager' ),
-		'description'   => __( 'Check this to inclulde the full category path of each product in enhanced ecommerce tracking. WARNING! This can lead to performance issues on large sites with lots of traffic!', 'duracelltomi-google-tag-manager' ),
-		'phase'         => GTM4WP_PHASE_BETA,
-		'plugintocheck' => 'woocommerce/woocommerce.php',
-	),
-	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION   => array(
-		'label'         => __( 'Products per impression', 'duracelltomi-google-tag-manager' ),
-		'description'   => __(
-			'If you have many products shown on product category pages and/or on your site home, you could miss pageviews in Google Analytics due to the ' .
-			'amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by ' .
-			'entering a number here (minimum 10-15 recommended) and adding gtm4wp.productImpressionEEC into your Google Analytics ecommerce event helper ' .
-			"tag's trigger.<br /><br />Leave this value 0 to include product impression data in your pageview hit.",
-			'duracelltomi-google-tag-manager'
-		),
 		'phase'         => GTM4WP_PHASE_BETA,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
@@ -733,6 +745,25 @@ function gtm4wp_admin_output_field( $args ) {
 			break;
 		}
 
+		case GTM4WP_OPTIONS . "[" . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . "]": {
+			echo '<select id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . ']">';
+			echo '<option value="">(not set)</option>';
+
+			$gtm4wp_taxonomies = get_taxonomies(array(
+				"show_ui" => true,
+				"public" => true,
+				"_builtin" => false
+			), "object", "and");
+
+			foreach( $gtm4wp_taxonomies as $onetaxonomy ) {
+				echo '<option value="' . $onetaxonomy->name . '"' . ( $gtm4wp_options[GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY] === $onetaxonomy->name ? ' selected="selected"' : '' ) . '>' . $onetaxonomy->label . '</option>';
+			}
+
+			echo '</select>';
+
+			break;
+		}
+
 		default: {
 			$optval = $gtm4wp_options[ $args['optionfieldid'] ];
 
@@ -866,6 +897,9 @@ function gtm4wp_sanitize_options( $options ) {
 
 		} elseif ( $optionname == GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) {
 			$output[ $optionname ] = trim( (string) $newoptionvalue );
+
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ) {
+			$output[$optionname] = trim( (string) $newoptionvalue );
 
 			// Accelerated Mobile Pages settings
 		} elseif ( $optionname == GTM4WP_OPTION_INTEGRATE_AMPID ) {

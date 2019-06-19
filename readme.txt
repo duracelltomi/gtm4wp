@@ -261,6 +261,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.10 =
 
 * Added: add associated taxonomy values for post type
+* Added: select brand taxonomy for WooCommerce products to populate "Product brand" dimension in enhanced ecommerce
+* Added: add cart content into data layer so that you can personalize your site experience using Google Optimize
 
 = 1.9.2 =
 
