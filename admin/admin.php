@@ -1442,7 +1442,7 @@ function gtm4wp_show_warning() {
 		$gtm4wp_def_user_notices_dismisses;
 
 	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ]['plugintocheck'] );
-	if ( $woo_plugin_active ) {
+	if ( $woo_plugin_active && function_exists( 'WC' ) ) {
 		$woo = WC();
 	} else {
 		$woo = null;
