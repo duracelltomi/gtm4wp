@@ -26,6 +26,7 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTTITLE', 'include-posttitle' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTCOUNT', 'include-postcount' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTID', 'include-postid' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTFORMAT', 'include-postformat' );
+define( 'GTM4WP_OPTION_INCLUDE_POSTTERMLIST',  'include-postterms' );
 define( 'GTM4WP_OPTION_INCLUDE_SEARCHDATA', 'include-searchdata' );
 define( 'GTM4WP_OPTION_INCLUDE_BROWSERDATA', 'include-browserdata' );
 define( 'GTM4WP_OPTION_INCLUDE_OSDATA', 'include-osdata' );
@@ -149,6 +150,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_POSTCOUNT               => false,
 	GTM4WP_OPTION_INCLUDE_POSTID                  => false,
 	GTM4WP_OPTION_INCLUDE_POSTFORMAT              => false,
+	GTM4WP_OPTION_INCLUDE_POSTTERMLIST            => false,
 	GTM4WP_OPTION_INCLUDE_SEARCHDATA              => false,
 	GTM4WP_OPTION_INCLUDE_BROWSERDATA             => false,
 	GTM4WP_OPTION_INCLUDE_OSDATA                  => false,

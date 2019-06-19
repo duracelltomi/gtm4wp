@@ -240,6 +240,20 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$dataLayer['pagePostDateMonth'] = get_the_date( 'm' );
 			$dataLayer['pagePostDateDay']   = get_the_date( 'd' );
 		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTERMLIST ] ) {
+			$dataLayer["pagePostTerms"] = array();
+			$object_taxonomies = get_object_taxonomies( get_post_type() );
+			foreach( $object_taxonomies as $one_object_taxonomy ) {
+				$post_taxonomy_values = get_the_terms( $GLOBALS[ "post" ]->ID, $one_object_taxonomy );
+				if ( is_array( $post_taxonomy_values ) ) {
+					$dataLayer["pagePostTerms"][$one_object_taxonomy] = array();
+					foreach( $post_taxonomy_values as $one_taxonomy_value ) {
+						$dataLayer["pagePostTerms"][$one_object_taxonomy][] = $one_taxonomy_value->name;
+					}
+				}
+			}
+		}
 	}
 
 	if ( is_archive() || is_post_type_archive() ) {
