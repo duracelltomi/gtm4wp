@@ -1438,8 +1438,7 @@ function gtm4wp_admin_head() {
 }
 
 function gtm4wp_show_warning() {
-	global $gtm4wp_options, $gtp4wp_plugin_url, $gtm4wp_integratefieldtexts, $current_user,
-		$gtm4wp_def_user_notices_dismisses;
+	global $gtm4wp_options, $gtp4wp_plugin_url, $gtm4wp_integratefieldtexts, $current_user, $gtm4wp_def_user_notices_dismisses;
 
 	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ]['plugintocheck'] );
 	if ( $woo_plugin_active && function_exists( 'WC' ) ) {
@@ -1448,7 +1447,7 @@ function gtm4wp_show_warning() {
 		$woo = null;
 	}
 
-	$gtm4wp_user_notices_dismisses = get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
+	$gtm4wp_user_notices_dismisses = @get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
 	if ( $gtm4wp_user_notices_dismisses === '' ) {
 		$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
 	} else {
@@ -1457,7 +1456,7 @@ function gtm4wp_show_warning() {
 			$gtm4wp_user_notices_dismisses = array();
 		}
 	}
-	$gtm4wp_user_notices_dismisses = array_merge( $gtm4wp_def_user_notices_dismisses, $gtm4wp_user_notices_dismisses );
+	$gtm4wp_user_notices_dismisses = @array_merge( $gtm4wp_def_user_notices_dismisses, $gtm4wp_user_notices_dismisses );
 
 	if ( ( trim( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) == '' ) && ( false === $gtm4wp_user_notices_dismisses['enter-gtm-code'] ) ) {
 		echo '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code"><p><strong>' . sprintf( __( 'To start using Google Tag Manager for WordPress, please <a href="%s">enter your GTM ID</a>', 'duracelltomi-google-tag-manager' ), 'options-general.php?page=' . GTM4WP_ADMINSLUG ) . '</strong></p></div>';
@@ -1521,7 +1520,7 @@ function gtm4wp_show_warning() {
 function gtm4wp_dismiss_notice() {
 	global $gtm4wp_def_user_notices_dismisses, $current_user;
 
-	$gtm4wp_user_notices_dismisses = get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
+	$gtm4wp_user_notices_dismisses = @get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
 	if ( $gtm4wp_user_notices_dismisses === '' ) {
 		$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
 	} else {
@@ -1530,7 +1529,7 @@ function gtm4wp_dismiss_notice() {
 			$gtm4wp_user_notices_dismisses = array();
 		}
 	}
-	$gtm4wp_user_notices_dismisses = array_merge( $gtm4wp_def_user_notices_dismisses, $gtm4wp_user_notices_dismisses );
+	$gtm4wp_user_notices_dismisses = @array_merge( $gtm4wp_def_user_notices_dismisses, $gtm4wp_user_notices_dismisses );
 
 	$noticeid = trim( basename( $_POST['noticeid'] ) );
 	if ( array_key_exists( $noticeid, $gtm4wp_user_notices_dismisses ) ) {
