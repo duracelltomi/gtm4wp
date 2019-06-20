@@ -403,17 +403,23 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$order_revenue = floatval( $order->get_total() );
 			}
 
+			if ( $gtm4wp_is_woocommerce3 ) {
+				$order_shipping_cost = floatval( $order->get_shipping_total() );
+			} else {
+				$order_shipping_cost = floatval( $order->get_total_shipping() );
+			}
+
+			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING ] ) {
+				$order_revenue -= $order_shipping_cost;
+			}
+
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
-				$dataLayer['transactionId']          = $order->get_order_number();
-				$dataLayer['transactionDate']        = date( 'c' );
-				$dataLayer['transactionType']        = 'sale';
-				$dataLayer['transactionAffiliation'] = '';
-				$dataLayer['transactionTotal']       = $order_revenue;
-				if ( $gtm4wp_is_woocommerce3 ) {
-					$dataLayer['transactionShipping'] = floatval( $order->get_shipping_total() );
-				} else {
-					$dataLayer['transactionShipping'] = floatval( $order->get_total_shipping() );
-				}
+				$dataLayer['transactionId']             = $order->get_order_number();
+				$dataLayer['transactionDate']           = date( 'c' );
+				$dataLayer['transactionType']           = 'sale';
+				$dataLayer['transactionAffiliation']    = '';
+				$dataLayer['transactionTotal']          = $order_revenue;
+				$dataLayer['transactionShipping']       = $order_shipping_cost;
 				$dataLayer['transactionTax']            = floatval( $order->get_total_tax() );
 				$dataLayer['transactionPaymentType']    = ( $gtm4wp_is_woocommerce3 ? $order->get_payment_method_title() : $order->payment_method_title );
 				$dataLayer['transactionCurrency']       = get_woocommerce_currency();

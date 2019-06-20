@@ -516,6 +516,12 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'         => GTM4WP_PHASE_BETA,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
+	GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING     => array(
+		'label'         => __( 'Exclude shipping from revenue', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'Enable this to exclude shipping costs from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_BETA,
+		'plugintocheck' => 'woocommerce/woocommerce.php',
+	),
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING         => array(
 		'label'         => __( 'AdWords Remarketing', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( 'Enable this to add Google AdWords dynamic remarketing variables to the dataLayer', 'duracelltomi-google-tag-manager' ),
@@ -1527,14 +1533,14 @@ function gtm4wp_dismiss_notice() {
 
 	$gtm4wp_user_notices_dismisses = get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
 	if ( $gtm4wp_user_notices_dismisses === '' ) {
-		if ( is_array( $gtm4wp_def_user_notices_dismisses ) {
+		if ( is_array( $gtm4wp_def_user_notices_dismisses ) ) {
 			$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
 		} else {
 			$gtm4wp_user_notices_dismisses = array();
 		}
 	} else {
 		$gtm4wp_user_notices_dismisses = @unserialize( $gtm4wp_user_notices_dismisses );
-		if ( false === $gtm4wp_user_notices_dismisses || !is_array( $gtm4wp_user_notices_dismisses ) {
+		if ( false === $gtm4wp_user_notices_dismisses || !is_array( $gtm4wp_user_notices_dismisses ) ) {
 			$gtm4wp_user_notices_dismisses = array();
 		}
 	}
