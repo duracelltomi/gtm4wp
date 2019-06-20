@@ -10,10 +10,10 @@ Text Domain: duracelltomi-google-tag-manager
 Domain Path: /languages
 
 WC requires at least: 2.6
-WC tested up to: 3.5.4
+WC tested up to: 3.6.4
 */
 
-define( 'GTM4WP_VERSION',    '1.9.2' );
+define( 'GTM4WP_VERSION',    '1.10' );
 define( 'GTM4WP_PATH',       plugin_dir_path( __FILE__ ) );
 
 $gtp4wp_plugin_url      = plugin_dir_url( __FILE__ );
