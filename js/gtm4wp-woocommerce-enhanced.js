@@ -12,6 +12,7 @@ function gtm4wp_handle_cart_qty_change() {
 
 		if ( _original_value != _current_value ) {
 			var productdata = jQuery( this ).closest( '.cart_item' ).find( '.remove' );
+			var productprice = productdata.data( 'gtm4wp_product_price' );
 
 			if ( _original_value < _current_value ) {
 				window[ gtm4wp_datalayer_name ].push({
@@ -22,7 +23,7 @@ function gtm4wp_handle_cart_qty_change() {
 							'products': [{
 								'name':       productdata.data( 'gtm4wp_product_name' ),
 								'id':         productdata.data( 'gtm4wp_product_id' ),
-								'price':      productdata.data( 'gtm4wp_product_price' ),
+								'price':      productprice.toFixed(2),
 								'category':   productdata.data( 'gtm4wp_product_cat' ),
 								'variant':    productdata.data( 'gtm4wp_product_variant' ),
 								'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
@@ -41,7 +42,7 @@ function gtm4wp_handle_cart_qty_change() {
 							'products': [{
 								'name':       productdata.data( 'gtm4wp_product_name' ),
 								'id':         productdata.data( 'gtm4wp_product_id' ),
-								'price':      productdata.data( 'gtm4wp_product_price' ),
+								'price':      productprice.toFixed(2),
 								'category':   productdata.data( 'gtm4wp_product_cat' ),
 								'variant':    productdata.data( 'gtm4wp_product_variant' ),
 								'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
@@ -65,12 +66,13 @@ jQuery(function() {
 		var products = [];
 		var productdata;
 		jQuery( '.gtm4wp_productdata,.widget-product-item' ).each( function() {
+		var productprice = productdata.data( 'gtm4wp_product_price' );
 
 			productdata = jQuery( this );
 			products.push({
 				'name':       productdata.data( 'gtm4wp_product_name' ),
 				'id':         productdata.data( 'gtm4wp_product_id' ),
-				'price':      productdata.data( 'gtm4wp_product_price' ),
+				'price':      productprice.toFixed(2),
 				'category':   productdata.data( 'gtm4wp_product_cat' ),
 				'position':   productdata.data( 'gtm4wp_product_listposition' ),
 				'list':       productdata.data( 'gtm4wp_productlist_name' ),
@@ -121,6 +123,7 @@ jQuery(function() {
 	// track add to cart events for simple products in product lists
 	jQuery( document ).on( 'click', '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)', function() {
 		var productdata = jQuery( this ).closest( '.product' ).find( '.gtm4wp_productdata' );
+		var productprice = productdata.data( 'gtm4wp_product_price' );
 
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.addProductToCartEEC',
@@ -130,7 +133,7 @@ jQuery(function() {
 					'products': [{
 						'name':       productdata.data( 'gtm4wp_product_name' ),
 						'id':         productdata.data( 'gtm4wp_product_id' ),
-						'price':      productdata.data( 'gtm4wp_product_price' ),
+						'price':      productprice.toFixed(2),
 						'category':   productdata.data( 'gtm4wp_product_cat' ),
 						'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
 						'brand':      productdata.data( 'gtm4wp_product_brand' ),
