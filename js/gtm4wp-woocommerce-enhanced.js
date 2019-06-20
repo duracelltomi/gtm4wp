@@ -156,6 +156,8 @@ jQuery(function() {
 
 		if ( _product_var_id.length > 0 ) {
 			if ( gtm4wp_last_selected_product_variation ) {
+				gtm4wp_last_selected_product_variation.quantity = jQuery( 'form.cart:first input[name=quantity]' ).val();
+
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.addProductToCartEEC',
 					'ecommerce': {
