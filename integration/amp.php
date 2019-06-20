@@ -45,6 +45,11 @@ function gtm4wp_amp_running() {
 function gtm4wp_amp_gtmampcode_check( $data ) {
 	global $gtm4wp_amp_headerinjected;
 
+	//run once
+	if($gtm4wp_amp_headerinjected){
+		return $data;
+	}
+
 	// AMP-WP Plugin
 	if ( ! empty( $data['amp_analytics'] ) ) {
 		// Inject into AMP Plugin to load
@@ -81,8 +86,14 @@ function gtm4wp_amp_gtmampcode_injecthead() {
  * @return int Returns number of injected snippets, false if no injection
  */
 function gtm4wp_amp_gtmcode() {
-	global $gtm4wp_datalayer_json, $gtm4wp_options;
+	global $gtm4wp_datalayer_json, $gtm4wp_options, $gtm4wp_amp_bodyinjected;
 
+	//run once
+	if($gtm4wp_amp_bodyinjected){
+		return false;
+	}
+
+	$gtm4wp_amp_bodyinjected = true;
 	// Check dataLayer is loaded from the plugin
 	if ( ! empty( $gtm4wp_datalayer_json ) ) {
 
@@ -134,6 +145,7 @@ function gtm4wp_amp_gtmvariables() {
 
 // Set Status at start
 $gtm4wp_amp_headerinjected = false;
+$gtm4wp_amp_bodyinjected = false;
 
 // Load AMP-Analytics tag into <head>
 add_action( 'amp_post_template_data', 'gtm4wp_amp_gtmampcode_check' );
@@ -142,8 +154,8 @@ add_action( 'amp_post_template_data', 'gtm4wp_amp_gtmampcode_check' );
 add_action( 'amp_post_template_head', 'gtm4wp_wp_header_begin' );
 add_action( 'amp_post_template_head', 'gtm4wp_wp_header_top', 1 );
 
-// Try amp_post_template_body
+// Try amp_wp_body_open
 // (https://github.com/Automattic/amp-wp/pull/1143)
-// add_action( 'amp_post_template_body', 'gtm4wp_amp_gtmcode');
+add_action( 'amp_post_template_body_open', 'gtm4wp_amp_gtmcode');
 // Publish the GTM code and dataLayer to the footer
 add_action( 'amp_post_template_footer', 'gtm4wp_amp_gtmcode' );
