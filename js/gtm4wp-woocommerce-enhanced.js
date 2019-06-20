@@ -426,7 +426,7 @@ jQuery(function() {
 		window.gtm4wp_checkout_products    = window.gtm4wp_checkout_products || [];
 		var gtm4wp_checkout_step_fired          = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
 
-		jQuery( document ).on( 'blur', 'input[name^=shipping_]:not(input[name=shipping_method])', function() {
+		jQuery( document ).on( 'blur', 'input[name^=shipping_]:not(input[name^=shipping_method])', function() {
 			// do not report checkout step if already reported
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping' ) > -1 ) {
 				return;
@@ -452,7 +452,7 @@ jQuery(function() {
 			gtm4wp_checkout_step_fired.push( 'shipping' );
 		});
 
-		jQuery( document ).on( 'change', 'input[name=shipping_method]', function() {
+		jQuery( document ).on( 'change', 'input[name^=shipping_method]', function() {
 			// do not report checkout step if already reported
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) > -1 ) {
 				return;
@@ -508,7 +508,7 @@ jQuery(function() {
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1 ) {
 				// shipping methods are not visible if only one is available
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
-				jQuery( 'input[name=shipping_method]:checked' ).trigger( 'click' );
+				jQuery( 'input[name^=shipping_method]:checked' ).trigger( 'click' );
 
 				gtm4wp_checkout_step_fired.push( 'shipping_method' );
 			}
