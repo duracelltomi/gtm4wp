@@ -142,8 +142,8 @@ add_action( 'amp_post_template_data', 'gtm4wp_amp_gtmampcode_check' );
 add_action( 'amp_post_template_head', 'gtm4wp_wp_header_begin' );
 add_action( 'amp_post_template_head', 'gtm4wp_wp_header_top', 1 );
 
-// Try amp_post_template_body
+// Try amp_wp_body_open
 // (https://github.com/Automattic/amp-wp/pull/1143)
-// add_action( 'amp_post_template_body', 'gtm4wp_amp_gtmcode');
+add_action( 'amp_wp_body_open', 'gtm4wp_amp_gtmcode');
 // Publish the GTM code and dataLayer to the footer
 add_action( 'amp_post_template_footer', 'gtm4wp_amp_gtmcode' );
