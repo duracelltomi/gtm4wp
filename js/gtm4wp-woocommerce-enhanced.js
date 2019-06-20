@@ -552,7 +552,7 @@ jQuery(function() {
 		});
 	}
 
-	// codes for AdWords dynamic remarketing
+	// codes for Google Ads dynamic remarketing
 	if ( window.gtm4wp_remarketing&& !is_cart && !is_checkout ) {
 		if ( jQuery( '.gtm4wp_productdata' ).length > 0 ) {
 			for( var i=0; i<window[ gtm4wp_datalayer_name ].length; i++ ) {

@@ -130,9 +130,9 @@ Scroll tracking is based on the solution originally created by
 Original script:
 http://cutroni.com/blog/2012/02/21/advanced-content-tracking-with-google-analytics-part-1/
 
-= Google AdWords remarketing =
+= Google Ads remarketing =
 
-Google Tag Manager for WordPress can add each dataLayer variable as an AdWords remarketing custom parameter list.
+Google Tag Manager for WordPress can add each dataLayer variable as a Google Ads remarketing custom parameter list.
 This enables you to build sophisticated remarketing lists.
 
 = Blacklist & Whitelist Tag Manager tags and variables =
@@ -153,7 +153,7 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 	* Classic e-commerce:
 		* fire an event when visitors add products to their cart
 		* capture transaction data to be passed to your ad platforms and/or Analytics
-		* capture necessary remarketing parameters for Google AdWords Dynamic Remarketing
+		* capture necessary remarketing parameters for Google Ads Dynamic Remarketing
 	* Enhanced e-commerce (beta):
 		*	implementation of [Enhanced E-commerce](https://developers.google.com/tag-manager/enhanced-ecommerce)
 		* Does not support promotions since WooCommerce does not have such a feature (yet)
@@ -202,7 +202,7 @@ There are five dataLayer events you can use in your rule definitions:
 * gtm4wp.reading.pagebottom: the visitor reached the end of the page. `timeToScroll` dataLayer variable updated
 * gtm4wp.reading.readerType: based on time spent since article loaded we determine whether the user is a 'scanner' or 'reader' and store this in the `readerType` dataLayer variable
 
-Example use cases: using these events as triggers, you can fire Google Universal Analytics and/or AdWords remarketing/conversion tags
+Example use cases: using these events as triggers, you can fire Google Universal Analytics and/or Google Ads remarketing/conversion tags
 to report micro conversions and/or to serve ads only to visitors who spend more time reading your content.
 
 = Can I exclude certain user roles from being tracked? =
@@ -356,8 +356,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Fixed: even more WooCommerce 3.x compatibility
 * Added: registration date of the logged in user can be added to the data layer
 * Updated: geoplugin.net has been replaced by freegeoip.net for weather tracking which has far better quota for free usage
-* Updated: AdWords dynamic remarketing data layer items on a WooCommerce product page will be shown for the root product as well on variable product pages
-* Updated: Selecting a product variation will include the price of the product in AdWords dynamic remarketing data layer items
+* Updated: Google Ads dynamic remarketing data layer items on a WooCommerce product page will be shown for the root product as well on variable product pages
+* Updated: Selecting a product variation will include the price of the product in Google Ads dynamic remarketing data layer items
 * Updated: minor code cleanup
 
 = 1.7.1 =
@@ -446,7 +446,7 @@ Major changes to the Enhanced Ecommerce implementation of the WooCommerce integr
 * Fixed: opening product detail page in a new window/tab when user pressed the CTRL key
 * Fixed: ecomm_totalvalue included the total price of the cart without taxes
 * Fixed: ecomm_totalvalue does not take into account the quantity of ordered products on the order received page
-* Fixed: php error message on product lists when AdWords dynamic remarketing was enabled on WooCommerce 2.6
+* Fixed: php error message on product lists when Google Ads dynamic remarketing was enabled on WooCommerce 2.6
 * Fixed: added data-cfasync="false" to the GTM container code for better compatibility with CloudFlare
 * Added: introducing tracking of list names (general product list, recent products list, featured products list, etc.)
   * Some list names (like cross-sells) will be shown as 'General Product List'. A proposed change in WooCommerce 2.6 will solve that issue
@@ -475,7 +475,7 @@ Major changes to the Enhanced Ecommerce implementation of the WooCommerce integr
 = 1.1 =
 
 * Added: track embedded YouTube/Vimeo/Soundcloud videos (experimental)
-* Added: new checkbox - use product SKU for AdWords Dynamic Remarketing variables instead of product ID (experimental)
+* Added: new checkbox - use product SKU for Google Ads Dynamic Remarketing variables instead of product ID (experimental)
 * Added: place your container code after the opening body tag without modifying your theme files (thx Yaniv Friedensohn)
 * Added: automatic codeless container code injection for Genesis framework users
 * Fixed: Possible PHP error with custom payment gateway (QuickPay) on the checkout page (thx Damiel for findig this)
@@ -722,7 +722,7 @@ Important change: Tag Manager event name of a WooCommerce successful order has b
 See changelog for details.
 
 = 0.3 =
-This is a minor release. If you are using WooCommerce you should update to include more accurate AdWords dynamic remarketing feature.
+This is a minor release. If you are using WooCommerce you should update to include more accurate Google Ads dynamic remarketing feature.
 
 = 0.2 =
 BACKWARD INCOMPATIBLE CHANGE: Names of Tag Manager click events has been changed to comply with naming conventions.

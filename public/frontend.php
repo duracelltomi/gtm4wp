@@ -814,7 +814,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_REMARKETING ] ) {
-			// add adwords remarketing tags as suggested here:
+			// add Google Ads remarketing tags as suggested here:
 			// https://support.google.com/tagmanager/answer/3002580?hl=en
 			add_filter( GTM4WP_WPFILTER_COMPILE_REMARKTING, 'gtm4wp_filter_visitor_keys' );
 			$gtm4wp_remarketing_tags = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_REMARKTING, $gtm4wp_datalayer_data );
