@@ -846,7 +846,57 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		);
 
 		$_gtm_header_content .= '
-	' . $gtm4wp_datalayer_name . '.push(' . $gtm4wp_datalayer_json . ');';
+	var dataLayer_content = ' . $gtm4wp_datalayer_json . ';
+
+	// if dataLayer contains ecommerce purchase data, check whether it has been already tracked
+	if ( dataLayer_content.transactionId || ( dataLayer_content.ecommerce && dataLayer_content.ecommerce.purchase ) ) {
+		// read order id already tracked from cookies
+		var gtm4wp_orderid_tracked = "";
+		var gtm4wp_cookie = "; " + document.cookie;
+		var gtm4wp_cookie_parts = gtm4wp_cookie.split( "; gtm4wp_orderid_tracked=" );
+		if ( gtm4wp_cookie_parts.length == 2 ) {
+			gtm4wp_orderid_tracked = gtm4wp_cookie_parts.pop().split(";").shift();
+		}
+
+		// check enhanced ecommerce
+		if ( dataLayer_content.ecommerce && dataLayer_content.ecommerce.purchase ) {
+			if ( gtm4wp_orderid_tracked && ( dataLayer_content.ecommerce.purchase.actionField.id == gtm4wp_orderid_tracked ) ) {
+				delete dataLayer_content.ecommerce.purchase;
+			} else {
+				gtm4wp_orderid_tracked = dataLayer_content.ecommerce.purchase.actionField.id;
+			}
+		}
+
+		// check standard ecommerce
+		if ( dataLayer_content.transactionId ) {
+			if ( gtm4wp_orderid_tracked && ( dataLayer_content.transactionId == gtm4wp_orderid_tracked ) ) {
+				delete dataLayer_content.transactionId;
+				delete dataLayer_content.transactionDate;
+				delete dataLayer_content.transactionType;
+				delete dataLayer_content.transactionAffiliation;
+				delete dataLayer_content.transactionTotal;
+				delete dataLayer_content.transactionShipping;
+				delete dataLayer_content.transactionTax;
+				delete dataLayer_content.transactionPaymentType;
+				delete dataLayer_content.transactionCurrency;
+				delete dataLayer_content.transactionShippingMethod;
+				delete dataLayer_content.transactionPromoCode;
+				delete dataLayer_content.transactionProducts;
+			} else {
+				gtm4wp_orderid_tracked = dataLayer_content.transactionId;
+			}
+		}
+
+		if ( gtm4wp_orderid_tracked ) {
+			var gtm4wp_orderid_cookie_expire = new Date();
+			gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
+			var gtm4wp_orderid_cookie_expires = "expires="+ gtm4wp_orderid_cookie_expire.toUTCString();
+			document.cookie = "gtm4wp_orderid_cookie_expire=" + gtm4wp_orderid_tracked + ";" + gtm4wp_orderid_cookie_expire + ";path=/";
+		}
+
+	}
+
+	' . $gtm4wp_datalayer_name . '.push( dataLayer_content );';
 	}
 
 	$_gtm_header_content .= '//]]>

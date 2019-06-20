@@ -392,6 +392,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			unset( $order );
 		}
 
+		if ( isset( $_COOKIE[ 'gtm4wp_orderid_tracked' ] ) && ( $_COOKIE[ 'gtm4wp_orderid_tracked' ] == $order_id ) && ! $do_not_flag_tracked_order ) {
+			unset( $order );
+		}
+
 		if ( isset( $order ) ) {
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
 				$order_revenue = floatval( $order->get_total() - $order->get_total_tax() );
