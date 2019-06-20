@@ -266,6 +266,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: add cart content into data layer so that you can personalize your site experience using Google Optimize
 * Fixed: better compatibility with Google's mod_pagespeed
 * Fixed: missing product quantity while adding a variable product into the cart
+* Fixed: prevent multiple tracking of WooCommerce orders on mobile devices where the mobile browser reloads the order received page from local cache executing GTM tracking again
 
 = 1.9.2 =
 
