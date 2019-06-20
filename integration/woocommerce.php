@@ -245,7 +245,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				}
 			}
 			$remarketing_id = (string) $product_id;
-			$product_price  = $product->get_price();
+			$product_price  = floatval( $product->get_price() );
 
 			if ( 'variable' != $product->get_type() ) {
 				$dataLayer['productIsVariable'] = 0;
@@ -394,9 +394,9 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 		if ( isset( $order ) ) {
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
-				$order_revenue = $order->get_total() - $order->get_total_tax();
+				$order_revenue = floatval( $order->get_total() - $order->get_total_tax() );
 			} else {
-				$order_revenue = $order->get_total();
+				$order_revenue = floatval( $order->get_total() );
 			}
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
@@ -406,11 +406,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer['transactionAffiliation'] = '';
 				$dataLayer['transactionTotal']       = $order_revenue;
 				if ( $gtm4wp_is_woocommerce3 ) {
-					$dataLayer['transactionShipping'] = $order->get_shipping_total();
+					$dataLayer['transactionShipping'] = floatval( $order->get_shipping_total() );
 				} else {
-					$dataLayer['transactionShipping'] = $order->get_total_shipping();
+					$dataLayer['transactionShipping'] = floatval( $order->get_total_shipping() );
 				}
-				$dataLayer['transactionTax']            = $order->get_total_tax();
+				$dataLayer['transactionTax']            = floatval( $order->get_total_tax() );
 				$dataLayer['transactionPaymentType']    = ( $gtm4wp_is_woocommerce3 ? $order->get_payment_method_title() : $order->payment_method_title );
 				$dataLayer['transactionCurrency']       = get_woocommerce_currency();
 				$dataLayer['transactionShippingMethod'] = $order->get_shipping_method();
@@ -425,8 +425,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 							'id'          => $order->get_order_number(),
 							'affiliation' => '',
 							'revenue'     => $order_revenue,
-							'tax'         => $order->get_total_tax(),
-							'shipping'    => ( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping() ),
+							'tax'         => floatval( $order->get_total_tax() ),
+							'shipping'    => floatval( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping() ),
 							'coupon'      => implode( ', ', $order->get_used_coupons() ),
 						),
 					),
@@ -462,7 +462,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						$remarketing_id = $product_sku;
 					}
 
-					$product_price     = $order->get_item_total( $item );
+					$product_price     = floatval( $order->get_item_total( $item ) );
 					$_temp_productdata = array(
 						'id'         => $remarketing_id,
 						'name'       => $product->get_title(),
@@ -993,7 +993,7 @@ function gtm4wp_wc_quick_view_before_single_product() {
 			}
 		}
 		$remarketing_id = (string) $product_id;
-		$product_price  = $product->get_price();
+		$product_price  = floatval( $product->get_price() );
 
 		if ( 'variable' != $product->get_type() ) {
 			$_temp_productdata = array(
