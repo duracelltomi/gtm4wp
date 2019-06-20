@@ -129,7 +129,7 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_REMARKETING   => array(
 		'label'       => __( 'Remarketing variable', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include a dataLayer variable where all dataLayer values are stored to be included in your Google Ads remarketing tag as a custom variable field', 'duracelltomi-google-tag-manager' ),
+		'description' => __( 'Check this option to include a dataLayer variable where all dataLayer values are stored to be included in your AdWords remarketing tag as a custom variable field', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 	GTM4WP_OPTION_INCLUDE_BROWSERDATA   => array(
@@ -295,12 +295,12 @@ $GLOBALS['gtm4wp_blacklistfieldtexts'] = array(
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 	GTM4WP_OPTION_BLACKLIST_AWCONV      => array(
-		'label'       => __( 'Google Ads Conversion Tracking Tag', 'duracelltomi-google-tag-manager' ),
+		'label'       => __( 'AdWords Conversion Tracking Tag', 'duracelltomi-google-tag-manager' ),
 		'description' => __( '', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 	GTM4WP_OPTION_BLACKLIST_AWREMARKET  => array(
-		'label'       => __( 'Google Ads Remarketing Tag', 'duracelltomi-google-tag-manager' ),
+		'label'       => __( 'AdWords Remarketing Tag', 'duracelltomi-google-tag-manager' ),
 		'description' => __( '', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
@@ -517,8 +517,8 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING         => array(
-		'label'         => __( 'Google Ads Remarketing', 'duracelltomi-google-tag-manager' ),
-		'description'   => __( 'Enable this to add Google Ads dynamic remarketing variables to the dataLayer', 'duracelltomi-google-tag-manager' ),
+		'label'         => __( 'AdWords Remarketing', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'Enable this to add Google AdWords dynamic remarketing variables to the dataLayer', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_BETA,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
@@ -1243,7 +1243,7 @@ function gtm4wp_add_admin_js( $hook ) {
 			'posttabtitle'             => __( 'Posts', 'duracelltomi-google-tag-manager' ),
 			'searchtabtitle'           => __( 'Search', 'duracelltomi-google-tag-manager' ),
 			'visitortabtitle'          => __( 'Visitors', 'duracelltomi-google-tag-manager' ),
-			'adwordstabtitle'          => __( 'Google Ads', 'duracelltomi-google-tag-manager' ),
+			'adwordstabtitle'          => __( 'AdWords', 'duracelltomi-google-tag-manager' ),
 			'browsertabtitle'          => __( 'Browser/OS/Device', 'duracelltomi-google-tag-manager' ),
 			'blocktagstabtitle'        => __( 'Blacklist tags', 'duracelltomi-google-tag-manager' ),
 			'blockmacrostabtitle'      => __( 'Blacklist macros', 'duracelltomi-google-tag-manager' ),
@@ -1450,10 +1450,14 @@ function gtm4wp_show_warning() {
 
 	$gtm4wp_user_notices_dismisses = get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
 	if ( $gtm4wp_user_notices_dismisses === '' ) {
-		$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
+	  if ( is_array( $gtm4wp_def_user_notices_dismisses ) ) {
+			$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
+	  } else {
+			$gtm4wp_user_notices_dismisses = array();
+	  }
 	} else {
 		$gtm4wp_user_notices_dismisses = @unserialize( $gtm4wp_user_notices_dismisses );
-		if ( false === $gtm4wp_user_notices_dismisses ) {
+		if ( false === $gtm4wp_user_notices_dismisses || !is_array( $gtm4wp_user_notices_dismisses ) ) {
 			$gtm4wp_user_notices_dismisses = array();
 		}
 	}
@@ -1523,10 +1527,14 @@ function gtm4wp_dismiss_notice() {
 
 	$gtm4wp_user_notices_dismisses = get_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, true );
 	if ( $gtm4wp_user_notices_dismisses === '' ) {
-		$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
+		if ( is_array( $gtm4wp_def_user_notices_dismisses ) {
+			$gtm4wp_user_notices_dismisses = $gtm4wp_def_user_notices_dismisses;
+		} else {
+			$gtm4wp_user_notices_dismisses = array();
+		}
 	} else {
 		$gtm4wp_user_notices_dismisses = @unserialize( $gtm4wp_user_notices_dismisses );
-		if ( false === $gtm4wp_user_notices_dismisses ) {
+		if ( false === $gtm4wp_user_notices_dismisses || !is_array( $gtm4wp_user_notices_dismisses ) {
 			$gtm4wp_user_notices_dismisses = array();
 		}
 	}
