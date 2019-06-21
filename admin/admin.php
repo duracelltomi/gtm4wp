@@ -157,6 +157,11 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 		'description' => sprintf( __( 'Enter your IPStack.com API key here. <a href="%s" target="_blank">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), 'https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress' ),
 		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
 	),
+	GTM4WP_OPTION_INCLUDE_MISCGEOCF     => array(
+		'label'       => __( 'Cloudflare country code', 'duracelltomi-google-tag-manager' ),
+		'description' => __( 'Add the country code of the user provided by Cloudflare (if Cloudflare is used with your site)', 'duracelltomi-google-tag-manager' ),
+		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+	),
 	GTM4WP_OPTION_INCLUDE_WEATHER       => array(
 		'label'       => __( 'Weather data', 'duracelltomi-google-tag-manager' ),
 		'description' => sprintf(
@@ -1257,7 +1262,7 @@ function gtm4wp_add_admin_js( $hook ) {
 			'wctabtitle'               => __( 'WooCommerce', 'duracelltomi-google-tag-manager' ),
 			'gotabtitle'               => __( 'Google Optimize', 'duracelltomi-google-tag-manager' ),
 			'amptabtitle'              => __( 'Accelerated Mobile Pages', 'duracelltomi-google-tag-manager' ),
-			'weathertabtitle'          => __( 'Weather data', 'duracelltomi-google-tag-manager' ),
+			'weathertabtitle'          => __( 'Weather & geo data', 'duracelltomi-google-tag-manager' ),
 			'generaleventstabtitle'    => __( 'General events', 'duracelltomi-google-tag-manager' ),
 			'mediaeventstabtitle'      => __( 'Media events', 'duracelltomi-google-tag-manager' ),
 			'depecratedeventstabtitle' => __( 'Deprecated', 'duracelltomi-google-tag-manager' ),

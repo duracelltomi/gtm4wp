@@ -33,6 +33,7 @@ define( 'GTM4WP_OPTION_INCLUDE_OSDATA', 'include-osdata' );
 define( 'GTM4WP_OPTION_INCLUDE_DEVICEDATA', 'include-devicedata' );
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEO', 'include-miscgeo' );
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEOAPI', 'geo-apikey' );
+define( 'GTM4WP_OPTION_INCLUDE_MISCGEOCF', 'include-miscgeo-cloudflare' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHER', 'include-weather' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHERUNITS', 'weather-weatherunits' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI', 'weather-openweathermap-apikey' );
@@ -160,6 +161,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_DEVICEDATA              => false,
 	GTM4WP_OPTION_INCLUDE_MISCGEO                 => false,
 	GTM4WP_OPTION_INCLUDE_MISCGEOAPI              => '',
+	GTM4WP_OPTION_INCLUDE_MISCGEOCF               => false,
 	GTM4WP_OPTION_INCLUDE_WEATHER                 => false,
 	GTM4WP_OPTION_INCLUDE_WEATHERUNITS            => 0,
 	GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI           => '',

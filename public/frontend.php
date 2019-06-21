@@ -515,6 +515,10 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		$dataLayer['gtm.blacklist'] = $_gtmblacklist;
 	}
 
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOCF ] && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
+		$dataLayer['geoCloudflareCountryCode'] = $_SERVER['HTTP_CF_IPCOUNTRY'];
+	}
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
 			$dataLayer['weatherCategory']    = __( '(no weather data available)', 'duracelltomi-google-tag-manager' );
