@@ -247,6 +247,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$remarketing_id = (string) $product_id;
 			$product_price  = floatval( $product->get_price() );
 
+			$dataLayer['productRatingCounts']  = $product->get_rating_counts();
+			$dataLayer['productAverageRating'] = (float) $product->get_average_rating();
+			$dataLayer['productReviewCount']   = (int) $product->get_review_count();
+
 			if ( 'variable' != $product->get_type() ) {
 				$dataLayer['productIsVariable'] = 0;
 

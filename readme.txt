@@ -265,6 +265,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: select brand taxonomy for WooCommerce products to populate "Product brand" dimension in enhanced ecommerce
 * Added: add cart content into data layer so that you can personalize your site experience using Google Optimize
 * Added: option to remove shipping costs from revenue data on order received page of WooCommerce
+* Added: if you enable either enhanced ecommerce or just Google Ads remarketing variables, 3 new data layer variables will be also available about the product on a detail page
+  * Product rating details (productRatingCounts)
+  * Averate product rating (productAverageRating)
+  * Review count (productReviewCount)
 * Added: if you are using Cloudflare, you can now add the country code HTTP header value into the data layer and read from it with the geoCloudflareCountryCode variable name
 * Fixed: better compatibility with Google's mod_pagespeed
 * Fixed: missing product quantity while adding a variable product into the cart
