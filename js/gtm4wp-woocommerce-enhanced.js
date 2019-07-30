@@ -64,11 +64,11 @@ jQuery(function() {
 	// track impressions of products in product lists
 	if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
 		var products = [];
-		var productdata;
+		var productdata, productprice=0;
 		jQuery( '.gtm4wp_productdata,.widget-product-item' ).each( function() {
-		var productprice = productdata.data( 'gtm4wp_product_price' );
-
 			productdata = jQuery( this );
+			productprice = productdata.data( 'gtm4wp_product_price' );
+
 			products.push({
 				'name':       productdata.data( 'gtm4wp_product_name' ),
 				'id':         productdata.data( 'gtm4wp_product_id' ),
