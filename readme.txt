@@ -599,7 +599,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.10 =
 
-TODO
+Better WordPress 5.2 integration, support for brands in WooCommerce, access cart content in data layer, more stable double transaction tracking prevention on mobiles and more!
 
 = 1.9.2 =
 
