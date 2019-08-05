@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.2.2
-Stable tag: 1.10
+Stable tag: 1.10.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -258,6 +258,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.10.1 =
+* Fixed: wrong cookie name was used with the newly introduced double transaction tracking protection while setting the cookie
+* Fixed: double transaction tracking JavaScript code is now only included on the order received page
+
 = 1.10 =
 
 * Added: Automatically add the noscript part of the container code after the opening body tag for WordPress 5.2+ sites where themes support the new wp_body_open action
@@ -267,7 +271,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 * Added: option to remove shipping costs from revenue data on order received page of WooCommerce
 * Added: if you enable either enhanced ecommerce or just Google Ads remarketing variables, 3 new data layer variables will be also available about the product on a detail page
   * Product rating details (productRatingCounts)
-  * Averate product rating (productAverageRating)
+  * Average product rating (productAverageRating)
   * Review count (productReviewCount)
 * Added: if you are using Cloudflare, you can now add the country code HTTP header value into the data layer and read from it with the geoCloudflareCountryCode variable name
 * Fixed: better compatibility with Google's mod_pagespeed
@@ -596,6 +600,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.10.1 =
+
+Bugfix release
 
 = 1.10 =
 
