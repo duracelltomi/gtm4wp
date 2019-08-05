@@ -807,7 +807,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 }
 
 function gtm4wp_wp_header_begin( $echo = true ) {
-	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options;
+	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options, $woocommerce;
 
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
@@ -850,8 +850,12 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		);
 
 		$_gtm_header_content .= '
-	var dataLayer_content = ' . $gtm4wp_datalayer_json . ';
+	var dataLayer_content = ' . $gtm4wp_datalayer_json . ';';
 
+		// fire WooCommerce order double tracking protection only if WooCommerce is active and user is on the order received page
+		if ( isset( $gtm4wp_options ) && ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) && isset( $woocommerce ) && is_order_received_page() ) {
+
+			$_gtm_header_content .= '
 	// if dataLayer contains ecommerce purchase data, check whether it has been already tracked
 	if ( dataLayer_content.transactionId || ( dataLayer_content.ecommerce && dataLayer_content.ecommerce.purchase ) ) {
 		// read order id already tracked from cookies
@@ -895,11 +899,13 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			var gtm4wp_orderid_cookie_expire = new Date();
 			gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
 			var gtm4wp_orderid_cookie_expires = "expires="+ gtm4wp_orderid_cookie_expire.toUTCString();
-			document.cookie = "gtm4wp_orderid_cookie_expire=" + gtm4wp_orderid_tracked + ";" + gtm4wp_orderid_cookie_expire + ";path=/";
+			document.cookie = "gtm4wp_orderid_tracked=" + gtm4wp_orderid_tracked + ";" + gtm4wp_orderid_cookie_expire + ";path=/";
 		}
 
-	}
+	}';
+		}
 
+		$_gtm_header_content .= '
 	' . $gtm4wp_datalayer_name . '.push( dataLayer_content );';
 	}
 
