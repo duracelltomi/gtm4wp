@@ -119,7 +119,9 @@ jQuery(function() {
 				if ( window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ] ) {
 
 					if ( ! window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] ) {
-						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = [];
+						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = products;
+					} else {
+						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ].concat( products );
 					}
 
 					break;
