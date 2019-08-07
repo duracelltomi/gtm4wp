@@ -261,6 +261,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.10.1 =
 * Fixed: wrong cookie name was used with the newly introduced double transaction tracking protection while setting the cookie
 * Fixed: double transaction tracking JavaScript code is now only included on the order received page
+* Fixed: replaced all references to AdWords to Google Ads
 
 = 1.10 =
 
