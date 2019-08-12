@@ -238,14 +238,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			$product_cat = gtm4wp_get_product_category( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH ] );
 
-			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ) {
-				$product_sku = $product->get_sku();
-				if ( '' != $product_sku ) {
-					$product_id = $product_sku;
-				}
-			}
 			$remarketing_id = (string) $product_id;
 			$product_price  = floatval( $product->get_price() );
+			$product_sku = $product->get_sku();
+			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
+				$remarketing_id = $product_sku;
+			}
 
 			$dataLayer['productRatingCounts']  = $product->get_rating_counts();
 			$dataLayer['productAverageRating'] = (float) $product->get_average_rating();
@@ -256,7 +254,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 				$_temp_productdata = array(
 					'name'       => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
-					'id'         => $product_id,
+					'id'         => $remarketing_id,
 					'price'      => $product_price,
 					'category'   => $product_cat,
 					'stocklevel' => $product->get_stock_quantity(),
@@ -1000,19 +998,17 @@ function gtm4wp_wc_quick_view_before_single_product() {
 
 		$product_cat = gtm4wp_get_product_category( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH ] );
 
-		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] ) {
-			$product_sku = $product->get_sku();
-			if ( '' != $product_sku ) {
-				$product_id = $product_sku;
-			}
-		}
 		$remarketing_id = (string) $product_id;
 		$product_price  = floatval( $product->get_price() );
+		$product_sku = $product->get_sku();
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
+			$remarketing_id = $product_sku;
+		}
 
 		if ( 'variable' != $product->get_type() ) {
 			$_temp_productdata = array(
 				'name'       => gtm4wp_woocommerce_html_entity_decode( get_the_title() ),
-				'id'         => $product_id,
+				'id'         => $remarketing_id,
 				'price'      => $product_price,
 				'category'   => $product_cat,
 				'stocklevel' => $product->get_stock_quantity(),
