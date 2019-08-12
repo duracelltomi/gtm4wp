@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.2.2
-Stable tag: 1.10.1
+Stable tag: 1.10.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -258,9 +258,15 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.10.2 =
+
+
+
 = 1.10.1 =
+
 * Fixed: wrong cookie name was used with the newly introduced double transaction tracking protection while setting the cookie
 * Fixed: double transaction tracking JavaScript code is now only included on the order received page
+* Fixed: product impressions not properly reported if Products per impressions were set to 0
 * Fixed: replaced all references to AdWords to Google Ads
 
 = 1.10 =
@@ -601,6 +607,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.10.2 =
+
+
 
 = 1.10.1 =
 
