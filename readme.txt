@@ -260,6 +260,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 = 1.10.2 =
 
+* Added Oxygen Builder support - you can now use the codeless placement option without issues
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
 
 = 1.10.1 =

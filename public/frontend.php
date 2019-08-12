@@ -1007,6 +1007,7 @@ add_action( 'body_open', 'gtm4wp_wp_body_open' );
 add_action( 'genesis_before', 'gtm4wp_wp_body_open' ); // Genisis theme
 add_action( 'generate_before_header', 'gtm4wp_wp_body_open', 0 ); // GeneratePress theme
 add_action( 'elementor/page_templates/canvas/before_content', 'gtm4wp_wp_body_open' ); // Elementor
+add_action( 'ct_before_builder', 'gtm4wp_wp_body_open', 0 ); // Oxygen Builder
 
 // standard WP theme support for body open tags
 add_action( 'wp_body_open', 'gtm4wp_wp_body_open' );
