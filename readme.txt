@@ -261,6 +261,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.10.2 =
 
 * Added Oxygen Builder support - you can now use the codeless placement option without issues
+* Improved: from WooCommerce 3.7 WC_Abstract_Order::get_used_coupons() was replaced with WC_Abstract_Order::get_coupon_codes() which is now used if WC 3.7+ is detected
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
 
 = 1.10.1 =

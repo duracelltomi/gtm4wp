@@ -6,9 +6,11 @@ define( 'GTM4WP_WPFILTER_EEC_ORDER_ITEM', 'gtm4wp_eec_order_item' );
 $gtm4wp_product_counter   = 0;
 $gtm4wp_last_widget_title = 'Sidebar Products';
 if ( function_exists( 'WC' ) ) {
-	$GLOBALS['gtm4wp_is_woocommerce3'] = version_compare( WC()->version, '3.0', '>=' );
+	$GLOBALS['gtm4wp_is_woocommerce3']   = version_compare( WC()->version, '3.0', '>=' );
+	$GLOBALS['gtm4wp_is_woocommerce3_7'] = version_compare( WC()->version, '3.7', '>=' );
 } else {
-	$GLOBALS['gtm4wp_is_woocommerce3'] = false;
+	$GLOBALS['gtm4wp_is_woocommerce3']   = false;
+	$GLOBALS['gtm4wp_is_woocommerce3_7'] = false;
 }
 
 function gtm4wp_woocommerce_addjs( $js ) {
@@ -126,7 +128,7 @@ function gtm4wp_woocommerce_addglobalvars( $return = '' ) {
 }
 
 function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
-	global $gtm4wp_options, $wp_query, $gtm4wp_datalayer_name, $gtm4wp_product_counter, $gtm4wp_is_woocommerce3;
+	global $gtm4wp_options, $wp_query, $gtm4wp_datalayer_name, $gtm4wp_product_counter, $gtm4wp_is_woocommerce3, $gtm4wp_is_woocommerce3_7;
 
 	$woo = WC();
 
@@ -426,7 +428,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer['transactionPaymentType']    = ( $gtm4wp_is_woocommerce3 ? $order->get_payment_method_title() : $order->payment_method_title );
 				$dataLayer['transactionCurrency']       = get_woocommerce_currency();
 				$dataLayer['transactionShippingMethod'] = $order->get_shipping_method();
-				$dataLayer['transactionPromoCode']      = implode( ', ', $order->get_used_coupons() );
+				$dataLayer['transactionPromoCode']      = implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) );
 			}
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
@@ -439,7 +441,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 							'revenue'     => $order_revenue,
 							'tax'         => floatval( $order->get_total_tax() ),
 							'shipping'    => floatval( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping() ),
-							'coupon'      => implode( ', ', $order->get_used_coupons() ),
+							'coupon'      => implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) ),
 						),
 					),
 				);
