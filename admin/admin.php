@@ -515,6 +515,12 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'         => GTM4WP_PHASE_BETA,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
+	GTM4WP_OPTION_INTEGRATE_WCORDERDATA           => array(
+		'label'         => __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'Enable this to add all order attribute into the data layer on the order received page regardless and independently from classic and enhanced ecommerce tracking (WooCommerce 3.x required)', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_BETA,
+		'plugintocheck' => 'woocommerce/woocommerce.php',
+	),
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX          => array(
 		'label'         => __( 'Exclude tax from revenue', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( 'Enable this to exclude tax from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),

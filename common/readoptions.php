@@ -108,6 +108,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCUSESKU', 'integrate-woocommerce-remarketing-u
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH', 'integrate-woocommerce-use-full-category-path' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX', 'integrate-woocommerce-remarketing-productidprefix' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA', 'integrate-woocommerce-customer-data' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCORDERDATA', 'integrate-woocommerce-order-data' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX', 'integrate-woocommerce-exclude-tax' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING', 'integrate-woocommerce-exclude-shipping' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG', 'integrate-woocommerce-do-not-use-order-tracked-flag' );
@@ -235,6 +236,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => false,
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX     => '',
 	GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA        => false,
+	GTM4WP_OPTION_INTEGRATE_WCORDERDATA           => false,
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX          => false,
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING     => false,
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG  => false,

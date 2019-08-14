@@ -261,6 +261,16 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.10.2 =
 
 * Added Oxygen Builder support - you can now use the codeless placement option without issues
+* Added new WooCommerce option to add all order data into the data layer on the order reveived page
+** This includes personal data of the customer -> you need to ensure this is used in a privacy friendly and compliant way!
+** This order data will be always present on the order received page, even if the page is reloaded or later revisited!
+* Removed several unofficial data layer variables on the WooCommerce order received page as they can be read using the new order data option
+** transactionDate
+** transactionType
+** transactionPaymentType
+** transactionShippingMethod
+** transactionPromoCode
+* Removed legacy events from WooCommerce order received pages: gtm4wp.orderCompleted and gtm4wp.orderCompletedEEC - you can simply instead use a Page View trigger to fire corresponding tags
 * Improved: from WooCommerce 3.7 WC_Abstract_Order::get_used_coupons() was replaced with WC_Abstract_Order::get_coupon_codes() which is now used if WC 3.7+ is detected
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
 
