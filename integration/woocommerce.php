@@ -270,7 +270,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$_temp_productdata = array(
 				"id"         => $remarketing_id,
 				"name"       => $product->get_title(),
-				"price"      => $product->get_price(),
+				"price"      => floatval( wc_get_price_to_display( $product ) ),
 				"category"   => $product_cat,
 				"stocklevel" => $product->get_stock_quantity(),
 				"quantity"   => $cart_item_data["quantity"]
@@ -311,7 +311,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$product_cat = gtm4wp_get_product_category( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH ] );
 
 			$remarketing_id = (string) $product_id;
-			$product_price  = floatval( $product->get_price() );
+			$product_price  = floatval( wc_get_price_to_display( $product ) );
 			$product_sku = $product->get_sku();
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 				$remarketing_id = $product_sku;
@@ -390,7 +390,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$_temp_productdata = array(
 						'id'         => $remarketing_id,
 						'name'       => $product->get_title(),
-						'price'      => $product->get_price(),
+						'price'      => floatval( wc_get_price_to_display( $product ) ),
 						'category'   => $product_cat,
 						'stocklevel' => $product->get_stock_quantity(),
 						'quantity'   => $cart_item_data['quantity'],
@@ -632,7 +632,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$_temp_productdata = array(
 					'id'         => $remarketing_id,
 					'name'       => $product->get_title(),
-					'price'      => $product->get_price(),
+					'price'      => floatval( wc_get_price_to_display( $product ) ),
 					'category'   => $product_cat,
 					'stocklevel' => $product->get_stock_quantity(),
 					'quantity'   => $cart_item_data['quantity'],
@@ -708,7 +708,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$dataLayer['ecommerce']['add']['products'][] = array(
 				'name'       => $product->get_title(),
 				'id'         => $remarketing_id,
-				'price'      => $product->get_price(),
+				'price'      => floatval( wc_get_price_to_display( $product ) ),
 				'category'   => $product_cat,
 				'stocklevel' => $product->get_stock_quantity(),
 				'quantity'   => $cart_item['quantity'],
@@ -753,7 +753,7 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 		'name'       => $product->get_title(),
 		'sku'        => $product_sku ? $product_sku : $product_id,
 		'category'   => $product_cat,
-		'price'      => $product->get_price(),
+		'price'      => floatval( wc_get_price_to_display( $product ) ),
 		'currency'   => get_woocommerce_currency(),
 		'stocklevel' => $product->get_stock_quantity(),
 	);
@@ -790,7 +790,7 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item = '',
 	$_temp_productdata = array(
 		'id'          => $remarketing_id,
 		'name'        => $product->get_title(),
-		'price'       => $product->get_price(),
+		'price'       => floatval( wc_get_price_to_display( $product ) ),
 		'category'    => $product_cat,
 		'productlink' => apply_filters( 'the_permalink', get_permalink(), 0 ),
 		'variant'     => '',
@@ -891,7 +891,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 		$_temp_productdata = array(
 			'id'           => $remarketing_id,
 			'name'         => $product->get_title(),
-			'price'        => $product->get_price(),
+			'price'        => floatval( wc_get_price_to_display( $product ) ),
 			'category'     => $product_cat,
 			'productlink'  => apply_filters( 'the_permalink', get_permalink(), 0 ),
 			'listname'     => $gtm4wp_last_widget_title,
@@ -1016,7 +1016,7 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 	$_temp_productdata = array(
 		'id'           => $remarketing_id,
 		'name'         => $product->get_title(),
-		'price'        => $product->get_price(),
+		'price'        => floatval( wc_get_price_to_display( $product ) ),
 		'category'     => $product_cat,
 		'productlink'  => apply_filters( 'the_permalink', get_permalink(), 0 ),
 		'listname'     => $list_name,
@@ -1077,7 +1077,7 @@ function gtm4wp_wc_quick_view_before_single_product() {
 		$product_cat = gtm4wp_get_product_category( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH ] );
 
 		$remarketing_id = (string) $product_id;
-		$product_price  = floatval( $product->get_price() );
+		$product_price  = floatval( wc_get_price_to_display( $product ) );
 		$product_sku = $product->get_sku();
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && ( "" != $product_sku ) ) {
 			$remarketing_id = $product_sku;
