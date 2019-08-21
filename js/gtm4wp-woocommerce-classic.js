@@ -15,12 +15,15 @@ jQuery(function() {
 		var _product_id       = jQuery( '[name=gtm4wp_id]', _product_form ).val();
 		var _product_name     = jQuery( '[name=gtm4wp_name]', _product_form ).val();
 		var _product_sku      = jQuery( '[name=gtm4wp_sku]', _product_form ).val();
+		var _product_is_grouped = jQuery( _product_form ).hasClass( 'grouped_form' );
 
-		window[ gtm4wp_datalayer_name ].push({
-			'event': 'gtm4wp.addProductToCart',
-			'productName': _product_name,
-			'productSKU':  _product_sku,
-			'productID':   _product_id
-		});
+		if ( ! _product_is_grouped ) {
+			window[ gtm4wp_datalayer_name ].push({
+				'event': 'gtm4wp.addProductToCart',
+				'productName': _product_name,
+				'productSKU':  _product_sku,
+				'productID':   _product_id
+			});
+		}
 	});
 });
