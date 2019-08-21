@@ -277,6 +277,7 @@ Please read the changelog very carefully as there are many important changes and
 * Improved: price reporting with the WooCommerce enhanced ecommerce integration now follows the option set with the 'Display prices in the shop' option of WooCommerce
 * Improved: from WooCommerce 3.7 WC_Abstract_Order::get_used_coupons() was replaced with WC_Abstract_Order::get_coupon_codes() which is now used if WC 3.7+ is detected
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
+* Fixed: Wrong lookup for product brand name for variable products
 
 = 1.10.1 =
 

@@ -164,7 +164,13 @@ function gtm4wp_process_order_items( $order ) {
 			);
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] != "" ) {
-				$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
+				if ( isset( $parent_product_id ) && ( $parent_product_id !== 0 ) ) {
+					$product_id_to_query = $parent_product_id;
+				} else {
+					$product_id_to_query = $product_id;
+				}
+
+				$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id_to_query, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
 			}
 
 			if ( 'variation' == $product_type ) {
@@ -255,7 +261,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$product_type = $product->get_type();
 
 			if ( "variation" == $product_type ) {
-				$parent_product_id = ( $gtm4wp_is_woocommerce3 ? $product->get_parent_id() : $product->id);
+				$parent_product_id = ( $gtm4wp_is_woocommerce3 ? $product->get_parent_id() : $product->id );
 				$product_cat = gtm4wp_get_product_category( $parent_product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH ] );
 			} else {
 				$product_cat = gtm4wp_get_product_category( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH ] );
@@ -277,7 +283,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			);
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] != "" ) {
-				$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
+				if ( isset( $parent_product_id ) && ( $parent_product_id !== 0 ) ) {
+					$product_id_to_query = $parent_product_id;
+				} else {
+					$product_id_to_query = $product_id;
+				}
+
+				$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id_to_query, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
 			}
 
 			if ( "variation" == $product_type ) {
@@ -397,7 +409,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					);
 
 					if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] != "" ) {
-						$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
+						if ( isset( $parent_product_id ) && ( $parent_product_id !== 0 ) ) {
+							$product_id_to_query = $parent_product_id;
+						} else {
+							$product_id_to_query = $product_id;
+						}
+
+						$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id_to_query, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
 					}
 
 					if ( 'variation' == $product_type ) {
@@ -639,7 +657,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				);
 
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] != "" ) {
-					$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
+					if ( isset( $parent_product_id ) && ( $parent_product_id !== 0 ) ) {
+						$product_id_to_query = $parent_product_id;
+					} else {
+						$product_id_to_query = $product_id;
+					}
+
+					$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id_to_query, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
 				}
 
 				if ( 'variation' == $product_type ) {
@@ -715,7 +739,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			);
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] != "" ) {
-				$dataLayer["ecommerce"]["add"]["products"][0][ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
+				if ( isset( $parent_product_id ) && ( $parent_product_id !== 0 ) ) {
+					$product_id_to_query = $parent_product_id;
+				} else {
+					$product_id_to_query = $product_id;
+				}
+
+				$dataLayer["ecommerce"]["add"]["products"][0][ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id_to_query, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
 			}
 
 			if ( 'variation' == $product_type ) {
@@ -798,7 +828,13 @@ function gtm4wp_woocommerce_cart_item_product_filter( $product, $cart_item = '',
 	);
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] != "" ) {
-		$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
+		if ( isset( $parent_product_id ) && ( $parent_product_id !== 0 ) ) {
+			$product_id_to_query = $parent_product_id;
+		} else {
+			$product_id_to_query = $product_id;
+		}
+
+		$_temp_productdata[ "brand" ] = gtm4wp_woocommerce_getproductterm( $product_id_to_query, $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] );
 	} else {
 		$_temp_productdata[ "brand" ] = "";
 	}
