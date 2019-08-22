@@ -281,7 +281,7 @@ Please read the changelog very carefully as there are many important changes and
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
 * Fixed: Wrong lookup for product brand name for variable products
 
-! Planned deprecation of support for WooCommerce 2.x with next plugin version !
+! Planned deprecation of support for WooCommerce 2.x-3.1.x with next plugin version !
 ! Planned deprecation of support for WordPress 4.x with next plugin version !
 
 = 1.10.1 =
