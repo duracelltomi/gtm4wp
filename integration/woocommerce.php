@@ -145,7 +145,7 @@ function gtm4wp_process_product( $product, $additional_product_attributes, $attr
 		'name'       => $product->get_title(),
 		'sku'        => $product_sku ? $product_sku : $product_id,
 		'category'   => $product_cat,
-		'price'      => floatval( wc_get_price_to_display( $product ) ),
+		'price'      => (float) wc_get_price_to_display( $product ),
 		'stocklevel' => $product->get_stock_quantity()
 	);
 
@@ -190,7 +190,7 @@ function gtm4wp_process_order_items( $order ) {
 			}
 
 			$product = ( $gtm4wp_is_woocommerce3 ? $item->get_product() : $order->get_product_from_item( $item ) );
-			$product_price = floatval( $order->get_item_total( $item ) );
+			$product_price = (float) $order->get_item_total( $item );
 			$eec_product_array = gtm4wp_process_product( $product, array(
 				'quantity' => $item->get_quantity(),
 				'price'    => $product_price
@@ -379,7 +379,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				} else {
 					$cart_total = $woo->cart->cart_contents_total + $woo->cart->tax_total;
 				}
-				$dataLayer['ecomm_totalvalue'] = floatval( $cart_total );
+				$dataLayer['ecomm_totalvalue'] = (float) $cart_total;
 			}
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] ) {
@@ -498,15 +498,15 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 		if ( isset( $order ) ) {
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
-				$order_revenue = floatval( $order->get_total() - $order->get_total_tax() );
+				$order_revenue = (float)( $order->get_total() - $order->get_total_tax() );
 			} else {
-				$order_revenue = floatval( $order->get_total() );
+				$order_revenue = (float) $order->get_total();
 			}
 
 			if ( $gtm4wp_is_woocommerce3 ) {
-				$order_shipping_cost = floatval( $order->get_shipping_total() );
+				$order_shipping_cost = (float) $order->get_shipping_total();
 			} else {
-				$order_shipping_cost = floatval( $order->get_total_shipping() );
+				$order_shipping_cost = (float) $order->get_total_shipping();
 			}
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING ] ) {
@@ -518,7 +518,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$dataLayer['transactionAffiliation']    = '';
 				$dataLayer['transactionTotal']          = $order_revenue;
 				$dataLayer['transactionShipping']       = $order_shipping_cost;
-				$dataLayer['transactionTax']            = floatval( $order->get_total_tax() );
+				$dataLayer['transactionTax']            = (float) $order->get_total_tax();
 				$dataLayer['transactionCurrency']       = $order->get_currency();
 			}
 
@@ -530,8 +530,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 							'id'          => $order->get_order_number(),
 							'affiliation' => '',
 							'revenue'     => $order_revenue,
-							'tax'         => floatval( $order->get_total_tax() ),
-							'shipping'    => floatval( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping() ),
+							'tax'         => (float) $order->get_total_tax(),
+							'shipping'    => (float)( $gtm4wp_is_woocommerce3 ? $order->get_shipping_total() : $order->get_total_shipping() ),
 							'coupon'      => implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) ),
 						),
 					),
