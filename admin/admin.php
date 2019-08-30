@@ -703,7 +703,18 @@ function gtm4wp_admin_output_field( $args ) {
 
 	switch ( $args['label_for'] ) {
 		case GTM4WP_ADMIN_GROUP_GTMID: {
-			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']" value="' . $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] . '" /><br />' . $args['description'];
+			if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
+				$_gtm_id_value   = GTM4WP_HARDCODED_GTM_ID;
+				$_input_readonly = ' readonly="readonly"';
+				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Container ID was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the container ID or remove the GTM4WP_HARDCODED_GTM_ID constant!</span>';
+			} else {
+				$_gtm_id_value   = $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ];
+				$_input_readonly = '';
+				$_warning_after  = '';
+			}
+
+			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']" value="' . $_gtm_id_value . '" ' . $_input_readonly . '/><br />' . $args['description'];
+			echo $_warning_after;
 			echo '<br /><span class="gtmid_validation_error">' . __( 'This does not seems to be a valid Google Tag Manager ID! Valid format: GTM-XXXXX where X can be numbers and capital letters. Use comma without any space (,) to enter multpile container IDs.', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
@@ -726,14 +737,36 @@ function gtm4wp_admin_output_field( $args ) {
 		}
 
 		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']': {
-			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']" value="' . $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] . '" /><br />' . $args['description'];
+			if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
+				$_gtm_auth_value = GTM4WP_HARDCODED_GTM_ENV_AUTH;
+				$_input_readonly = ' readonly="readonly"';
+				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Environment auth parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_AUTH constant!</span>';
+			} else {
+				$_gtm_auth_value = $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ];
+				$_input_readonly = '';
+				$_warning_after  = '';
+			}
+
+			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']" value="' . $_gtm_auth_value . '" ' . $_input_readonly . '/><br />' . $args['description'];
+			echo $_warning_after;
 			echo '<br /><span class="gtmauth_validation_error">' . __( 'This does not seems to be a valid gtm_auth parameter! It should only contain letters, number and the &quot;-&quot; character. Please check and try again', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
 		}
 
 		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']': {
-			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']" value="' . $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] . '" /><br />' . $args['description'];
+			if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
+				$_gtm_preview_value = GTM4WP_HARDCODED_GTM_ENV_PREVIEW;
+				$_input_readonly    = ' readonly="readonly"';
+				$_warning_after     = '<br /><span class="gtm_wpconfig_set">WARNING! Environment preview parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_PREVIEW constant!</span>';
+			} else {
+				$_gtm_preview_value = $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ];
+				$_input_readonly    = '';
+				$_warning_after     = '';
+			}
+
+			echo '<input type="text" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']" value="' . $_gtm_preview_value . '" ' . $_input_readonly . '/><br />' . $args['description'];
+			echo $_warning_after;
 			echo '<br /><span class="gtmpreview_validation_error">' . __( 'This does not seems to be a valid gtm_preview parameter! It should have the format &quot;env-NN&quot; where NN is an integer number. Please check and try again', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
@@ -1293,10 +1326,19 @@ function gtm4wp_admin_head() {
 	.ampid_validation_error,
 	.datalayername_validation_error,
 	.gtmauth_validation_error,
-	.gtmpreview_validation_error {
-		display: none;
+	.gtmpreview_validation_error,
+	.gtm_wpconfig_set	{
 		color: #c00;
 		font-weight: bold;
+	}
+	.gtmid_validation_error,
+	.goid_validation_error,
+	.goid_ga_validation_error,
+	.ampid_validation_error,
+	.datalayername_validation_error,
+	.gtmauth_validation_error,
+	.gtmpreview_validation_error {
+		display: none;
 	}
 </style>
 <script type="text/javascript">

@@ -267,7 +267,21 @@ function gtm4wp_reload_options() {
 		unset( $storedoptions[ GTM4WP_OPTION_INTEGRATE_WOOCOMMERCE ] );
 	}
 
-	return array_merge( $gtm4wp_defaultoptions, $storedoptions );
+	$return_options = array_merge( $gtm4wp_defaultoptions, $storedoptions );
+
+	if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
+		$return_options[ GTM4WP_OPTION_GTM_CODE ] = GTM4WP_HARDCODED_GTM_ID;
+	}
+
+	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
+		$return_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] = GTM4WP_HARDCODED_GTM_ENV_AUTH;
+	}
+
+	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
+		$return_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] = GTM4WP_HARDCODED_GTM_ENV_PREVIEW;
+	}
+
+	return $return_options;
 }
 
 function gtp4wp_debug_file( $debug_data ) {

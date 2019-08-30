@@ -264,6 +264,10 @@ WARNING!
 Please read the changelog very carefully as there are many important changes and removed features which could need your attention before updating!
 
 * Added Oxygen Builder support - you can now use the codeless placement option without issues
+* Added ability to fix the Google Tag Manager ID and GTM Environment parameters in wp-config.php. To use it, create PHP constants with the names
+** GTM4WP_HARDCODED_GTM_ID
+** GTM4WP_HARDCODED_GTM_ENV_AUTH
+** GTM4WP_HARDCODED_GTM_ENV_PREVIEW
 * Added support for WooCommerce Grouped Products
 * Added new WooCommerce option to add all order data into the data layer on the order reveived page
 ** This includes personal data of the customer -> you need to ensure this is used in a privacy friendly and compliant way!
