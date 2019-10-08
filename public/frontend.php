@@ -904,8 +904,8 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			if ( !window.localStorage ) {
 				var gtm4wp_orderid_cookie_expire = new Date();
 				gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
-				var gtm4wp_orderid_cookie_expires = "expires="+ gtm4wp_orderid_cookie_expire.toUTCString();
-				document.cookie = "gtm4wp_orderid_tracked=" + gtm4wp_orderid_tracked + ";" + gtm4wp_orderid_cookie_expire + ";path=/";
+				var gtm4wp_orderid_cookie_expires_part = "expires=" + gtm4wp_orderid_cookie_expire.toUTCString();
+				document.cookie = "gtm4wp_orderid_tracked=" + gtm4wp_orderid_tracked + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
 			} else {
 				window.localStorage.setItem( "gtm4wp_orderid_tracked", gtm4wp_orderid_tracked );
 			}
