@@ -286,6 +286,7 @@ Please read the changelog very carefully as there are many important changes and
 * Deprecated data layer variable productIsVariable. Use the new productType data layer variable which will equal to simple, variable, grouped or external depending on the type of the product shown
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
 * Fixed: Wrong lookup for product brand name for variable products
+* Fixed: check if $woo->customer is initialized
 
 ! Planned deprecation of support for WooCommerce 2.x-3.1.x with next plugin version !
 ! Planned deprecation of support for WordPress 4.x with next plugin version !
