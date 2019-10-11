@@ -516,6 +516,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
+				$dataLayer['event']                     = 'gtm4wp.orderCompleted';
 				$dataLayer['transactionId']             = $order->get_order_number();
 				$dataLayer['transactionAffiliation']    = '';
 				$dataLayer['transactionTotal']          = $order_revenue;
@@ -525,6 +526,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
+				$dataLayer['event']     = 'gtm4wp.orderCompletedEEC';
 				$dataLayer['ecommerce'] = array(
 					'currencyCode' => $order->get_currency(),
 					'purchase'     => array(

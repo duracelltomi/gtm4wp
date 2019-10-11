@@ -278,7 +278,6 @@ Please read the changelog very carefully as there are many important changes and
 ** transactionPaymentType
 ** transactionShippingMethod
 ** transactionPromoCode
-* Removed legacy events from WooCommerce order received pages: gtm4wp.orderCompleted and gtm4wp.orderCompletedEEC - you can simply instead use a Page View trigger to fire corresponding tags
 * Improved: price reporting with the WooCommerce enhanced ecommerce integration now follows the option set with the 'Display prices in the shop' option of WooCommerce
 * Improved: from WooCommerce 3.7 WC_Abstract_Order::get_used_coupons() was replaced with WC_Abstract_Order::get_coupon_codes() which is now used if WC 3.7+ is detected
 * Improved: use localStorage for WooCommerce duplicate transaction tracking prevention if available. Should be work with Safari at least for now.
