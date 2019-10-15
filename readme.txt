@@ -286,6 +286,7 @@ Please read the changelog very carefully as there are many important changes and
 * Fixed: Wrong lookup for product brand name if Use SKU instead of product ID option was turned on
 * Fixed: Wrong lookup for product brand name for variable products
 * Fixed: check if $woo->customer is initialized
+* Fixed: no checkout step reported on WooCommerce checkout page if the user has accepted the default selection of the payment and shipping methods
 
 ! Planned deprecation of support for WooCommerce 2.x-3.1.x with next plugin version !
 ! Planned deprecation of support for WordPress 4.x with next plugin version !

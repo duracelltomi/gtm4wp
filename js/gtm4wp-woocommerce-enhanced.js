@@ -558,16 +558,12 @@ jQuery(function() {
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1 ) {
 				// shipping methods are not visible if only one is available
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
-				jQuery( 'input[name^=shipping_method]:checked' ).trigger( 'click' );
-
-				gtm4wp_checkout_step_fired.push( 'shipping_method' );
+				jQuery( 'input[name^=shipping_method]:checked' ).trigger( 'change' );
 			}
 
 			if ( gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) == -1 ) {
 				// if the user has already a pre-selected method, no click event will fire to report the checkout step
-				jQuery( 'input[name=payment_method]:checked' ).trigger( 'click' );
-
-				gtm4wp_checkout_step_fired.push( 'payment_method' );
+				jQuery( 'input[name=payment_method]:checked' ).trigger( 'change' );
 			}
 
 			var _shipping_el = jQuery( '#shipping_method input:checked' );
