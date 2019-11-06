@@ -177,7 +177,6 @@ jQuery(function() {
 	jQuery( document ).on( 'click', '.single_add_to_cart_button', function() {
 		var _product_form       = jQuery( this ).closest( 'form.cart' );
 		var _product_var_id     = jQuery( '[name=variation_id]', _product_form );
-		var _product_currency   = jQuery( '[name=gtm4wp_currency]', _product_form ).val();
 		var _product_is_grouped = jQuery( _product_form ).hasClass( 'grouped_form' );
 
 		if ( _product_var_id.length > 0 ) {
@@ -187,7 +186,7 @@ jQuery(function() {
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.addProductToCartEEC',
 					'ecommerce': {
-						'currencyCode': _product_currency,
+						'currencyCode': gtm4wp_currency,
 						'add': {
 							'products': [gtm4wp_last_selected_product_variation]
 						}
@@ -230,7 +229,7 @@ jQuery(function() {
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.addProductToCartEEC',
 				'ecommerce': {
-					'currencyCode': _product_currency,
+					'currencyCode': gtm4wp_currency,
 					'add': {
 						'products': _products_eec
 					}
@@ -240,7 +239,7 @@ jQuery(function() {
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.addProductToCartEEC',
 				'ecommerce': {
-					'currencyCode': _product_currency,
+					'currencyCode': gtm4wp_currency,
 					'add': {
 						'products': [{
 							'id':         gtm4wp_use_sku_instead ? jQuery( '[name=gtm4wp_sku]', _product_form ).val() : jQuery( '[name=gtm4wp_id]', _product_form ).val(),
@@ -400,7 +399,6 @@ jQuery(function() {
 		var _product_sku        = jQuery( '[name=gtm4wp_sku]', _product_form ).val();
 		var _product_category   = jQuery( '[name=gtm4wp_category]', _product_form ).val();
 		var _product_price      = jQuery( '[name=gtm4wp_price]', _product_form ).val();
-		var _product_currency   = jQuery( '[name=gtm4wp_currency]', _product_form ).val();
 		var _product_stocklevel = jQuery( '[name=gtm4wp_stocklevel]', _product_form ).val();
 		var _product_brand      = jQuery( '[name=gtm4wp_brand]', _product_form ).val();
 
@@ -430,7 +428,7 @@ jQuery(function() {
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.changeDetailViewEEC',
 			'ecommerce': {
-				'currencyCode': _product_currency,
+				'currencyCode': gtm4wp_currency,
 				'detail': {
 					'products': [current_product_detail_data]
 				},

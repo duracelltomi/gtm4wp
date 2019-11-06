@@ -553,7 +553,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 					$dataLayer['weatherTemp']            = $weatherdata->main->temp;
 					$dataLayer['weatherPressure']        = $weatherdata->main->pressure;
 					$dataLayer['weatherWindSpeed']       = $weatherdata->wind->speed;
-					$dataLayer['weatherWindDeg']         = ( $weatherdata->wind->deg ? $weatherdata->wind->deg : '' );
+					$dataLayer['weatherWindDeg']         = ( isset($weatherdata->wind->deg) ? $weatherdata->wind->deg : '' );
 					$dataLayer['weatherFullWeatherData'] = $weatherdata;
 					$dataLayer['weatherDataStatus']      = 'Read from cache';
 				} else {
