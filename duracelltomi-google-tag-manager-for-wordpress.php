@@ -16,6 +16,7 @@ WC tested up to: 3.7
 define( 'GTM4WP_VERSION',    '1.11' );
 define( 'GTM4WP_PATH',       plugin_dir_path( __FILE__ ) );
 
+global $gtp4wp_plugin_url, $gtp4wp_plugin_basename;
 $gtp4wp_plugin_url      = plugin_dir_url( __FILE__ );
 $gtp4wp_plugin_basename = plugin_basename( __FILE__ );
 require_once GTM4WP_PATH . '/common/readoptions.php';
