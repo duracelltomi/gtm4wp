@@ -968,7 +968,7 @@ function gtm4wp_body_class( $classes ) {
 
 	// solution is based on the code of Yaniv Friedensohn
 	// http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
-	if ( GTM4WP_PLACEMENT_BODYOPEN_AUTO == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
+	if ( ( GTM4WP_PLACEMENT_BODYOPEN_AUTO == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) && ( !isset($_GET["ct_builder"]) ) ) {
 		$classes[] = '">' . gtm4wp_get_the_gtm_tag() . '<br style="display:none;';
 	}
 
