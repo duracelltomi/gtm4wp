@@ -542,7 +542,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				);
 			}
 
-			if ( ! $order_items ) {
+			if ( ! isset( $order_items ) ) {
 				$order_items = gtm4wp_process_order_items( $order );
 			}
 
@@ -683,6 +683,10 @@ function gtm4wp_woocommerce_cart_item_remove_link_filter( $remove_from_cart_link
 		$GLOBALS['gtm4wp_cart_item_proddata']['variant'] = '';
 	}
 
+	if ( ! isset( $GLOBALS['gtm4wp_cart_item_proddata']['brand'] ) ) {
+		$GLOBALS['gtm4wp_cart_item_proddata']['brand'] = '';
+	}
+
 	$cartlink_with_data                   = sprintf(
 		'data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_variant="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s" href="',
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['id'] ),
@@ -745,6 +749,10 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			'listname'     => $gtm4wp_last_widget_title,
 			'listposition' => $gtm4wp_product_counter
 		), 'widgetproduct' );
+
+		if ( ! isset( $eec_product_array[ 'brand' ] ) ) {
+			$eec_product_array[ 'brand' ] = '';
+		}
 
 		$productlink_with_data = sprintf(
 			'data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s" href="',
@@ -853,6 +861,10 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		'listname'     => $list_name,
 		'listposition' => $woocommerce_loop['loop'] + ( $posts_per_page * ( $paged - 1 ) )
 	), 'productlist' );
+
+	if ( ! isset( $eec_product_array[ 'brand' ] ) ) {
+		$eec_product_array[ 'brand' ] = '';
+	}
 
 	printf(
 		'<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s"></span>',
@@ -966,6 +978,10 @@ function gtm4wp_woocommerce_grouped_product_list_column_label( $labelvalue, $pro
 	), 'groupedproductlist' );
 
 	$gtm4wp_grouped_product_ix++;
+
+	if ( ! isset( $eec_product_array[ 'brand' ] ) ) {
+		$eec_product_array[ 'brand' ] = '';
+	}
 
 	$labelvalue .=
 		sprintf(
