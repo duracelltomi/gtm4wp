@@ -1,3 +1,0 @@
-[submodule "integration/whichbrowser"]
-	path = integration/whichbrowser
-	url = https://github.com/WhichBrowser/Parser-PHP.git
