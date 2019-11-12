@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.2.4
-Stable tag: 1.11
+Stable tag: 1.11.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -257,6 +257,14 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.11.1 =
+
+WARNING!
+If you are upgrading directly from v1.10.x, please read the changelog of v1.11 since it includes many important notices!
+
+* Fixed: PHP notice about undefined order_items variable if the new 'Order data in data layer' is turned off
+* Fixed: PHP notice about missing brand array key if no brand taxonomy is selected in GTM4WP options
 
 = 1.11 =
 
@@ -636,6 +644,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.11.1 =
+
+WooCommerce integration related fixes.
 
 = 1.11 =
 
