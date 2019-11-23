@@ -613,7 +613,7 @@ function gtm4wp_wp_loaded() {
 								set_transient( 'gtm4wp-weatherdata-' . esc_attr( $client_ip ), $weatherdata, 60 * 60 );
 								setcookie( 'gtm4wp_last_weatherstatus', 'Weather data loaded.' );
 							} else {
-								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org did not return processable data: ' . var_dump( $weatherdata, true ) );
+								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org did not return processable data: ' . var_export( $weatherdata, true ) );
 							}
 						} else {
 							if ( is_wp_error( $weatherdata ) ) {
@@ -624,7 +624,7 @@ function gtm4wp_wp_loaded() {
 						}
 					}
 				} else {
-					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com did not return lat-lng data: ' . var_dump( $gtm4wp_geodata, true ) );
+					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com did not return lat-lng data: ' . var_export( $gtm4wp_geodata, true ) );
 				}
 			} else {
 				if ( is_wp_error( $gtm4wp_geodata ) ) {
