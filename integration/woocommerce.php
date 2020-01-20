@@ -190,7 +190,8 @@ function gtm4wp_process_order_items( $order ) {
 			}
 
 			$product = ( $gtm4wp_is_woocommerce3 ? $item->get_product() : $order->get_product_from_item( $item ) );
-			$product_price = (float) $order->get_item_total( $item );
+			$inc_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+			$product_price = (float) $order->get_item_total( $item, $inc_tax );
 			$eec_product_array = gtm4wp_process_product( $product, array(
 				'quantity' => $item->get_quantity(),
 				'price'    => $product_price
