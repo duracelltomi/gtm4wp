@@ -36,6 +36,7 @@ function gtm4wp_handle_cart_qty_change() {
 								'category':   productdata.data( 'gtm4wp_product_cat' ),
 								'variant':    productdata.data( 'gtm4wp_product_variant' ),
 								'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+								'availability': productdata.data( 'gtm4wp_product_availability' ),
 								'brand':      productdata.data( 'gtm4wp_product_brand' ),
 								'quantity':   _current_value - _original_value
 							}]
@@ -55,6 +56,7 @@ function gtm4wp_handle_cart_qty_change() {
 								'category':   productdata.data( 'gtm4wp_product_cat' ),
 								'variant':    productdata.data( 'gtm4wp_product_variant' ),
 								'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+								'availability': productdata.data( 'gtm4wp_product_availability' ),
 								'brand':      productdata.data( 'gtm4wp_product_brand' ),
 								'quantity':   _original_value - _current_value
 							}]
@@ -95,6 +97,7 @@ jQuery(function() {
 				'position':   productdata.data( 'gtm4wp_product_listposition' ),
 				'list':       productdata.data( 'gtm4wp_productlist_name' ),
 				'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+				'availability': productdata.data( 'gtm4wp_product_availability' ),
 				'brand':      productdata.data( 'gtm4wp_product_brand' )
 			});
 
@@ -165,6 +168,7 @@ jQuery(function() {
 						'price':      productprice.toFixed(2),
 						'category':   productdata.data( 'gtm4wp_product_cat' ),
 						'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+						'availability': productdata.data( 'gtm4wp_product_availability' ),
 						'brand':      productdata.data( 'gtm4wp_product_brand' ),
 						'quantity':   1
 					}]
@@ -218,6 +222,7 @@ jQuery(function() {
 					'category':   productdata.data( 'gtm4wp_product_cat' ),
 					'quantity':   product_qty,
 					'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+					'availability': productdata.data( 'gtm4wp_product_availability' ),
 					'brand':      productdata.data( 'gtm4wp_product_brand' )
 				});
 			});
@@ -248,6 +253,7 @@ jQuery(function() {
 							'category':   jQuery( '[name=gtm4wp_category]', _product_form ).val(),
 							'quantity':   jQuery( 'form.cart:first input[name=quantity]' ).val(),
 							'stocklevel': jQuery( '[name=gtm4wp_stocklevel]', _product_form ).val(),
+							'availability': jQuery( '[name=gtm4wp_availability]', _product_form ).val(),
 							'brand':      jQuery( '[name=gtm4wp_brand]', _product_form ).val()
 						}]
 					}
@@ -290,6 +296,7 @@ jQuery(function() {
 						'category':   productdata.data( 'gtm4wp_product_cat' ),
 						'variant':    productdata.data( 'gtm4wp_product_variant' ),
 						'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+						'availability': productdata.data( 'gtm4wp_product_availability' ),
 						'brand':      productdata.data( 'gtm4wp_product_brand' ),
 						'quantity':   qty
 					}]
@@ -364,6 +371,7 @@ jQuery(function() {
 						'price':      productdata.data( 'gtm4wp_product_price' ),
 						'category':   productdata.data( 'gtm4wp_product_cat' ),
 						'stocklevel': productdata.data( 'gtm4wp_product_stocklevel' ),
+						'availability': productdata.data( 'gtm4wp_product_availability' ),
 						'brand':      productdata.data( 'gtm4wp_product_brand' ),
 						'position':   productdata.data( 'gtm4wp_product_listposition' )
 					}]
@@ -400,6 +408,7 @@ jQuery(function() {
 		var _product_category   = jQuery( '[name=gtm4wp_category]', _product_form ).val();
 		var _product_price      = jQuery( '[name=gtm4wp_price]', _product_form ).val();
 		var _product_stocklevel = jQuery( '[name=gtm4wp_stocklevel]', _product_form ).val();
+		var _product_availability = jQuery( '[name=gtm4wp_availability]', _product_form ).val();
 		var _product_brand      = jQuery( '[name=gtm4wp_brand]', _product_form ).val();
 
 		var current_product_detail_data   = {
@@ -408,6 +417,7 @@ jQuery(function() {
 			price: 0,
 			category: _product_category,
 			stocklevel: _product_stocklevel,
+			availability: _product_availability,
 			brand: _product_brand,
 			variant: ''
 		};
