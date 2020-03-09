@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 5.6
-Tested up to: 5.2.4
-Stable tag: 1.11.1
+Tested up to: 5.4
+Stable tag: 1.11.3
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -257,6 +257,20 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.11.3 =
+
+* Fixed: use var_export instead of var_dump in some debug code,
+* Fixed: apply WooCommerce option for tax inclusion on the order received page as well
+* Updated: do not add type attribut to script elements if theme suppors HTML5
+* Updated: tested version numbers for WordPress and WooCommerce
+
+= 1.11.2 =
+
+WARNING!
+If you are upgrading directly from v1.10.x, please read the changelog of v1.11 since it includes many important notices!
+
+No change in plugin code, WP.org deployment of v1.11.1 included wrong directories
 
 = 1.11.1 =
 
@@ -644,6 +658,14 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.11.3 =
+
+Some bugfixes and adding support for the latest WordPress and WooCommerce version
+
+= 1.11.2 =
+
+Replaces v1.11.1
 
 = 1.11.1 =
 
