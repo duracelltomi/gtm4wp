@@ -262,6 +262,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Fixed: use var_export instead of var_dump in some debug code,
 * Fixed: apply WooCommerce option for tax inclusion on the order received page as well
+* Fixed: JavaScript errors in Vimeo player
 * Updated: do not add type attribut to script elements if theme suppors HTML5
 * Updated: tested version numbers for WordPress and WooCommerce
 

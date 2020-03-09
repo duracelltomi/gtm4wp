@@ -105,27 +105,26 @@ jQuery(function() {
 					'mediaPlayerEvent': 'texttrackchange',
 					'mediaPlayerEventParam': data,
 					'mediaCurrentTime': seconds
+				});
 
-				}).catch( function( error ) {
+			}).catch( function( error ) {
 
-					window[ gtm4wp_datalayer_name ].push({
-						'event': 'gtm4wp.mediaPlayerEvent',
-						'mediaType': 'vimeo',
-						'mediaData': {
-							'id': videoid,
-							'author': '',
-							'title': "Unknown title",
-							'url': videourl,
-							'duration': jqframe.attr( "data-player_duration" )
-						},
-						'mediaCurrentTime': 0,
-						'mediaPlayerEvent': 'error',
-						'mediaPlayerEventParam': error
-					});
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'gtm4wp.mediaPlayerEvent',
+					'mediaType': 'vimeo',
+					'mediaData': {
+						'id': videoid,
+						'author': '',
+						'title': "Unknown title",
+						'url': videourl,
+						'duration': jqframe.attr( "data-player_duration" )
+					},
+					'mediaCurrentTime': 0,
+					'mediaPlayerEvent': 'error',
+					'mediaPlayerEventParam': error
+				});
 
-				}); // end call api getCurrentTime()
-
-			});
+			}); // end call api getCurrentTime()
 
 		});
 
@@ -147,26 +146,26 @@ jQuery(function() {
 					'mediaPlayerEventParam': data.volume,
 					'mediaCurrentTime': seconds
 
-				}).catch( function( error ) {
+				});
 
-					window[ gtm4wp_datalayer_name ].push({
-						'event': 'gtm4wp.mediaPlayerEvent',
-						'mediaType': 'vimeo',
-						'mediaData': {
-							'id': videoid,
-							'author': '',
-							'title': "Unknown title",
-							'url': videourl,
-							'duration': jqframe.attr( "data-player_duration" )
-						},
-						'mediaCurrentTime': 0,
-						'mediaPlayerEvent': 'error',
-						'mediaPlayerEventParam': error
-					});
+			}).catch( function( error ) {
 
-				}); // end call api getCurrentTime()
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'gtm4wp.mediaPlayerEvent',
+					'mediaType': 'vimeo',
+					'mediaData': {
+						'id': videoid,
+						'author': '',
+						'title': "Unknown title",
+						'url': videourl,
+						'duration': jqframe.attr( "data-player_duration" )
+					},
+					'mediaCurrentTime': 0,
+					'mediaPlayerEvent': 'error',
+					'mediaPlayerEventParam': error
+				});
 
-			});
+			}); // end call api getCurrentTime()
 
 		});
 
@@ -188,26 +187,27 @@ jQuery(function() {
 					'mediaPlayerEventParam': data,
 					'mediaCurrentTime': seconds
 
-				}).catch( function( error ) {
+				});
 
-					window[ gtm4wp_datalayer_name ].push({
-						'event': 'gtm4wp.mediaPlayerEvent',
-						'mediaType': 'vimeo',
-						'mediaData': {
-							'id': videoid,
-							'author': '',
-							'title': "Unknown title",
-							'url': videourl,
-							'duration': jqframe.attr( "data-player_duration" )
-						},
-						'mediaCurrentTime': 0,
-						'mediaPlayerEvent': 'error',
-						'mediaPlayerEventParam': error
-					});
+			}).catch( function( error ) {
 
-				}); // end call api getCurrentTime()
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'gtm4wp.mediaPlayerEvent',
+					'mediaType': 'vimeo',
+					'mediaData': {
+						'id': videoid,
+						'author': '',
+						'title': "Unknown title",
+						'url': videourl,
+						'duration': jqframe.attr( "data-player_duration" )
+					},
+					'mediaCurrentTime': 0,
+					'mediaPlayerEvent': 'error',
+					'mediaPlayerEventParam': error
+				});
 
-			});
+			}); // end call api getCurrentTime()
+
 		});
 
 		vimeoapi.on( 'timeupdate', function( data ) {
