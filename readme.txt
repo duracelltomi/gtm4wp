@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.4
-Stable tag: 1.11.3
+Stable tag: 1.11.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -258,12 +258,17 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 == Changelog ==
 
+= 1.11.4 =
+
+* Fixed: fire gtm4wp.checkoutStepEEC and gtm4wp.checkoutOptionEEC events if there is only one shipping method available and it is hidden from the user
+* Updated: tested version number for WooCommerce
+
 = 1.11.3 =
 
 * Fixed: use var_export instead of var_dump in some debug code,
 * Fixed: apply WooCommerce option for tax inclusion on the order received page as well
 * Fixed: JavaScript errors in Vimeo player
-* Updated: do not add type attribut to script elements if theme suppors HTML5
+* Updated: do not add type attribute to script elements if theme suppors HTML5
 * Updated: tested version numbers for WordPress and WooCommerce
 
 = 1.11.2 =
@@ -659,6 +664,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.11.4 =
+
+Bugfix and updated tested version number for WooCommerce
 
 = 1.11.3 =
 
