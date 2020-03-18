@@ -218,7 +218,8 @@ function gtm4wp_woocommerce_addglobalvars( $return = '' ) {
 	var gtm4wp_eec                    = ' . gtm4wp_escjs_boolean( (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) ) . ';
 	var gtm4wp_classicec              = ' . gtm4wp_escjs_boolean( (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) ) . ";
 	var gtm4wp_currency               = '" . esc_js( get_woocommerce_currency() ) . "';
-	var gtm4wp_product_per_impression = " . (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ] ) . ';';
+	var gtm4wp_product_per_impression = " . (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ] ) . ';
+	var gtm4wp_needs_shipping_address = ' . gtm4wp_escjs_boolean( (bool) WC()->cart->needs_shipping_address() ) . ';';
 
 	return $return;
 }

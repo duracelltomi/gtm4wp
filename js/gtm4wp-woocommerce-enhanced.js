@@ -472,6 +472,7 @@ jQuery(function() {
 	if ( is_checkout ) {
 		window.gtm4wp_checkout_step_offset = window.gtm4wp_checkout_step_offset || 0;
 		window.gtm4wp_checkout_products    = window.gtm4wp_checkout_products || [];
+		var gtm4wp_shipping_payment_method_step_offset =  window.gtm4wp_needs_shipping_address ? 0 : -1;
 		var gtm4wp_checkout_step_fired          = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
 
 		jQuery( document ).on( 'blur', 'input[name^=shipping_]:not(input[name^=shipping_method])', function() {
@@ -516,7 +517,7 @@ jQuery(function() {
 				'ecommerce': {
 					'checkout': {
 						'actionField': {
-							'step': 3 + window.gtm4wp_checkout_step_offset
+							'step': 3 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
 						},
 						'products': window.gtm4wp_checkout_products
 					}
@@ -542,7 +543,7 @@ jQuery(function() {
 				'ecommerce': {
 					'checkout': {
 						'actionField': {
-							'step': 4 + window.gtm4wp_checkout_step_offset
+							'step': 4 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
 						},
 						'products': window.gtm4wp_checkout_products
 					}
@@ -580,7 +581,7 @@ jQuery(function() {
 					'ecommerce': {
 						'checkout_option': {
 							'actionField': {
-								'step': 3 + window.gtm4wp_checkout_step_offset,
+								'step': 3 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset,
 								'option': 'Shipping: ' + _shipping_el.val()
 							}
 						}
@@ -595,7 +596,7 @@ jQuery(function() {
 					'ecommerce': {
 						'checkout_option': {
 							'actionField': {
-								'step': 4 + window.gtm4wp_checkout_step_offset,
+								'step': 4 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset,
 								'option': 'Payment: ' + _payment_el.val()
 							}
 						}

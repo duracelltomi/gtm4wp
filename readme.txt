@@ -261,6 +261,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 = 1.11.4 =
 
 * Fixed: fire gtm4wp.checkoutStepEEC and gtm4wp.checkoutOptionEEC events if there is only one shipping method available and it is hidden from the user
+* Fixed: decrease checkout step numbers 3 and 4 if shipping destination is set to 'Force shipping to the customer billing address' in WooCommerce. This way there will be no gap in Checkout behaviour report in Google Analytics.
 * Updated: tested version number for WooCommerce
 
 = 1.11.3 =
