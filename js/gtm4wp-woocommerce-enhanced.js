@@ -556,7 +556,13 @@ jQuery(function() {
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1 ) {
 				// shipping methods are not visible if only one is available
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
-				jQuery( 'input[name^=shipping_method]:checked' ).trigger( 'change' );
+				var selected_shipping_method = jQuery( 'input[name^=shipping_method]:checked' );
+				if ( selected_shipping_method.length == 0 ) {
+					selected_shipping_method = jQuery( 'input[name^=shipping_method]:first' );
+				}
+				if ( selected_shipping_method.length > 0 ) {
+					selected_shipping_method.trigger( 'change' );
+				}
 			}
 
 			if ( gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) == -1 ) {
@@ -564,7 +570,10 @@ jQuery(function() {
 				jQuery( 'input[name=payment_method]:checked' ).trigger( 'change' );
 			}
 
-			var _shipping_el = jQuery( '#shipping_method input:checked' );
+			var _shipping_el = jQuery( 'input[name^=shipping_method]:checked' );
+			if ( _shipping_el.length == 0 ) {
+				_shipping_el = jQuery( 'input[name^=shipping_method]:first' );
+			}
 			if ( _shipping_el.length > 0 ) {
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.checkoutOptionEEC',
