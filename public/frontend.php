@@ -43,12 +43,6 @@ function gtm4wp_escjs_boolean( $obj ) {
 	}
 }
 
-function gtm4wp_is_assoc( $arr ) {
-	// borrowed from
-	// http://stackoverflow.com/questions/173400/php-arrays-a-good-way-to-check-if-an-array-is-associative-or-sequential
-	return array_keys( $arr ) !== range( 0, count( $arr ) - 1 );
-}
-
 /**
  * Original copyright:
  * By Grant Burton @ BURTONTECH.COM
