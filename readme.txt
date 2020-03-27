@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.4
-Stable tag: 1.11.4
+Stable tag: 1.11.5
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -257,6 +257,10 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.11.5 =
+
+* Safer IP address validation in geo and weather data features
 
 = 1.11.4 =
 
@@ -665,6 +669,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.11.5 =
+
+Bugfix release, small improvements
 
 = 1.11.4 =
 
