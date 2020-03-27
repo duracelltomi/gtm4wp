@@ -51,68 +51,38 @@ function gtm4wp_is_assoc( $arr ) {
 
 /**
  * Original copyright:
- * By Grant Burton @ BURTONTECH.COM (11-30-2008): IP-Proxy-Cluster Fix
- *
- * Code improved by Thomas Geiger
- */
-function gtm4wp_ip_is_private( $ip ) {
-	$int_ip = ip2long( $ip );
-	if ( ! empty( $ip ) && $int_ip != -1 && $int_ip !== false ) {
-		$private_ips = array(
-			array( '0.0.0.0', '2.255.255.255' ),
-			array( '10.0.0.0', '10.255.255.255' ),
-			array( '127.0.0.0', '127.255.255.255' ),
-			array( '169.254.0.0', '169.254.255.255' ),
-			array( '172.16.0.0', '172.31.255.255' ),
-			array( '192.0.2.0', '192.0.2.255' ),
-			array( '192.168.0.0', '192.168.255.255' ),
-			array( '255.255.255.0', '255.255.255.255' ),
-		);
-
-		foreach ( $private_ips as $private_ip ) {
-			$min_int_ip = ip2long( $private_ip[0] );
-			$max_int_ip = ip2long( $private_ip[1] );
-			if ( ( $int_ip >= $min_int_ip ) && ( $int_ip <= $max_int_ip ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	} else {
-		return true;
-	}
-}
-
-/**
- * Original copyright:
  * By Grant Burton @ BURTONTECH.COM
  *
  * Code improved by Thomas Geiger
  */
 function gtm4wp_get_user_ip() {
-	if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) && ! gtm4wp_ip_is_private( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-		return $_SERVER['HTTP_CLIENT_IP'];
-	}
-
 	if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
 		foreach ( explode( ',', $_SERVER['HTTP_X_FORWARDED_FOR'] ) as $ip ) {
-			if ( ! gtm4wp_ip_is_private( trim( $ip ) ) ) {
+			if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) !== false ) {
 				return $ip;
 			}
 		}
 	}
 
-	if ( ! empty( $_SERVER['HTTP_X_FORWARDED'] ) && ! gtm4wp_ip_is_private( $_SERVER['HTTP_X_FORWARDED'] ) ) {
-		return $_SERVER['HTTP_X_FORWARDED'];
-	} elseif ( ! empty( $_SERVER['HTTP_X_CLUSTER_CLIENT_IP'] ) && ! gtm4wp_ip_is_private( $_SERVER['HTTP_X_CLUSTER_CLIENT_IP'] ) ) {
-		return $_SERVER['HTTP_X_CLUSTER_CLIENT_IP'];
-	} elseif ( ! empty( $_SERVER['HTTP_FORWARDED_FOR'] ) && ! gtm4wp_ip_is_private( $_SERVER['HTTP_FORWARDED_FOR'] ) ) {
-		return $_SERVER['HTTP_FORWARDED_FOR'];
-	} elseif ( ! empty( $_SERVER['HTTP_FORWARDED'] ) && ! gtm4wp_ip_is_private( $_SERVER['HTTP_FORWARDED'] ) ) {
-		return $_SERVER['HTTP_FORWARDED'];
-	} else {
-		return $_SERVER['REMOTE_ADDR'];
+	$possible_ip_variables = array(
+		'HTTP_CLIENT_IP',
+		'HTTP_X_FORWARDED',
+		'HTTP_X_CLUSTER_CLIENT_IP',
+		'HTTP_FORWARDED_FOR',
+		'HTTP_FORWARDED',
+		'REMOTE_ADDR'
+	);
+
+	foreach( $possible_ip_variables as $one_ip_variable ) {
+		if (
+		  ! empty( $_SERVER[ $one_ip_variable ] )
+		  && ( filter_var( $_SERVER[ $one_ip_variable ], FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) !== false )
+		) {
+			return $_SERVER[ $one_ip_variable ];
+		}
 	}
+
+	return '';
 }
 
 if ( ! function_exists( 'getallheaders' ) ) {
