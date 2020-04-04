@@ -165,7 +165,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INCLUDE_SITEID                  => false,
 	GTM4WP_OPTION_INCLUDE_SITENAME                => false,
 
-	GTM4WP_OPTION_EVENTS_FORMMOVE                 => true,
+	GTM4WP_OPTION_EVENTS_FORMMOVE                 => false,
 	GTM4WP_OPTION_EVENTS_NEWUSERREG               => false,
 	GTM4WP_OPTION_EVENTS_USERLOGIN                => false,
 
