@@ -9,7 +9,7 @@ Author URI: https://gtm4wp.com/
 Text Domain: duracelltomi-google-tag-manager
 Domain Path: /languages
 
-WC requires at least: 2.6
+WC requires at least: 3.2
 WC tested up to: 4.0.0
 */
 

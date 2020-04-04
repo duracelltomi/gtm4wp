@@ -964,8 +964,15 @@ add_action( 'fl_before_builder', 'gtm4wp_wp_body_open', 0 ); // Beaver Builder T
 add_action( 'wp_body_open', 'gtm4wp_wp_body_open' );
 
 add_filter( 'rocket_excluded_inline_js_content', 'gtm4wp_rocket_excluded_inline_js_content' ); // WP Rocket
-if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] || $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] )
-	&& isset( $GLOBALS['woocommerce'] ) ) {
+if (
+	isset( $GLOBALS['gtm4wp_options'] )
+	&& (
+		$GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ]
+		|| $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ]
+	)
+	&& isset( $GLOBALS['woocommerce'] )
+	&& version_compare( WC()->version, '3.2', '>=' ) // only activate WooCommerce integration for minimum supported WooCommerce version
+) {
 	require_once dirname( __FILE__ ) . '/../integration/woocommerce.php';
 }
 
