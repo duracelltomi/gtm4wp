@@ -262,6 +262,7 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 * Fixed: safer IP address validation in geo and weather data features
 * Updated: removed deprecated events: download links, email links, social links -> all those can be now tracked with native Google Tag Manager triggers
+* Updated: removed support for WooCommerce versions before v3.2
 
 = 1.11.4 =
 
@@ -673,7 +674,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.12 =
 
-Bugfix release, small improvements
+Removed several deprecated features, dropped support for WooCommerce versions before 3.2
 
 = 1.11.4 =
 
