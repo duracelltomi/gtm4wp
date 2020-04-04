@@ -260,7 +260,8 @@ If you or your social plugin inserts the Facebook buttons using IFRAMEs (like So
 
 = 1.12 =
 
-* Safer IP address validation in geo and weather data features
+* Fixed: safer IP address validation in geo and weather data features
+* Updated: removed deprecated events: download links, email links, social links -> all those can be now tracked with native Google Tag Manager triggers
 
 = 1.11.4 =
 

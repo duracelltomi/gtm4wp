@@ -232,32 +232,7 @@ $GLOBALS['gtm4wp_eventfieldtexts'] = array(
 		'label'       => __( 'Soundcloud events', 'duracelltomi-google-tag-manager' ),
 		'description' => __( 'Check this option to include a Tag Manager event when a visitor interacts with a Soundcloud media embeded on your site.', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
-	),
-	GTM4WP_OPTION_EVENTS_SOCIAL      => array(
-		'label'       => __( 'Social actions (gtm4wp.socialAction)', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include a Tag Manager event when a visitor uses a social button to share/like content on a social network.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
-	GTM4WP_OPTION_EVENTS_OUTBOUND    => array(
-		'label'       => __( 'Outbound link click events (gtm4wp.outboundClick)', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include a Tag Manager event when a visitor clicks on a link directing the visitor out of your website.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
-	GTM4WP_OPTION_EVENTS_DOWNLOADS   => array(
-		'label'       => __( 'Download click events (gtm4wp.downloadClick)', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include a Tag Manager event when a visitors clicks on a link that leads to a downloadable file on your website.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
-	GTM4WP_OPTION_EVENTS_DWLEXT      => array(
-		'label'       => __( 'Extensions to track', 'duracelltomi-google-tag-manager' ),
-		'description' => __( "Enter a comma separated list of extensions to track when 'Include download click events' option is set.", 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
-	GTM4WP_OPTION_EVENTS_EMAILCLICKS => array(
-		'label'       => __( 'Email click events (gtm4wp.emailClick)', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include a Tag Manager event when a visitor clicks on an email link.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
+	)
 );
 
 $GLOBALS['gtm4wp_scrollerfieldtexts'] = array(
@@ -817,11 +792,6 @@ function gtm4wp_admin_output_field( $args ) {
 		default: {
 			$optval = $gtm4wp_options[ $args['optionfieldid'] ];
 
-			// fix wrong data type saved in v0.4
-			if ( GTM4WP_OPTION_EVENTS_SOCIAL == $args['optionfieldid'] ) {
-				$optval = (bool) ( $optval );
-			}
-
 			switch ( gettype( $optval ) ) {
 				case 'boolean': {
 					echo '<input type="checkbox" id="' . GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']" name="' . GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']" value="1" ' . checked( 1, $optval, false ) . ' /><br />' . $args['description'];
@@ -882,10 +852,6 @@ function gtm4wp_sanitize_options( $options ) {
 		// "include" settings
 		if ( substr( $optionname, 0, 8 ) == 'include-' ) {
 			$output[ $optionname ] = (bool) $newoptionvalue;
-
-			// tracked download extensions
-		} elseif ( $optionname == GTM4WP_OPTION_EVENTS_DWLEXT ) {
-			$output[ $optionname ] = str_replace( ' ', '', trim( $newoptionvalue ) );
 
 			// dataLayer events
 		} elseif ( substr( $optionname, 0, 6 ) == 'event-' ) {
@@ -1563,21 +1529,6 @@ function gtm4wp_show_warning() {
 
 	if ( ( false === $gtm4wp_user_notices_dismisses['woo2x-warning'] ) && ( $woo ) && ( version_compare( $woo->version, '3.0', '<' ) ) ) {
 		echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?woo2x-warning"><p><strong>' . __( 'Warning: You are using an outdated version of WooCommerce (v' . $woo->version . '). Google Tag Manager for WordPress will drop support for this version in the near future. Please consider to upgrade.', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
-	}
-
-	if ( ( false === $gtm4wp_user_notices_dismisses['deprecated-warning'] ) && (
-		( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_SOCIAL ] ) ||
-		( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_OUTBOUND ] ) ||
-		( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_OUTBOUND ] ) ||
-		( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_OUTBOUND ] )
-	) ) {
-		$deprecated_list = array(
-			'Social actions',
-			'Outbound link click events',
-			'Download click events',
-			'Email click events',
-		);
-		echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?deprecated-warning"><p><strong>' . __( 'Warning: Some features of Google Tag Manager for WordPress are deprecated and will be removed in the next version: <ul><li>' . implode( '</li><li>', $deprecated_list ) . '</li></ul>', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
 	}
 }
 

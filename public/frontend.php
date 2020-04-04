@@ -643,21 +643,6 @@ function gtm4wp_the_gtm_tag() {
 function gtm4wp_enqueue_scripts() {
 	global $gtm4wp_options, $gtp4wp_plugin_url;
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_OUTBOUND ] ) {
-		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_OUTBOUND, false );
-		wp_enqueue_script( 'gtm4wp-outbound-click-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-outbound-click-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
-	}
-
-	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_DOWNLOADS ] ) {
-		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_DOWNLOADS, false );
-		wp_enqueue_script( 'gtm4wp-download-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-download-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
-	}
-
-	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_EMAILCLICKS ] ) {
-		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_EMAILCLICKS, false );
-		wp_enqueue_script( 'gtm4wp-email-link-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-email-link-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
-	}
-
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WPCF7 ] ) {
 		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WPCF7, false );
 		wp_enqueue_script( 'gtm4wp-contact-form-7-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-contact-form-7-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
@@ -666,11 +651,6 @@ function gtm4wp_enqueue_scripts() {
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_FORMMOVE ] ) {
 		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_FORMMOVE, false );
 		wp_enqueue_script( 'gtm4wp-form-move-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-form-move-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
-	}
-
-	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_SOCIAL ] ) {
-		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_SOCIAL, false );
-		wp_enqueue_script( 'gtm4wp-social-actions', $gtp4wp_plugin_url . 'js/gtm4wp-social-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_YOUTUBE ] ) {
@@ -795,13 +775,6 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			$_gtm_header_content                       .= json_encode( $gtm4wp_remarketing_tags );
 			$_gtm_header_content                       .= ';';
 			$gtm4wp_datalayer_data['google_tag_params'] = '-~-window.google_tag_params-~-';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_DOWNLOADS ] ) {
-			$_gtm_header_content .= '
-	jQuery( function() {
-		gtm4wp_track_downloads( "' . str_replace( '"', '', $gtm4wp_options[ GTM4WP_OPTION_EVENTS_DWLEXT ] ) . '" );
-	});';
 		}
 
 		if ( version_compare( PHP_VERSION, '5.4.0' ) >= 0 ) {
