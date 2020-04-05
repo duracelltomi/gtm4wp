@@ -46,7 +46,7 @@ var adminsubtabs = {
 		},
 		"depecratedevents": {
 			tabtext: gtm4wp.depecratedeventstabtitle,
-			numitems: 4
+			numitems: 0
 		}
 	},
 	3: {},
