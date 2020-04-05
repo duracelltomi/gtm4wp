@@ -133,18 +133,15 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_BROWSERDATA   => array(
 		'label'       => __( 'Browser data *', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include the name, version and engine data of the browser the visitor uses.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_BETA,
+		'description' => __( 'Check this option to include the name, version and engine data of the browser the visitor uses.', 'duracelltomi-google-tag-manager' )
 	),
 	GTM4WP_OPTION_INCLUDE_OSDATA        => array(
 		'label'       => __( 'OS data *', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include the name and version of the operating system the visitor uses.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_BETA,
+		'description' => __( 'Check this option to include the name and version of the operating system the visitor uses.', 'duracelltomi-google-tag-manager' )
 	),
 	GTM4WP_OPTION_INCLUDE_DEVICEDATA    => array(
 		'label'       => __( 'Device data *', 'duracelltomi-google-tag-manager' ),
-		'description' => __( 'Check this option to include the type of device the user is currently using (desktop, tablet or mobile) including manufacturer and model data.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_BETA,
+		'description' => __( 'Check this option to include the type of device the user is currently using (desktop, tablet or mobile) including manufacturer and model data.', 'duracelltomi-google-tag-manager' )
 	),
 	GTM4WP_OPTION_INCLUDE_MISCGEO       => array(
 		'label'       => __( 'Geo data', 'duracelltomi-google-tag-manager' ),
@@ -606,9 +603,6 @@ function gtm4wp_admin_output_section( $args ) {
 
 		case GTM4WP_ADMIN_GROUP_EVENTS: {
 			_e( 'Fire tags in Google Tag Manager on special events on your website', 'duracelltomi-google-tag-manager' );
-			echo '<p style="font-weight: bold;">';
-			_e( 'In October 2013 Google released a new feature called <a href="https://support.google.com/tagmanager/answer/3415369?hl=en" target="_blank">auto event tracking</a>. It is up to you how you use click events either using Google\'s solution or the settings below.', 'duracelltomi-google-tag-manager' );
-			echo '</p>';
 
 			break;
 		}
@@ -1016,14 +1010,13 @@ function gtm4wp_admin_init() {
 
 	add_settings_field(
 		GTM4WP_ADMIN_GROUP_PLACEMENT,
-		__( 'Container code placement', 'duracelltomi-google-tag-manager' ),
+		__( 'Container code <code>&lt;noscript&gt;</code> part placement', 'duracelltomi-google-tag-manager' ),
 		'gtm4wp_admin_output_field',
 		GTM4WP_ADMINSLUG,
 		GTM4WP_ADMIN_GROUP_GENERAL,
 		array(
 			'label_for'                   => GTM4WP_ADMIN_GROUP_PLACEMENT,
-			// "description" => __( "Select how your container code should be included in your website.<br />If you select 'Custom' you need to edit your template file and add the following line just after the opening &lt;body&gt; tag:<br /><code>&lt;?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code>", 'duracelltomi-google-tag-manager' )
-							'description' => __( "Code placement decides where to put the second, so called noscript part of the GTM container code.<br />This code is usually only executed if your visitor has for some reason disabled JavaScript.<br/>The main GTM container code will be placed into the <code>&lt;head&gt;</code> section of your webpages anyway (where it belongs to).<br />If you select 'Custom' you need to edit your template file and add the following line just after the opening <code>&lt;body&gt;</code> tag:<br /><code>&lt;?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code>", 'duracelltomi-google-tag-manager' ),
+			'description' => __( "Code placement decides where to put the second, so called noscript part of the GTM container code.<br />This code is usually only executed if your visitor has for some reason disabled JavaScript.<br/>The main GTM container code will be placed into the <code>&lt;head&gt;</code> section of your webpages anyway (where it belongs to).<br />If you select 'Custom' you need to edit your template file and add the following line just after the opening <code>&lt;body&gt;</code> tag:<br /><code>&lt;?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code>", 'duracelltomi-google-tag-manager' ),
 		)
 	);
 
