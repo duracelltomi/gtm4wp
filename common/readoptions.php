@@ -56,6 +56,10 @@ define( 'GTM4WP_OPTION_SCROLLER_CONTENTID', 'scroller-contentid' );
 define( 'GTM4WP_OPTION_SCROLLER_READERTIME', 'scroller-readertime' );
 
 define( 'GTM4WP_OPTION_BLACKLIST_ENABLE', 'blacklist-enable' );
+define( 'GTM4WP_OPTION_BLACKLIST_SANDBOXED', 'blacklist-sandboxed' );
+define( 'GTM4WP_OPTION_BLACKLIST_STATUS', 'blacklist-status' );
+
+// deprecated options BEGIN
 define( 'GTM4WP_OPTION_BLACKLIST_ADADVISOR', 'blacklist-adadvisor' );
 define( 'GTM4WP_OPTION_BLACKLIST_ADROLL', 'blacklist-adroll' );
 define( 'GTM4WP_OPTION_BLACKLIST_AWCONV', 'blacklist-adwords-conversion' );
@@ -87,6 +91,7 @@ define( 'GTM4WP_OPTION_BLACKLIST_MACRO_RANDOMNUM', 'blacklist-macro-random-numbe
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_REFERRER', 'blacklist-macro-referrer' );
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_URL', 'blacklist-macro-url' );
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT', 'blacklist-macro-autoevent-variable' );
+// deprecated options END
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
 
@@ -119,7 +124,7 @@ define( 'GTM4WP_PLACEMENT_BODYOPEN', 1 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN_AUTO', 2 );
 define( 'GTM4WP_PLACEMENT_OFF', 3 );
 
-global $gtm4wp_options, $gtm4wp_defaultoptions;
+global $gtm4wp_options, $gtm4wp_defaultoptions, $gtm4wp_entity_ids;
 
 $gtm4wp_options = array();
 
@@ -180,37 +185,8 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_SCROLLER_READERTIME             => 60,
 
 	GTM4WP_OPTION_BLACKLIST_ENABLE                => 0,
-	GTM4WP_OPTION_BLACKLIST_ADADVISOR             => false,
-	GTM4WP_OPTION_BLACKLIST_ADROLL                => false,
-	GTM4WP_OPTION_BLACKLIST_AWCONV                => false,
-	GTM4WP_OPTION_BLACKLIST_AWREMARKET            => false,
-	GTM4WP_OPTION_BLACKLIST_BIZO                  => false,
-	GTM4WP_OPTION_BLACKLIST_CLICKTALE             => false,
-	GTM4WP_OPTION_BLACKLIST_COMSCORE              => false,
-	GTM4WP_OPTION_BLACKLIST_CUSTOMHTML            => false,
-	GTM4WP_OPTION_BLACKLIST_CUSTOMIMG             => false,
-	GTM4WP_OPTION_BLACKLIST_DBLCLKCOUNT           => false,
-	GTM4WP_OPTION_BLACKLIST_DBLCLKSALES           => false,
-	GTM4WP_OPTION_BLACKLIST_GACLASSIC             => false,
-	GTM4WP_OPTION_BLACKLIST_MARIN                 => false,
-	GTM4WP_OPTION_BLACKLIST_MPLEXIFRAME           => false,
-	GTM4WP_OPTION_BLACKLIST_MPLEXROI              => false,
-	GTM4WP_OPTION_BLACKLIST_MEDIA6DEG             => false,
-	GTM4WP_OPTION_BLACKLIST_TURNCONV              => false,
-	GTM4WP_OPTION_BLACKLIST_TURNDATA              => false,
-	GTM4WP_OPTION_BLACKLIST_UA                    => false,
-
-	GTM4WP_OPTION_BLACKLIST_MACRO_DOMELEMENT      => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_CUSTOMJS        => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_CONSTANT        => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_1STCOOKIE       => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_EVENTNAME       => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_JSVAR           => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_DLAYERVAR       => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_RANDOMNUM       => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_REFERRER        => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_URL             => true,
-	GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT       => true,
+	GTM4WP_OPTION_BLACKLIST_SANDBOXED             => false,
+	GTM4WP_OPTION_BLACKLIST_STATUS                => '',
 
 	GTM4WP_OPTION_INTEGRATE_WPCF7                 => false,
 
@@ -239,6 +215,184 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => ''
 );
 
+$gtm4wp_entity_ids = array(
+	'tags' => array(
+		'abtGeneric' => 'AB TASTY Generic Tag',
+		'ta' => 'AdAdvisor Tag',
+		'adm' => 'Adometry Tag',
+		'asp' => 'AdRoll Smart Pixel Tag',
+		'awct' => 'Google Ads Conversion Tracking Tag',
+		'sp' => 'Google Ads Remarketing Tag',
+		'awc' => 'Affiliate Window Conversion Tag',
+		'awj' => 'Affiliate Window Journey Tag',
+		'baut' => 'Bing Ads Universal Event Tracking',
+		'bb' => 'Bizrate Insights Buyer Survey Solution',
+		'bsa' => 'Bizrate Insights Site Abandonment Survey Solution',
+		'cts' => 'ClickTale Standard Tracking Tag',
+		'csm' => 'comScore Unified Digital Measurement Tag',
+		'mpm' => 'Conversant Mediaplex - IFRAME MCT Tag',
+		'mpr' => 'Conversant Mediaplex - Standard IMG ROI Tag',
+		'gclidw' => 'Conversion Linker',
+		'cegg' => 'Crazy Egg Tag',
+		'crto' => 'Criteo OneTag',
+		'html' => 'Custom HTML Tag',
+		'img' => 'Custom Image Tag',
+		'dstag' => 'DistroScale Tag',
+		'flc' => 'Floodlight Counter Tag',
+		'fls' => 'Floodlight Sales Tag',
+		'm6d' => 'Dstillery Universal Pixel Tag',
+		'ela' => 'Eulerian Analytics Tag',
+		'ga' => 'Google Analytics Tag (classic, legacy)',
+		'ua' => 'Google Analytics Tag (universal, latest)',
+		'gcs' => 'Google Consumer Surveys Website Satisfaction',
+		'opt' => 'Google Optimize',
+		'ts' => 'Google Trusted Stores Tag',
+		'hjtc' => 'Hotjar Tracking Code',
+		'infinity' => 'Infinity Call Tracking Tag',
+		'sca' => 'Intent Media - Search Compare Ads',
+		'k50Init' => 'K50 tracking tag',
+		'll' => 'LeadLab',
+		'bzi' => 'LinkedIn Tag',
+		'ljs' => 'Lytics JS Tag',
+		'ms' => 'Marin Software Tag',
+		'mpm' => 'Mediaplex - IFRAME MCT Tag',
+		'mpr' => 'Mediaplex - Standard IMG ROI Tag',
+		'messagemate' => 'Message Mate',
+		'mf' => 'Mouseflow Tag',
+		'ta' => 'Neustar Pixel',
+		'ndcr' => 'Nielsen DCR Static Lite Tag',
+		'nudge' => 'Nudge Content Analytics Tag',
+		'okt' => 'Oktopost Tracking Code',
+		'omc' => 'Optimise Conversion Tag',
+		'messagemate' => 'OwnerListens Message Mate',
+		'pa' => 'Perfect Audience Pixel',
+		'pc' => 'Personali Canvas',
+		'pntr' => 'Pinterest',
+		'placedPixel' => 'Placed',
+		'pijs' => 'Pulse Insights Voice of Customer Platform',
+		'qcm' => 'Quantcast Audience Measurement',
+		'qpx' => 'Quora Pixel',
+		'fxm' => 'Rawsoft FoxMetrics',
+		'scjs' => 'SaleCycle JavaScript Tag',
+		'scp' => 'SaleCycle Pixel Tag',
+		'sfc' => 'SearchForce JavaScript Tracking for Conversion Page',
+		'sfl' => 'SearchForce JavaScript Tracking for Landing Page',
+		'sfr' => 'SearchForce Redirection Tracking Tag',
+		'shareaholic' => 'Shareaholic',
+		'svw' => 'Survicate Widget',
+		'tdlc' => 'Tradedoubler Lead Conversion Tag',
+		'tdsc' => 'Tradedoubler Sale Conversion Tag',
+		'tc' => 'Turn Conversion Tracking Tag',
+		'tdc' => 'Turn Data Collection Tag',
+		'twitter_website_tag' => 'Twitter Universal Website Tag',
+		'uslt' => 'Upsellit Global Footer Tag',
+		'uspt' => 'Upsellit Confirmation Tag',
+		'vei' => 'Ve Interactive JavaScript Tag',
+		'veip' => 'Ve Interactive Pixel',
+		'vdc' => 'VisualDNA Conversion Tag',
+		'xpsh' => 'Xtremepush',
+		'yieldify' => 'Yieldify',
+		'zone' => 'Zones'
+	),
+	'triggers' => array(
+		'evl' => 'Element Visibility Listener/Trigger',
+		'cl' => 'Click Listener/Trigger',
+		'fsl' => 'Form Submit Listener/Trigger',
+		'hl' => 'History Listener/Trigger',
+		'jel' => 'JavaScript Error Listener/Trigger',
+		'lcl' => 'Link Click Listener/Trigger',
+		'sdl' => 'Scroll Depth Listener/Trigger',
+		'tl' => 'Timer Listener/Trigger',
+		'ytl' => 'YouTube Video Listener/Trigger'
+	),
+	'variables' => array(
+		'k' => '1st Party Cookie',
+		'c' => 'Constant',
+		'ctv' => 'Container Version Number',
+		'e' => 'Custom Event',
+		'jsm' => 'Custom JavaScript Variable',
+		'v' => 'Data Layer Variable',
+		'dbg' => 'Debug Mode',
+		'd' => 'DOM Element',
+		'vis' => 'Element Visibility',
+		'f' => 'HTTP Referrer',
+		'j' => 'JavaScript Variable',
+		'smm' => 'Lookup Table',
+		'r' => 'Random Number',
+		'remm' => 'RegEx Table',
+		'u' => 'URL'
+	)
+);
+
+function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
+	if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 ) {
+		$_gtmrestrictlistitems = array();
+
+		// IDs from https://developers.google.com/tag-manager/devguide#security
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ADADVISOR ] ) {
+			$_gtmrestrictlistitems[] = 'ta';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ADROLL ] ) {
+			$_gtmrestrictlistitems[] = 'asp';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_AWCONV ] ) {
+			$_gtmrestrictlistitems[] = 'awct';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_AWREMARKET ] ) {
+			$_gtmrestrictlistitems[] = 'sp';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_BIZO ] ) {
+			$_gtmrestrictlistitems[] = 'bzi';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_CLICKTALE ] ) {
+			$_gtmrestrictlistitems[] = 'cts';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_COMSCORE ] ) {
+			$_gtmrestrictlistitems[] = 'csm';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_CUSTOMHTML ] ) {
+			$_gtmrestrictlistitems[] = 'html';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_CUSTOMIMG ] ) {
+			$_gtmrestrictlistitems[] = 'img';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_DBLCLKCOUNT ] ) {
+			$_gtmrestrictlistitems[] = 'flc';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_DBLCLKSALES ] ) {
+			$_gtmrestrictlistitems[] = 'fls';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_GACLASSIC ] ) {
+			$_gtmrestrictlistitems[] = 'ga';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MARIN ] ) {
+			$_gtmrestrictlistitems[] = 'ms';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MPLEXIFRAME ] ) {
+			$_gtmrestrictlistitems[] = 'mpm';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MPLEXROI ] ) {
+			$_gtmrestrictlistitems[] = 'mpr';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MEDIA6DEG ] ) {
+			$_gtmrestrictlistitems[] = 'm6d';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_TURNCONV ] ) {
+			$_gtmrestrictlistitems[] = 'tc';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_TURNDATA ] ) {
+			$_gtmrestrictlistitems[] = 'tdc';
+		}
+		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_UA ] ) {
+			$_gtmrestrictlistitems[] = 'ua';
+		}
+
+		$current_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] = implode( ',', $_gtmrestrictlistitems );
+	}
+
+	return $current_options;
+}
+
 function gtm4wp_reload_options() {
 	global $gtm4wp_defaultoptions;
 
@@ -247,7 +401,12 @@ function gtm4wp_reload_options() {
 		$gtm4wp_defaultoptions = array();
 	}
 
+	if ( !isset( $storedoptions[ GTM4WP_OPTION_BLACKLIST_STATUS ] ) ) {
+		$storedoptions = gtm4wp_migrate_blacklist_whitelist( $storedoptions );
+	}
+
 	$return_options = array_merge( $gtm4wp_defaultoptions, $storedoptions );
+	$return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] = explode( ',', $return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] );
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
 		$return_options[ GTM4WP_OPTION_GTM_CODE ] = GTM4WP_HARDCODED_GTM_ID;

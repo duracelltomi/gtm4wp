@@ -93,7 +93,7 @@ if ( ! function_exists( 'getallheaders' ) ) {
 }
 
 function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
-	global $wp_query, $gtm4wp_options;
+	global $wp_query, $gtm4wp_options, $gtm4wp_entity_ids;
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_DONOTTRACK ] ) {
 		if ( ! empty( $_SERVER['HTTP_DNT'] ) ) {
@@ -364,63 +364,17 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 	if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 ) {
 		$_gtmrestrictlistitems = array();
 
-		// IDs from https://developers.google.com/tag-manager/devguide#security
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ADADVISOR ] ) {
-			$_gtmrestrictlistitems[] = 'ta';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ADROLL ] ) {
-			$_gtmrestrictlistitems[] = 'asp';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_AWCONV ] ) {
-			$_gtmrestrictlistitems[] = 'awct';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_AWREMARKET ] ) {
-			$_gtmrestrictlistitems[] = 'sp';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_BIZO ] ) {
-			$_gtmrestrictlistitems[] = 'bzi';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_CLICKTALE ] ) {
-			$_gtmrestrictlistitems[] = 'cts';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_COMSCORE ] ) {
-			$_gtmrestrictlistitems[] = 'csm';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_CUSTOMHTML ] ) {
-			$_gtmrestrictlistitems[] = 'html';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_CUSTOMIMG ] ) {
-			$_gtmrestrictlistitems[] = 'img';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_DBLCLKCOUNT ] ) {
-			$_gtmrestrictlistitems[] = 'flc';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_DBLCLKSALES ] ) {
-			$_gtmrestrictlistitems[] = 'fls';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_GACLASSIC ] ) {
-			$_gtmrestrictlistitems[] = 'ga';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MARIN ] ) {
-			$_gtmrestrictlistitems[] = 'ms';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MPLEXIFRAME ] ) {
-			$_gtmrestrictlistitems[] = 'mpm';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MPLEXROI ] ) {
-			$_gtmrestrictlistitems[] = 'mpr';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MEDIA6DEG ] ) {
-			$_gtmrestrictlistitems[] = 'm6d';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_TURNCONV ] ) {
-			$_gtmrestrictlistitems[] = 'tc';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_TURNDATA ] ) {
-			$_gtmrestrictlistitems[] = 'tdc';
-		}
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_UA ] ) {
-			$_gtmrestrictlistitems[] = 'ua';
+		// because of security reasons, we loop through each stored entity in the options and validate them
+		// to make sure nobody has entered some 'funny' item manually
+		$valid_entity_ids = array_merge(
+			array_keys( $gtm4wp_entity_ids[ 'tags' ] ),
+			array_keys( $gtm4wp_entity_ids[ 'triggers' ] ),
+			array_keys( $gtm4wp_entity_ids[ 'variables' ] )
+		);
+		foreach( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] as $listed_entity ) {
+			if ( in_array( $listed_entity, $valid_entity_ids ) ) {
+				$_gtmrestrictlistitems[] = $listed_entity;
+			}
 		}
 
 		$_gtmwhitelist = array();
@@ -429,50 +383,6 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$_gtmblacklist = array_merge( $_gtmblacklist, $_gtmrestrictlistitems );
 		} else {
 			$_gtmwhitelist = array_merge( $_gtmwhitelist, $_gtmrestrictlistitems );
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_DOMELEMENT ] ) {
-			$_gtmwhitelist[] = 'd';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_CUSTOMJS ] ) {
-			$_gtmwhitelist[] = 'jsm';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_CONSTANT ] ) {
-			$_gtmwhitelist[] = 'c';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_1STCOOKIE ] ) {
-			$_gtmwhitelist[] = 'k';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_EVENTNAME ] ) {
-			$_gtmwhitelist[] = 'e';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_JSVAR ] ) {
-			$_gtmwhitelist[] = 'j';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_DLAYERVAR ] ) {
-			$_gtmwhitelist[] = 'v';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_RANDOMNUM ] ) {
-			$_gtmwhitelist[] = 'r';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_REFERRER ] ) {
-			$_gtmwhitelist[] = 'f';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_URL ] ) {
-			$_gtmwhitelist[] = 'u';
-		}
-
-		if ( $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT ] ) {
-			$_gtmwhitelist[] = 'v';
 		}
 
 		$dataLayer['gtm.whitelist'] = $_gtmwhitelist;
