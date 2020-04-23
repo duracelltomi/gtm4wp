@@ -774,7 +774,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	$_gtm_header_content .= apply_filters( GTM4WP_WPFILTER_AFTER_DATALAYER, '' );
 
-	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
+	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) ) {
 		$_gtm_codes = explode( ',', str_replace( array( ';', ' ' ), array( ',', '' ), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 
 		$_gtm_tag = '';
