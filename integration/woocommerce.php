@@ -200,7 +200,7 @@ function gtm4wp_woocommerce_addglobalvars( $return = '' ) {
 	global $gtm4wp_options;
 
 	if ( function_exists( 'WC' ) && WC()->cart ) {
-		$gtm4wp_needs_shipping_address = bool) WC()->cart->needs_shipping_address();
+		$gtm4wp_needs_shipping_address = (bool) WC()->cart->needs_shipping_address();
 	} else {
 		$gtm4wp_needs_shipping_address = false;
 	}
