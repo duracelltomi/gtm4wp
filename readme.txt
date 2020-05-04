@@ -268,6 +268,7 @@ If you are using the blacklist/whitelist feature of the plugin, review these opt
 * Updated: removed support for WooCommerce versions before v3.2
 * Updated: 'Blacklist tags' tab renamed to 'Security'
 * Updated: complete rework of blacklist/whitelist feature to use the latest tag/trigger/variable list of Google
+* Updated: do not fire add to cart event if button is in a disabled state
 
 = 1.11.4 =
 

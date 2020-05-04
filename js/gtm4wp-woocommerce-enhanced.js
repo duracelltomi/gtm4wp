@@ -174,7 +174,7 @@ jQuery(function() {
 	});
 
 	// track add to cart events for products on product detail pages
-	jQuery( document ).on( 'click', '.single_add_to_cart_button', function() {
+	jQuery( document ).on( 'click', '.single_add_to_cart_button:not(.disabled)', function() {
 		var _product_form       = jQuery( this ).closest( 'form.cart' );
 		var _product_var_id     = jQuery( '[name=variation_id]', _product_form );
 		var _product_is_grouped = jQuery( _product_form ).hasClass( 'grouped_form' );
