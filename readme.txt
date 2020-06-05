@@ -264,6 +264,8 @@ WARNING!
 If you are using the blacklist/whitelist feature of the plugin, review these options after upgrade as they could break because of a fundamental rework of this feature.
 
 * Fixed: safer IP address validation in geo and weather data features
+* Updated: plugin is now using the new Google Optimize snippet and supports new container ID format (OPT-XXXXX)
+* Updated: do not track hidden products in the cart in WooCommerce shops
 * Updated: removed deprecated events: download links, email links, social links -> all those can be now tracked with native Google Tag Manager triggers
 * Updated: removed support for WooCommerce versions before v3.2
 * Updated: 'Blacklist tags' tab renamed to 'Security'
