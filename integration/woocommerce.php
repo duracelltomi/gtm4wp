@@ -270,7 +270,10 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 		foreach( $current_cart->get_cart() as $cart_item_id => $cart_item_data) {
 			$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data["data"], $cart_item_data, $cart_item_id );
-			if ( !apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item_data ) ) {
+			if (
+				!apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item_data )
+				|| !apply_filters( 'woocommerce_widget_cart_item_visible', true, $cart_item_data, $cart_item_id )
+				) {
 				continue;
 			}
 
