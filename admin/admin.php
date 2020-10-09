@@ -614,7 +614,7 @@ function gtm4wp_admin_output_field( $args ) {
 							if ( is_plugin_active( $args['plugintocheck'] ) ) {
 								echo '<br />' . __( 'This plugin is <strong class="gtm4wp-plugin-active">active</strong>, it is strongly recommended to enable this integration!', 'duracelltomi-google-tag-manager' );
 							} else {
-								echo '<br />' . __( 'This plugin (' . $args['plugintocheck'] . ') is <strong class="gtm4wp-plugin-not-active">not active</strong>, enabling this integration could cause issues on frontend!', 'duracelltomi-google-tag-manager' );
+								sprintf( __( "This plugin (%s) is <strong class='gtm4wp-plugin-not-active'>not active</strong>, enabling this integration could cause issues on frontend!", "duracelltomi-google-tag-manager" ), $args['plugintocheck'] );
 							}
 						}
 
