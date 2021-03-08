@@ -364,8 +364,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'description' => sprintf(
 			__(
 				'Enter a comma separated list of Google Optimize container IDs that you would like to use on your site.<br />' .
-				'This plugin will add the <a href="%s">page-hiding snippet</a> to your pages.<br /><br />' .
-				'The Google Optimize container will be only loaded if you provide your Google Analytics property ID bellow as well.',
+				'This plugin will add the <a href="%s">page-hiding snippet</a> to your pages.<br />',
 				'duracelltomi-google-tag-manager'
 			),
 			'https://developers.google.com/optimize/#the_page-hiding_snippet_code'
@@ -488,7 +487,7 @@ function gtm4wp_admin_output_field( $args ) {
 			if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
 				$_gtm_id_value   = GTM4WP_HARDCODED_GTM_ID;
 				$_input_readonly = ' readonly="readonly"';
-				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Container ID was set and fixed by the GTM4WP_HARDCODED_GTM_ID constant: check wp-config.php, plugins, and your theme settings to change or remove the container ID.</span>';
+				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Container ID was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the container ID or remove the GTM4WP_HARDCODED_GTM_ID constant!</span>';
 			} else {
 				$_gtm_id_value   = $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ];
 				$_input_readonly = '';
@@ -522,7 +521,7 @@ function gtm4wp_admin_output_field( $args ) {
 			if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
 				$_gtm_auth_value = GTM4WP_HARDCODED_GTM_ENV_AUTH;
 				$_input_readonly = ' readonly="readonly"';
-				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Environment auth parameter was set and fixed by the GTM4WP_HARDCODED_GTM_ENV_AUTH constant: check wp-config.php, plugins, and your theme settings to change or remove the environment auth parameter.</span>';
+				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Environment auth parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_AUTH constant!</span>';
 			} else {
 				$_gtm_auth_value = $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ];
 				$_input_readonly = '';
@@ -540,7 +539,7 @@ function gtm4wp_admin_output_field( $args ) {
 			if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
 				$_gtm_preview_value = GTM4WP_HARDCODED_GTM_ENV_PREVIEW;
 				$_input_readonly    = ' readonly="readonly"';
-				$_warning_after     = '<br /><span class="gtm_wpconfig_set">WARNING! Environment preview parameter was set and fixed by the GTM4WP_HARDCODED_GTM_ENV_PREVIEW constant: check wp-config.php, plugins, and your theme settings to change or remove the environment preview parameter.</span>';
+				$_warning_after     = '<br /><span class="gtm_wpconfig_set">WARNING! Environment preview parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_PREVIEW constant!</span>';
 			} else {
 				$_gtm_preview_value = $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ];
 				$_input_readonly    = '';
@@ -614,7 +613,7 @@ function gtm4wp_admin_output_field( $args ) {
 							if ( is_plugin_active( $args['plugintocheck'] ) ) {
 								echo '<br />' . __( 'This plugin is <strong class="gtm4wp-plugin-active">active</strong>, it is strongly recommended to enable this integration!', 'duracelltomi-google-tag-manager' );
 							} else {
-								sprintf( __( "This plugin (%s) is <strong class='gtm4wp-plugin-not-active'>not active</strong>, enabling this integration could cause issues on frontend!", "duracelltomi-google-tag-manager" ), $args['plugintocheck'] );
+								echo '<br />' . __( 'This plugin (' . $args['plugintocheck'] . ') is <strong class="gtm4wp-plugin-not-active">not active</strong>, enabling this integration could cause issues on frontend!', 'duracelltomi-google-tag-manager' );
 							}
 						}
 
