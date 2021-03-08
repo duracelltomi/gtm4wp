@@ -731,6 +731,22 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			}
 		}
 
+		// check app+web ecommerce
+		if ( dataLayer_content.ecommerce && dataLayer_content.ecommerce.items ) {
+			if ( gtm4wp_orderid_tracked && ( dataLayer_content.ecommerce.transaction_id == gtm4wp_orderid_tracked ) ) {
+				delete dataLayer_content.ecommerce.affiliation;
+				delete dataLayer_content.ecommerce.value;
+				delete dataLayer_content.ecommerce.currency;
+				delete dataLayer_content.ecommerce.tax;
+				delete dataLayer_content.ecommerce.shipping;
+				delete dataLayer_content.ecommerce.transaction_id;
+
+				delete dataLayer_content.ecommerce.items;
+			} else {
+				gtm4wp_orderid_tracked = dataLayer_content.ecommerce.purchase.actionField.id;
+			}
+		}
+
 		// check standard ecommerce
 		if ( dataLayer_content.transactionId ) {
 			if ( gtm4wp_orderid_tracked && ( dataLayer_content.transactionId == gtm4wp_orderid_tracked ) ) {
@@ -814,18 +830,6 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 }
 
-function gtm4wp_body_class( $classes ) {
-	global $gtm4wp_options;
-
-	// solution is based on the code of Yaniv Friedensohn
-	// http://www.affectivia.com/blog/placing-the-google-tag-manager-in-wordpress-after-the-body-tag/
-	if ( ( GTM4WP_PLACEMENT_BODYOPEN_AUTO == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) && ( !isset($_GET["ct_builder"]) ) ) {
-		$classes[] = '">' . gtm4wp_get_the_gtm_tag() . '<br style="display:none;';
-	}
-
-	return $classes;
-}
-
 function gtm4wp_wp_login() {
 	setcookie( 'gtm4wp_user_logged_in', '1', 0, '/' );
 }
@@ -857,7 +861,6 @@ add_action( 'wp_head', 'gtm4wp_wp_header_begin', $gtm4wp_header_begin_prior, 0 )
 add_action( 'wp_head', 'gtm4wp_wp_header_top', 1, 0 );
 add_action( 'wp_footer', 'gtm4wp_wp_footer' );
 add_action( 'wp_loaded', 'gtm4wp_wp_loaded' );
-add_filter( 'body_class', 'gtm4wp_body_class', 10000 );
 add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_add_basic_datalayer_data' );
 
 // to be able to easily migrate from other Google Tag Manager plugins

@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 5.6
-Tested up to: 5.4
+Tested up to: 5.7
 Stable tag: 1.12
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
@@ -264,13 +264,22 @@ WARNING!
 If you are using the blacklist/whitelist feature of the plugin, review these options after upgrade as they could break because of a fundamental rework of this feature.
 
 * Fixed: safer IP address validation in geo and weather data features
-* Updated: plugin is now using the new Google Optimize snippet and supports new container ID format (OPT-XXXXX)
-* Updated: do not track hidden products in the cart in WooCommerce shops
-* Updated: removed deprecated events: download links, email links, social links -> all those can be now tracked with native Google Tag Manager triggers
+* Updated: removed deprecated events: download links, email links, social links -> such can be now tracked with native Google Tag Manager triggers
 * Updated: removed support for WooCommerce versions before v3.2
 * Updated: 'Blacklist tags' tab renamed to 'Security'
 * Updated: complete rework of blacklist/whitelist feature to use the latest tag/trigger/variable list of Google
-* Updated: do not fire add to cart event if button is in a disabled state
+
+= 1.11.6 =
+
+* Fixed: do not track hidden products in the cart in WooCommerce shops
+* Fixed: do not fire add to cart event if button is in a disabled state
+* Fixed: fixed translation of an admin text
+* Fixed: needs_shipping_address() calls were sometimes broken in WooCommerce shops, added additional checks to prevent
+* Updated: removed the body_class method of adding the iframe/noscript container code (page builders and the standard wp_body_open hook remains supported)
+
+= 1.11.5 =
+
+* Fixed: new Google Optimize container ID format accepted now
 
 = 1.11.4 =
 
@@ -683,6 +692,14 @@ Please report all bugs found in my plugin using the [contact form on my website]
 = 1.12 =
 
 Removed several deprecated features, dropped support for WooCommerce versions before 3.2
+
+= 1.11.6 =
+
+Bugfix release
+
+= 1.11.5 =
+
+Fixed: new Google Optimize container ID format accepted now
 
 = 1.11.4 =
 
