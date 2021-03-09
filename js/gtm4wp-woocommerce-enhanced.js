@@ -31,11 +31,11 @@ function gtm4wp_map_eec_to_ga4( productdata ) {
 	if ( productdata.variant ) {
 		ga4_product.item_variant = productdata.variant;
 	}
-	if ( productdata.listname ) {
-		ga4_product.item_list_name = productdata.listname;
+	if ( productdata.list ) {
+		ga4_product.item_list_name = productdata.list;
 	}
-	if ( productdata.listposition ) {
-		ga4_product.index = productdata.listposition;
+	if ( productdata.position ) {
+		ga4_product.index = productdata.position;
 	}
 	if ( productdata.quantity ) {
 		ga4_product.quantity = productdata.quantity;
