@@ -1,6 +1,6 @@
 {
     "name": "duracelltomi/gtm4wp",
-    "type": "library",
+    "type": "wordpress-plugin",
     "description": "The most populer Google Tag Manager plugin for WordPress",
     "homepage": "https://gtm4wp.com/",
     "license": "LGPL-3.0-or-later",
