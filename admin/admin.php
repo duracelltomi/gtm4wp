@@ -129,7 +129,7 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 	GTM4WP_OPTION_INCLUDE_REMARKETING   => array(
 		'label'       => __( 'Remarketing variable', 'duracelltomi-google-tag-manager' ),
 		'description' => __( 'Check this option to include a dataLayer variable where all dataLayer values are stored to be included in your Google Ads remarketing tag as a custom variable field', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_STABLE,
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INCLUDE_BROWSERDATA   => array(
 		'label'       => __( 'Browser data *', 'duracelltomi-google-tag-manager' ),
@@ -274,7 +274,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC      => array(
 		'label'         => __( 'Track classic e-commerce', 'duracelltomi-google-tag-manager' ),
 		'description'   => sprintf( __( 'Choose this option if you would like to track e-commerce data using <a href="%s" target="_blank">classic transaction data</a>.', 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/analytics/devguides/collection/analyticsjs/ecommerce' ),
-		'phase'         => GTM4WP_PHASE_STABLE,
+		'phase'         => GTM4WP_PHASE_DEPRECATED,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
 	GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC     => array(
@@ -337,7 +337,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING         => array(
 		'label'         => __( 'Google Ads Remarketing', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( 'Enable this to add Google Ads dynamic remarketing variables to the dataLayer', 'duracelltomi-google-tag-manager' ),
-		'phase'         => GTM4WP_PHASE_STABLE
+		'phase'         => GTM4WP_PHASE_DEPRECATED
 	),
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX     => array(
 		'label'         => __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ),
