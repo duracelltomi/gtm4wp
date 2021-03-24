@@ -81,15 +81,23 @@ function gtm4wp_handle_cart_qty_change() {
 					'quantity':   _current_value - _original_value
 				};
 
+				// fire ga3 version
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.addProductToCartEEC',
-					'ecommerce_event': 'add_to_cart',
 					'ecommerce': {
-						'currencyCode': gtm4wp_currency, // ga3 version
-						'currency': gtm4wp_currency, // ga4 version
+						'currencyCode': gtm4wp_currency,
 						'add': {
 							'products': [ product_data ]
-						},
+						}
+					}
+				});
+
+				// fire ga4 version
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'add_to_cart',
+					'ecommerce': {
+						'currency': gtm4wp_currency, // ga4 version
+						'value': productprice.toFixed(2) * (_current_value - _original_value),
 						'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 					}
 				});
@@ -105,15 +113,23 @@ function gtm4wp_handle_cart_qty_change() {
 					'quantity':   _original_value - _current_value
 				};
 
+				// fire ga3 version
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.removeFromCartEEC',
-					'ecommerce_event': 'remove_from_cart',
 					'ecommerce': {
-						'currencyCode': gtm4wp_currency, // ga3 version
-						'currency': gtm4wp_currency, // ga4 version
+						'currencyCode': gtm4wp_currency,
 						'remove': {
 							'products': [ product_data ]
-						},
+						}
+					}
+				});
+
+				// fire ga4 version
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'remove_from_cart',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'value': productprice.toFixed(2) * (_original_value - _current_value),
 						'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 					}
 				});
@@ -167,13 +183,20 @@ jQuery(function() {
 				chunk = products.splice( 0, gtm4wp_product_per_impression );
 				ga4_chunk = ga4_products.splice( 0, gtm4wp_product_per_impression );
 
+				// fire ga3 version
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.productImpressionEEC',
-					'ecommerce_event': 'view_item_list',
 					'ecommerce': {
-						'currencyCode': gtm4wp_currency, // ga3 version
-						'currency': gtm4wp_currency, // ga4 version
-						'impressions': chunk,
+						'currencyCode': gtm4wp_currency,
+						'impressions': chunk
+					}
+				});
+
+				// fire ga4 version
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'view_item_list',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
 						'items': ga4_chunk
 					}
 				});
@@ -184,10 +207,8 @@ jQuery(function() {
 
 					if ( ! window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] ) {
 						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = products;
-						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'items' ] = ga4_products;
 					} else {
 						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ].concat( products );
-						window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'items' ] = window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'items' ].concat( ga4_products );
 					}
 
 					break;
@@ -199,12 +220,9 @@ jQuery(function() {
 				i = 0;
 				window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ] = {};
 				window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'impressions' ] = products;
-				window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'items' ] = ga4_products;
 			}
 
-			window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'currencyCode' ] = gtm4wp_currency; // ga3 version
-			window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'currency' ] = gtm4wp_currency; // ga4 version
-			window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'ecommerce_event' ] = 'view_item_list';
+			window[ gtm4wp_datalayer_name ][ i ][ 'ecommerce' ][ 'currencyCode' ] = gtm4wp_currency;
 		}
 	}
 
@@ -232,15 +250,23 @@ jQuery(function() {
 			'quantity':   1
 		};
 
+		// fire ga3 version
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.addProductToCartEEC',
-			'ecommerce_event': 'add_to_cart',
 			'ecommerce': {
-				'currencyCode': gtm4wp_currency, // ga3 version
-				'currency': gtm4wp_currency, // ga4 version
+				'currencyCode': gtm4wp_currency,
 				'add': {
 					'products': [ product_data ]
-				},
+				}
+			}
+		});
+
+		// fire ga4 version
+		window[ gtm4wp_datalayer_name ].push({
+			'event': 'add_to_cart',
+			'ecommerce': {
+				'currency': gtm4wp_currency,
+				'value': productprice.toFixed(2),
 				'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 			}
 		});
@@ -256,15 +282,23 @@ jQuery(function() {
 			if ( gtm4wp_last_selected_product_variation ) {
 				gtm4wp_last_selected_product_variation.quantity = jQuery( 'form.cart:first input[name=quantity]' ).val();
 
+				// fire ga3 version
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.addProductToCartEEC',
-					'ecommerce_event': 'add_to_cart',
 					'ecommerce': {
-						'currencyCode': gtm4wp_currency, // ga3 version
-						'currency': gtm4wp_currency, // ga4 version
+						'currencyCode': gtm4wp_currency,
 						'add': {
 							'products': [gtm4wp_last_selected_product_variation]
-						},
+						}
+					}
+				});
+
+				// fire ga4 version
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'add_to_cart',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'value': gtm4wp_last_selected_product_variation.price * gtm4wp_last_selected_product_variation.quantity,
 						'items': [ gtm4wp_map_eec_to_ga4( gtm4wp_last_selected_product_variation ) ]
 					}
 				});
@@ -273,6 +307,7 @@ jQuery(function() {
 			var products_in_group = jQuery( '.grouped_form .gtm4wp_productdata' );
 			var products = [];
 			var ga4_products = [];
+			var sum_value = 0;
 
 			products_in_group.each( function() {
 				var productdata = jQuery( this );
@@ -300,21 +335,30 @@ jQuery(function() {
 
 				products.push( product_data );
 				ga4_products.push( gtm4wp_map_eec_to_ga4( product_data ) );
+				sum_value += product_data.price * product_data.quantity;
 			});
 
 			if ( 0 == products.length ) {
 				return;
 			}
 
+			// fire ga3 version
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.addProductToCartEEC',
-				'ecommerce_event': 'add_to_cart',
 				'ecommerce': {
-					'currencyCode': gtm4wp_currency, // ga3 version
-					'currency': gtm4wp_currency, // ga4 version
+					'currencyCode': gtm4wp_currency,
 					'add': {
 						'products': products
-					},
+					}
+				}
+			});
+
+			// fire ga4 version
+			window[ gtm4wp_datalayer_name ].push({
+				'event': 'add_to_cart',
+				'ecommerce': {
+					'currency': gtm4wp_currency,
+					'value': sum_value,
 					'items': ga4_products
 				}
 			});
@@ -329,15 +373,23 @@ jQuery(function() {
 				'brand':      jQuery( '[name=gtm4wp_brand]', product_form ).val()
 			};
 
+			// fire ga3 version
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.addProductToCartEEC',
-				'ecommerce_event': 'add_to_cart',
 				'ecommerce': {
-					'currencyCode': gtm4wp_currency, // ga3 version
-					'currency': gtm4wp_currency, // ga4 version
+					'currencyCode': gtm4wp_currency,
 					'add': {
 						'products': [ product_data ]
-					},
+					}
+				}
+			});
+
+			// fire ga4 version
+			window[ gtm4wp_datalayer_name ].push({
+				'event': 'add_to_cart',
+				'ecommerce': {
+					'currency': gtm4wp_currency,
+					'value': product_data.price * product_data.quantity,
 					'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 				}
 			});
@@ -378,15 +430,23 @@ jQuery(function() {
 			'quantity':   qty
 		};
 
+		// fire ga3 version
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.removeFromCartEEC',
-			'ecommerce_event': 'remove_from_cart',
 			'ecommerce': {
-				'currencyCode': gtm4wp_currency, // ga3 version
-				'currency': gtm4wp_currency, // ga4 version
+				'currencyCode': gtm4wp_currency,
 				'remove': {
 					'products': [ product_data ]
-				},
+				}
+			}
+		});
+
+		// fire ga4 version
+		window[ gtm4wp_datalayer_name ].push({
+			'event': 'remove_from_cart',
+			'ecommerce': {
+				'currency': gtm4wp_currency,
+				'value': product_data.price * product_data.quantity,
 				'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 			}
 		});
@@ -456,24 +516,37 @@ jQuery(function() {
 			'position':   dom_productdata.data( 'gtm4wp_product_listposition' )
 		};
 
+		// fire ga3 version
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.productClickEEC',
-			'ecommerce_event': 'select_item',
 			'ecommerce': {
-				'currencyCode': gtm4wp_currency, // ga3 version
-				'currency': gtm4wp_currency, // ga4 version
+				'currencyCode': gtm4wp_currency,
 				'click': {
 					'actionField': {'list': dom_productdata.data( 'gtm4wp_productlist_name' )},
 					'products': [ product_data ]
-				},
-				'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
+				}
 			},
 			'eventCallback': function() {
-				if ( ctrl_key_pressed && productpage_window ) {
-					productpage_window.location.href= dom_productdata.data( 'gtm4wp_product_url' );
-				} else {
-					document.location.href = dom_productdata.data( 'gtm4wp_product_url' );
-				}
+
+				// fire ga4 version
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'select_item',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
+					},
+					'eventCallback': function() {
+
+						if ( ctrl_key_pressed && productpage_window ) {
+							productpage_window.location.href= dom_productdata.data( 'gtm4wp_product_url' );
+						} else {
+							document.location.href = dom_productdata.data( 'gtm4wp_product_url' );
+						}
+
+					},
+					'eventTimeout': 2000
+				});
+
 			},
 			'eventTimeout': 2000
 		});
@@ -524,20 +597,27 @@ jQuery(function() {
 		current_product_detail_data.variant = _tmp.join(',');
 		gtm4wp_last_selected_product_variation = current_product_detail_data;
 
+		// fire ga3 version
 		window[ gtm4wp_datalayer_name ].push({
 			'event': 'gtm4wp.changeDetailViewEEC',
-			'ecommerce_event': 'view_item',
 			'ecommerce': {
-				'currencyCode': gtm4wp_currency, // ga3 version
-				'currency': gtm4wp_currency, // ga4 version
+				'currencyCode': gtm4wp_currency,
 				'detail': {
 					'products': [ current_product_detail_data ]
-				},
-				'items': [ gtm4wp_map_eec_to_ga4( current_product_detail_data ) ]
+				}
 			},
 			'ecomm_prodid': gtm4wp_id_prefix + current_product_detail_data.id,
 			'ecomm_pagetype': 'product',
 			'ecomm_totalvalue': current_product_detail_data.price,
+		});
+
+		// fire ga4 version
+		window[ gtm4wp_datalayer_name ].push({
+			'event': 'view_item',
+			'ecommerce': {
+				'currency': gtm4wp_currency,
+				'items': [ gtm4wp_map_eec_to_ga4( current_product_detail_data ) ]
+			}
 		});
 
 		if ( document.readyState === "interactive" ) {
@@ -573,6 +653,7 @@ jQuery(function() {
 	// codes for enhanced ecommerce events on checkout page
 	if ( is_checkout ) {
 		window.gtm4wp_checkout_step_offset  = window.gtm4wp_checkout_step_offset || 0;
+		window.gtm4wp_checkout_value        = window.gtm4wp_checkout_value || 0;
 		window.gtm4wp_checkout_products     = window.gtm4wp_checkout_products || [];
 		window.gtm4wp_checkout_products_ga4 = window.gtm4wp_checkout_products_ga4 || [];
 
@@ -627,19 +708,27 @@ jQuery(function() {
 				shipping_tier = shipping_el.val();
 			}
 
+			// fire ga3 version
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.checkoutStepEEC',
-				'ecommerce_event': 'add_shipping_info',
 				'ecommerce': {
-					'currencyCode': gtm4wp_currency, // ga3 version
-					'currency': gtm4wp_currency, // ga4 version
-					'shipping_tier': shipping_tier,
+					'currencyCode': gtm4wp_currency,
 					'checkout': {
 						'actionField': {
 							'step': 3 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
 						},
 						'products': window.gtm4wp_checkout_products
-					},
+					}
+				}
+			});
+
+			// fire ga4 version
+			window[ gtm4wp_datalayer_name ].push({
+				'event': 'add_shipping_info',
+				'ecommerce': {
+					'currency': gtm4wp_currency,
+					'shipping_tier': shipping_tier,
+					'value': window.gtm4wp_checkout_value,
 					'items': window.gtm4wp_checkout_products_ga4
 				}
 			});
@@ -667,19 +756,27 @@ jQuery(function() {
 				payment_type = payment_el.val();
 			}
 
+			// fire ga3 version
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.checkoutStepEEC',
-				'ecommerce_event': 'add_payment_info',
 				'ecommerce': {
-					'currencyCode': gtm4wp_currency, // ga3 version
-					'currency': gtm4wp_currency, // ga4 version
-					'payment_type': payment_type,
+					'currencyCode': gtm4wp_currency,
 					'checkout': {
 						'actionField': {
 							'step': 4 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
 						},
 						'products': window.gtm4wp_checkout_products
-					},
+					}
+				}
+			});
+
+			// fire ga4 version
+			window[ gtm4wp_datalayer_name ].push({
+				'event': 'add_payment_info',
+				'ecommerce': {
+					'currency': gtm4wp_currency,
+					'payment_type': payment_type,
+					'value': window.gtm4wp_checkout_value,
 					'items': window.gtm4wp_checkout_products_ga4
 				}
 			});
@@ -758,16 +855,110 @@ jQuery(function() {
 				window[ gtm4wp_datalayer_name ][ i ][ 'ecomm_prodid' ] = [];
 			}
 
-			if ( 'undefined' == typeof window[ gtm4wp_datalayer_name ][ i ][ 'ecomm_prodid' ].push ) {
-				return false;
+			if ( 'undefined' !== typeof window[ gtm4wp_datalayer_name ][ i ][ 'ecomm_prodid' ].push ) {
+				var productdata;
+				jQuery( '.gtm4wp_productdata' ).each( function() {
+					productdata = jQuery( this );
+
+					window[ gtm4wp_datalayer_name ][ i ][ 'ecomm_prodid' ].push( gtm4wp_id_prefix + productdata.data( 'gtm4wp_product_id' ) );
+				});
+			}
+		}
+	}
+
+	// loop through datalayer and fire GA4 version of EEC events
+	if ( window[ gtm4wp_datalayer_name ] && window[ gtm4wp_datalayer_name ].forEach ) {
+		window[ gtm4wp_datalayer_name ].forEach(function( item ) {
+
+			if ( item && item.ecommerce && item.ecommerce.detail ) {
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'view_item',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'items': [ gtm4wp_map_eec_to_ga4( item.ecommerce.detail.products[0] ) ]
+					}
+				});
 			}
 
-			var productdata;
-			jQuery( '.gtm4wp_productdata' ).each( function() {
-				productdata = jQuery( this );
+			if ( item && item.ecommerce && ( item.ecommerce.cart || (item.ecommerce.checkout && is_cart) ) ) {
+				var source_products = item.ecommerce.cart || item.ecommerce.checkout;
+				var ga4_products = [];
+				var sum_value = 0;
 
-				window[ gtm4wp_datalayer_name ][ i ][ 'ecomm_prodid' ].push( gtm4wp_id_prefix + productdata.data( 'gtm4wp_product_id' ) );
-			});
-		}
+				source_products.forEach(function( product ) {
+					ga4_products.push( gtm4wp_map_eec_to_ga4( product ) );
+					sum_value += product.price * product.quantity;
+				});
+
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'view_cart',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'value': sum_value,
+						'items': ga4_products
+					}
+				});
+			}
+
+			if ( item && item.ecommerce && item.ecommerce.checkout && !is_cart ) {
+				var ga4_products = [];
+				var sum_value = 0;
+
+				item.ecommerce.checkout.products.forEach(function( product ) {
+					ga4_products.push( gtm4wp_map_eec_to_ga4( product ) );
+					sum_value += product.price * product.quantity;
+				});
+
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'begin_checkout',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'value': sum_value,
+						'items': ga4_products
+					}
+				});
+			}
+
+			// present if product is readded into cart just after removel
+			if ( item && item.ecommerce && item.ecommerce.add ) {
+				var ga4_products = [];
+				var sum_value = 0;
+
+				item.ecommerce.add.products.forEach(function( product ) {
+					ga4_products.push( gtm4wp_map_eec_to_ga4( product ) );
+					sum_value += product.price * product.quantity;
+				});
+
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'add_to_cart',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'value': sum_value,
+						'items': ga4_products
+					}
+				});
+			}
+
+			if ( item && item.ecommerce && item.ecommerce.purchase ) {
+				var ga4_products = [];
+				item.ecommerce.purchase.products.forEach(function( product ) {
+					ga4_products.push( gtm4wp_map_eec_to_ga4( product ) );
+				});
+
+				window[ gtm4wp_datalayer_name ].push({
+					'event': 'purchase',
+					'ecommerce': {
+						'currency': gtm4wp_currency,
+						'items': ga4_products,
+						'transaction_id': item.ecommerce.purchase.actionField.id,
+						'affiliation': item.ecommerce.purchase.actionField.affiliation,
+						'value': item.ecommerce.purchase.actionField.revenue,
+						'tax': item.ecommerce.purchase.actionField.tax,
+						'shipping': item.ecommerce.purchase.actionField.shipping,
+						'coupon': item.ecommerce.purchase.actionField.coupon
+					}
+				});
+			}
+		});
 	}
 });

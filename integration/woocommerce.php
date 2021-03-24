@@ -388,16 +388,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 						$currencyCode = get_woocommerce_currency();
 
-						$dataLayer['ecommerce_event'] = 'view_item';
 						$dataLayer['ecommerce'] = array(
-							'currencyCode' => $currencyCode, // ga3 version
-							'currency'     => $currencyCode, // ga4 version
+							'currencyCode' => $currencyCode,
 							'detail'       => array(
 								'products' => array(
 									$eec_product_array
 								)
-							),
-							'items' => array( gtm4wp_map_eec_to_ga4( $eec_product_array ) )
+							)
 						);
 					}
 				}
@@ -409,7 +406,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			|| $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ]
 		) {
 			$gtm4wp_cart_products             = array();
-			$gtm4wp_cart_ga4_products      = array();
 			$gtm4wp_cart_products_remarketing = array();
 
 			$gtm4wp_currency = get_woocommerce_currency();
@@ -425,12 +421,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					'quantity' => $cart_item_data['quantity']
 				), 'cart' );
 
-				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] ) {
-					$gtm4wp_cart_products[] = $eec_product_array;
-				}
-
+				$gtm4wp_cart_products[] = $eec_product_array;
 				$gtm4wp_cart_products_remarketing[] = gtm4wp_prefix_productid( $eec_product_array[ 'id' ] );
-				$gtm4wp_cart_ga4_products[] = gtm4wp_map_eec_to_ga4( $eec_product_array );
 			}
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
@@ -446,25 +438,19 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] ) {
-					// add ga3 and ga4 products
-					$dataLayer['ecommerce_event'] = 'view_cart';
 					$dataLayer['ecommerce'] = array(
-						'currencyCode' => $gtm4wp_currency, // ga3 version
-						'currency'     => $gtm4wp_currency, // ga4 version
+						'currencyCode' => $gtm4wp_currency,
 						'checkout'     => array(
 							'actionField' => array(
 								'step' => 1,
 							),
 							'products'    => $gtm4wp_cart_products,
-						),
-						'items' => $gtm4wp_cart_ga4_products
+						)
 					);
 				} else {
 					// add only ga4 products to populate view_cart event
-					$dataLayer['ecommerce_event'] = 'view_cart';
 					$dataLayer['ecommerce'] = array(
-						'currency' => $gtm4wp_currency, // ga4 version
-						'items'    => $gtm4wp_cart_ga4_products
+						'cart'    => $gtm4wp_cart_products
 					);
 				}
 			}
@@ -594,10 +580,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 				$dataLayer['event']     = 'gtm4wp.orderCompletedEEC';
-				$dataLayer['ecommerce_event'] = 'purchase';
 				$dataLayer['ecommerce'] = array(
-					'currencyCode' => $order_currency, // ga3 version
-					'currency'     => $order_currency, // ga4 version
+					'currencyCode' => $order_currency,
 					'purchase'     => array(
 						'actionField' => array(
 							'id'          => $order->get_order_number(),
@@ -607,13 +591,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 							'shipping'    => (float)( $order->get_shipping_total() ),
 							'coupon'      => implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) ),
 						)
-					),
-					'transaction_id' => $order->get_order_number(),
-					'affiliation'    => '',
-					'value'          => $order_revenue,
-					'tax'            => (float) $order->get_total_tax(),
-					'shipping'       => (float)( $order->get_shipping_total() ),
-					'coupon'         => implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) )
+					)
 				);
 			}
 
@@ -627,12 +605,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 				$dataLayer['ecommerce']['purchase']['products'] = $order_items['products'];
-
-				$ga4_products = array();
-				foreach( $order_items['products'] as $oneproduct ) {
-					$ga4_products[] = gtm4wp_map_eec_to_ga4( $oneproduct );
-				}
-				$dataLayer['ecommerce']['items'] = $ga4_products;
 			}
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
@@ -681,26 +653,26 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 				$currencyCode = get_woocommerce_currency();
 
 				$ga4_products = array();
+				$sum_value = 0;
 				foreach( $gtm4wp_checkout_products as $oneproduct ) {
 					$ga4_products[] = gtm4wp_map_eec_to_ga4( $oneproduct );
+					$sum_value += $oneproduct["price"] * $oneproduct["quantity"];
 				}
 
-				$dataLayer['ecommerce_event'] = 'begin_checkout';
 				$dataLayer['ecommerce'] = array(
-					'currencyCode' => $currencyCode, // ga3 version
-					'currency'     => $currencyCode, // ga4 version
+					'currencyCode' => $currencyCode,
 					'checkout'     => array(
 						'actionField' => array(
 							'step' => 1 + (int) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ],
 						),
 						'products'    => $gtm4wp_checkout_products,
-					),
-					'items'        => $ga4_products
+					)
 				);
 
 				wc_enqueue_js('
 					window.gtm4wp_checkout_products     = ' . json_encode( $gtm4wp_checkout_products ) . ';
 					window.gtm4wp_checkout_products_ga4 = ' . json_encode( $ga4_products ) . ';
+					window.gtm4wp_checkout_value        = ' . (float) $sum_value . ';
 					window.gtm4wp_checkout_step_offset  = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] . ';'
 				);
 			}
@@ -723,16 +695,13 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$currencyCode = get_woocommerce_currency();
 
 			$dataLayer['event'] = 'gtm4wp.addProductToCartEEC';
-			$dataLayer['ecommerce_event'] = 'add_to_cart';
 			$dataLayer['ecommerce'] = array(
-				'currencyCode' => $currencyCode, // ga3 version
-				'currency'     => $currencyCode, // ga4 version
+				'currencyCode' => $currencyCode,
 				'add' => array(
 					'products' => array(
 						$eec_product_array
 					)
-				),
-				'items' => array( gtm4wp_map_eec_to_ga4( $eec_product_array ) )
+				)
 			);
 		}
 
@@ -1046,16 +1015,13 @@ function gtm4wp_wc_quick_view_before_single_product() {
 				if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 					$currencyCode = get_woocommerce_currency();
 
-					$dataLayer['ecommerce_event'] = 'view_item';
 					$dataLayer['ecommerce'] = array(
-						'currencyCode' => $currencyCode, // ga3 version
-						'currency'     => $currencyCode, // ga4 version
+						'currencyCode' => $currencyCode,
 						'detail'       => array(
 							'products' => array(
 								$eec_product_array
 							)
-						),
-						'items'        => array( gtm4wp_map_eec_to_ga4( $eec_product_array ) )
+						)
 					);
 				}
 			}
