@@ -280,7 +280,7 @@ jQuery(function() {
 
 		if ( product_variant_id.length > 0 ) {
 			if ( gtm4wp_last_selected_product_variation ) {
-				gtm4wp_last_selected_product_variation.quantity = jQuery( 'form.cart:first input[name=quantity]' ).val();
+				gtm4wp_last_selected_product_variation.quantity = jQuery( 'form.cart' ).first().find( 'input[name=quantity]' ).first().val();
 
 				// fire ga3 version
 				window[ gtm4wp_datalayer_name ].push({
@@ -368,7 +368,7 @@ jQuery(function() {
 				'name':       jQuery( '[name=gtm4wp_name]', product_form ).val(),
 				'price':      jQuery( '[name=gtm4wp_price]', product_form ).val(),
 				'category':   jQuery( '[name=gtm4wp_category]', product_form ).val(),
-				'quantity':   jQuery( 'form.cart:first input[name=quantity]' ).val(),
+				'quantity':   jQuery( 'form.cart' ).first().find( 'input[name=quantity]' ).first().val(),
 				'stocklevel': jQuery( '[name=gtm4wp_stocklevel]', product_form ).val(),
 				'brand':      jQuery( '[name=gtm4wp_brand]', product_form ).val()
 			};
