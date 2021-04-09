@@ -881,7 +881,7 @@ jQuery(function() {
 			}
 
 			if ( item && item.ecommerce && ( item.ecommerce.cart || (item.ecommerce.checkout && is_cart) ) ) {
-				var source_products = item.ecommerce.cart || item.ecommerce.checkout;
+				var source_products = item.ecommerce.cart || item.ecommerce.checkout.products;
 				var ga4_products = [];
 				var sum_value = 0;
 
