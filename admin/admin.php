@@ -687,15 +687,18 @@ function gtm4wp_sanitize_options( $options ) {
 			if ( GTM4WP_OPTION_BLACKLIST_ENABLE === $optionname ) {
 				$output[ $optionname ] = (int) $options[ GTM4WP_OPTION_BLACKLIST_ENABLE ];
 			} else if ( GTM4WP_OPTION_BLACKLIST_SANDBOXED == $optionname ) {
-				$output[ $optionname ] = (bool) $options[ GTM4WP_OPTION_BLACKLIST_SANDBOXED ];
+				$output[ $optionname ] = (bool) $newoptionvalue;
 			} else if ( GTM4WP_OPTION_BLACKLIST_STATUS == $optionname ) {
 				$selected_blacklist_entities = array();
 
 				foreach( $gtm4wp_entity_ids as $gtm_entity_group_id => $gtm_entity_group_list ) {
 					foreach( $gtm_entity_group_list as $gtm_entity_id => $gtm_entity_label ) {
-						$newoptionvalue = (bool) $options[ 'blacklist-' . $gtm_entity_group_id . '-' . $gtm_entity_id ];
-						if ( $newoptionvalue ) {
-							$selected_blacklist_entities[] = $gtm_entity_id;
+						$entity_option_id = 'blacklist-' . $gtm_entity_group_id . '-' . $gtm_entity_id;
+						if ( array_key_exists( $entity_option_id, $options ) ) {
+							$newoptionvalue = (bool) $options[ $entity_option_id ];
+							if ( $newoptionvalue ) {
+								$selected_blacklist_entities[] = $gtm_entity_id;
+							}
 						}
 					}
 				}
