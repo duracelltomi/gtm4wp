@@ -178,7 +178,7 @@ function gtm4wp_map_eec_to_ga4( $productdata ) {
 	} else if ( count($category_parts) > 1 ) {
 		$ga4_product[ "item_category" ] = $category_parts[0];
 		for( $i=1; $i < min( 5, count( $category_parts ) ); $i++ ) {
-			$ga4_product[ "item_category_" + ($i+1) ] = $category_parts[$i];
+			$ga4_product[ "item_category_" . (string)($i+1) ] = $category_parts[$i];
 		}
 	}
 
