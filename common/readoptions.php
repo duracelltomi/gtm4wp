@@ -323,7 +323,9 @@ $gtm4wp_entity_ids = array(
 );
 
 function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
-	if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 ) {
+	if ( ( array_key_exists( GTM4WP_OPTION_BLACKLIST_ENABLE, $current_options ) )
+		  && ( $current_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 )
+		) {
 		$_gtmrestrictlistitems = array();
 
 		// IDs from https://developers.google.com/tag-manager/devguide#security
