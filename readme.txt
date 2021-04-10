@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.7
-Stable tag: 1.12.1
+Stable tag: 1.12.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -229,6 +229,13 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.12.2 =
+
+If you are upgrading from 1.11.x, please read the previous changelog entry for v1.12
+
+* Fixed: error message in WooCommerce integration on PHP 8 hosts
+* Fixed: PHP notice about non existing blacklist-enable array key
 
 = 1.12.1 =
 
@@ -671,9 +678,13 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
+= 1.12.2 =
+
+Bugfix release + read changelog for important v1.12.x changes
+
 = 1.12.1 =
 
-Bugfix release + v1.12: Removed several deprecated features, dropped support for WooCommerce versions before 3.2, introduced GA4 data layer variables, deprecated classic ecommerce and Google Ads remarketing varibale
+Bugfix release + read changelog for important v1.12.x changes
 
 = 1.12 =
 
