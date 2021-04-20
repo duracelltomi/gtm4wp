@@ -102,6 +102,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP', 'integrate-woocommerce-c
 define( 'GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL',    'integrate-woocommerce-cart-content-in-datalayer' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY',    'integrate-woocommerce-brand-taxonomy' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCREMARKETING', 'integrate-woocommerce-remarketing' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL', 'integrate-woocommerce-business-vertical' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSESKU', 'integrate-woocommerce-remarketing-usesku' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH', 'integrate-woocommerce-use-full-category-path' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX', 'integrate-woocommerce-remarketing-productidprefix' );
@@ -196,6 +197,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL    => false,
 	GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY    => '',
 	GTM4WP_OPTION_INTEGRATE_WCREMARKETING         => false,
+	GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL    => 'retail',
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU              => false,
 	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => false,
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX     => '',
@@ -211,6 +213,23 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE           => false,
 
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => ''
+);
+
+$gtm4wp_business_verticals = array(
+	'retail' => 'Retail',
+	'education' => 'Education',
+	'flights' => 'Flights',
+	'hotel_rental' => 'Hotel rental',
+	'jobs' => 'Jobs',
+	'local' => 'Local deals',
+	'real_estate' => 'Real estate',
+	'travel' => 'Travel',
+	'custom' => 'Custom'
+);
+
+$gtm4wp_business_verticals_ids = array(
+	'flights' => 'destination',
+	'travel' => 'destination'
 );
 
 $gtm4wp_entity_ids = array(
@@ -394,7 +413,7 @@ function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
 }
 
 function gtm4wp_reload_options() {
-	global $gtm4wp_defaultoptions;
+	global $gtm4wp_defaultoptions, $gtm4wp_business_verticals;
 
 	$storedoptions = (array) get_option( GTM4WP_OPTIONS );
 	if ( ! is_array( $gtm4wp_defaultoptions ) ) {
@@ -418,6 +437,10 @@ function gtm4wp_reload_options() {
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
 		$return_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] = GTM4WP_HARDCODED_GTM_ENV_PREVIEW;
+	}
+
+	if ( !array_key_exists( $return_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ], $gtm4wp_business_verticals ) ) {
+		$return_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] = $gtm4wp_defaultoptions[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ];
 	}
 
 	return $return_options;

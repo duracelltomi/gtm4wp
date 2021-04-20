@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.7
-Stable tag: 1.12.2
+Stable tag: 1.12.3
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -229,6 +229,19 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.13 =
+
+* Added: Google Business Vertical option to populate Google Ads dynamic remarketing
+* Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
+
+= 1.12.3 =
+
+No new or updated functionality, but updated WooCommerce compatibility.
+
+IMPORTANT!
+If you are using the WooCommerce integration and enhanced ecommerce, please update your ecommerce event trigger to include gtm4wp.orderCompletedEEC as well.
+https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking
 
 = 1.12.2 =
 
@@ -677,6 +690,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.12.3 =
+
+Updated compatible WooCommerce version and added an important message to the changelog for WooCommerce users
 
 = 1.12.2 =
 

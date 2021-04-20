@@ -339,6 +339,11 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'description'   => __( 'Enable this to add Google Ads dynamic remarketing variables to the dataLayer', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_DEPRECATED
 	),
+	GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL    => array(
+		'label'         => __( 'Google Ads Business Vertical', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'Select which vertical category to add next to each product to utilize dynamic remarketing for Google Ads', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_STABLE
+	),
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX     => array(
 		'label'         => __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( "Some product feed generator plugins prefix product IDs with a fixed text like 'woocommerce_gpf'. You can enter this prefix here so that tags in your website include this prefix as well.", 'duracelltomi-google-tag-manager' ),
@@ -480,7 +485,7 @@ function gtm4wp_admin_output_section( $args ) {
 }
 
 function gtm4wp_admin_output_field( $args ) {
-	global $gtm4wp_options;
+	global $gtm4wp_options, $gtm4wp_business_verticals;
 
 	switch ( $args['label_for'] ) {
 		case GTM4WP_ADMIN_GROUP_GTMID: {
@@ -588,6 +593,18 @@ function gtm4wp_admin_output_field( $args ) {
 
 			foreach( $gtm4wp_taxonomies as $onetaxonomy ) {
 				echo '<option value="' . $onetaxonomy->name . '"' . ( $gtm4wp_options[GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY] === $onetaxonomy->name ? ' selected="selected"' : '' ) . '>' . $onetaxonomy->label . '</option>';
+			}
+
+			echo '</select>';
+
+			break;
+		}
+
+		case GTM4WP_OPTIONS . "[" . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . "]": {
+			echo '<select id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . ']" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . ']">';
+
+			foreach( $gtm4wp_business_verticals as $vertical_id => $vertical_display_name ) {
+				echo '<option value="' . $vertical_id . '"' . ( $gtm4wp_options[GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL] === $vertical_id ? ' selected="selected"' : '' ) . '>' . $vertical_display_name . '</option>';
 			}
 
 			echo '</select>';
@@ -735,6 +752,9 @@ function gtm4wp_sanitize_options( $options ) {
 			$output[ $optionname ] = trim( (string) $newoptionvalue );
 
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ) {
+			$output[$optionname] = trim( (string) $newoptionvalue );
+
+		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ) {
 			$output[$optionname] = trim( (string) $newoptionvalue );
 
 		// Accelerated Mobile Pages settings
