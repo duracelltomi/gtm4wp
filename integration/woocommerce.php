@@ -133,7 +133,7 @@ function gtm4wp_process_product( $product, $additional_product_attributes, $attr
 		'name'       => $product->get_title(),
 		'sku'        => $product_sku ? $product_sku : $product_id,
 		'category'   => $product_cat,
-		'price'      => (float) wc_get_price_to_display( $product ),
+		'price'      => round( (float) wc_get_price_to_display( $product ), 2),
 		'stocklevel' => $product->get_stock_quantity()
 	);
 
@@ -225,7 +225,7 @@ function gtm4wp_process_order_items( $order ) {
 
 			$product = $item->get_product();
 			$inc_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
-			$product_price = (float) $order->get_item_total( $item, $inc_tax );
+			$product_price = round( (float) $order->get_item_total( $item, $inc_tax ), 2);
 			$eec_product_array = gtm4wp_process_product( $product, array(
 				'quantity' => $item->get_quantity(),
 				'price'    => $product_price
