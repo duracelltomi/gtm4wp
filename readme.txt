@@ -233,6 +233,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.13 =
 
 * Added: Google Business Vertical option to populate Google Ads dynamic remarketing
+* Added: Make automatic cookie blocking mode of Cookiebot to work with your Google Tag Manager container (new option in the Integration tab)
 * Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
 
 = 1.12.3 =

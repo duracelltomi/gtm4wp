@@ -119,6 +119,8 @@ define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_AMPID', 'integrate-amp-id' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
+
 define( 'GTM4WP_PLACEMENT_FOOTER', 0 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN', 1 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN_AUTO', 2 );
@@ -212,7 +214,9 @@ $gtm4wp_defaultoptions = array(
 
 	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE           => false,
 
-	GTM4WP_OPTION_INTEGRATE_AMPID                 => ''
+	GTM4WP_OPTION_INTEGRATE_AMPID                 => '',
+
+	GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false
 );
 
 $gtm4wp_business_verticals = array(

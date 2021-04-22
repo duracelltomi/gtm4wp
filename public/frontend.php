@@ -792,6 +792,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
 		$_gtm_codes = explode( ',', str_replace( array( ';', ' ' ), array( ',', '' ), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
+		$add_cookiebot_ignore = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
 
 		$_gtm_tag = '';
 		foreach ( $_gtm_codes as $one_gtm_code ) {
@@ -802,7 +803,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			}
 
 			$_gtm_tag .= '
-<script data-cfasync="false">//<![CDATA[
+<script data-cfasync="false"' . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>//<![CDATA[
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=

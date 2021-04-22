@@ -80,6 +80,10 @@ var adminsubtabs = {
 		"int-amp": {
 			tabtext: gtm4wp.amptabtitle,
 			numitems: 1
+		},
+		"int-cookiebot": {
+			tabtext: gtm4wp.cookiebottabtitle,
+			numitems: 1
 		}
 	}
 };

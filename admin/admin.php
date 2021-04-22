@@ -390,6 +390,12 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'         => GTM4WP_PHASE_EXPERIMENTAL,
 		'plugintocheck' => 'amp/amp.php',
 	),
+
+	GTM4WP_OPTION_INTEGRATE_COOKIEBOT => array(
+		'label'         => __( 'Cookiebot auto blocking', 'duracelltomi-google-tag-manager' ),
+		'description'   => sprintf( __( 'Enable this checkbox if you wish to use the <a href="%s" target="_blank">automatic cookie blocking mode of Cookiebot with Google Tag Manager</a>.', 'duracelltomi-google-tag-manager' ), 'https://support.cookiebot.com/hc/en-us/articles/360009192739-Google-Tag-Manager-and-Automatic-cookie-blocking' ),
+		'phase'         => GTM4WP_PHASE_STABLE
+	),
 );
 
 $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
@@ -1130,6 +1136,7 @@ function gtm4wp_add_admin_js( $hook ) {
 			'wctabtitle'               => __( 'WooCommerce', 'duracelltomi-google-tag-manager' ),
 			'gotabtitle'               => __( 'Google Optimize', 'duracelltomi-google-tag-manager' ),
 			'amptabtitle'              => __( 'Accelerated Mobile Pages', 'duracelltomi-google-tag-manager' ),
+			'cookiebottabtitle'        => __( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
 			'weathertabtitle'          => __( 'Weather & geo data', 'duracelltomi-google-tag-manager' ),
 			'generaleventstabtitle'    => __( 'General events', 'duracelltomi-google-tag-manager' ),
 			'mediaeventstabtitle'      => __( 'Media events', 'duracelltomi-google-tag-manager' ),
