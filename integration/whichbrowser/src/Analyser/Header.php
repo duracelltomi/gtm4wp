@@ -82,7 +82,7 @@ trait Header
 
     private function analyseUserAgent($header)
     {
-        new Header\Useragent($header, $this->data);
+        new Header\Useragent($header, $this->data, $this->options);
     }
 
     private function analyseBaiduHeader($header)
@@ -139,9 +139,11 @@ trait Header
 
     private function getHeader($h)
     {
+        /* Find the header that matches */
         foreach ($this->headers as $k => $v) {
             if (strtolower($h) == strtolower($k)) {
-                return $v;
+                /* And return the first 1024 bytes */
+                return substr($v, 0, 1024);
             }
         }
     }
