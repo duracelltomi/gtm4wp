@@ -319,7 +319,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		}
 	}
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL ] && version_compare( $woo->version, "3.2", ">=" ) ) {
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL ] && version_compare( $woo->version, "3.2", ">=" ) && isset($woo) && isset($woo->cart) ) {
 		$current_cart = $woo->cart;
 		$dataLayer["cartContent"] = array(
 			"totals" => array(
