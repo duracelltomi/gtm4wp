@@ -531,6 +531,11 @@ jQuery(function() {
 			},
 			'eventCallback': function() {
 
+				// do not fire this event multiple times
+				if ( window[ "gtm4wp_select_item_" + product_data.id ] ) {
+					return;
+				}
+
 				// fire ga4 version
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'select_item',
