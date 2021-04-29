@@ -239,7 +239,10 @@ If you are using the geo or weather options of this plugin, make sure your hosti
 * Added: Make automatic cookie blocking mode of Cookiebot to work with your Google Tag Manager container (new option in the Integration tab)
 * Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
 * Fixed: select_item event fired multiple times (at least twice)
+* Fixed: frontend protection to preveent double tracking transactions had a bug
 * Updated: WhichBrowser v2.1.1 (requires PHP 7.0 or newer)
+* Updated: descriptions of WooCommerce tracking methods to emphasize the importance to migrate from standard to enhanced ecommerce
+* Updated: added links to enhanced ecommerce setup guides (GA3 and GA4)
 
 = 1.12.3 =
 
