@@ -273,13 +273,22 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC      => array(
 		'label'         => __( 'Track classic e-commerce', 'duracelltomi-google-tag-manager' ),
-		'description'   => sprintf( __( 'Choose this option if you would like to track e-commerce data using <a href="%s" target="_blank">classic transaction data</a>.', 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/analytics/devguides/collection/analyticsjs/ecommerce' ),
-		'phase'         => GTM4WP_PHASE_DEPRECATED,
-		'plugintocheck' => 'woocommerce/woocommerce.php',
+		'description'   => __( 'This feature is deprecated and will be removed soon! You should upgrade to enhanced ecommerce as soon as possible.', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_DEPRECATED
 	),
 	GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC     => array(
 		'label'         => __( 'Track enhanced e-commerce', 'duracelltomi-google-tag-manager' ),
-		'description'   => sprintf( __( 'Choose this option if you would like to track e-commerce data using <a href="%s" target="_blank">enhanced ecommerce tracking</a>.', 'duracelltomi-google-tag-manager' ), 'https://developers.google.com/analytics/devguides/collection/analyticsjs/enhanced-ecommerce' ),
+		'description'   => sprintf(
+			__(
+				'Choose this option if you would like to track e-commerce data using '.
+				'<a href="%s" target="_blank">enhanced ecommerce tracking</a>.<br>'.
+				'Use the plugin\'s official guides to setup your Google Tag Manager container:<br>'.
+				'<ul><li><a href="%s" target="_blank">Google Analytics 3 / Universal Analytics setup</a></li>'.
+				'<li><a href="%s" target="_blank">Google Analytics 4 setup</a></li></ul>'
+			, 'duracelltomi-google-tag-manager' )
+		, 'https://developers.google.com/analytics/devguides/collection/analyticsjs/enhanced-ecommerce'
+		, 'https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking'
+		, 'https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking-google-analytics-4-ga4-version' ),
 		'phase'         => GTM4WP_PHASE_STABLE,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
