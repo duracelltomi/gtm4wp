@@ -719,7 +719,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 				gtm4wp_orderid_tracked = gtm4wp_cookie_parts.pop().split(";").shift();
 			}
 		} else {
-			window.localStorage.getItem( "gtm4wp_orderid_tracked" );
+			gtm4wp_orderid_tracked = window.localStorage.getItem( "gtm4wp_orderid_tracked" );
 		}
 
 		// check enhanced ecommerce
