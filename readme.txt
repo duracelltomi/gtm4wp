@@ -139,8 +139,6 @@ http://cutroni.com/blog/2012/02/21/advanced-content-tracking-with-google-analyti
 Google Tag Manager for WordPress can add each dataLayer variable as a Google Ads remarketing custom parameter list.
 This enables you to build sophisticated remarketing lists.
 
-NOTE: the current implementation can be used to populate Google ads in an old fashioned way, codes will be updated soon in this plugin.
-
 = Blacklist & Whitelist Tag Manager tags, triggers and variables =
 
 To increase website security, you have the option to white- and blacklist tags/triggers/variables.
@@ -165,6 +163,11 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 		*	implementation of [Enhanced E-commerce GA4](https://developers.google.com/tag-manager/ecommerce-ga4)
 		* Does not support promotions since WooCommerce does not have such a feature (yet)
 		* Does not support refunds
+
+= Server side containers =
+
+If you are using a [server side container](https://developers.google.com/tag-manager/serverside/send-data#update_the_gtmjs_source_domain)
+you can enter your custom domain name to load gtm.js from your there.
 
 == Installation ==
 
@@ -237,6 +240,7 @@ If you are using the geo or weather options of this plugin, make sure your hosti
 
 * Added: Google Business Vertical option to populate Google Ads dynamic remarketing
 * Added: Make automatic cookie blocking mode of Cookiebot to work with your Google Tag Manager container (new option in the Integration tab)
+* Added: support for [server side containers with custom domains](https://developers.google.com/tag-manager/serverside/send-data#update_the_gtmjs_source_domain)
 * Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
 * Fixed: select_item event fired multiple times (at least twice)
 * Fixed: frontend protection to preveent double tracking transactions had a bug

@@ -433,6 +433,11 @@ $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
 		'description' => __( "Turning on this option will load your Google Tag Manager container as early as possible during page load. This can cause issues if you are using jQuery in your custom HTML tags that fire on 'Page View' events.", 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+	GTM4WP_OPTION_GTMDOMAIN       => array(
+		'label'       => __( 'Container domain name', 'duracelltomi-google-tag-manager' ),
+		'description' => __( "Enter your custom domain name if you are using a server side GTM container for tracking. Leave this black to use www.googletagmanager.com", 'duracelltomi-google-tag-manager' ),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	)
 );
 
 function gtm4wp_admin_output_section( $args ) {
@@ -770,6 +775,18 @@ function gtm4wp_sanitize_options( $options ) {
 			$output[$optionname] = trim( (string) $newoptionvalue );
 
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ) {
+			$output[$optionname] = trim( (string) $newoptionvalue );
+
+		} else if ( $optionname == GTM4WP_OPTION_GTMDOMAIN ) {
+			// for PHP 7- compatibility
+			if ( !defined("FILTER_FLAG_HOSTNAME") ) {
+				define( "FILTER_FLAG_HOSTNAME", 0 );
+			}
+
+			$newoptionvalue = filter_var( $newoptionvalue, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
+			if ( $newoptionvalue === false ) {
+				$newoptionvalue = '';
+			}
 			$output[$optionname] = trim( (string) $newoptionvalue );
 
 		// Accelerated Mobile Pages settings

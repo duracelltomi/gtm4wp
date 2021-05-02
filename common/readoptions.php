@@ -7,6 +7,7 @@ define( 'GTM4WP_OPTION_ENV_GTM_AUTH', 'gtm-env-gtm-auth' );
 define( 'GTM4WP_OPTION_ENV_GTM_PREVIEW', 'gtm-env-gtm-preview' );
 define( 'GTM4WP_OPTION_DONOTTRACK', 'gtm-browser-do-not-track' );
 define( 'GTM4WP_OPTION_LOADEARLY', 'gtm-load-gtm-early' );
+define( 'GTM4WP_OPTION_GTMDOMAIN', 'gtm-domain-name' );
 
 define( 'GTM4WP_OPTION_INCLUDE_REMARKETING', 'include-remarketing' );
 define( 'GTM4WP_OPTION_INCLUDE_LOGGEDIN', 'include-loggedin' );
@@ -138,6 +139,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_ENV_GTM_PREVIEW                 => '',
 	GTM4WP_OPTION_DONOTTRACK                      => false,
 	GTM4WP_OPTION_LOADEARLY                       => false,
+	GTM4WP_OPTION_GTMDOMAIN                       => '',
 
 	GTM4WP_OPTION_INCLUDE_REMARKETING             => false,
 	GTM4WP_OPTION_INCLUDE_LOGGEDIN                => false,
