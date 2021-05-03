@@ -435,7 +435,7 @@ $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
 	),
 	GTM4WP_OPTION_GTMDOMAIN       => array(
 		'label'       => __( 'Container domain name', 'duracelltomi-google-tag-manager' ),
-		'description' => __( "Enter your custom domain name if you are using a server side GTM container for tracking. Leave this black to use www.googletagmanager.com", 'duracelltomi-google-tag-manager' ),
+		'description' => __( "Enter your custom domain name if you are using a server side GTM container for tracking. Leave this blank to use www.googletagmanager.com", 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	)
 );
