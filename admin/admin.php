@@ -329,8 +329,8 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'description'   => __( 'Enable this to exclude tax from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_STABLE
 	),	GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE          => array(
-		'label'         => __( 'Max. age of order creation / payment', 'duracelltomi-google-tag-manager' ),
-		'description'   => __( 'Max. age of order creation or order payment (in minutes)', 'duracelltomi-google-tag-manager' ),
+		'label'         => __( 'Only track orders younger than', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'To prevent duplicate transaction tracking at the order received page, enter the maximum age (in minutes) of the order or its payment for the transaction to be measured. Viewing the order received page of older orders will be ignored from transaction tracking, as it is considered to be a measured in an earlier session.', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_EXPERIMENTAL
 	),
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING     => array(
