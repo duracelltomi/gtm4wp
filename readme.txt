@@ -241,6 +241,7 @@ If you are using the geo or weather options of this plugin, make sure your hosti
 * Added: Google Business Vertical option to populate Google Ads dynamic remarketing
 * Added: Make automatic cookie blocking mode of Cookiebot to work with your Google Tag Manager container (new option in the Integration tab)
 * Added: support for [server side containers with custom domains](https://developers.google.com/tag-manager/serverside/send-data#update_the_gtmjs_source_domain)
+* Added: improved duplacate WooCommerce order tracking prevention by also checking the age of the order. You can adjust the value in minutes on the plugin options page - by [Code-Craze](https://github.com/Code-Craze)
 * Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
 * Fixed: select_item event fired multiple times (at least twice)
 * Fixed: frontend protection to preveent double tracking transactions had a bug
