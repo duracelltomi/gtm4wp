@@ -337,6 +337,10 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'label'         => __( 'Exclude tax from revenue', 'duracelltomi-google-tag-manager' ),
 		'description'   => __( 'Enable this to exclude tax from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_STABLE
+	),	GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE          => array(
+		'label'         => __( 'Only track orders younger than', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'To prevent duplicate transaction tracking at the order received page, enter the maximum age (in minutes) of the order or its payment for the transaction to be measured. Viewing the order received page of older orders will be ignored from transaction tracking, as it is considered to be a measured in an earlier session.', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_EXPERIMENTAL
 	),
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING     => array(
 		'label'         => __( 'Exclude shipping from revenue', 'duracelltomi-google-tag-manager' ),
@@ -768,7 +772,10 @@ function gtm4wp_sanitize_options( $options ) {
 		} elseif ( $optionname == GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ) {
 			$output[ $optionname ] = (int) $newoptionvalue;
 
-		} elseif ( $optionname == GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) {
+		} elseif ( $optionname == GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ) {
+			$output[ $optionname ] = (int) $newoptionvalue;
+
+		}elseif ( $optionname == GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) {
 			$output[ $optionname ] = trim( (string) $newoptionvalue );
 
 		} else if ( $optionname == GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ) {
