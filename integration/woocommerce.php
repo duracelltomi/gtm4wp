@@ -405,6 +405,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 						$currencyCode = get_woocommerce_currency();
 
+						$dataLayer['event'] = 'gtm4wp.changeDetailViewEEC';
 						$dataLayer['ecommerce'] = array(
 							'currencyCode' => $currencyCode,
 							'detail'       => array(
@@ -456,6 +457,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 				if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP ] ) {
+					$dataLayer['event'] = 'gtm4wp.checkoutStepEEC';
 					$dataLayer['ecommerce'] = array(
 						'currencyCode' => $gtm4wp_currency,
 						'checkout'     => array(
@@ -693,6 +695,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 					$sum_value += $oneproduct["price"] * $oneproduct["quantity"];
 				}
 
+				$dataLayer['event'] = 'gtm4wp.checkoutStepEEC';
 				$dataLayer['ecommerce'] = array(
 					'currencyCode' => $currencyCode,
 					'checkout'     => array(
