@@ -245,6 +245,7 @@ If you are using the geo or weather options of this plugin, make sure your hosti
 * Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
 * Fixed: select_item event fired multiple times (at least twice)
 * Fixed: frontend protection to preveent double tracking transactions had a bug
+* Fixed: missing product detail and first checkout step tracking in WooCommerce shops with Enhanced Ecommerce
 * Updated: WhichBrowser v2.1.1 (requires PHP 7.0 or newer)
 * Updated: descriptions of WooCommerce tracking methods to emphasize the importance to migrate from standard to enhanced ecommerce
 * Updated: added links to enhanced ecommerce setup guides (GA3 and GA4)
