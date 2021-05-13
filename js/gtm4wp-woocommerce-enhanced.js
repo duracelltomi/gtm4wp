@@ -902,7 +902,7 @@ jQuery(function() {
 					'event': 'view_cart',
 					'ecommerce': {
 						'currency': gtm4wp_currency,
-						'value': sum_value,
+						'value': sum_value.toFixed(2),
 						'items': ga4_products
 					}
 				});
