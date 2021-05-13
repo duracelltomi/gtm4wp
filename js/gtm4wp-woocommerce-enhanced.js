@@ -7,7 +7,7 @@ function gtm4wp_map_eec_to_ga4( productdata ) {
 	}
 
 	var category_path  = productdata.category ? productdata.category : '';
-	var category_parts = category_path.split('/');
+	var category_parts = category_path.toString().split('/');
 
 	// default, required parameters
 	var ga4_product = {
