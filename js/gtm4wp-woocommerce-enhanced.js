@@ -555,6 +555,8 @@ jQuery(function() {
 					'eventTimeout': 2000
 				});
 
+				window[ "gtm4wp_select_item_" + product_data.id ] = true;
+
 			},
 			'eventTimeout': 2000
 		});
