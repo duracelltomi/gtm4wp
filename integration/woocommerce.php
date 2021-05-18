@@ -80,12 +80,22 @@ function gtm4wp_get_product_category( $product_id, $fullpath = false ) {
 	$product_cat = '';
 
 	$_product_cats = get_the_terms( $product_id, 'product_cat' );
-	if ( ( is_array( $_product_cats ) ) && ( count( $_product_cats ) > 0 ) ) {
-		$first_product_cat = array_pop( $_product_cats );
-		if ( $fullpath ) {
-			$product_cat = gtm4wp_get_product_category_hierarchy( $first_product_cat->term_id );
+	$last_child = false;
+	
+	if ($_product_cats && !is_wp_error($_product_cats)) {
+        foreach ($_product_cats as $cat) {
+      		$children = get_categories( array ('taxonomy' => 'product_cat', 'parent' => $cat->term_id ));
+			if (count($children) == 0) {
+				$last_child = $cat;
+			}
+		}
+	}
+	
+	if ($last_child) {
+		if ($fullpath) {
+			$product_cat = gtm4wp_get_product_category_hierarchy( $last_child->term_id );
 		} else {
-			$product_cat = $first_product_cat->name;
+			$product_cat = $last_child->name;
 		}
 	}
 
