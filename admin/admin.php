@@ -354,7 +354,13 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL    => array(
 		'label'         => __( 'Google Ads Business Vertical', 'duracelltomi-google-tag-manager' ),
-		'description'   => __( 'Select which vertical category to add next to each product to utilize dynamic remarketing for Google Ads', 'duracelltomi-google-tag-manager' ),
+		'description'   => sprintf(
+			__(
+				'Select which vertical category to add next to each product to utilize dynamic remarketing for Google Ads.'.
+				'<br>Use the plugin\'s <a href="%s" target="_blank">official setup guide for dynamic remarketing</a> '.
+				'to setup your Google Tag Manager container.'
+			, 'duracelltomi-google-tag-manager' )
+		, 'https://gtm4wp.com/how-to-articles/how-to-setup-dynamic-remarketing-in-google-ads-adwords'),
 		'phase'         => GTM4WP_PHASE_STABLE
 	),
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX     => array(
@@ -631,7 +637,7 @@ function gtm4wp_admin_output_field( $args ) {
 				echo '<option value="' . $vertical_id . '"' . ( $gtm4wp_options[GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL] === $vertical_id ? ' selected="selected"' : '' ) . '>' . $vertical_display_name . '</option>';
 			}
 
-			echo '</select>';
+			echo '</select><br>' . $args['description'];
 
 			break;
 		}
