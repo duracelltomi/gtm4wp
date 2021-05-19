@@ -128,7 +128,7 @@ define( 'GTM4WP_PLACEMENT_BODYOPEN', 1 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN_AUTO', 2 );
 define( 'GTM4WP_PLACEMENT_OFF', 3 );
 
-global $gtm4wp_options, $gtm4wp_defaultoptions, $gtm4wp_entity_ids;
+global $gtm4wp_options, $gtm4wp_defaultoptions, $gtm4wp_entity_ids, $gtm4wp_business_verticals, $gtm4wp_business_verticals_ids;
 
 $gtm4wp_options = array();
 
