@@ -1375,7 +1375,7 @@ function gtm4wp_show_warning() {
 	global $gtm4wp_options, $gtp4wp_plugin_url, $gtm4wp_integratefieldtexts, $current_user,
 		$gtm4wp_def_user_notices_dismisses;
 
-	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ]['plugintocheck'] );
+	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ]['plugintocheck'] );
 	if ( $woo_plugin_active && function_exists( 'WC' ) ) {
 		$woo = WC();
 	} else {
