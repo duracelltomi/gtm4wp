@@ -711,6 +711,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
+= 1.3 =
+
+Updated support for Google Ads dynamic remarketing with WooCommerce, added support for server side containers and Cookiebot + fixes
+
 = 1.12.3 =
 
 Updated compatible WooCommerce version and added an important message to the changelog for WooCommerce users
