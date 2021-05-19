@@ -238,6 +238,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 WARNING!
 If you are using the geo or weather options of this plugin, make sure your hosting is using PHP 7.0 or newer!
 
+If you are using the WooCommerce integration with enhanced ecommerce, once again you will need to update your GTM container.
+Please check the [setup article](https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking) to see what needs to be changed.
+The goal is to keep this setup in the upcoming versions.
+
 * Added: Google Business Vertical option to populate Google Ads dynamic remarketing
 * Added: Make automatic cookie blocking mode of Cookiebot to work with your Google Tag Manager container (new option in the Integration tab)
 * Added: support for [server side containers with custom domains](https://developers.google.com/tag-manager/serverside/send-data#update_the_gtmjs_source_domain)
@@ -246,7 +250,6 @@ If you are using the geo or weather options of this plugin, make sure your hosti
 * Fixed: select_item event fired multiple times (at least twice)
 * Fixed: frontend protection to preveent double tracking transactions had a bug
 * Fixed: missing product detail and first checkout step tracking in WooCommerce shops with Enhanced Ecommerce
-* Fixed: round event value of view_cart event to 2 decimals
 * Fixed: JavaScript type error if product category is a number
 * Updated: WhichBrowser v2.1.1 (requires PHP 7.0 or newer)
 * Updated: descriptions of WooCommerce tracking methods to emphasize the importance to migrate from standard to enhanced ecommerce
