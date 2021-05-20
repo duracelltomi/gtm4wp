@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.7.2
-Stable tag: 1.13
+Stable tag: 1.13.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -232,6 +232,11 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.13.1 =
+
+* Fix: better PHP8 compatibility
+* Fix: PHP notice on admin page
 
 = 1.13 =
 
@@ -711,7 +716,11 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
-= 1.3 =
+= 1.13.1 =
+
+Bugfix release
+
+= 1.13 =
 
 Updated support for Google Ads dynamic remarketing with WooCommerce, added support for server side containers and Cookiebot + fixes
 
