@@ -590,6 +590,16 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		}
 
 		if ( isset( $order ) ) {
+			// variable for Google Smart Shopping campaign new customer reporting
+			// https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager
+			if ( !isset( $woo_customer ) ) {
+				if ( $woo->customer instanceof WC_Customer ) {
+				// we need to use this instead of $woo->customer as this will load proper total order number and value from the database instead of the session
+				$woo_customer = new WC_Customer( $woo->customer->get_id() );
+				}
+			}
+			$dataLayer['new_customer'] = $woo_customer->get_order_count() === 1;
+
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
 				$order_revenue = (float)( $order->get_total() - $order->get_total_tax() );
 			} else {
