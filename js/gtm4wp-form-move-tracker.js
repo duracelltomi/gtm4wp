@@ -1,50 +1,33 @@
-jQuery( function() {
-	jQuery( ":input" )
-		.on( "focus", function() {
-			var input      = jQuery(this);
-			var inputID    = input.attr("id") || "(no input ID)";
-			var inputName  = input.attr("name") || "(no input name)";
-			var inputClass = input.attr("class") || "(no input class)";
+document.addEventListener("focusin", function(event) {
+	const elem = event.target.closest("input,select,textarea,button,meter,progress"); 
+	if ( elem ) { 
+		window[ gtm4wp_datalayer_name ].push({
+			'event'    : 'gtm4wp.formElementEnter',
 
-			var form      = jQuery(this.form);
-			var formID    = form.attr("id") || "(no form ID)";
-			var formName  = form.attr("name") || "(no form name)";
-			var formClass = form.attr("class") || "(no form class)";
+			'inputID'   : elem.getAttribute("id") || "(no input ID)",
+			'inputName' : elem.getAttribute("name") || "(no input name)",
+			'inputClass': elem.getAttribute("class") || "(no input class)",
 
-			window[ gtm4wp_datalayer_name ].push({
-				'event'    : 'gtm4wp.formElementEnter',
-
-				'inputID'   : inputID,
-				'inputName' : inputName,
-				'inputClass': inputClass,
-
-				'formID'   : formID,
-				'formName' : formName,
-				'formClass': formClass
-			});
-		})
-
-		.on( "blur", function() {
-			var input      = jQuery(this);
-			var inputID    = input.attr("id") || "(no input ID)";
-			var inputName  = input.attr("name") || "(no input name)";
-			var inputClass = input.attr("class") || "(no input class)";
-
-			var form      = jQuery(this.form);
-			var formID    = form.attr("id") || "(no form ID)";
-			var formName  = form.attr("name") || "(no form name)";
-			var formClass = form.attr("class") || "(no form class)";
-
-			window[ gtm4wp_datalayer_name ].push({
-				'event'    : 'gtm4wp.formElementLeave',
-
-				'inputID'   : inputID,
-				'inputName' : inputName,
-				'inputClass': inputClass,
-
-				'formID'   : formID,
-				'formName' : formName,
-				'formClass': formClass
-			});
+			'formID'   : elem.form.getAttribute("id") || "(no form ID)",
+			'formName' : elem.form.getAttribute("name") || "(no form name)",
+			'formClass': elem.form.getAttribute("class") || "(no form class)"
 		});
+	}
+}, false);
+  
+document.addEventListener("focusout", function(event) {
+	const elem = event.target.closest("input,select,textarea,button,meter,progress"); 
+	if ( elem ) { 
+		window[ gtm4wp_datalayer_name ].push({
+			'event'    : 'gtm4wp.formElementLeave',
+
+			'inputID'   : elem.getAttribute("id") || "(no input ID)",
+			'inputName' : elem.getAttribute("name") || "(no input name)",
+			'inputClass': elem.getAttribute("class") || "(no input class)",
+
+			'formID'   : elem.form.getAttribute("id") || "(no form ID)",
+			'formName' : elem.form.getAttribute("name") || "(no form name)",
+			'formClass': elem.form.getAttribute("class") || "(no form class)"
+		});
+	};
 });

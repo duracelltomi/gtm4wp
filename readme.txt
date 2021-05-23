@@ -236,7 +236,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.14 =
 
 * Added: support for tracking WooCommerce Block based product lists, except the "All Products" block
-* Updated: removed jQuery dependency from plugin modules: contact form 7 integration
+* Updated: removed jQuery dependency from plugin modules: contact form 7 integration, form move tracker
 
 = 1.13.1 =
 
