@@ -1,25 +1,30 @@
-var gtm4wp_vimeo_percentage_tracking = 10;
-var gtm4wp_vimeo_percentage_tracking_marks = {};
+let gtm4wp_vimeo_percentage_tracking = 10;
+let gtm4wp_vimeo_percentage_tracking_marks = {};
 
-jQuery(function() {
-	jQuery( 'iframe[src*="vimeo.com"]' ).each(function() {
-		var vimeoapi = new Vimeo.Player( this ),
-				jqframe  = jQuery( this ),
-				videourl = jqframe
-					.attr( "src" )
-					.split( "?" )
-					.shift(),
-				videoid = videourl.split( "/" ).pop();
+window.addEventListener('DOMContentLoaded', function() {
+	const gtm4wp_vimeo_frames = document.querySelectorAll( 'iframe[src*="vimeo.com"]' );
+	if ( !gtm4wp_vimeo_frames || gtm4wp_vimeo_frames.length == 0 ) {
+		return;
+	}
 
-		jqframe.attr( "data-player_id", videoid );
-		jqframe.attr( "data-player_url", videourl );
+	gtm4wp_vimeo_frames.forEach(function( vimeo_frame ) {
+		const vimeoapi = new Vimeo.Player( vimeo_frame );
+		let videourl = vimeo_frame
+			.getAttribute( "src" )
+			.split( "?" )
+			.shift();
+		let videoid = videourl.split( "/" )
+			.pop();
+
+		vimeo_frame.setAttribute( "data-player_id", videoid );
+		vimeo_frame.setAttribute( "data-player_url", videourl );
 
 		vimeoapi.getVideoTitle().then( function( title ) {
-			jqframe.attr( "data-player_title", title );
+			vimeo_frame.setAttribute( "data-player_title", title );
 
 			vimeoapi.getDuration().then( function( duration ) {
 
-				jqframe.attr( "data-player_duration", duration );
+				vimeo_frame.setAttribute( "data-player_duration", duration );
 
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.mediaPlayerReady',
@@ -27,7 +32,7 @@ jQuery(function() {
 					'mediaData': {
 						'id': videoid,
 						'author': '',
-						'title': jqframe.attr( "data-player_title" ),
+						'title': vimeo_frame.getAttribute( "data-player_title" ),
 						'url': videourl,
 						'duration': duration
 					},
@@ -42,7 +47,7 @@ jQuery(function() {
 					'mediaData': {
 						'id': videoid,
 						'author': '',
-						'title': jqframe.attr( "data-player_title" ),
+						'title': vimeo_frame.getAttribute( "data-player_title" ),
 						'url': videourl,
 						'duration': 0
 					},
@@ -98,9 +103,9 @@ jQuery(function() {
 					'mediaData': {
 						'id': videoid,
 						'author': '',
-						'title': jqframe.attr( "data-player_title" ),
-						'url': jqframe.attr( "data-player_url" ),
-						'duration': jqframe.attr( "data-player_duration" )
+						'title': vimeo_frame.getAttribute( "data-player_title" ),
+						'url': vimeo_frame.getAttribute( "data-player_url" ),
+						'duration': vimeo_frame.getAttribute( "data-player_duration" )
 					},
 					'mediaPlayerEvent': 'texttrackchange',
 					'mediaPlayerEventParam': data,
@@ -117,7 +122,7 @@ jQuery(function() {
 						'author': '',
 						'title': "Unknown title",
 						'url': videourl,
-						'duration': jqframe.attr( "data-player_duration" )
+						'duration': vimeo_frame.getAttribute( "data-player_duration" )
 					},
 					'mediaCurrentTime': 0,
 					'mediaPlayerEvent': 'error',
@@ -138,9 +143,9 @@ jQuery(function() {
 					'mediaData': {
 						'id': videoid,
 						'author': '',
-						'title': jqframe.attr( "data-player_title" ),
-						'url': jqframe.attr( "data-player_url" ),
-						'duration': jqframe.attr( "data-player_duration" )
+						'title': vimeo_frame.getAttribute( "data-player_title" ),
+						'url': vimeo_frame.getAttribute( "data-player_url" ),
+						'duration': vimeo_frame.getAttribute( "data-player_duration" )
 					},
 					'mediaPlayerEvent': 'volumechange',
 					'mediaPlayerEventParam': data.volume,
@@ -158,7 +163,7 @@ jQuery(function() {
 						'author': '',
 						'title': "Unknown title",
 						'url': videourl,
-						'duration': jqframe.attr( "data-player_duration" )
+						'duration': vimeo_frame.getAttribute( "data-player_duration" )
 					},
 					'mediaCurrentTime': 0,
 					'mediaPlayerEvent': 'error',
@@ -179,9 +184,9 @@ jQuery(function() {
 					'mediaData': {
 						'id': videoid,
 						'author': '',
-						'title': jqframe.attr( "data-player_title" ),
-						'url': jqframe.attr( "data-player_url" ),
-						'duration': jqframe.attr( "data-player_duration" )
+						'title': vimeo_frame.getAttribute( "data-player_title" ),
+						'url': vimeo_frame.getAttribute( "data-player_url" ),
+						'duration': vimeo_frame.getAttribute( "data-player_duration" )
 					},
 					'mediaPlayerEvent': 'error',
 					'mediaPlayerEventParam': data,
@@ -199,7 +204,7 @@ jQuery(function() {
 						'author': '',
 						'title': "Unknown title",
 						'url': videourl,
-						'duration': jqframe.attr( "data-player_duration" )
+						'duration': vimeo_frame.getAttribute( "data-player_duration" )
 					},
 					'mediaCurrentTime': 0,
 					'mediaPlayerEvent': 'error',
@@ -214,7 +219,7 @@ jQuery(function() {
 			gtm4wp_onVimeoPercentageChange( data );
 		});
 
-		var gtm4wp_onVimeoPlayerStateChange = function( player_state, data ) {
+		const gtm4wp_onVimeoPlayerStateChange = function( player_state, data ) {
 
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.mediaPlayerStateChange',
@@ -222,8 +227,8 @@ jQuery(function() {
 				'mediaData': {
 					'id': videoid,
 					'author': '',
-					'title': jqframe.attr( "data-player_title" ),
-					'url': jqframe.attr( "data-player_url" ),
+					'title': vimeo_frame.getAttribute( "data-player_title" ),
+					'url': vimeo_frame.getAttribute( "data-player_url" ),
 					'duration': data.duration
 				},
 				'mediaPlayerState': player_state,
@@ -232,16 +237,16 @@ jQuery(function() {
 
 		};
 
-		var gtm4wp_onVimeoPercentageChange = function( data ) {
+		const gtm4wp_onVimeoPercentageChange = function( data ) {
 
-			var videoDuration   = data.duration;
-			var videoPercentage = Math.floor( data.seconds / videoDuration * 100 );
+			let videoDuration   = data.duration;
+			let videoPercentage = Math.floor( data.seconds / videoDuration * 100 );
 
 			if ( typeof gtm4wp_vimeo_percentage_tracking_marks[ videoid ] == "undefined" ) {
 				gtm4wp_vimeo_percentage_tracking_marks[ videoid ] = [];
 			}
 
-			for( var i=0; i<100; i+=gtm4wp_vimeo_percentage_tracking ) {
+			for( let i=0; i<100; i+=gtm4wp_vimeo_percentage_tracking ) {
 				if ( ( videoPercentage > i ) && ( gtm4wp_vimeo_percentage_tracking_marks[ videoid ].indexOf( i ) == -1 ) ) {
 
 					gtm4wp_vimeo_percentage_tracking_marks[ videoid ].push( i );
@@ -252,8 +257,8 @@ jQuery(function() {
 						'mediaData': {
 							'id': videoid,
 							'author': '',
-							'title': jqframe.attr( "data-player_title" ),
-							'url': jqframe.attr( "data-player_url" ),
+							'title': vimeo_frame.getAttribute( "data-player_title" ),
+							'url': vimeo_frame.getAttribute( "data-player_url" ),
 							'duration': videoDuration
 						},
 						'mediaCurrentTime': data.seconds,
