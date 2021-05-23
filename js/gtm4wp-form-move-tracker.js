@@ -30,4 +30,4 @@ document.addEventListener("focusout", function(event) {
 			'formClass': elem.form.getAttribute("class") || "(no form class)"
 		});
 	};
-});
+}, false);
