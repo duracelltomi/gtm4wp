@@ -559,8 +559,8 @@ function gtm4wp_enqueue_scripts() {
 	global $gtm4wp_options, $gtp4wp_plugin_url;
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WPCF7 ] ) {
-		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WPCF7, false );
-		wp_enqueue_script( 'gtm4wp-contact-form-7-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-contact-form-7-tracker.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
+		$in_footer = apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WPCF7, true );
+		wp_enqueue_script( 'gtm4wp-contact-form-7-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-contact-form-7-tracker.js', array(), GTM4WP_VERSION, $in_footer );
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_FORMMOVE ] ) {
