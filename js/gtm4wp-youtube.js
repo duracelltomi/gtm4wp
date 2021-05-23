@@ -1,6 +1,6 @@
-var gtm4wp_youtube_percentage_tracking = 10;
-var gtm4wp_youtube_percentage_tracking_timeouts = {};
-var gtm4wp_youtube_percentage_tracking_marks = {};
+let gtm4wp_youtube_percentage_tracking = 10;
+let gtm4wp_youtube_percentage_tracking_timeouts = {};
+let gtm4wp_youtube_percentage_tracking_marks = {};
 
 if ( typeof onYouTubeIframeAPIReady === "undefined" ) {
 	window.onYouTubeIframeAPIReady = function() {
@@ -9,19 +9,23 @@ if ( typeof onYouTubeIframeAPIReady === "undefined" ) {
 			'mediaType': 'youtube'
 		});
 
-		jQuery( "iframe[src^='https://www.youtube.com/embed']" ).each( function() {
-			var gtm4wp_jqthis = jQuery( this );
-			var playerID = gtm4wp_jqthis.attr( "id" );
+		const gtm4wp_youtube_frames = document.querySelectorAll( "iframe[src^='https://www.youtube.com/embed']" );
+		if ( !gtm4wp_youtube_frames || gtm4wp_youtube_frames.length == 0 ) {
+			return;
+		}
 
-			if ( ( playerID === undefined ) || ( playerID === "" ) ) {
-				var _gtm4wp_temp  = gtm4wp_jqthis.attr( "src" ).split( "?" );
-				var _gtm4wp_temp2 = _gtm4wp_temp[ 0 ].split( "/" );
+		gtm4wp_youtube_frames.forEach( function( youtube_frame ) {
+			let playerID = youtube_frame.getAttribute( "id" );
+
+			if ( ( playerID === null ) || ( playerID === undefined ) || ( playerID === "" ) ) {
+				const _gtm4wp_temp  = youtube_frame.getAttribute( "src" ).split( "?" );
+				const _gtm4wp_temp2 = _gtm4wp_temp[ 0 ].split( "/" );
 
 				playerID = "youtubeplayer_" + _gtm4wp_temp2[ _gtm4wp_temp2.length-1 ];
-				gtm4wp_jqthis.attr( "id", playerID );
+				youtube_frame.setAttribute( "id", playerID );
 			}
 
-			var gtm4wp_yturl = gtm4wp_jqthis.attr( "src" );
+			let gtm4wp_yturl = youtube_frame.getAttribute( "src" );
 			if ( gtm4wp_yturl.indexOf( "enablejsapi=1" ) == -1 ) {
 				if ( gtm4wp_yturl.indexOf( "?" ) == -1 ) {
 					gtm4wp_yturl += "?";
@@ -29,7 +33,7 @@ if ( typeof onYouTubeIframeAPIReady === "undefined" ) {
 
 				gtm4wp_yturl += "&enablejsapi=1&origin=" + document.location.protocol + "//" + document.location.hostname;
 
-				gtm4wp_jqthis.attr( "src", gtm4wp_yturl );
+				youtube_frame.setAttribute( "src", gtm4wp_yturl );
 			}
 
 			player = new YT.Player( playerID, {
@@ -45,17 +49,17 @@ if ( typeof onYouTubeIframeAPIReady === "undefined" ) {
 		});
 	};
 
-	var tag = document.createElement( 'script' );
+	let tag = document.createElement( 'script' );
 	tag.src = "//www.youtube.com/iframe_api";
-	var firstScriptTag = document.getElementsByTagName( 'script' )[0];
+	let firstScriptTag = document.getElementsByTagName( 'script' )[0];
 	firstScriptTag.parentNode.insertBefore( tag, firstScriptTag );
 } else {
-	var gtm4wp_err = new Error( "Another code is already utilizing YouTube API, GTM4WP plugin can not load YouTube tracking!" );
+	let gtm4wp_err = new Error( "Another code is already utilizing YouTube API, GTM4WP plugin can not load YouTube tracking!" );
 	throw gtm4wp_err;
 }
 
 function gtm4wp_onYouTubePlayerReady( event ) {
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push({
 		'event': 'gtm4wp.mediaPlayerReady',
@@ -72,7 +76,8 @@ function gtm4wp_onYouTubePlayerReady( event ) {
 }
 
 function gtm4wp_onYouTubePlayerStateChange( event ) {
-	var playerState = "unknown";
+	let playerState = "unknown";
+
 	switch( event.data ) {
 		case -1:                       playerState = "unstarted"; break;
 		case YT.PlayerState.ENDED:     playerState = "ended"; break;
@@ -82,7 +87,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 		case YT.PlayerState.CUED:      playerState = "cued"; break;
 	}
 
-	var videoId = event.target.getVideoData().video_id;
+	const videoId = event.target.getVideoData().video_id;
 
 	if ( ( YT.PlayerState.PLAYING == event.data ) && ( gtm4wp_youtube_percentage_tracking > 0 ) ) {
 		gtm4wp_youtube_percentage_tracking_timeouts[ videoId ] = setInterval(function() {
@@ -94,7 +99,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 		}
 	}
 
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push({
 		'event': 'gtm4wp.mediaPlayerStateChange',
@@ -112,7 +117,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 }
 
 function gtm4wp_onYouTubePlaybackQualityChange( event ) {
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push({
 		'event': 'gtm4wp.mediaPlayerEvent',
@@ -131,7 +136,7 @@ function gtm4wp_onYouTubePlaybackQualityChange( event ) {
 }
 
 function gtm4wp_onYouTubePlaybackRateChange( event ) {
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push({
 		'event': 'gtm4wp.mediaPlayerEvent',
@@ -150,7 +155,7 @@ function gtm4wp_onYouTubePlaybackRateChange( event ) {
 }
 
 function gtm4wp_onYouTubeError( event ) {
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push({
 		'event': 'gtm4wp.mediaPlayerEvent',
@@ -169,7 +174,7 @@ function gtm4wp_onYouTubeError( event ) {
 }
 
 function gtm4wp_onYouTubeApiChange( event ) {
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push({
 		'event': 'gtm4wp.mediaPlayerEvent',
@@ -188,18 +193,18 @@ function gtm4wp_onYouTubeApiChange( event ) {
 }
 
 function gtm4wp_onYouTubePercentageChange( event ) {
-	var videoId          = event.target.getVideoData().video_id;
-	var videoCurrentTime = event.target.getCurrentTime();
-	var videoDuration    = event.target.getDuration();
-	var videoPercentage  = Math.floor( videoCurrentTime / videoDuration * 100 );
+	const videoId          = event.target.getVideoData().video_id;
+	const videoCurrentTime = event.target.getCurrentTime();
+	const videoDuration    = event.target.getDuration();
+	const videoPercentage  = Math.floor( videoCurrentTime / videoDuration * 100 );
 
 	if ( typeof gtm4wp_youtube_percentage_tracking_marks[ videoId ] == "undefined" ) {
 		gtm4wp_youtube_percentage_tracking_marks[ videoId ] = [];
 	}
 
-	var videodata = event.target.getVideoData();
+	const videodata = event.target.getVideoData();
 
-	for( var i=0; i<100; i+=gtm4wp_youtube_percentage_tracking ) {
+	for( let i=0; i<100; i+=gtm4wp_youtube_percentage_tracking ) {
 		if ( ( videoPercentage > i ) && ( gtm4wp_youtube_percentage_tracking_marks[ videoId ].indexOf( i ) == -1 ) ) {
 			gtm4wp_youtube_percentage_tracking_marks[ videoId ].push( i );
 
