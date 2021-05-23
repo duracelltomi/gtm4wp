@@ -1,22 +1,24 @@
-var gtm4wp_soundclound_percentage_tracking = 10;
-var gtm4wp_soundclound_percentage_tracking_marks = {};
+let gtm4wp_soundclound_percentage_tracking = 10;
+let gtm4wp_soundclound_percentage_tracking_marks = {};
 
-jQuery(function() {
-//	jQuery( '[id^="soundcloudplayer_"]' ).each(function() {
-	jQuery( 'iframe[src*="soundcloud.com"]' ).each(function() {
-		var iframe  = this,
-		widget  = SC.Widget( this ),
-		jqframe = jQuery( iframe ),
-		sound   = {};
+window.addEventListener('DOMContentLoaded', function() {
+	const gtm4wp_soundcloud_frames = document.querySelectorAll( 'iframe[src*="soundcloud.com"]' );
+	if ( !gtm4wp_soundcloud_frames || gtm4wp_soundcloud_frames.length == 0 ) {
+		return;
+	}
+
+	gtm4wp_soundcloud_frames.forEach(function( soundcloud_frame ) {
+		let widget  = SC.Widget( soundcloud_frame ),
+		let sound   = {};
 
 		widget.bind( SC.Widget.Events.READY, function() {
 			widget.getCurrentSound(function( soundData ) {
 
-				jqframe.attr( "data-player_id", soundData.id );
-				jqframe.attr( "data-player_author", soundData.user.username );
-				jqframe.attr( "data-player_title", soundData.title );
-				jqframe.attr( "data-player_url", soundData.permalink_url );
-				jqframe.attr( "data-player_duration", soundData.duration );
+				soundcloud_frame.setAttribute( "data-player_id", soundData.id );
+				soundcloud_frame.setAttribute( "data-player_author", soundData.user.username );
+				soundcloud_frame.setAttribute( "data-player_title", soundData.title );
+				soundcloud_frame.setAttribute( "data-player_url", soundData.permalink_url );
+				soundcloud_frame.setAttribute( "data-player_duration", soundData.duration );
 
 				sound = soundData;
 
@@ -71,7 +73,7 @@ jQuery(function() {
 			});
 		});
 
-		var gtm4wp_onSoundCloudPlayerStateChange = function( eventData, playerState ) {
+		const gtm4wp_onSoundCloudPlayerStateChange = function( eventData, playerState ) {
 			window[ gtm4wp_datalayer_name ].push({
 				'event': 'gtm4wp.mediaPlayerStateChange',
 				'mediaType': 'soundcloud',
@@ -87,14 +89,14 @@ jQuery(function() {
 			});
 		};
 
-		var gtm4wp_onSoundCloudPercentageChange = function( eventData ) {
-			var mediaPercentage  = Math.floor( eventData.currentPosition / sound.duration * 100 );
+		const gtm4wp_onSoundCloudPercentageChange = function( eventData ) {
+			const mediaPercentage  = Math.floor( eventData.currentPosition / sound.duration * 100 );
 
 			if ( typeof gtm4wp_soundclound_percentage_tracking_marks[ sound.id ] == "undefined" ) {
 				gtm4wp_soundclound_percentage_tracking_marks[ sound.id ] = [];
 			}
 
-			for( var i=0; i<100; i+=gtm4wp_soundclound_percentage_tracking ) {
+			for( let i=0; i<100; i+=gtm4wp_soundclound_percentage_tracking ) {
 				if ( ( mediaPercentage > i ) && ( gtm4wp_soundclound_percentage_tracking_marks[ sound.id ].indexOf( i ) == -1 ) ) {
 					gtm4wp_soundclound_percentage_tracking_marks[ sound.id ].push( i );
 
@@ -115,7 +117,7 @@ jQuery(function() {
 			}
 		};
 
-		var gtm4wp_onSoundCloudPlayerEvent = function( eventName ) {
+		const gtm4wp_onSoundCloudPlayerEvent = function( eventName ) {
 			widget.getPosition(function( currentPosition ) {
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.mediaPlayerEvent',
