@@ -8,7 +8,7 @@ window.addEventListener('DOMContentLoaded', function() {
 	}
 
 	gtm4wp_soundcloud_frames.forEach(function( soundcloud_frame ) {
-		let widget  = SC.Widget( soundcloud_frame ),
+		let widget  = SC.Widget( soundcloud_frame );
 		let sound   = {};
 
 		widget.bind( SC.Widget.Events.READY, function() {
