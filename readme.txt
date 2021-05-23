@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.7.2
-Stable tag: 1.13.1
+Stable tag: 1.14
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -232,6 +232,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.14 =
+
+* Added: support for tracking WooCommerce Block based product lists, except the "All Products" block
 
 = 1.13.1 =
 
@@ -715,6 +719,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.14 =
+
+Initial support for WooCommerce Blocks
 
 = 1.13.1 =
 

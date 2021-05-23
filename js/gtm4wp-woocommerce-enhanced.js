@@ -145,6 +145,64 @@ jQuery(function() {
 	var is_cart     = jQuery( 'body' ).hasClass( 'woocommerce-cart' );
 	var is_checkout = jQuery( 'body' ).hasClass( 'woocommerce-checkout' );
 
+	// loop through WC blocks to set proper listname and position parameters
+	const gtm4wp_product_block_names = {
+		'wp-block-handpicked-products': {
+			'displayname': 'Handpicked Products',
+			'counter': 1
+		},
+		'wp-block-product-best-sellers': {
+			'displayname': 'Best Selling Products',
+			'counter': 1
+		},
+		'wp-block-product-category': {
+			'displayname': 'Product Category List',
+			'counter': 1
+		},
+		'wp-block-product-new': {
+			'displayname': 'New Products',
+			'counter': 1
+		},
+		'wp-block-product-on-sale': {
+			'displayname': 'Sale Products',
+			'counter': 1
+		},
+		'wp-block-products-by-attribute': {
+			'displayname': 'Products By Attribute',
+			'counter': 1
+		},
+		'wp-block-product-tag': {
+			'displayname': 'Products By Tag',
+			'counter': 1
+		},
+		'wp-block-product-top-rated': {
+			'displayname': 'Top Rated Products',
+			'counter': 1
+		},
+	}
+	const gtm4wp_guttenberg_product_blocks = document.querySelectorAll( '.wc-block-grid .wc-block-grid__product' );
+	gtm4wp_guttenberg_product_blocks.forEach( function( product_grid_item ) {
+
+		const product_grid_container = product_grid_item.closest( '.wc-block-grid' );
+		const product_data = product_grid_item.querySelector( '.gtm4wp_productdata' );
+		if ( product_grid_container && product_data ) {
+
+			const product_grid_container_classes = product_grid_container.classList;
+			if ( product_grid_container_classes ) {
+				for(let i in gtm4wp_product_block_names) {
+					if ( product_grid_container_classes.contains( i ) ) {
+						product_data.setAttribute("data-gtm4wp_productlist_name", gtm4wp_product_block_names[i].displayname);
+						product_data.setAttribute("data-gtm4wp_product_listposition", gtm4wp_product_block_names[i].counter);
+
+						gtm4wp_product_block_names[i].counter++;
+					}
+				}
+			}
+
+		}
+
+	});
+
 	// track impressions of products in product lists
 	if ( jQuery( '.gtm4wp_productdata,.widget-product-item' ).length > 0 ) {
 		var products = [];
@@ -231,7 +289,7 @@ jQuery(function() {
 
 	// track add to cart events for simple products in product lists
 	jQuery( document ).on( 'click', '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)', function() {
-		var productdata = jQuery( this ).closest( '.product' ).find( '.gtm4wp_productdata' );
+		var productdata = jQuery( this ).closest( '.product,.wc-block-grid__product' ).find( '.gtm4wp_productdata' );
 		var productprice = productdata.data( 'gtm4wp_product_price' );
 
 		if ( typeof productprice == "string" ) {
@@ -456,13 +514,18 @@ jQuery(function() {
 	});
 
 	// track clicks in product lists
-	jQuery( document ).on( 'click', '.products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),.widget-product-item,.woocommerce-grouped-product-list-item__label a', function( event ) {
+	var productlist_item_selector = '.products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
+		+'.wc-block-grid__products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
+		+'.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
+		+'.widget-product-item,'
+		+'.woocommerce-grouped-product-list-item__label a'
+	jQuery( document ).on( 'click', productlist_item_selector, function( event ) {
 		// do nothing if GTM is blocked for some reason
 		if ( 'undefined' == typeof google_tag_manager ) {
 			return true;
 		}
 
-		var temp_selector = jQuery( this ).closest( '.product' );
+		var temp_selector = jQuery( this ).closest( '.product,.wc-block-grid__product' );
 		var dom_productdata = '';
 
 		if ( temp_selector.length > 0 ) {

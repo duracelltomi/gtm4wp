@@ -927,8 +927,8 @@ function gtm4wp_before_related_products_loop() {
 	$woocommerce_loop['listtype'] = __( 'Related Products', 'duracelltomi-google-tag-manager' );
 }
 
-function gtm4wp_woocommerce_before_shop_loop_item() {
-	global $product, $woocommerce_loop, $wp_query, $gtm4wp_options;
+function gtm4wp_woocommerce_get_product_list_item_extra_tag($product, $listtype, $itemix, $permalink) {
+	global $wp_query, $gtm4wp_options;
 
 	if ( ! isset( $product ) ) {
 		return;
@@ -951,8 +951,8 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 
 	if ( is_search() ) {
 		$list_name = __( 'Search Results', 'duracelltomi-google-tag-manager' );
-	} elseif ( isset( $woocommerce_loop['listtype'] ) && ( $woocommerce_loop['listtype'] != '' ) ) {
-		$list_name = $woocommerce_loop['listtype'];
+	} elseif ( $listtype != '' ) {
+		$list_name = $listtype;
 	} else {
 		$list_name = __( 'General Product List', 'duracelltomi-google-tag-manager' );
 	}
@@ -964,16 +964,16 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 	}
 
 	$eec_product_array = gtm4wp_process_product( $product, array(
-		'productlink'  => apply_filters( 'the_permalink', get_permalink(), 0 ),
+		'productlink'  => $permalink,
 		'listname'     => $list_name,
-		'listposition' => $woocommerce_loop['loop'] + ( $posts_per_page * ( $paged - 1 ) )
+		'listposition' => $itemix + ( $posts_per_page * ( $paged - 1 ) )
 	), 'productlist' );
 
 	if ( ! isset( $eec_product_array[ 'brand' ] ) ) {
 		$eec_product_array[ 'brand' ] = '';
 	}
 
-	printf(
+	return sprintf(
 		'<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s"></span>',
 		esc_attr( $eec_product_array['id'] ),
 		esc_attr( $eec_product_array['name'] ),
@@ -985,6 +985,22 @@ function gtm4wp_woocommerce_before_shop_loop_item() {
 		esc_attr( $eec_product_array['stocklevel'] ),
 		esc_attr( $eec_product_array[ "brand" ] )
 	);
+}
+
+function gtm4wp_woocommerce_before_shop_loop_item() {
+	global $product, $woocommerce_loop;
+
+	$listtype = "";
+	if ( isset( $woocommerce_loop['listtype'] ) && ( $woocommerce_loop['listtype'] != '' ) ) {
+		$listtype = $woocommerce_loop['listtype'];
+	}
+
+	$itemix = "";
+	if ( isset( $woocommerce_loop['loop'] ) && ( $woocommerce_loop['loop'] != '' ) ) {
+		$itemix = $woocommerce_loop['loop'];
+	}
+
+	echo gtm4wp_woocommerce_get_product_list_item_extra_tag($product, $listtype, $itemix, apply_filters( 'the_permalink', get_permalink(), 0 ));
 }
 
 function gtm4wp_woocommerce_cart_item_restored( $cart_item_key ) {
@@ -1110,6 +1126,12 @@ function gtm4wp_woocommerce_grouped_product_list_column_label( $labelvalue, $pro
 	return $labelvalue;
 }
 
+function gtm4wp_add_productdata_to_wc_block($content, $data, $product) {
+	$product_data_tag = gtm4wp_woocommerce_get_product_list_item_extra_tag($product, "", 0, $data->permalink);
+
+	return preg_replace('/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', '$0' . $product_data_tag, $content);
+}
+
 // do not add filter if someone enabled WooCommerce integration without an activated WooCommerce plugin
 if ( function_exists( 'WC' ) ) {
 	add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_woocommerce_datalayer_filter_items' );
@@ -1121,6 +1143,8 @@ if ( function_exists( 'WC' ) ) {
 	// add_action( "wp_footer", "gtm4wp_woocommerce_wp_footer" );
 	add_action( 'wp_enqueue_scripts', 'gtm4wp_woocommerce_enqueue_scripts' );
 	add_filter( GTM4WP_WPACTION_ADDGLOBALVARS, 'gtm4wp_woocommerce_addglobalvars' );
+
+	add_filter( 'woocommerce_blocks_product_grid_item_html', 'gtm4wp_add_productdata_to_wc_block', 10, 3);
 
 	if ( true === $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 		// add_action( "wp_footer", "gtm4wp_woocommerce_enhanced_ecom_product_click" );
