@@ -997,7 +997,7 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag($product, $listtype,
 	);
 }
 
-function gtm4wp_woocommerce_before_shop_loop_item() {
+function gtm4wp_woocommerce_after_shop_loop_item() {
 	global $product, $woocommerce_loop;
 
 	$listtype = "";
@@ -1147,7 +1147,7 @@ if ( function_exists( 'WC' ) ) {
 	add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_woocommerce_datalayer_filter_items' );
 
 	add_filter( 'loop_end', 'gtp4wp_woocommerce_reset_loop' );
-	add_action( 'woocommerce_before_shop_loop_item', 'gtm4wp_woocommerce_before_shop_loop_item' );
+	add_action( 'woocommerce_after_shop_loop_item', 'gtm4wp_woocommerce_after_shop_loop_item' );
 	add_action( 'woocommerce_after_add_to_cart_button', 'gtm4wp_woocommerce_single_add_to_cart_tracking' );
 
 	// add_action( "wp_footer", "gtm4wp_woocommerce_wp_footer" );
