@@ -1,3 +1,6 @@
+// this part of the code is deprecated and will be removed in a later version
+// therefore jQuery usage will be not rewritten
+// turn of the deprecated standard/classic ecommerce feature and this code will not execute
 jQuery(function() {
 	jQuery( document ).on( 'click', '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)', function() {
 		var productdata = jQuery( this ).closest( '.product' ).find( '.gtm4wp_productdata' );
