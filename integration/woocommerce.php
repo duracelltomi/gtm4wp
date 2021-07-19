@@ -585,8 +585,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			unset( $order );
 		}
 
-		if ( isset( $_COOKIE[ 'gtm4wp_orderid_tracked' ] ) && ( $_COOKIE[ 'gtm4wp_orderid_tracked' ] == $order_id ) && ! $do_not_flag_tracked_order ) {
-			unset( $order );
+		if ( isset( $_COOKIE[ 'gtm4wp_orderid_tracked' ] ) ) {
+			$tracked_order_id = filter_var( $_COOKIE[ 'gtm4wp_orderid_tracked' ], FILTER_VALIDATE_INT );
+
+			if ( $tracked_order_id && ( $tracked_order_id == $order_id ) && !$do_not_flag_tracked_order ) {
+				unset( $order );
+			}
 		}
 
 		if ( isset( $order ) ) {
