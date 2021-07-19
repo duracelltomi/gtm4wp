@@ -752,7 +752,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			);
 		}
 
-		wc_enqueue_js( "document.cookie = 'gtm4wp_product_readded_to_cart=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';" );
 		unset( $_COOKIE['gtm4wp_product_readded_to_cart'] );
 	}
 
@@ -1014,7 +1013,7 @@ function gtm4wp_woocommerce_after_shop_loop_item() {
 }
 
 function gtm4wp_woocommerce_cart_item_restored( $cart_item_key ) {
-	setcookie( 'gtm4wp_product_readded_to_cart', $cart_item_key );
+	setcookie( 'gtm4wp_product_readded_to_cart', $cart_item_key, 0, "/", "", false, true );
 }
 
 function gtm4wp_woocommerce_enqueue_scripts() {
