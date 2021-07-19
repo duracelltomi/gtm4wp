@@ -485,26 +485,26 @@ function gtm4wp_wp_loaded() {
 
 							if ( is_object( $weatherdata ) ) {
 								set_transient( 'gtm4wp-weatherdata-' . esc_attr( $client_ip ), $weatherdata, 60 * 60 );
-								setcookie( 'gtm4wp_last_weatherstatus', 'Weather data loaded.' );
+								setcookie( 'gtm4wp_last_weatherstatus', 'Weather data loaded.', 0, "/", "", false, true );
 							} else {
-								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org did not return processable data: ' . var_export( $weatherdata, true ) );
+								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org did not return processable data: ' . var_export( $weatherdata, true ), 0, "/", "", false, true );
 							}
 						} else {
 							if ( is_wp_error( $weatherdata ) ) {
-								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org request error: ' . $weatherdata->get_error_message() );
+								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org request error: ' . $weatherdata->get_error_message(), 0, "/", "", false, true );
 							} else {
-								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org returned status code: ' . $weatherdata['response']['code'] );
+								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org returned status code: ' . $weatherdata['response']['code'], 0, "/", "", false, true );
 							}
 						}
 					}
 				} else {
-					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com did not return lat-lng data: ' . var_export( $gtm4wp_geodata, true ) );
+					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com did not return lat-lng data: ' . var_export( $gtm4wp_geodata, true ), 0, "/", "", false, true );
 				}
 			} else {
 				if ( is_wp_error( $gtm4wp_geodata ) ) {
-					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com request error: ' . $gtm4wp_geodata->get_error_message() );
+					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com request error: ' . $gtm4wp_geodata->get_error_message(), 0, "/", "", false, true );
 				} else {
-					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com returned status code: ' . $gtm4wp_geodata['response']['code'] );
+					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com returned status code: ' . $gtm4wp_geodata['response']['code'], 0, "/", "", false, true );
 				}
 			}
 		}
