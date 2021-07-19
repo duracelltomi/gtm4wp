@@ -150,7 +150,7 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_MISCGEOAPI    => array(
 		'label'       => __( 'IPStack.com API key', 'duracelltomi-google-tag-manager' ),
-		'description' => sprintf( __( 'Enter your IPStack.com API key here. <a href="%s" target="_blank">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), 'https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress' ),
+		'description' => sprintf( __( 'Enter your IPStack.com API key here. <a href="%s" target="_blank" rel="noopener">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), 'https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress' ),
 		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
 	),
 	GTM4WP_OPTION_INCLUDE_MISCGEOCF     => array(
@@ -163,8 +163,8 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 		'description' => sprintf(
 			__(
 				'Check this option to include the current weather conditions around the current visitor.<br /><br />' .
-				'<strong>Attention!</strong> This feature uses <a href="%s" target="_blank">ipstack.com</a> and ' .
-				'<a href="%s" target="_blank">openweathermap.org</a> to collect data.<br />' .
+				'<strong>Attention!</strong> This feature uses <a href="%s" target="_blank" rel="noopener">ipstack.com</a> and ' .
+				'<a href="%s" target="_blank" rel="noopener">openweathermap.org</a> to collect data.<br />' .
 				"Depending on your website's traffic, additional fees may apply!<br />" .
 				'This plugin caches weather data for 1 hour to lower the need to access those services.<br /><br />' .
 				'If you activate weather data, <strong>you will need</strong> to add an IPStack.com API key regardless of whether you ' .
@@ -183,7 +183,7 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI => array(
 		'label'       => __( 'OpenWeatherMap API key', 'duracelltomi-google-tag-manager' ),
-		'description' => sprintf( __( 'Enter your OpenWeatherMap API key here. <a href="%s" target="_blank">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), 'http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress' ),
+		'description' => sprintf( __( 'Enter your OpenWeatherMap API key here. <a href="%s" target="_blank" rel="noopener">Get a free API key here</a>.', 'duracelltomi-google-tag-manager' ), 'http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress' ),
 		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
 	),
 	GTM4WP_OPTION_INCLUDE_SITEID        => array(
@@ -281,10 +281,10 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'description'   => sprintf(
 			__(
 				'Choose this option if you would like to track e-commerce data using '.
-				'<a href="%s" target="_blank">enhanced ecommerce tracking</a>.<br>'.
+				'<a href="%s" target="_blank" rel="noopener">enhanced ecommerce tracking</a>.<br>'.
 				'Use the plugin\'s official guides to setup your Google Tag Manager container:<br>'.
-				'<ul><li><a href="%s" target="_blank">Google Analytics 3 / Universal Analytics setup</a></li>'.
-				'<li><a href="%s" target="_blank">Google Analytics 4 setup</a></li></ul>'
+				'<ul><li><a href="%s" target="_blank" rel="noopener">Google Analytics 3 / Universal Analytics setup</a></li>'.
+				'<li><a href="%s" target="_blank" rel="noopener">Google Analytics 4 setup</a></li></ul>'
 			, 'duracelltomi-google-tag-manager' )
 		, 'https://developers.google.com/analytics/devguides/collection/analyticsjs/enhanced-ecommerce'
 		, 'https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking'
@@ -357,7 +357,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'description'   => sprintf(
 			__(
 				'Select which vertical category to add next to each product to utilize dynamic remarketing for Google Ads.'.
-				'<br>Use the plugin\'s <a href="%s" target="_blank">official setup guide for dynamic remarketing</a> '.
+				'<br>Use the plugin\'s <a href="%s" target="_blank" rel="noopener">official setup guide for dynamic remarketing</a> '.
 				'to setup your Google Tag Manager container.'
 			, 'duracelltomi-google-tag-manager' )
 		, 'https://gtm4wp.com/how-to-articles/how-to-setup-dynamic-remarketing-in-google-ads-adwords'),
@@ -412,7 +412,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 
 	GTM4WP_OPTION_INTEGRATE_COOKIEBOT => array(
 		'label'         => __( 'Cookiebot auto blocking', 'duracelltomi-google-tag-manager' ),
-		'description'   => sprintf( __( 'Enable this checkbox if you wish to use the <a href="%s" target="_blank">automatic cookie blocking mode of Cookiebot with Google Tag Manager</a>.', 'duracelltomi-google-tag-manager' ), 'https://support.cookiebot.com/hc/en-us/articles/360009192739-Google-Tag-Manager-and-Automatic-cookie-blocking' ),
+		'description'   => sprintf( __( 'Enable this checkbox if you wish to use the <a href="%s" target="_blank" rel="noopener">automatic cookie blocking mode of Cookiebot with Google Tag Manager</a>.', 'duracelltomi-google-tag-manager' ), 'https://support.cookiebot.com/hc/en-us/articles/360009192739-Google-Tag-Manager-and-Automatic-cookie-blocking' ),
 		'phase'         => GTM4WP_PHASE_STABLE
 	),
 );
@@ -455,7 +455,7 @@ function gtm4wp_admin_output_section( $args ) {
 
 	switch ( $args['id'] ) {
 		case GTM4WP_ADMIN_GROUP_GENERAL: {
-			_e( 'This plugin is intended to be used by IT girls&guys and marketing staff. Please be sure you read the <a href="https://developers.google.com/tag-manager/" target="_blank">Google Tag Manager Help Center</a> before you start using this plugin.<br /><br />', 'duracelltomi-google-tag-manager' );
+			_e( 'This plugin is intended to be used by IT girls&guys and marketing staff. Please be sure you read the <a href="https://developers.google.com/tag-manager/" target="_blank" rel="noopener">Google Tag Manager Help Center</a> before you start using this plugin.<br /><br />', 'duracelltomi-google-tag-manager' );
 
 			break;
 		}
@@ -1117,9 +1117,9 @@ function gtm4wp_admin_init() {
 		array(
 			'label_for'   => GTM4WP_ADMIN_GROUP_INFO,
 			'description' => '<strong>Thomas Geiger</strong><br />
-				Website: <a href="https://gtm4wp.com/" target="_blank">gtm4wp.com</a><br />
-				<a href="https://www.linkedin.com/in/duracelltomi" target="_blank">Me on LinkedIn</a><br />
-				<a href="http://www.linkedin.com/company/jabjab-online-marketing-ltd" target="_blank">JabJab Online Marketing on LinkedIn</a>',
+				Website: <a href="https://gtm4wp.com/" target="_blank" rel="noopener">gtm4wp.com</a><br />
+				<a href="https://www.linkedin.com/in/duracelltomi" target="_blank" rel="noopener">Me on LinkedIn</a><br />
+				<a href="http://www.linkedin.com/company/jabjab-online-marketing-ltd" target="_blank" rel="noopener">JabJab Online Marketing on LinkedIn</a>',
 		)
 	);
 
