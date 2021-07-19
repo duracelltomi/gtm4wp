@@ -17,7 +17,7 @@ jQuery( function() {
 				_subtabs.push( '<a href="#" data-formtableid="' + i + '" data-startrow="' + _startrow + '" data-endrow="' + (_startrow + adminsubtabsdata[ i ][ j ].numitems) + '">' + adminsubtabsdata[ i ][ j ].tabtext + '</a>' );
 				_startrow += adminsubtabsdata[ i ][ j ].numitems;
 			}
-			
+
 			if ( _subtabs.length > 0 ) {
 				adminsubtabs.push( '<ul class="adminsubtabs" id="adminsubtabs' + i + '"><li>' + _subtabs.join('</li><li>') + '</li></ul>' );
 			}
@@ -65,7 +65,8 @@ jQuery( function() {
 				.show();
 
 			jQuery( '#wpbody #adminsubtabs' + tabindex + ':not(.subtab-activated)' )
-				.find( 'a:first' )
+				.find( 'a' )
+				.first()
 				.trigger( 'click' );
 
 			jQuery( '#wpbody #adminsubtabs' + tabindex )
@@ -75,6 +76,7 @@ jQuery( function() {
 			return false;
 		});
 
-	jQuery( '.nav-tab-wrapper a:first' )
+	jQuery( '.nav-tab-wrapper a' )
+		.first()
 		.trigger( 'click' );
 });
