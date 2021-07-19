@@ -456,6 +456,38 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		}
 	}
 
+	if (
+		isset( $GLOBALS['gtm4wp_options'] )
+		&& ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_NEWUSERREG ] )
+		&& ( get_transient('gtm4wp_user_logged_in') )
+	) {
+		wc_enqueue_js("
+	if ( window.dataLayer ) {
+		window.dataLayer.push({
+			'event': 'gtm4wp.userLoggedIn'
+		});
+	}
+		");
+
+		delete_transient('gtm4wp_user_logged_in');
+	}
+
+	if (
+		isset( $GLOBALS['gtm4wp_options'] )
+		&& ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_USERLOGIN ] )
+		&& ( get_transient('gtm4wp_user_registered') )
+	) {
+		wc_enqueue_js("
+	if ( window.dataLayer ) {
+		window.dataLayer.push({
+			'event': 'gtm4wp.userRegistered'
+		});
+	}
+		");
+
+		delete_transient('gtm4wp_user_registered');
+	}
+
 	return $dataLayer;
 }
 
@@ -842,18 +874,11 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 }
 
 function gtm4wp_wp_login() {
-	setcookie( 'gtm4wp_user_logged_in', '1', 0, '/' );
+	set_transient( 'gtm4wp_user_logged_in', '1', 30 );
 }
 
 function gtm4wp_user_register() {
-	setcookie( 'gtm4wp_user_registered', '1', 0, '/' );
-}
-
-function gtm4wp_user_reg_login_script() {
-	global $gtp4wp_plugin_url;
-
-	$in_footer = apply_filters( 'gtm4wp_user_reg_login_script', true );
-	wp_enqueue_script( 'gtm4wp-user-reg-login-script', $gtp4wp_plugin_url . 'js/gtm4wp-users.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
+	set_transient( 'gtm4wp_user_registered', '1', 30 );
 }
 
 function gtm4wp_rocket_excluded_inline_js_content( $pattern ) {
@@ -902,14 +927,4 @@ if (
 
 if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] != '' ) ) {
 	require_once dirname( __FILE__ ) . '/../integration/google-optimize.php';
-}
-
-if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) ) {
-	add_action( 'wp_login', 'gtm4wp_wp_login' );
-	add_action( 'wp_enqueue_scripts', 'gtm4wp_user_reg_login_script' );
-}
-
-if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) ) {
-	add_action( 'user_register', 'gtm4wp_user_register' );
-	add_action( 'wp_enqueue_scripts', 'gtm4wp_user_reg_login_script' );
 }
