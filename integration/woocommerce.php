@@ -1091,9 +1091,7 @@ function gtm4wp_wc_quick_view_before_single_product() {
 	}
 
 	echo '
-	<script>
-		' . $gtm4wp_datalayer_name . '.push(' . json_encode( $dataLayer ) . ');
-	</script>';
+	<span style="display: none;" id="gtm4wp_quickview_data" data-gtm4wp_datalayer="' . esc_attr(json_encode( $dataLayer )) . '"></span>';
 }
 
 function gtm4wp_woocommerce_grouped_product_list_column_label( $labelvalue, $product ) {

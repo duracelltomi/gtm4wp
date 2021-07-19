@@ -751,10 +751,20 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	jQuery( document ).ajaxSuccess( function( event, xhr, settings ) {
 		if(typeof settings !== 'undefined') {
 			if (settings.url.indexOf( 'wc-api=WC_Quick_View' ) > -1 ) {
-			  setTimeout( function() {
-					jQuery( ".woocommerce.quick-view" ).parent().find( "script" ).each( function(i) {
-						eval( jQuery( this ).text() );
-					});
+				setTimeout( function() {
+
+					const dl_data = document.querySelector('#gtm4wp_quickview_data');
+					if ( dl_data && dl_data.dataset && dl_data.dataset.gtm4wp_datalayer ) {
+						try {
+							const dl_data_obj = JSON.parse( dl_data.dataset.gtm4wp_datalayer );
+							if ( dl_data_obj && window.dataLayer ) {
+								window.dataLayer.push(dl_data_obj);
+							}
+						} catch(e) {
+							console && console.error && console.error( e.message );
+						}
+					}
+
 				}, 500);
 			}
 		}
