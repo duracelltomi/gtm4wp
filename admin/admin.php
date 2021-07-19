@@ -1219,7 +1219,7 @@ function gtm4wp_admin_head() {
 <script type="text/javascript">
 	jQuery(function() {
 		jQuery( "#gtm4wp-options\\\\[gtm-code\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var gtmid_regex = /^GTM-[A-Z0-9]+$/;
 				var gtmid_list = jQuery( this ).val().trim().split( "," );
 
@@ -1238,7 +1238,7 @@ function gtm4wp_admin_head() {
 			});
 
 		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-idlist\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var goid_regex = /^(GTM|OPT)-[A-Z0-9]+$/;
 				var goid_val  = jQuery( this ).val().trim();
 				if ( "" == goid_val ) {
@@ -1262,7 +1262,7 @@ function gtm4wp_admin_head() {
 			});
 
 		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-gaid\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var gogaid_regex = /^UA-[0-9]+-[0-9]+$/;
 				var gogaid_val  = jQuery( this ).val().trim();
 				if ( "" == gogaid_val ) {
@@ -1286,7 +1286,7 @@ function gtm4wp_admin_head() {
 			});
 
 		jQuery( "#gtm4wp-options\\\\[integrate-amp-gtm\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var ampid_regex = /^GTM-[A-Z0-9]+$/;
 				var ampid_val  = jQuery( this ).val().trim();
 				if ( "" == ampid_val ) {
@@ -1310,7 +1310,7 @@ function gtm4wp_admin_head() {
 			});
 
 		jQuery( "#gtm4wp-options\\\\[gtm-datalayer-variable-name\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var currentval = jQuery( this ).val();
 
 				jQuery( ".datalayername_validation_error" )
@@ -1327,7 +1327,7 @@ function gtm4wp_admin_head() {
 			});
 
 		jQuery( "#gtm4wp-options\\\\[gtm-env-gtm-auth\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var currentval = jQuery( this ).val();
 
 				jQuery( ".gtmauth_validation_error" )
@@ -1343,7 +1343,7 @@ function gtm4wp_admin_head() {
 			});
 
 		jQuery( "#gtm4wp-options\\\\[gtm-env-gtm-preview\\\\]" )
-			.bind( "blur", function() {
+			.on( "blur", function() {
 				var currentval = jQuery( this ).val();
 
 				jQuery( ".gtmpreview_validation_error" )
