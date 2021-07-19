@@ -1221,7 +1221,11 @@ function gtm4wp_admin_head() {
 		jQuery( "#gtm4wp-options\\\\[gtm-code\\\\]" )
 			.on( "blur", function() {
 				var gtmid_regex = /^GTM-[A-Z0-9]+$/;
-				var gtmid_list = jQuery( this ).val().trim().split( "," );
+				var gtmid_list_str = jQuery( this ).val();
+				if ( typeof gtmid_list_str != "string" ) {
+					return;
+				}
+				var gtmid_list = trim( gtmid_list_str ).split( "," );
 
 				var gtmid_haserror = false;
 				for( var i=0; i<gtmid_list.length; i++ ) {
@@ -1240,7 +1244,11 @@ function gtm4wp_admin_head() {
 		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-idlist\\\\]" )
 			.on( "blur", function() {
 				var goid_regex = /^(GTM|OPT)-[A-Z0-9]+$/;
-				var goid_val  = jQuery( this ).val().trim();
+				var goid_val_str = jQuery( this ).val();
+				if ( typeof goid_val_str != "string" ) {
+					return;
+				}
+				var goid_val  = trim( goid_val_str );
 				if ( "" == goid_val ) {
 					goid_list = [];
 				} else {
@@ -1264,7 +1272,11 @@ function gtm4wp_admin_head() {
 		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-gaid\\\\]" )
 			.on( "blur", function() {
 				var gogaid_regex = /^UA-[0-9]+-[0-9]+$/;
-				var gogaid_val  = jQuery( this ).val().trim();
+				var gogaid_val_str = jQuery( this ).val();
+				if ( typeof gogaid_val_str != "string" ) {
+					return;
+				}
+				var gogaid_val  = trim( gogaid_val_str );
 				if ( "" == gogaid_val ) {
 					gogaid_list = [];
 				} else {
@@ -1288,7 +1300,11 @@ function gtm4wp_admin_head() {
 		jQuery( "#gtm4wp-options\\\\[integrate-amp-gtm\\\\]" )
 			.on( "blur", function() {
 				var ampid_regex = /^GTM-[A-Z0-9]+$/;
-				var ampid_val  = jQuery( this ).val().trim();
+				var ampid_val_str = jQuery( this ).val();
+				if ( typeof ampid_val_str != "string" ) {
+					return;
+				}
+				var ampid_val  = trim( ampid_val_str );
 				if ( "" == ampid_val ) {
 					ampid_list = [];
 				} else {
