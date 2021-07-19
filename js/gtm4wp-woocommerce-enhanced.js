@@ -858,7 +858,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 			let shipping_tier = '(shipping tier not found)';
 			let shipping_el = document.querySelector( 'input[name^=shipping_method]:checked' );
 			if ( !shipping_el ) {
-				shipping_el = document.querySelector( 'input[name^=shipping_method]:first' );
+				shipping_el = document.querySelector( 'input[name^=shipping_method]' ); // select the first input element
 			}
 			if ( shipping_el ) {
 				shipping_tier = shipping_el.value;
@@ -912,7 +912,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 			let payment_type = '(payment type not found)';
 			let payment_el = document.querySelector( '.payment_methods input:checked' );
 			if ( !payment_el ) {
-				payment_el = document.querySelector( 'input[name^=payment_method]:first' );
+				payment_el = document.querySelector( 'input[name^=payment_method]' ); // select the first input element
 			}
 			if ( payment_el ) {
 				payment_type = payment_el.value;
@@ -958,7 +958,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
 				let selected_shipping_method = document.querySelector( 'input[name^=shipping_method]:checked' );
 				if ( !selected_shipping_method ) {
-					selected_shipping_method = document.querySelector( 'input[name^=shipping_method]:first' );
+					selected_shipping_method = document.querySelector( 'input[name^=shipping_method]' ); // select the first input element
 				}
 				if ( selected_shipping_method ) {
 					selected_shipping_method.dispatchEvent( new Event('change') );
@@ -972,7 +972,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 
 			let shipping_el = document.querySelector( 'input[name^=shipping_method]:checked' );
 			if ( !shipping_el ) {
-				shipping_el = document.querySelector( 'input[name^=shipping_method]:first' );
+				shipping_el = document.querySelector( 'input[name^=shipping_method]' ); // select the first input element
 			}
 			if ( shipping_el ) {
 				window[ gtm4wp_datalayer_name ].push({
@@ -990,7 +990,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 
 			let payment_el = document.querySelector( '.payment_methods input:checked' );
 			if ( !payment_el ) {
-				payment_el = document.querySelector( 'input[name^=payment_method]:first' );
+				payment_el = document.querySelector( 'input[name^=payment_method]' ); // select the first input element
 			}
 			if ( payment_el ) {
 				window[ gtm4wp_datalayer_name ].push({
