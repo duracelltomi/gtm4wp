@@ -238,8 +238,16 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Added: support for tracking WooCommerce Block based product lists, except the "All Products" block
 * Added: support for [new_customer parameter](https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager) for Google Smart Shopping campaigns
 * Updated: removed jQuery dependency from plugin modules: contact form 7 integration, form move tracker, Vimeo, YouTube, Soundcloud, partly WooCommerce
-* Modified: moved the hidden helper span element in products lists to the end of the product box to make more compatible with themes
+* Updated: moved the hidden helper span element in products lists to the end of the product box to make more compatible with themes
+* Updated: more consistent retrieval of product categories  - by [Dekadinious](https://github.com/Dekadinious)
+* Updated: gtm4wp_product_readded_to_cart, gtm4wp_user_logged_in and gtm4wp_user_registered cookies are replaced with WordPress transients
+* Updated: gtm4wp_last_weatherstatus cookie is changed to HTTP Only to make it safer
+* Updated: replaced deprecated jQuery method and event usage in WP admin
+* Updated: added rel="noopener" to links pointing to external sites on WP admin page
 * Fixed: proper values for visitorType data layer variable
+* Fixed: replaced unsafe usage of eval() in WooCommerce QuickView plugin integration
+* Fixed: type check of the order ID obtained from a cookie before using the value
+* Fixed: navigation issues in Safari if browser loads previous page from cache. GTM4WP will now force Safari to always reload pages.
 
 = 1.13.1 =
 
