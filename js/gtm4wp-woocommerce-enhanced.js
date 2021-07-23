@@ -149,6 +149,102 @@ function gtm4wp_handle_cart_qty_change() {
 	}); // end each qty field
 } // end gtm4wp_handle_cart_qty_change()
 
+function gtm4wp_handle_payment_method_change() {
+	// do not report checkout step if already reported
+	if ( gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) > -1 ) {
+		return;
+	}
+
+	// do not fire event during page load
+	if ( 'complete' != document.readyState ) {
+		return;
+	}
+
+	let payment_type = '(payment type not found)';
+	let payment_el = document.querySelector( '.payment_methods input:checked' );
+	if ( !payment_el ) {
+		payment_el = document.querySelector( 'input[name^=payment_method]' ); // select the first input element
+	}
+	if ( payment_el ) {
+		payment_type = payment_el.value;
+	}
+
+	// fire ga3 version
+	window[ gtm4wp_datalayer_name ].push({
+		'event': 'gtm4wp.checkoutStepEEC',
+		'ecommerce': {
+			'currencyCode': gtm4wp_currency,
+			'checkout': {
+				'actionField': {
+					'step': 4 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
+				},
+				'products': window.gtm4wp_checkout_products
+			}
+		}
+	});
+
+	// fire ga4 version
+	window[ gtm4wp_datalayer_name ].push({
+		'event': 'add_payment_info',
+		'ecommerce': {
+			'currency': gtm4wp_currency,
+			'payment_type': payment_type,
+			'value': window.gtm4wp_checkout_value,
+			'items': window.gtm4wp_checkout_products_ga4
+		}
+	});
+
+	gtm4wp_checkout_step_fired.push( 'payment_method' );
+} // end gtm4wp_handle_payment_method_change()
+
+function gtm4wp_handle_shipping_method_change() {
+	// do not report checkout step if already reported
+	if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) > -1 ) {
+		return;
+	}
+
+	// do not fire event during page load
+	if ( 'complete' != document.readyState ) {
+		return;
+	}
+
+	let shipping_tier = '(shipping tier not found)';
+	let shipping_el = document.querySelector( 'input[name^=shipping_method]:checked' );
+	if ( !shipping_el ) {
+		shipping_el = document.querySelector( 'input[name^=shipping_method]' ); // select the first input element
+	}
+	if ( shipping_el ) {
+		shipping_tier = shipping_el.value;
+	}
+
+	// fire ga3 version
+	window[ gtm4wp_datalayer_name ].push({
+		'event': 'gtm4wp.checkoutStepEEC',
+		'ecommerce': {
+			'currencyCode': gtm4wp_currency,
+			'checkout': {
+				'actionField': {
+					'step': 3 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
+				},
+				'products': window.gtm4wp_checkout_products
+			}
+		}
+	});
+
+	// fire ga4 version
+	window[ gtm4wp_datalayer_name ].push({
+		'event': 'add_shipping_info',
+		'ecommerce': {
+			'currency': gtm4wp_currency,
+			'shipping_tier': shipping_tier,
+			'value': window.gtm4wp_checkout_value,
+			'items': window.gtm4wp_checkout_products_ga4
+		}
+	});
+
+	gtm4wp_checkout_step_fired.push( 'shipping_method' );
+}
+
 document.addEventListener( 'DOMContentLoaded', function() {
 	const is_cart     = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-cart' );
 	const is_checkout = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-checkout' );
@@ -845,51 +941,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 				return true;
 			}
 
-			// do not report checkout step if already reported
-			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) > -1 ) {
-				return;
-			}
-
-			// do not fire event during page load
-			if ( 'complete' != document.readyState ) {
-				return;
-			}
-
-			let shipping_tier = '(shipping tier not found)';
-			let shipping_el = document.querySelector( 'input[name^=shipping_method]:checked' );
-			if ( !shipping_el ) {
-				shipping_el = document.querySelector( 'input[name^=shipping_method]' ); // select the first input element
-			}
-			if ( shipping_el ) {
-				shipping_tier = shipping_el.value;
-			}
-
-			// fire ga3 version
-			window[ gtm4wp_datalayer_name ].push({
-				'event': 'gtm4wp.checkoutStepEEC',
-				'ecommerce': {
-					'currencyCode': gtm4wp_currency,
-					'checkout': {
-						'actionField': {
-							'step': 3 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
-						},
-						'products': window.gtm4wp_checkout_products
-					}
-				}
-			});
-
-			// fire ga4 version
-			window[ gtm4wp_datalayer_name ].push({
-				'event': 'add_shipping_info',
-				'ecommerce': {
-					'currency': gtm4wp_currency,
-					'shipping_tier': shipping_tier,
-					'value': window.gtm4wp_checkout_value,
-					'items': window.gtm4wp_checkout_products_ga4
-				}
-			});
-
-			gtm4wp_checkout_step_fired.push( 'shipping_method' );
+			gtm4wp_handle_shipping_method_change();
 		});
 
 		document.addEventListener( 'change', function( e ) {
@@ -899,51 +951,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 				return true;
 			}
 
-			// do not report checkout step if already reported
-			if ( gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) > -1 ) {
-				return;
-			}
-
-			// do not fire event during page load
-			if ( 'complete' != document.readyState ) {
-				return;
-			}
-
-			let payment_type = '(payment type not found)';
-			let payment_el = document.querySelector( '.payment_methods input:checked' );
-			if ( !payment_el ) {
-				payment_el = document.querySelector( 'input[name^=payment_method]' ); // select the first input element
-			}
-			if ( payment_el ) {
-				payment_type = payment_el.value;
-			}
-
-			// fire ga3 version
-			window[ gtm4wp_datalayer_name ].push({
-				'event': 'gtm4wp.checkoutStepEEC',
-				'ecommerce': {
-					'currencyCode': gtm4wp_currency,
-					'checkout': {
-						'actionField': {
-							'step': 4 + window.gtm4wp_checkout_step_offset + gtm4wp_shipping_payment_method_step_offset
-						},
-						'products': window.gtm4wp_checkout_products
-					}
-				}
-			});
-
-			// fire ga4 version
-			window[ gtm4wp_datalayer_name ].push({
-				'event': 'add_payment_info',
-				'ecommerce': {
-					'currency': gtm4wp_currency,
-					'payment_type': payment_type,
-					'value': window.gtm4wp_checkout_value,
-					'items': window.gtm4wp_checkout_products_ga4
-				}
-			});
-
-			gtm4wp_checkout_step_fired.push( 'payment_method' );
+			gtm4wp_handle_payment_method_change();
 		});
 
 		document.addEventListener( 'submit', function( e ) {
@@ -956,18 +964,12 @@ document.addEventListener( 'DOMContentLoaded', function() {
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1 ) {
 				// shipping methods are not visible if only one is available
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
-				let selected_shipping_method = document.querySelector( 'input[name^=shipping_method]:checked' );
-				if ( !selected_shipping_method ) {
-					selected_shipping_method = document.querySelector( 'input[name^=shipping_method]' ); // select the first input element
-				}
-				if ( selected_shipping_method ) {
-					selected_shipping_method.dispatchEvent( new Event('change') );
-				}
+				gtm4wp_handle_shipping_method_change();
 			}
 
 			if ( gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) == -1 ) {
 				// if the user has already a pre-selected method, no click event will fire to report the checkout step
-				document.querySelector( 'input[name=payment_method]:checked' )?.dispatchEvent( new Event('change') );
+				gtm4wp_handle_payment_method_change();
 			}
 
 			let shipping_el = document.querySelector( 'input[name^=shipping_method]:checked' );

@@ -248,6 +248,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Fixed: replaced unsafe usage of eval() in WooCommerce QuickView plugin integration
 * Fixed: type check of the order ID obtained from a cookie before using the value
 * Fixed: navigation issues in Safari if browser loads previous page from cache. GTM4WP will now force Safari to always reload pages.
+* Fixed: Do not trigger browser change event in WooCommerce checkout page submit event handler. It caused issues with other 3rd party plugins.
 
 = 1.13.1 =
 
