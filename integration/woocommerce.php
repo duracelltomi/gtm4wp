@@ -79,7 +79,7 @@ function gtm4wp_get_product_category_hierarchy( $category_id ) {
 function gtm4wp_get_product_category( $product_id, $fullpath = false ) {
 	$product_cat = '';
 
-	$_product_cats = get_the_terms( $product_id, 'product_cat' );
+	$_product_cats = wp_get_post_terms( $product_id, 'product_cat', array( 'orderby' => 'parent', 'order' => 'ASC')); 
 	if ( ( is_array( $_product_cats ) ) && ( count( $_product_cats ) > 0 ) ) {
 		$first_product_cat = array_pop( $_product_cats );
 		if ( $fullpath ) {
@@ -93,7 +93,7 @@ function gtm4wp_get_product_category( $product_id, $fullpath = false ) {
 }
 
 function gtm4wp_woocommerce_getproductterm( $product_id, $taxonomy ) {
-	$gtm4wp_product_terms = get_the_terms( $product_id, $taxonomy );
+	$gtm4wp_product_terms = wp_get_post_terms( $product_id, $taxonomy, array( 'orderby' => 'parent', 'order' => 'ASC'));
 	if ( is_array( $gtm4wp_product_terms ) && ( count( $gtm4wp_product_terms ) > 0 ) ) {
 		return $gtm4wp_product_terms[0]->name;
 	}
