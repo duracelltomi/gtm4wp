@@ -1148,6 +1148,24 @@ function gtm4wp_add_productdata_to_wc_block($content, $data, $product) {
 	return preg_replace('/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', '$0' . $product_data_tag, $content);
 }
 
+function gtm4wp_woocommerce_header_top() {
+	$has_html5_support = current_theme_supports( 'html5' );
+
+	echo "<script" . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ">
+const gtm4wp_is_safari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+if ( gtm4wp_is_safari ) {
+	window.addEventListener('pageshow', function(event) {
+		if ( event.persisted ) {
+			// if Safari loads the page from cache usually by navigating with the back button
+			// it creates issues with product list click tracking
+			// therefore GTM4WP forces the page reload in this browser
+			window.location.reload();
+		}
+	});
+}
+</script>";
+}
+
 // do not add filter if someone enabled WooCommerce integration without an activated WooCommerce plugin
 if ( function_exists( 'WC' ) ) {
 	add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_woocommerce_datalayer_filter_items' );
@@ -1163,7 +1181,6 @@ if ( function_exists( 'WC' ) ) {
 	add_filter( 'woocommerce_blocks_product_grid_item_html', 'gtm4wp_add_productdata_to_wc_block', 10, 3);
 
 	if ( true === $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
-		// add_action( "wp_footer", "gtm4wp_woocommerce_enhanced_ecom_product_click" );
 		add_action( 'woocommerce_before_template_part', 'gtm4wp_woocommerce_before_template_part' );
 		add_action( 'woocommerce_after_template_part', 'gtm4wp_woocommerce_after_template_part' );
 		add_filter( 'widget_title', 'gtm4wp_widget_title_filter' );
@@ -1185,5 +1202,7 @@ if ( function_exists( 'WC' ) ) {
 		add_action( 'woocommerce_shortcode_before_top_rated_products_loop', 'gtm4wp_before_top_rated_products_loop' );
 		add_action( 'woocommerce_shortcode_before_featured_products_loop', 'gtm4wp_before_featured_products_loop' );
 		add_action( 'woocommerce_shortcode_before_related_products_loop', 'gtm4wp_before_related_products_loop' );
+
+		add_action( 'wp_head', 'gtm4wp_woocommerce_header_top', 1, 0 );
 	}
 }
