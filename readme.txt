@@ -244,6 +244,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Updated: gtm4wp_last_weatherstatus cookie is changed to HTTP Only to make it safer
 * Updated: replaced deprecated jQuery method and event usage in WP admin
 * Updated: added rel="noopener" to links pointing to external sites on WP admin page
+* Updated: changed the gtm4wp_add_global_vars WP filter to an action
 * Fixed: proper values for visitorType data layer variable
 * Fixed: replaced unsafe usage of eval() in WooCommerce QuickView plugin integration
 * Fixed: type check of the order ID obtained from a cookie before using the value

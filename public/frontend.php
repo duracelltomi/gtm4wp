@@ -673,7 +673,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 
 	// Load in the global variables from gtm4wp_add_global_vars / GTM4WP_WPACTION_ADDGLOBALVARS filter
-	$_gtm_top_content .= apply_filters( GTM4WP_WPACTION_ADDGLOBALVARS, '', true );
+	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_top_content .= '
