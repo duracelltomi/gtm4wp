@@ -3,7 +3,7 @@ define( 'GTM4WP_WPFILTER_COMPILE_DATALAYER', 'gtm4wp_compile_datalayer' );
 define( 'GTM4WP_WPFILTER_COMPILE_REMARKTING', 'gtm4wp_compile_remarkering' );
 define( 'GTM4WP_WPFILTER_AFTER_DATALAYER', 'gtm4wp_after_datalayer' );
 define( 'GTM4WP_WPFILTER_GETTHEGTMTAG', 'gtm4wp_get_the_gtm_tag' );
-define( 'GTM4WP_WPACTION_ADDGLOBALVARS', 'gtm4wp_add_global_vars' );
+define( 'GTM4WP_WPFILTER_ADDGLOBALVARS', 'gtm4wp_add_global_vars' );
 
 $GLOBALS['gtm4wp_container_code_written'] = false;
 
@@ -672,8 +672,8 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	var gtm4wp_datalayer_name = "' . $gtm4wp_datalayer_name . '";
 	var ' . $gtm4wp_datalayer_name . ' = ' . $gtm4wp_datalayer_name . ' || [];';
 
-	// Load in the global variables from gtm4wp_add_global_vars / GTM4WP_WPACTION_ADDGLOBALVARS filter
-	do_action( GTM4WP_WPACTION_ADDGLOBALVARS );
+	// Load in the global variables from gtm4wp_add_global_vars / GTM4WP_WPFILTER_ADDGLOBALVARS filter
+	$_gtm_top_content .= apply_filters( GTM4WP_WPFILTER_ADDGLOBALVARS, '' );
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$_gtm_top_content .= '
