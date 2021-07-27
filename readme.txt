@@ -240,8 +240,8 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Updated: removed jQuery dependency from plugin modules: contact form 7 integration, form move tracker, Vimeo, YouTube, Soundcloud, partly WooCommerce
 * Updated: moved the hidden helper span element in products lists to the end of the product box to make more compatible with themes
 * Updated: more consistent retrieval of product categories  - by [Dekadinious](https://github.com/Dekadinious)
-* Updated: gtm4wp_product_readded_to_cart, gtm4wp_user_logged_in and gtm4wp_user_registered cookies are replaced with WordPress transients
-* Updated: gtm4wp_last_weatherstatus cookie is changed to HTTP Only to make it safer
+* Updated: gtm4wp_product_readded_to_cart cookie replaced with a WooCommerce session variable to use fewer cookies in this plugin
+* Updated: gtm4wp_user_logged_in, gtm4wp_user_registered and gtm4wp_last_weatherstatus cookies are now HTTP only cookies
 * Updated: replaced deprecated jQuery method and event usage in WP admin
 * Updated: added rel="noopener" to links pointing to external sites on WP admin page
 * Fixed: proper values for visitorType data layer variable
