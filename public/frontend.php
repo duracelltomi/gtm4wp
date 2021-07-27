@@ -456,38 +456,6 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 		}
 	}
 
-	if (
-		isset( $GLOBALS['gtm4wp_options'] )
-		&& ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_NEWUSERREG ] )
-		&& ( get_transient('gtm4wp_user_logged_in') )
-	) {
-		wc_enqueue_js("
-	if ( window.dataLayer ) {
-		window.dataLayer.push({
-			'event': 'gtm4wp.userLoggedIn'
-		});
-	}
-		");
-
-		delete_transient('gtm4wp_user_logged_in');
-	}
-
-	if (
-		isset( $GLOBALS['gtm4wp_options'] )
-		&& ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_USERLOGIN ] )
-		&& ( get_transient('gtm4wp_user_registered') )
-	) {
-		wc_enqueue_js("
-	if ( window.dataLayer ) {
-		window.dataLayer.push({
-			'event': 'gtm4wp.userRegistered'
-		});
-	}
-		");
-
-		delete_transient('gtm4wp_user_registered');
-	}
-
 	return $dataLayer;
 }
 
@@ -623,6 +591,44 @@ function gtm4wp_wp_footer() {
 
 	if ( GTM4WP_PLACEMENT_FOOTER == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
 		gtm4wp_the_gtm_tag();
+	}
+
+	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) {
+		$user_logged_in = array_key_exists( "gtm4wp_user_logged_in", $_COOKIE ) ?
+			filter_var( $_COOKIE[ "gtm4wp_user_logged_in" ], FILTER_VALIDATE_INT )
+			: 0;
+
+		if ( $user_logged_in ) {
+			echo "
+<script>
+	if ( window.dataLayer ) {
+		window.dataLayer.push({
+			'event': 'gtm4wp.userLoggedIn'
+		});
+	}
+</script>";
+
+			unset( $_COOKIE[ "gtm4wp_user_logged_in" ] );
+		}
+	}
+
+	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) {
+		$user_registered = array_key_exists( "gtm4wp_user_registered", $_COOKIE ) ?
+			filter_var( $_COOKIE[ "gtm4wp_user_registered" ], FILTER_VALIDATE_INT )
+			: 0;
+
+		if ( $user_registered ) {
+			echo "
+<script>
+	if ( window.dataLayer ) {
+		window.dataLayer.push({
+			'event': 'gtm4wp.userRegistered'
+		});
+	}
+</script>";
+
+			unset( $_COOKIE[ "gtm4wp_user_registered" ] );
+		}
 	}
 }
 
@@ -874,11 +880,27 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 }
 
 function gtm4wp_wp_login() {
-	set_transient( 'gtm4wp_user_logged_in', '1', 30 );
+	setcookie(
+		"gtm4wp_user_logged_in",
+		"1",
+		0,
+		"/",
+		"",
+		(false !== strstr( get_option( 'home' ), 'https:' )) && is_ssl(),
+		true
+	);
 }
 
 function gtm4wp_user_register() {
-	set_transient( 'gtm4wp_user_registered', '1', 30 );
+	setcookie(
+		"gtm4wp_user_registered",
+		"1",
+		0,
+		"/",
+		"",
+		(false !== strstr( get_option( 'home' ), 'https:' )) && is_ssl(),
+		true
+	);
 }
 
 function gtm4wp_rocket_excluded_inline_js_content( $pattern ) {
@@ -886,6 +908,32 @@ function gtm4wp_rocket_excluded_inline_js_content( $pattern ) {
 	$pattern[] = 'gtm4wp';
 
 	return $pattern;
+}
+
+function gtm4wp_wp_init() {
+	if ( array_key_exists( "gtm4wp_user_logged_in", $_COOKIE ) ) {
+		setcookie(
+			"gtm4wp_user_logged_in",
+			"",
+			-10000,
+			"/",
+			"",
+			(false !== strstr( get_option( 'home' ), 'https:' )) && is_ssl(),
+			true
+		);
+	}
+
+	if ( array_key_exists( "gtm4wp_user_registered", $_COOKIE ) ) {
+		setcookie(
+			"gtm4wp_user_registered",
+			"",
+			-10000,
+			"/",
+			"",
+			(false !== strstr( get_option( 'home' ), 'https:' )) && is_ssl(),
+			true
+		);
+	}
 }
 
 add_action( 'wp_enqueue_scripts', 'gtm4wp_enqueue_scripts' );
@@ -898,6 +946,7 @@ add_action( 'wp_head', 'gtm4wp_wp_header_top', 1, 0 );
 add_action( 'wp_footer', 'gtm4wp_wp_footer' );
 add_action( 'wp_loaded', 'gtm4wp_wp_loaded' );
 add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_add_basic_datalayer_data' );
+add_action( 'init', 'gtm4wp_wp_init' );
 
 // to be able to easily migrate from other Google Tag Manager plugins
 add_action( 'body_open', 'gtm4wp_wp_body_open' );
@@ -927,4 +976,12 @@ if (
 
 if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS ] != '' ) ) {
 	require_once dirname( __FILE__ ) . '/../integration/google-optimize.php';
+}
+
+if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) ) {
+	add_action( 'wp_login', 'gtm4wp_wp_login' );
+}
+
+if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) ) {
+	add_action( 'user_register', 'gtm4wp_user_register' );
 }
