@@ -738,30 +738,32 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		}
 	}
 
-	$cart_readded_hash = get_transient( 'gtm4wp_product_readded_to_cart' );
-	if ( isset( $cart_readded_hash ) ) {
-		$cart_item = $woo->cart->get_cart_item( $cart_readded_hash );
-		if ( ! empty( $cart_item ) ) {
-			$product = $cart_item['data'];
+	if ( function_exists( 'WC' ) && WC()->session ) {
+		$cart_readded_hash = WC()->session->get( 'gtm4wp_product_readded_to_cart' );
+		if ( isset( $cart_readded_hash ) ) {
+			$cart_item = $woo->cart->get_cart_item( $cart_readded_hash );
+			if ( ! empty( $cart_item ) ) {
+				$product = $cart_item['data'];
 
-			$eec_product_array = gtm4wp_process_product( $product, array(
-				'quantity' => $cart_item['quantity']
-			), 'readdedtocart' );
+				$eec_product_array = gtm4wp_process_product( $product, array(
+					'quantity' => $cart_item['quantity']
+				), 'readdedtocart' );
 
-			$currencyCode = get_woocommerce_currency();
+				$currencyCode = get_woocommerce_currency();
 
-			$dataLayer['event'] = 'gtm4wp.addProductToCartEEC';
-			$dataLayer['ecommerce'] = array(
-				'currencyCode' => $currencyCode,
-				'add' => array(
-					'products' => array(
-						$eec_product_array
+				$dataLayer['event'] = 'gtm4wp.addProductToCartEEC';
+				$dataLayer['ecommerce'] = array(
+					'currencyCode' => $currencyCode,
+					'add' => array(
+						'products' => array(
+							$eec_product_array
+						)
 					)
-				)
-			);
-		}
+				);
+			}
 
-		delete_transient( 'gtm4wp_product_readded_to_cart' );
+			WC()->session->set( 'gtm4wp_product_readded_to_cart', NULL );
+		}
 	}
 
 	return $dataLayer;
@@ -1022,7 +1024,9 @@ function gtm4wp_woocommerce_after_shop_loop_item() {
 }
 
 function gtm4wp_woocommerce_cart_item_restored( $cart_item_key ) {
-	set_transient( 'gtm4wp_product_readded_to_cart', $cart_item_key, 30 );
+	if ( function_exists( 'WC' ) && WC()->session ) {
+		WC()->session->set( 'gtm4wp_product_readded_to_cart', $cart_item_key );
+	}
 }
 
 function gtm4wp_woocommerce_enqueue_scripts() {
