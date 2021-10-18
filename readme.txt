@@ -245,6 +245,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Updated: gtm4wp_user_logged_in, gtm4wp_user_registered and gtm4wp_last_weatherstatus cookies are now HTTP only cookies
 * Updated: replaced deprecated jQuery method and event usage in WP admin
 * Updated: added rel="noopener" to links pointing to external sites on WP admin page
+* Updated: Hiding the iframe tag from assistive technologies as it provides no functionality for the end user. This will also alleviate a11y audit warnings.
 * Fixed: proper values for visitorType data layer variable
 * Fixed: replaced unsafe usage of eval() in WooCommerce QuickView plugin integration
 * Fixed: type check of the order ID obtained from a cookie before using the value
