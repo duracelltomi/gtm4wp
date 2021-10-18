@@ -237,6 +237,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 * Added: support for tracking WooCommerce Block based product lists, except the "All Products" block
 * Added: support for [new_customer parameter](https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager) for Google Smart Shopping campaigns
+* Added: SHA256 hashed versions of data layer variables containing email addresses: customerBillingEmailHash on WooCommerce order received pages and visitorEmailHash on generic uses cases
 * Updated: removed jQuery dependency from plugin modules: contact form 7 integration, form move tracker, Vimeo, YouTube, Soundcloud, partly WooCommerce
 * Updated: moved the hidden helper span element in products lists to the end of the product box to make more compatible with themes
 * Updated: more consistent retrieval of product categories  - by [Dekadinious](https://github.com/Dekadinious)

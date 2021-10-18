@@ -132,6 +132,7 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USEREMAIL ] ) {
 			$dataLayer['visitorEmail'] = ( empty( $current_user->user_email ) ? '' : $current_user->user_email );
+			$dataLayer['visitorEmailHash'] = ( empty( $current_user->user_email ) ? '' : hash( 'sha256', $current_user->user_email ) );
 		}
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_USERREGDATE ] ) {
@@ -593,6 +594,8 @@ function gtm4wp_wp_footer() {
 		gtm4wp_the_gtm_tag();
 	}
 
+	$has_html5_support = current_theme_supports( 'html5' );
+
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) {
 		$user_logged_in = array_key_exists( "gtm4wp_user_logged_in", $_COOKIE ) ?
 			filter_var( $_COOKIE[ "gtm4wp_user_logged_in" ], FILTER_VALIDATE_INT )
@@ -600,7 +603,7 @@ function gtm4wp_wp_footer() {
 
 		if ( $user_logged_in ) {
 			echo "
-<script>
+<script" . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ">
 	if ( window.dataLayer ) {
 		window.dataLayer.push({
 			'event': 'gtm4wp.userLoggedIn'
@@ -619,7 +622,7 @@ function gtm4wp_wp_footer() {
 
 		if ( $user_registered ) {
 			echo "
-<script>
+<script" . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ">
 	if ( window.dataLayer ) {
 		window.dataLayer.push({
 			'event': 'gtm4wp.userRegistered'

@@ -310,6 +310,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			$dataLayer['customerBillingPostcode']  = $woo_customer->get_billing_postcode();
 			$dataLayer['customerBillingCountry']   = $woo_customer->get_billing_country();
 			$dataLayer['customerBillingEmail']     = $woo_customer->get_billing_email();
+			$dataLayer['customerBillingEmailHash'] = hash( 'sha256', $woo_customer->get_billing_email() );
 			$dataLayer['customerBillingPhone']     = $woo_customer->get_billing_phone();
 
 			$dataLayer['customerShippingFirstName'] = $woo_customer->get_shipping_first_name();
@@ -565,6 +566,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 						'postcode'   => esc_js( $order->get_billing_postcode() ),
 						'country'    => esc_js( $order->get_billing_country() ),
 						'email'      => esc_js( $order->get_billing_email() ),
+						'emailhash'  => esc_js( hash( 'sha256', $order->get_billing_email() ) ),
 						'phone'      => esc_js( $order->get_billing_phone() )
 					),
 
