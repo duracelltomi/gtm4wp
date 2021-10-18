@@ -539,7 +539,7 @@ function gtm4wp_get_the_gtm_tag() {
 		foreach ( $_gtm_codes as $one_gtm_code ) {
 			$_gtm_tag .= '
 <noscript><iframe src="https://' . $_gtm_domain_name . '/ns.html?id=' . $one_gtm_code . $_gtm_env . '"
-height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>';
+height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe></noscript>';
 		}
 
 		$_gtm_tag .= '
