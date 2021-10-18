@@ -746,9 +746,9 @@ document.addEventListener( 'DOMContentLoaded', function() {
 						'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 					},
 					'eventCallback': function() {
-
+						delete window[ "gtm4wp_select_item_" + product_data.id ];
 						if ( ctrl_key_pressed && productpage_window ) {
-							productpage_window.location.href= dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
+							productpage_window.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
 						} else {
 							document.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
 						}
