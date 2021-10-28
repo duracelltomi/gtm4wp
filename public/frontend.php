@@ -603,7 +603,7 @@ function gtm4wp_wp_footer() {
 
 		if ( $user_logged_in ) {
 			echo "
-<script" . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ">
+<script" . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ">
 	if ( window.dataLayer ) {
 		window.dataLayer.push({
 			'event': 'gtm4wp.userLoggedIn'
@@ -622,7 +622,7 @@ function gtm4wp_wp_footer() {
 
 		if ( $user_registered ) {
 			echo "
-<script" . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ">
+<script" . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ">
 	if ( window.dataLayer ) {
 		window.dataLayer.push({
 			'event': 'gtm4wp.userRegistered'
