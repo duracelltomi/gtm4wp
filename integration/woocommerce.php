@@ -11,6 +11,7 @@ if ( function_exists( 'WC' ) ) {
 	$GLOBALS['gtm4wp_is_woocommerce3_7'] = false;
 }
 $GLOBALS['gtm4wp_grouped_product_ix'] = 1;
+$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = false;
 
 // from https://snippets.webaware.com.au/ramblings/php-really-doesnt-unicode/
 function gtm4wp_untexturize( $fancy ) {
@@ -281,6 +282,87 @@ function gtm4wp_woocommerce_addglobalvars( $return ) {
 	return $return;
 }
 
+function gtm4wp_get_purchase_datalayer( $order, $order_items ) {
+	global $gtm4wp_options, $gtm4wp_is_woocommerce3_7;
+
+	$dataLayer = array();
+
+	if ( $order instanceof WC_Order ) {
+		$woo = WC();
+
+		// variable for Google Smart Shopping campaign new customer reporting
+		// https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager
+		if ( $woo->customer instanceof WC_Customer ) {
+			// we need to use this instead of $woo->customer as this will load proper total order number and value from the database instead of the session
+			$woo_customer = new WC_Customer( $woo->customer->get_id() );
+			$dataLayer['new_customer'] = $woo_customer->get_order_count() === 1;
+		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
+			$order_revenue = (float)( $order->get_total() - $order->get_total_tax() );
+		} else {
+			$order_revenue = (float) $order->get_total();
+		}
+
+		$order_shipping_cost = (float) $order->get_shipping_total();
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING ] ) {
+			$order_revenue -= $order_shipping_cost;
+		}
+
+		$order_currency = $order->get_currency();
+
+		if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
+			$dataLayer['event']                     = 'gtm4wp.orderCompleted';
+			$dataLayer['transactionId']             = $order->get_order_number();
+			$dataLayer['transactionAffiliation']    = '';
+			$dataLayer['transactionTotal']          = $order_revenue;
+			$dataLayer['transactionShipping']       = $order_shipping_cost;
+			$dataLayer['transactionTax']            = (float) $order->get_total_tax();
+			$dataLayer['transactionCurrency']       = $order_currency;
+		}
+
+		if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
+			$dataLayer['event']     = 'gtm4wp.orderCompletedEEC';
+			$dataLayer['ecommerce'] = array(
+				'currencyCode' => $order_currency,
+				'purchase'     => array(
+					'actionField' => array(
+						'id'          => $order->get_order_number(),
+						'affiliation' => '',
+						'revenue'     => $order_revenue,
+						'tax'         => (float) $order->get_total_tax(),
+						'shipping'    => (float)( $order->get_shipping_total() ),
+						'coupon'      => implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) ),
+					)
+				)
+			);
+		}
+
+		if ( isset( $order_items ) ) {
+			$_order_items = $order_items;
+		} else {
+			$_order_items = gtm4wp_process_order_items( $order );
+		}
+
+		if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
+			$dataLayer['transactionProducts'] = $_order_items['products'];
+		}
+
+		if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
+			$dataLayer['ecommerce']['purchase']['products'] = $_order_items['products'];
+		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
+			$dataLayer['ecomm_prodid']     = $_order_items['product_ids'];
+			$dataLayer['ecomm_pagetype']   = 'purchase';
+			$dataLayer['ecomm_totalvalue'] = (float) $_order_items['sumprice'];
+		}
+	}
+
+	return $dataLayer;
+}
+
 function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 	global $gtm4wp_options, $wp_query, $gtm4wp_datalayer_name, $gtm4wp_product_counter, $gtm4wp_is_woocommerce3_7;
 
@@ -504,6 +586,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 		}
 
+		// From this point if for any reason purchase data is not pushed
+		// that is because for a specific reason.
+		// In any other case woocommerce_thankyou hook will be the fallback if
+		// is_order_received_page does not work
+//		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
+
 		if(isset($order) && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ){
 
 			$now = new DateTime();
@@ -520,6 +608,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 		}
 
+		$order_items = NULL;
 		if ( isset($order) && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERDATA ] ) {
 			$order_items = gtm4wp_process_order_items( $order );
 
@@ -600,74 +689,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		}
 
 		if ( isset( $order ) ) {
-			// variable for Google Smart Shopping campaign new customer reporting
-			// https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager
-			if ( !isset( $woo_customer ) ) {
-				if ( $woo->customer instanceof WC_Customer ) {
-				// we need to use this instead of $woo->customer as this will load proper total order number and value from the database instead of the session
-				$woo_customer = new WC_Customer( $woo->customer->get_id() );
-				}
-			}
-			$dataLayer['new_customer'] = $woo_customer->get_order_count() === 1;
-
-			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {
-				$order_revenue = (float)( $order->get_total() - $order->get_total_tax() );
-			} else {
-				$order_revenue = (float) $order->get_total();
-			}
-
-			$order_shipping_cost = (float) $order->get_shipping_total();
-
-			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING ] ) {
-				$order_revenue -= $order_shipping_cost;
-			}
-
-			$order_currency = $order->get_currency();
-
-			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
-				$dataLayer['event']                     = 'gtm4wp.orderCompleted';
-				$dataLayer['transactionId']             = $order->get_order_number();
-				$dataLayer['transactionAffiliation']    = '';
-				$dataLayer['transactionTotal']          = $order_revenue;
-				$dataLayer['transactionShipping']       = $order_shipping_cost;
-				$dataLayer['transactionTax']            = (float) $order->get_total_tax();
-				$dataLayer['transactionCurrency']       = $order_currency;
-			}
-
-			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
-				$dataLayer['event']     = 'gtm4wp.orderCompletedEEC';
-				$dataLayer['ecommerce'] = array(
-					'currencyCode' => $order_currency,
-					'purchase'     => array(
-						'actionField' => array(
-							'id'          => $order->get_order_number(),
-							'affiliation' => '',
-							'revenue'     => $order_revenue,
-							'tax'         => (float) $order->get_total_tax(),
-							'shipping'    => (float)( $order->get_shipping_total() ),
-							'coupon'      => implode( ', ', ( $gtm4wp_is_woocommerce3_7 ? $order->get_coupon_codes() : $order->get_used_coupons() ) ),
-						)
-					)
-				);
-			}
-
-			if ( ! isset( $order_items ) ) {
-				$order_items = gtm4wp_process_order_items( $order );
-			}
-
-			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ) {
-				$dataLayer['transactionProducts'] = $order_items['products'];
-			}
-
-			if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
-				$dataLayer['ecommerce']['purchase']['products'] = $order_items['products'];
-			}
-
-			if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ] ) {
-				$dataLayer['ecomm_prodid']     = $order_items['product_ids'];
-				$dataLayer['ecomm_pagetype']   = 'purchase';
-				$dataLayer['ecomm_totalvalue'] = (float) $order_items['sumprice'];
-			}
+			$dataLayer = array_merge( $dataLayer, gtm4wp_get_purchase_datalayer( $order, $order_items ) );
 
 			if ( ! $do_not_flag_tracked_order ) {
 				update_post_meta( $order_id, '_ga_tracked', 1 );
@@ -769,6 +791,65 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 	}
 
 	return $dataLayer;
+}
+
+function gtm4wp_woocommerce_thankyou( $order_id ) {
+	global $gtm4wp_options, $gtm4wp_datalayer_name;
+
+	// if this flag is set to true, it means that the puchase event was fired
+	// when capturing the is_order_received_page template tag therefore
+	// no need to handle this here twice
+	if ( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ) {
+		return;
+	}
+
+	if ( $order_id > 0 ) {
+		$order = wc_get_order( $order_id );
+	}
+
+	if( isset( $order ) && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ) {
+		$now = new DateTime();
+		if( $order->is_paid() && $order->get_date_paid() ) {
+			$diff = $now->diff( $order->get_date_paid() );
+			$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
+		} else {
+			$diff = $now->diff( $order->get_date_created() );
+			$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
+		}
+
+		if( $minutes > $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ) {
+			unset( $order );
+		}
+	}
+
+	$do_not_flag_tracked_order = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ] );
+	if ( ( 1 == get_post_meta( $order_id, '_ga_tracked', true ) ) && ! $do_not_flag_tracked_order ) {
+		unset( $order );
+	}
+
+	if ( isset( $_COOKIE[ 'gtm4wp_orderid_tracked' ] ) ) {
+		$tracked_order_id = filter_var( $_COOKIE[ 'gtm4wp_orderid_tracked' ], FILTER_VALIDATE_INT );
+
+		if ( $tracked_order_id && ( $tracked_order_id == $order_id ) && !$do_not_flag_tracked_order ) {
+			unset( $order );
+		}
+	}
+
+	if ( isset( $order ) ) {
+		$dataLayer = gtm4wp_get_purchase_datalayer( $order, NULL );
+
+		$has_html5_support = current_theme_supports( 'html5' );
+
+		echo '
+<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . '>//<![CDATA[
+	window.' . $gtm4wp_datalayer_name . ' = window.' . $gtm4wp_datalayer_name . ' || [];
+	window.' . $gtm4wp_datalayer_name . '.push(' . json_encode( $dataLayer ) . ');
+//]]></script>';
+
+		if ( ! $do_not_flag_tracked_order ) {
+			update_post_meta( $order_id, '_ga_tracked', 1 );
+		}
+	}
 }
 
 function gtm4wp_woocommerce_single_add_to_cart_tracking() {
@@ -1185,6 +1266,8 @@ if ( function_exists( 'WC' ) ) {
 	add_filter( GTM4WP_WPFILTER_ADDGLOBALVARS, 'gtm4wp_woocommerce_addglobalvars' );
 
 	add_filter( 'woocommerce_blocks_product_grid_item_html', 'gtm4wp_add_productdata_to_wc_block', 10, 3);
+
+	add_action( 'woocommerce_thankyou', 'gtm4wp_woocommerce_thankyou' );
 
 	if ( true === $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ) {
 		add_action( 'woocommerce_before_template_part', 'gtm4wp_woocommerce_before_template_part' );
