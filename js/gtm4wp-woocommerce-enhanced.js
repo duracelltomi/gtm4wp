@@ -1,6 +1,11 @@
 window.gtm4wp_last_selected_product_variation;
 window.gtm4wp_changedetail_fired_during_pageload=false;
 
+window.gtm4wp_is_cart     = false;
+window.gtm4wp_is_checkout = false;
+window.gtm4wp_checkout_step_fired = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
+window.gtm4wp_shipping_payment_method_step_offset =  window.gtm4wp_needs_shipping_address ? 0 : -1;
+
 function gtm4wp_map_eec_to_ga4( productdata ) {
 	if ( !productdata ) {
 		return;
@@ -246,8 +251,8 @@ function gtm4wp_handle_shipping_method_change() {
 }
 
 document.addEventListener( 'DOMContentLoaded', function() {
-	const is_cart     = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-cart' );
-	const is_checkout = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-checkout' );
+	window.gtm4wp_is_cart     = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-cart' );
+	window.gtm4wp_is_checkout = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-checkout' );
 
 	// loop through WC blocks to set proper listname and position parameters
 	const gtm4wp_product_block_names = {
@@ -867,7 +872,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	});
 
 	// codes for enhanced ecommerce events on cart page
-	if ( is_cart ) {
+	if ( gtm4wp_is_cart ) {
 		document.addEventListener( 'click', function( e ) {
 			let event_target_element = e.target;
 
@@ -890,15 +895,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	}
 
 	// codes for enhanced ecommerce events on checkout page
-	if ( is_checkout ) {
+	if ( gtm4wp_is_checkout ) {
 		window.gtm4wp_checkout_step_offset  = window.gtm4wp_checkout_step_offset || 0;
 		window.gtm4wp_checkout_value        = window.gtm4wp_checkout_value || 0;
 		window.gtm4wp_checkout_products     = window.gtm4wp_checkout_products || [];
 		window.gtm4wp_checkout_products_ga4 = window.gtm4wp_checkout_products_ga4 || [];
-
-		const gtm4wp_shipping_payment_method_step_offset =  window.gtm4wp_needs_shipping_address ? 0 : -1;
-
-		let gtm4wp_checkout_step_fired = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
 
 		// this checkout step is not reported to GA4 as currently there is no option to report in-between custom steps
 		document.addEventListener( 'blur', function( e ) {
@@ -1014,7 +1015,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	// this part of the code is deprecated and will be removed in a later version
 	// therefore jQuery usage will be not rewritten
 	// turn of the deprecated Google Ads remarketing feature and this code will not execute
-	if ( window.gtm4wp_remarketing&& !is_cart && !is_checkout ) {
+	if ( window.gtm4wp_remarketing&& !gtm4wp_is_cart && !gtm4wp_is_checkout ) {
 		if ( jQuery( '.gtm4wp_productdata' ).length > 0 ) {
 			for( var i=0; i<window[ gtm4wp_datalayer_name ].length; i++ ) {
 				if ( window[ gtm4wp_datalayer_name ][ i ][ 'ecomm_prodid' ] ) {
@@ -1054,7 +1055,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 				});
 			}
 
-			if ( item && item.ecommerce && ( item.ecommerce.cart || (item.ecommerce.checkout && is_cart) ) ) {
+			if ( item && item.ecommerce && ( item.ecommerce.cart || (item.ecommerce.checkout && gtm4wp_is_cart) ) ) {
 				let source_products = item.ecommerce.cart || item.ecommerce.checkout.products;
 				let ga4_products = [];
 				let sum_value = 0;
@@ -1074,7 +1075,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 				});
 			}
 
-			if ( item && item.ecommerce && item.ecommerce.checkout && !is_cart ) {
+			if ( item && item.ecommerce && item.ecommerce.checkout && !gtm4wp_is_cart ) {
 				let ga4_products = [];
 				let sum_value = 0;
 
