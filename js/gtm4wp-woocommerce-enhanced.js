@@ -6,6 +6,8 @@ window.gtm4wp_is_checkout = false;
 window.gtm4wp_checkout_step_fired = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
 window.gtm4wp_shipping_payment_method_step_offset =  window.gtm4wp_needs_shipping_address ? 0 : -1;
 
+window.gtm4wp_first_container_id = "";
+
 function gtm4wp_map_eec_to_ga4( productdata ) {
 	if ( !productdata ) {
 		return;
@@ -659,8 +661,9 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		}
 
 		const event_target_element = e.target;
+		const matching_link_element = event_target_element.closest( productlist_item_selector );
 
-		if ( !event_target_element.closest( productlist_item_selector ) ) {
+		if ( !matching_link_element ) {
 			return true;
 		}
 
@@ -699,7 +702,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		}
 
 		// only act on links pointing to the product detail page
-		if ( dom_productdata.getAttribute( 'data-gtm4wp_product_url' ) != event_target_element.getAttribute( 'href' ) ) {
+		if ( dom_productdata.getAttribute( 'data-gtm4wp_product_url' ) != matching_link_element.getAttribute( 'href' ) ) {
 			return true;
 		}
 
@@ -713,9 +716,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 			'position':   dom_productdata.getAttribute( 'data-gtm4wp_product_listposition' )
 		};
 
-		// do not fire this event multiple times within a single page view
-		if ( window[ "gtm4wp_select_item_" + product_data.id ] ) {
-			return true;
+		for (let i in window.google_tag_manager) {
+			if (i.substring(0,4).toLowerCase() == "gtm-") {
+				window.gtm4wp_first_container_id = i;
+				break;
+			}
 		}
 
 		const ctrl_key_pressed = e.ctrlKey || e.metaKey;
@@ -723,7 +728,7 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		e.preventDefault();
 		if ( ctrl_key_pressed ) {
 			// we need to open the new tab/page here so that popup blocker of the browser doesn't block our code
-			let productpage_window = window.open( 'about:blank', '_blank' );
+			window.productpage_window = window.open( 'about:blank', '_blank' );
 		}
 
 		// fire ga3 version
@@ -736,11 +741,10 @@ document.addEventListener( 'DOMContentLoaded', function() {
 					'products': [ product_data ]
 				}
 			},
-			'eventCallback': function() {
-
-				// do not fire this event multiple times
-				if ( window[ "gtm4wp_select_item_" + product_data.id ] ) {
-					return;
+			'eventCallback': function( container_id ) {
+				if (window.gtm4wp_first_container_id != container_id) {
+					// only call this for the first loaded container
+					return true;
 				}
 
 				// fire ga4 version
@@ -751,7 +755,6 @@ document.addEventListener( 'DOMContentLoaded', function() {
 						'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 					},
 					'eventCallback': function() {
-						delete window[ "gtm4wp_select_item_" + product_data.id ];
 						if ( ctrl_key_pressed && productpage_window ) {
 							productpage_window.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
 						} else {
@@ -761,9 +764,6 @@ document.addEventListener( 'DOMContentLoaded', function() {
 					},
 					'eventTimeout': 2000
 				});
-
-				window[ "gtm4wp_select_item_" + product_data.id ] = true;
-
 			},
 			'eventTimeout': 2000
 		});
