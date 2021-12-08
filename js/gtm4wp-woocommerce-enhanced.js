@@ -404,7 +404,18 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	document.addEventListener( 'click', function( e ) {
 		let event_target_element = e.target;
 
-		if ( !event_target_element.closest( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)' ) ) {
+		if ( !event_target_element ) {
+			// for some reason event target is not specificed
+			return true;
+		}
+
+		try {
+			if ( !event_target_element.closest( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)' ) ) {
+				return true;
+			}
+		} catch (e) {
+			// during beta testing, closest() sometimes threw SyntaxError which is thrown if selector is invalid. But the selector above should be valid in all cases
+			// assumption was that perhaps event_target_element was not set or not a proper DOM node for some reasons
 			return true;
 		}
 
@@ -460,7 +471,18 @@ document.addEventListener( 'DOMContentLoaded', function() {
 	document.addEventListener( 'click', function( e ) {
 		let event_target_element = e.target;
 
-		if ( !event_target_element.closest( '.single_add_to_cart_button:not(.disabled)' ) ) {
+		if ( !event_target_element ) {
+			// for some reason event target is not specificed
+			return true;
+		}
+
+		try {
+			if ( !event_target_element.closest( '.single_add_to_cart_button:not(.disabled)' ) ) {
+				return true;
+			}
+		} catch (e) {
+			// during beta testing, closest() sometimes threw SyntaxError which is thrown if selector is invalid. But the selector above should be valid in all cases
+			// assumption was that perhaps event_target_element was not set or not a proper DOM node for some reasons
 			return true;
 		}
 
@@ -876,6 +898,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		document.addEventListener( 'click', function( e ) {
 			let event_target_element = e.target;
 
+			if ( !event_target_element ) {
+				// for some reason event target is not specificed
+				return true;
+			}
+
 			if ( !event_target_element.closest( '[name=update_cart]' ) ) {
 				return true;
 			}
@@ -885,6 +912,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 
 		document.addEventListener( 'keypress', function( e ) {
 			let event_target_element = e.target;
+
+			if ( !event_target_element ) {
+				// for some reason event target is not specificed
+				return true;
+			}
 
 			if ( !event_target_element.closest( '.woocommerce-cart-form input[type=number]' ) ) {
 				return true;
@@ -905,7 +937,12 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		document.addEventListener( 'blur', function( e ) {
 			let event_target_element = e.target;
 
-			if ( !event_target_element.closest( 'input[name^=shipping_]:not(input[name^=shipping_method])' ) ) {
+			if ( !event_target_element ) {
+				// for some reason event target is not specificed
+				return true;
+			}
+
+			if ( !event_target_element.closest || !event_target_element.closest( 'input[name^=shipping_]:not(input[name^=shipping_method])' ) ) {
 				return true;
 			}
 
@@ -938,6 +975,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		document.addEventListener( 'change', function( e ) {
 			let event_target_element = e.target;
 
+			if ( !event_target_element ) {
+				// for some reason event target is not specificed
+				return true;
+			}
+
 			if ( !event_target_element.closest( 'input[name^=shipping_method]' ) ) {
 				return true;
 			}
@@ -948,6 +990,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		document.addEventListener( 'change', function( e ) {
 			let event_target_element = e.target;
 
+			if ( !event_target_element ) {
+				// for some reason event target is not specificed
+				return true;
+			}
+
 			if ( !event_target_element.closest( 'input[name=payment_method]' ) ) {
 				return true;
 			}
@@ -957,6 +1004,11 @@ document.addEventListener( 'DOMContentLoaded', function() {
 
 		document.addEventListener( 'submit', function( e ) {
 			let event_target_element = e.target;
+
+			if ( !event_target_element ) {
+				// for some reason event target is not specificed
+				return true;
+			}
 
 			if ( !event_target_element.closest( 'form[name=checkout]' ) ) {
 				return true;
