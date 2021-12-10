@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.8
-Stable tag: 1.13
+Stable tag: 1.14
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -740,7 +740,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.14 =
 
-Initial support for WooCommerce Blocks
+Initial support for WooCommerce Blocks, removed jQuery usage in JavaScript codes (except for WooCommerce related codes)
 
 = 1.13.1 =
 
