@@ -590,7 +590,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 		// that is because for a specific reason.
 		// In any other case woocommerce_thankyou hook will be the fallback if
 		// is_order_received_page does not work
-//		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
+		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
 
 		if(isset($order) && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ){
 
