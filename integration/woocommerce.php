@@ -1069,7 +1069,7 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag($product, $listtype,
 	$eec_product_array = gtm4wp_process_product( $product, array(
 		'productlink'  => $permalink,
 		'listname'     => $list_name,
-		'listposition' => $itemix + ( $posts_per_page * ( $paged - 1 ) )
+		'listposition' => (int) $itemix + ( $posts_per_page * ( $paged - 1 ) )
 	), 'productlist' );
 
 	if ( ! isset( $eec_product_array[ 'brand' ] ) ) {
