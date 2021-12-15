@@ -25,9 +25,9 @@ document.addEventListener("focusout", function(event) {
 			'inputName' : elem.getAttribute("name") || "(no input name)",
 			'inputClass': elem.getAttribute("class") || "(no input class)",
 
-			'formID'   : elem.form.getAttribute("id") || "(no form ID)",
-			'formName' : elem.form.getAttribute("name") || "(no form name)",
-			'formClass': elem.form.getAttribute("class") || "(no form class)"
+			'formID'   : elem.form?.getAttribute("id") || "(no form ID)",
+			'formName' : elem.form?.getAttribute("name") || "(no form name)",
+			'formClass': elem.form?.getAttribute("class") || "(no form class)"
 		});
 	};
 }, false);
