@@ -322,7 +322,7 @@ function gtm4wp_process_woocommerce_pages() {
 		let product_data;
 
 		document.querySelectorAll( '.gtm4wp_productdata,.widget-product-item' ).forEach( function( dom_productdata ) {
-			productprice = dom_productdata.getAttribute( 'gtm4wp_product_price' );
+			productprice = dom_productdata.getAttribute( 'data-gtm4wp_product_price' );
 
 			if ( typeof productprice == "string" ) {
 				productprice = parseFloat( productprice );
