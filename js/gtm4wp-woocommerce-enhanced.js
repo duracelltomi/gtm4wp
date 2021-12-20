@@ -51,8 +51,8 @@ function gtm4wp_map_eec_to_ga4( productdata ) {
 		ga4_product.coupon = productdata.coupon;
 	}
 
-	ga4_product.google_business_vertical = window.gtm4wp_business_vertical;
-	ga4_product[ window.gtm4wp_business_vertical_id ] = gtm4wp_id_prefix + ga4_product[ "item_id" ];
+	ga4_product.google_business_vertical = gtm4wp_business_vertical;
+	ga4_product[ gtm4wp_business_vertical_id ] = gtm4wp_id_prefix + ga4_product[ "item_id" ];
 
 	return ga4_product;
 }
