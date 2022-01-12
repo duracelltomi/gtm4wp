@@ -238,6 +238,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Fixed: Unclickable products in WooCommerce product lists in Firefox when visiting site in Strict privacy mode or using private browsing
 * Updated: Removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used
 * Updated: Products per impression in WooCommerce integration now defaults to 10 instead of 0. This allows view_item_list event to fire on new sites as well
+* Updated: code placement options. Separated container on/off option and replaced code placement with new the new terminology: compatibility mode
 
 = 1.14.2 =
 
