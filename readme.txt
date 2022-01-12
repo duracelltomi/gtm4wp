@@ -233,6 +233,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= DEV =
+
+* Updated: Removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used
+
 = 1.14.2 =
 
 * Fixed: undefined google_business_vertical
@@ -748,6 +752,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.14.2 =
+
+Bugfix release
 
 = 1.14.1 =
 
