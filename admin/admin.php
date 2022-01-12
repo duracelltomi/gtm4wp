@@ -4,7 +4,8 @@ define( 'GTM4WP_ADMIN_GROUP', 'gtm4wp-admin-group' );
 
 define( 'GTM4WP_ADMIN_GROUP_GENERAL', 'gtm4wp-admin-group-general' );
 define( 'GTM4WP_ADMIN_GROUP_GTMID', 'gtm4wp-admin-group-gtm-id' );
-define( 'GTM4WP_ADMIN_GROUP_PLACEMENT', 'gtm4wp-admin-code-placement' );
+define( 'GTM4WP_ADMIN_GROUP_CONTAINERON', 'gtm4wp-admin-container-on' );
+define( 'GTM4WP_ADMIN_GROUP_COMPATMODE', 'gtm4wp-admin-compat-mode' );
 define( 'GTM4WP_ADMIN_GROUP_INFO', 'gtm4wp-admin-group-datalayer-info' );
 
 define( 'GTM4WP_ADMIN_GROUP_INCLUDES', 'gtm4wp-admin-group-includes' );
@@ -536,11 +537,19 @@ function gtm4wp_admin_output_field( $args ) {
 			break;
 		}
 
-		case GTM4WP_ADMIN_GROUP_PLACEMENT: {
-			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']_' . GTM4WP_PLACEMENT_FOOTER . '" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']" value="' . GTM4WP_PLACEMENT_FOOTER . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_FOOTER ? 'checked="checked"' : '' ) . '/> ' . __( 'Footer of the page (not recommended by Google, no tweak in your template required)', 'duracelltomi-google-tag-manager' ) . '<br />';
-			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']_' . GTM4WP_PLACEMENT_BODYOPEN . '" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']" value="' . GTM4WP_PLACEMENT_BODYOPEN . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_BODYOPEN ? 'checked="checked"' : '' ) . '/> ' . __( 'Custom (needs tweak in your template)', 'duracelltomi-google-tag-manager' ) . '<br />';
-			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']_' . GTM4WP_PLACEMENT_BODYOPEN_AUTO . '" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']" value="' . GTM4WP_PLACEMENT_BODYOPEN_AUTO . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_BODYOPEN_AUTO ? 'checked="checked"' : '' ) . '/> ' . __( 'Codeless injection (no tweak, right placement but experimental, could break your frontend)', 'duracelltomi-google-tag-manager' ) . '<br />';
-			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']_' . GTM4WP_PLACEMENT_OFF . '" name="' . GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_PLACEMENT . ']" value="' . GTM4WP_PLACEMENT_OFF . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_OFF ? 'checked="checked"' : '' ) . '/> ' . __( 'Off (only add data layer to the page source)', 'duracelltomi-google-tag-manager' ) . '<br /><br />' . $args['description'];
+		case GTM4WP_ADMIN_GROUP_CONTAINERON: {
+			echo $args['description'].'<br/><br/>';
+			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[container-on]_1" name="' . GTM4WP_OPTIONS . '[container-on]" value="1" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] != GTM4WP_PLACEMENT_OFF ? 'checked="checked"' : '' ) . '/> ' . __( 'On', 'duracelltomi-google-tag-manager' ) . '<br />';
+			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[container-on]_0" name="' . GTM4WP_OPTIONS . '[container-on]" value="0" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_OFF ? 'checked="checked"' : '' ) . '/> ' . __( 'Off', 'duracelltomi-google-tag-manager' ) . '<br />';
+
+			break;
+		}
+
+		case GTM4WP_ADMIN_GROUP_COMPATMODE: {
+			echo $args['description'].'<br/><br/>';
+			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[compat-mode]_' . GTM4WP_PLACEMENT_BODYOPEN_AUTO . '" name="' . GTM4WP_OPTIONS . '[compat-mode]" value="' . GTM4WP_PLACEMENT_BODYOPEN_AUTO . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_BODYOPEN_AUTO || $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_OFF ? 'checked="checked"' : '' ) . '/> ' . __( 'Off (no tweak, right placement)', 'duracelltomi-google-tag-manager' ) . '<br />';
+			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[compat-mode]_' . GTM4WP_PLACEMENT_FOOTER . '" name="' . GTM4WP_OPTIONS . '[compat-mode]" value="' . GTM4WP_PLACEMENT_FOOTER . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_FOOTER ? 'checked="checked"' : '' ) . '/> ' . __( 'Footer of the page (not recommended by Google, Search Console verification will not work)', 'duracelltomi-google-tag-manager' ) . '<br />';
+			echo '<input type="radio" id="' . GTM4WP_OPTIONS . '[compat-mode]_' . GTM4WP_PLACEMENT_BODYOPEN . '" name="' . GTM4WP_OPTIONS . '[compat-mode]" value="' . GTM4WP_PLACEMENT_BODYOPEN . '" ' . ( $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] == GTM4WP_PLACEMENT_BODYOPEN ? 'checked="checked"' : '' ) . '/> ' . __( 'Manually coded (needs tweak in your template)', 'duracelltomi-google-tag-manager' ) . '<br />';
 
 			break;
 		}
@@ -856,11 +865,19 @@ function gtm4wp_sanitize_options( $options ) {
 				$output[ $optionname ] = $newoptionvalue;
 			}
 
-		// GTM container code placement
+		// GTM container ON/OFF + compat mode
 		} elseif ( $optionname == GTM4WP_OPTION_GTM_PLACEMENT ) {
-			$output[ $optionname ] = (int) $newoptionvalue;
-			if ( ( $output[ $optionname ] < 0 ) || ( $output[ $optionname ] > 3 ) ) {
-				$output[ $optionname ] = 0;
+			$container_on_off = (bool) $options['container-on'];
+			$container_compat = (int) $options['compat-mode'];
+
+			if ( !$container_on_off ) {
+				$output[ $optionname ] = GTM4WP_PLACEMENT_OFF;
+			} else {
+				if ( ( $container_compat < 0 ) || ( $container_compat > 2 ) ) {
+					$container_compat = 2;
+				}
+
+				$output[ $optionname ] = $container_compat;
 			}
 
 		// scroll tracking content ID
@@ -918,14 +935,34 @@ function gtm4wp_admin_init() {
 	);
 
 	add_settings_field(
-		GTM4WP_ADMIN_GROUP_PLACEMENT,
-		__( 'Container code <code>&lt;noscript&gt;</code> part placement', 'duracelltomi-google-tag-manager' ),
+		GTM4WP_ADMIN_GROUP_CONTAINERON,
+		__( 'Container code ON/OFF', 'duracelltomi-google-tag-manager' ),
 		'gtm4wp_admin_output_field',
 		GTM4WP_ADMINSLUG,
 		GTM4WP_ADMIN_GROUP_GENERAL,
 		array(
-			'label_for'                   => GTM4WP_ADMIN_GROUP_PLACEMENT,
-			'description' => __( "Code placement decides where to put the second, so called noscript part of the GTM container code.<br />This code is usually only executed if your visitor has for some reason disabled JavaScript.<br/>The main GTM container code will be placed into the <code>&lt;head&gt;</code> section of your webpages anyway (where it belongs to).<br />If you select 'Custom' you need to edit your template file and add the following line just after the opening <code>&lt;body&gt;</code> tag:<br /><code>&lt;?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code>", 'duracelltomi-google-tag-manager' ),
+			'label_for'   => GTM4WP_ADMIN_GROUP_CONTAINERON,
+			'description' => __( "Turning OFF the Google Tag Manager container itself will remove both the head and the body part of the container code but leave data layer codes working.<br/>This should be only used in specific cases where you need to place the container code manually or using another tool.", 'duracelltomi-google-tag-manager' ),
+		)
+	);
+
+	add_settings_field(
+		GTM4WP_ADMIN_GROUP_COMPATMODE,
+		__( 'Container code compatibility mode', 'duracelltomi-google-tag-manager' ),
+		'gtm4wp_admin_output_field',
+		GTM4WP_ADMINSLUG,
+		GTM4WP_ADMIN_GROUP_GENERAL,
+		array(
+			'label_for'   => GTM4WP_ADMIN_GROUP_COMPATMODE,
+			'description' => __(
+				'Compatibility mode decides where to put the second, so called <code>&lt;noscript&gt;</code> or <code>&lt;iframe&gt;</code> part of the GTM container code.<br />'.
+				'This code is usually only executed if your visitor has disabled JavaScript for some reason.<br/>'.
+				'It is also mandatory in order to verify your site in Google Search Console using the GTM method.<br/>'.
+				'The main GTM container code will be placed into the <code>&lt;head&gt;</code> section of your webpages anyway (where it belongs to).<br/><br/>'.
+				'If you select "Custom", you need to edit your template files and add the following line just after the opening <code>&lt;body&gt;</code> tag:<br />'.
+				"<code>&lt;?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code>",
+				'duracelltomi-google-tag-manager'
+			),
 		)
 	);
 

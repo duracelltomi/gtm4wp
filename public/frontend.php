@@ -512,10 +512,23 @@ function gtm4wp_wp_loaded() {
 	}
 }
 
+function gtm4wp_get_container_placement_string() {
+	global $gtm4wp_options;
+
+	switch($gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ]) {
+		case GTM4WP_PLACEMENT_FOOTER: return "footer";
+		case GTM4WP_PLACEMENT_BODYOPEN: return "manual";
+		case GTM4WP_PLACEMENT_BODYOPEN_AUTO: return "automatic";
+		case GTM4WP_PLACEMENT_OFF: return "off";
+		default: return "unknown (" . $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] . ")";
+	}
+}
+
 function gtm4wp_get_the_gtm_tag() {
 	global $gtm4wp_options, $gtm4wp_datalayer_name, $gtm4wp_container_code_written;
 
 	$_gtm_tag = '
+<!-- GTM Container placement set to ' . gtm4wp_get_container_placement_string() . ' -->
 <!-- Google Tag Manager (noscript) -->';
 
 	if ( GTM4WP_PLACEMENT_OFF == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
@@ -714,6 +727,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
+<!-- GTM Container placement set to ' . gtm4wp_get_container_placement_string() . ' -->
 <script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . '>';
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) {
