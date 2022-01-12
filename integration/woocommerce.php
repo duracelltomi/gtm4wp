@@ -841,10 +841,10 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 		$has_html5_support = current_theme_supports( 'html5' );
 
 		echo '
-<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . '>//<![CDATA[
+<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . '>
 	window.' . $gtm4wp_datalayer_name . ' = window.' . $gtm4wp_datalayer_name . ' || [];
 	window.' . $gtm4wp_datalayer_name . '.push(' . json_encode( $dataLayer ) . ');
-//]]></script>';
+</script>';
 
 		if ( ! $do_not_flag_tracked_order ) {
 			update_post_meta( $order_id, '_ga_tracked', 1 );
