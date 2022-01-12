@@ -764,7 +764,7 @@ function gtm4wp_process_woocommerce_pages() {
 				}
 			},
 			'eventCallback': function( container_id ) {
-				if (window.gtm4wp_first_container_id != container_id) {
+				if ( "undefined" !== typeof container_id && window.gtm4wp_first_container_id != container_id) {
 					// only call this for the first loaded container
 					return true;
 				}

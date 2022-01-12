@@ -235,6 +235,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 = DEV =
 
+* Fixed: Unclickable products in WooCommerce product lists in Firefox when visiting site in Strict privacy mode or using private browsing
 * Updated: Removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used
 
 = 1.14.2 =
