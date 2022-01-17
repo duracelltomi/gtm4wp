@@ -377,8 +377,10 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG  => array(
 		'label'         => __( 'Do not flag orders as being tracked', 'duracelltomi-google-tag-manager' ),
 		'description'   => __(
-			'Check this to prevent the plugin to flag orders as being already tracked.<br /><br />This ensures that no order data will be tracked ' .
-			'multiple times in any ad or measurement system so please only enable this feature if you really need it (with iDeal you might need this)!',
+			'Turn this on to prevent the plugin to flag orders as being already tracked.<br /><br />'.
+			'Leaving this unchecked ensures that no order data will be tracked multiple times '.
+			'in any ad or measurement system.<br />'.
+			'Please only turn on this feature if you really need it!',
 			'duracelltomi-google-tag-manager'
 		),
 		'phase'         => GTM4WP_PHASE_STABLE
