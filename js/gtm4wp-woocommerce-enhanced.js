@@ -68,7 +68,8 @@ function gtm4wp_handle_cart_qty_change() {
 
 		// is quantity changed changed?
 		if ( original_value != current_value ) {
-			const productdata = qty_el.closest( '.cart_item' )?.querySelector( '.remove' );
+			const cart_item_temp = qty_el.closest( '.cart_item' );
+			const productdata = cart_item_temp && cart_item_temp.querySelector( '.remove' );
 			if ( !productdata ) {
 				return;
 			}
@@ -253,8 +254,14 @@ function gtm4wp_handle_shipping_method_change() {
 }
 
 function gtm4wp_process_woocommerce_pages() {
-	window.gtm4wp_is_cart     = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-cart' );
-	window.gtm4wp_is_checkout = document.querySelector( 'body' )?.classList?.contains( 'woocommerce-checkout' );
+	window.gtm4wp_is_cart     = false;
+	window.gtm4wp_is_checkout = false;
+
+    const doc_body = document.querySelector( 'body' );
+	if ( doc_body ) {
+		window.gtm4wp_is_cart     = doc_body.classList && doc_body.classList.contains( 'woocommerce-cart' );
+		window.gtm4wp_is_checkout = doc_body.classList && doc_body.classList.contains( 'woocommerce-checkout' );
+	}
 
 	// loop through WC blocks to set proper listname and position parameters
 	const gtm4wp_product_block_names = {
@@ -419,7 +426,8 @@ function gtm4wp_process_woocommerce_pages() {
 			return true;
 		}
 
-		const productdata = event_target_element.closest( '.product,.wc-block-grid__product' )?.querySelector( '.gtm4wp_productdata' );
+		const product_el = event_target_element.closest( '.product,.wc-block-grid__product' );
+		const productdata = product_el && product_el.querySelector( '.gtm4wp_productdata' );
 		if ( !productdata ) {
 			return true;
 		}
@@ -492,11 +500,12 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		let product_variant_id = product_form.querySelectorAll( '[name=variation_id]' );
-		let product_is_grouped = product_form.classList?.contains( 'grouped_form' );
+		let product_is_grouped = product_form.classList && product_form.classList.contains( 'grouped_form' );
 
 		if ( product_variant_id.length > 0 ) {
 			if ( gtm4wp_last_selected_product_variation ) {
-				gtm4wp_last_selected_product_variation.quantity = product_form.querySelector( '[name=quantity]' )?.value || 1;
+				const qty_el = product_form.querySelector( '[name=quantity]' );
+				gtm4wp_last_selected_product_variation.quantity = (qty_el && qty_el.value) || 1;
 
 				// fire ga3 version
 				window[ gtm4wp_datalayer_name ].push({
@@ -528,7 +537,7 @@ function gtm4wp_process_woocommerce_pages() {
 			products_in_group.forEach( function( dom_productdata ) {
 				const product_qty_input = document.querySelectorAll( 'input[name=quantity\\[' + dom_productdata.getAttribute( 'data-gtm4wp_product_id' ) + '\\]]' );
 				if ( product_qty_input.length > 0 ) {
-					product_qty = product_qty_input[0]?.value || 1;
+					product_qty = (product_qty_input[0] && product_qty_input[0].value) || 1;
 				} else {
 					return true;
 				}
@@ -577,14 +586,15 @@ function gtm4wp_process_woocommerce_pages() {
 				}
 			});
 		} else {
+			const product_id_el = gtm4wp_use_sku_instead ? product_form.querySelector( '[name=gtm4wp_sku]' ) : product_form.querySelector( '[name=gtm4wp_id]' );
 			const product_data = {
-				'id':         gtm4wp_use_sku_instead ? product_form.querySelector( '[name=gtm4wp_sku]' )?.value : product_form.querySelector( '[name=gtm4wp_id]' )?.value,
-				'name':       product_form.querySelector( '[name=gtm4wp_name]' )?.value,
-				'price':      product_form.querySelector( '[name=gtm4wp_price]' )?.value,
-				'category':   product_form.querySelector( '[name=gtm4wp_category]' )?.value,
-				'quantity':   product_form.querySelector( '[name=quantity]' )?.value,
-				'stocklevel': product_form.querySelector( '[name=gtm4wp_stocklevel]' )?.value,
-				'brand':      product_form.querySelector( '[name=gtm4wp_brand]' )?.value
+				'id':         product_id_el && product_id_el.value,
+				'name':       product_form.querySelector( '[name=gtm4wp_name]' ) && product_form.querySelector( '[name=gtm4wp_name]' ).value,
+				'price':      product_form.querySelector( '[name=gtm4wp_price]' ) && product_form.querySelector( '[name=gtm4wp_price]' ).value,
+				'category':   product_form.querySelector( '[name=gtm4wp_category]' ) && product_form.querySelector( '[name=gtm4wp_category]' ).value,
+				'quantity':   product_form.querySelector( '[name=quantity]' ) && product_form.querySelector( '[name=quantity]' ).value,
+				'stocklevel': product_form.querySelector( '[name=gtm4wp_stocklevel]' ) && product_form.querySelector( '[name=gtm4wp_stocklevel]' ).value,
+				'brand':      product_form.querySelector( '[name=gtm4wp_brand]' ) && product_form.querySelector( '[name=gtm4wp_brand]' ).value
 			};
 
 			// fire ga3 version
@@ -614,14 +624,16 @@ function gtm4wp_process_woocommerce_pages() {
 	document.addEventListener( 'click', function( e ) {
 		const dom_productdata = e.target;
 
-		if ( !dom_productdata.closest( '.mini_cart_item a.remove,.product-remove a.remove' ) ) {
+		if ( !dom_productdata || !dom_productdata.closest( '.mini_cart_item a.remove,.product-remove a.remove' ) ) {
 			return true;
 		}
 
 		let qty = 0;
-		let qty_element = dom_productdata.closest( '.cart_item' )?.querySelectorAll( '.product-quantity input.qty' );
+		const cart_item_el = dom_productdata.closest( '.cart_item' );
+		let qty_element = cart_item_el && cart_item_el.querySelectorAll( '.product-quantity input.qty' );
 		if ( !qty_element || ( qty_element.length === 0 ) ) {
-			qty_element = dom_productdata.closest( '.mini_cart_item' )?.querySelectorAll( '.quantity' );
+			const mini_cart_item_el = dom_productdata.closest( '.mini_cart_item' );
+			qty_element = mini_cart_item_el && mini_cart_item_el.querySelectorAll( '.quantity' );
 			if ( qty_element && ( qty_element.length > 0 ) ) {
 				qty = parseInt( qty_element[0].textContent );
 
@@ -806,14 +818,14 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		const product_form       = event.target;
-		const product_variant_id = product_form.querySelector( '[name=variation_id]' )?.value;
-		const product_id         = product_form.querySelector( '[name=gtm4wp_id]' )?.value;
-		const product_name       = product_form.querySelector( '[name=gtm4wp_name]' )?.value;
-		const product_sku        = product_form.querySelector( '[name=gtm4wp_sku]' )?.value;
-		const product_category   = product_form.querySelector( '[name=gtm4wp_category]' )?.value;
-		const product_price      = product_form.querySelector( '[name=gtm4wp_price]' )?.value;
-		const product_stocklevel = product_form.querySelector( '[name=gtm4wp_stocklevel]' )?.value;
-		const product_brand      = product_form.querySelector( '[name=gtm4wp_brand]' )?.value;
+		const product_variant_id = product_form.querySelector( '[name=variation_id]' ) && product_form.querySelector( '[name=variation_id]' ).value;
+		const product_id         = product_form.querySelector( '[name=gtm4wp_id]' ) && product_form.querySelector( '[name=gtm4wp_id]' ).value;
+		const product_name       = product_form.querySelector( '[name=gtm4wp_name]' ) && product_form.querySelector( '[name=gtm4wp_name]' ).value;
+		const product_sku        = product_form.querySelector( '[name=gtm4wp_sku]' ) && product_form.querySelector( '[name=gtm4wp_sku]' ).value;
+		const product_category   = product_form.querySelector( '[name=gtm4wp_category]' ) && product_form.querySelector( '[name=gtm4wp_category]' ).value;
+		const product_price      = product_form.querySelector( '[name=gtm4wp_price]' ) && product_form.querySelector( '[name=gtm4wp_price]' ).value;
+		const product_stocklevel = product_form.querySelector( '[name=gtm4wp_stocklevel]' ) && product_form.querySelector( '[name=gtm4wp_stocklevel]' ).value;
+		const product_brand      = product_form.querySelector( '[name=gtm4wp_brand]' ) && product_form.querySelector( '[name=gtm4wp_brand]' ).value;
 
 		let current_product_detail_data = {
 			name: product_name,
