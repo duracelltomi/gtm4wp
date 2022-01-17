@@ -288,6 +288,8 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 	}
 
 	if ( is_search() ) {
+		$dataLayer['pagePostType'] = 'search-results';
+
 		$dataLayer['siteSearchTerm'] = get_search_query();
 		$dataLayer['siteSearchFrom'] = '';
 		if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
@@ -307,6 +309,10 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 
 	if ( ! is_front_page() && is_home() && $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTYPE ] ) {
 		$dataLayer['pagePostType'] = 'bloghome';
+	}
+
+	if ( is_404() ) {
+		$dataLayer['pagePostType'] = '404-error';
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_BROWSERDATA ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_OSDATA ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_DEVICEDATA ] ) {
