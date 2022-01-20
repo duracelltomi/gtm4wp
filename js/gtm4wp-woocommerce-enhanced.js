@@ -4,7 +4,7 @@ window.gtm4wp_changedetail_fired_during_pageload=false;
 window.gtm4wp_is_cart     = false;
 window.gtm4wp_is_checkout = false;
 window.gtm4wp_checkout_step_fired = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
-window.gtm4wp_shipping_payment_method_step_offset =  window.gtm4wp_needs_shipping_address ? 0 : -1;
+window.gtm4wp_shipping_payment_method_step_offset =  gtm4wp_needs_shipping_address ? 0 : -1;
 
 window.gtm4wp_first_container_id = "";
 
@@ -946,7 +946,7 @@ function gtm4wp_process_woocommerce_pages() {
 		window.gtm4wp_checkout_products_ga4 = window.gtm4wp_checkout_products_ga4 || [];
 
 		// this checkout step is not reported to GA4 as currently there is no option to report in-between custom steps
-		document.addEventListener( 'blur', function( e ) {
+		document.addEventListener( 'focusout', function( e ) {
 			let event_target_element = e.target;
 
 			if ( !event_target_element ) {
