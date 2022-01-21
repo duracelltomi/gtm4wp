@@ -380,7 +380,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 			'Turn this on to prevent the plugin to flag orders as being already tracked.<br /><br />'.
 			'Leaving this unchecked ensures that no order data will be tracked multiple times '.
 			'in any ad or measurement system.<br />'.
-			'Please only turn on this feature if you really need it!',
+			'Please only turn this feature on if you really need it!',
 			'duracelltomi-google-tag-manager'
 		),
 		'phase'         => GTM4WP_PHASE_STABLE
@@ -449,6 +449,11 @@ $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
 	GTM4WP_OPTION_GTMDOMAIN       => array(
 		'label'       => __( 'Container domain name', 'duracelltomi-google-tag-manager' ),
 		'description' => __( "Enter your custom domain name if you are using a server side GTM container for tracking. Leave this blank to use www.googletagmanager.com", 'duracelltomi-google-tag-manager' ),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
+	GTM4WP_OPTION_NOGTMFORLOGGEDIN => array(
+		'label'       => __( 'User roles to exclude', 'duracelltomi-google-tag-manager' ),
+		'description' => __( "Do not load GTM container on the frontend if role of the logged in user is any of this", 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	)
 );
@@ -649,6 +654,21 @@ function gtm4wp_admin_output_field( $args ) {
 			}
 
 			echo '</select><br>' . $args['description'];
+
+			break;
+		}
+
+		case GTM4WP_OPTIONS . "[" . GTM4WP_OPTION_NOGTMFORLOGGEDIN . "]": {
+			$roles = get_editable_roles();
+
+			echo $args['description'].'<br/><br/>';
+
+			$saved_roles = explode(",", $gtm4wp_options[GTM4WP_OPTION_NOGTMFORLOGGEDIN]);
+
+			foreach($roles as $role_id => $role_info) {
+				$role_name = translate_user_role( $role_info['name'] );
+				echo '<input type="checkbox" id="' . GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']_' . $role_id . '" name="' . GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . '][]" value="' . $role_id . '"' . ( in_array( $role_id, $saved_roles ) ? ' checked="checked"' : '' ) . '><label for="' . GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']_' . $role_id . '">' . $role_name . '</label><br/>';
+			}
 
 			break;
 		}
@@ -885,6 +905,10 @@ function gtm4wp_sanitize_options( $options ) {
 		// scroll tracking content ID
 		} elseif ( $optionname == GTM4WP_OPTION_SCROLLER_CONTENTID ) {
 			$output[ $optionname ] = trim( str_replace( '#', '', $newoptionvalue ) );
+
+		// do not output GTM container code for specific user roles
+		} elseif ( $optionname == GTM4WP_OPTION_NOGTMFORLOGGEDIN ) {
+			$output[ $optionname ] = implode(",", $newoptionvalue );
 
 		// anything else
 		} else {

@@ -236,6 +236,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = DEV =
 
 * Added: pagePostType data layer variable will now return 404-error on 404 pages and search-results on search result pages
+* Added: Google Tag Manager container code can be disabled for specific WordPress user roles under Advanced plugin options. A browser console warning will be show in such cases to prevent confusion.
 * Fixed: Unclickable products in WooCommerce product lists in Firefox when visiting site in Strict privacy mode or using private browsing
 * Fixed: tracking step 2 on WooCommerce checkout page was broken
 * Updated: Removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used

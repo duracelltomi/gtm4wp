@@ -533,12 +533,21 @@ function gtm4wp_get_container_placement_string() {
 function gtm4wp_get_the_gtm_tag() {
 	global $gtm4wp_options, $gtm4wp_datalayer_name, $gtm4wp_container_code_written;
 
+	$has_html5_support = current_theme_supports( 'html5' );
+
 	$_gtm_tag = '
 <!-- GTM Container placement set to ' . gtm4wp_get_container_placement_string() . ' -->
 <!-- Google Tag Manager (noscript) -->';
 
 	if ( GTM4WP_PLACEMENT_OFF == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
 		$gtm4wp_container_code_written = true;
+
+		$_gtm_tag .= '
+<script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . '>
+	const console_cmd = console.warn || console.log;
+	console_cmd && console_cmd("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
+	console_cmd && console_cmd("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
+</script>';
 	}
 
 	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) && ( ! $gtm4wp_container_code_written ) ) {
@@ -734,7 +743,8 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <!-- GTM Container placement set to ' . gtm4wp_get_container_placement_string() . ' -->
-<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . '>';
+<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . '>
+	const console_cmd = console.warn || console.log;';
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) {
 		$gtm4wp_datalayer_data = array();
@@ -855,7 +865,37 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	$_gtm_header_content .= apply_filters( GTM4WP_WPFILTER_AFTER_DATALAYER, '' );
 
-	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) && ( GTM4WP_PLACEMENT_OFF != $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) ) {
+	$output_container_code = true;
+	if ( GTM4WP_PLACEMENT_OFF == $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
+		$output_container_code = false;
+
+		$_gtm_header_content .= '
+<script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . '>
+	console_cmd && console_cmd("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
+	console_cmd && console_cmd("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
+</script>';
+	}
+
+	$disabled_roles = explode( ',', $gtm4wp_options[ GTM4WP_OPTION_NOGTMFORLOGGEDIN ] );
+	if (count($disabled_roles) > 0 ) {
+		$current_user = wp_get_current_user();
+		foreach( $current_user->roles as $user_role ) {
+			if ( in_array( $user_role, $disabled_roles ) ) {
+				$output_container_code = false;
+
+				$_gtm_header_content .= '
+<script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . '>
+	console_cmd && console_cmd("[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $user_role . ' !!!");
+	console_cmd && console_cmd("[GTM4WP] Logout or login with a user having a different user role!");
+	console_cmd && console_cmd("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
+</script>';
+
+				break;
+			}
+		}
+	}
+
+	if ( ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) && $output_container_code ) {
 		$_gtm_codes = explode( ',', str_replace( array( ';', ' ' ), array( ',', '' ), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 		$add_cookiebot_ignore = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
 
