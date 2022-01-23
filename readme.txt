@@ -163,6 +163,8 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 		*	implementation of [Enhanced E-commerce GA4](https://developers.google.com/tag-manager/ecommerce-ga4)
 		* Does not support promotions since WooCommerce does not have such a feature (yet)
 		* Does not support refunds
+* Google Optimize: load your Google Optimize container directly from your website with the ability to use the data layer variables provided during page load
+* AMP: load your AMP container on the AMP version of your pages
 
 = Server side containers =
 
