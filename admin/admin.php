@@ -448,7 +448,7 @@ $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
 	),
 	GTM4WP_OPTION_GTMDOMAIN       => array(
 		'label'       => __( 'Container domain name', 'duracelltomi-google-tag-manager' ),
-		'description' => __( "Enter your custom domain name if you are using a server side GTM container for tracking. Leave this blank to use www.googletagmanager.com", 'duracelltomi-google-tag-manager' ),
+		'description' => __( "Enter your custom domain name if you are using a server side GTM container for tracking. Do not include https:// prefix. Leave this blank to use www.googletagmanager.com", 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 	GTM4WP_OPTION_NOGTMFORLOGGEDIN => array(
@@ -826,6 +826,9 @@ function gtm4wp_sanitize_options( $options ) {
 			if ( !defined("FILTER_FLAG_HOSTNAME") ) {
 				define( "FILTER_FLAG_HOSTNAME", 0 );
 			}
+
+			// remove https:// prefix if used
+			$newoptionvalue = str_replace( 'https://', '', $newoptionvalue );
 
 			$newoptionvalue = filter_var( $newoptionvalue, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
 			if ( $newoptionvalue === false ) {

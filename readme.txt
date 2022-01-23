@@ -247,6 +247,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Updated: Code placement options. Separated container on/off option and replaced code placement with the new terminology: compatibility mode
 * Updated: Removed optional chaining operator usage (?.) in JavaScript codes for better compatibility with outdated browsers
 * Updated: Changed 'Do not flag orders as being tracked' description to be more precise about what happens if turned on or left off
+* Updated: if you enter your custom domain name for server side tagging with the https:// prefix, it will be removed before domain name validation
 
 = 1.14.2 =
 
