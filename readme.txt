@@ -152,7 +152,7 @@ and/or custom JavaScript variables you can secure the Tag Manager container.
 
 Google Tag Manager for WordPress integrates with several popular plugins. More integration to come!
 
-* Contact Form 7: fire an event upon successful form submission
+* Contact Form 7: fire an event when a Contact Form 7 form was submitted with any result (mail sent, mail failed, spam detected, invalid input)
 * WooCommerce:
 	* Classic e-commerce (deprecated):
 		* fire an event when visitors add products to their cart
@@ -237,6 +237,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 * Added: pagePostType data layer variable will now return 404-error on 404 pages and search-results on search result pages
 * Added: Google Tag Manager container code can be disabled for specific WordPress user roles under Advanced plugin options. A browser console warning will be show in such cases to prevent confusion.
+* Added: support for all Contact Form 7 events for more granual tracking: gtm4wp.contactForm7MailSent, gtm4wp.contactForm7MailFailed, gtm4wp.contactForm7SpamDetected, gtm4wp.contactForm7InvalidInput
 * Fixed: Unclickable products in WooCommerce product lists in Firefox when visiting site in Strict privacy mode or using private browsing
 * Fixed: tracking step 2 on WooCommerce checkout page was broken
 * Updated: Removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used

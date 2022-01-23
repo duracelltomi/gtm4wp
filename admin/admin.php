@@ -268,7 +268,7 @@ $GLOBALS['gtm4wp_scrollerfieldtexts'] = array(
 $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_WPCF7                 => array(
 		'label'         => __( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
-		'description'   => __( 'Check this to include a dataLayer event after a successfull form submission.', 'duracelltomi-google-tag-manager' ),
+		'description'   => __( 'Check this to fire dataLayer events after Contact Form 7 submissions (supported events: invalid input, spam detected, form submitted, form submitted and mail sent, form submitted and mail send failed).', 'duracelltomi-google-tag-manager' ),
 		'phase'         => GTM4WP_PHASE_STABLE,
 		'plugintocheck' => 'contact-form-7/wp-contact-form-7.php',
 	),
