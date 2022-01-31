@@ -238,15 +238,15 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.15 =
 
 * Added: pagePostType data layer variable will now return 404-error on 404 pages and search-results on search result pages
-* Added: Google Tag Manager container code can be disabled for specific WordPress user roles under Advanced plugin options. A browser console warning will be show in such cases to prevent confusion.
+* Added: Google Tag Manager container code can be disabled for specific WordPress user roles under Advanced plugin options. A browser console warning will be shown in such cases to prevent confusion
 * Added: support for all Contact Form 7 events for more granual tracking: gtm4wp.contactForm7MailSent, gtm4wp.contactForm7MailFailed, gtm4wp.contactForm7SpamDetected, gtm4wp.contactForm7InvalidInput
-* Fixed: Unclickable products in WooCommerce product lists in Firefox when visiting site in Strict privacy mode or using private browsing
+* Fixed: unclickable products in WooCommerce product lists in Firefox when visiting site in Strict privacy mode or using private browsing
 * Fixed: tracking step 2 on WooCommerce checkout page was broken
-* Updated: Removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used
-* Updated: Products per impression in WooCommerce integration now defaults to 10 instead of 0. This allows view_item_list event to fire on new sites as well
-* Updated: Code placement options. Separated container on/off option and replaced code placement with the new terminology: compatibility mode
-* Updated: Removed optional chaining operator usage (?.) in JavaScript codes for better compatibility with outdated browsers
-* Updated: Changed 'Do not flag orders as being tracked' description to be more precise about what happens if turned on or left off
+* Updated: removed CDATA blocks as they are not required in simple HTML and they break some cases where code optimizer is being used
+* Updated: products per impression in WooCommerce integration now defaults to 10 instead of 0. This allows view_item_list event to fire on new sites as well
+* Updated: code placement options. Separated container on/off option and replaced code placement with the new terminology: compatibility mode
+* Updated: removed optional chaining operator usage (?.) in JavaScript codes for better compatibility with outdated browsers
+* Updated: changed 'Do not flag orders as being tracked' description to be more precise about what happens if turned on or left off
 * Updated: if you enter your custom domain name for server side tagging with the https:// prefix, it will be removed before domain name validation
 * Updated: all script blocks to be ignored by Cookiebot if this integration is enabled
 * Updated: do not track WooCommerce order where payment failed
