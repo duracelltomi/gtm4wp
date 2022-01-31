@@ -249,6 +249,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Updated: Changed 'Do not flag orders as being tracked' description to be more precise about what happens if turned on or left off
 * Updated: if you enter your custom domain name for server side tagging with the https:// prefix, it will be removed before domain name validation
 * Updated: all script blocks to be ignored by Cookiebot if this integration is enabled
+* Updated: do not track WooCommerce order where payment failed
 
 = 1.14.2 =
 

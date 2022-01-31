@@ -688,6 +688,11 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 			}
 		}
 
+		if ( isset( $order ) && ( "failed" == $order->get_status() ) ) {
+			// do not track order where payment failed
+			unset( $order );
+		}
+
 		if ( isset( $order ) ) {
 			$dataLayer = array_merge( $dataLayer, gtm4wp_get_purchase_datalayer( $order, $order_items ) );
 
@@ -833,6 +838,11 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 		if ( $tracked_order_id && ( $tracked_order_id == $order_id ) && !$do_not_flag_tracked_order ) {
 			unset( $order );
 		}
+	}
+
+	if ( isset( $order ) && ( "failed" == $order->get_status() ) ) {
+		// do not track order where payment failed
+		unset( $order );
 	}
 
 	if ( isset( $order ) ) {
