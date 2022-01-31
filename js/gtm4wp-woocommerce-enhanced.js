@@ -257,7 +257,7 @@ function gtm4wp_process_woocommerce_pages() {
 	window.gtm4wp_is_cart     = false;
 	window.gtm4wp_is_checkout = false;
 
-    const doc_body = document.querySelector( 'body' );
+	const doc_body = document.querySelector( 'body' );
 	if ( doc_body ) {
 		window.gtm4wp_is_cart     = doc_body.classList && doc_body.classList.contains( 'woocommerce-cart' );
 		window.gtm4wp_is_checkout = doc_body.classList && doc_body.classList.contains( 'woocommerce-checkout' );
