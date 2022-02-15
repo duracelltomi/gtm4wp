@@ -757,6 +757,11 @@ function gtm4wp_process_woocommerce_pages() {
 			}
 		}
 
+		// do not do anything if GTM was not loaded for any reason
+		if ( "" === window.gtm4wp_first_container_id ) {
+			return true;
+		}
+
 		const ctrl_key_pressed = e.ctrlKey || e.metaKey;
 
 		e.preventDefault();
