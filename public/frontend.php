@@ -204,6 +204,11 @@ function gtm4wp_add_basic_datalayer_data( $dataLayer ) {
 			$dataLayer['pagePostDateYear']  = get_the_date( 'Y' );
 			$dataLayer['pagePostDateMonth'] = get_the_date( 'm' );
 			$dataLayer['pagePostDateDay']   = get_the_date( 'd' );
+			$dataLayer['pagePostDateDayName']   = get_the_date( 'l' );
+			$dataLayer['pagePostDateHour']   = get_the_date( 'H' );
+			$dataLayer['pagePostDateMinute']   = get_the_date( 'i' );
+			$dataLayer['pagePostDateIso']   = get_the_date( 'c' );
+			$dataLayer['pagePostDateUnix']   = get_the_date( 'U' );
 		}
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTERMLIST ] ) {
