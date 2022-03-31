@@ -911,7 +911,11 @@ function gtm4wp_sanitize_options( $options ) {
 
 		// do not output GTM container code for specific user roles
 		} elseif ( $optionname == GTM4WP_OPTION_NOGTMFORLOGGEDIN ) {
-			$output[ $optionname ] = implode(",", $newoptionvalue );
+			if ( is_array( $newoptionvalue ) ) {
+				$output[ $optionname ] = implode(",", $newoptionvalue );
+			} else {
+				$output[ $optionname ] = '';
+			}
 
 		// anything else
 		} else {
