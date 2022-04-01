@@ -992,7 +992,7 @@ function gtm4wp_admin_init() {
 				'This code is usually only executed if your visitor has disabled JavaScript for some reason.<br/>'.
 				'It is also mandatory in order to verify your site in Google Search Console using the GTM method.<br/>'.
 				'The main GTM container code will be placed into the <code>&lt;head&gt;</code> section of your webpages anyway (where it belongs to).<br/><br/>'.
-				'If you select "Custom", you need to edit your template files and add the following line just after the opening <code>&lt;body&gt;</code> tag:<br />'.
+				'If you select "Manually coded", you need to edit your template files and add the following line just after the opening <code>&lt;body&gt;</code> tag:<br />'.
 				"<code>&lt;?php if ( function_exists( 'gtm4wp_the_gtm_tag' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code>",
 				'duracelltomi-google-tag-manager'
 			),
