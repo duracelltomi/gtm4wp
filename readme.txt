@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.9.0
-Stable tag: 1.14.2
+Stable tag: 1.15
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -767,6 +767,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.15 =
+
+Various updates, fixes and improvements
 
 = 1.14.2 =
 
