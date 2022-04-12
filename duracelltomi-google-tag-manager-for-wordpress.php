@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Google Tag Manager for Wordpress
-Version: 1.5
+Version: 1.15
 Plugin URI: https://gtm4wp.com/
 Description: The first Google Tag Manager plugin for WordPress with business goals in mind
 Author: Thomas Geiger
