@@ -550,9 +550,8 @@ function gtm4wp_get_the_gtm_tag() {
 
 		$_gtm_tag .= '
 <script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
-	const console_cmd = console.warn || console.log;
-	console_cmd && console_cmd("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
-	console_cmd && console_cmd("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
+	console.warn && console.warn("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
+	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
 </script>';
 	}
 
@@ -752,8 +751,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	$_gtm_header_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <!-- GTM Container placement set to ' . gtm4wp_get_container_placement_string() . ' -->
-<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
-	const console_cmd = console.warn || console.log;';
+<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>';
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] != '' ) {
 		$gtm4wp_datalayer_data = array();
@@ -880,8 +878,8 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 		$_gtm_header_content .= '
 <script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
-	console_cmd && console_cmd("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
-	console_cmd && console_cmd("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
+	console.warn && console.warn("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
+	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
 </script>';
 	}
 
@@ -894,9 +892,9 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 				$_gtm_header_content .= '
 <script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
-	console_cmd && console_cmd("[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $user_role . ' !!!");
-	console_cmd && console_cmd("[GTM4WP] Logout or login with a user having a different user role!");
-	console_cmd && console_cmd("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
+	console.warn && console.warn("[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $user_role . ' !!!");
+	console.warn && console.warn("[GTM4WP] Logout or login with a user having a different user role!");
+	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
 </script>';
 
 				break;
