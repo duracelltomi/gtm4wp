@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 5.6
-Tested up to: 5.9.0
-Stable tag: 1.15
+Tested up to: 5.9.3
+Stable tag: 1.15.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -234,6 +234,11 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.15.1 =
+
+* Fixed: JavaScript error with the newly added console logging to debug code placement issues
+* Fixed: Fix: possible Xss Vulnerability if Cloudflare country code option enabled. Thanks [Guillaume Fortier](https://www.linkedin.com/in/guillaume-f-a728711b0/)
 
 = 1.15 =
 
