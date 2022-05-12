@@ -594,11 +594,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $dataLayer ) {
 
 		if(isset($order) && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ){
 
-			$now = new DateTime();
 			if($order->is_paid() && $order->get_date_paid()){
+				$now = new DateTime("now", $order->get_date_paid()->getTimezone());
 				$diff = $now->diff($order->get_date_paid());
 				$minutes = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
 			} else {
+				$now = new DateTime("now", $order->get_date_created()->getTimezone());
 				$diff = $now->diff($order->get_date_created());
 				$minutes = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
 			}
