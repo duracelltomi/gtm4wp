@@ -1,4 +1,13 @@
 <?php
+/**
+ * Plugin constant declarations and default option values.
+ *
+ * @package GTM4WP
+ * @author Thomas Geiger
+ * @copyright 2013- Geiger Tamás e.v. (Thomas Geiger s.e.)
+ * @license GNU General Public License, version 3
+ */
+
 define( 'GTM4WP_OPTIONS', 'gtm4wp-options' );
 define( 'GTM4WP_OPTION_GTM_CODE', 'gtm-code' );
 define( 'GTM4WP_OPTION_GTM_PLACEMENT', 'gtm-code-placement' );
@@ -28,7 +37,7 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTTITLE', 'include-posttitle' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTCOUNT', 'include-postcount' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTID', 'include-postid' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTFORMAT', 'include-postformat' );
-define( 'GTM4WP_OPTION_INCLUDE_POSTTERMLIST',  'include-postterms' );
+define( 'GTM4WP_OPTION_INCLUDE_POSTTERMLIST', 'include-postterms' );
 define( 'GTM4WP_OPTION_INCLUDE_SEARCHDATA', 'include-searchdata' );
 define( 'GTM4WP_OPTION_INCLUDE_BROWSERDATA', 'include-browserdata' );
 define( 'GTM4WP_OPTION_INCLUDE_OSDATA', 'include-osdata' );
@@ -61,7 +70,7 @@ define( 'GTM4WP_OPTION_BLACKLIST_ENABLE', 'blacklist-enable' );
 define( 'GTM4WP_OPTION_BLACKLIST_SANDBOXED', 'blacklist-sandboxed' );
 define( 'GTM4WP_OPTION_BLACKLIST_STATUS', 'blacklist-status' );
 
-// deprecated options BEGIN
+// deprecated options BEGIN.
 define( 'GTM4WP_OPTION_BLACKLIST_ADADVISOR', 'blacklist-adadvisor' );
 define( 'GTM4WP_OPTION_BLACKLIST_ADROLL', 'blacklist-adroll' );
 define( 'GTM4WP_OPTION_BLACKLIST_AWCONV', 'blacklist-adwords-conversion' );
@@ -93,7 +102,7 @@ define( 'GTM4WP_OPTION_BLACKLIST_MACRO_RANDOMNUM', 'blacklist-macro-random-numbe
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_REFERRER', 'blacklist-macro-referrer' );
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_URL', 'blacklist-macro-url' );
 define( 'GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT', 'blacklist-macro-autoevent-variable' );
-// deprecated options END
+// deprecated options END.
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
 
@@ -101,8 +110,8 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC', 'integrate-woocommerce-track
 define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC', 'integrate-woocommerce-track-enhanced-ecommerce' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION', 'integrate-woocommerce-product-per-impression' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP', 'integrate-woocommerce-cart-as-first-step' );
-define( 'GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL',    'integrate-woocommerce-cart-content-in-datalayer' );
-define( 'GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY',    'integrate-woocommerce-brand-taxonomy' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL', 'integrate-woocommerce-cart-content-in-datalayer' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY', 'integrate-woocommerce-brand-taxonomy' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCREMARKETING', 'integrate-woocommerce-remarketing' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL', 'integrate-woocommerce-business-vertical' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSESKU', 'integrate-woocommerce-remarketing-usesku' );
@@ -210,7 +219,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX     => '',
 	GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA        => false,
 	GTM4WP_OPTION_INTEGRATE_WCORDERDATA           => false,
-	GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE           => 30,
+	GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE         => 30,
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX          => false,
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING     => false,
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG  => false,
@@ -222,142 +231,148 @@ $gtm4wp_defaultoptions = array(
 
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => '',
 
-	GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false
+	GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false,
 );
 
 $gtm4wp_business_verticals = array(
-	'retail' => 'Retail',
-	'education' => 'Education',
-	'flights' => 'Flights',
+	'retail'       => 'Retail',
+	'education'    => 'Education',
+	'flights'      => 'Flights',
 	'hotel_rental' => 'Hotel rental',
-	'jobs' => 'Jobs',
-	'local' => 'Local deals',
-	'real_estate' => 'Real estate',
-	'travel' => 'Travel',
-	'custom' => 'Custom'
+	'jobs'         => 'Jobs',
+	'local'        => 'Local deals',
+	'real_estate'  => 'Real estate',
+	'travel'       => 'Travel',
+	'custom'       => 'Custom',
 );
 
 $gtm4wp_business_verticals_ids = array(
 	'flights' => 'destination',
-	'travel' => 'destination'
+	'travel'  => 'destination',
 );
 
 $gtm4wp_entity_ids = array(
-	'tags' => array(
-		'abtGeneric' => 'AB TASTY Generic Tag',
-		'ta' => 'AdAdvisor Tag',
-		'adm' => 'Adometry Tag',
-		'asp' => 'AdRoll Smart Pixel Tag',
-		'awct' => 'Google Ads Conversion Tracking Tag',
-		'sp' => 'Google Ads Remarketing Tag',
-		'awc' => 'Affiliate Window Conversion Tag',
-		'awj' => 'Affiliate Window Journey Tag',
-		'baut' => 'Bing Ads Universal Event Tracking',
-		'bb' => 'Bizrate Insights Buyer Survey Solution',
-		'bsa' => 'Bizrate Insights Site Abandonment Survey Solution',
-		'cts' => 'ClickTale Standard Tracking Tag',
-		'csm' => 'comScore Unified Digital Measurement Tag',
-		'mpm' => 'Conversant Mediaplex - IFRAME MCT Tag',
-		'mpr' => 'Conversant Mediaplex - Standard IMG ROI Tag',
-		'gclidw' => 'Conversion Linker',
-		'cegg' => 'Crazy Egg Tag',
-		'crto' => 'Criteo OneTag',
-		'html' => 'Custom HTML Tag',
-		'img' => 'Custom Image Tag',
-		'dstag' => 'DistroScale Tag',
-		'flc' => 'Floodlight Counter Tag',
-		'fls' => 'Floodlight Sales Tag',
-		'm6d' => 'Dstillery Universal Pixel Tag',
-		'ela' => 'Eulerian Analytics Tag',
-		'ga' => 'Google Analytics Tag (classic, legacy)',
-		'ua' => 'Google Analytics Tag (universal, latest)',
-		'gcs' => 'Google Consumer Surveys Website Satisfaction',
-		'opt' => 'Google Optimize',
-		'ts' => 'Google Trusted Stores Tag',
-		'hjtc' => 'Hotjar Tracking Code',
-		'infinity' => 'Infinity Call Tracking Tag',
-		'sca' => 'Intent Media - Search Compare Ads',
-		'k50Init' => 'K50 tracking tag',
-		'll' => 'LeadLab',
-		'bzi' => 'LinkedIn Tag',
-		'ljs' => 'Lytics JS Tag',
-		'ms' => 'Marin Software Tag',
-		'mpm' => 'Mediaplex - IFRAME MCT Tag',
-		'mpr' => 'Mediaplex - Standard IMG ROI Tag',
-		'messagemate' => 'Message Mate',
-		'mf' => 'Mouseflow Tag',
-		'ta' => 'Neustar Pixel',
-		'ndcr' => 'Nielsen DCR Static Lite Tag',
-		'nudge' => 'Nudge Content Analytics Tag',
-		'okt' => 'Oktopost Tracking Code',
-		'omc' => 'Optimise Conversion Tag',
-		'messagemate' => 'OwnerListens Message Mate',
-		'pa' => 'Perfect Audience Pixel',
-		'pc' => 'Personali Canvas',
-		'pntr' => 'Pinterest',
-		'placedPixel' => 'Placed',
-		'pijs' => 'Pulse Insights Voice of Customer Platform',
-		'qcm' => 'Quantcast Audience Measurement',
-		'qpx' => 'Quora Pixel',
-		'fxm' => 'Rawsoft FoxMetrics',
-		'scjs' => 'SaleCycle JavaScript Tag',
-		'scp' => 'SaleCycle Pixel Tag',
-		'sfc' => 'SearchForce JavaScript Tracking for Conversion Page',
-		'sfl' => 'SearchForce JavaScript Tracking for Landing Page',
-		'sfr' => 'SearchForce Redirection Tracking Tag',
-		'shareaholic' => 'Shareaholic',
-		'svw' => 'Survicate Widget',
-		'tdlc' => 'Tradedoubler Lead Conversion Tag',
-		'tdsc' => 'Tradedoubler Sale Conversion Tag',
-		'tc' => 'Turn Conversion Tracking Tag',
-		'tdc' => 'Turn Data Collection Tag',
+	'tags'      => array(
+		'abtGeneric'          => 'AB TASTY Generic Tag',
+		'ta'                  => 'AdAdvisor Tag',
+		'adm'                 => 'Adometry Tag',
+		'asp'                 => 'AdRoll Smart Pixel Tag',
+		'awct'                => 'Google Ads Conversion Tracking Tag',
+		'sp'                  => 'Google Ads Remarketing Tag',
+		'awc'                 => 'Affiliate Window Conversion Tag',
+		'awj'                 => 'Affiliate Window Journey Tag',
+		'baut'                => 'Bing Ads Universal Event Tracking',
+		'bb'                  => 'Bizrate Insights Buyer Survey Solution',
+		'bsa'                 => 'Bizrate Insights Site Abandonment Survey Solution',
+		'cts'                 => 'ClickTale Standard Tracking Tag',
+		'csm'                 => 'comScore Unified Digital Measurement Tag',
+		'mpm'                 => 'Conversant Mediaplex - IFRAME MCT Tag',
+		'mpr'                 => 'Conversant Mediaplex - Standard IMG ROI Tag',
+		'gclidw'              => 'Conversion Linker',
+		'cegg'                => 'Crazy Egg Tag',
+		'crto'                => 'Criteo OneTag',
+		'html'                => 'Custom HTML Tag',
+		'img'                 => 'Custom Image Tag',
+		'dstag'               => 'DistroScale Tag',
+		'flc'                 => 'Floodlight Counter Tag',
+		'fls'                 => 'Floodlight Sales Tag',
+		'm6d'                 => 'Dstillery Universal Pixel Tag',
+		'ela'                 => 'Eulerian Analytics Tag',
+		'ga'                  => 'Google Analytics Tag (classic, legacy)',
+		'ua'                  => 'Google Analytics Tag (universal, latest)',
+		'gcs'                 => 'Google Consumer Surveys Website Satisfaction',
+		'opt'                 => 'Google Optimize',
+		'ts'                  => 'Google Trusted Stores Tag',
+		'hjtc'                => 'Hotjar Tracking Code',
+		'infinity'            => 'Infinity Call Tracking Tag',
+		'sca'                 => 'Intent Media - Search Compare Ads',
+		'k50Init'             => 'K50 tracking tag',
+		'll'                  => 'LeadLab',
+		'bzi'                 => 'LinkedIn Tag',
+		'ljs'                 => 'Lytics JS Tag',
+		'ms'                  => 'Marin Software Tag',
+		'mpm'                 => 'Mediaplex - IFRAME MCT Tag',
+		'mpr'                 => 'Mediaplex - Standard IMG ROI Tag',
+		'messagemate'         => 'Message Mate',
+		'mf'                  => 'Mouseflow Tag',
+		'ta'                  => 'Neustar Pixel',
+		'ndcr'                => 'Nielsen DCR Static Lite Tag',
+		'nudge'               => 'Nudge Content Analytics Tag',
+		'okt'                 => 'Oktopost Tracking Code',
+		'omc'                 => 'Optimise Conversion Tag',
+		'messagemate'         => 'OwnerListens Message Mate',
+		'pa'                  => 'Perfect Audience Pixel',
+		'pc'                  => 'Personali Canvas',
+		'pntr'                => 'Pinterest',
+		'placedPixel'         => 'Placed',
+		'pijs'                => 'Pulse Insights Voice of Customer Platform',
+		'qcm'                 => 'Quantcast Audience Measurement',
+		'qpx'                 => 'Quora Pixel',
+		'fxm'                 => 'Rawsoft FoxMetrics',
+		'scjs'                => 'SaleCycle JavaScript Tag',
+		'scp'                 => 'SaleCycle Pixel Tag',
+		'sfc'                 => 'SearchForce JavaScript Tracking for Conversion Page',
+		'sfl'                 => 'SearchForce JavaScript Tracking for Landing Page',
+		'sfr'                 => 'SearchForce Redirection Tracking Tag',
+		'shareaholic'         => 'Shareaholic',
+		'svw'                 => 'Survicate Widget',
+		'tdlc'                => 'Tradedoubler Lead Conversion Tag',
+		'tdsc'                => 'Tradedoubler Sale Conversion Tag',
+		'tc'                  => 'Turn Conversion Tracking Tag',
+		'tdc'                 => 'Turn Data Collection Tag',
 		'twitter_website_tag' => 'Twitter Universal Website Tag',
-		'uslt' => 'Upsellit Global Footer Tag',
-		'uspt' => 'Upsellit Confirmation Tag',
-		'vei' => 'Ve Interactive JavaScript Tag',
-		'veip' => 'Ve Interactive Pixel',
-		'vdc' => 'VisualDNA Conversion Tag',
-		'xpsh' => 'Xtremepush',
-		'yieldify' => 'Yieldify',
-		'zone' => 'Zones'
+		'uslt'                => 'Upsellit Global Footer Tag',
+		'uspt'                => 'Upsellit Confirmation Tag',
+		'vei'                 => 'Ve Interactive JavaScript Tag',
+		'veip'                => 'Ve Interactive Pixel',
+		'vdc'                 => 'VisualDNA Conversion Tag',
+		'xpsh'                => 'Xtremepush',
+		'yieldify'            => 'Yieldify',
+		'zone'                => 'Zones',
 	),
-	'triggers' => array(
+	'triggers'  => array(
 		'evl' => 'Element Visibility Listener/Trigger',
-		'cl' => 'Click Listener/Trigger',
+		'cl'  => 'Click Listener/Trigger',
 		'fsl' => 'Form Submit Listener/Trigger',
-		'hl' => 'History Listener/Trigger',
+		'hl'  => 'History Listener/Trigger',
 		'jel' => 'JavaScript Error Listener/Trigger',
 		'lcl' => 'Link Click Listener/Trigger',
 		'sdl' => 'Scroll Depth Listener/Trigger',
-		'tl' => 'Timer Listener/Trigger',
-		'ytl' => 'YouTube Video Listener/Trigger'
+		'tl'  => 'Timer Listener/Trigger',
+		'ytl' => 'YouTube Video Listener/Trigger',
 	),
 	'variables' => array(
-		'k' => '1st Party Cookie',
-		'c' => 'Constant',
-		'ctv' => 'Container Version Number',
-		'e' => 'Custom Event',
-		'jsm' => 'Custom JavaScript Variable',
-		'v' => 'Data Layer Variable',
-		'dbg' => 'Debug Mode',
-		'd' => 'DOM Element',
-		'vis' => 'Element Visibility',
-		'f' => 'HTTP Referrer',
-		'j' => 'JavaScript Variable',
-		'smm' => 'Lookup Table',
-		'r' => 'Random Number',
+		'k'    => '1st Party Cookie',
+		'c'    => 'Constant',
+		'ctv'  => 'Container Version Number',
+		'e'    => 'Custom Event',
+		'jsm'  => 'Custom JavaScript Variable',
+		'v'    => 'Data Layer Variable',
+		'dbg'  => 'Debug Mode',
+		'd'    => 'DOM Element',
+		'vis'  => 'Element Visibility',
+		'f'    => 'HTTP Referrer',
+		'j'    => 'JavaScript Variable',
+		'smm'  => 'Lookup Table',
+		'r'    => 'Random Number',
 		'remm' => 'RegEx Table',
-		'u' => 'URL'
-	)
+		'u'    => 'URL',
+	),
 );
 
+/**
+ * Helper function to migrate blacklist / whitelist options from v1.12- to v1.12+
+ *
+ * @param array $current_options The current and possible outdated config array.
+ * @return array
+ */
 function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
 	if ( ( array_key_exists( GTM4WP_OPTION_BLACKLIST_ENABLE, $current_options ) )
-		  && ( $current_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 )
+			&& ( $current_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 )
 		) {
 		$_gtmrestrictlistitems = array();
 
-		// IDs from https://developers.google.com/tag-manager/devguide#security
+		// IDs from https://developers.google.com/tag-manager/devguide#security .
 		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ADADVISOR ] ) {
 			$_gtmrestrictlistitems[] = 'ta';
 		}
@@ -422,6 +437,13 @@ function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
 	return $current_options;
 }
 
+/**
+ * Reads plugin options from database backend and merges this with default values.
+ * Migrates blacklist/whitelist options from v1.12- to v1.12+
+ * Overwrites some options that can be hard coded in wp-config.
+ *
+ * @return array
+ */
 function gtm4wp_reload_options() {
 	global $gtm4wp_defaultoptions, $gtm4wp_business_verticals;
 
@@ -430,38 +452,47 @@ function gtm4wp_reload_options() {
 		$gtm4wp_defaultoptions = array();
 	}
 
-	if ( !isset( $storedoptions[ GTM4WP_OPTION_BLACKLIST_STATUS ] ) ) {
+	if ( ! isset( $storedoptions[ GTM4WP_OPTION_BLACKLIST_STATUS ] ) ) {
 		$storedoptions = gtm4wp_migrate_blacklist_whitelist( $storedoptions );
 	}
 
+	// phpcs:ignore
 	$return_options = array_merge( $gtm4wp_defaultoptions, $storedoptions );
 	$return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] = explode( ',', $return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] );
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
-		$return_options[ GTM4WP_OPTION_GTM_CODE ] = GTM4WP_HARDCODED_GTM_ID;
+		$return_options[ GTM4WP_OPTION_GTM_CODE ] = constant( 'GTM4WP_HARDCODED_GTM_ID' );
 	}
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
-		$return_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] = GTM4WP_HARDCODED_GTM_ENV_AUTH;
+		$return_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] = constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' );
 	}
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
-		$return_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] = GTM4WP_HARDCODED_GTM_ENV_PREVIEW;
+		$return_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] = constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' );
 	}
 
-	if ( !array_key_exists( $return_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ], $gtm4wp_business_verticals ) ) {
+	if ( ! array_key_exists( $return_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ], $gtm4wp_business_verticals ) ) {
 		$return_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] = $gtm4wp_defaultoptions[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ];
 	}
 
 	return $return_options;
 }
 
+/**
+ * Helper function for debug purposes. Not used in stable versions.
+ *
+ * @param string $debug_data The data that needs to be saved for debug logging.
+ * @return void
+ */
+// phpcs:disable
 function gtp4wp_debug_file( $debug_data ) {
-	$fp = fopen( dirname( __FILE__ ) . '/' . date( 'Y-m-d-H-i-s-u' ) . '.txt', 'w' );
+	$fp = fopen( dirname( __FILE__ ) . '/' . gmdate( 'Y-m-d-H-i-s-u' ) . '.txt', 'w' );
 	if ( $fp ) {
 		fwrite( $fp, $debug_data );
 		fclose( $fp );
 	}
 }
+// phpcs:enable
 
 $gtm4wp_options = gtm4wp_reload_options();
