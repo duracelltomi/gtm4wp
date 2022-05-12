@@ -14,10 +14,6 @@ var adminsubtabs = {
 			tabtext: gtm4wp.visitortabtitle,
 			numitems: 7
 		},
-		"adwords": {
-			tabtext: gtm4wp.adwordstabtitle,
-			numitems: 1
-		},
 		"whichbrowser": {
 			tabtext: gtm4wp.browsertabtitle,
 			numitems: 3

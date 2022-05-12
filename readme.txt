@@ -238,7 +238,14 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.15.1 =
 
 * Fixed: JavaScript error with the newly added console logging to debug code placement issues
-* Fixed: Fix: possible Xss Vulnerability if Cloudflare country code option enabled. Thanks [Guillaume Fortier](https://www.linkedin.com/in/guillaume-f-a728711b0/)
+* Fixed: possible XSS Vulnerability if Cloudflare country code option enabled. Thanks [Guillaume Fortier](https://www.linkedin.com/in/guillaume-f-a728711b0/)
+* Fixed: proven XSS Vulnerability if adding site search into the data layer was enabled. Original report by [not_stoppable](https://hackerone.com/not_stoppable?type=user). Root cause analysis by [Cory Buecker](https://www.linkedin.com/in/corybuecker/).
+* Removed: deprecated feature Google Ads remarketing. This is the outdated, classic way using the google_tag_params variable.
+* Dev: removed PHP constant GTM4WP_WPFILTER_COMPILE_REMARKTING (related to removed Google Ads remarketing feature)
+* Dev: removed gtm4wp_compile_remarkering WordPress filter (related to removed Google Ads remarketing feature)
+
+Note to plugin users: I sincerely appologize for the vulnerabilities. To make sure, such cases do not happen again,
+the next version will be fully dedicacted to go through every peace of code and make sure proper data processing is happening in GTM4WP.
 
 = 1.15 =
 
