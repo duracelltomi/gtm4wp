@@ -1,4 +1,14 @@
 <?php
+/**
+ * Vimeo integration related codes.
+ * Enqueues the official Vimeo JS API script and the interaction tracking script of GTM4WP.
+ *
+ * @package GTM4WP
+ * @author Thomas Geiger
+ * @copyright 2013- Geiger Tamás e.v. (Thomas Geiger s.e.)
+ * @license GNU General Public License, version 3
+ */
+
 if ( ! is_admin() ) {
 	$in_footer = apply_filters( 'gtm4wp_vimeo', true );
 
