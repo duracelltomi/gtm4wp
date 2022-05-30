@@ -445,7 +445,7 @@ function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
 function gtm4wp_reload_options() {
 	global $gtm4wp_defaultoptions, $gtm4wp_business_verticals;
 
-	$storedoptions = (array) get_option( GTM4WP_OPTIONS );
+	$storedoptions = get_option( GTM4WP_OPTIONS, array() );
 	if ( ! is_array( $gtm4wp_defaultoptions ) ) {
 		$gtm4wp_defaultoptions = array();
 	}
@@ -458,16 +458,39 @@ function gtm4wp_reload_options() {
 	$return_options = array_merge( $gtm4wp_defaultoptions, $storedoptions );
 	$return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] = explode( ',', $return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] );
 
-	if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
-		$return_options[ GTM4WP_OPTION_GTM_CODE ] = constant( 'GTM4WP_HARDCODED_GTM_ID' );
-	}
-
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
 		$return_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] = constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' );
 	}
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
 		$return_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] = constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' );
+	}
+
+	if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
+		$hardcoded_gtm_id = constant( 'GTM4WP_HARDCODED_GTM_ID' );
+
+		// validate hard coded GTM ID before overriding stored value.
+		$_gtmid_list     = explode( ',', $hardcoded_gtm_id );
+		$_gtmid_haserror = false;
+
+		foreach ( $_gtmid_list as $one_gtm_id ) {
+			$_gtmid_haserror = $_gtmid_haserror || ! preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id );
+		}
+
+		if ( ! $_gtmid_haserror ) {
+			$return_options[ GTM4WP_OPTION_GTM_CODE ] = $hardcoded_gtm_id;
+		}
+	}
+
+	// only load the first container if environment parameters are set.
+	if (
+		( '' !== $return_options[ GTM4WP_OPTION_ENV_GTM_AUTH ] ) &&
+		( '' !== $return_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] )
+	) {
+		$_gtmid_list = explode( ',', $return_options[ GTM4WP_OPTION_GTM_CODE ] );
+		if ( count( $_gtmid_list ) > 0 ) {
+			$return_options[ GTM4WP_OPTION_GTM_CODE ] = $_gtmid_list[0];
+		}
 	}
 
 	if ( ! array_key_exists( $return_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ], $gtm4wp_business_verticals ) ) {
