@@ -33,6 +33,6 @@ function gtm4wp_youtube( $return, $url, $data ) {
 add_filter( 'oembed_result', 'gtm4wp_youtube', 10, 3 );
 
 if ( ! is_admin() ) {
-	$in_footer = apply_filters( 'gtm4wp_youtube', true );
+	$in_footer = (bool) apply_filters( 'gtm4wp_youtube', true );
 	wp_enqueue_script( 'gtm4wp-youtube', $gtp4wp_plugin_url . 'js/gtm4wp-youtube.js', array(), GTM4WP_VERSION, $in_footer );
 }
