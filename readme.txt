@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 5.6
-Tested up to: 5.9.3
-Stable tag: 1.15.2
+Tested up to: 6.0.0
+Stable tag: 1.16
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -235,9 +235,25 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.16 =
+
+This plugin version does not add or update any functionality.
+After recent events, the code of the plugin has been checked line by line to see where additional security checks can be added.
+The code has been formatted to better support readability for other programmers.
+
+Upcoming version will come with important changes:
+* Minimum PHP version will be raised to 7.4
+* Minimum supported WooCommerce version will be raised to WooCommerce 5.0
+* Deprecated features will be removed:
+  * Do not track flag of the browser added into data layer
+  * Legacy version of WooCommerce dynamic remarketing (using ecomm_ parameters)
+
+The goal of all these changes aim to keep the plugin code clean and free from legacy solutions.
+
 = 1.15.2 =
 
 * Fixed: Stored XSS when using the scroll tracking feature and an admin changes the content element ID into a JavaScript code.
+* Deprecated option: 'do not track' flag of the browser. This browser feature itself [is now deprecated](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/DNT)
 
 Full scan of the plugin is also in works to fix any other possible XSS issue.
 
