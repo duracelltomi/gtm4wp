@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 5.9.3
-Stable tag: 1.15.1
+Stable tag: 1.15.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -234,6 +234,12 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.15.2 =
+
+* Fixed: Stored XSS when using the scroll tracking feature and an admin changes the content element ID into a JavaScript code.
+
+Full scan of the plugin is also in works to fix any other possible XSS issue.
 
 = 1.15.1 =
 
@@ -779,6 +785,14 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.15.2 =
+
+Bugfix release
+
+= 1.15.1 =
+
+Bugfix release
 
 = 1.15 =
 
