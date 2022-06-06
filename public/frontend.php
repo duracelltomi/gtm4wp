@@ -70,12 +70,12 @@ if ( empty( $GLOBALS['gtm4wp_options'] ) || ( '' === $GLOBALS['gtm4wp_options'][
 }
 
 /**
- * Stores the data layer content in a JSON object string to give access to this data
+ * Stores the data layer content to give access to this data
  * for the AMP integration.
  *
  * @var string
  */
-$GLOBALS['gtm4wp_datalayer_json'] = '';
+$GLOBALS['gtm4wp_datalayer_data'] = array();
 
 /**
  * Include AMP integration
@@ -916,7 +916,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
  * @return string|void Returns the HTML if the $echo parameter is set to false or when not AMP page generation is running.
  */
 function gtm4wp_wp_header_begin( $echo = true ) {
-	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_json, $gtm4wp_options, $woocommerce;
+	global $gtm4wp_datalayer_name, $gtm4wp_datalayer_data, $gtm4wp_options, $woocommerce;
 
 	$has_html5_support    = current_theme_supports( 'html5' );
 	$add_cookiebot_ignore = (bool) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
