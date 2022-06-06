@@ -81,6 +81,54 @@ function gtm4wp_safe_admin_html( $text ) {
 	);
 }
 
+/**
+ * Generic function to safely escape text that outputs on the admin page.
+ * Works just like gtm4wp_safe_admin_html() but also allows anchor elements.
+ *
+ * @param string $text The admin text that needs escaping.
+ * @return string The escaped text.
+ */
+function gtm4wp_safe_admin_html_with_links( $text ) {
+	return wp_kses(
+		$text,
+		array(
+			'br'     => array(),
+			'strong' => array(
+				'style' => array(),
+				'class' => array(),
+			),
+			'em'     => array(
+				'style' => array(),
+				'class' => array(),
+			),
+			'p'      => array(
+				'style' => array(),
+				'class' => array(),
+			),
+			'span'   => array(
+				'style' => array(),
+				'class' => array(),
+			),
+			'code'   => array(),
+			'ul'     => array(
+				'style' => array(),
+				'class' => array(),
+			),
+			'li'     => array(
+				'style' => array(),
+				'class' => array(),
+			),
+			'a'      => array(
+				'id'     => array(),
+				'name'   => array(),
+				'href'   => array(),
+				'target' => array(),
+				'rel'    => array(),
+			),
+		)
+	);
+}
+
 require_once dirname( __FILE__ ) . '/admin-tab-basicdata.php';
 require_once dirname( __FILE__ ) . '/admin-tab-events.php';
 require_once dirname( __FILE__ ) . '/admin-tab-scrolltracking.php';
@@ -99,7 +147,7 @@ function gtm4wp_admin_output_section( $args ) {
 	echo '<span class="tabinfo">';
 
 	switch ( $args['id'] ) {
-		case GTM4WP_ADMIN_GROUP_GENERAL: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_GENERAL:
 			sprintf(
 				// translators: 1: opening anchor tag linking to GTM's developer doc homepage. 2: Closing anchor tag.
 				esc_html__(
@@ -112,9 +160,8 @@ function gtm4wp_admin_output_section( $args ) {
 			);
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_INCLUDES: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_INCLUDES:
 			esc_html_e( 'Here you can check what data is needed to be included in the dataLayer to be able to access them in Google Tag Manager', 'duracelltomi-google-tag-manager' );
 			echo '<br />';
 			printf(
@@ -128,15 +175,13 @@ function gtm4wp_admin_output_section( $args ) {
 			);
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_EVENTS: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_EVENTS:
 			esc_html_e( 'Fire tags in Google Tag Manager on special events on your website', 'duracelltomi-google-tag-manager' );
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_SCROLLER: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_SCROLLER:
 			esc_html_e( 'Fire tags based on how the visitor scrolls through your page.', 'duracelltomi-google-tag-manager' );
 			echo '<br />';
 			printf(
@@ -150,9 +195,8 @@ function gtm4wp_admin_output_section( $args ) {
 			);
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_BLACKLIST: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_BLACKLIST:
 			esc_html_e( 'Here you can control which types of tags, triggers and variables can be executed on your site regardless of what tags are included in your container on the Google Tag Manager site. Use this to increase security!', 'duracelltomi-google-tag-manager' );
 			echo '<br />';
 			esc_html_e( 'Do not modify if you do not know what to do, since it can cause issues with your tag deployment!', 'duracelltomi-google-tag-manager' );
@@ -160,25 +204,21 @@ function gtm4wp_admin_output_section( $args ) {
 			esc_html_e( 'For example blacklisting everything and only whitelisting the Google Analytics tag without whitelisting the URL variable type will cause your Google Analytics tags to be blocked anyway since the attached triggers (Page View) can not fire!', 'duracelltomi-google-tag-manager' );
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_INTEGRATION: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_INTEGRATION:
 			esc_html_e( 'Google Tag Manager for WordPress can integrate with several popular plugins. Please check the plugins you would like to integrate with:', 'duracelltomi-google-tag-manager' );
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_ADVANCED: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_ADVANCED:
 			esc_html_e( 'You usually do not need to modify thoose settings. Please be carefull while hacking here.', 'duracelltomi-google-tag-manager' );
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_CREDITS: { // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_CREDITS:
 			esc_html_e( 'Some info about the author of this plugin', 'duracelltomi-google-tag-manager' );
 
 			break;
-		}
 	} // end switch
 
 	echo '</span>';
@@ -196,124 +236,153 @@ function gtm4wp_admin_output_field( $args ) {
 	global $gtm4wp_options, $gtm4wp_business_verticals;
 
 	switch ( $args['label_for'] ) {
-		case GTM4WP_ADMIN_GROUP_GTMID: { // phpcs:ignore
-			if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
-				$_gtm_id_value   = constant( 'GTM4WP_HARDCODED_GTM_ID' );
-				$_input_readonly = ' readonly="readonly"';
-				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Container ID was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the container ID or remove the GTM4WP_HARDCODED_GTM_ID constant!</span>';
-			} else {
-				$_gtm_id_value   = $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ];
-				$_input_readonly = '';
-				$_warning_after  = '';
-			}
+		case GTM4WP_ADMIN_GROUP_GTMID:
+			echo wp_kses(
+				sprintf(
+					'<input type="text" id="%s" name="%s" value="%s"%s />',
+					esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']' ),
+					esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']' ),
+					defined( 'GTM4WP_HARDCODED_GTM_ID' ) ? constant( 'GTM4WP_HARDCODED_GTM_ID' ) : $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ],
+					defined( 'GTM4WP_HARDCODED_GTM_ID' ) ? ' readonly="readonly"' : ''
+				),
+				array(
+					'input' => array(
+						'type'     => array(),
+						'id'       => array(),
+						'name'     => array(),
+						'value'    => array(),
+						'readonly' => array(),
+					),
+				)
+			);
+			echo '<br />';
 
-			// $_input_readonly is not routed through any translation module, $args['description'] is escaped in admin-tab-*.php
-			echo '<input type="text" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTM_CODE . ']' ) . '" value="' . esc_attr( $_gtm_id_value ) . '" ';
-			echo $_input_readonly . '/><br />'; // phpcs:ignore
-			echo $args['description']; // phpcs:ignore
-			echo $_warning_after; // phpcs:ignore
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+
+			if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
+				echo '<br /><span class="gtm_wpconfig_set">WARNING! Container ID was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the container ID or remove the GTM4WP_HARDCODED_GTM_ID constant!</span>';
+			}
 			echo '<br /><span class="gtmid_validation_error">' . esc_html__( 'This does not seems to be a valid Google Tag Manager ID! Valid format: GTM-XXXXX where X can be numbers and capital letters. Use comma without any space (,) to enter multpile container IDs.', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_CONTAINERON: { // phpcs:ignore
-			// $args['description'] is escaped in admin-tab-*.php
-			echo $args['description'] . '<br/><br/>'; // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_CONTAINERON:
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+			echo '<br/><br/>';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[container-on]_1' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[container-on]' ) . '" value="1" ' . ( GTM4WP_PLACEMENT_OFF !== $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'On', 'duracelltomi-google-tag-manager' ) . '<br />';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[container-on]_0' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[container-on]' ) . '" value="0" ' . ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Off', 'duracelltomi-google-tag-manager' ) . '<br />';
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_COMPATMODE: { // phpcs:ignore
-			// $args['description'] is escaped in admin-tab-*.php
-			echo $args['description'] . '<br/><br/>'; // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_COMPATMODE:
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+			echo '<br/><br/>';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[compat-mode]_' . GTM4WP_PLACEMENT_BODYOPEN_AUTO ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[compat-mode]' ) . '" value="' . esc_attr( GTM4WP_PLACEMENT_BODYOPEN_AUTO ) . '" ' . ( GTM4WP_PLACEMENT_BODYOPEN_AUTO === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] || GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Off (no tweak, right placement)', 'duracelltomi-google-tag-manager' ) . '<br />';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[compat-mode]_' . GTM4WP_PLACEMENT_FOOTER ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[compat-mode]' ) . '" value="' . esc_attr( GTM4WP_PLACEMENT_FOOTER ) . '" ' . ( GTM4WP_PLACEMENT_FOOTER === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Footer of the page (not recommended by Google, Search Console verification will not work)', 'duracelltomi-google-tag-manager' ) . '<br />';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[compat-mode]_' . GTM4WP_PLACEMENT_BODYOPEN ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[compat-mode]' ) . '" value="' . esc_attr( GTM4WP_PLACEMENT_BODYOPEN ) . '" ' . ( GTM4WP_PLACEMENT_BODYOPEN === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Manually coded (needs tweak in your template)', 'duracelltomi-google-tag-manager' ) . '<br />';
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']': { // phpcs:ignore
-			// $args['description'] is escaped in admin-tab-*.php
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']':
 			echo '<input type="text" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_DATALAYER_NAME . ']' ) . '" value="' . esc_attr( $gtm4wp_options[ GTM4WP_OPTION_DATALAYER_NAME ] ) . '" /><br />';
-			echo $args['description']; // phpcs:ignore
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 			echo '<br /><span class="datalayername_validation_error">' . esc_html__( 'This does not seems to be a valid JavaScript variable name! Please check and try again', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']':
+			echo wp_kses(
+				sprintf(
+					'<input type="text" id="%s" name="%s" value="%s"%s />',
+					esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']' ),
+					esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']' ),
+					defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ? constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) : $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ],
+					defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ? ' readonly="readonly"' : ''
+				),
+				array(
+					'input' => array(
+						'type'     => array(),
+						'id'       => array(),
+						'name'     => array(),
+						'value'    => array(),
+						'readonly' => array(),
+					),
+				)
+			);
+
+			echo '<br />';
+
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+
 			if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
-				$_gtm_auth_value = constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' );
-				$_input_readonly = ' readonly="readonly"';
-				$_warning_after  = '<br /><span class="gtm_wpconfig_set">WARNING! Environment auth parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_AUTH constant!</span>';
-			} else {
-				$_gtm_auth_value = $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_AUTH ];
-				$_input_readonly = '';
-				$_warning_after  = '';
+				echo '<br /><span class="gtm_wpconfig_set">WARNING! Environment auth parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_AUTH constant!</span>';
 			}
-
-			// $_input_readonly is not routed through any translation module, $args['description'] is escaped in admin-tab-*.php
-			echo '<input type="text" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_AUTH . ']' ) . '" value="' . esc_attr( $_gtm_auth_value ) . '" ';
-			echo $_input_readonly . '/><br />'; // phpcs:ignore
-			echo $args['description']; // phpcs:ignore
-			echo $_warning_after; // phpcs:ignore
 			echo '<br /><span class="gtmauth_validation_error">' . esc_html__( 'This does not seems to be a valid gtm_auth parameter! It should only contain letters, number and the &quot;-&quot; character. Please check and try again', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']':
+			echo wp_kses(
+				sprintf(
+					'<input type="text" id="%s" name="%s" value="%s"%s />',
+					esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']' ),
+					esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']' ),
+					defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ? constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) : $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ],
+					defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ? ' readonly="readonly"' : ''
+				),
+				array(
+					'input' => array(
+						'type'     => array(),
+						'id'       => array(),
+						'name'     => array(),
+						'value'    => array(),
+						'readonly' => array(),
+					),
+				)
+			);
+
+			echo '<br />';
+
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+
 			if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
-				$_gtm_preview_value = constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' );
-				$_input_readonly    = ' readonly="readonly"';
-				$_warning_after     = '<br /><span class="gtm_wpconfig_set">WARNING! Environment preview parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_PREVIEW constant!</span>';
-			} else {
-				$_gtm_preview_value = $gtm4wp_options[ GTM4WP_OPTION_ENV_GTM_PREVIEW ];
-				$_input_readonly    = '';
-				$_warning_after     = '';
+				echo '<br /><span class="gtm_wpconfig_set">WARNING! Environment preview parameter was set and fixed in wp-config.php. If you wish to change this value, please edit your wp-config.php and change the parameter value or remove the GTM4WP_HARDCODED_GTM_ENV_PREVIEW constant!</span>';
 			}
 
-			// $_input_readonly is not routed through any translation module, $args['description'] is escaped in admin-tab-*.php
-			echo '<input type="text" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_ENV_GTM_PREVIEW . ']' ) . '" value="' . esc_attr( $_gtm_preview_value ) . '" ';
-			echo $_input_readonly . '/><br />'; // phpcs:ignore
-			echo $args['description']; // phpcs:ignore
-			echo $_warning_after; // phpcs:ignore
 			echo '<br /><span class="gtmpreview_validation_error">' . esc_html__( 'This does not seems to be a valid gtm_preview parameter! It should have the format &quot;env-NN&quot; where NN is an integer number. Please check and try again', 'duracelltomi-google-tag-manager' ) . '</span>';
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']':
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']_0' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']' ) . '" value="0" ' . ( 0 === $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Disable feature: control everything on Google Tag Manager interface', 'duracelltomi-google-tag-manager' ) . '<br />';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']_1' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']' ) . '" value="1" ' . ( 1 === $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Allow all, except the checked items on all blacklist tabs (blacklist)', 'duracelltomi-google-tag-manager' ) . '<br />';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']_2' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_ENABLE . ']' ) . '" value="2" ' . ( 2 === $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Block all, except the checked items on all blacklist tabs (whitelist)', 'duracelltomi-google-tag-manager' ) . '<br />';
-			// $args['description'] is escaped in admin-tab-*.php
-			echo $args['description']; // phpcs:ignore
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INCLUDE_WEATHERUNITS . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INCLUDE_WEATHERUNITS . ']':
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INCLUDE_WEATHERUNITS . ']_0' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INCLUDE_WEATHERUNITS . ']' ) . '" value="0" ' . ( 0 === $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Celsius', 'duracelltomi-google-tag-manager' ) . '<br />';
 			echo '<input type="radio" id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INCLUDE_WEATHERUNITS . ']_1' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INCLUDE_WEATHERUNITS . ']' ) . '" value="1" ' . ( 1 === $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHERUNITS ] ? 'checked="checked"' : '' ) . '/> ' . esc_html__( 'Fahrenheit', 'duracelltomi-google-tag-manager' ) . '<br />';
-			// $args['description'] is escaped in admin-tab-*.php
-			echo $args['description']; // phpcs:ignore
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 
 			break;
-		}
 
-		case GTM4WP_ADMIN_GROUP_INFO: { // phpcs:ignore
-			// $args['description'] is escaped in admin-tab-*.php
-			echo $args['description']; // phpcs:ignore
+		case GTM4WP_ADMIN_GROUP_INFO:
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . ']':
 			echo '<select id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY . ']' ) . '">';
 			echo '<option value="">(not set)</option>';
 
@@ -334,26 +403,27 @@ function gtm4wp_admin_output_field( $args ) {
 			echo '</select>';
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . ']':
 			echo '<select id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL . ']' ) . '">';
 
 			foreach ( $gtm4wp_business_verticals as $vertical_id => $vertical_display_name ) {
 				echo '<option value="' . esc_attr( $vertical_id ) . '"' . esc_attr( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] === $vertical_id ? ' selected="selected"' : '' ) . '>' . esc_html( $vertical_display_name ) . '</option>';
 			}
 
-			// $args['description'] is escaped in admin-tab-*.php
-			echo '</select><br>' . $args['description']; // phpcs:ignore
+			echo '</select><br>';
+
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 
 			break;
-		}
 
-		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_NOGTMFORLOGGEDIN . ']': { // phpcs:ignore
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_NOGTMFORLOGGEDIN . ']':
 			$roles = get_editable_roles();
 
-			// $args['description'] is escaped in admin-tab-*.php
-			echo $args['description'] . '<br/><br/>'; // phpcs:ignore
+			// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+			echo '<br/><br/>';
 
 			$saved_roles = explode( ',', $gtm4wp_options[ GTM4WP_OPTION_NOGTMFORLOGGEDIN ] );
 
@@ -363,41 +433,37 @@ function gtm4wp_admin_output_field( $args ) {
 			}
 
 			break;
-		}
 
-		default: { // phpcs:ignore
+		default:
 			if ( preg_match( '/' . GTM4WP_OPTIONS . '\\[blacklist\\-[^\\]]+\\]/i', $args['label_for'] ) ) {
 				if ( 'blacklist-sandboxed' === $args['entityid'] ) {
 					echo '<input type="checkbox" id="' . esc_attr( $args['label_for'] ) . '" name="' . esc_attr( $args['label_for'] ) . '" value="1" ' . checked( 1, $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_SANDBOXED ], false ) . ' /><br />';
-					// $args['description'] is escaped in admin-tab-*.php
-					echo $args['description']; // phpcs:ignore
 				} else {
 					echo '<input type="checkbox" id="' . esc_attr( $args['label_for'] ) . '" name="' . esc_attr( $args['label_for'] ) . '" value="1" ' . checked( 1, in_array( $args['entityid'], $gtm4wp_options[ GTM4WP_OPTION_BLACKLIST_STATUS ], true ), false ) . ' /><br />';
-					// $args['description'] is escaped in admin-tab-*.php
-					echo $args['description']; // phpcs:ignore
 				}
+
+				// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+				echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 			} else {
 				$optval = $gtm4wp_options[ $args['optionfieldid'] ];
 
 				switch ( gettype( $optval ) ) {
 					case 'boolean':
-						// $args['description'] is escaped in admin-tab-*.php
 						echo '<input type="checkbox" id="' . esc_attr( GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']' ) . '" value="1" ' . checked( 1, $optval, false ) . ' /><br />';
-						echo $args['description']; // phpcs:ignore
 
 						break;
 
 					case 'integer':
 						echo '<input type="number" step="1" min="0" class="small-text" id="' . esc_attr( GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']' ) . '" value="' . esc_attr( $optval ) . '" /><br />';
-						// $args['description'] is escaped in admin-tab-*.php
-						echo $args['description']; // phpcs:ignore
 
 						break;
 
 					default:
 						echo '<input type="text" id="' . esc_attr( GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . $args['optionfieldid'] . ']' ) . '" value="' . esc_attr( $optval ) . '" size="80" /><br />';
-						echo $args['description']; // phpcs:ignore
-				}
+				} // end switch gettype optval
+
+				// gtm4wp_safe_admin_html_with_links() calls wp_kses().
+				echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
 
 				if ( isset( $args['plugintocheck'] ) && ( '' !== $args['plugintocheck'] ) ) {
 					if ( is_plugin_active( $args['plugintocheck'] ) ) {
@@ -422,8 +488,7 @@ function gtm4wp_admin_output_field( $args ) {
 						);
 					}
 				}
-			}  // end switch gettype optval
-		}
+			}
 	} // end switch args label_for
 }
 
@@ -458,10 +523,12 @@ function gtm4wp_sanitize_options( $options ) {
 			// clear oembed transients when feature is enabled because we need to hook into the oembed process to enable some 3rd party APIs.
 			if ( $output[ $optionname ] && ! $optionvalue ) {
 				if ( GTM4WP_OPTION_EVENTS_YOUTUBE === $optionname ) {
+					// TODO: replace with $wpdb->delete() https://developer.wordpress.org/reference/classes/wpdb/delete/.
 					$wpdb->query( "DELETE FROM $wpdb->postmeta WHERE meta_value LIKE '%youtube.com%' AND meta_key LIKE '_oembed_%'" ); // phpcs:ignore
 				}
 
 				if ( GTM4WP_OPTION_EVENTS_VIMEO === $optionname ) {
+					// TODO: replace with $wpdb->delete() https://developer.wordpress.org/reference/classes/wpdb/delete/.
 					$wpdb->query( "DELETE FROM $wpdb->postmeta WHERE meta_value LIKE '%vimeo.com%' AND meta_key LIKE '_oembed_%'" ); // phpcs:ignore
 				}
 			}
@@ -676,7 +743,7 @@ function gtm4wp_admin_init() {
 		GTM4WP_ADMIN_GROUP_GENERAL,
 		array(
 			'label_for'   => GTM4WP_ADMIN_GROUP_CONTAINERON,
-			'description' => esc_html__( 'Turning OFF the Google Tag Manager container itself will remove both the head and the body part of the container code but leave data layer codes working.<br/>This should be only used in specific cases where you need to place the container code manually or using another tool.', 'duracelltomi-google-tag-manager' ),
+			'description' => gtm4wp_safe_admin_html( 'Turning OFF the Google Tag Manager container itself will remove both the head and the body part of the container code but leave data layer codes working.<br/>This should be only used in specific cases where you need to place the container code manually or using another tool.', 'duracelltomi-google-tag-manager' ),
 		)
 	);
 
@@ -954,6 +1021,7 @@ function gtm4wp_add_admin_js( $hook ) {
 	global $gtp4wp_plugin_url;
 
 	if ( 'settings_page_' . GTM4WP_ADMINSLUG === $hook ) {
+		// phpcs ignore set due to in_footer set to true does not load the script.
 		wp_register_script( 'admin-subtabs', $gtp4wp_plugin_url . 'js/admin-subtabs.js', array(), GTM4WP_VERSION ); // phpcs:ignore
 
 		$subtabtexts = array(
@@ -979,6 +1047,8 @@ function gtm4wp_add_admin_js( $hook ) {
 		wp_localize_script( 'admin-subtabs', 'gtm4wp', $subtabtexts );
 
 		wp_enqueue_script( 'admin-subtabs' );
+
+		// phpcs ignore set due to in_footer set to true does not load the script.
 		wp_enqueue_script( 'admin-tabcreator', $gtp4wp_plugin_url . 'js/admin-tabcreator.js', array( 'jquery' ), GTM4WP_VERSION ); // phpcs:ignore
 
 		wp_enqueue_style( 'gtm4wp-admin-css', $gtp4wp_plugin_url . 'css/admin-gtm4wp.css', array(), GTM4WP_VERSION );
@@ -1308,7 +1378,7 @@ function gtm4wp_dismiss_notice() {
 	$noticeid = trim( basename( $noticeid ) );
 	if ( array_key_exists( $noticeid, $gtm4wp_user_notices_dismisses ) ) {
 		$gtm4wp_user_notices_dismisses[ $noticeid ] = true;
-		update_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, json_encode( $gtm4wp_user_notices_dismisses ) ); // phpcs:ignore
+		update_user_meta( $current_user->ID, GTM4WP_USER_NOTICES_KEY, wp_json_encode( $gtm4wp_user_notices_dismisses ) );
 	}
 }
 
