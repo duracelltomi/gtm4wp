@@ -24,7 +24,8 @@ define( 'GTM4WP_WPFILTER_AFTER_DATALAYER', 'gtm4wp_after_datalayer' );
  * Constant that 3rd party plugins can use as a WordPress filter to alter the generated
  * Google Tag Manager container code (both the regular and iframe/noscript code).
  *
- * @deprecated 1.16
+ * @deprecated 1.16 Instead of manipulating the GTM container code through this filter,
+ *                  turn off the container code in plugin options and add your modified code manually.
  */
 define( 'GTM4WP_WPFILTER_GETTHEGTMTAG', 'gtm4wp_get_the_gtm_tag' );
 
@@ -102,7 +103,7 @@ if ( ! function_exists( 'gtm4wp_amp_running' ) ) {
  */
 function gtm4wp_get_user_ip() {
 	if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-		foreach ( explode( ',', wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) as $ip ) { // phpcs:ignore
+		foreach ( explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) ) as $ip ) {
 			if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) !== false ) {
 				return $ip;
 			}
@@ -160,7 +161,7 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_DONOTTRACK ] ) {
 		if ( ! empty( $_SERVER['HTTP_DNT'] ) ) {
-			$data_layer['visitorDoNotTrack'] = (int) ( wp_unslash( $_SERVER['HTTP_DNT'] ) ); //phpcs:ignore
+			$data_layer['visitorDoNotTrack'] = (int) ( sanitize_text_field( wp_unslash( $_SERVER['HTTP_DNT'] ) ) );
 		} else {
 			$data_layer['visitorDoNotTrack'] = 0;
 		}
@@ -467,7 +468,7 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEOCF ] && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
-		$data_layer['geoCloudflareCountryCode'] = esc_js( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ); // phpcs:ignore
+		$data_layer['geoCloudflareCountryCode'] = esc_js( sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) );
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
@@ -697,6 +698,15 @@ height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"><
 	return $_gtm_tag;
 }
 
+add_filter(
+	'safe_style_css',
+	function( $styles ) {
+		$styles[] = 'display';
+		$styles[] = 'visibility';
+		return $styles;
+	}
+);
+
 /**
  * Outputs a HTML code that includes the noscript/iframe part of the Google Tag Manager container.
  * Can be used to manually place the snippet next to the opening body tag if the installed template
@@ -707,8 +717,19 @@ height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"><
  * @return void
  */
 function gtm4wp_the_gtm_tag() {
-	// escaping is done within the function call.
-	echo gtm4wp_get_the_gtm_tag(); //phpcs:ignore
+	echo wp_kses(
+		gtm4wp_get_the_gtm_tag(),
+		array(
+			'noscript' => array(),
+			'iframe'   => array(
+				'src'         => array(),
+				'height'      => array(),
+				'width'       => array(),
+				'style'       => array(),
+				'aria-hidden' => array(),
+			),
+		)
+	);
 }
 
 /**
@@ -1102,7 +1123,15 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 
 	if ( ! gtm4wp_amp_running() ) {
 		if ( $echo ) {
-			echo $_gtm_header_content; // phpcs:ignore
+			echo wp_kses(
+				$_gtm_header_content,
+				array(
+					'script' => array(
+						'data-cfasync'       => array(),
+						'data-cookieconsent' => array(),
+					),
+				)
+			);
 		} else {
 			return $_gtm_header_content;
 		}
@@ -1223,6 +1252,8 @@ add_action( 'fl_before_builder', 'gtm4wp_wp_body_open', 0 ); // Beaver Builder T
 add_action( 'wp_body_open', 'gtm4wp_wp_body_open' );
 
 add_filter( 'rocket_excluded_inline_js_content', 'gtm4wp_rocket_excluded_inline_js_content' ); // WP Rocket.
+
+// only activate WooCommerce integration for minimum supported WooCommerce version.
 if (
 	isset( $GLOBALS['gtm4wp_options'] ) &&
 	(
@@ -1230,8 +1261,8 @@ if (
 		$GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ]
 	) &&
 	isset( $GLOBALS['woocommerce'] ) &&
-	version_compare( WC()->version, '3.2', '>=' ) // only activate WooCommerce integration for minimum supported WooCommerce version.
-) { // phpcs:ignore
+	version_compare( WC()->version, '3.2', '>=' )
+) {
 	require_once dirname( __FILE__ ) . '/../integration/woocommerce.php';
 }
 
