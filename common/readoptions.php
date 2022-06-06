@@ -454,8 +454,8 @@ function gtm4wp_reload_options() {
 		$storedoptions = gtm4wp_migrate_blacklist_whitelist( $storedoptions );
 	}
 
-	// phpcs:ignore
 	$return_options = array_merge( $gtm4wp_defaultoptions, $storedoptions );
+
 	$return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] = explode( ',', $return_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] );
 
 	if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
