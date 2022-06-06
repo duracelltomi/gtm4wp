@@ -23,7 +23,7 @@ function gtm4wp_go_pagehiding_snippet() {
 	$gtm4wp_goid_pagehiding_list = array();
 	if ( count( $gtm4wp_goids ) > 0 ) {
 		foreach ( $gtm4wp_goids as $gtm4wp_onegoid ) {
-			$gtm4wp_goid_pagehiding_list[] = "'" . esc_js( $gtm4wp_onegoid ) . "': true";
+			$gtm4wp_goid_pagehiding_list[ esc_attr( $gtm4wp_onegoid ) ] = true;
 		}
 
 		$gtm4wp_gotimeout = (int) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT ];
@@ -51,7 +51,7 @@ function gtm4wp_go_pagehiding_snippet() {
 		h.end=null
 	},c);
 	h.timeout=c;
-})(window,document.documentElement,'async-hide','dataLayer'," . esc_js( $gtm4wp_gotimeout ) . ',{' . implode( ', ', $gtm4wp_goid_pagehiding_list ) . '});
+})(window,document.documentElement,'async-hide','dataLayer'," . esc_js( $gtm4wp_gotimeout ) . ',' . wp_json_encode( $gtm4wp_goid_pagehiding_list, JSON_FORCE_OBJECT ) . ');
 </script>
 <!-- GTM4WP: End of Google Optimize Page Hiding snippet -->';
 	}
@@ -71,6 +71,7 @@ function gtm4wp_go_snippet( $content ) {
 	$gtm4wp_goid_list = array();
 	if ( count( $gtm4wp_goids ) > 0 ) {
 		foreach ( $gtm4wp_goids as $gtm4wp_onegoid ) {
+			// phpcs ignore set due to wp_enqueue_script() can not handle custom script element attributes.
 			$gtm4wp_goid_list[] = '
 <script src="' . esc_url( 'https://www.googleoptimize.com/optimize.js?id=' . $gtm4wp_onegoid ) . '" onerror="dataLayer.hide.end && dataLayer.hide.end()"></script>'; // phpcs:ignore
 		}
