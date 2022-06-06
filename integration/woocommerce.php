@@ -717,7 +717,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 	} elseif ( is_order_received_page() ) {
 		$do_not_flag_tracked_order = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ] );
 
-		$order_id = filter_var( wp_unslash( isset( $_GET['order'] ) ? $_GET['order'] : '' ), FILTER_VALIDATE_INT ); // phpcs:ignore Supressing 'Processing form data without nonce verification.' message as there is no nonce accesible in this case.
+		// Supressing 'Processing form data without nonce verification.' message as there is no nonce accesible in this case.
+		$order_id = filter_var( wp_unslash( isset( $_GET['order'] ) ? $_GET['order'] : '' ), FILTER_VALIDATE_INT ); // phpcs:ignore
 		if ( ! $order_id & isset( $GLOBALS['wp']->query_vars['order-received'] ) ) {
 			$order_id = $GLOBALS['wp']->query_vars['order-received'];
 		}
@@ -728,7 +729,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			$order_id = $order_id_filtered;
 		}
 
-		$order_key = isset( $_GET['key'] ) ? wc_clean( wp_unslash( $_GET['key'] ) ) : ''; // phpcs:ignore
+		// Supressing 'Processing form data without nonce verification.' message as there is no nonce accesible in this case.
+		$order_key = isset( $_GET['key'] ) ? wc_clean( sanitize_text_field( wp_unslash( $_GET['key'] ) ) ) : ''; // phpcs:ignore
 		$order_key = apply_filters( 'woocommerce_thankyou_order_key', $order_key );
 
 		if ( $order_id > 0 ) {
@@ -1265,6 +1267,12 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 		$productitem = str_replace( 'href="', $productlink_with_data, $productitem );
 	}
 
+	/*
+	$productitem is initialized as the template itself outputs a product item.
+	Therefore I can not pass this to wp_kses() as it can include eventually any HTML.
+	This filter function only adds additional attributes to the link element that points
+	to a product detail page. Attribute values are escaped above.
+	*/
 	echo $productitem; // phpcs:ignore
 }
 
