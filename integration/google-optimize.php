@@ -62,7 +62,7 @@ function gtm4wp_go_pagehiding_snippet() {
  * Google Optimize can utilize content of the data layer.
  *
  * @param string $content The original content that can be extended by this hook.
- * @return string
+ * @return void
  */
 function gtm4wp_go_snippet( $content ) {
 	global $gtm4wp_options;
@@ -82,8 +82,16 @@ function gtm4wp_go_snippet( $content ) {
 <!-- GTM4WP: End of Load Google Optimize containers -->';
 	}
 
-	return $content;
+	echo wp_kses(
+		$content,
+		array(
+			'script' => array(
+				'src'     => array(),
+				'onerror' => array(),
+			),
+		)
+	);
 }
 
 add_action( 'wp_head', 'gtm4wp_go_pagehiding_snippet', 1 );
-add_filter( GTM4WP_WPFILTER_AFTER_DATALAYER, 'gtm4wp_go_snippet' );
+add_action( GTM4WP_WPACTION_AFTER_DATALAYER, 'gtm4wp_go_snippet' );
