@@ -244,6 +244,7 @@ The code has been formatted to better support readability for other programmers.
 Deprecated:
 * gtm4wp_get_the_gtm_tag hook and the corresponding GTM4WP_WPFILTER_GETTHEGTMTAG PHP constant.
 * gtm4wp_add_global_vars hook and the corresponding GTM4WP_WPFILTER_ADDGLOBALVARS PHP constant. Use gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY instead.
+* gtm4wp_after_datalayer hook and the corresponding GTM4WP_WPACTION_AFTER_DATALAYER PHP constant. Use gtm4wp_output_after_datalayer / GTM4WP_WPACTION_AFTER_DATALAYER instead witch can be used in the same way but it is an action instead of a filter.
 
 Upcoming version will come with important changes:
 * Minimum PHP version will be raised to 7.4: this will allow me to add even more safety measures
