@@ -875,7 +875,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	$_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
-	const gtm4wp_datalayer_name = "' . esc_js( $gtm4wp_datalayer_name ) . '";
+	var gtm4wp_datalayer_name = "' . esc_js( $gtm4wp_datalayer_name ) . '";
 	var ' . esc_js( $gtm4wp_datalayer_name ) . ' = ' . esc_js( $gtm4wp_datalayer_name ) . ' || [];';
 
 	// Load in the global variables from gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter.
