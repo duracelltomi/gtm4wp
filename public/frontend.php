@@ -689,11 +689,11 @@ function gtm4wp_get_the_gtm_tag() {
 		}
 
 		foreach ( $_gtm_codes as $one_gtm_id ) {
-			$gtm_id = preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id );
-
-			$_gtm_tag .= '
-<noscript><iframe src="https://' . $_gtm_domain_name . '/ns.html?id=' . $gtm_id . $_gtm_env . '"
-height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe></noscript>';
+			if ( preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id ) ) {
+				$_gtm_tag .= '
+				<noscript><iframe src="https://' . $_gtm_domain_name . '/ns.html?id=' . $one_gtm_id . $_gtm_env . '"
+				height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe></noscript>';
+			}
 		}
 
 		$_gtm_tag .= '
