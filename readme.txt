@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 5.6
 Tested up to: 6.0.0
-Stable tag: 1.16
+Stable tag: 1.16.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -234,6 +234,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.16.1 = 
+
+* Fixed: GTM ID not properly set in noscript tag (probably fixes some 403 errors with firewalls too)
 
 = 1.16 =
 
@@ -806,6 +810,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.16.1 =
+
+Bugfix release
 
 = 1.16 =
 
