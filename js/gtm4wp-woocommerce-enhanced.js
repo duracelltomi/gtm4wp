@@ -30,7 +30,7 @@ function gtm4wp_map_eec_to_ga4( productdata ) {
 	} else if ( category_parts.length > 1 ) {
 		ga4_product.item_category = category_parts[0];
 		for( let i=1; i < Math.min( 5, category_parts.length ); i++ ) {
-			ga4_product[ 'item_category_' + (i+1) ] = category_parts[i];
+			ga4_product[ 'item_category' + (i+1) ] = category_parts[i];
 		}
 	}
 

@@ -285,7 +285,7 @@ function gtm4wp_map_eec_to_ga4( $productdata ) {
 
 		$num_category_parts = min( 5, count( $category_parts ) );
 		for ( $i = 1; $i < $num_category_parts; $i++ ) {
-			$ga4_product[ 'item_category_' . (string) ( $i + 1 ) ] = $category_parts[ $i ];
+			$ga4_product[ 'item_category' . (string) ( $i + 1 ) ] = $category_parts[ $i ];
 		}
 	}
 
