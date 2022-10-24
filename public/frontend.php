@@ -680,12 +680,15 @@ function gtm4wp_get_the_gtm_tag() {
 			$_gtm_env = '';
 		}
 
-		$_gtm_domain_name = 'www.googletagmanager.com';
-		if (
-			( '' !== $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] ) &&
-			( preg_match( '/^[a-z0-9\.:]+$/', strtolower( $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] ) ) )
-		) {
-			$_gtm_domain_name = $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ];
+		// for PHP 7- compatibility.
+		if ( ! defined( 'FILTER_FLAG_HOSTNAME' ) ) {
+			define( 'FILTER_FLAG_HOSTNAME', 0 );
+		}
+
+		$_gtm_domain_test = ( '' === $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] ) ? 'www.googletagmanager.com' : strtolower( $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] );
+		$_gtm_domain_name = filter_var( $_gtm_domain_test, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
+		if ( false === $_gtm_domain_name ) {
+			$_gtm_domain_name = 'www.googletagmanager.com';
 		}
 
 		foreach ( $_gtm_codes as $one_gtm_id ) {
@@ -1087,12 +1090,15 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 				continue;
 			}
 
-			$_gtm_domain_name = 'www.googletagmanager.com';
-			if (
-				( '' !== $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] ) &&
-				( preg_match( '/^[a-z0-9\.:]+$/', strtolower( $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] ) ) )
-			) {
-				$_gtm_domain_name = $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ];
+			// for PHP 7- compatibility.
+			if ( ! defined( 'FILTER_FLAG_HOSTNAME' ) ) {
+				define( 'FILTER_FLAG_HOSTNAME', 0 );
+			}
+
+			$_gtm_domain_test = ( '' === $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] ) ? 'www.googletagmanager.com' : strtolower( $gtm4wp_options[ GTM4WP_OPTION_GTMDOMAIN ] );
+			$_gtm_domain_name = filter_var( $_gtm_domain_test, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
+			if ( false === $_gtm_domain_name ) {
+				$_gtm_domain_name = 'www.googletagmanager.com';
 			}
 
 			echo '
