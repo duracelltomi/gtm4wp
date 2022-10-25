@@ -241,6 +241,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Fixed: user login and user registration data layer events were swapped, thanks [danvy](https://github.com/danvy) for the fix
 * Fixed: JavaScript error in Chrome around event.target.closest calls, thanks [pinkasey](https://github.com/pinkasey) for the fix
 * Fixed: cast _ga_tracked variable as integer to make the identical operator work correctly, thanks [Irfan](https://github.com/in-codes) for the suggestion
+* Fixed: removed extra code added in 1.14 that reloads pages in Safari in WooCommerce integration. It broke some sites.
 
 = 1.16.1 = 
 

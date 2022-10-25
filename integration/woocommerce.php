@@ -1653,35 +1653,6 @@ function gtm4wp_add_productdata_to_wc_block( $content, $data, $product ) {
 	return preg_replace( '/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', '$0' . $product_data_tag, $content );
 }
 
-/**
- * Executed during wp_head with high priority.
- * Adds a JavaScript code that reloads the page in Safari if the user landed on the page using the back button of the browser.
- * Since the back button loads the previous state of the page instead of a new, clean state, some double tracking preventions
- * break the functionality of GTM4WP.
- *
- * @return void
- */
-function gtm4wp_woocommerce_header_top() {
-	global $gtm4wp_options;
-
-	$has_html5_support    = current_theme_supports( 'html5' );
-	$add_cookiebot_ignore = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
-
-	echo '<script' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . ">
-const gtm4wp_is_safari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-if ( gtm4wp_is_safari ) {
-	window.addEventListener('pageshow', function(event) {
-		if ( event.persisted ) {
-			// if Safari loads the page from cache usually by navigating with the back button
-			// it creates issues with product list click tracking
-			// therefore GTM4WP forces the page reload in this browser
-			window.location.reload();
-		}
-	});
-}
-</script>";
-}
-
 // do not add filter if someone enabled WooCommerce integration without an activated WooCommerce plugin.
 if ( function_exists( 'WC' ) ) {
 	add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_woocommerce_datalayer_filter_items' );
@@ -1719,7 +1690,5 @@ if ( function_exists( 'WC' ) ) {
 		add_action( 'woocommerce_shortcode_before_top_rated_products_loop', 'gtm4wp_before_top_rated_products_loop' );
 		add_action( 'woocommerce_shortcode_before_featured_products_loop', 'gtm4wp_before_featured_products_loop' );
 		add_action( 'woocommerce_shortcode_before_related_products_loop', 'gtm4wp_before_related_products_loop' );
-
-		add_action( 'wp_head', 'gtm4wp_woocommerce_header_top', 1, 0 );
 	}
 }
