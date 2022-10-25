@@ -235,6 +235,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.17 =
+
+* Fixed: server side GTM hostname did not work if domain name included a hyphen character
+
 = 1.16.1 = 
 
 * Fixed: GTM ID not properly set in noscript tag (probably fixes some 403 errors with firewalls too)
