@@ -801,7 +801,7 @@ function gtm4wp_wp_footer() {
 	$has_html5_support    = current_theme_supports( 'html5' );
 	$add_cookiebot_ignore = (bool) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) {
+	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) {
 		$user_logged_in = array_key_exists( 'gtm4wp_user_logged_in', $_COOKIE ) ?
 			filter_var( wp_unslash( $_COOKIE['gtm4wp_user_logged_in'] ), FILTER_VALIDATE_INT )
 			: 0;
@@ -820,7 +820,7 @@ function gtm4wp_wp_footer() {
 		}
 	}
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) {
+	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_NEWUSERREG ] ) {
 		$user_registered = array_key_exists( 'gtm4wp_user_registered', $_COOKIE ) ?
 			filter_var( wp_unslash( $_COOKIE['gtm4wp_user_registered'] ), FILTER_VALIDATE_INT )
 			: 0;
