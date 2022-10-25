@@ -13,7 +13,7 @@
  * Description: The first Google Tag Manager plugin for WordPress with business goals in mind
  * Version: 1.17.beta1
  * Requires at least: 3.4.0
- * Requires PHP: 5.6
+ * Requires PHP: 7.4
  * Author: Thomas Geiger
  * Author URI: https://gtm4wp.com/
  * License: GPLv3
