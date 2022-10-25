@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.0.0
-Stable tag: 1.16.1
+Stable tag: 1.16.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -232,7 +232,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
-= 1.17 =
+= 1.16.2 =
 
 * Fixed: server side GTM hostname did not work if domain name included a hyphen character
 * Fixed: user login and user registration data layer events were swapped, thanks [danvy](https://github.com/danvy) for the fix
@@ -816,6 +816,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.16.2 =
+
+Bugfix release
 
 = 1.16.1 =
 
