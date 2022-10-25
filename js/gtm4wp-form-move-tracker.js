@@ -1,5 +1,5 @@
 document.addEventListener("focusin", function(event) {
-	const elem = event && event.target && event.target.closest("input,select,textarea,button,meter,progress");
+	const elem = event && event.target && event.target.closest && event.target.closest("input,select,textarea,button,meter,progress");
 	if ( elem ) {
 		window[ gtm4wp_datalayer_name ].push({
 			'event'    : 'gtm4wp.formElementEnter',
@@ -16,7 +16,7 @@ document.addEventListener("focusin", function(event) {
 }, false);
 
 document.addEventListener("focusout", function(event) {
-	const elem = event && event.target && event.target.closest("input,select,textarea,button,meter,progress");
+	const elem = event && event.target && event.target.closest && event.target.closest("input,select,textarea,button,meter,progress");
 	if ( elem ) {
 		window[ gtm4wp_datalayer_name ].push({
 			'event'    : 'gtm4wp.formElementLeave',
