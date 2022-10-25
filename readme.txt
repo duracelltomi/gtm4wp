@@ -238,7 +238,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.17 =
 
 * Fixed: server side GTM hostname did not work if domain name included a hyphen character
-* Fixed: user login and user registration data layer events were swapped
+* Fixed: user login and user registration data layer events were swapped, thanks [danvy](https://github.com/danvy) for the fix
 
 = 1.16.1 = 
 
