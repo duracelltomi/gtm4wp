@@ -959,7 +959,7 @@ function gtm4wp_admin_init() {
 			'description' => '<strong>Thomas Geiger</strong><br />
 				Website: <a href="https://gtm4wp.com/" target="_blank" rel="noopener">gtm4wp.com</a><br />
 				<a href="https://www.linkedin.com/in/duracelltomi" target="_blank" rel="noopener">Me on LinkedIn</a><br />
-				<a href="http://www.linkedin.com/company/jabjab-online-marketing-ltd" target="_blank" rel="noopener">JabJab Online Marketing on LinkedIn</a>',
+				<a href="https://www.linkedin.com/company/jabjab-online-marketing/" target="_blank" rel="noopener">JabJab Online Marketing on LinkedIn</a>',
 		)
 	);
 
