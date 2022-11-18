@@ -661,7 +661,7 @@ function gtm4wp_get_the_gtm_tag() {
 <!-- GTM Container placement set to ' . esc_html( gtm4wp_get_container_placement_string() ) . ' -->
 <!-- Google Tag Manager (noscript) -->';
 
-	if ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
+	if ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] && apply_filters('gtm4wp_show_placement_off_warning', '__return_true') ) {
 		$gtm4wp_container_code_written = true;
 
 		$_gtm_tag .= '
