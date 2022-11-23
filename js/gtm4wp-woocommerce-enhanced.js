@@ -793,16 +793,12 @@ function gtm4wp_process_woocommerce_pages() {
 						'currency': gtm4wp_currency,
 						'items': [ gtm4wp_map_eec_to_ga4( product_data ) ]
 					},
-					'eventCallback': function() {
-						// In some strange cases, this callback is invoked while the user is navigating back from a product detail page.
-						// This will navigate the user back to the detail page immediatelly. To prevent this UX issue, we do some checks.
-						if ("loading" === document.readyState && window.performance && window.performance.getEntriesByType) {
-							const perf_nav = window.performance.getEntriesByType("navigation");
-							if (perf_nav && perf_nav.length>0 && "back_forward" === perf_nav[0].type) {
-								return;
-							}
+					'eventCallback': function( container_id ) {
+						if ( "undefined" !== typeof container_id && window.gtm4wp_first_container_id != container_id) {
+							// only call this for the first loaded container
+							return true;
 						}
-
+		
 						if ( ctrl_key_pressed && productpage_window ) {
 							productpage_window.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
 						} else {
