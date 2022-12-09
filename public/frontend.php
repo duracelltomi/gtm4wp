@@ -297,6 +297,21 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 					}
 				}
 			}
+
+			$post_meta = get_post_meta( $GLOBALS['post']->ID );
+			if ( is_array( $post_meta ) ) {
+				$data_layer['pagePostTerms'][ "meta" ] = array();
+				foreach( $post_meta as $post_meta_key => $post_meta_value ) {
+					if ( "_" !== substr( $post_meta_key, 0, 1 ) ) {
+						if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
+							$post_meta_dl_value = $post_meta_value[0];
+						} else {
+							$post_meta_dl_value = $post_meta_value;
+						}
+						$data_layer['pagePostTerms'][ "meta" ][ $post_meta_key ] = $post_meta_dl_value;
+					}
+				}
+			}
 		}
 	}
 
