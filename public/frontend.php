@@ -1116,8 +1116,8 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 				$_gtm_domain_name = 'www.googletagmanager.com';
 			}
 
-			$_gtm_domain_path_test      = ( '' === $gtm4wp_options[ GTM4WP_OPTION_GTMCUSTOMPATH ] ) ? 'gtm.js' : $gtm4wp_options[ GTM4WP_OPTION_GTMCUSTOMPATH ];
-			$_gtm_custom_path_has_error = (bool) preg_match( '/^[a-zA-Z0-9\.\-\_]+$/', $_gtm_domain_path_test );
+			$_gtm_domain_path           = ( '' === $gtm4wp_options[ GTM4WP_OPTION_GTMCUSTOMPATH ] ) ? 'gtm.js' : $gtm4wp_options[ GTM4WP_OPTION_GTMCUSTOMPATH ];
+			$_gtm_custom_path_has_error = (bool) preg_match( '/^[a-zA-Z0-9\.\-\_]+$/', $_gtm_domain_path );
 			if ( false === $_gtm_custom_path_has_error ) {
 				$_gtm_domain_path = 'gtm.js';
 			}
