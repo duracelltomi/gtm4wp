@@ -39,6 +39,11 @@ $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
 		'description' => esc_html__( 'Enter your custom domain name if you are using a server side GTM container for tracking. Do not include https:// prefix. Leave this blank to use www.googletagmanager.com', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+	GTM4WP_OPTION_GTMCUSTOMPATH    => array(
+		'label'       => esc_html__( 'Container custom path', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__( 'Enter a custom path for your custom domain name if it is not gtm.js. Do not include the / prefix. Leave this blank to use gtm.js', 'duracelltomi-google-tag-manager' ),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
 	GTM4WP_OPTION_NOGTMFORLOGGEDIN => array(
 		'label'       => esc_html__( 'User roles to exclude', 'duracelltomi-google-tag-manager' ),
 		'description' => esc_html__( 'Do not load GTM container on the frontend if role of the logged in user is any of this', 'duracelltomi-google-tag-manager' ),
