@@ -19,6 +19,7 @@ define( 'GTM4WP_OPTION_LOADEARLY', 'gtm-load-gtm-early' );
 define( 'GTM4WP_OPTION_GTMDOMAIN', 'gtm-domain-name' );
 define( 'GTM4WP_OPTION_GTMCUSTOMPATH', 'gtm-custom-path' );
 define( 'GTM4WP_OPTION_NOGTMFORLOGGEDIN', 'gtm-no-gtm-for-logged-in' );
+define( 'GTM4WP_OPTION_NOCONSOLELOG', 'gtm-no-console-log' );
 
 define( 'GTM4WP_OPTION_INCLUDE_LOGGEDIN', 'include-loggedin' );
 define( 'GTM4WP_OPTION_INCLUDE_USERROLE', 'include-userrole' );
@@ -153,6 +154,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_GTMDOMAIN                       => '',
 	GTM4WP_OPTION_GTMCUSTOMPATH                   => '',
 	GTM4WP_OPTION_NOGTMFORLOGGEDIN                => '',
+	GTM4WP_OPTION_NOCONSOLELOG                    => false,
 
 	GTM4WP_OPTION_INCLUDE_LOGGEDIN                => false,
 	GTM4WP_OPTION_INCLUDE_USERROLE                => false,

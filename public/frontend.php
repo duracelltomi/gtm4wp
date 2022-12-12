@@ -671,12 +671,13 @@ function gtm4wp_get_the_gtm_tag() {
 
 	$has_html5_support    = current_theme_supports( 'html5' );
 	$add_cookiebot_ignore = (bool) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
+	$no_console_log       = (bool) $gtm4wp_options[ GTM4WP_OPTION_NOCONSOLELOG ];
 
 	$_gtm_tag = '
 <!-- GTM Container placement set to ' . esc_html( gtm4wp_get_container_placement_string() ) . ' -->
 <!-- Google Tag Manager (noscript) -->';
 
-	if ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
+	if ( ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) && ( ! $no_console_log ) ) {
 		$gtm4wp_container_code_written = true;
 
 		$_gtm_tag .= '
@@ -967,6 +968,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 
 	$has_html5_support    = current_theme_supports( 'html5' );
 	$add_cookiebot_ignore = (bool) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
+	$no_console_log       = (bool) $gtm4wp_options[ GTM4WP_OPTION_NOCONSOLELOG ];
 
 	echo '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
@@ -1067,7 +1069,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	do_action( GTM4WP_WPACTION_AFTER_DATALAYER );
 
 	$output_container_code = true;
-	if ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) {
+	if ( ( GTM4WP_PLACEMENT_OFF === $gtm4wp_options[ GTM4WP_OPTION_GTM_PLACEMENT ] ) && ( ! $no_console_log ) ) {
 		$output_container_code = false;
 
 		echo '
@@ -1084,12 +1086,14 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 			if ( in_array( $user_role, $disabled_roles, true ) ) {
 				$output_container_code = false;
 
-				echo '
+				if ( ! $no_console_log ) {
+					echo '
 <script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
 	console.warn && console.warn("[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . esc_js( $user_role ) . ' !!!");
 	console.warn && console.warn("[GTM4WP] Logout or login with a user having a different user role!");
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
 </script>';
+				}
 
 				break;
 			}
