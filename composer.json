@@ -14,5 +14,8 @@
         "install-codestandards": [
             "Dealerdirect\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\Plugin::run"
         ]
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.7"
     }
 }
