@@ -1006,16 +1006,18 @@ function gtm4wp_show_admin_page() {
 
 /**
  * Hook function for admin_menu. Adds the plugin options page into the Settings menu of the WordPress admin.
+ * The capability can be changed with the gtm4wp_admin_page_capability filter.
  *
  * @see https://developer.wordpress.org/reference/hooks/admin_menu/
  *
  * @return void
  */
 function gtm4wp_add_admin_page() {
+	$capability = apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' );
 	add_options_page(
 		esc_html__( 'Google Tag Manager for WordPress settings', 'duracelltomi-google-tag-manager' ),
 		esc_html__( 'Google Tag Manager', 'duracelltomi-google-tag-manager' ),
-		'manage_options',
+		$capability,
 		GTM4WP_ADMINSLUG,
 		'gtm4wp_show_admin_page'
 	);
