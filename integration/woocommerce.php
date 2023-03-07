@@ -490,7 +490,7 @@ function gtm4wp_get_purchase_datalayer( $order, $order_items ) {
 		}
 	}
 
-	return $data_layer;
+	return apply_filters( 'gtm4wp_purchase_datalayer', $data_layer );
 }
 
 /**
@@ -969,7 +969,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 		}
 	}
 
-	return $data_layer;
+	return apply_filters( 'gtm4wp_datalayer_on_pageload', $data_layer );
 }
 
 /**
