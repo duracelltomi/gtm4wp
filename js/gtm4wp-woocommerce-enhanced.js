@@ -624,7 +624,8 @@ function gtm4wp_process_woocommerce_pages() {
 	document.addEventListener( 'click', function( e ) {
 		const dom_productdata = e.target;
 
-		if ( !dom_productdata || !dom_productdata.closest( '.mini_cart_item a.remove,.product-remove a.remove' ) ) {
+		dom_productdata = dom_productdata && dom_productdata.closest( '.mini_cart_item a.remove,.product-remove a.remove' );
+		if ( !dom_productdata ) {
 			return true;
 		}
 
