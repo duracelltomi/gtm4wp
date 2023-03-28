@@ -764,9 +764,10 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		const ctrl_key_pressed = e.ctrlKey || e.metaKey;
+		const target_new_tab = (matching_link_element.target === '_blank');
 
 		e.preventDefault();
-		if ( ctrl_key_pressed ) {
+		if ( ctrl_key_pressed || target_new_tab ) {
 			// we need to open the new tab/page here so that popup blocker of the browser doesn't block our code
 			window.productpage_window = window.open( 'about:blank', '_blank' );
 		}
@@ -800,7 +801,7 @@ function gtm4wp_process_woocommerce_pages() {
 							return true;
 						}
 		
-						if ( ctrl_key_pressed && productpage_window ) {
+						if ( ( target_new_tab || ctrl_key_pressed ) && productpage_window ) {
 							productpage_window.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
 						} else {
 							document.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
