@@ -424,9 +424,7 @@ function gtm4wp_get_purchase_datalayer( $order, $order_items ) {
 		 * @see https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager
 		 */
 		if ( $woo->customer instanceof WC_Customer ) {
-			// we need to use this instead of $woo->customer as this will load proper total order number and value from the database instead of the session.
-			$woo_customer               = new WC_Customer( $woo->customer->get_id() );
-			$data_layer['new_customer'] = $woo_customer->get_order_count() === 1;
+			$data_layer['new_customer'] = $order->is_returning_customer() === false;
 		}
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ] ) {

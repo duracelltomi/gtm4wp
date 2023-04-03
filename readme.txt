@@ -242,6 +242,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Added: new filter: gtm4wp_datalayer_on_pageload to be able to alter data layer content generated during page load
 * Updated: WooCommerce integration will also check target attitbute of product links while firing select_item event, thanks [robklo])(https://github.com/robklo)
 * Fixed: add_to_cart event on grouped products not working when SKU is selected as product ID in plugin options.
+* Fixed: more reliable new_customer flag working with guest orders of existing customers, thanks [morvy](https://github.com/morvy)
 
 = 1.16.2 =
 
