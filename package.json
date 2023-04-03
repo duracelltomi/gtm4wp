@@ -7,8 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "gulp",
-    "start": "node index.js"
+    "build": "gulp"
   },
   "repository": {
     "type": "git",
