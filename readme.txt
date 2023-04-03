@@ -235,6 +235,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.17 =
 
 * Added: pagePostTerms data layer variable will now also include a meta key with post meta values that does not start with the _ character. This should allow to utilize custom fields added by plugins like Advanced Custom Fields.
+* Added: new filter: gtm4wp_post_meta_in_datalayer to limit which post meta should be present with with the previously added feature.
 * Added: ability to use a custom path for your server side GTM container. This makes GTM4WP compatible with services like stape.io
 * Added: new advanced option to disable browser console.log() messages on frontend
 * Added: new filter: gtm4wp_purchase_datalayer to be able to alter data layer content for the purchase data

@@ -303,12 +303,30 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 				$data_layer['pagePostTerms']['meta'] = array();
 				foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
 					if ( '_' !== substr( $post_meta_key, 0, 1 ) ) {
-						if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
-							$post_meta_dl_value = $post_meta_value[0];
-						} else {
-							$post_meta_dl_value = $post_meta_value;
+
+						/**
+						 * Applies a filter to determine if post meta should be included in the data layer.
+						 * This function allows other plugins or themes to modify whether post meta should be included in the data layer
+						 * by applying a filter to the variable $include_post_meta_in_datalayer.
+						 *
+						 * @since 1.17
+						 *
+						 * @param string $gtm4wp_post_meta_in_datalayer The name of the filter to be applied.
+						 * @param bool $true_false_default The default value of $include_post_meta_in_datalayer (true).
+						 * @param string $post_meta_key The name of the post meta key to be included in the data layer.
+						 *
+						 * @return bool The final value of $include_post_meta_in_datalayer after the filter has been applied.
+						*/
+						$include_post_meta_in_datalayer = (bool) apply_filters( 'gtm4wp_post_meta_in_datalayer', true, $post_meta_key );
+
+						if ( $include_post_meta_in_datalayer ) {
+							if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
+								$post_meta_dl_value = $post_meta_value[0];
+							} else {
+								$post_meta_dl_value = $post_meta_value;
+							}
+							$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
 						}
-						$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
 					}
 				}
 			}
