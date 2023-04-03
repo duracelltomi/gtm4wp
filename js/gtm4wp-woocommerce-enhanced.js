@@ -764,7 +764,7 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		const ctrl_key_pressed = e.ctrlKey || e.metaKey;
-		const target_new_tab = (matching_link_element.target === '_blank');
+		const target_new_tab = ( '_blank' === matching_link_element.target );
 
 		e.preventDefault();
 		if ( ctrl_key_pressed || target_new_tab ) {

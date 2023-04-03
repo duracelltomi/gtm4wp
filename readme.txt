@@ -239,6 +239,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 * Added: new advanced option to disable browser console.log() messages on frontend
 * Added: new filter: gtm4wp_purchase_datalayer to be able to alter data layer content for the purchase data
 * Added: new filter: gtm4wp_datalayer_on_pageload to be able to alter data layer content generated during page load
+* Updated: WooCommerce integration will also check target attitbute of product links while firing select_item event, thanks [robklo])(https://github.com/robklo)
 
 = 1.16.2 =
 
