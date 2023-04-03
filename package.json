@@ -3,9 +3,6 @@
   "version": "1.17.0",
   "description": "The first Google Tag Manager plugin for WordPress with business goals in mind",
   "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
   "scripts": {
     "build": "gulp"
   },
@@ -14,9 +11,7 @@
     "url": "git+https://github.com/duracelltomi/gtm4wp.git"
   },
   "keywords": [
-    "google",
-    "tag",
-    "manager",
+    "google tag manager",
     "wordpress"
   ],
   "author": "Thomas Geiger",
