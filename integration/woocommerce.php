@@ -523,6 +523,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			$data_layer['customerBillingAddress1']  = $woo_customer->get_billing_address_1();
 			$data_layer['customerBillingAddress2']  = $woo_customer->get_billing_address_2();
 			$data_layer['customerBillingCity']      = $woo_customer->get_billing_city();
+			$data_layer['customerBillingRegion']    = $woo_customer->get_billing_region();
 			$data_layer['customerBillingPostcode']  = $woo_customer->get_billing_postcode();
 			$data_layer['customerBillingCountry']   = $woo_customer->get_billing_country();
 			$data_layer['customerBillingEmail']     = $woo_customer->get_billing_email();
@@ -535,6 +536,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			$data_layer['customerShippingAddress1']  = $woo_customer->get_shipping_address_1();
 			$data_layer['customerShippingAddress2']  = $woo_customer->get_shipping_address_2();
 			$data_layer['customerShippingCity']      = $woo_customer->get_shipping_city();
+			$data_layer['customerShippingRegion']    = $woo_customer->get_shipping_region();
 			$data_layer['customerShippingPostcode']  = $woo_customer->get_shipping_postcode();
 			$data_layer['customerShippingCountry']   = $woo_customer->get_shipping_country();
 		}
