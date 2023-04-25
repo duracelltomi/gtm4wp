@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 7.4
-Tested up to: 6.1.1
-Stable tag: 1.17
+Tested up to: 6.2
+Stable tag: 1.16
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
