@@ -36,8 +36,8 @@ if ( ! is_admin() ) {
 	$in_footer = (bool) apply_filters( 'gtm4wp_youtube', true );
 
 	if (
-		has_block( 'core-embed/youtube', $post )
-		|| ( strpos( $post->post_content, '<iframe' ) !== false && strpos( $post->post_content, 'youtu' ) !== false )
+		has_block( 'core-embed/youtube', $GLOBALS['post'] )
+		|| ( strpos( $GLOBALS['post']->post_content, '<iframe' ) !== false && strpos( $GLOBALS['post']->post_content, 'youtu' ) !== false )
 	) {
 		wp_enqueue_script( 'gtm4wp-youtube', $gtp4wp_plugin_url . 'js/gtm4wp-youtube.js', array(), GTM4WP_VERSION, $in_footer );
 	}
