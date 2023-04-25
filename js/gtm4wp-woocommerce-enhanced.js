@@ -622,7 +622,7 @@ function gtm4wp_process_woocommerce_pages() {
 
 	// track remove links in mini cart widget and on cart page
 	document.addEventListener( 'click', function( e ) {
-		const dom_productdata = e.target;
+		let dom_productdata = e.target;
 
 		dom_productdata = dom_productdata && dom_productdata.closest( '.mini_cart_item a.remove,.product-remove a.remove' );
 		if ( !dom_productdata ) {
