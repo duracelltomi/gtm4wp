@@ -49,3 +49,27 @@ function gtm4wp_init() {
 	}
 }
 add_action( 'plugins_loaded', 'gtm4wp_init' );
+
+/**
+ * Adds an action to declare compatibility with High Performance Order Storage (HPOS)
+ * before WooCommerce initialization.
+ *
+ * @since 1.17
+ *
+ * @param string   $hook_name  The name of the action to which the callback function is hooked.
+ * @param callable $callback   The callback function to be executed when the action is run.
+ * @param int      $priority   Optional. The order in which the callback functions are executed. Default is 10.
+ * @param int      $args_count Optional. The number of arguments the callback accepts. Default is 1.
+ *
+ * @return void
+ */
+add_action(
+	'before_woocommerce_init',
+	function() {
+		// Check if the FeaturesUtil class exists in the \Automattic\WooCommerce\Utilities namespace.
+		if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
+			// Declare compatibility with custom order tables using the FeaturesUtil class.
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+		}
+	}
+);
