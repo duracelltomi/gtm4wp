@@ -11,7 +11,7 @@
  * Plugin Name: GTM4WP
  * Plugin URI: https://gtm4wp.com/
  * Description: The first Google Tag Manager plugin for WordPress with business goals in mind
- * Version: 1.17
+ * Version: 1.17-beta1
  * Requires at least: 3.4.0
  * Requires PHP: 7.4
  * Author: Thomas Geiger
@@ -22,10 +22,10 @@
  * Domain Path: /languages
 
  * WC requires at least: 5.0
- * WC tested up to: 7.1
+ * WC tested up to: 7.6
  */
 
-define( 'GTM4WP_VERSION', '1.17' );
+define( 'GTM4WP_VERSION', '1.17-beta1' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
 
 global $gtp4wp_plugin_url, $gtp4wp_plugin_basename;
