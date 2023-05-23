@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.2
-Stable tag: 1.16
+Stable tag: 1.17
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -160,6 +160,7 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 		*	implementation of [Enhanced E-commerce GA4](https://developers.google.com/tag-manager/ecommerce-ga4)
 		* Does not support promotions since WooCommerce does not have such a feature (yet)
 		* Does not support refunds
+  * Compatibility with High Performance Order Storage (HPOS)
 * Google Optimize: load your Google Optimize container directly from your website with the ability to use the data layer variables provided during page load
 * AMP: load your AMP container on the AMP version of your pages
 
