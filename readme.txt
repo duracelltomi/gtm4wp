@@ -237,6 +237,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 * Updated: WordPress and WooCommerce compatibility
 * Updated: Deprecated Google Optimize integration as the tool is sunsetting in September 2023
+* Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
 
 = 1.17 =
 

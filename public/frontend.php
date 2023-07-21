@@ -589,7 +589,19 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 function gtm4wp_wp_loaded() {
 	global $gtm4wp_options;
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
+	/**
+	 * GeoIP functionality can be disabled per user by setting the block_gtm4wp_geoip cookie to either "true", "on", "yes" or "1".
+	 * Use this to integrate the feature with your consent manager tool. When user do not accept a specific cookie category, place
+	 * this cookie and for that particular user the GeoIP (and weather API) feature will be not activated.
+	 */
+	if ( isset( $_COOKIE['block_gtm4wp_geoip'] ) ) {
+		$blocking_cookie = filter_var( wp_unslash( $_COOKIE['block_gtm4wp_geoip'] ), FILTER_VALIDATE_BOOLEAN );
+	}
+
+	if (
+		( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] )
+		&& ( ! $blocking_cookie )
+	) {
 		$client_ip = gtm4wp_get_user_ip();
 		$geodata   = get_transient( 'gtm4wp-geodata-' . esc_attr( $client_ip ) );
 
