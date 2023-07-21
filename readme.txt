@@ -236,6 +236,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.17.1 =
 
 * Updated: WordPress and WooCommerce compatibility
+* Updated: Deprecated Google Optimize integration as the tool is sunsetting in September 2023
 
 = 1.17 =
 
