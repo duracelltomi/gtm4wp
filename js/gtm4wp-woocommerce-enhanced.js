@@ -365,6 +365,7 @@ function gtm4wp_process_woocommerce_pages() {
 				ga4_chunk = ga4_products.splice( 0, gtm4wp_product_per_impression );
 
 				// fire ga3 version
+				window[ gtm4wp_datalayer_name ].push({ecommerce: null});
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'gtm4wp.productImpressionEEC',
 					'ecommerce': {
@@ -374,6 +375,7 @@ function gtm4wp_process_woocommerce_pages() {
 				});
 
 				// fire ga4 version
+				window[ gtm4wp_datalayer_name ].push({ecommerce: null});
 				window[ gtm4wp_datalayer_name ].push({
 					'event': 'view_item_list',
 					'ecommerce': {
