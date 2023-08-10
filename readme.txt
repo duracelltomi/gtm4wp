@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.3
-Stable tag: 1.17.1
+Stable tag: 1.18
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -233,7 +233,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
-= 1.17.1 =
+= 1.18 =
 
 * Updated: WordPress and WooCommerce compatibility
 * Updated: Deprecated Google Optimize integration as the tool is sunsetting in September 2023
@@ -838,6 +838,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.18 =
+
+Bugfixes and new features
 
 = 1.17 =
 
