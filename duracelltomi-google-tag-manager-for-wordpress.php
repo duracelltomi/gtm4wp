@@ -22,7 +22,7 @@
  * Domain Path: /languages
 
  * WC requires at least: 5.0
- * WC tested up to: 7.9
+ * WC tested up to: 8.0
  */
 
 define( 'GTM4WP_VERSION', '1.18' );
