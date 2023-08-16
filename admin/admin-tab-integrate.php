@@ -64,7 +64,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL    => array(
 		'label'       => esc_html__( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
-		'description' => esc_html__( 'Enable this option to include the content of the cart in the data layer on each page. Needs WooCommerce v3.2 or newer. Especially useful for site personalization with Google Optimize.', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__( 'Enable this option to include the content of the cart in the data layer on each page. Needs WooCommerce v3.2 or newer. Especially useful for site personalization tools.', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => array(
@@ -169,12 +169,12 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 				'duracelltomi-google-tag-manager'
 			) .
 			'</span>',
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => array(
 		'label'       => esc_html__( 'Google Optimize page-hiding timeout', 'duracelltomi-google-tag-manager' ),
 		'description' => esc_html__( 'Enter here the amount of time in milliseconds that the page-hiding snippet should wait before page content gets visible even if Google Optimize has not been completely loaded yet.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => array(

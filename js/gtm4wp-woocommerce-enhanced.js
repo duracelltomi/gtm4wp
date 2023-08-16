@@ -535,7 +535,7 @@ function gtm4wp_process_woocommerce_pages() {
 			let sum_value = 0;
 
 			products_in_group.forEach( function( dom_productdata ) {
-				const product_qty_input = document.querySelectorAll( 'input[name=quantity\\[' + dom_productdata.getAttribute( 'data-gtm4wp_product_id' ) + '\\]]' );
+				const product_qty_input = document.querySelectorAll( 'input[name=quantity\\[' + dom_productdata.getAttribute( 'data-gtm4wp_product_internal_id' ) + '\\]]' );
 				if ( product_qty_input.length > 0 ) {
 					product_qty = (product_qty_input[0] && product_qty_input[0].value) || 1;
 				} else {
@@ -622,7 +622,7 @@ function gtm4wp_process_woocommerce_pages() {
 
 	// track remove links in mini cart widget and on cart page
 	document.addEventListener( 'click', function( e ) {
-		const dom_productdata = e.target;
+		let dom_productdata = e.target;
 
 		dom_productdata = dom_productdata && dom_productdata.closest( '.mini_cart_item a.remove,.product-remove a.remove' );
 		if ( !dom_productdata ) {

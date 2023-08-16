@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
 Requires at least: 3.4.0
 Requires PHP: 7.4
-Tested up to: 6.1.1
-Stable tag: 1.17
+Tested up to: 6.3
+Stable tag: 1.18
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -160,6 +160,7 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 		*	implementation of [Enhanced E-commerce GA4](https://developers.google.com/tag-manager/ecommerce-ga4)
 		* Does not support promotions since WooCommerce does not have such a feature (yet)
 		* Does not support refunds
+  * Compatibility with High Performance Order Storage (HPOS)
 * Google Optimize: load your Google Optimize container directly from your website with the ability to use the data layer variables provided during page load
 * AMP: load your AMP container on the AMP version of your pages
 
@@ -232,14 +233,28 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.18 =
+
+* Fixed: error while checking the new customer status in WooCommerce on the order received page (thanks [morvy](https://github.com/morvy))
+* Fixed: Call to a member function get_meta() on null error on WooCommerce order received page (thanks [Dekadinious](https://github.com/Dekadinious))
+* Updated: WordPress and WooCommerce compatibility
+* Updated: Deprecated Google Optimize integration as the tool is sunsetting in September 2023
+* Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
+
 = 1.17 =
 
 * Added: pagePostTerms data layer variable will now also include a meta key with post meta values that does not start with the _ character. This should allow to utilize custom fields added by plugins like Advanced Custom Fields.
+* Added: new filter: gtm4wp_post_meta_in_datalayer to limit which post meta should be present with with the previously added feature.
 * Added: ability to use a custom path for your server side GTM container. This makes GTM4WP compatible with services like stape.io
 * Added: new advanced option to disable browser console.log() messages on frontend
 * Added: new filter: gtm4wp_purchase_datalayer to be able to alter data layer content for the purchase data
 * Added: new filter: gtm4wp_datalayer_on_pageload to be able to alter data layer content generated during page load
+* Added: customerBillingState and customerShippingState on WooCommerce order received page, thanks [massimo-maimeri](https://github.com/massimo-maimeri)
+* Added: High Performance Order Storage (HPOS) compatibility for WooCommerce
 * Updated: WooCommerce integration will also check target attitbute of product links while firing select_item event, thanks [robklo])(https://github.com/robklo)
+* Updated: YouTube tracking will not load on pages not containing a YouTube block or a YouTube iframe
+* Fixed: add_to_cart event on grouped products not working when SKU is selected as product ID in plugin options.
+* Fixed: more reliable new_customer flag working with guest orders of existing customers, thanks [morvy](https://github.com/morvy)
 
 = 1.16.2 =
 
@@ -825,6 +840,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.18 =
+
+Bugfixes and new features
 
 = 1.17 =
 
