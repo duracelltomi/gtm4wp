@@ -798,16 +798,16 @@ function gtm4wp_the_gtm_tag() {
  * @return void
  */
 function gtm4wp_enqueue_scripts() {
-	global $gtm4wp_options, $gtp4wp_plugin_url;
+	global $gtm4wp_options, $gtp4wp_script_path;
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WPCF7 ] ) {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WPCF7, true );
-		wp_enqueue_script( 'gtm4wp-contact-form-7-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-contact-form-7-tracker.js', array(), GTM4WP_VERSION, $in_footer );
+		wp_enqueue_script( 'gtm4wp-contact-form-7-tracker', $gtp4wp_script_path . 'gtm4wp-contact-form-7-tracker.js', array(), GTM4WP_VERSION, $in_footer );
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_FORMMOVE ] ) {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_FORMMOVE, true );
-		wp_enqueue_script( 'gtm4wp-form-move-tracker', $gtp4wp_plugin_url . 'js/gtm4wp-form-move-tracker.js', array(), GTM4WP_VERSION, $in_footer );
+		wp_enqueue_script( 'gtm4wp-form-move-tracker', $gtp4wp_script_path . 'gtm4wp-form-move-tracker.js', array(), GTM4WP_VERSION, $in_footer );
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_EVENTS_YOUTUBE ] ) {
@@ -824,7 +824,7 @@ function gtm4wp_enqueue_scripts() {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_SCROLLER_ENABLED, false );
-		wp_enqueue_script( 'gtm4wp-scroll-tracking', $gtp4wp_plugin_url . 'js/analytics-talk-content-tracking.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
+		wp_enqueue_script( 'gtm4wp-scroll-tracking', $gtp4wp_script_path . 'analytics-talk-content-tracking.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
 	}
 }
 

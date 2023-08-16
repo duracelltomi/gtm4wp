@@ -1,0 +1,31 @@
+{
+  "name": "gtm4wp",
+  "version": "1.17.0",
+  "description": "The first Google Tag Manager plugin for WordPress with business goals in mind",
+  "main": "index.js",
+  "scripts": {
+    "build": "gulp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duracelltomi/gtm4wp.git"
+  },
+  "keywords": [
+    "google tag manager",
+    "wordpress"
+  ],
+  "author": "Thomas Geiger",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/duracelltomi/gtm4wp/issues"
+  },
+  "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
+  "devDependencies": {
+    "@babel/core": "^7.21.4",
+    "@babel/preset-env": "^7.21.4",
+    "gulp": "^4.0.2",
+    "gulp-babel": "^8.0.0",
+    "gulp-clean-dir": "^1.0.2",
+    "gulp-uglify": "^3.0.2"
+  }
+}
