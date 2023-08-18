@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.3
-Stable tag: 1.18
+Stable tag: 1.18.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -232,6 +232,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.18.1 =
+
+* Fixed: PHP notice about Undefined variable: blocking_cookie
 
 = 1.18 =
 
@@ -840,6 +844,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.18.1 =
+
+Bugfix release
 
 = 1.18 =
 

@@ -594,6 +594,7 @@ function gtm4wp_wp_loaded() {
 	 * Use this to integrate the feature with your consent manager tool. When user do not accept a specific cookie category, place
 	 * this cookie and for that particular user the GeoIP (and weather API) feature will be not activated.
 	 */
+	$blocking_cookie = false;
 	if ( isset( $_COOKIE['block_gtm4wp_geoip'] ) ) {
 		$blocking_cookie = filter_var( wp_unslash( $_COOKIE['block_gtm4wp_geoip'] ), FILTER_VALIDATE_BOOLEAN );
 	}
