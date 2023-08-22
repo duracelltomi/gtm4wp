@@ -25,7 +25,7 @@
  * WC tested up to: 8.0
  */
 
-define( 'GTM4WP_VERSION', '1.18' );
+define( 'GTM4WP_VERSION', '1.18.1' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
 
 global $gtp4wp_plugin_url, $gtp4wp_plugin_basename;
