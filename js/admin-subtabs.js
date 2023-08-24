@@ -80,6 +80,10 @@ var adminsubtabs = {
 		"int-cookiebot": {
 			tabtext: gtm4wp.cookiebottabtitle,
 			numitems: 1
+		},
+		"int-consentmode": {
+			tabtext: gtm4wp.consentmodetabtitle,
+			numitems: 6
 		}
 	}
 };
