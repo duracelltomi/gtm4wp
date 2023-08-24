@@ -233,6 +233,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.19 =
+
+* Added: support for Google Consent Mode default command for use cases where the consent management tool does not support it already
+
 = 1.18.1 =
 
 * Fixed: PHP notice about Undefined variable: blocking_cookie
@@ -844,6 +848,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.19 =
+
+Added features
 
 = 1.18.1 =
 
