@@ -250,6 +250,8 @@ Instead of the above events, you can use the new GA4 ecommerce events (add_to_ca
 In the Universal Analytics GTM tag now you have an option to use the GA4 ecommerce data in the data layer.
 If you are on GA360 and still collecting ecommerce data, you need to update your GTM setup to use that option firing on the GA4 ecommerce events.
 
+* Updated: use the gtm4wp_admin_page_capability filter to modify the capability needed to use the admin page (thanks [emreerkan](https://github.com/emreerkan))
+
 = 1.18.1 =
 
 * Fixed: PHP notice about Undefined variable: blocking_cookie

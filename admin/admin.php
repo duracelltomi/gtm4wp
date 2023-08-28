@@ -1014,6 +1014,7 @@ function gtm4wp_show_admin_page() {
  */
 function gtm4wp_add_admin_page() {
 	$capability = apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' );
+
 	add_options_page(
 		esc_html__( 'Google Tag Manager for WordPress settings', 'duracelltomi-google-tag-manager' ),
 		esc_html__( 'Google Tag Manager', 'duracelltomi-google-tag-manager' ),
