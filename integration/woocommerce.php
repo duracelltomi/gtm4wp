@@ -272,7 +272,7 @@ function gtm4wp_map_eec_to_ga4( $productdata ) {
 
 	// Default, required parameters.
 	$ga4_product = array(
-		'item_id'    => array_key_exists( 'id', $productdata ) ? $productdata['id'] : '',
+		'item_id'    => array_key_exists( 'id', $productdata ) ? (string) $productdata['id'] : '',
 		'item_name'  => array_key_exists( 'name', $productdata ) ? $productdata['name'] : '',
 		'item_brand' => array_key_exists( 'brand', $productdata ) ? $productdata['brand'] : '',
 		'price'      => array_key_exists( 'price', $productdata ) ? $productdata['price'] : '',
