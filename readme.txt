@@ -233,6 +233,23 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.19 =
+
+WARNING!
+Universal Analytics / GA3 ecommerce events **deprecated**!
+Please update your GTM setup so that it does not rely on any of the following GTM4WP events and the old ecommerce data layer:
+* gtm4wp.productClickEEC
+* gtm4wp.addProductToCartEEC
+* gtm4wp.removeFromCartEEC
+* gtm4wp.checkoutOptionEEC
+* gtm4wp.checkoutStepEEC
+* gtm4wp.changeDetailViewEEC
+* gtm4wp.orderCompletedEEC
+
+Instead of the above events, you can use the new GA4 ecommerce events (add_to_cart, purchase, etc.)
+In the Universal Analytics GTM tag now you have an option to use the GA4 ecommerce data in the data layer.
+If you are on GA360 and still collecting ecommerce data, you need to update your GTM setup to use that option firing on the GA4 ecommerce events.
+
 = 1.18.1 =
 
 * Fixed: PHP notice about Undefined variable: blocking_cookie
