@@ -121,27 +121,47 @@ function gtm4wp_get_product_category_hierarchy( $category_id ) {
  * @return string The first category name of the product. Incluldes the name of parent categories if the $fullpath parameter is set to true.
  */
 function gtm4wp_get_product_category( $product_id, $fullpath = false ) {
-	$product_cat = '';
+	$product_category     = '';
+	$wp_category_taxonomy = 'product_cat';
 
-	$_product_cats = wp_get_post_terms(
-		$product_id,
-		'product_cat',
-		array(
-			'orderby' => 'parent',
-			'order'   => 'ASC',
-		)
-	);
+	$primary_category_id = false;
+	$category_data       = false;
 
-	if ( ( is_array( $_product_cats ) ) && ( count( $_product_cats ) > 0 ) ) {
-		$first_product_cat = array_pop( $_product_cats );
-		if ( $fullpath ) {
-			$product_cat = gtm4wp_get_product_category_hierarchy( $first_product_cat->term_id );
-		} else {
-			$product_cat = $first_product_cat->name;
+	if ( function_exists( 'yoast_get_primary_term_id' ) ) {
+		$primary_category_id = yoast_get_primary_term_id( $wp_category_taxonomy, $product_id );
+	} elseif ( function_exists( 'rank_math' ) ) {
+		$rank_math_data = get_post_meta( $product_id, 'rank_math_primary_' . $wp_category_taxonomy, true );
+		if ( ! empty( $rank_math_data ) && intval( $rank_math_data ) ) {
+			$primary_category_id = $rank_math_data;
 		}
 	}
 
-	return $product_cat;
+	if ( false === $primary_category_id ) {
+		$product_categories = wp_get_post_terms(
+			$product_id,
+			$wp_category_taxonomy,
+			array(
+				'orderby' => 'parent',
+				'order'   => 'ASC',
+			)
+		);
+
+		if ( ( is_array( $product_categories ) ) && ( count( $product_categories ) > 0 ) ) {
+			$category_data = array_pop( $product_categories );
+		}
+	} else {
+		$category_data = get_term( $primary_category_id, $wp_category_taxonomy );
+	}
+
+	if ( false !== $category_data ) {
+		if ( $fullpath ) {
+			$product_category = gtm4wp_get_product_category_hierarchy( $category_data->term_id );
+		} else {
+			$product_category = $category_data->name;
+		}
+	}
+
+	return $product_category;
 }
 
 /**

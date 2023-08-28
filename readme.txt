@@ -250,6 +250,8 @@ Instead of the above events, you can use the new GA4 ecommerce events (add_to_ca
 In the Universal Analytics GTM tag now you have an option to use the GA4 ecommerce data in the data layer.
 If you are on GA360 and still collecting ecommerce data, you need to update your GTM setup to use that option firing on the GA4 ecommerce events.
 
+* Updated: WooCommerce integration now accepts the primary category selection of Yoast SEO and Rank Math SEO
+
 = 1.18.1 =
 
 * Fixed: PHP notice about Undefined variable: blocking_cookie
