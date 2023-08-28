@@ -398,6 +398,7 @@ function gtm4wp_woocommerce_addglobalvars( $return ) {
 	$return['gtm4wp_needs_shipping_address'] = (bool) $gtm4wp_needs_shipping_address;
 	$return['gtm4wp_business_vertical']      = esc_js( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] );
 	$return['gtm4wp_business_vertical_id']   = gtm4wp_get_gads_product_id_variable_name( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] );
+	$return['gtm4wp_clear_ecommerce']        = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ] );
 
 	return $return;
 }
