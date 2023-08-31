@@ -349,7 +349,7 @@ function gtm4wp_process_order_items( $order ) {
 				continue;
 			}
 
-			$product       = $item->get_product();
+			$product       = apply_filters('woocommerce_order_item_product', $item->get_product(), $item);
 			$inc_tax       = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
 			$product_price = round( (float) $order->get_item_total( $item, $inc_tax ), 2 );
 
