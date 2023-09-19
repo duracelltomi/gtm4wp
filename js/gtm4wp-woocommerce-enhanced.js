@@ -18,7 +18,7 @@ function gtm4wp_map_eec_to_ga4( productdata ) {
 
 	// default, required parameters
 	let ga4_product = {
-		'item_id': productdata.id ? productdata.id : '',
+		'item_id': productdata.id ? productdata.id.toString() : '',
 		'item_name': productdata.name ? productdata.name : '',
 		'item_brand': productdata.brand ? productdata.brand : '',
 		'price': productdata.price ? productdata.price : ""
