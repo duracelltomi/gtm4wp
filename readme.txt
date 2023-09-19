@@ -254,6 +254,7 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 * Updated: use the gtm4wp_admin_page_capability filter to modify the capability needed to use the admin page (thanks [emreerkan](https://github.com/emreerkan))
 * Fixed: price did not include the .00 postfix for integers in the add_to_cart event
 * Added: if needed, you can turn on clearing the ecommerce object before a new GA4 event is being pushed.
+* Added: support for Google Consent Mode default command for use cases where the consent management tool does not support it already
 
 = 1.18.1 =
 
@@ -866,6 +867,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.19 =
+
+Added features
 
 = 1.18.1 =
 

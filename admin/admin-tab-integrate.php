@@ -231,4 +231,60 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => array(
+		'label'       => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
+		'description' => sprintf(
+			// translators: 1: opening anchor tag linking to Google's documentation about the consent mode command. 2: Closing anchor tag.
+			gtm4wp_safe_admin_html(
+				'Enable this checkbox if you wish to execute the "default" command of %1$sGoogle Consent Mode%2$s before the container loads.
+				The "update" command needs to be executed from your consent management tool.<br /><br />
+				DO NOT enable this feature if your consent manager tool supports firing both the "default" and the "update" command.',
+				'duracelltomi-google-tag-manager'
+			),
+			'<a href="https://developers.google.com/tag-platform/gtagjs/reference#consent" target="_blank" rel="noopener">',
+			'</a>'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS       => array(
+		'label'       => esc_html__( 'Ad Storage', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__(
+			'Select thic checkbox to make the ad_storage flag "granted" by default.',
+			'duracelltomi-google-tag-manager'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => array(
+		'label'       => esc_html__( 'Analytics Storage', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__(
+			'Select thic checkbox to make the ad_storage flag "granted" by default.',
+			'duracelltomi-google-tag-manager'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO     => array(
+		'label'       => esc_html__( 'Personalization Storage', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__(
+			'Select thic checkbox to make the ad_storage flag "granted" by default.',
+			'duracelltomi-google-tag-manager'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC      => array(
+		'label'       => esc_html__( 'Functionality Storage', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__(
+			'Select thic checkbox to make the ad_storage flag "granted" by default.',
+			'duracelltomi-google-tag-manager'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY  => array(
+		'label'       => esc_html__( 'Security Storage', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__(
+			'Select thic checkbox to make the ad_storage flag "granted" by default.',
+			'duracelltomi-google-tag-manager'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
 );

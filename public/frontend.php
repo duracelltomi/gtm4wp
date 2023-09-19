@@ -1131,6 +1131,23 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		}
 	}
 
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE ] ) {
+		echo '
+<script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
+		if (typeof gtag == "undefined") {
+			function gtag(){dataLayer.push(arguments);}
+		}
+
+		gtag("consent", "default", {
+			"ad_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ] ? 'granted' : 'denied' ) . '",
+			"analytics_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ] ? 'granted' : 'denied' ) . '",
+			"personalization_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO ] ? 'granted' : 'denied' ) . '",
+			"functionality_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC ] ? 'granted' : 'denied' ) . '",
+			"security_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY ] ? 'granted' : 'denied' ) . '",
+		});
+</script>';
+	}
+
 	if ( ( '' !== $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) && $output_container_code ) {
 		$_gtm_codes = explode( ',', str_replace( array( ';', ' ' ), array( ',', '' ), $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) );
 

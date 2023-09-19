@@ -433,7 +433,6 @@ function gtm4wp_admin_output_field( $args ) {
 			}
 
 			break;
-
 		default:
 			if ( preg_match( '/' . GTM4WP_OPTIONS . '\\[blacklist\\-[^\\]]+\\]/i', $args['label_for'] ) ) {
 				if ( 'blacklist-sandboxed' === $args['entityid'] ) {
@@ -1058,6 +1057,7 @@ function gtm4wp_add_admin_js( $hook ) {
 			'depecratedeventstabtitle' => esc_html__( 'Deprecated', 'duracelltomi-google-tag-manager' ),
 			'sitetabtitle'             => esc_html__( 'Site', 'duracelltomi-google-tag-manager' ),
 			'misctabtitle'             => esc_html__( 'Misc', 'duracelltomi-google-tag-manager' ),
+			'consentmodetabtitle'      => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
 		);
 		wp_localize_script( 'admin-subtabs', 'gtm4wp', $subtabtexts );
 

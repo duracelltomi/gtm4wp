@@ -135,6 +135,13 @@ define( 'GTM4WP_OPTION_INTEGRATE_AMPID', 'integrate-amp-id' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE', 'integrate-consent-mode' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS', 'integrate-consent-mode-ads' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS', 'integrate-consent-mode-analytics' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO', 'integrate-consent-mode-perso' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC', 'integrate-consent-mode-func' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY', 'integrate-consent-mode-security' );
+
 define( 'GTM4WP_PLACEMENT_FOOTER', 0 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN', 1 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN_AUTO', 2 );
@@ -236,6 +243,13 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => '',
 
 	GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false,
+
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => false,
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS       => false,
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => false,
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO     => false,
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC      => false,
+	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY  => false,
 );
 
 $gtm4wp_business_verticals = array(
