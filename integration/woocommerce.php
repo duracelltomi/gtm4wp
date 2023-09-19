@@ -214,7 +214,7 @@ function gtm4wp_process_product( $product, $additional_product_attributes, $attr
 		'name'        => $product->get_title(),
 		'sku'         => $product_sku ? $product_sku : $product_id,
 		'category'    => $product_cat,
-		'price'       => round( (float) wc_get_price_to_display( $product ), 2 ),
+		'price'       => round( (float) wc_get_price_to_display( $product ), 2 ), // Unfortunately this does not force a .00 postfix for integers.
 		'stocklevel'  => $product->get_stock_quantity(),
 	);
 
