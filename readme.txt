@@ -235,6 +235,25 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 = 1.19 =
 
+WARNING!
+Universal Analytics / GA3 ecommerce events **deprecated**!
+Please update your GTM setup so that it does not rely on any of the following GTM4WP events and the old ecommerce data layer:
+* gtm4wp.productClickEEC
+* gtm4wp.addProductToCartEEC
+* gtm4wp.removeFromCartEEC
+* gtm4wp.checkoutOptionEEC
+* gtm4wp.checkoutStepEEC
+* gtm4wp.changeDetailViewEEC
+* gtm4wp.orderCompletedEEC
+
+Instead of the above events, you can use the new GA4 ecommerce events (add_to_cart, purchase, etc.)
+In the Universal Analytics GTM tag now you have an option to use the GA4 ecommerce data in the data layer.
+If you are on GA360 and still collecting ecommerce data, you need to update your GTM setup to use that option firing on the GA4 ecommerce events.
+
+* Updated: WooCommerce integration now accepts the primary category selection of Yoast SEO and Rank Math SEO
+* Updated: use the gtm4wp_admin_page_capability filter to modify the capability needed to use the admin page (thanks [emreerkan](https://github.com/emreerkan))
+* Fixed: price did not include the .00 postfix for integers in the add_to_cart event
+* Added: if needed, you can turn on clearing the ecommerce object before a new GA4 event is being pushed.
 * Added: support for Google Consent Mode default command for use cases where the consent management tool does not support it already
 
 = 1.18.1 =
