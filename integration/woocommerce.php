@@ -234,7 +234,7 @@ function gtm4wp_process_product( $product, $additional_product_attributes, $attr
 		'name'        => $product->get_title(),
 		'sku'         => $product_sku ? $product_sku : $product_id,
 		'category'    => $product_cat,
-		'price'       => round( (float) wc_get_price_to_display( $product ), 2 ),
+		'price'       => round( (float) wc_get_price_to_display( $product ), 2 ), // Unfortunately this does not force a .00 postfix for integers.
 		'stocklevel'  => $product->get_stock_quantity(),
 	);
 
@@ -418,6 +418,7 @@ function gtm4wp_woocommerce_addglobalvars( $return ) {
 	$return['gtm4wp_needs_shipping_address'] = (bool) $gtm4wp_needs_shipping_address;
 	$return['gtm4wp_business_vertical']      = esc_js( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] );
 	$return['gtm4wp_business_vertical_id']   = gtm4wp_get_gads_product_id_variable_name( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] );
+	$return['gtm4wp_clear_ecommerce']        = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ] );
 
 	return $return;
 }
