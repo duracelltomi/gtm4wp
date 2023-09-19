@@ -28,9 +28,10 @@
 define( 'GTM4WP_VERSION', '1.18.1' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
 
-global $gtp4wp_plugin_url, $gtp4wp_plugin_basename;
+global $gtp4wp_plugin_url, $gtp4wp_plugin_basename, $gtp4wp_script_path;
 $gtp4wp_plugin_url      = plugin_dir_url( __FILE__ );
 $gtp4wp_plugin_basename = plugin_basename( __FILE__ );
+$gtp4wp_script_path = $gtp4wp_plugin_url . (defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? '' : 'dist/') . 'js/';
 require_once GTM4WP_PATH . '/common/readoptions.php';
 
 /**
