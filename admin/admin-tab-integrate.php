@@ -147,6 +147,24 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+	GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL    => array(
+		'label'       => esc_html__( 'Clear ecommerce object before new event', 'duracelltomi-google-tag-manager' ),
+		'description' => sprintf(
+			gtm4wp_safe_admin_html(
+				// translators: 1: anchor element linking to the official GA4 doc about clearing the ecommerce object. 2: closing anchor element.
+				__(
+					'Clear the ecommerce object before any new event being pushed into the data layer.<br /><br />
+					Althought it is %1$srecommended by Google%2$s, it is not mandatory to activate this feature as
+					the GA4 event tag reads only the last pushed ecommerce data on any new event.<br />
+					Use it if you encounter issues with your GTM implementation.',
+					'duracelltomi-google-tag-manager'
+				)
+			),
+			'<a href="https://developers.google.com/analytics/devguides/collection/ga4/ecommerce?client_type=gtm#clear_the_ecommerce_object" target="_blank" rel="noopener">',
+			'</a>'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
 
 	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS     => array(
 		'label'       => esc_html__( 'Google Optimize container ID list', 'duracelltomi-google-tag-manager' ),

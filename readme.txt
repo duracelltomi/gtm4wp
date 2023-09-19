@@ -252,6 +252,7 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 
 * Updated: use the gtm4wp_admin_page_capability filter to modify the capability needed to use the admin page (thanks [emreerkan](https://github.com/emreerkan))
 * Fixed: price did not include the .00 postfix for integers in the add_to_cart event
+* Added: if needed, you can turn on clearing the ecommerce object before a new GA4 event is being pushed.
 
 = 1.18.1 =
 
