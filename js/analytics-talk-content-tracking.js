@@ -21,24 +21,24 @@ if ( "undefined" == typeof console ) {
 
 jQuery( function( $ ) {
 	// Debug flag
-	var debugMode      = gtm4wp_scrollerscript_debugmode;
+	const debugMode      = gtm4wp_scrollerscript_debugmode;
 
 	// Default time delay before checking location
-	var callBackTime   = gtm4wp_scrollerscript_callbacktime;
+	const callBackTime   = gtm4wp_scrollerscript_callbacktime;
 
 	// # px before tracking a reader
-	var readerLocation = gtm4wp_scrollerscript_readerlocation;
+	const readerLocation = gtm4wp_scrollerscript_readerlocation;
 
 	// Set some flags for tracking & execution
-	var timer       = 0;
-	var scroller    = false;
-	var endContent  = false;
-	var didComplete = false;
+	let timer       = 0;
+	let scroller    = false;
+	let endContent  = false;
+	let didComplete = false;
 
 	// Set some time variables to calculate reading time
-	var startTime = new Date();
-	var beginning = startTime.getTime();
-	var totalTime = 0;
+	const startTime = new Date();
+	const beginning = startTime.getTime();
+	let totalTime = 0;
 
 	// Track the aticle load
 	if ( !debugMode ) {
@@ -51,14 +51,16 @@ jQuery( function( $ ) {
 
 	// Check the location and track user
 	function trackLocation() {
-		bottom = $( window ).height() + $( window ).scrollTop();
-		height = $( document ).height();
+		const bottom = $( window ).height() + $( window ).scrollTop();
+		const height = $( document ).height();
+
+		let scrollStart = 0;
 
 		// If user starts to scroll send an event
 		if ( bottom > readerLocation && !scroller ) {
-			currentTime = new Date();
+			const currentTime = new Date();
 			scrollStart = currentTime.getTime();
-			timeToScroll = Math.round( ( scrollStart - beginning ) / 1000 );
+			const timeToScroll = Math.round( ( scrollStart - beginning ) / 1000 );
 
 			if ( !debugMode ) {
 				window[ gtm4wp_datalayer_name ].push({
@@ -73,9 +75,9 @@ jQuery( function( $ ) {
 
 		// If user has hit the bottom of the content send an event
 		if ( bottom >= $( '#' + gtm4wp_scrollerscript_contentelementid ).scrollTop() + $( '#' + gtm4wp_scrollerscript_contentelementid ).innerHeight() && !endContent ) {
-			currentTime = new Date();
-			contentScrollEnd = currentTime.getTime();
-			timeToContentEnd = Math.round( ( contentScrollEnd - scrollStart ) / 1000 );
+			const currentTime = new Date();
+			const contentScrollEnd = currentTime.getTime();
+			const timeToContentEnd = Math.round( ( contentScrollEnd - scrollStart ) / 1000 );
 
 			if ( !debugMode ) {
 				window[ gtm4wp_datalayer_name ].push({
@@ -91,8 +93,8 @@ jQuery( function( $ ) {
 
 		// If user has hit the bottom of page send an event
 		if ( bottom >= height && !didComplete ) {
-			currentTime = new Date();
-			end = currentTime.getTime();
+			const currentTime = new Date();
+			const end = currentTime.getTime();
 			totalTime = Math.round( ( end - scrollStart ) / 1000 );
 
 			if ( !debugMode ) {
