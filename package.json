@@ -22,7 +22,7 @@
   "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
   "devDependencies": {
     "@babel/core": "^7.21.4",
-    "@babel/preset-env": "^7.21.4",
+    "@babel/preset-env": "^7.22.20",
     "gulp": "^4.0.2",
     "gulp-babel": "^8.0.0",
     "gulp-clean-dir": "^1.0.2",
