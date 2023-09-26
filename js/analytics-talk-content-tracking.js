@@ -19,7 +19,7 @@ if ( "undefined" == typeof console ) {
 	};
 }
 
-jQuery( function( $ ) {
+(function(  ) {
 	// Debug flag
 	const debugMode      = gtm4wp_scrollerscript_debugmode;
 
@@ -51,9 +51,10 @@ jQuery( function( $ ) {
 
 	// Check the location and track user
 	function trackLocation() {
-		const bottom = $( window ).height() + $( window ).scrollTop();
-		const height = $( document ).height();
-
+		//const bottom = $( window ).height() + $( window ).scrollTop();
+		const bottom = window.innerHeight + window.scrollY;
+		//const height = $( document ).height();
+		const height = document.body.offsetHeight
 		let scrollStart = 0;
 
 		// If user starts to scroll send an event
@@ -74,7 +75,9 @@ jQuery( function( $ ) {
 		}
 
 		// If user has hit the bottom of the content send an event
-		if ( bottom >= $( '#' + gtm4wp_scrollerscript_contentelementid ).scrollTop() + $( '#' + gtm4wp_scrollerscript_contentelementid ).innerHeight() && !endContent ) {
+		//if ( bottom >= $( '#' + gtm4wp_scrollerscript_contentelementid ).scrollTop() + $( '#' + gtm4wp_scrollerscript_contentelementid ).innerHeight() && !endContent ) {
+		if ( bottom >= document.querySelector('#' + gtm4wp_scrollerscript_contentelementid).scrollTop + document.querySelector('#' + gtm4wp_scrollerscript_contentelementid ).clientHeight && !endContent ) {
+			
 			const currentTime = new Date();
 			const contentScrollEnd = currentTime.getTime();
 			const timeToContentEnd = Math.round( ( contentScrollEnd - scrollStart ) / 1000 );
@@ -127,9 +130,10 @@ jQuery( function( $ ) {
 			didComplete = true;
 		}
 	}
-
+	
 	// Track the scrolling and track location
-	$( window ).scroll(function() {
+	//$( window ).scroll(function() {
+	document.addEventListener("scroll", function(event){
 		if ( timer ) {
 			clearTimeout( timer );
 		}
@@ -137,4 +141,4 @@ jQuery( function( $ ) {
 		// Use a buffer so we don't call trackLocation too often.
 		timer = setTimeout( trackLocation, callBackTime );
 	});
-});
+})(window, document);
