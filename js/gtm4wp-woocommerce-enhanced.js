@@ -1,4 +1,4 @@
-window.gtm4wp_last_selected_product_variation;
+let gtm4wp_last_selected_product_variation;
 window.gtm4wp_changedetail_fired_during_pageload=false;
 
 window.gtm4wp_is_cart     = false;
