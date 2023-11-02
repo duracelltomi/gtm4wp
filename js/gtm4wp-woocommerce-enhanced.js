@@ -851,7 +851,7 @@ function gtm4wp_process_woocommerce_pages() {
 		if ( gtm4wp_use_sku_instead && product_variation.sku && ('' !== product_variation.sku) ) {
 			current_product_detail_data.id = product_variation.sku;
 		}
-		const variant_price = parsefloat( product_variation.display_price );
+		const variant_price = parseFloat( product_variation.display_price );
 		if ( isNaN( variant_price ) ) {
 			current_product_detail_data.price = 0;
 		} else {
