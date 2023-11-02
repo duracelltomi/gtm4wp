@@ -825,7 +825,7 @@ function gtm4wp_enqueue_scripts() {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_SCROLLER_ENABLED, false );
-		wp_enqueue_script( 'gtm4wp-scroll-tracking', $gtp4wp_script_path . 'analytics-talk-content-tracking.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
+		wp_enqueue_script( 'gtm4wp-scroll-tracking', $gtp4wp_script_path . 'analytics-talk-content-tracking.js', array(), GTM4WP_VERSION, $in_footer );
 	}
 }
 
