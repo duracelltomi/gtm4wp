@@ -1139,11 +1139,13 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		}
 
 		gtag("consent", "default", {
-			"ad_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ] ? 'granted' : 'denied' ) . '",
 			"analytics_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ] ? 'granted' : 'denied' ) . '",
-			"personalization_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO ] ? 'granted' : 'denied' ) . '",
+			"ad_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ] ? 'granted' : 'denied' ) . '",
+			"ad_user_data": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA ] ? 'granted' : 'denied' ) . '",
+			"ad_personalization": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO ] ? 'granted' : 'denied' ) . '",
 			"functionality_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC ] ? 'granted' : 'denied' ) . '",
 			"security_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY ] ? 'granted' : 'denied' ) . '",
+			"personalization_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO ] ? 'granted' : 'denied' ) . '",
 		});
 </script>';
 	}
