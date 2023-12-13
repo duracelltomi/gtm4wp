@@ -236,6 +236,7 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 = 1.19.1 =
 
 * Fixed: run additional checks when determing product category to prevent PHP errors in certain cases
+* Fixed: corrected Consent Mode flag names in admin page description texts
 
 = 1.19 =
 
