@@ -151,12 +151,15 @@ function gtm4wp_get_product_category( $product_id, $fullpath = false ) {
 		}
 	} else {
 		$category_data = get_term( $primary_category_id, $wp_category_taxonomy );
+		if ( is_wp_error( $category_data ) || is_null( $category_data ) ) {
+			$category_data = false;
+		}
 	}
 
 	if ( false !== $category_data ) {
 		if ( $fullpath ) {
 			$product_category = gtm4wp_get_product_category_hierarchy( $category_data->term_id );
-		} else {
+		} elseif ( isset( $category_data->name ) ) {
 			$product_category = $category_data->name;
 		}
 	}
