@@ -14,7 +14,6 @@ define( 'GTM4WP_OPTION_GTM_PLACEMENT', 'gtm-code-placement' );
 define( 'GTM4WP_OPTION_DATALAYER_NAME', 'gtm-datalayer-variable-name' );
 define( 'GTM4WP_OPTION_ENV_GTM_AUTH', 'gtm-env-gtm-auth' );
 define( 'GTM4WP_OPTION_ENV_GTM_PREVIEW', 'gtm-env-gtm-preview' );
-define( 'GTM4WP_OPTION_DONOTTRACK', 'gtm-browser-do-not-track' );
 define( 'GTM4WP_OPTION_LOADEARLY', 'gtm-load-gtm-early' );
 define( 'GTM4WP_OPTION_GTMDOMAIN', 'gtm-domain-name' );
 define( 'GTM4WP_OPTION_GTMCUSTOMPATH', 'gtm-custom-path' );
@@ -157,7 +156,6 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_GTM_PLACEMENT                   => GTM4WP_PLACEMENT_FOOTER,
 	GTM4WP_OPTION_ENV_GTM_AUTH                    => '',
 	GTM4WP_OPTION_ENV_GTM_PREVIEW                 => '',
-	GTM4WP_OPTION_DONOTTRACK                      => false,
 	GTM4WP_OPTION_LOADEARLY                       => false,
 	GTM4WP_OPTION_GTMDOMAIN                       => '',
 	GTM4WP_OPTION_GTMCUSTOMPATH                   => '',

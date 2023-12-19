@@ -233,6 +233,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.20 =
+
+* Removed: deprecated feature that puts the 'Do not track' option of the browser into the data layer. It is a deprecated browser feature therefore removed from this plugin.
+
 = 1.19.1 =
 
 * Fixed: run additional checks when determing product category to prevent PHP errors in certain cases

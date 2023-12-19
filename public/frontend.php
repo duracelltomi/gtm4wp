@@ -167,14 +167,6 @@ if ( ! function_exists( 'getallheaders' ) ) {
 function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 	global $wp_query, $gtm4wp_options, $gtm4wp_entity_ids;
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_DONOTTRACK ] ) {
-		if ( ! empty( $_SERVER['HTTP_DNT'] ) ) {
-			$data_layer['visitorDoNotTrack'] = (int) ( sanitize_text_field( wp_unslash( $_SERVER['HTTP_DNT'] ) ) );
-		} else {
-			$data_layer['visitorDoNotTrack'] = 0;
-		}
-	}
-
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITEID ] || $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SITENAME ] ) {
 		$data_layer['siteID']   = 0;
 		$data_layer['siteName'] = '';
