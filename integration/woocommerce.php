@@ -232,13 +232,14 @@ function gtm4wp_process_product( $product, $additional_product_attributes, $attr
 	}
 
 	$_temp_productdata = array(
-		'id'          => $remarketing_id,
-		'internal_id' => $product_id,
-		'name'        => $product->get_title(),
-		'sku'         => $product_sku ? $product_sku : $product_id,
-		'category'    => $product_cat,
-		'price'       => round( (float) wc_get_price_to_display( $product ), 2 ), // Unfortunately this does not force a .00 postfix for integers.
-		'stocklevel'  => $product->get_stock_quantity(),
+		'id'           => $remarketing_id,
+		'internal_id'  => $product_id,
+		'name'         => $product->get_title(),
+		'sku'          => $product_sku ? $product_sku : $product_id,
+		'category'     => $product_cat,
+		'price'        => round( (float) wc_get_price_to_display( $product ), 2 ), // Unfortunately this does not force a .00 postfix for integers.
+		'stocklevel'   => $product->get_stock_quantity(),
+		'stockstatus'  => $product->get_stock_status(),
 	);
 
 	if ( '' !== $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ] ) {
@@ -1159,7 +1160,7 @@ function gtm4wp_woocommerce_cart_item_remove_link_filter( $remove_from_cart_link
 	}
 
 	$cartlink_with_data = sprintf(
-		'data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_variant="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s" href="',
+		'data-gtm4wp_product_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_variant="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_stockstatus="%s" data-gtm4wp_product_brand="%s" href="',
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['id'] ),
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['name'] ),
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['price'] ),
@@ -1167,6 +1168,7 @@ function gtm4wp_woocommerce_cart_item_remove_link_filter( $remove_from_cart_link
 		esc_url( $GLOBALS['gtm4wp_cart_item_proddata']['productlink'] ),
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['variant'] ),
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['stocklevel'] ),
+		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['stockstatus'] ),
 		esc_attr( $GLOBALS['gtm4wp_cart_item_proddata']['brand'] )
 	);
 
@@ -1275,7 +1277,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 		}
 
 		$productlink_with_data = sprintf(
-			'data-gtm4wp_product_id="%s" data-gtm4wp_product_internal_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s" href="',
+			'data-gtm4wp_product_id="%s" data-gtm4wp_product_internal_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_stockstatus="%s" data-gtm4wp_product_brand="%s" href="',
 			esc_attr( $eec_product_array['id'] ),
 			esc_attr( $eec_product_array['internal_id'] ),
 			esc_attr( $eec_product_array['name'] ),
@@ -1285,6 +1287,7 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			esc_attr( $eec_product_array['listname'] ),
 			esc_attr( $eec_product_array['listposition'] ),
 			esc_attr( $eec_product_array['stocklevel'] ),
+			esc_attr( $eec_product_array['stockstatus'] ),
 			esc_attr( $eec_product_array['brand'] )
 		);
 
@@ -1458,7 +1461,7 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 	}
 
 	return sprintf(
-		'<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_internal_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s"></span>',
+		'<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_internal_id="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_stockstatus="%s" data-gtm4wp_product_brand="%s"></span>',
 		esc_attr( $eec_product_array['id'] ),
 		esc_attr( $eec_product_array['internal_id'] ),
 		esc_attr( $eec_product_array['name'] ),
@@ -1468,6 +1471,7 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 		esc_attr( $eec_product_array['listposition'] ),
 		esc_attr( $eec_product_array['listname'] ),
 		esc_attr( $eec_product_array['stocklevel'] ),
+		esc_attr( $eec_product_array['stockstatus'] ),
 		esc_attr( $eec_product_array['brand'] )
 	);
 }
@@ -1647,7 +1651,7 @@ function gtm4wp_woocommerce_grouped_product_list_column_label( $labelvalue, $pro
 
 	$labelvalue .=
 		sprintf(
-			'<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_internal_id="%s" data-gtm4wp_product_sku="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_brand="%s"></span>',
+			'<span class="gtm4wp_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_id="%s" data-gtm4wp_product_internal_id="%s" data-gtm4wp_product_sku="%s" data-gtm4wp_product_name="%s" data-gtm4wp_product_price="%s" data-gtm4wp_product_cat="%s" data-gtm4wp_product_url="%s" data-gtm4wp_product_listposition="%s" data-gtm4wp_productlist_name="%s" data-gtm4wp_product_stocklevel="%s" data-gtm4wp_product_stockstatus="%s" data-gtm4wp_product_brand="%s"></span>',
 			esc_attr( $eec_product_array['id'] ),
 			esc_attr( $eec_product_array['internal_id'] ),
 			esc_attr( $eec_product_array['sku'] ),
@@ -1658,6 +1662,7 @@ function gtm4wp_woocommerce_grouped_product_list_column_label( $labelvalue, $pro
 			esc_attr( $eec_product_array['listposition'] ),
 			esc_attr( $eec_product_array['listname'] ),
 			esc_attr( $eec_product_array['stocklevel'] ),
+			esc_attr( $eec_product_array['stockstatus'] ),
 			esc_attr( $eec_product_array['brand'] )
 		);
 

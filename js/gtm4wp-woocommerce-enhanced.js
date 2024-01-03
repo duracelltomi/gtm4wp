@@ -60,7 +60,7 @@ function gtm4wp_map_eec_to_ga4( productdata ) {
 function gtm4wp_push_ecommerce( event_name, items, extra_params, event_callback=false, event_timeout=2000 ) {
 	const ecom_obj = extra_params || {};
 	ecom_obj.items = items;
-	
+
 	if (gtm4wp_clear_ecommerce) {
 		window[ gtm4wp_datalayer_name ].push({
 			ecommerce: null
@@ -112,14 +112,15 @@ function gtm4wp_handle_cart_qty_change() {
 			if ( original_value < current_value ) {
 				// yes => handle add to cart event
 				const product_data = {
-					'name':       productdata.getAttribute( 'data-gtm4wp_product_name' ),
-					'id':         productdata.getAttribute( 'data-gtm4wp_product_id' ),
-					'price':      productprice.toFixed(2),
-					'category':   productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-					'variant':    productdata.getAttribute( 'data-gtm4wp_product_variant' ),
-					'stocklevel': productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-					'brand':      productdata.getAttribute( 'data-gtm4wp_product_brand' ),
-					'quantity':   current_value - original_value
+					'name':        productdata.getAttribute( 'data-gtm4wp_product_name' ),
+					'id':          productdata.getAttribute( 'data-gtm4wp_product_id' ),
+					'price':       productprice.toFixed(2),
+					'category':    productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+					'variant':     productdata.getAttribute( 'data-gtm4wp_product_variant' ),
+					'stocklevel':  productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+					'stockstatus': productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+					'brand':       productdata.getAttribute( 'data-gtm4wp_product_brand' ),
+					'quantity':    current_value - original_value
 				};
 
 				// fire ga3 version
@@ -141,14 +142,15 @@ function gtm4wp_handle_cart_qty_change() {
 			} else {
 				// no => handle remove from cart event
 				const product_data = {
-					'name':       productdata.getAttribute( 'data-gtm4wp_product_name' ),
-					'id':         productdata.getAttribute( 'data-gtm4wp_product_id' ),
-					'price':      productprice.toFixed(2),
-					'category':   productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-					'variant':    productdata.getAttribute( 'data-gtm4wp_product_variant' ),
-					'stocklevel': productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-					'brand':      productdata.getAttribute( 'data-gtm4wp_product_brand' ),
-					'quantity':   original_value - current_value
+					'name':        productdata.getAttribute( 'data-gtm4wp_product_name' ),
+					'id':          productdata.getAttribute( 'data-gtm4wp_product_id' ),
+					'price':       productprice.toFixed(2),
+					'category':    productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+					'variant':     productdata.getAttribute( 'data-gtm4wp_product_variant' ),
+					'stocklevel':  productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+					'stockstatus': productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+					'brand':       productdata.getAttribute( 'data-gtm4wp_product_brand' ),
+					'quantity':    original_value - current_value
 				};
 
 				// fire ga3 version
@@ -348,14 +350,15 @@ function gtm4wp_process_woocommerce_pages() {
 			}
 
 			product_data = {
-				'name':       dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
-				'id':         dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
-				'price':      productprice.toFixed(2),
-				'category':   dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-				'position':   dom_productdata.getAttribute( 'data-gtm4wp_product_listposition' ),
-				'list':       dom_productdata.getAttribute( 'data-gtm4wp_productlist_name' ),
-				'stocklevel': dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-				'brand':      dom_productdata.getAttribute( 'data-gtm4wp_product_brand' )
+				'name':        dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
+				'id':          dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
+				'price':       productprice.toFixed(2),
+				'category':    dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+				'position':    dom_productdata.getAttribute( 'data-gtm4wp_product_listposition' ),
+				'list':        dom_productdata.getAttribute( 'data-gtm4wp_productlist_name' ),
+				'stocklevel':  dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+				'stockstatus': dom_productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+				'brand':       dom_productdata.getAttribute( 'data-gtm4wp_product_brand' )
 			};
 
 			products.push(product_data);
@@ -447,13 +450,14 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		const product_data = {
-			'name':       productdata.getAttribute( 'data-gtm4wp_product_name' ),
-			'id':         productdata.getAttribute( 'data-gtm4wp_product_id' ),
-			'price':      productprice.toFixed(2),
-			'category':   productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-			'stocklevel': productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-			'brand':      productdata.getAttribute( 'data-gtm4wp_product_brand' ),
-			'quantity':   1
+			'name':        productdata.getAttribute( 'data-gtm4wp_product_name' ),
+			'id':          productdata.getAttribute( 'data-gtm4wp_product_id' ),
+			'price':       productprice.toFixed(2),
+			'category':    productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+			'stocklevel':  productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+			'stockstatus': productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+			'brand':       productdata.getAttribute( 'data-gtm4wp_product_brand' ),
+			'quantity':    1
 		};
 
 		// fire ga3 version
@@ -548,13 +552,14 @@ function gtm4wp_process_woocommerce_pages() {
 				}
 
 				const product_data = {
-					'id':         gtm4wp_use_sku_instead ? dom_productdata.getAttribute( 'data-gtm4wp_product_sku' ) : dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
-					'name':       dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
-					'price':      group_product_price.toFixed(2),
-					'category':   dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-					'quantity':   product_qty,
-					'stocklevel': dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-					'brand':      dom_productdata.getAttribute( 'data-gtm4wp_product_brand' )
+					'id':          gtm4wp_use_sku_instead ? dom_productdata.getAttribute( 'data-gtm4wp_product_sku' ) : dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
+					'name':        dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
+					'price':       group_product_price.toFixed(2),
+					'category':    dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+					'quantity':    product_qty,
+					'stocklevel':  dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+					'stockstatus': dom_productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+					'brand':       dom_productdata.getAttribute( 'data-gtm4wp_product_brand' )
 				};
 
 				products.push( product_data );
@@ -594,13 +599,14 @@ function gtm4wp_process_woocommerce_pages() {
 			}
 
 			const product_data = {
-				'id':         product_id_el && product_id_el.value,
-				'name':       product_form.querySelector( '[name=gtm4wp_name]' ) && product_form.querySelector( '[name=gtm4wp_name]' ).value,
-				'price':      product_price.toFixed(2),
-				'category':   product_form.querySelector( '[name=gtm4wp_category]' ) && product_form.querySelector( '[name=gtm4wp_category]' ).value,
-				'quantity':   product_form.querySelector( '[name=quantity]' ) && product_form.querySelector( '[name=quantity]' ).value,
-				'stocklevel': product_form.querySelector( '[name=gtm4wp_stocklevel]' ) && product_form.querySelector( '[name=gtm4wp_stocklevel]' ).value,
-				'brand':      product_form.querySelector( '[name=gtm4wp_brand]' ) && product_form.querySelector( '[name=gtm4wp_brand]' ).value
+				'id':          product_id_el && product_id_el.value,
+				'name':        product_form.querySelector( '[name=gtm4wp_name]' ) && product_form.querySelector( '[name=gtm4wp_name]' ).value,
+				'price':       product_price.toFixed(2),
+				'category':    product_form.querySelector( '[name=gtm4wp_category]' ) && product_form.querySelector( '[name=gtm4wp_category]' ).value,
+				'quantity':    product_form.querySelector( '[name=quantity]' ) && product_form.querySelector( '[name=quantity]' ).value,
+				'stocklevel':  product_form.querySelector( '[name=gtm4wp_stocklevel]' ) && product_form.querySelector( '[name=gtm4wp_stocklevel]' ).value,
+				'stockstatus': product_form.querySelector( '[name=gtm4wp_stockstatus]' ) && product_form.querySelector( '[name=gtm4wp_stockstatus]' ).value,
+				'brand':       product_form.querySelector( '[name=gtm4wp_brand]' ) && product_form.querySelector( '[name=gtm4wp_brand]' ).value
 			};
 
 			// fire ga3 version
@@ -653,14 +659,15 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		const product_data = {
-			'name':       dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
-			'id':         dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
-			'price':      dom_productdata.getAttribute( 'data-gtm4wp_product_price' ),
-			'category':   dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-			'variant':    dom_productdata.getAttribute( 'data-gtm4wp_product_variant' ),
-			'stocklevel': dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-			'brand':      dom_productdata.getAttribute( 'data-gtm4wp_product_brand' ),
-			'quantity':   qty
+			'name':        dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
+			'id':          dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
+			'price':       dom_productdata.getAttribute( 'data-gtm4wp_product_price' ),
+			'category':    dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+			'variant':     dom_productdata.getAttribute( 'data-gtm4wp_product_variant' ),
+			'stocklevel':  dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+			'stockstatus': dom_productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+			'brand':       dom_productdata.getAttribute( 'data-gtm4wp_product_brand' ),
+			'quantity':    qty
 		};
 
 		// fire ga3 version
@@ -740,13 +747,14 @@ function gtm4wp_process_woocommerce_pages() {
 		}
 
 		const product_data = {
-			'id':         dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
-			'name':       dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
-			'price':      dom_productdata.getAttribute( 'data-gtm4wp_product_price' ),
-			'category':   dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
-			'stocklevel': dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
-			'brand':      dom_productdata.getAttribute( 'data-gtm4wp_product_brand' ),
-			'position':   dom_productdata.getAttribute( 'data-gtm4wp_product_listposition' )
+			'id':          dom_productdata.getAttribute( 'data-gtm4wp_product_id' ),
+			'name':        dom_productdata.getAttribute( 'data-gtm4wp_product_name' ),
+			'price':       dom_productdata.getAttribute( 'data-gtm4wp_product_price' ),
+			'category':    dom_productdata.getAttribute( 'data-gtm4wp_product_cat' ),
+			'stocklevel':  dom_productdata.getAttribute( 'data-gtm4wp_product_stocklevel' ),
+			'stockstatus': dom_productdata.getAttribute( 'data-gtm4wp_product_stockstatus' ),
+			'brand':       dom_productdata.getAttribute( 'data-gtm4wp_product_brand' ),
+			'position':    dom_productdata.getAttribute( 'data-gtm4wp_product_listposition' )
 		};
 
 		for (let i in window.google_tag_manager) {
@@ -763,13 +771,13 @@ function gtm4wp_process_woocommerce_pages() {
 
 		const ctrl_key_pressed = e.ctrlKey || e.metaKey;
 		const target_new_tab = ( '_blank' === matching_link_element.target );
-		
+
 		// save this info to prevent redirection if another plugin already prevented to event for some reason
 		let event_already_prevented = e.defaultPrevented;
 		if ( !event_already_prevented ) {
 			e.preventDefault();
 		}
-		
+
 		if ( ctrl_key_pressed || target_new_tab ) {
 			// we need to open the new tab/page here so that popup blocker of the browser doesn't block our code
 			window.productpage_window = window.open( 'about:blank', '_blank' );
@@ -799,7 +807,7 @@ function gtm4wp_process_woocommerce_pages() {
 						// only call this for the first loaded container
 						return true;
 					}
-	
+
 					if ( !event_already_prevented ) {
 						if ( ( target_new_tab || ctrl_key_pressed ) && productpage_window ) {
 							productpage_window.location.href = dom_productdata.getAttribute( 'data-gtm4wp_product_url' );
@@ -827,15 +835,16 @@ function gtm4wp_process_woocommerce_pages() {
 			return;
 		}
 
-		const product_form       = event.target;
-		const product_variant_id = product_form.querySelector( '[name=variation_id]' ) && product_form.querySelector( '[name=variation_id]' ).value;
-		const product_id         = product_form.querySelector( '[name=gtm4wp_id]' ) && product_form.querySelector( '[name=gtm4wp_id]' ).value;
-		const product_name       = product_form.querySelector( '[name=gtm4wp_name]' ) && product_form.querySelector( '[name=gtm4wp_name]' ).value;
-		const product_sku        = product_form.querySelector( '[name=gtm4wp_sku]' ) && product_form.querySelector( '[name=gtm4wp_sku]' ).value;
-		const product_category   = product_form.querySelector( '[name=gtm4wp_category]' ) && product_form.querySelector( '[name=gtm4wp_category]' ).value;
-		const product_price      = product_form.querySelector( '[name=gtm4wp_price]' ) && product_form.querySelector( '[name=gtm4wp_price]' ).value;
-		const product_stocklevel = product_form.querySelector( '[name=gtm4wp_stocklevel]' ) && product_form.querySelector( '[name=gtm4wp_stocklevel]' ).value;
-		const product_brand      = product_form.querySelector( '[name=gtm4wp_brand]' ) && product_form.querySelector( '[name=gtm4wp_brand]' ).value;
+		const product_form        = event.target;
+		const product_variant_id  = product_form.querySelector( '[name=variation_id]' ) && product_form.querySelector( '[name=variation_id]' ).value;
+		const product_id          = product_form.querySelector( '[name=gtm4wp_id]' ) && product_form.querySelector( '[name=gtm4wp_id]' ).value;
+		const product_name        = product_form.querySelector( '[name=gtm4wp_name]' ) && product_form.querySelector( '[name=gtm4wp_name]' ).value;
+		const product_sku         = product_form.querySelector( '[name=gtm4wp_sku]' ) && product_form.querySelector( '[name=gtm4wp_sku]' ).value;
+		const product_category    = product_form.querySelector( '[name=gtm4wp_category]' ) && product_form.querySelector( '[name=gtm4wp_category]' ).value;
+		const product_price       = product_form.querySelector( '[name=gtm4wp_price]' ) && product_form.querySelector( '[name=gtm4wp_price]' ).value;
+		const product_stocklevel  = product_form.querySelector( '[name=gtm4wp_stocklevel]' ) && product_form.querySelector( '[name=gtm4wp_stocklevel]' ).value;
+		const product_stockstatus = product_form.querySelector( '[name=gtm4wp_stockstatus]' ) && product_form.querySelector( '[name=gtm4wp_stockstatus]' ).value;
+		const product_brand       = product_form.querySelector( '[name=gtm4wp_brand]' ) && product_form.querySelector( '[name=gtm4wp_brand]' ).value;
 
 		let current_product_detail_data = {
 			name: product_name,
@@ -843,6 +852,7 @@ function gtm4wp_process_woocommerce_pages() {
 			price: 0,
 			category: product_category,
 			stocklevel: product_stocklevel,
+			stockstatus: product_stockstatus,
 			brand: product_brand,
 			variant: ''
 		};
@@ -857,7 +867,7 @@ function gtm4wp_process_woocommerce_pages() {
 		} else {
 			current_product_detail_data.price = variant_price.toFixed(2);
 		}
-		
+
 
 		let product_variation_attribute_values = [];
 		for( let attrib_key in product_variation.attributes ) {
