@@ -98,6 +98,7 @@ function gtm4wp_woocommerce_process_product( $product, $additional_product_attri
 		'sku'                      => $product_sku ? $product_sku : $product_id,
 		'price'                    => round( (float) wc_get_price_to_display( $product ), 2 ), // Unfortunately this does not force a .00 postfix for integers.
 		'stocklevel'               => $product->get_stock_quantity(),
+		'stockstatus'              => $product->get_stock_status(),
 		'google_business_vertical' => $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ],
 	);
 
@@ -656,7 +657,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 
 			// Read order id already tracked from cookies or local storage.
 			let gtm4wp_orderid_tracked = "";
-		
+
 			if ( !window.localStorage ) {
 				let gtm4wp_cookie = "; " + document.cookie;
 				let gtm4wp_cookie_parts = gtm4wp_cookie.split( "; gtm4wp_orderid_tracked=" );
@@ -678,7 +679,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 
 			$after_purchase_dl_push = '
 			}
-		
+
 			// Store order ID to prevent tracking this purchase again.
 			if ( !window.localStorage ) {
 				var gtm4wp_orderid_cookie_expire = new Date();
