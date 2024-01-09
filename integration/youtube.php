@@ -35,7 +35,7 @@ add_filter( 'oembed_result', 'gtm4wp_youtube', 10, 3 );
 if ( ! is_admin() ) {
 	$in_footer = (bool) apply_filters( 'gtm4wp_youtube', true );
 
-  if (
+	if (
 		isset( $GLOBALS['post'] )
 		&& (
 			has_block( 'core-embed/youtube', $GLOBALS['post'] )

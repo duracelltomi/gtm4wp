@@ -565,27 +565,6 @@ function gtm4wp_sanitize_options( $options ) {
 
 				$output[ $optionname ] = implode( ',', $selected_blacklist_entities );
 			}
-		} elseif ( GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS === $optionname ) {
-			// Google Optimize settings.
-			$_goid_val = trim( $newoptionvalue );
-			if ( '' === $_goid_val ) {
-				$_goid_list = array();
-			} else {
-				$_goid_list = explode( ',', $_goid_val );
-			}
-			$_goid_haserror = false;
-
-			foreach ( $_goid_list as $one_go_id ) {
-				$_goid_haserror = $_goid_haserror || ! preg_match( '/^(GTM|OPT)-[A-Z0-9]+$/', $one_go_id );
-			}
-
-			if ( $_goid_haserror && ( count( $_goid_list ) > 0 ) ) {
-				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS . ']', esc_html__( 'Invalid Google Optimize ID. Valid ID format: GTM-XXXXX or OPT-XXXXX. Use comma without additional space (,) to enter more than one ID.', 'duracelltomi-google-tag-manager' ) );
-			} else {
-				$output[ $optionname ] = $newoptionvalue;
-			}
-		} elseif ( GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT === $optionname ) {
-			$output[ $optionname ] = (int) $newoptionvalue;
 		} elseif ( GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION === $optionname ) {
 			$output[ $optionname ] = (int) $newoptionvalue;
 		} elseif ( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE === $optionname ) {
@@ -1059,13 +1038,11 @@ function gtm4wp_add_admin_js( $hook ) {
 			'blockmacrostabtitle'      => esc_html__( 'Blacklist variables', 'duracelltomi-google-tag-manager' ),
 			'wpcf7tabtitle'            => esc_html__( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
 			'wctabtitle'               => esc_html__( 'WooCommerce', 'duracelltomi-google-tag-manager' ),
-			'gotabtitle'               => esc_html__( 'Google Optimize', 'duracelltomi-google-tag-manager' ),
 			'amptabtitle'              => esc_html__( 'Accelerated Mobile Pages', 'duracelltomi-google-tag-manager' ),
 			'cookiebottabtitle'        => esc_html__( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
 			'weathertabtitle'          => esc_html__( 'Weather & geo data', 'duracelltomi-google-tag-manager' ),
 			'generaleventstabtitle'    => esc_html__( 'General events', 'duracelltomi-google-tag-manager' ),
 			'mediaeventstabtitle'      => esc_html__( 'Media events', 'duracelltomi-google-tag-manager' ),
-			'depecratedeventstabtitle' => esc_html__( 'Deprecated', 'duracelltomi-google-tag-manager' ),
 			'sitetabtitle'             => esc_html__( 'Site', 'duracelltomi-google-tag-manager' ),
 			'misctabtitle'             => esc_html__( 'Misc', 'duracelltomi-google-tag-manager' ),
 			'consentmodetabtitle'      => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
@@ -1133,62 +1110,6 @@ function gtm4wp_admin_head() {
 						.show();
 				} else {
 					jQuery( ".gtmid_validation_error" )
-						.hide();
-				}
-			});
-
-		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-idlist\\\\]" )
-			.on( "blur", function() {
-				var goid_regex = /^(GTM|OPT)-[A-Z0-9]+$/;
-				var goid_val_str = jQuery( this ).val();
-				if ( typeof goid_val_str != "string" ) {
-					return;
-				}
-				var goid_val  = goid_val_str.trim();
-				if ( "" == goid_val ) {
-					goid_list = [];
-				} else {
-					var goid_list = goid_val.split( "," );
-				}
-
-				var goid_haserror = false;
-				for( var i=0; i<goid_list.length; i++ ) {
-					goid_haserror = goid_haserror || !goid_regex.test( goid_list[ i ] );
-				}
-
-				if ( goid_haserror && (goid_list.length > 0) ) {
-					jQuery( ".goid_validation_error" )
-						.show();
-				} else {
-					jQuery( ".goid_validation_error" )
-						.hide();
-				}
-			});
-
-		jQuery( "#gtm4wp-options\\\\[integrate-google-optimize-gaid\\\\]" )
-			.on( "blur", function() {
-				var gogaid_regex = /^UA-[0-9]+-[0-9]+$/;
-				var gogaid_val_str = jQuery( this ).val();
-				if ( typeof gogaid_val_str != "string" ) {
-					return;
-				}
-				var gogaid_val  = gogaid_val_str.trim();
-				if ( "" == gogaid_val ) {
-					gogaid_list = [];
-				} else {
-					var gogaid_list = gogaid_val.split( "," );
-				}
-
-				var gogaid_haserror = false;
-				for( var i=0; i<gogaid_list.length; i++ ) {
-					gogaid_haserror = gogaid_haserror || !gogaid_regex.test( gogaid_list[ i ] );
-				}
-
-				if ( gogaid_haserror && (gogaid_list.length > 0) ) {
-					jQuery( ".goid_ga_validation_error" )
-						.show();
-				} else {
-					jQuery( ".goid_ga_validation_error" )
 						.hide();
 				}
 			});
@@ -1295,7 +1216,7 @@ function gtm4wp_show_warning() {
 	global $gtm4wp_options, $gtp4wp_plugin_url, $gtm4wp_integratefieldtexts, $current_user,
 		$gtm4wp_def_user_notices_dismisses;
 
-	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ]['plugintocheck'] );
+	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ]['plugintocheck'] );
 	if ( $woo_plugin_active && function_exists( 'WC' ) ) {
 		$woo = WC();
 	} else {
@@ -1345,9 +1266,7 @@ function gtm4wp_show_warning() {
 	}
 
 	if ( ( false === $gtm4wp_user_notices_dismisses['wc-ga-plugin-warning'] ) || ( false === $gtm4wp_user_notices_dismisses['wc-gayoast-plugin-warning'] ) ) {
-		$is_wc_active = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ||
-				$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ||
-				$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ];
+		$is_wc_active = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ];
 
 		if ( ( false === $gtm4wp_user_notices_dismisses['wc-ga-plugin-warning'] ) && $is_wc_active && is_plugin_active( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
 			echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
