@@ -70,40 +70,6 @@ define( 'GTM4WP_OPTION_BLACKLIST_ENABLE', 'blacklist-enable' );
 define( 'GTM4WP_OPTION_BLACKLIST_SANDBOXED', 'blacklist-sandboxed' );
 define( 'GTM4WP_OPTION_BLACKLIST_STATUS', 'blacklist-status' );
 
-// deprecated options BEGIN.
-define( 'GTM4WP_OPTION_BLACKLIST_ADADVISOR', 'blacklist-adadvisor' );
-define( 'GTM4WP_OPTION_BLACKLIST_ADROLL', 'blacklist-adroll' );
-define( 'GTM4WP_OPTION_BLACKLIST_AWCONV', 'blacklist-adwords-conversion' );
-define( 'GTM4WP_OPTION_BLACKLIST_AWREMARKET', 'blacklist-adwords-remarketing' );
-define( 'GTM4WP_OPTION_BLACKLIST_BIZO', 'blacklist-bizo' );
-define( 'GTM4WP_OPTION_BLACKLIST_CLICKTALE', 'blacklist-clicktale' );
-define( 'GTM4WP_OPTION_BLACKLIST_COMSCORE', 'blacklist-comscore' );
-define( 'GTM4WP_OPTION_BLACKLIST_CUSTOMHTML', 'blacklist-custom-html' );
-define( 'GTM4WP_OPTION_BLACKLIST_CUSTOMIMG', 'blacklist-custom-img-tag' );
-define( 'GTM4WP_OPTION_BLACKLIST_DBLCLKCOUNT', 'blacklist-doubleclick-counter' );
-define( 'GTM4WP_OPTION_BLACKLIST_DBLCLKSALES', 'blacklist-doubleclick-sales' );
-define( 'GTM4WP_OPTION_BLACKLIST_GACLASSIC', 'blacklist-google-analytics' );
-define( 'GTM4WP_OPTION_BLACKLIST_MARIN', 'blacklist-marin' );
-define( 'GTM4WP_OPTION_BLACKLIST_MPLEXIFRAME', 'blacklist-mediaplex-iframe' );
-define( 'GTM4WP_OPTION_BLACKLIST_MPLEXROI', 'blacklist-mediaplex-roi' );
-define( 'GTM4WP_OPTION_BLACKLIST_MEDIA6DEG', 'blacklist-media6degrees' );
-define( 'GTM4WP_OPTION_BLACKLIST_TURNCONV', 'blacklist-turn-conversion' );
-define( 'GTM4WP_OPTION_BLACKLIST_TURNDATA', 'blacklist-turn-data' );
-define( 'GTM4WP_OPTION_BLACKLIST_UA', 'blacklist-universal-analytics' );
-
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_DOMELEMENT', 'blacklist-macro-dom-element' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_CUSTOMJS', 'blacklist-macro-custom-js' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_CONSTANT', 'blacklist-macro-constant-string' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_1STCOOKIE', 'blacklist-macro-1st-party-cookie' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_EVENTNAME', 'blacklist-macro-event-name' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_JSVAR', 'blacklist-macro-javascript-variable' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_DLAYERVAR', 'blacklist-macro-datalayer-variable' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_RANDOMNUM', 'blacklist-macro-random-number' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_REFERRER', 'blacklist-macro-referrer' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_URL', 'blacklist-macro-url' );
-define( 'GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT', 'blacklist-macro-autoevent-variable' );
-// deprecated options END.
-
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE', 'integrate-woocommerce-track-enhanced-ecommerce' );
@@ -366,83 +332,6 @@ $gtm4wp_entity_ids = array(
 );
 
 /**
- * Helper function to migrate blacklist / whitelist options from v1.12- to v1.12+
- *
- * @param array $current_options The current and possible outdated config array.
- * @return array
- */
-function gtm4wp_migrate_blacklist_whitelist( $current_options ) {
-	if ( ( array_key_exists( GTM4WP_OPTION_BLACKLIST_ENABLE, $current_options ) )
-			&& ( $current_options[ GTM4WP_OPTION_BLACKLIST_ENABLE ] > 0 )
-		) {
-		$_gtmrestrictlistitems = array();
-
-		// IDs from https://developers.google.com/tag-manager/devguide#security .
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ADADVISOR ] ) {
-			$_gtmrestrictlistitems[] = 'ta';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_ADROLL ] ) {
-			$_gtmrestrictlistitems[] = 'asp';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_AWCONV ] ) {
-			$_gtmrestrictlistitems[] = 'awct';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_AWREMARKET ] ) {
-			$_gtmrestrictlistitems[] = 'sp';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_BIZO ] ) {
-			$_gtmrestrictlistitems[] = 'bzi';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_CLICKTALE ] ) {
-			$_gtmrestrictlistitems[] = 'cts';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_COMSCORE ] ) {
-			$_gtmrestrictlistitems[] = 'csm';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_CUSTOMHTML ] ) {
-			$_gtmrestrictlistitems[] = 'html';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_CUSTOMIMG ] ) {
-			$_gtmrestrictlistitems[] = 'img';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_DBLCLKCOUNT ] ) {
-			$_gtmrestrictlistitems[] = 'flc';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_DBLCLKSALES ] ) {
-			$_gtmrestrictlistitems[] = 'fls';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_GACLASSIC ] ) {
-			$_gtmrestrictlistitems[] = 'ga';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MARIN ] ) {
-			$_gtmrestrictlistitems[] = 'ms';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MPLEXIFRAME ] ) {
-			$_gtmrestrictlistitems[] = 'mpm';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MPLEXROI ] ) {
-			$_gtmrestrictlistitems[] = 'mpr';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_MEDIA6DEG ] ) {
-			$_gtmrestrictlistitems[] = 'm6d';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_TURNCONV ] ) {
-			$_gtmrestrictlistitems[] = 'tc';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_TURNDATA ] ) {
-			$_gtmrestrictlistitems[] = 'tdc';
-		}
-		if ( $current_options[ GTM4WP_OPTION_BLACKLIST_UA ] ) {
-			$_gtmrestrictlistitems[] = 'ua';
-		}
-
-		$current_options[ GTM4WP_OPTION_BLACKLIST_STATUS ] = implode( ',', $_gtmrestrictlistitems );
-	}
-
-	return $current_options;
-}
-
-/**
  * Reads plugin options from database backend and merges this with default values.
  * Migrates blacklist/whitelist options from v1.12- to v1.12+
  * Overwrites some options that can be hard coded in wp-config.
@@ -455,10 +344,6 @@ function gtm4wp_reload_options() {
 	$storedoptions = get_option( GTM4WP_OPTIONS, array() );
 	if ( ! is_array( $gtm4wp_defaultoptions ) ) {
 		$gtm4wp_defaultoptions = array();
-	}
-
-	if ( ! isset( $storedoptions[ GTM4WP_OPTION_BLACKLIST_STATUS ] ) ) {
-		$storedoptions = gtm4wp_migrate_blacklist_whitelist( $storedoptions );
 	}
 
 	$return_options = array_merge( $gtm4wp_defaultoptions, $storedoptions );
