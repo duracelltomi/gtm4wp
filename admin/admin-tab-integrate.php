@@ -15,7 +15,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'         => GTM4WP_PHASE_STABLE,
 		'plugintocheck' => 'contact-form-7/wp-contact-form-7.php',
 	),
-	GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE      => array(
+	GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE         => array(
 		'label'         => esc_html__( 'Track e-commerce', 'duracelltomi-google-tag-manager' ),
 		'description'   => sprintf(
 			gtm4wp_safe_admin_html(
@@ -48,7 +48,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
-	GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL    => array(
+	GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL       => array(
 		'label'       => esc_html__( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
 		'description' => esc_html__( 'Enable this option to include the content of the cart in the data layer on each page. Needs WooCommerce v3.2 or newer. Especially useful for site personalization tools.', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
@@ -147,7 +147,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 
-	GTM4WP_OPTION_INTEGRATE_AMPID                 => array(
+	GTM4WP_OPTION_INTEGRATE_AMPID                    => array(
 		'label'         => esc_html__( "Google Tag Manager 'AMP' Container ID", 'duracelltomi-google-tag-manager' ),
 		'description'   => sprintf(
 			// translators: 1: opening anchor tag for a link pointing to the official GTM help center article about the AMP container snippet 2: Closing anchor tag.
