@@ -122,9 +122,6 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING', 'integrate-woocommerce-excl
 define( 'GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG', 'integrate-woocommerce-do-not-use-order-tracked-flag' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL', 'integrate-woocommerce-clear-ecommerce-datalayer' );
 
-define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS', 'integrate-google-optimize-idlist' );
-define( 'GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT', 'integrate-google-optimize-timeout' );
-
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_AMPID', 'integrate-amp-id' );
@@ -229,9 +226,6 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG  => false,
 	GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL    => false,
 
-	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS     => '',
-	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT => 4000,
-
 	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE           => false,
 
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => '',
@@ -293,7 +287,6 @@ $gtm4wp_entity_ids = array(
 		'ga'                  => 'Google Analytics Tag (classic, legacy)',
 		'ua'                  => 'Google Analytics Tag (universal, latest)',
 		'gcs'                 => 'Google Consumer Surveys Website Satisfaction',
-		'opt'                 => 'Google Optimize',
 		'ts'                  => 'Google Trusted Stores Tag',
 		'hjtc'                => 'Hotjar Tracking Code',
 		'infinity'            => 'Infinity Call Tracking Tag',

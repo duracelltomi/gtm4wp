@@ -147,36 +147,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
 
-	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZEIDS        => array(
-		'label'       => esc_html__( 'Google Optimize container ID list', 'duracelltomi-google-tag-manager' ),
-		'description' => sprintf(
-			gtm4wp_safe_admin_html(
-				// translators: 1: opening anchor tag for a link to Google's documentation about the Google Optimize anti-flicker snippet. 2: Closing anchor tag.
-				__(
-					'Enter a comma separated list of Google Optimize container IDs that you would like to use on your site.<br />
-					This plugin will add the %1$spage-hiding snippet%2$s to your pages.<br />',
-					'duracelltomi-google-tag-manager'
-				)
-			),
-			'<a href="https://developers.google.com/optimize/#the_page-hiding_snippet_code" target="_blank" rel="noopener">',
-			'</a>'
-		) .
-			'<br /><span class="goid_validation_error">' .
-			esc_html__(
-				'This does not seems to be a valid Google Optimize ID! Valid format: GTM-XXXXXX or OPT-XXXXXX where X can be numbers and
-				capital letters. Use comma without any space (,) to enter multpile IDs.',
-				'duracelltomi-google-tag-manager'
-			) .
-			'</span>',
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
-	GTM4WP_OPTION_INTEGRATE_GOOGLEOPTIMIZETIMEOUT    => array(
-		'label'       => esc_html__( 'Google Optimize page-hiding timeout', 'duracelltomi-google-tag-manager' ),
-		'description' => esc_html__( 'Enter here the amount of time in milliseconds that the page-hiding snippet should wait before page content gets visible even if Google Optimize has not been completely loaded yet.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
-
-	GTM4WP_OPTION_INTEGRATE_AMPID                    => array(
+	GTM4WP_OPTION_INTEGRATE_AMPID                 => array(
 		'label'         => esc_html__( "Google Tag Manager 'AMP' Container ID", 'duracelltomi-google-tag-manager' ),
 		'description'   => sprintf(
 			// translators: 1: opening anchor tag for a link pointing to the official GTM help center article about the AMP container snippet 2: Closing anchor tag.
