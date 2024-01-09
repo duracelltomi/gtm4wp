@@ -233,6 +233,10 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.20 =
+
+* Fix: GTM4WP will only look for the user's IP address in the REMOTE_ADDR server variable. You may enter a custom HTTP header instead in plugin settings.
+
 = 1.19.1 =
 
 * Fixed: run additional checks when determing product category to prevent PHP errors in certain cases
