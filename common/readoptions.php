@@ -14,7 +14,6 @@ define( 'GTM4WP_OPTION_GTM_PLACEMENT', 'gtm-code-placement' );
 define( 'GTM4WP_OPTION_DATALAYER_NAME', 'gtm-datalayer-variable-name' );
 define( 'GTM4WP_OPTION_ENV_GTM_AUTH', 'gtm-env-gtm-auth' );
 define( 'GTM4WP_OPTION_ENV_GTM_PREVIEW', 'gtm-env-gtm-preview' );
-define( 'GTM4WP_OPTION_DONOTTRACK', 'gtm-browser-do-not-track' );
 define( 'GTM4WP_OPTION_LOADEARLY', 'gtm-load-gtm-early' );
 define( 'GTM4WP_OPTION_GTMDOMAIN', 'gtm-domain-name' );
 define( 'GTM4WP_OPTION_GTMCUSTOMPATH', 'gtm-custom-path' );
@@ -107,13 +106,10 @@ define( 'GTM4WP_OPTION_BLACKLIST_MACRO_AUTOEVENT', 'blacklist-macro-autoevent-va
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
 
-define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC', 'integrate-woocommerce-track-classic-ecommerce' );
-define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC', 'integrate-woocommerce-track-enhanced-ecommerce' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE', 'integrate-woocommerce-track-enhanced-ecommerce' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION', 'integrate-woocommerce-product-per-impression' );
-define( 'GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP', 'integrate-woocommerce-cart-as-first-step' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL', 'integrate-woocommerce-cart-content-in-datalayer' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY', 'integrate-woocommerce-brand-taxonomy' );
-define( 'GTM4WP_OPTION_INTEGRATE_WCREMARKETING', 'integrate-woocommerce-remarketing' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL', 'integrate-woocommerce-business-vertical' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSESKU', 'integrate-woocommerce-remarketing-usesku' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH', 'integrate-woocommerce-use-full-category-path' );
@@ -134,6 +130,8 @@ define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE', 'integrate-consent-mode' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS', 'integrate-consent-mode-ads' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA', 'integrate-consent-mode-ad-user-data' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO', 'integrate-consent-mode-ad-perso' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS', 'integrate-consent-mode-analytics' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO', 'integrate-consent-mode-perso' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC', 'integrate-consent-mode-func' );
@@ -154,7 +152,6 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_GTM_PLACEMENT                   => GTM4WP_PLACEMENT_FOOTER,
 	GTM4WP_OPTION_ENV_GTM_AUTH                    => '',
 	GTM4WP_OPTION_ENV_GTM_PREVIEW                 => '',
-	GTM4WP_OPTION_DONOTTRACK                      => false,
 	GTM4WP_OPTION_LOADEARLY                       => false,
 	GTM4WP_OPTION_GTMDOMAIN                       => '',
 	GTM4WP_OPTION_GTMCUSTOMPATH                   => '',
@@ -213,13 +210,10 @@ $gtm4wp_defaultoptions = array(
 
 	GTM4WP_OPTION_INTEGRATE_WPCF7                 => false,
 
-	GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC      => false,
-	GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC     => false,
+	GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE      => false,
 	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION   => 10,
-	GTM4WP_OPTION_INTEGRATE_WCEECCARTASFIRSTSTEP  => false,
 	GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL    => false,
 	GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY    => '',
-	GTM4WP_OPTION_INTEGRATE_WCREMARKETING         => false,
 	GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL    => 'retail',
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU              => false,
 	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => false,

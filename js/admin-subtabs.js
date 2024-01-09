@@ -67,7 +67,7 @@ var adminsubtabs = {
 		},
 		"int-wc": {
 			tabtext: gtm4wp.wctabtitle,
-			numitems: 16
+			numitems: 15
 		},
 		"int-amp": {
 			tabtext: gtm4wp.amptabtitle,
@@ -79,7 +79,7 @@ var adminsubtabs = {
 		},
 		"int-consentmode": {
 			tabtext: gtm4wp.consentmodetabtitle,
-			numitems: 6
+			numitems: 8
 		}
 	}
 };

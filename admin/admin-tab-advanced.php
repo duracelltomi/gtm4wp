@@ -24,11 +24,6 @@ $GLOBALS['gtm4wp_advancedfieldtexts'] = array(
 		'description' => esc_html__( 'Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
-	GTM4WP_OPTION_DONOTTRACK       => array(
-		'label'       => esc_html__( "Include browser 'Do not track' setting", 'duracelltomi-google-tag-manager' ),
-		'description' => esc_html__( 'Add into the data layer whether the user has asked not to track any website interaction. You may want to respect this and disable all tags if this variable is set in the data layer.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_DEPRECATED,
-	),
 	GTM4WP_OPTION_LOADEARLY        => array(
 		'label'       => esc_html__( 'Load GTM container as early as possible', 'duracelltomi-google-tag-manager' ),
 		'description' => esc_html__( 'Turning on this option will load your Google Tag Manager container as early as possible during page load. This can cause issues if you are using jQuery in your custom HTML tags that fire on \'Page View\' events.', 'duracelltomi-google-tag-manager' ),

@@ -1206,7 +1206,7 @@ function gtm4wp_show_warning() {
 	global $gtm4wp_options, $gtp4wp_plugin_url, $gtm4wp_integratefieldtexts, $current_user,
 		$gtm4wp_def_user_notices_dismisses;
 
-	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ]['plugintocheck'] );
+	$woo_plugin_active = is_plugin_active( $gtm4wp_integratefieldtexts[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ]['plugintocheck'] );
 	if ( $woo_plugin_active && function_exists( 'WC' ) ) {
 		$woo = WC();
 	} else {
@@ -1256,9 +1256,7 @@ function gtm4wp_show_warning() {
 	}
 
 	if ( ( false === $gtm4wp_user_notices_dismisses['wc-ga-plugin-warning'] ) || ( false === $gtm4wp_user_notices_dismisses['wc-gayoast-plugin-warning'] ) ) {
-		$is_wc_active = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKCLASSICEC ] ||
-				$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKENHANCEDEC ] ||
-				$gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMARKETING ];
+		$is_wc_active = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ];
 
 		if ( ( false === $gtm4wp_user_notices_dismisses['wc-ga-plugin-warning'] ) && $is_wc_active && is_plugin_active( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
 			echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
