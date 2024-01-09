@@ -27,15 +27,6 @@ define( 'GTM4WP_WPACTION_AFTER_DATALAYER', 'gtm4wp_output_after_datalayer' );
 define( 'GTM4WP_WPACTION_AFTER_CONTAINER_CODE', 'gtm4wp_after_container_code' );
 
 /**
- * Constant that 3rd party plugins can use as a WordPress filter to alter the generated
- * Google Tag Manager container code (both the regular and iframe/noscript code).
- *
- * @deprecated 1.16 Instead of manipulating the GTM container code through this filter,
- *                  turn off the container code in plugin options and add your modified code manually.
- */
-define( 'GTM4WP_WPFILTER_GETTHEGTMTAG', 'gtm4wp_get_the_gtm_tag' );
-
-/**
  * Constant that GTM4WP itself and 3rd party plugins can use to add JavaScript
  * variable declarations above the first data layer push command.
  */
@@ -733,7 +724,6 @@ function gtm4wp_get_the_gtm_tag() {
 		$_gtm_tag .= '
 <!-- End Google Tag Manager (noscript) -->';
 
-		$_gtm_tag                      = apply_filters( GTM4WP_WPFILTER_GETTHEGTMTAG, $_gtm_tag );
 		$gtm4wp_container_code_written = true;
 	}
 
