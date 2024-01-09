@@ -233,6 +233,21 @@ https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked
 
 == Changelog ==
 
+= 1.20 =
+
+THE BIG CLEANUP RELEASE!
+
+Lots of deprecated features removed.
+The code of WooCommerce integration was cleaned and restructured, if you have any custom code that relies on GTM4WP internal data structure,
+please update the plugin on a test version of your website before updating your live site!
+
+* Removed deprecated Universal Analytics events for WooCommerce
+* Removed deprecated filter GTM4WP_WPFILTER_AFTER_DATALAYER/gtm4wp_after_datalayer
+* Removed deprecated filter GTM4WP_WPFILTER_ADDGLOBALVARS/gtm4wp_add_global_vars
+* Changed: lots of internal function names and variable names changed, although is not recommended to depend on them, if you did, check your code
+* Changed: renamed WP filter gtm4wp_datalayer_on_pageload to gtm4wp_woocommerce_datalayer_on_pageload to better reflect when it is called.
+* Added: stockstatus key into the product array of every ecommerce action. Returns the value of WP_Product->get_stock_status(). Thanks [hans2103](https://github.com/hans2103).
+
 = 1.19.1 =
 
 * Fixed: run additional checks when determing product category to prevent PHP errors in certain cases
