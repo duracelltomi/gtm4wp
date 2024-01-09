@@ -888,6 +888,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
+= 1.20 =
+
+* Updated: added ad_user_data and ad_personalisation flags to support Consent Mode v2
+
 = 1.19.1 =
 
 Bugfix release
