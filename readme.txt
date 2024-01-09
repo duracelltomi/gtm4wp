@@ -1,4 +1,4 @@
-=== GTM4WP ===
+=== GTM4WP - A Google Tag Manager (GTM) plugin for WordPress  ===
 Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, google ads, adwords remarketing, google ads remarketing, remarketing, google analytics, analytics, facebook ads, facebook remarketing, facebook pixel, google optimize, personalisation
@@ -9,20 +9,18 @@ Stable tag: 1.19.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
-Advanced measurement/advertising tag management and site personalisation for WordPress with Google Tag Manager and Google Optimize
+Advanced tag management for WordPress with Google Tag Manager
 
 == Description ==
 
 Google Tag Manager (GTM) is Google's free tool for everyone to manage and deploy analytics and marketing tags as well as other code snippets
-using an intuitive web UI. To learn more about this tool, visit the [official website](https://www.google.com/analytics/tag-manager/).
+using an intuitive web UI. To learn more about this tool, visit the [official website](https://marketingplatform.google.com/about/tag-manager/).
 
-This plugin places the GTM container code snippets onto your wordpress website so that you do not need to add this manually.
+This plugin places the GTM container code snippets onto your WordPress website so that you do not need to add it manually.
 Multiple containers are also supported!
 
 The plugin complements your GTM setup by pushing page meta data and user information into the so called data layer.
-Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-manager/devguide#datalayer).
-
-You can also add your Google Optimize container with the [recommended code setup](https://support.google.com/optimize/answer/7359264?hl=en)
+Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-platform/tag-manager/datalayer#datalayer).
 
 **PHP 7.4 is required to use this plugin.**
 
@@ -41,11 +39,10 @@ Albeit not ideal, it will work when placed lower in the code. This plugin provid
 
 If your WordPress theme is compatible with the additions of WordPress 5.2 then this plugin will place this second code to the right place.
 Users of the Genisis theme, GeneratePress theme, Elementor, Oxygen Builder and Beaver Builder Theme will also have this placed correctly.
-To utilize this, use the "Codeless" placement option.
+To utilize this, set the compatibility mode in plugin options to off.
 
-All other users can place this second code snippet using a custom PHP code ("Custom" placement option) or select the so called "Footer" option to
+All other users can place this second code snippet using a custom PHP code ("Manually coded" option) or select the so called "Footer" option to
 add the code lower in the code (it is not the recommended way but will work)
-
 
 = Basic data included =
 
@@ -56,12 +53,13 @@ add the code lower in the code (it is not the recommended way but will work)
 * post/page author ID and name
 * post/page ID
 * post types
+* post format
 * post count on the current page + in the current category/tag/taxonomy
 * custom terms associated with any post type
 * logged in status
 * logged in user role
 * logged in user ID (to track cross device behaviour in Google Analytics)
-* logged in user email address (to comply with [GTM terms of service](https://www.google.com/analytics/tag-manager/use-policy/) do not pass this on to Google tags)
+* logged in user email address (both unhashed and SHA256 hased values to be used with tracking)
 * logger in user creation date
 * site search data
 * site name and id (for WordPress multisite instances)
@@ -131,11 +129,6 @@ Scroll tracking is based on the solution originally created by
 Original script:
 http://cutroni.com/blog/2012/02/21/advanced-content-tracking-with-google-analytics-part-1/
 
-= Google Ads remarketing =
-
-Google Tag Manager for WordPress can add each dataLayer variable as a Google Ads remarketing custom parameter list.
-This enables you to build sophisticated remarketing lists.
-
 = Blacklist & Whitelist Tag Manager tags, triggers and variables =
 
 To increase website security, you have the option to white- and blacklist tags/triggers/variables.
@@ -151,23 +144,22 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 
 * Contact Form 7: fire an event when a Contact Form 7 form was submitted with any result (mail sent, mail failed, spam detected, invalid input)
 * WooCommerce:
-	* Classic e-commerce (deprecated):
-		* fire an event when visitors add products to their cart
-		* capture transaction data to be passed to your ad platforms and/or Analytics
-		* capture necessary remarketing parameters for Google Ads Dynamic Remarketing
-	* Enhanced e-commerce:
-		*	implementation of [Enhanced E-commerce GA3](https://developers.google.com/tag-manager/enhanced-ecommerce)
-		*	implementation of [Enhanced E-commerce GA4](https://developers.google.com/tag-manager/ecommerce-ga4)
-		* Does not support promotions since WooCommerce does not have such a feature (yet)
-		* Does not support refunds
+	*	Implementation of [GA4 E-commerce](https://developers.google.com/tag-manager/ecommerce-ga4)
+	* Does not support promotions since WooCommerce does not have such a feature (yet)
+	* Does not support refunds
   * Compatibility with High Performance Order Storage (HPOS)
-* Google Optimize: load your Google Optimize container directly from your website with the ability to use the data layer variables provided during page load
 * AMP: load your AMP container on the AMP version of your pages
+* Cookiebot: use automatic cookie blocking mode if needed
+* Google Consent Mode v2: fire the "default" command with specific consent flags to integrat with non-certified Consent Management Platforms (CMPs) and plugins.
 
 = Server side containers =
 
 If you are using a [server side container](https://developers.google.com/tag-manager/serverside/send-data#update_the_gtmjs_source_domain)
-you can enter your custom domain name to load gtm.js from your there.
+you can enter your custom domain name and custom path to load gtm.js from your there.
+
+= Exclude specific user roles from being tracked =
+
+You can set which user roles needs to be excluded from tracking when a user with that role visits the frontend. This will completely disable the container code for that user.
 
 == Installation ==
 
@@ -179,8 +171,8 @@ you can enter your custom domain name to load gtm.js from your there.
 
 = How can I ... =
 
-Tutorials for various Google Tag Manager settings and implementation are available on my website:
-https://gtm4wp.com/how-to-articles/
+Tutorials for various Google Tag Manager settings and implementation are available on the plugin's website:
+https://gtm4wp.com/setup-gtm4wp-features
 
 = PayPal / 3rd party payment gateway transactions in WooCommerce are not being tracked in Google Analytics =
 
@@ -190,6 +182,12 @@ It offers the route back for your customer but it can happen that users close th
 
 Enable auto-return in your payment gateway settings. This will instruct them to show a quick info page after payment
 and redirect the user back to your site. This will improve the accuracy and frequency of tracked transactions.
+
+= Purchase event is not tracked with WooCommerce =
+
+If you are using a 3rd party plugin that alters the default order received page in a way that does not utilize the integration hooks
+of WooCommerce then this can happen. Either stop using this 3rd party plugin or ask them to better mimic the behavior of the
+default order received page by supporting the woocommerce is_order_received_page and the woocommerce_thankyou actions and filters.
 
 = Why isn't there an option to blacklist tag/variable classes =
 
@@ -214,13 +212,6 @@ There are five dataLayer events you can use in your rule definitions:
 
 Example use cases: using these events as triggers, you can fire Google Universal Analytics and/or Google Ads remarketing/conversion tags
 to report micro conversions and/or to serve ads only to visitors who spend more time reading your content.
-
-= Can I exclude certain user roles from being tracked? =
-
-This is easily managed through GTM itself. If you want to exclude logged in users or users with certain user roles,
-use the corresponding dataLayer variable (visitorType) and an exclude filter in Google Tag Manager.
-
-https://gtm4wp.com/how-to-articles/how-to-exclude-admin-users-from-being-tracked/
 
 == Screenshots ==
 
