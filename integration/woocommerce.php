@@ -31,22 +31,9 @@ $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = false;
 function gtm4wp_woocommerce_add_global_vars( $return ) {
 	global $gtm4wp_options;
 
-	/*
-	if ( function_exists( 'WC' ) && WC()->cart ) {
-		$gtm4wp_needs_shipping_address = (bool) WC()->cart->needs_shipping_address();
-	} else {
-		$gtm4wp_needs_shipping_address = false;
-	}
-	*/
-
 	$return['gtm4wp_use_sku_instead']        = (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] );
-//	$return['gtm4wp_id_prefix']              = gtm4wp_prefix_productid( '', $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ] );
-//	$return['gtm4wp_ecommerce']              = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] );
 	$return['gtm4wp_currency']               = get_woocommerce_currency();
 	$return['gtm4wp_product_per_impression'] = (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ] );
-//	$return['gtm4wp_needs_shipping_address'] = (bool) $gtm4wp_needs_shipping_address;
-//	$return['gtm4wp_business_vertical']      = esc_js( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] );
-//	$return['gtm4wp_business_vertical_id']   = gtm4wp_get_gads_product_id_variable_name( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ] );
 	$return['gtm4wp_clear_ecommerce']        = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ] );
 
 	return $return;
