@@ -35,10 +35,6 @@ var adminsubtabs = {
 		"mediaevents": {
 			tabtext: gtm4wp.mediaeventstabtitle,
 			numitems: 3
-		},
-		"depecratedevents": {
-			tabtext: gtm4wp.depecratedeventstabtitle,
-			numitems: 0
 		}
 	},
 	3: {},
