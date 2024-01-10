@@ -72,6 +72,10 @@ var adminsubtabs = {
 		"int-consentmode": {
 			tabtext: gtm4wp.consentmodetabtitle,
 			numitems: 8
+		},
+		"int-webtoffeegdpr": {
+			tabtext: gtm4wp.webtoffeetabtitle,
+			numitems: 1
 		}
 	}
 };

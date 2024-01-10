@@ -94,6 +94,8 @@ define( 'GTM4WP_OPTION_INTEGRATE_AMPID', 'integrate-amp-id' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR', 'integrate-webtoffee-gdpr' );
+
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE', 'integrate-consent-mode' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS', 'integrate-consent-mode-ads' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA', 'integrate-consent-mode-ad-user-data' );
@@ -197,6 +199,8 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_AMPID                 => '',
 
 	GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false,
+
+	GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR        => false,
 
 	GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => false,
 	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS       => false,

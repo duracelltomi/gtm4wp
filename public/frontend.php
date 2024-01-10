@@ -937,6 +937,35 @@ function gtm4wp_wp_header_top( $echo = true ) {
 	const gtm4wp_scrollerscript_scannertime       = ' . (int) $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_READERTIME ] . ';';
 	}
 
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR ] ) {
+		$_gtm_top_content .= '
+	var CookieLawInfo_Accept_Callback = (function() {
+		var gtm4wp_original_cli_callback = CookieLawInfo_Accept_Callback;
+	
+		return function() {
+			if ( !window.CLI.consent ) {
+				return false;
+			}
+		
+			window.' . esc_js( $gtm4wp_datalayer_name ) . ' = window.' . esc_js( $gtm4wp_datalayer_name ) . ' || [];
+			window.' . esc_js( $gtm4wp_datalayer_name ) . '.push({
+				"event": "cookie_consent_update",
+				"consent_data": window.CLI.consent
+			});
+		
+			for(var i in window.CLI.consent) {
+				window.' . esc_js( $gtm4wp_datalayer_name ) . '.push({
+					"event": "cookie_consent_" + i
+				});
+			}
+	
+			if ( "function" == typeof gtm4wp_original_cli_callback ) {
+				gtm4wp_original_cli_callback();
+			}
+		}
+	})();';
+	}
+
 	$_gtm_top_content .= '
 </script>
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';

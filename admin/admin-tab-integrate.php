@@ -255,4 +255,12 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+
+	GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR           => array(
+		'label'         => esc_html__( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
+		'description'   => esc_html__( 'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found.', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_STABLE,
+		'plugintocheck' => 'webtoffee-gdpr-cookie-consent/cookie-law-info.php',
+	),
+
 );

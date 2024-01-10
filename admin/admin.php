@@ -1035,6 +1035,7 @@ function gtm4wp_add_admin_js( $hook ) {
 			'sitetabtitle'          => esc_html__( 'Site', 'duracelltomi-google-tag-manager' ),
 			'misctabtitle'          => esc_html__( 'Misc', 'duracelltomi-google-tag-manager' ),
 			'consentmodetabtitle'   => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
+			'webtoffeetabtitle'     => esc_html__( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
 		);
 		wp_localize_script( 'admin-subtabs', 'gtm4wp', $subtabtexts );
 
