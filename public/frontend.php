@@ -1222,11 +1222,6 @@ function gtm4wp_fire_additional_datalayer_pushes() {
 	$has_html5_support    = current_theme_supports( 'html5' );
 	$add_cookiebot_ignore = (bool) $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
 
-	if ( count( $gtm4wp_additional_datalayer_pushes ) > 0 ) {
-		echo '
-<script' . ( $has_html5_support ? '' : ' type="text/javascript"' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>';
-	}
-
 	foreach ( $gtm4wp_additional_datalayer_pushes as $one_event ) {
 		$datalayer_push_code = '';
 
@@ -1248,12 +1243,6 @@ function gtm4wp_fire_additional_datalayer_pushes() {
 
 	// Reset array so that additional data can be added and this function can be re-run without double running code.
 	$gtm4wp_additional_datalayer_pushes = array();
-
-	if ( count( $gtm4wp_additional_datalayer_pushes ) > 0 ) {
-		echo '
-</script>';
-	}
-
 }
 
 /**

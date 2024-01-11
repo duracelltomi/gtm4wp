@@ -443,6 +443,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				'cart'
 			);
 
+			unset( $eec_product_array['internal_id'] );
+
 			$data_layer['cartContent']['items'][] = $eec_product_array;
 		}
 	}
