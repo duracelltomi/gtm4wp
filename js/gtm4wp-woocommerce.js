@@ -637,18 +637,9 @@ function gtm4wp_woocommerce_process_pages() {
 			gtm4wp_woocommerce_handle_payment_method_change();
 		});
 
-		document.addEventListener( 'click', function( e ) {
-			let event_target_element = e.target;
-
-			if ( !event_target_element ) {
-				// for some reason event target is not specificed
-				return true;
-			}
-
-			if ( !event_target_element.closest( 'form[name=checkout] button[type=submit]' ) ) {
-				return true;
-			}
-
+		// We need to use jQuery where since the checkout_place_order event is only triggered using jQuery
+		const checkout_form = jQuery('form.checkout');
+		checkout_form.on('checkout_place_order', function () {
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1 ) {
 				// shipping methods are not visible if only one is available
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
