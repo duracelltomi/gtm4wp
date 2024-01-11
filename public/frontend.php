@@ -802,6 +802,9 @@ function gtm4wp_enqueue_scripts() {
 		wp_enqueue_script( 'gtm4wp-scroll-tracking', $gtp4wp_script_path . 'analytics-talk-content-tracking.js', array(), GTM4WP_VERSION, $in_footer );
 	}
 
+	wp_register_script( 'gtm4wp-additional-datalayer-pushes', '', array(), GTM4WP_VERSION, true );
+	wp_enqueue_script( 'gtm4wp-additional-datalayer-pushes' );
+
 	gtm4wp_fire_additional_datalayer_pushes();
 }
 
@@ -1014,7 +1017,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
 
 		echo '
-	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE ) . ';';
+	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK ) . ';';
 
 		echo '
 	' . esc_js( $gtm4wp_datalayer_name ) . '.push( dataLayer_content );';
@@ -1233,14 +1236,14 @@ function gtm4wp_fire_additional_datalayer_pushes() {
 
 		if ( array_key_exists( 'datalayer_object', $one_event ) ) {
 			$datalayer_push_code .= '
-	' . esc_js( $gtm4wp_datalayer_name ) . '.push(' . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE ) . ');';
+	' . esc_js( $gtm4wp_datalayer_name ) . '.push(' . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK ) . ');';
 		}
 
 		if ( array_key_exists( 'js_after', $one_event ) ) {
 			$datalayer_push_code .= $one_event['js_after'];
 		}
 
-		wp_add_inline_script( 'gtm4wp-woocommerce', $datalayer_push_code, 'after' );
+		wp_add_inline_script( 'gtm4wp-additional-datalayer-pushes', $datalayer_push_code, 'after' );
 	}
 
 	// Reset array so that additional data can be added and this function can be re-run without double running code.
