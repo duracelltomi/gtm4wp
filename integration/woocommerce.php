@@ -1168,8 +1168,8 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			'widgetproduct'
 		);
 
-		if ( ! isset( $eec_product_array['brand'] ) ) {
-			$eec_product_array['brand'] = '';
+		if ( ! isset( $eec_product_array['item_brand'] ) ) {
+			$eec_product_array['item_brand'] = '';
 		}
 
 		$productlink_with_data = sprintf(
@@ -1234,8 +1234,8 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 		'productlist'
 	);
 
-	if ( ! isset( $eec_product_array['brand'] ) ) {
-		$eec_product_array['brand'] = '';
+	if ( ! isset( $eec_product_array['item_brand'] ) ) {
+		$eec_product_array['item_brand'] = '';
 	}
 
 	return sprintf(
