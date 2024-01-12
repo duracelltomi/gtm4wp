@@ -187,12 +187,15 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_CONSENTMODE              => array(
 		'label'       => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
 		'description' => sprintf(
-			// translators: 1: opening anchor tag linking to Google's documentation about the consent mode command. 2: Closing anchor tag.
-			gtm4wp_safe_admin_html( __( 'Enable this checkbox if you wish to execute the "default" command of %1$sGoogle Consent Mode%2$s before the container loads.
-				The "update" command needs to be executed from your consent management tool.<br /><br />
-				DO NOT enable this feature if your consent manager tool supports firing both the "default" and the "update" command.',
-				'duracelltomi-google-tag-manager'
-			) ),
+			gtm4wp_safe_admin_html(
+				// translators: 1: opening anchor tag linking to Google's documentation about the consent mode command. 2: Closing anchor tag.
+				__(
+					'Enable this checkbox if you wish to execute the "default" command of %1$sGoogle Consent Mode%2$s before the container loads.
+					The "update" command needs to be executed from your consent management tool.<br /><br />
+					DO NOT enable this feature if your consent manager tool supports firing both the "default" and the "update" command.',
+					'duracelltomi-google-tag-manager'
+				)
+			),
 			'<a href="https://developers.google.com/tag-platform/gtagjs/reference#consent" target="_blank" rel="noopener">',
 			'</a>'
 		),
