@@ -744,7 +744,13 @@ function gtm4wp_admin_init() {
 		GTM4WP_ADMIN_GROUP_GENERAL,
 		array(
 			'label_for'   => GTM4WP_ADMIN_GROUP_CONTAINERON,
-			'description' => gtm4wp_safe_admin_html( 'Turning OFF the Google Tag Manager container itself will remove both the head and the body part of the container code but leave data layer codes working.<br/>This should be only used in specific cases where you need to place the container code manually or using another tool.', 'duracelltomi-google-tag-manager' ),
+			'description' => gtm4wp_safe_admin_html(
+				__(
+					'Turning OFF the Google Tag Manager container itself will remove both the head and the body part of the container code but leave data layer codes working.<br/>
+					This should be only used in specific cases where you need to place the container code manually or using another tool.',
+					'duracelltomi-google-tag-manager'
+				)
+			),
 		)
 	);
 
@@ -1029,23 +1035,24 @@ function gtm4wp_add_admin_js( $hook ) {
 		wp_register_script( 'admin-subtabs', $gtp4wp_plugin_url . 'js/admin-subtabs.js', array(), GTM4WP_VERSION ); // phpcs:ignore
 
 		$subtabtexts = array(
-			'posttabtitle'             => esc_html__( 'Posts', 'duracelltomi-google-tag-manager' ),
-			'searchtabtitle'           => esc_html__( 'Search', 'duracelltomi-google-tag-manager' ),
-			'visitortabtitle'          => esc_html__( 'Visitors', 'duracelltomi-google-tag-manager' ),
-			'browsertabtitle'          => esc_html__( 'Browser/OS/Device', 'duracelltomi-google-tag-manager' ),
-			'blocktagstabtitle'        => esc_html__( 'Blacklist tags', 'duracelltomi-google-tag-manager' ),
-			'blocktriggerstabtitle'    => esc_html__( 'Blacklist triggers', 'duracelltomi-google-tag-manager' ),
-			'blockmacrostabtitle'      => esc_html__( 'Blacklist variables', 'duracelltomi-google-tag-manager' ),
-			'wpcf7tabtitle'            => esc_html__( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
-			'wctabtitle'               => esc_html__( 'WooCommerce', 'duracelltomi-google-tag-manager' ),
-			'amptabtitle'              => esc_html__( 'Accelerated Mobile Pages', 'duracelltomi-google-tag-manager' ),
-			'cookiebottabtitle'        => esc_html__( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
-			'weathertabtitle'          => esc_html__( 'Weather & geo data', 'duracelltomi-google-tag-manager' ),
-			'generaleventstabtitle'    => esc_html__( 'General events', 'duracelltomi-google-tag-manager' ),
-			'mediaeventstabtitle'      => esc_html__( 'Media events', 'duracelltomi-google-tag-manager' ),
-			'sitetabtitle'             => esc_html__( 'Site', 'duracelltomi-google-tag-manager' ),
-			'misctabtitle'             => esc_html__( 'Misc', 'duracelltomi-google-tag-manager' ),
-			'consentmodetabtitle'      => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
+			'posttabtitle'          => esc_html__( 'Posts', 'duracelltomi-google-tag-manager' ),
+			'searchtabtitle'        => esc_html__( 'Search', 'duracelltomi-google-tag-manager' ),
+			'visitortabtitle'       => esc_html__( 'Visitors', 'duracelltomi-google-tag-manager' ),
+			'browsertabtitle'       => esc_html__( 'Browser/OS/Device', 'duracelltomi-google-tag-manager' ),
+			'blocktagstabtitle'     => esc_html__( 'Blacklist tags', 'duracelltomi-google-tag-manager' ),
+			'blocktriggerstabtitle' => esc_html__( 'Blacklist triggers', 'duracelltomi-google-tag-manager' ),
+			'blockmacrostabtitle'   => esc_html__( 'Blacklist variables', 'duracelltomi-google-tag-manager' ),
+			'wpcf7tabtitle'         => esc_html__( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
+			'wctabtitle'            => esc_html__( 'WooCommerce', 'duracelltomi-google-tag-manager' ),
+			'amptabtitle'           => esc_html__( 'Accelerated Mobile Pages', 'duracelltomi-google-tag-manager' ),
+			'cookiebottabtitle'     => esc_html__( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
+			'weathertabtitle'       => esc_html__( 'Weather & geo data', 'duracelltomi-google-tag-manager' ),
+			'generaleventstabtitle' => esc_html__( 'General events', 'duracelltomi-google-tag-manager' ),
+			'mediaeventstabtitle'   => esc_html__( 'Media events', 'duracelltomi-google-tag-manager' ),
+			'sitetabtitle'          => esc_html__( 'Site', 'duracelltomi-google-tag-manager' ),
+			'misctabtitle'          => esc_html__( 'Misc', 'duracelltomi-google-tag-manager' ),
+			'consentmodetabtitle'   => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
+			'webtoffeetabtitle'     => esc_html__( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
 		);
 		wp_localize_script( 'admin-subtabs', 'gtm4wp', $subtabtexts );
 

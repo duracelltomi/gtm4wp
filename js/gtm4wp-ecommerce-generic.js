@@ -37,20 +37,32 @@ function gtm4wp_push_ecommerce( event_name, items, extra_params, event_callback=
 	window[ gtm4wp_datalayer_name ].push(dl_obj);
 }
 
-function gtm4wp_read_json_from_node( el, dataset_item_id ) {
-	if ( el && el.dataset && el.dataset[ dataset_item_id ] ) {
-		try {
-			const parsed_json = JSON.parse( el.dataset[ dataset_item_id ] );
-			if ( parsed_json ) {
-				if ( parsed_json.price ) {
-					parsed_json.price = gtm4wp_make_sure_is_float( parsed_json.price );
-				}
-
-				return parsed_json;
+function gtm4wp_read_from_json( json_data, exclude_keys=['productlink', 'internal_id'] ) {
+	try {
+		const parsed_json = JSON.parse( json_data );
+		if ( parsed_json ) {
+			if ( parsed_json.price ) {
+				parsed_json.price = gtm4wp_make_sure_is_float( parsed_json.price );
 			}
-		} catch(e) {
-			console && console.error && console.error( e.message );
+
+			if ( exclude_keys && exclude_keys.length > 0 ) {
+				for ( let i = 0; i < exclude_keys.length; i++ ) {
+					delete parsed_json[ exclude_keys[i] ];
+				}
+			}
+
+			return parsed_json;
 		}
+	} catch(e) {
+		console && console.error && console.error( e.message );
+	}
+
+	return false;
+}
+
+function gtm4wp_read_json_from_node( el, dataset_item_id, exclude_keys=['productlink', 'internal_id'] ) {
+	if ( el && el.dataset && el.dataset[ dataset_item_id ] ) {
+		return gtm4wp_read_from_json( el.dataset[ dataset_item_id ], exclude_keys );
 	}
 
 	return false;

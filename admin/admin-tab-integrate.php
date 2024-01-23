@@ -187,12 +187,14 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	GTM4WP_OPTION_INTEGRATE_CONSENTMODE              => array(
 		'label'       => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
 		'description' => sprintf(
-			// translators: 1: opening anchor tag linking to Google's documentation about the consent mode command. 2: Closing anchor tag.
 			gtm4wp_safe_admin_html(
-				'Enable this checkbox if you wish to execute the "default" command of %1$sGoogle Consent Mode%2$s before the container loads.
-				The "update" command needs to be executed from your consent management tool.<br /><br />
-				DO NOT enable this feature if your consent manager tool supports firing both the "default" and the "update" command.',
-				'duracelltomi-google-tag-manager'
+				// translators: 1: opening anchor tag linking to Google's documentation about the consent mode command. 2: Closing anchor tag.
+				__(
+					'Enable this checkbox if you wish to execute the "default" command of %1$sGoogle Consent Mode%2$s before the container loads.
+					The "update" command needs to be executed from your consent management tool.<br /><br />
+					DO NOT enable this feature if your consent manager tool supports firing both the "default" and the "update" command.',
+					'duracelltomi-google-tag-manager'
+				)
 			),
 			'<a href="https://developers.google.com/tag-platform/gtagjs/reference#consent" target="_blank" rel="noopener">',
 			'</a>'
@@ -255,4 +257,12 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+
+	GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR           => array(
+		'label'         => esc_html__( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
+		'description'   => esc_html__( 'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found.', 'duracelltomi-google-tag-manager' ),
+		'phase'         => GTM4WP_PHASE_STABLE,
+		'plugintocheck' => 'webtoffee-gdpr-cookie-consent/cookie-law-info.php',
+	),
+
 );

@@ -188,6 +188,8 @@ function gtm4wp_woocommerce_process_order_items( $order ) {
 				'purchase'
 			);
 
+			unset( $eec_product_array['internal_id'] );
+
 			if ( $eec_product_array ) {
 				$order_data[] = $eec_product_array;
 			}
@@ -441,6 +443,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				'cart'
 			);
 
+			unset( $eec_product_array['internal_id'] );
+
 			$data_layer['cartContent']['items'][] = $eec_product_array;
 		}
 	}
@@ -477,6 +481,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 					$data_layer['productIsVariable'] = 0;
 
 					$gtm4wp_currency = get_woocommerce_currency();
+					unset( $eec_product_array['internal_id'] );
 
 					gtm4wp_datalayer_push(
 						'view_item',
@@ -527,6 +532,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 					),
 					'cart'
 				);
+
+				unset( $eec_product_array['internal_id'] );
 
 				$gtm4wp_cart_products[] = $eec_product_array;
 				$gtm4wp_cart_total     += $eec_product_array['price'] * $eec_product_array['quantity'];
@@ -723,6 +730,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 					'checkout'
 				);
 
+				unset( $eec_product_array['internal_id'] );
+
 				$gtm4wp_checkout_products[] = $eec_product_array;
 				$gtm4wp_checkout_total     += $eec_product_array['quantity'] * $eec_product_array['price'];
 			} // end foreach cart item
@@ -765,6 +774,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				);
 
 				$gtm4wp_currency = get_woocommerce_currency();
+				unset( $eec_product_array['internal_id'] );
 
 				gtm4wp_datalayer_push(
 					'add_to_cart',
@@ -1168,8 +1178,8 @@ function gtm4wp_woocommerce_after_template_part( $template_name ) {
 			'widgetproduct'
 		);
 
-		if ( ! isset( $eec_product_array['brand'] ) ) {
-			$eec_product_array['brand'] = '';
+		if ( ! isset( $eec_product_array['item_brand'] ) ) {
+			$eec_product_array['item_brand'] = '';
 		}
 
 		$productlink_with_data = sprintf(
@@ -1234,8 +1244,8 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 		'productlist'
 	);
 
-	if ( ! isset( $eec_product_array['brand'] ) ) {
-		$eec_product_array['brand'] = '';
+	if ( ! isset( $eec_product_array['item_brand'] ) ) {
+		$eec_product_array['item_brand'] = '';
 	}
 
 	return sprintf(

@@ -263,7 +263,7 @@ function gtm4wp_woocommerce_process_pages() {
 				let sum_value = 0;
 	
 				products_in_group.forEach( function( product_data_el ) {
-					const productdata = gtm4wp_read_json_from_node(product_data_el, 'gtm4wp_product_data');
+					const productdata = gtm4wp_read_json_from_node(product_data_el, 'gtm4wp_product_data', ['productlink']);
 					if ( !productdata ) {
 						return true;
 					}
@@ -279,6 +279,8 @@ function gtm4wp_woocommerce_process_pages() {
 						return true;
 					}
 					productdata.quantity = product_qty;
+
+					delete productdata.internal_id;
 	
 					products.push( productdata );
 					sum_value += productdata.price * productdata.quantity;
@@ -298,15 +300,7 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
-				let productdata;
-				try {
-					productdata = JSON.parse( product_data_el.value );
-				} catch(e) {
-					console && console.error && console.error( e.message );
-					return true;
-				}
-	
-				productdata.price = gtm4wp_make_sure_is_float( productdata.price );
+				let productdata = gtm4wp_read_from_json( product_data_el.value );
 				productdata.quantity = product_form.querySelector( '[name=quantity]' ) && product_form.querySelector( '[name=quantity]' ).value;
 				if ( isNaN( productdata.quantity ) ) {
 					productdata.quantity = 1;
@@ -418,7 +412,7 @@ function gtm4wp_woocommerce_process_pages() {
 				}
 			}
 			
-			const productdata = gtm4wp_read_json_from_node( productdata_el, 'gtm4wp_product_data' );
+			const productdata = gtm4wp_read_json_from_node( productdata_el, 'gtm4wp_product_data', ['internal_id'] );
 			if ( !productdata ) {
 				return true;
 			}
@@ -456,6 +450,9 @@ function gtm4wp_woocommerce_process_pages() {
 				// we need to open the new tab/page here so that popup blocker of the browser doesn't block our code
 				window.productpage_window = window.open( 'about:blank', '_blank' );
 			}
+
+			const productlink_to_redirect = productdata.productlink;
+			delete productdata.productlink;
 	
 			// fire ga4 version
 			gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
@@ -468,9 +465,9 @@ function gtm4wp_woocommerce_process_pages() {
 
 				if ( !event_already_prevented ) {
 					if ( ( target_new_tab || ctrl_key_pressed ) && productpage_window ) {
-						productpage_window.location.href = productdata.productlink;
+						productpage_window.location.href = productlink_to_redirect;
 					} else {
-						document.location.href = productdata.productlink;
+						document.location.href = productlink_to_redirect;
 					}
 				}
 			});
@@ -640,18 +637,9 @@ function gtm4wp_woocommerce_process_pages() {
 			gtm4wp_woocommerce_handle_payment_method_change();
 		});
 
-		document.addEventListener( 'click', function( e ) {
-			let event_target_element = e.target;
-
-			if ( !event_target_element ) {
-				// for some reason event target is not specificed
-				return true;
-			}
-
-			if ( !event_target_element.closest( 'form[name=checkout] button[type=submit]' ) ) {
-				return true;
-			}
-
+		// We need to use jQuery where since the checkout_place_order event is only triggered using jQuery
+		const checkout_form = jQuery('form.checkout');
+		checkout_form.on('checkout_place_order', function () {
 			if ( gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1 ) {
 				// shipping methods are not visible if only one is available
 				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
