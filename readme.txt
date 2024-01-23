@@ -244,6 +244,7 @@ please update the plugin on a test version of your website before updating your 
 * Added: stockstatus key into the product array of every ecommerce action. Returns the value of WP_Product->get_stock_status(). Thanks [hans2103](https://github.com/hans2103).
 * Added: integration with WebToffee GDPR Cookie Consent plugin. GTM4WP can not fire a GTM event when user consent changes or when a previously stored consent has been loaded.
 * Fixed: add_payment_info and add_shipping_info events were not fired during checkout submit when not fired before on the page.
+* Fixed: GTM4WP will only look for the user's IP address in the REMOTE_ADDR server variable. You may enter a custom HTTP header instead in plugin settings.
 
 = 1.19.1 =
 

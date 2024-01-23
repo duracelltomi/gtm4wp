@@ -12,7 +12,7 @@ var adminsubtabs = {
 		},
 		"visitor": {
 			tabtext: gtm4wp.visitortabtitle,
-			numitems: 7
+			numitems: 8
 		},
 		"whichbrowser": {
 			tabtext: gtm4wp.browsertabtitle,

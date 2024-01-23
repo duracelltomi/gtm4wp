@@ -511,7 +511,18 @@ function gtm4wp_sanitize_options( $options ) {
 			$newoptionvalue = '';
 		}
 
-		if ( 'include-' === substr( $optionname, 0, 8 ) ) {
+		if ( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER === $optionname ) {
+			if ( '' !== $newoptionvalue ) {
+				$custom_header = strtoupper( str_replace( '-', '_', $newoptionvalue ) );
+				if ( preg_match( '/[A-Z0-9_]+/', $custom_header ) ) {
+					$output[ $optionname ] = $custom_header;
+				} else {
+					$output[ $optionname ] = '';
+				}
+			} else {
+				$output[ $optionname ] = $newoptionvalue;
+			}
+		} elseif ( 'include-' === substr( $optionname, 0, 8 ) ) {
 			// "include" settings.
 			$output[ $optionname ] = (bool) $newoptionvalue;
 
