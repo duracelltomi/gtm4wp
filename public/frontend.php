@@ -127,6 +127,10 @@ function gtm4wp_get_user_ip( $use_custom_header = '' ) {
 		}
 	}
 
+	if ( isset( $_SERVER['REMOTE_ADDR'] ) ) {
+		return filter_var( wp_unslash( $_SERVER['REMOTE_ADDR'] ), FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
+	}
+
 	return '';
 }
 
