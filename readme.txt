@@ -270,6 +270,11 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 
 * Updated: WooCommerce integration now accepts the primary category selection of Yoast SEO and Rank Math SEO
 * Updated: use the gtm4wp_admin_page_capability filter to modify the capability needed to use the admin page (thanks [emreerkan](https://github.com/emreerkan))
+* Updated: orderData data layer variable in WooCommerce integration now includes keys to better support enhanced conversions setup:
+  * orderData.customer.billing.first_name_hash
+  * orderData.customer.billing.last_name_hash
+  * orderData.customer.billing.phone_hash
+* Deprecated: orderData.customer.billing.emailhash, please update to use orderData.customer.billing.email_hash (with an underscore)
 * Fixed: price did not include the .00 postfix for integers in the add_to_cart event
 * Added: if needed, you can turn on clearing the ecommerce object before a new GA4 event is being pushed.
 * Added: support for Google Consent Mode default command for use cases where the consent management tool does not support it already
