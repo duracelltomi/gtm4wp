@@ -218,6 +218,30 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 		return $order_data;
 	}
 
+	$billing_email      = strtolower( trim( $order->get_billing_email() ) );
+	$billing_email_hash = '';
+	if ( '' !== $billing_email ) {
+		$billing_email_hash = hash( 'sha256', $billing_email );
+	}
+
+	$billing_first      = trim( $order->get_billing_email() );
+	$billing_first_hash = '';
+	if ( '' !== $billing_first ) {
+		$billing_first_hash = hash( 'sha256', $billing_first );
+	}
+
+	$billing_last      = trim( $order->get_billing_email() );
+	$billing_last_hash = '';
+	if ( '' !== $billing_last ) {
+		$billing_last_hash = hash( 'sha256', $billing_last );
+	}
+
+	$billing_phone      = trim( $order->get_billing_email() );
+	$billing_phone_hash = '';
+	if ( '' !== $billing_phone ) {
+		$billing_phone_hash = hash( 'sha256', $billing_phone );
+	}
+
 	$order_data = array(
 		'attributes' => array(
 			'date'                 => $order->get_date_created()->date( 'c' ),
@@ -252,9 +276,9 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 
 			'billing'  => array(
 				'first_name'      => esc_js( $order->get_billing_first_name() ),
-				'first_name_hash' => esc_js( hash( 'sha256', $order->get_billing_first_name() ) ),
+				'first_name_hash' => esc_js( $billing_first_hash ),
 				'last_name'       => esc_js( $order->get_billing_last_name() ),
-				'last_name_hash'  => esc_js( hash( 'sha256', $order->get_billing_last_name() ) ),
+				'last_name_hash'  => esc_js( $billing_last_hash ),
 				'company'         => esc_js( $order->get_billing_company() ),
 				'address_1'       => esc_js( $order->get_billing_address_1() ),
 				'address_2'       => esc_js( $order->get_billing_address_2() ),
@@ -263,10 +287,10 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 				'postcode'        => esc_js( $order->get_billing_postcode() ),
 				'country'         => esc_js( $order->get_billing_country() ),
 				'email'           => esc_js( $order->get_billing_email() ),
-				'emailhash'       => esc_js( hash( 'sha256', $order->get_billing_email() ) ), // deprecated.
-				'email_hash'      => esc_js( hash( 'sha256', $order->get_billing_email() ) ),
+				'emailhash'       => esc_js( $billing_email_hash ), // deprecated.
+				'email_hash'      => esc_js( $billing_email_hash ),
 				'phone'           => esc_js( $order->get_billing_phone() ),
-				'phone_hash'      => esc_js( hash( 'sha256', $order->get_billing_phone() ) ),
+				'phone_hash'      => esc_js( $billing_phone_hash ),
 			),
 
 			'shipping' => array(
