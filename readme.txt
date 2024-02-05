@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.4
-Stable tag: 1.19.1
+Stable tag: 1.20
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -232,15 +232,20 @@ Lots of deprecated features removed.
 The code of WooCommerce integration was cleaned and restructured, if you have any custom code that relies on GTM4WP internal data structure,
 please update the plugin on a test version of your website before updating your live site!
 
-* Removed deprecated Universal Analytics events for WooCommerce
-* Removed deprecated filter GTM4WP_WPFILTER_AFTER_DATALAYER/gtm4wp_after_datalayer
-* Removed deprecated filter GTM4WP_WPFILTER_ADDGLOBALVARS/gtm4wp_add_global_vars
+* Removed: deprecated Universal Analytics events for WooCommerce
+* Removed: deprecated filter GTM4WP_WPFILTER_AFTER_DATALAYER/gtm4wp_after_datalayer
+* Removed: deprecated filter GTM4WP_WPFILTER_ADDGLOBALVARS/gtm4wp_add_global_vars
 * Removed: deprecated feature that puts the 'Do not track' option of the browser into the data layer. It is a deprecated browser feature therefore removed from this plugin.
 * Removed: deprecated Google Optimize integration
 * Removed: deprecated constants GTM4WP_OPTION_BLACKLIST_MACRO_* and GTM4WP_OPTION_BLACKLIST_<adsystemname>
 * Removed: deprecated WordPress filter GTM4WP_WPFILTER_GETTHEGTMTAG (deprecated in v1.16)
 * Changed: lots of internal function names and variable names changed, although is not recommended to depend on them, if you did, check your code
 * Changed: renamed WP filter gtm4wp_datalayer_on_pageload to gtm4wp_woocommerce_datalayer_on_pageload to better reflect when it is called.
+* Changed: orderData data layer variable in WooCommerce integration now includes keys to better support enhanced conversions setup:
+  * orderData.customer.billing.first_name_hash
+  * orderData.customer.billing.last_name_hash
+  * orderData.customer.billing.phone_hash
+* Deprecated: orderData.customer.billing.emailhash, please update to use orderData.customer.billing.email_hash (with an underscore)
 * Added: stockstatus key into the product array of every ecommerce action. Returns the value of WP_Product->get_stock_status(). Thanks [hans2103](https://github.com/hans2103).
 * Added: integration with WebToffee GDPR Cookie Consent plugin. GTM4WP can not fire a GTM event when user consent changes or when a previously stored consent has been loaded.
 * Fixed: add_payment_info and add_shipping_info events were not fired during checkout submit when not fired before on the page.
@@ -270,11 +275,6 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 
 * Updated: WooCommerce integration now accepts the primary category selection of Yoast SEO and Rank Math SEO
 * Updated: use the gtm4wp_admin_page_capability filter to modify the capability needed to use the admin page (thanks [emreerkan](https://github.com/emreerkan))
-* Updated: orderData data layer variable in WooCommerce integration now includes keys to better support enhanced conversions setup:
-  * orderData.customer.billing.first_name_hash
-  * orderData.customer.billing.last_name_hash
-  * orderData.customer.billing.phone_hash
-* Deprecated: orderData.customer.billing.emailhash, please update to use orderData.customer.billing.email_hash (with an underscore)
 * Fixed: price did not include the .00 postfix for integers in the add_to_cart event
 * Added: if needed, you can turn on clearing the ecommerce object before a new GA4 event is being pushed.
 * Added: support for Google Consent Mode default command for use cases where the consent management tool does not support it already
@@ -893,7 +893,7 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 = 1.20 =
 
-* Updated: added ad_user_data and ad_personalisation flags to support Consent Mode v2
+* Lots of deprecated features removed, please read announcement post before upgrading!
 
 = 1.19.1 =
 
