@@ -224,19 +224,19 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 		$billing_email_hash = hash( 'sha256', $billing_email );
 	}
 
-	$billing_first      = trim( $order->get_billing_email() );
+	$billing_first      = trim( $order->get_billing_first_name() );
 	$billing_first_hash = '';
 	if ( '' !== $billing_first ) {
 		$billing_first_hash = hash( 'sha256', $billing_first );
 	}
 
-	$billing_last      = trim( $order->get_billing_email() );
+	$billing_last      = trim( $order->get_billing_last_name() );
 	$billing_last_hash = '';
 	if ( '' !== $billing_last ) {
 		$billing_last_hash = hash( 'sha256', $billing_last );
 	}
 
-	$billing_phone      = trim( $order->get_billing_email() );
+	$billing_phone      = trim( $order->get_billing_phone() );
 	$billing_phone_hash = '';
 	if ( '' !== $billing_phone ) {
 		$billing_phone_hash = hash( 'sha256', $billing_phone );
