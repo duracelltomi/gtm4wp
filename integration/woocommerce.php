@@ -184,6 +184,7 @@ function gtm4wp_woocommerce_process_order_items( $order ) {
 				array(
 					'quantity' => $order_item->get_quantity(),
 					'price'    => $product_price,
+					'item'     => $order_item,
 				),
 				'purchase'
 			);
@@ -466,7 +467,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			$eec_product_array = gtm4wp_woocommerce_process_product(
 				$product,
 				array(
-					'quantity' => $cart_item_data['quantity'],
+					'quantity'  => $cart_item_data['quantity'],
+					'cart_item' => $cart_item_data,
 				),
 				'cart'
 			);
@@ -556,7 +558,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				$eec_product_array = gtm4wp_woocommerce_process_product(
 					$product,
 					array(
-						'quantity' => $cart_item_data['quantity'],
+						'quantity'  => $cart_item_data['quantity'],
+						'cart_item' => $cart_item_data,
 					),
 					'cart'
 				);
@@ -753,7 +756,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				$eec_product_array = gtm4wp_woocommerce_process_product(
 					$product,
 					array(
-						'quantity' => $cart_item_data['quantity'],
+						'quantity'  => $cart_item_data['quantity'],
+						'cart_item' => $cart_item_data,
 					),
 					'checkout'
 				);
@@ -796,7 +800,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				$eec_product_array = gtm4wp_woocommerce_process_product(
 					$product,
 					array(
-						'quantity' => $cart_item['quantity'],
+						'quantity'  => $cart_item['quantity'],
+						'cart_item' => $cart_item,
 					),
 					'readdedtocart'
 				);
