@@ -41,8 +41,7 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 			__(
 				'If you have many products shown on product category pages and/or on your site home, you could miss pageviews in Google Analytics due to the
 				amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by
-				entering a number here (minimum 10-15 recommended) and adding gtm4wp.productImpressionEEC into your Google Analytics ecommerce event helper
-				tag\'s trigger.<br /><br />Leave this value 0 to include product impression data in your pageview hit.',
+				entering a number here (minimum 10-15 recommended)<br /><br />Leave this value 0 to include product impression data in your pageview hit.',
 				'duracelltomi-google-tag-manager'
 			)
 		),
