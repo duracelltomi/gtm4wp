@@ -46,9 +46,7 @@ function gtm4wp_untexturize( $fancy ) {
 		json_decode( '"\u2014"' ) => '--', // em dash.
 	);
 
-	$normal = strtr( $fancy, $fixes );
-
-	return $normal;
+	return strtr( $fancy, $fixes );
 }
 
 /**
