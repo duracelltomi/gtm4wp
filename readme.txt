@@ -229,6 +229,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 Fix: do not load GTM container when OFF and console.log OFF. Thanks [morvy](https://github.com/morvy)
 Fix: reverted a change where item_id in ecommerce data layer was converted to numeric type when the value was a numeric value. It will be kept as a string to preserve compatibility with other integrations.
 Fix: JavaScript error when element ID not set correctly in scroll tracking
+Changed: better normalize and hash user data with WooCommerce + orderData variable for enhanced conventions
 
 = 1.20 =
 

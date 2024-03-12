@@ -218,29 +218,10 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 		return $order_data;
 	}
 
-	$billing_email      = strtolower( trim( $order->get_billing_email() ) );
-	$billing_email_hash = '';
-	if ( '' !== $billing_email ) {
-		$billing_email_hash = hash( 'sha256', $billing_email );
-	}
-
-	$billing_first      = trim( $order->get_billing_first_name() );
-	$billing_first_hash = '';
-	if ( '' !== $billing_first ) {
-		$billing_first_hash = hash( 'sha256', $billing_first );
-	}
-
-	$billing_last      = trim( $order->get_billing_last_name() );
-	$billing_last_hash = '';
-	if ( '' !== $billing_last ) {
-		$billing_last_hash = hash( 'sha256', $billing_last );
-	}
-
-	$billing_phone      = trim( $order->get_billing_phone() );
-	$billing_phone_hash = '';
-	if ( '' !== $billing_phone ) {
-		$billing_phone_hash = hash( 'sha256', $billing_phone );
-	}
+	$billing_email_hash = gtm4wp_normalize_and_hash_email_address( 'sha256', $order->get_billing_email() );
+	$billing_first_hash = gtm4wp_normalize_and_hash( 'sha256', $order->get_billing_first_name(), false );
+	$billing_last_hash  = gtm4wp_normalize_and_hash( 'sha256', $order->get_billing_last_name(), false );
+	$billing_phone_hash = gtm4wp_normalize_and_hash( 'sha256', $order->get_billing_phone(), true );
 
 	$order_data = array(
 		'attributes' => array(
