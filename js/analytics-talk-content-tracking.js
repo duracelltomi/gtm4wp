@@ -76,7 +76,9 @@ if ( "undefined" == typeof console ) {
 
 		// If user has hit the bottom of the content send an event
 		//if ( bottom >= $( '#' + gtm4wp_scrollerscript_contentelementid ).scrollTop() + $( '#' + gtm4wp_scrollerscript_contentelementid ).innerHeight() && !endContent ) {
-		if ( bottom >= document.querySelector('#' + gtm4wp_scrollerscript_contentelementid).scrollTop + document.querySelector('#' + gtm4wp_scrollerscript_contentelementid ).clientHeight && !endContent ) {
+		const scroll_top = document.querySelector('#' + gtm4wp_scrollerscript_contentelementid)?.scrollTop || 0;
+		const client_height = document.querySelector('#' + gtm4wp_scrollerscript_contentelementid )?.clientHeight || 0;
+		if ( bottom >= scroll_top + client_height && !endContent ) {
 			
 			const currentTime = new Date();
 			const contentScrollEnd = currentTime.getTime();
