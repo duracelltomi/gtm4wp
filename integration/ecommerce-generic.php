@@ -46,9 +46,7 @@ function gtm4wp_untexturize( $fancy ) {
 		json_decode( '"\u2014"' ) => '--', // em dash.
 	);
 
-	$normal = strtr( $fancy, $fixes );
-
-	return $normal;
+	return strtr( $fancy, $fixes );
 }
 
 /**
@@ -191,7 +189,7 @@ function gtm4wp_get_gads_product_id_variable_name( $vertical_id ) {
 	if ( array_key_exists( $vertical_id, $gtm4wp_business_verticals_ids ) ) {
 		return $gtm4wp_business_verticals_ids[ $vertical_id ];
 	}
-	
+
 	return 'id';
 }
 
