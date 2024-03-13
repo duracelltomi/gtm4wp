@@ -65,9 +65,9 @@ function gtm4wp_untexturize( $fancy ) {
 function gtm4wp_prefix_productid( $product_id, $prefix ) {
 	if ( '' !== $prefix ) {
 		return $prefix . $product_id;
-	} else {
-		return $product_id;
 	}
+
+	return $product_id;
 }
 
 /**
@@ -190,9 +190,9 @@ function gtm4wp_get_gads_product_id_variable_name( $vertical_id ) {
 
 	if ( array_key_exists( $vertical_id, $gtm4wp_business_verticals_ids ) ) {
 		return $gtm4wp_business_verticals_ids[ $vertical_id ];
-	} else {
-		return 'id';
 	}
+	
+	return 'id';
 }
 
 /**
@@ -218,9 +218,9 @@ function gtm4wp_normalize_and_hash( $hash_algorithm, $value, $trim_intermediate_
 
 	if ( '' === $normalized ) {
 		return '';
-	} else {
-		return hash( $hash_algorithm, $normalized );
 	}
+
+	return hash( $hash_algorithm, $normalized );
 }
 
 /**
