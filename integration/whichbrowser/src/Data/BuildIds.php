@@ -15,9 +15,9 @@ class BuildIds
         if (isset(BuildIds::$ANDROID_BUILDS[$id])) {
             if (is_array(BuildIds::$ANDROID_BUILDS[$id])) {
                 return new Version(BuildIds::$ANDROID_BUILDS[$id]);
-            } else {
-                return new Version([ 'value' => BuildIds::$ANDROID_BUILDS[$id] ]);
-            }
+            } 
+
+			return new Version([ 'value' => BuildIds::$ANDROID_BUILDS[$id] ]);
         }
     }
 }
