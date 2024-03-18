@@ -231,6 +231,7 @@ Fix: reverted a change where item_id in ecommerce data layer was converted to nu
 Fix: JavaScript error when element ID not set correctly in scroll tracking
 Changed: better normalize and hash user data with WooCommerce + orderData variable for enhanced conventions
 Changed: PHP code optimization by [hans2103](https://github.com/hans2103)
+Added: New filter to be able to modify data in the orderData variable on a WooCommerce order received page. Filter can be accessed either using the GTM4WP_WPFILTER_EEC_ORDER_DATA constant or the gtm4wp_eec_order_data string.
 
 = 1.20 =
 

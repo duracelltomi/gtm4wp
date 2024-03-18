@@ -11,6 +11,7 @@
 define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
 define( 'GTM4WP_WPFILTER_EEC_CART_ITEM', 'gtm4wp_eec_cart_item' );
 define( 'GTM4WP_WPFILTER_EEC_ORDER_ITEM', 'gtm4wp_eec_order_item' );
+define( 'GTM4WP_WPFILTER_EEC_ORDER_DATA', 'gtm4wp_eec_order_data' );
 define( 'GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER', 'gtm4wp_purchase_datalayer' );
 define( 'GTM4WP_WPFILTER_EEC_DATALAYER_PAGELOAD', 'gtm4wp_woocommerce_datalayer_on_pageload' );
 
@@ -290,7 +291,13 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 		'items'      => $order_items,
 	);
 
-	return $order_data;
+	/**
+	 * Filters the orderData array before using it for tracking.
+	 * Can be used to add custom order or even product data into the data layer.
+	 *
+	 * @param array  $order_data An associative array containing all data (head data and products) about the currently placed order.
+	 */
+	return apply_filters( GTM4WP_WPFILTER_EEC_ORDER_DATA, $order_data );
 }
 /**
  * Takes a WooCommerce order and order items and generates the standard/classic and
