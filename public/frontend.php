@@ -48,10 +48,10 @@ $GLOBALS['gtm4wp_container_code_written'] = false;
  *
  * @since 1.2
  */
+$GLOBALS['gtm4wp_datalayer_name'] = $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_DATALAYER_NAME ];
+
 if ( empty( $GLOBALS['gtm4wp_options'] ) || ( '' === $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_DATALAYER_NAME ] ) ) {
 	$GLOBALS['gtm4wp_datalayer_name'] = 'dataLayer';
-} else {
-	$GLOBALS['gtm4wp_datalayer_name'] = $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_DATALAYER_NAME ];
 }
 
 /**
@@ -175,10 +175,10 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] ) {
+		$data_layer['visitorLoginState'] = 'logged-out';
+		
 		if ( is_user_logged_in() ) {
 			$data_layer['visitorLoginState'] = 'logged-in';
-		} else {
-			$data_layer['visitorLoginState'] = 'logged-out';
 		}
 	}
 
@@ -393,10 +393,10 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 		$data_layer['siteSearchFrom'] = '';
 		if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
 			$referer_url_parts = explode( '?', esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) );
+			$data_layer['siteSearchFrom'] = $referer_url_parts[0];
+			
 			if ( count( $referer_url_parts ) > 1 ) {
 				$data_layer['siteSearchFrom'] = $referer_url_parts[0] . '?' . rawurlencode( $referer_url_parts[1] );
-			} else {
-				$data_layer['siteSearchFrom'] = $referer_url_parts[0];
 			}
 		}
 		$data_layer['siteSearchResults'] = $wp_query->post_count;
@@ -526,7 +526,8 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 		if ( '' !== $client_ip ) {
 			if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
 				$weatherdata = get_transient( 'gtm4wp-weatherdata-' . esc_attr( $client_ip ) );
-
+				$data_layer['weatherDataStatus'] = 'No weather data in cache (' . esc_attr( $client_ip ) . ')';
+				
 				if ( false !== $weatherdata ) {
 					$data_layer['weatherCategory']        = $weatherdata->weather[0]->main;
 					$data_layer['weatherDescription']     = $weatherdata->weather[0]->description;
@@ -536,8 +537,6 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 					$data_layer['weatherWindDeg']         = ( isset( $weatherdata->wind->deg ) ? $weatherdata->wind->deg : '' );
 					$data_layer['weatherFullWeatherData'] = $weatherdata;
 					$data_layer['weatherDataStatus']      = 'Read from cache';
-				} else {
-					$data_layer['weatherDataStatus'] = 'No weather data in cache (' . esc_attr( $client_ip ) . ')';
 				}
 			}
 
