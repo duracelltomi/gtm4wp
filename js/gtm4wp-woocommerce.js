@@ -33,7 +33,7 @@ function gtm4wp_woocommerce_handle_cart_qty_change() {
 				productdata.quantity = current_value - original_value;
 				productdata.price    = productdata.price;
 
-				gtm4wp_push_ecommerce( 'add_to_cart', [ product_data ], {
+				gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
 					'currency': gtm4wp_currency, // ga4 version
 					'value': productdata.price * productdata.quantity
 				});
@@ -42,7 +42,7 @@ function gtm4wp_woocommerce_handle_cart_qty_change() {
 				productdata.quantity = original_value - current_value;
 				productdata.price    = productdata.price;
 
-				gtm4wp_push_ecommerce( 'remove_from_cart', [ product_data ], {
+				gtm4wp_push_ecommerce( 'remove_from_cart', [ productdata ], {
 					'currency': gtm4wp_currency,
 					'value': productdata.price * productdata.quantity
 				});
