@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google, adwords, google adwords, goo
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.5
-Stable tag: 1.20.1
+Stable tag: 1.20.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -223,6 +223,10 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.20.2 =
+
+* Fix: Wrong ID parameter used tracking product variations (id instead of item_id). Thanks [micmaf](https://github.com/micmaf)
 
 = 1.20.1 =
 
@@ -899,6 +903,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 * First beta release
 
 == Upgrade Notice ==
+
+= 1.20.2 =
+
+Bugfix release
 
 = 1.20.1 =
 
