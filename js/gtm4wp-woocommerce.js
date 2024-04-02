@@ -224,11 +224,15 @@ function gtm4wp_woocommerce_process_pages() {
 			if ( !productdata ) {
 				return true;
 			}
-	
+
+			if ( "variable" === productdata.product_type || "grouped" === productdata.product_type ) {
+				return true;
+			}
+
 			if ( productdata.productlink ) {
 				delete productdata.productlink;
 			}
-
+			delete productdata.product_type;
 			productdata.quantity = 1;
 
 			gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {

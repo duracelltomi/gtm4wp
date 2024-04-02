@@ -1256,6 +1256,7 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 			'productlink'    => $permalink,
 			'item_list_name' => $list_name,
 			'index'          => (int) $itemix + ( $posts_per_page * ( $paged - 1 ) ),
+			'product_type'   => $product->get_type(),
 		),
 		'productlist'
 	);

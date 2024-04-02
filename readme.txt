@@ -227,6 +227,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 = 1.20.2 =
 
 * Fix: Wrong ID parameter used tracking product variations (id instead of item_id). Thanks [micmaf](https://github.com/micmaf)
+* Fix: do not track add_to_cart in product lists when 'Select options' or 'View products' buttons are clicked
 
 = 1.20.1 =
 
