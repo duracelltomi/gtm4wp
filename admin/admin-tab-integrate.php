@@ -23,7 +23,8 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 				__(
 					'Choose this option if you would like to track e-commerce data using 
 					 %1$secommerce tracking%2$s.<br>
-					 Use the plugin\'s %3$sofficial guides%4$s to setup your Google Tag Manager container:<br/>',
+					 Use the plugin\'s %3$sofficial guides%4$s to setup your Google Tag Manager container:<br/>
+					 <strong>WooCommerce 5.0+ is required to use this integration</strong>',
 					'duracelltomi-google-tag-manager'
 				)
 			),
