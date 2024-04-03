@@ -228,6 +228,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 * Fix: Wrong ID parameter used tracking product variations (id instead of item_id). Thanks [micmaf](https://github.com/micmaf)
 * Fix: do not track add_to_cart in product lists when 'Select options' or 'View products' buttons are clicked
+* Fix: JavaScript reference error while updating cart count in WooCommerce. Thanks [Sakuk3](https://github.com/Sakuk3)
 * Added: minimum required WooCommerce version (currently 5.0+) is displayed now on GTM4WP admin
 
 = 1.20.1 =
