@@ -396,7 +396,7 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			$data_layer['customerBillingPostcode']  = $woo_customer->get_billing_postcode();
 			$data_layer['customerBillingCountry']   = $woo_customer->get_billing_country();
 			$data_layer['customerBillingEmail']     = $woo_customer->get_billing_email();
-			$data_layer['customerBillingEmailHash'] = hash( 'sha256', $woo_customer->get_billing_email() );
+			$data_layer['customerBillingEmailHash'] = gtm4wp_normalize_and_hash_email_address( 'sha256', $woo_customer->get_billing_email() );
 			$data_layer['customerBillingPhone']     = $woo_customer->get_billing_phone();
 
 			$data_layer['customerShippingFirstName'] = $woo_customer->get_shipping_first_name();
