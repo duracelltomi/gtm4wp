@@ -355,7 +355,7 @@ function gtm4wp_woocommerce_get_purchase_datalayer( $order, $order_items = null 
 	 *
 	 * @param array $data_layer An associative array containing the full data layer including purchase header attributes.
 	 */
-	return apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer );
+	return apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer, $order );
 }
 
 /**
