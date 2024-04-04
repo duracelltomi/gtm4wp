@@ -297,7 +297,7 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 	 *
 	 * @param array  $order_data An associative array containing all data (head data and products) about the currently placed order.
 	 */
-	return apply_filters( GTM4WP_WPFILTER_EEC_ORDER_DATA, $order_data );
+	return apply_filters( GTM4WP_WPFILTER_EEC_ORDER_DATA, $order_data, $order );
 }
 /**
  * Takes a WooCommerce order and order items and generates the standard/classic and
