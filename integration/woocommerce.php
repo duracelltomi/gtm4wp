@@ -296,6 +296,7 @@ function gtm4wp_woocommerce_get_raw_order_datalayer( $order, $order_items ) {
 	 * Can be used to add custom order or even product data into the data layer.
 	 *
 	 * @param array  $order_data An associative array containing all data (head data and products) about the currently placed order.
+	 * @param WC_Order $order       The WooCommerce order object.
 	 */
 	return apply_filters( GTM4WP_WPFILTER_EEC_ORDER_DATA, $order_data, $order );
 }
@@ -354,6 +355,7 @@ function gtm4wp_woocommerce_get_purchase_datalayer( $order, $order_items = null 
 	 * Can be used to add custom data to the data layer when the purhcase ecommerce action is included.
 	 *
 	 * @param array $data_layer An associative array containing the full data layer including purchase header attributes.
+	 * @param WC_Order $order The WooCommerce order that needs to be transformed into an enhanced ecommerce data layer.
 	 */
 	return apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer, $order );
 }
