@@ -90,6 +90,10 @@ function gtm4wp_woocommerce_process_product( $product, $additional_product_attri
 		'google_business_vertical' => $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ],
 	);
 
+	if ( 'variation' === $product_type ) {
+		$_temp_productdata['item_group_id'] = $parent_product_id;
+	}
+
 	if ( 1 === count( $product_cat_parts ) ) {
 		$_temp_productdata['item_category'] = $product_cat_parts[0];
 	} elseif ( count( $product_cat_parts ) > 1 ) {
