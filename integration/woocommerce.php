@@ -486,6 +486,24 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				case 'variable':
 					$data_layer['productIsVariable'] = 1;
 
+					if ( true === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT ] ) {
+						$gtm4wp_currency = get_woocommerce_currency();
+						unset( $eec_product_array['internal_id'] );
+
+						gtm4wp_datalayer_push(
+							'view_item',
+							array(
+								'ecommerce' => array(
+									'currency' => $gtm4wp_currency,
+									'value'    => $eec_product_array['price'],
+									'items'    => array(
+										$eec_product_array,
+									),
+								),
+							)
+						);
+					}
+
 					break;
 
 				case 'grouped':

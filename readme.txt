@@ -224,6 +224,10 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 == Changelog ==
 
+= 1.21 =
+
+* Added: new WooCommerce option that allows you to fire the view_item event during page load of a variable product using parent product data.
+
 = 1.20.2 =
 
 * Fix: Wrong ID parameter used tracking product variations (id instead of item_id). Thanks [micmaf](https://github.com/micmaf)
