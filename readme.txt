@@ -224,6 +224,10 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 == Changelog ==
 
+= 1.21 =
+
+* Added: GTM4WP_WPFILTER_GET_CSP_NONCE (PHP constant) / gtm4wp_get_csp_nonce WordPress filter to add nonce to script tags supporting Content Security Policy (CSP) setups
+
 = 1.20.2 =
 
 * Fix: Wrong ID parameter used tracking product variations (id instead of item_id). Thanks [micmaf](https://github.com/micmaf)
