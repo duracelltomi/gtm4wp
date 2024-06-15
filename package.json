@@ -23,7 +23,7 @@
   "devDependencies": {
     "@babel/core": "^7.21.4",
     "@babel/preset-env": "^7.22.20",
-    "gulp": "^4.0.2",
+    "gulp": "^5.0.0",
     "gulp-babel": "^8.0.0",
     "gulp-clean-dir": "^1.0.2",
     "gulp-uglify": "^3.0.2"
