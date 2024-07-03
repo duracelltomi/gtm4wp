@@ -513,6 +513,7 @@ function gtm4wp_woocommerce_process_pages() {
 
 		current_product_detail_data.price = gtm4wp_make_sure_is_float( current_product_detail_data.price );
 
+		current_product_detail_data.item_group_id = current_product_detail_data.id;
 		current_product_detail_data.id = product_variation.variation_id;
 		current_product_detail_data.item_id = product_variation.variation_id;
 		current_product_detail_data.sku = product_variation.sku;
@@ -528,6 +529,8 @@ function gtm4wp_woocommerce_process_pages() {
 		}
 		current_product_detail_data.variant = product_variation_attribute_values.join(',');
 		gtm4wp_last_selected_product_variation = current_product_detail_data;
+
+		delete current_product_detail_data.internal_id;
 
 		// fire ga4 version
 		gtm4wp_push_ecommerce( 'view_item', [ current_product_detail_data ], {
