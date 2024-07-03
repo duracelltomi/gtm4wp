@@ -226,8 +226,13 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 = 1.21 =
 
+!!! WARNING !!!
+Significant change in WooCommerce integration!
+Check your template whether it supports must have hook: woocommerce_thankyou
+
 * Added: new WooCommerce option that allows you to fire the view_item event during page load of a variable product using parent product data.
 * Added: item_group_id parameter includes the parent ID of a variable product in WooCommerce
+* Updated: purchase event is now fired on the woocommerce_thankyou event. This will move execution time behind consent state checks in most cases making the purchase event working in more cases.
 
 = 1.20.2 =
 
