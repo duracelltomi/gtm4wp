@@ -115,6 +115,11 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'description' => esc_html__( 'Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.', 'duracelltomi-google-tag-manager' ),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+	GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT       => array(
+		'label'       => esc_html__( 'Fire view_item on parent product', 'duracelltomi-google-tag-manager' ),
+		'description' => esc_html__( 'If this option is turned on, the view_item event will be also fired during page load of a variable product using parent product data.', 'duracelltomi-google-tag-manager' ),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG     => array(
 		'label'       => esc_html__( 'Do not flag orders as being tracked', 'duracelltomi-google-tag-manager' ),
 		'description' => gtm4wp_safe_admin_html(

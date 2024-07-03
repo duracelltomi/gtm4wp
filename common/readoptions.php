@@ -79,6 +79,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL', 'integrate-woocommerce-car
 define( 'GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY', 'integrate-woocommerce-brand-taxonomy' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL', 'integrate-woocommerce-business-vertical' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSESKU', 'integrate-woocommerce-remarketing-usesku' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT', 'integrate-woocommerce-view-item-on-parent-product' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH', 'integrate-woocommerce-use-full-category-path' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX', 'integrate-woocommerce-remarketing-productidprefix' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA', 'integrate-woocommerce-customer-data' );
@@ -186,6 +187,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY       => '',
 	GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL       => 'retail',
 	GTM4WP_OPTION_INTEGRATE_WCUSESKU                 => false,
+	GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT       => false,
 	GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH    => false,
 	GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX        => '',
 	GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA           => false,
