@@ -708,7 +708,7 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 	$data_layer = array();
 
 	if ( isset( $order ) && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ) {
-		$now = new DateTime( 'now', $order->get_date_paid()->getTimezone() );
+		$now = new DateTime( 'now', $order->get_date_created()->getTimezone() );
 		if ( $order->is_paid() && $order->get_date_paid() ) {
 			$diff    = $now->diff( $order->get_date_paid() );
 			$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
