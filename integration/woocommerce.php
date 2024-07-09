@@ -20,7 +20,7 @@ require_once dirname( __FILE__ ) . '/ecommerce-generic.php';
 $gtm4wp_product_counter   = 0;
 $gtm4wp_last_widget_title = 'Sidebar Products';
 
-$GLOBALS['gtm4wp_grouped_product_ix']               = 1;
+$GLOBALS['gtm4wp_grouped_product_ix'] = 1;
 
 /**
  * Function to be called on the gtm4wp_add_global_vars_array hook to output WooCommerce related global JavaScript variables.
@@ -804,9 +804,11 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 		}
 </script>';
 
-		echo wp_kses(
-			$script_tag,
-			gtm4wp_get_sanitize_script_block_rules()
+		echo htmlspecialchars_decode( //phpcs:ignore
+			wp_kses(
+				$script_tag,
+				gtm4wp_get_sanitize_script_block_rules()
+			)
 		);
 
 		if ( ! $do_not_flag_tracked_order ) {

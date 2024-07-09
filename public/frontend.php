@@ -890,9 +890,11 @@ function gtm4wp_wp_footer() {
 	}
 </script>";
 
-			echo wp_kses(
-				$script_tag,
-				gtm4wp_get_sanitize_script_block_rules()
+			echo htmlspecialchars_decode( //phpcs:ignore
+				wp_kses(
+					$script_tag,
+					gtm4wp_get_sanitize_script_block_rules()
+				)
 			);
 
 			unset( $_COOKIE['gtm4wp_user_logged_in'] );
@@ -914,9 +916,11 @@ function gtm4wp_wp_footer() {
 	}
 </script>";
 
-			echo wp_kses(
-				$script_tag,
-				gtm4wp_get_sanitize_script_block_rules()
+			echo htmlspecialchars_decode( //phpcs:ignore
+				wp_kses(
+					$script_tag,
+					gtm4wp_get_sanitize_script_block_rules()
+				)
 			);
 
 			unset( $_COOKIE['gtm4wp_user_registered'] );
@@ -1082,9 +1086,11 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	$script_tag .= '
 </script>';
 
-	echo wp_kses(
-		$script_tag,
-		gtm4wp_get_sanitize_script_block_rules()
+	echo htmlspecialchars_decode( //phpcs:ignore
+		wp_kses(
+			$script_tag,
+			gtm4wp_get_sanitize_script_block_rules()
+		)
 	);
 
 	do_action( GTM4WP_WPACTION_AFTER_DATALAYER );
@@ -1101,9 +1107,11 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
 </script>';
 
-		echo wp_kses(
-			$script_tag,
-			gtm4wp_get_sanitize_script_block_rules()
+		echo htmlspecialchars_decode( //phpcs:ignore
+			wp_kses(
+				$script_tag,
+				gtm4wp_get_sanitize_script_block_rules()
+			)
 		);
 	}
 
@@ -1122,9 +1130,11 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
 </script>';
 
-					echo wp_kses(
-						$script_tag,
-						gtm4wp_get_sanitize_script_block_rules()
+					echo htmlspecialchars_decode( //phpcs:ignore
+						wp_kses(
+							$script_tag,
+							gtm4wp_get_sanitize_script_block_rules()
+						)
 					);
 				}
 
@@ -1151,9 +1161,11 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		});
 </script>';
 
-		echo wp_kses(
-			$script_tag,
-			gtm4wp_get_sanitize_script_block_rules()
+		echo htmlspecialchars_decode( //phpcs:ignore
+			wp_kses(
+				$script_tag,
+				gtm4wp_get_sanitize_script_block_rules()
+			)
 		);
 	}
 
@@ -1193,9 +1205,11 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 })(window,document,\'script\',\'' . esc_js( $gtm4wp_datalayer_name ) . '\',\'' . esc_js( $one_gtm_id ) . '\');
 </script>';
 
-			echo wp_kses(
-				$script_tag,
-				gtm4wp_get_sanitize_script_block_rules()
+			echo htmlspecialchars_decode( //phpcs:ignore
+				wp_kses(
+					$script_tag,
+					gtm4wp_get_sanitize_script_block_rules()
+				)
 			);
 		} // end foreach $_gtm_codes
 	} // end if container code output possible
