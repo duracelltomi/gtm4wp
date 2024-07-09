@@ -233,6 +233,7 @@ Check your template whether it supports must have hook: woocommerce_thankyou
 * Added: new WooCommerce option that allows you to fire the view_item event during page load of a variable product using parent product data.
 * Added: item_group_id parameter includes the parent ID of a variable product in WooCommerce
 * Updated: purchase event is now fired on the woocommerce_thankyou event. This will move execution time behind consent state checks in most cases making the purchase event working in more cases.
+* Added: GTM4WP_WPFILTER_GET_CSP_NONCE (PHP constant) / gtm4wp_get_csp_nonce WordPress filter to add nonce to script tags supporting Content Security Policy (CSP) setups
 
 = 1.20.2 =
 

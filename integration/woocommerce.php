@@ -764,11 +764,8 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 			$purchase_data_layer
 		);
 
-		$has_html5_support    = current_theme_supports( 'html5' );
-		$add_cookiebot_ignore = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ];
-
-		echo '
-<script data-cfasync="false" data-pagespeed-no-defer' . ( $has_html5_support ? ' type="text/javascript"' : '' ) . ( $add_cookiebot_ignore ? ' data-cookieconsent="ignore"' : '' ) . '>
+		$script_tag = '
+' . gtm4wp_generate_script_opening_tag() . '
 		// Check whether this order has been already tracked in this browser.
 
 		// Read order id already tracked from cookies or local storage.
@@ -806,6 +803,11 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 			window.localStorage.setItem( "gtm4wp_orderid_tracked", ' . esc_js( $order->get_order_number() ) . ' );
 		}
 </script>';
+
+		echo wp_kses(
+			$script_tag,
+			gtm4wp_get_sanitize_script_block_rules()
+		);
 
 		if ( ! $do_not_flag_tracked_order ) {
 			$order->update_meta_data( '_ga_tracked', 1 );
