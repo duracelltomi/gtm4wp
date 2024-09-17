@@ -783,7 +783,7 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 
 		// Check whether this order has been already tracked before in this browser.
 		let gtm4wp_order_already_tracked = false;
-		if ( gtm4wp_orderid_tracked && ( ' . esc_js( $order->get_order_number() ) . ' == gtm4wp_orderid_tracked ) ) {
+		if ( gtm4wp_orderid_tracked && ( "' . esc_js( $order->get_order_number() ) . '" == gtm4wp_orderid_tracked ) ) {
 			gtm4wp_order_already_tracked = true;
 		}
 
@@ -798,9 +798,9 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 			var gtm4wp_orderid_cookie_expire = new Date();
 			gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
 			var gtm4wp_orderid_cookie_expires_part = "expires=" + gtm4wp_orderid_cookie_expire.toUTCString();
-			document.cookie = "gtm4wp_orderid_tracked=" + ' . esc_js( $order->get_order_number() ) . ' + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
+			document.cookie = "gtm4wp_orderid_tracked=" + "' . esc_js( $order->get_order_number() ) . '" + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
 		} else {
-			window.localStorage.setItem( "gtm4wp_orderid_tracked", ' . esc_js( $order->get_order_number() ) . ' );
+			window.localStorage.setItem( "gtm4wp_orderid_tracked", "' . esc_js( $order->get_order_number() ) . '" );
 		}
 </script>';
 
