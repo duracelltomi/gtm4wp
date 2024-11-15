@@ -527,7 +527,7 @@ function gtm4wp_woocommerce_process_pages() {
 		for( let attrib_key in product_variation.attributes ) {
 			product_variation_attribute_values.push( product_variation.attributes[ attrib_key ] );
 		}
-		current_product_detail_data.variant = product_variation_attribute_values.join(',');
+		current_product_detail_data.item_variant = product_variation_attribute_values.join(',');
 		gtm4wp_last_selected_product_variation = current_product_detail_data;
 
 		delete current_product_detail_data.internal_id;
