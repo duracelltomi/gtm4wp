@@ -45,10 +45,10 @@ function gtm4wp_woocommerce_add_global_vars( $return ) {
  *
  * @see https://developers.google.com/analytics/devguides/collection/ua/gtm/enhanced-ecommerce
  *
- * @param WP_Product $product An instance of WP_Product that needs to be transformed into an enhanced ecommerce product object.
- * @param array      $additional_product_attributes Any key-value pair that needs to be added into the enhanced ecommerce product object.
- * @param string     $attributes_used_for The placement ID of the product that is passed to the apply_filters hook so that 3rd party code can be notified where this product data is being used.
- * @return array The enhanced ecommerce product object of the WooCommerce product.
+ * @param WP_Product   $product An instance of WP_Product that needs to be transformed into an enhanced ecommerce product object.
+ * @param array        $additional_product_attributes Any key-value pair that needs to be added into the enhanced ecommerce product object.
+ * @param string       $attributes_used_for The placement ID of the product that is passed to the apply_filters hook so that 3rd party code can be notified where this product data is being used.
+ * @return array|false The enhanced ecommerce product object of the WooCommerce product, or false if the product does not exist.
  */
 function gtm4wp_woocommerce_process_product( $product, $additional_product_attributes, $attributes_used_for ) {
 	global $gtm4wp_options;
@@ -783,7 +783,7 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 
 		// Check whether this order has been already tracked before in this browser.
 		let gtm4wp_order_already_tracked = false;
-		if ( gtm4wp_orderid_tracked && ( ' . esc_js( $order->get_order_number() ) . ' == gtm4wp_orderid_tracked ) ) {
+		if ( gtm4wp_orderid_tracked && ( "' . esc_js( $order->get_order_number() ) . '" == gtm4wp_orderid_tracked ) ) {
 			gtm4wp_order_already_tracked = true;
 		}
 
@@ -798,9 +798,9 @@ function gtm4wp_woocommerce_thankyou( $order_id ) {
 			var gtm4wp_orderid_cookie_expire = new Date();
 			gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
 			var gtm4wp_orderid_cookie_expires_part = "expires=" + gtm4wp_orderid_cookie_expire.toUTCString();
-			document.cookie = "gtm4wp_orderid_tracked=" + ' . esc_js( $order->get_order_number() ) . ' + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
+			document.cookie = "gtm4wp_orderid_tracked=" + "' . esc_js( $order->get_order_number() ) . '" + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
 		} else {
-			window.localStorage.setItem( "gtm4wp_orderid_tracked", ' . esc_js( $order->get_order_number() ) . ' );
+			window.localStorage.setItem( "gtm4wp_orderid_tracked", "' . esc_js( $order->get_order_number() ) . '" );
 		}
 </script>';
 
@@ -1166,6 +1166,10 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 		),
 		'productlist'
 	);
+
+	if ( $eec_product_array === false ) {
+		return false;
+	}
 
 	if ( ! isset( $eec_product_array['item_brand'] ) ) {
 		$eec_product_array['item_brand'] = '';
