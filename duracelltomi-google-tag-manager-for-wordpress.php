@@ -35,21 +35,32 @@ $gtp4wp_script_path     = $gtp4wp_plugin_url . ( defined( 'SCRIPT_DEBUG' ) && SC
 require_once GTM4WP_PATH . '/common/readoptions.php';
 
 /**
+ * WordPress hook function to load translations
+ *
+ * @see https://developer.wordpress.org/reference/hooks/init/
+ *
+ * @return void
+ */
+function gtm4wp_init() {
+	load_plugin_textdomain( 'duracelltomi-google-tag-manager', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+}
+add_action( 'init', 'gtm4wp_init' );
+
+/**
  * WordPress hook function run after plugins have been loaded.
  *
  * @see https://developer.wordpress.org/reference/hooks/plugins_loaded/
  *
  * @return void
  */
-function gtm4wp_init() {
-	load_plugin_textdomain( 'duracelltomi-google-tag-manager', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+function gtm4wp_plugins_loaded() {
 	if ( is_admin() ) {
 		require_once GTM4WP_PATH . '/admin/admin.php';
 	} else {
 		require_once GTM4WP_PATH . '/public/frontend.php';
 	}
 }
-add_action( 'plugins_loaded', 'gtm4wp_init' );
+add_action( 'plugins_loaded', 'gtm4wp_plugins_loaded' );
 
 /**
  * Adds an action to declare compatibility with High Performance Order Storage (HPOS)
