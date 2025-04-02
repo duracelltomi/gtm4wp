@@ -129,12 +129,6 @@ function gtm4wp_safe_admin_html_with_links( $text ) {
 	);
 }
 
-require_once dirname( __FILE__ ) . '/admin-tab-basicdata.php';
-require_once dirname( __FILE__ ) . '/admin-tab-events.php';
-require_once dirname( __FILE__ ) . '/admin-tab-scrolltracking.php';
-require_once dirname( __FILE__ ) . '/admin-tab-integrate.php';
-require_once dirname( __FILE__ ) . '/admin-tab-advanced.php';
-
 /**
  * Callback function for add_settings_section(). Outputs the HTML of an admin tab.
  *
@@ -706,6 +700,12 @@ function gtm4wp_sanitize_options( $options ) {
  * @return void
  */
 function gtm4wp_admin_init() {
+	require_once dirname( __FILE__ ) . '/admin-tab-basicdata.php';
+	require_once dirname( __FILE__ ) . '/admin-tab-events.php';
+	require_once dirname( __FILE__ ) . '/admin-tab-scrolltracking.php';
+	require_once dirname( __FILE__ ) . '/admin-tab-integrate.php';
+	require_once dirname( __FILE__ ) . '/admin-tab-advanced.php';
+
 	global $gtm4wp_includefieldtexts, $gtm4wp_eventfieldtexts, $gtm4wp_integratefieldtexts, $gtm4wp_scrollerfieldtexts,
 		$gtm4wp_advancedfieldtexts, $gtm4wp_entity_ids;
 
