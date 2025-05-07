@@ -45,9 +45,9 @@ function gtm4wp_woocommerce_add_global_vars( $return ) {
  *
  * @see https://developers.google.com/analytics/devguides/collection/ua/gtm/enhanced-ecommerce
  *
- * @param WP_Product   $product An instance of WP_Product that needs to be transformed into an enhanced ecommerce product object.
- * @param array        $additional_product_attributes Any key-value pair that needs to be added into the enhanced ecommerce product object.
- * @param string       $attributes_used_for The placement ID of the product that is passed to the apply_filters hook so that 3rd party code can be notified where this product data is being used.
+ * @param WP_Product $product An instance of WP_Product that needs to be transformed into an enhanced ecommerce product object.
+ * @param array      $additional_product_attributes Any key-value pair that needs to be added into the enhanced ecommerce product object.
+ * @param string     $attributes_used_for The placement ID of the product that is passed to the apply_filters hook so that 3rd party code can be notified where this product data is being used.
  * @return array|false The enhanced ecommerce product object of the WooCommerce product, or false if the product does not exist.
  */
 function gtm4wp_woocommerce_process_product( $product, $additional_product_attributes, $attributes_used_for ) {
@@ -578,18 +578,21 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				$gtm4wp_cart_total     += $eec_product_array['price'] * $eec_product_array['quantity'];
 			}
 
-			gtm4wp_datalayer_push(
-				'view_cart',
-				array(
-					'ecommerce' => array(
-						'currency' => $gtm4wp_currency,
-						'value'    => $gtm4wp_cart_total,
-						'items'    => $gtm4wp_cart_products,
-					),
-				)
-			);
+			// Do not fire GTM event if no products are in the cart.
+			if ( count( $gtm4wp_cart_products ) > 0 ) {
+				gtm4wp_datalayer_push(
+					'view_cart',
+					array(
+						'ecommerce' => array(
+							'currency' => $gtm4wp_currency,
+							'value'    => $gtm4wp_cart_total,
+							'items'    => $gtm4wp_cart_products,
+						),
+					)
+				);
+			}
 		}
-	} elseif ( is_checkout() ) {
+	} elseif ( is_checkout() && ! is_order_received_page() ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] ) {
 			$gtm4wp_checkout_products = array();
 			$gtm4wp_checkout_total    = 0;
@@ -629,16 +632,19 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				$gtm4wp_checkout_total     += $eec_product_array['quantity'] * $eec_product_array['price'];
 			} // end foreach cart item
 
-			gtm4wp_datalayer_push(
-				'begin_checkout',
-				array(
-					'ecommerce' => array(
-						'currency' => $gtm4wp_currency,
-						'value'    => $gtm4wp_checkout_total,
-						'items'    => $gtm4wp_checkout_products,
-					),
-				)
-			);
+			// Do not fire GTM event if no products are in the cart.
+			if ( count( $gtm4wp_checkout_products ) > 0 ) {
+				gtm4wp_datalayer_push(
+					'begin_checkout',
+					array(
+						'ecommerce' => array(
+							'currency' => $gtm4wp_currency,
+							'value'    => $gtm4wp_checkout_total,
+							'items'    => $gtm4wp_checkout_products,
+						),
+					)
+				);
+			}
 
 			wc_enqueue_js(
 				'
@@ -1167,7 +1173,7 @@ function gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, $listtype
 		'productlist'
 	);
 
-	if ( $eec_product_array === false ) {
+	if ( false === $eec_product_array ) {
 		return false;
 	}
 
