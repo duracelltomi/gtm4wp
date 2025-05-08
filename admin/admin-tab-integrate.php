@@ -264,8 +264,17 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 	),
 
 	GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR           => array(
-		'label'         => esc_html__( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
-		'description'   => esc_html__( 'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found.', 'duracelltomi-google-tag-manager' ),
+		'label'         => esc_html__( 'WebToffee GDPR Cookie Consent (v2.x)', 'duracelltomi-google-tag-manager' ),
+		'description'   =>
+			esc_html__(
+				'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed
+				with consents being set or during pageload when previously set consents have been found.
+				You do not need to use this integration with v3.x or above since it includes all the necessary codes to integrate
+				the consent banner with Google Tag Manager. Just use their wcc_gcm_consent_update event to fire
+				tags that do not support advanced consent mode (usually non-Google tags) or if you would like to implement
+				basic consent mode.',
+				'duracelltomi-google-tag-manager'
+			),
 		'phase'         => GTM4WP_PHASE_STABLE,
 		'plugintocheck' => 'webtoffee-gdpr-cookie-consent/cookie-law-info.php',
 	),

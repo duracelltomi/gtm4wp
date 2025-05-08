@@ -227,6 +227,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 = 1.21.1 =
 
 * Fix: undefined product_qty variable prevents add_to_cart in some cases. Thanks [diegoarda](https://github.com/diegoarda)
+* Fix: clarified that WebToffee integartion is only needed with the legacy 2.x product line
 
 = 1.21 =
 
