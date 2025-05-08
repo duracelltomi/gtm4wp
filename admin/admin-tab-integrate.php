@@ -151,6 +151,24 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		),
 		'phase'       => GTM4WP_PHASE_STABLE,
 	),
+	GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT           => array(
+		'label'       => esc_html__( 'Set maximum timeout for select_item event', 'duracelltomi-google-tag-manager' ),
+		'description' => sprintf(
+			gtm4wp_safe_admin_html(
+				// translators: 1: anchor element linking to the official GA4 doc about clearing the ecommerce object. 2: closing anchor element.
+				__(
+					'When a user clicks on a product in a list, the <code>select_item</code> event uses a callback function with Google Tag Manager (GTM).
+					This ensures that GTM can fire all related tags before the browser navigates to the product detail page.
+					You can customize a timeout period (in milliseconds). This timeout only comes into play if a tag fails to fire within the specified time
+					for some reason. If all tags fire correctly, this timeout won\'t affect anything.',
+					'duracelltomi-google-tag-manager'
+				)
+			),
+			'<a href="https://developers.google.com/analytics/devguides/collection/ga4/ecommerce?client_type=gtm#clear_the_ecommerce_object" target="_blank" rel="noopener">',
+			'</a>'
+		),
+		'phase'       => GTM4WP_PHASE_STABLE,
+	),
 
 	GTM4WP_OPTION_INTEGRATE_AMPID                    => array(
 		'label'         => esc_html__( "Google Tag Manager 'AMP' Container ID", 'duracelltomi-google-tag-manager' ),

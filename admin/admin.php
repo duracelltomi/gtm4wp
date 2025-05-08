@@ -563,6 +563,8 @@ function gtm4wp_sanitize_options( $options ) {
 			$output[ $optionname ] = (int) $newoptionvalue;
 		} elseif ( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE === $optionname ) {
 			$output[ $optionname ] = (int) $newoptionvalue;
+		} elseif ( GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT === $optionname ) {
+			$output[ $optionname ] = (int) $newoptionvalue;
 		} elseif ( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX === $optionname ) {
 			$output[ $optionname ] = trim( (string) $newoptionvalue );
 		} elseif ( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY === $optionname ) {

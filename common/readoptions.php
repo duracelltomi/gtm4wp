@@ -89,6 +89,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX', 'integrate-woocommerce-exclude-t
 define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING', 'integrate-woocommerce-exclude-shipping' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG', 'integrate-woocommerce-do-not-use-order-tracked-flag' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL', 'integrate-woocommerce-clear-ecommerce-datalayer' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT', 'integrate-woocommerce-datalayer-max-timeout' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
@@ -197,6 +198,7 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING        => false,
 	GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG     => false,
 	GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL       => false,
+	GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT           => 2000,
 
 	GTM4WP_OPTION_INTEGRATE_WPECOMMERCE              => false,
 
