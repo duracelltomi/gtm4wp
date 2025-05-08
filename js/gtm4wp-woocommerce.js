@@ -271,6 +271,7 @@ function gtm4wp_woocommerce_process_pages() {
 					if ( !productdata ) {
 						return true;
 					}
+
 					let product_qty = 0;
 					const product_qty_input = document.querySelectorAll( 'input[name=quantity\\[' + productdata.internal_id + '\\]]' );
 					if ( product_qty_input.length > 0 ) {
