@@ -932,6 +932,10 @@ Please report all bugs found in my plugin using the [contact form on my website]
 
 == Upgrade Notice ==
 
+= 1.21.1 =
+
+Bugfix release with an XSS fix
+
 = 1.21 =
 
 Important update for WooCommerce users, please check the full changelog!
