@@ -257,7 +257,7 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
-		$data_layer['pageTitle'] = wp_strip_all_tags( wp_title( '|', false, 'right' ) );
+		$data_layer['pageTitle'] = htmlspecialchars( wp_strip_all_tags( wp_title( '|', false, 'right' ) ) );
 	}
 
 	if ( is_singular() ) {
