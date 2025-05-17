@@ -228,6 +228,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 * Fix: undefined product_qty variable prevents add_to_cart in some cases. Thanks [diegoarda](https://github.com/diegoarda)
 * Fix: clarified that WebToffee integartion is only needed with the legacy 2.x product line
+* Fix: Reflected Cross-Site Scripting (XSS) with site search tracking. Thanks [godzeo](https://github.com/godzeo)!
 
 = 1.21 =
 
