@@ -35,6 +35,7 @@ function gtm4wp_woocommerce_add_global_vars( $return ) {
 	$return['gtm4wp_currency']               = get_woocommerce_currency();
 	$return['gtm4wp_product_per_impression'] = (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ] );
 	$return['gtm4wp_clear_ecommerce']        = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ] );
+	$return['gtm4wp_datalayer_max_timeout']  = (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT ] );
 
 	return $return;
 }

@@ -459,6 +459,11 @@ function gtm4wp_woocommerce_process_pages() {
 			const productlink_to_redirect = productdata.productlink;
 			delete productdata.productlink;
 	
+			let datalayer_timeout = 2000;
+			if (window.gtm4wp_datalayer_max_timeout) {
+				datalayer_timeout = window.gtm4wp_datalayer_max_timeout;
+			}
+
 			// fire ga4 version
 			gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
 				'currency': gtm4wp_currency
@@ -475,7 +480,8 @@ function gtm4wp_woocommerce_process_pages() {
 						document.location.href = productlink_to_redirect;
 					}
 				}
-			});
+			},
+			datalayer_timeout);
 		}
 	});
 
