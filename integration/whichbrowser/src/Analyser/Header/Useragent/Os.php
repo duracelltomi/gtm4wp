@@ -260,20 +260,24 @@ trait Os
                     if (preg_match('/;\+? ?(?:\*\*)?([^;]*[^;\s]);?\s+(?:BUILD|Build|build)/u', $ua, $match)) {
                         $candidates[] = $match[1];
                     }
+                } elseif (preg_match('/\(Linux; Android [0-9\.]+; ([^\/]+)(; wv)?\) AppleWebKit/u', $ua, $match)) {
+                    /* New style minimal Android useragent string */
+
+                    $candidates[] = $match[1];
                 } elseif (preg_match('/Release\//ui', $ua)) {
                     /* WAP style useragent strings */
 
                     if (preg_match('/^(?U)([^\/]+)(?U)(?:(?:_CMCC_TD|_CMCC|_TD|_TDLTE|_LTE)?\/[^\/]*)? Linux\/[0-9.+]+ Android\/[0-9.]+/u', $this->removeKnownPrefixes($ua), $match)) {
                         $candidates[] = $match[1];
-                    } else if (preg_match('/^(?U)([^\/]+)(?U)(?:(?:_CMCC_TD|_CMCC|_TD|_TDLTE|_LTE)?\/[^\/]*)? Android(_OS)?\/[0-9.]+/u', $this->removeKnownPrefixes($ua), $match)) {
+                    } elseif (preg_match('/^(?U)([^\/]+)(?U)(?:(?:_CMCC_TD|_CMCC|_TD|_TDLTE|_LTE)?\/[^\/]*)? Android(_OS)?\/[0-9.]+/u', $this->removeKnownPrefixes($ua), $match)) {
                         $candidates[] = $match[1];
-                    } else if (preg_match('/^(?U)([^\/]+)(?U)(?:(?:_CMCC_TD|_CMCC|_TD|_TDLTE|_LTE)?\/[^\/]*)? Release\/[0-9.]+/u', $this->removeKnownPrefixes($ua), $match)) {
+                    } elseif (preg_match('/^(?U)([^\/]+)(?U)(?:(?:_CMCC_TD|_CMCC|_TD|_TDLTE|_LTE)?\/[^\/]*)? Release\/[0-9.]+/u', $this->removeKnownPrefixes($ua), $match)) {
                         $candidates[] = $match[1];
                     }
                 } elseif (preg_match('/Mozilla\//ui', $ua)) {
                     /* Old Android useragent strings */
 
-                    if (preg_match('/Linux; (?:arm; |arm_64; )?(?:U; )?Android [^;]+; (?:[a-zA-Z][a-zA-Z](?:[-_][a-zA-Z][a-zA-Z])?; )?(?:[^;]+; ?)?([^)\/;]+)\)/u', $ua, $match)) {
+                    if (preg_match('/Linux; (?:arm; |arm_64; )?(?:U; )?Android [^;]+; (?:[a-zA-Z][a-zA-Z](?:[-_][a-zA-Z][a-zA-Z])?; )?(?:[^;]+; ?)?([^\/;]+)\) /u', $ua, $match)) {
                         $candidates[] = $match[1];
                     } elseif (preg_match('/\(([^;]+);U;Android\/[^;]+;[0-9]+\*[0-9]+;CTC\/2.0\)/u', $ua, $match)) {
                         $candidates[] = $match[1];
@@ -303,9 +307,19 @@ trait Os
                         continue;
                     }
 
+                    /* Ignore "K" or "Unspecified Device" as a device, as it is a dummy value used by Chrome UA reduction */
+
+                    if ($candidates[$c] == 'K' || $candidates[$c] == 'Unspecified Device') {
+                        unset($candidates[$c]);
+                        continue;
+                    }
+
                     $candidates[$c] = preg_replace('/^[a-zA-Z][a-zA-Z][-_][a-zA-Z][a-zA-Z]\s+/u', '', $candidates[$c]);
                     $candidates[$c] = preg_replace('/(.*) - [0-9\.]+ - (?:with Google Apps - )?API [0-9]+ - [0-9]+x[0-9]+/', '\\1', $candidates[$c]);
                     $candidates[$c] = preg_replace('/^sprd-/u', '', $candidates[$c]);
+                    $candidates[$c] = preg_replace('/^HarmonyOS; /u', '', $candidates[$c]);
+                    $candidates[$c] = preg_replace('/; GMSCore.*/u', '', $candidates[$c]);
+                    $candidates[$c] = preg_replace('/; HMSCore.*/u', '', $candidates[$c]);
                 }
 
                 $candidates = array_unique($candidates);
@@ -385,6 +399,23 @@ trait Os
                 $this->data->device = $device;
             }
         }
+
+
+        /* Harmony OS */
+
+        if (preg_match('/HarmonyOS/u', $ua)) {
+            $this->data->os->name = 'Harmony OS';
+            $this->data->os->version = new Version();
+
+
+            if (preg_match('/; Android ([0-9\.]+);/u', $ua, $match)) {
+                $this->data->os->family = new Family([
+                    'name' => 'Android',
+                    'version' => new Version([ 'value' => $match[1], 'details' => 3 ])
+                ]);
+            }
+        }
+
 
         /* Aliyun OS */
 
@@ -1505,7 +1536,7 @@ trait Os
     {
         if (preg_match('/(?:web|hpw)OS\/(?:HP webOS )?([0-9.]*)/u', $ua, $match)) {
             $this->data->os->name = 'webOS';
-            $this->data->os->version = new Version([ 'value' => $match[1], 'details' => 2 ]);
+            $this->data->os->version = new Version([ 'value' => $match[1] ]);
             $this->data->device->type = preg_match('/Tablet/iu', $ua) ? Constants\DeviceType::TABLET : Constants\DeviceType::MOBILE;
             $this->data->device->generic = false;
         }
@@ -1861,7 +1892,7 @@ trait Os
 
             if (preg_match('/SunOS 5\.([123456](?:\.[0-9\.]*)?) /u', $ua, $match)) {
                 $this->data->os->version = new Version([ 'value' => '2.' . $match[1] ]);
-            } else if (preg_match('/SunOS 5\.([0-9\.]*)/u', $ua, $match)) {
+            } elseif (preg_match('/SunOS 5\.([0-9\.]*)/u', $ua, $match)) {
                 $this->data->os->version = new Version([ 'value' => $match[1] ]);
             }
 
