@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.21.1
+Stable tag: 1.22
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -223,6 +223,10 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 6. Scroll tracking
 
 == Changelog ==
+
+= 1.22 =
+
+* Added: new WooCommerce option to change the event timeout of the select_item event. Could help some UX issues when a user has an ad blocker installed.
 
 = 1.21.1 =
 
