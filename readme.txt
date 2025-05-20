@@ -227,6 +227,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 = 1.22 =
 
 * Added: new WooCommerce option to change the event timeout of the select_item event. Could help some UX issues when a user has an ad blocker installed.
+* Added: new WordPress filter GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG / gtm4wp_overwrite_consent_mode_flag to overwrite Consent Mode flags in the default command. Can be used by consent banner plugins to mitigate support issues.
 
 = 1.21.1 =
 

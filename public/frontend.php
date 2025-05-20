@@ -39,6 +39,11 @@ define( 'GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY', 'gtm4wp_add_global_vars_array' );
 define( 'GTM4WP_WPFILTER_GET_CSP_NONCE', 'gtm4wp_get_csp_nonce' );
 
 /**
+ * Constant that can be used to overwrite the stored default value of a consent mode flag.
+ */
+define( 'GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG', 'gtm4wp_overwrite_consent_mode_flag' );
+
+/**
  * Stores whether the container code has been outputed or not.
  * Helps preventing double output of the GTM container code if the WordPress
  * theme is using the gtm4wp_get_the_gtm_tag() function in a wrong way
@@ -1057,6 +1062,55 @@ function gtm4wp_wp_header_top( $echo = true ) {
 
 /**
  * Function executed during wp_head.
+ * Returns the value of the consent mode flag.
+ *
+ * @see https://developer.wordpress.org/reference/functions/wp_head/
+ *
+ * @param string $flag The flag to be set.
+ * @return string The value of the flag (granted or denied).
+ */
+function gtm4wp_get_consent_mode_flag( $flag ) {
+	global $gtm4wp_options;
+
+	$flag_value = false;
+
+	if ( in_array(
+		$flag,
+		array(
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY,
+		),
+		true
+	) ) {
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE ] ) {
+			$flag_value = (bool) $gtm4wp_options[ $flag ];
+
+			/**
+			 * Filter to overwrite the value of the consent mode flag.
+			 * Should use boolean true or false. Returned value will be converted to
+			 * string "granted" or "denied" afterwards.
+			 *
+			 * @since 1.22
+			 *
+			 * @param boolean $flag_value The value of the flag (boolean true or false).
+			 * @param string $flag The flag to be set.
+			 *
+			 * @return boolean The updated value of the flag (boolean true or false).
+			 */
+			$flag_value = apply_filters( GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG, $flag_value, $flag );
+		}
+	}
+
+	return ( $flag_value ? 'granted' : 'denied' );
+}
+
+/**
+ * Function executed during wp_head.
  * Outputs the main Google Tag Manager container code.
  *
  * @see https://developer.wordpress.org/reference/functions/wp_head/
@@ -1153,13 +1207,13 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		}
 
 		gtag("consent", "default", {
-			"analytics_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ] ? 'granted' : 'denied' ) . '",
-			"ad_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ] ? 'granted' : 'denied' ) . '",
-			"ad_user_data": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA ] ? 'granted' : 'denied' ) . '",
-			"ad_personalization": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO ] ? 'granted' : 'denied' ) . '",
-			"functionality_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC ] ? 'granted' : 'denied' ) . '",
-			"security_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY ] ? 'granted' : 'denied' ) . '",
-			"personalization_storage": "' . ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO ] ? 'granted' : 'denied' ) . '",
+			"analytics_storage": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ) . '",
+			"ad_storage": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) . '",
+			"ad_user_data": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA ) . '",
+			"ad_personalization": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO ) . '",
+			"functionality_storage": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC ) . '",
+			"security_storage": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY ) . '",
+			"personalization_storage": "' . gtm4wp_get_consent_mode_flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO ) . '",
 		});
 </script>';
 
