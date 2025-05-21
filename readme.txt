@@ -229,6 +229,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 * Added: new WooCommerce option to change the event timeout of the select_item event. Could help some UX issues when a user has an ad blocker installed.
 * Added: new WordPress filter GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG / gtm4wp_overwrite_consent_mode_flag to overwrite Consent Mode flags in the default command. Can be used by consent banner plugins to mitigate support issues.
 * Fixed: Unwanted content on frontend when container placement set to off and gtm4wp_the_gtm_tag() called manually. Thanks [Michael Bourne](https://wordpress.org/support/users/michaelbourne/)
+* Updated: bundled WhichBrowser library updated to the latest version. This is a short term solution to solve PHP erros, on the long term, the plan is to switch to [Matomo Device Detector](https://github.com/matomo-org/device-detector)
 
 = 1.21.1 =
 
@@ -339,6 +340,10 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 * Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
 
 == Upgrade Notice ==
+
+= 1.22 =
+
+Updated WhichBrowser library, new WooCommerce option, new filter for Consent Mode flags, fixes
 
 = 1.21.1 =
 
