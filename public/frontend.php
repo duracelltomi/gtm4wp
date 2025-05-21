@@ -809,15 +809,18 @@ add_filter(
 function gtm4wp_the_gtm_tag() {
 	echo wp_kses(
 		gtm4wp_get_the_gtm_tag(),
-		array(
-			'noscript' => array(),
-			'iframe'   => array(
-				'src'         => array(),
-				'height'      => array(),
-				'width'       => array(),
-				'style'       => array(),
-				'aria-hidden' => array(),
-			),
+		array_merge(
+			gtm4wp_get_sanitize_script_block_rules(),
+			array(
+				'noscript' => array(),
+				'iframe'   => array(
+					'src'         => array(),
+					'height'      => array(),
+					'width'       => array(),
+					'style'       => array(),
+					'aria-hidden' => array(),
+				),
+			)
 		)
 	);
 }
