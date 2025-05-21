@@ -41,9 +41,36 @@ trait Corrections
             $this->hideFamilyIfEqualToBrowser();
         }
 
+        if (isset($this->data->browser->name) && isset($this->data->os->name) && isset($this->data->os->version)) {
+            $this->hideOsVersionIfFixed();
+        }
+
         return $this;
     }
 
+
+    private function hideOsVersionIfFixed()
+    {
+        if ($this->data->os->name == 'OS X') {
+            $name = $this->data->browser->name;
+
+            if (isset($this->data->browser->family)) {
+                $name = $this->data->browser->family->name;
+            }
+
+            if ($name == 'Chrome' && $this->data->os->version->value == "10.15.7") {
+                $this->data->os->version = null;
+            }
+
+            if ($name == 'Safari' && $this->data->os->version->value == "10.15.7") {
+                $this->data->os->version = null;
+            }
+
+            if ($name == 'Firefox' && $this->data->os->version->value == "10.15") {
+                $this->data->os->version = null;
+            }
+        }
+    }
 
     private function hideFamilyIfEqualToBrowser()
     {
@@ -116,7 +143,7 @@ trait Corrections
 
     private function hideBrowserOnDeviceTypeGaming()
     {
-        if (isset($this->data->device->model) && $this->data->device->model == 'Playstation 2' && $this->data->browser->name == 'Internet Explorer') {
+        if (isset($this->data->device->model) && $this->data->device->model == 'PlayStation 2' && $this->data->browser->name == 'Internet Explorer') {
             $this->data->browser->reset();
         }
     }
