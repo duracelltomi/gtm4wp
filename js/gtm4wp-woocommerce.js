@@ -242,7 +242,13 @@ function gtm4wp_woocommerce_process_pages() {
 		}
 	
 		// track add to cart events for products on product detail pages
-		if ( event_target_element.closest( '.single_add_to_cart_button:not(.disabled)' ) ) {
+		const add_to_cart_button = event_target_element.closest( '.single_add_to_cart_button' );
+		if ( add_to_cart_button ) {
+			if (add_to_cart_button.hasclass( 'disabled' ) || add_to_cart_button.disabled) {
+				// do not track clicks on disabled buttons
+				return true;
+			}
+
 			const product_form = event_target_element.closest( 'form.cart' );
 			if ( !product_form ) {
 				return true;
