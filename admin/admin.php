@@ -588,9 +588,9 @@ function gtm4wp_sanitize_options( $options ) {
 
 		} elseif ( GTM4WP_OPTION_GTMCUSTOMPATH === $optionname ) {
 			// remove https:// prefix if used.
-			$newoptionvalue = trim( $newoptionvalue, "/\n\r\t\v\x00" );
+			$newoptionvalue = trim( $newoptionvalue, "\n\r\t\v\x00" );
 
-			$gtm_custom_path_has_error = (bool) preg_match( '/^[a-zA-Z0-9\.\-\_]*$/', $newoptionvalue );
+			$gtm_custom_path_has_error = (bool) preg_match( '/^[a-zA-Z0-9\.\-\_\/]*$/', $newoptionvalue );
 			if ( false === $gtm_custom_path_has_error ) {
 				add_settings_error( GTM4WP_ADMIN_GROUP, GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_GTMCUSTOMPATH . ']', esc_html__( 'Invalid GTM custom domain path. Value can include anything between a-z, A-Z, 0-9 or any of the characters . - _', 'duracelltomi-google-tag-manager' ) );
 				$newoptionvalue = '';

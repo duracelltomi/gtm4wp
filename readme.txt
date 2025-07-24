@@ -231,6 +231,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 * Fixed: Unwanted content on frontend when container placement set to off and gtm4wp_the_gtm_tag() called manually. Thanks [Michael Bourne](https://wordpress.org/support/users/michaelbourne/)
 * Fixed: Add to cart tracking broken with Bricks template and WooCommerce
 * Updated: bundled WhichBrowser library updated to the latest version. This is a short term solution to solve PHP erros, on the long term, the plan is to switch to [Matomo Device Detector](https://github.com/matomo-org/device-detector)
+* Updated: allow the / character in GTM container path to support same tag gateway
 
 = 1.21.1 =
 
