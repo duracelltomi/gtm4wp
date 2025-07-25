@@ -232,6 +232,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 * Fixed: Add to cart tracking broken with Bricks template and WooCommerce
 * Updated: bundled WhichBrowser library updated to the latest version. This is a short term solution to solve PHP erros, on the long term, the plan is to switch to [Matomo Device Detector](https://github.com/matomo-org/device-detector)
 * Updated: allow the / character in GTM container path to support same tag gateway
+* Updated / Fixed: I reverted back the purchase tracking with WooCommerce to the logic present in v1.20- as the new way caused more headache than it resolved. Sorry for everyone who was affected by this.
 
 = 1.21.1 =
 
