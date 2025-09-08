@@ -718,8 +718,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 
 			$after_purchase_dl_push = '
 			}
-			// *** DEBUG: mark after push (will only print if push path ran)
-			console.log("GTM4WP DBG (frontend): purchase push DONE for order ' . esc_js( $order->get_order_number() ) . '");
 			
 			// Store order ID to prevent tracking this purchase again.
 			if ( !window.localStorage ) {
