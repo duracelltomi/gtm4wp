@@ -595,7 +595,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			}
 		}
 	} elseif ( is_order_received_page() ) {
-		error_log('GTM4WP DBG: entered is_order_received_page');
 		// Order received page data layer content.
 
 		$do_not_flag_tracked_order = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ] );
@@ -615,22 +614,18 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 		// Supressing 'Processing form data without nonce verification.' message as there is no nonce accesible in this case.
 		$order_key = isset( $_GET['key'] ) ? wc_clean( sanitize_text_field( wp_unslash( $_GET['key'] ) ) ) : ''; // phpcs:ignore
 		$order_key = apply_filters( 'woocommerce_thankyou_order_key', $order_key );
-		error_log('GTM4WP DBG: order_id=' . $order_id . ' key_from_url=' . $order_key);
 
 		if ( $order_id > 0 ) {
 			$order = wc_get_order( $order_id );
 
 			if ( $order instanceof WC_Order ) {
-				error_log('GTM4WP DBG: loaded order. status=' . $order->get_status() . ' number=' . $order->get_order_number());
 
 				$this_order_key = $order->get_order_key();
 
 				if ( $this_order_key !== $order_key ) {
-					error_log('GTM4WP DBG: unset order due to key mismatch. expected=' . $this_order_key . ' got_from_url=' . $order_key);
 					unset( $order );
 				}
 			} else {
-				error_log('GTM4WP DBG: wc_get_order returned no order for id=' . $order_id);
 				unset( $order );
 			}
 		}
@@ -656,8 +651,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			}
 
 			if ( $minutes > $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ] ) {
-				error_log('GTM4WP DBG: unset order due to WCORDERMAXAGE. minutes=' . $minutes . ' limit=' . $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ]);
-
 				unset( $order );
 			}
 		}
@@ -672,8 +665,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 		}
 
 		if ( isset( $order ) && ( 1 === (int) $order->get_meta( '_ga_tracked', true ) ) && ! $do_not_flag_tracked_order ) {
-			error_log('GTM4WP DBG: unset order due to _ga_tracked meta');
-
 			unset( $order );
 		}
 
@@ -681,15 +672,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			$tracked_order_id = filter_var( wp_unslash( $_COOKIE['gtm4wp_orderid_tracked'] ), FILTER_VALIDATE_INT );
 
 			if ( $tracked_order_id && ( $tracked_order_id === $order_id ) && ! $do_not_flag_tracked_order ) {
-				error_log('GTM4WP DBG: unset order due to cookie duplicate (gtm4wp_orderid_tracked=' . $tracked_order_id . ')');
-
 				unset( $order );
 			}
 		}
 
 		if ( isset( $order ) && ( 'failed' === $order->get_status() ) ) {
 			// do not track order where payment failed.
-			error_log('GTM4WP DBG: unset order due to failed status');
 			unset( $order );
 		}
 
@@ -705,9 +693,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 
 			$before_purchase_dl_push = '
 			// Check whether this order has been already tracked in this browser.
-
-			// *** DEBUG: mark entry before push
-			console.log("GTM4WP DBG (frontend): entering purchase push for order ' . esc_js( $order->get_order_number() ) . '");
 
 			// Read order id already tracked from cookies or local storage.
 			let gtm4wp_orderid_tracked = "";
@@ -745,9 +730,6 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 			} else {
 				window.localStorage.setItem( "gtm4wp_orderid_tracked", "' . esc_js( $order->get_order_number() ) . '" );
 			}';
-	        error_log('GTM4WP DBG: about to push purchase. items=' . ( isset( $purchase_data_layer['ecommerce']['items'] ) ? count( $purchase_data_layer['ecommerce']['items'] ) : -1 ) );
-
-			//$gtm4wp_woocommerce_purchase_data_pushed = true;
 
 			gtm4wp_datalayer_push(
 				$purchase_data_layer['event'],
@@ -755,14 +737,12 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
 				$before_purchase_dl_push,
 				$after_purchase_dl_push
 			);
-			error_log('GTM4WP DBG: gtm4wp_datalayer_push() emitted purchase script for order ' . $order->get_order_number());
 
 
 			if ( ! $do_not_flag_tracked_order ) {
 				$order->update_meta_data( '_ga_tracked', 1 );
 				$order->save();
 			}
-			error_log('GTM4WP DBG: marked order as tracked by setting _ga_tracked meta to 1');
 		}
 	} elseif ( is_checkout() ) {
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] ) {
@@ -878,10 +858,8 @@ function gtm4wp_woocommerce_datalayer_filter_items( $data_layer ) {
  */
 function gtm4wp_woocommerce_thankyou( $order_id ) {
 	global $gtm4wp_options, $gtm4wp_woocommerce_purchase_data_pushed;
-	error_log('GTM4WP DBG: entered woocommerce_thankyou fallback. pushed_flag=' . ( $gtm4wp_woocommerce_purchase_data_pushed ? '1' : '0' ) . ' order_id=' . $order_id);
 
 	if ( function_exists('is_order_received_page') && is_order_received_page() ) {
-		error_log('GTM4WP DBG: skipping woocommerce_thankyou fallback because is_order_received_page() is true');
 		return;
 	}
 
