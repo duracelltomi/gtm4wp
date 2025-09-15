@@ -212,7 +212,7 @@ function gtm4wp_woocommerce_process_pages() {
 		}
 
 		// track add to cart events for simple products in product lists
-		if ( event_target_element.closest( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .single_add_to_cart_button)' ) ) {
+		if ( event_target_element.closest( '.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .product_type_bundle_input_required, .single_add_to_cart_button)' ) ) {
 			const product_el = event_target_element.closest( '.product,.wc-block-grid__product' );
 
 			const productdata_el = product_el && product_el.querySelector( '.gtm4wp_productdata' );
