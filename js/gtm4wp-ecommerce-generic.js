@@ -9,7 +9,7 @@ function gtm4wp_make_sure_is_float( probably_float ) {
 	} else if ( typeof will_be_float != "number" ) {
 		will_be_float = 0;
 	}
-	will_be_float = will_be_float.toFixed(2)
+	will_be_float = parseFloat(will_be_float.toFixed(2));
 
 	return will_be_float;
 }
@@ -17,7 +17,7 @@ function gtm4wp_make_sure_is_float( probably_float ) {
 function gtm4wp_push_ecommerce( event_name, items, extra_params, event_callback=false, event_timeout=2000 ) {
 	const ecom_obj = extra_params || {};
 	ecom_obj.items = items;
-	
+
 	if ( gtm4wp_clear_ecommerce ) {
 		window[ gtm4wp_datalayer_name ].push({
 			ecommerce: null
