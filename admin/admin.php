@@ -652,8 +652,8 @@ function gtm4wp_sanitize_options( $options ) {
 			}
 		} elseif ( GTM4WP_OPTION_GTM_PLACEMENT === $optionname ) {
 			// GTM container ON/OFF + compat mode.
-			$container_on_off = (bool) $options['container-on'];
-			$container_compat = (int) $options['compat-mode'];
+			$container_on_off = isset( $options['container-on'] ) && $options['container-on'];
+			$container_compat = (int) ( isset( $options['compat-mode'] ) ? $options['compat-mode'] : 0 );
 
 			if ( ! $container_on_off ) {
 				$output[ $optionname ] = GTM4WP_PLACEMENT_OFF;
