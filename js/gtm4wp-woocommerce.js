@@ -466,8 +466,8 @@ function gtm4wp_woocommerce_process_pages() {
 			delete productdata.productlink;
 
 			let datalayer_timeout = 2000;
-			if (window.gtm4wp_datalayer_max_timeout) {
-				datalayer_timeout = window.gtm4wp_datalayer_max_timeout;
+			if (gtm4wp_datalayer_max_timeout) {
+				datalayer_timeout = gtm4wp_datalayer_max_timeout;
 			}
 
 			// fire ga4 version
