@@ -36,6 +36,25 @@ $GLOBALS['gtm4wp_integratefieldtexts'] = array(
 		'phase'         => GTM4WP_PHASE_STABLE,
 		'plugintocheck' => 'woocommerce/woocommerce.php',
 	),
+	GTM4WP_OPTION_INTEGRATE_WCBLOCKSADDTOCART        => array(
+		'label'         => esc_html__( 'Use WooCommerce Blocks add-to-cart', 'duracelltomi-google-tag-manager' ),
+		'description'   => sprintf(
+			gtm4wp_safe_admin_html(
+				// translators: 1: anchor element linking to WooCommerce Blocks DOM events docs. 2: closing anchor element.
+				__(
+					'Enable this experimental feature to track WooCommerce Blocks cart interactions (Add to Cart + Options, mini-cart, and cart page).<br/>
+					This option uses the %1$sDOM events%2$s from WooCommerce Blocks to detect when products are added to or removed from the cart.<br/>
+					<strong>When enabled, the legacy add-to-cart tracking will be disabled.</strong><br/>
+					This feature requires "Track e-commerce" to be enabled.',
+					'duracelltomi-google-tag-manager'
+				)
+			),
+			'<a href="https://developer.woocommerce.com/docs/block-development/extensible-blocks/cart-and-checkout-blocks/dom-events/" target="_blank" rel="noopener">',
+			'</a>'
+		),
+		'phase'         => GTM4WP_PHASE_EXPERIMENTAL,
+		'plugintocheck' => 'woocommerce/woocommerce.php',
+	),
 	GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION      => array(
 		'label'       => esc_html__( 'Products per impression', 'duracelltomi-google-tag-manager' ),
 		'description' => gtm4wp_safe_admin_html(

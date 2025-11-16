@@ -37,6 +37,12 @@ function gtm4wp_woocommerce_add_global_vars( $return ) {
 	$return['gtm4wp_product_per_impression'] = (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ] );
 	$return['gtm4wp_clear_ecommerce']        = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ] );
 	$return['gtm4wp_datalayer_max_timeout']  = (int) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT ] );
+	$return['gtm4wp_blocks_add_to_cart']     = (bool) ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBLOCKSADDTOCART ] );
+	$return['gtm4wp_rest_root']              = esc_url_raw( get_rest_url() );
+	$return['gtm4wp_blocks_ajax_url']        = esc_url_raw( admin_url( 'admin-ajax.php' ) );
+	$return['gtm4wp_blocks_product_nonce']   = wp_create_nonce( 'gtm4wp-product-data' );
+	$return['gtm4wp_blocks_dedupe_window']   = (int) apply_filters( 'gtm4wp_blocks_dedupe_window', 800 );
+	$return['gtm4wp_rest_nonce']             = wp_create_nonce( 'wp_rest' );
 
 	return $return;
 }
@@ -92,7 +98,20 @@ function gtm4wp_woocommerce_process_product( $product, $additional_product_attri
 	);
 
 	if ( 'variation' === $product_type ) {
-		$_temp_productdata['item_group_id'] = $parent_product_id;
+		$parent_product = wc_get_product( $parent_product_id );
+		$parent_item_id = '';
+
+		if ( $parent_product instanceof WC_Product && $parent_product->get_sku() ) {
+			$parent_item_id = $parent_product->get_sku();
+		}
+
+		$_temp_productdata['item_group_sku'] = $parent_item_id;
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] && '' !== $parent_item_id ) {
+			$_temp_productdata['item_group_id'] = $parent_item_id;
+		} else {
+			$_temp_productdata['item_group_id'] = $parent_product_id;
+		}
 	}
 
 	if ( 1 === count( $product_cat_parts ) ) {
@@ -962,7 +981,8 @@ function gtm4wp_woocommerce_single_add_to_cart_tracking() {
 	global $product, $gtm4wp_options;
 
 	// exit early if there is nothing to do.
-	if ( false === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] ) {
+	if ( false === $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ]
+		|| ! empty( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBLOCKSADDTOCART ] ) ) {
 		return;
 	}
 
@@ -1376,8 +1396,27 @@ function gtm4wp_woocommerce_enqueue_scripts() {
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] ) {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE, true );
-		wp_enqueue_script( 'gtm4wp-ecommerce-generic', $gtp4wp_script_path . 'gtm4wp-ecommerce-generic.js', array(), GTM4WP_VERSION, $in_footer );
-		wp_enqueue_script( 'gtm4wp-woocommerce', $gtp4wp_script_path . 'gtm4wp-woocommerce.js', array( 'jquery' ), GTM4WP_VERSION, $in_footer );
+
+		$default_version      = GTM4WP_VERSION;
+		$generic_script_ver   = $default_version;
+		$woocommerce_script_ver = $default_version;
+
+		if ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) {
+			$script_dir = trailingslashit( dirname( __DIR__ ) ) . 'js/';
+
+			$generic_script_path = $script_dir . 'gtm4wp-ecommerce-generic.js';
+			if ( file_exists( $generic_script_path ) ) {
+				$generic_script_ver = filemtime( $generic_script_path );
+			}
+
+			$woocommerce_script_path = $script_dir . 'gtm4wp-woocommerce.js';
+			if ( file_exists( $woocommerce_script_path ) ) {
+				$woocommerce_script_ver = filemtime( $woocommerce_script_path );
+			}
+		}
+
+		wp_enqueue_script( 'gtm4wp-ecommerce-generic', $gtp4wp_script_path . 'gtm4wp-ecommerce-generic.js', array(), $generic_script_ver, $in_footer );
+		wp_enqueue_script( 'gtm4wp-woocommerce', $gtp4wp_script_path . 'gtm4wp-woocommerce.js', array( 'jquery' ), $woocommerce_script_ver, $in_footer );
 	}
 }
 
@@ -1506,6 +1545,107 @@ add_action( 'woocommerce_after_add_to_cart_button', 'gtm4wp_woocommerce_single_a
 
 add_action( 'wp_enqueue_scripts', 'gtm4wp_woocommerce_enqueue_scripts' );
 add_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, 'gtm4wp_woocommerce_add_global_vars' );
+
+add_action( 'rest_api_init', 'gtm4wp_register_wc_product_rest_route' );
+add_action( 'wp_ajax_gtm4wp_product_data', 'gtm4wp_ajax_get_product_data' );
+add_action( 'wp_ajax_nopriv_gtm4wp_product_data', 'gtm4wp_ajax_get_product_data' );
+
+/**
+ * Registers REST API endpoint to fetch processed product data.
+ *
+ * @return void
+ */
+function gtm4wp_register_wc_product_rest_route() {
+	register_rest_route(
+		'gtm4wp/v1',
+		'/product/(?P<id>\d+)',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => 'gtm4wp_rest_get_product_data',
+			'permission_callback' => '__return_true',
+		)
+	);
+}
+
+/**
+ * REST API callback to retrieve processed product data.
+ *
+ * @param WP_REST_Request $request The REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function gtm4wp_rest_get_product_data( WP_REST_Request $request ) {
+	$product_id = absint( $request['id'] );
+
+	if ( $product_id <= 0 ) {
+		return new WP_Error( 'gtm4wp_invalid_product', __( 'Invalid product ID.', 'duracelltomi-google-tag-manager' ), array( 'status' => 400 ) );
+	}
+
+	$product = wc_get_product( $product_id );
+
+	if ( ! $product ) {
+		return new WP_Error( 'gtm4wp_product_not_found', __( 'Product not found.', 'duracelltomi-google-tag-manager' ), array( 'status' => 404 ) );
+	}
+
+	$product_data = gtm4wp_woocommerce_process_product( $product, array(), 'productdetail' );
+
+	if ( ! $product_data ) {
+		return new WP_Error( 'gtm4wp_product_unavailable', __( 'Unable to build product data.', 'duracelltomi-google-tag-manager' ), array( 'status' => 404 ) );
+	}
+
+	return rest_ensure_response(
+		array(
+			'product' => $product_data,
+		)
+	);
+}
+
+/**
+ * AJAX fallback handler for product data when REST is not accessible.
+ *
+ * @return void
+ */
+function gtm4wp_ajax_get_product_data() {
+	check_ajax_referer( 'gtm4wp-product-data', 'nonce' );
+
+	$product_id = isset( $_REQUEST['product_id'] ) ? absint( $_REQUEST['product_id'] ) : 0;
+
+	if ( $product_id <= 0 ) {
+		wp_send_json_error(
+			array(
+				'message' => __( 'Invalid product ID.', 'duracelltomi-google-tag-manager' ),
+			),
+			400
+		);
+	}
+
+	$product = wc_get_product( $product_id );
+
+	if ( ! $product ) {
+		wp_send_json_error(
+			array(
+				'message' => __( 'Product not found.', 'duracelltomi-google-tag-manager' ),
+			),
+			404
+		);
+	}
+
+	$product_data = gtm4wp_woocommerce_process_product( $product, array(), 'ajax_fallback' );
+
+	if ( ! $product_data ) {
+		wp_send_json_error(
+			array(
+				'message' => __( 'Unable to build product data.', 'duracelltomi-google-tag-manager' ),
+			),
+			500
+		);
+	}
+
+	wp_send_json_success(
+		array(
+			'product' => $product_data,
+		)
+	);
+}
 
 add_filter( 'woocommerce_blocks_product_grid_item_html', 'gtm4wp_woocommerce_add_productdata_to_wc_block', 10, 3 );
 
