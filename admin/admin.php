@@ -652,8 +652,13 @@ function gtm4wp_sanitize_options( $options ) {
 			}
 		} elseif ( GTM4WP_OPTION_GTM_PLACEMENT === $optionname ) {
 			// GTM container ON/OFF + compat mode.
-			$container_on_off = (bool) $options['container-on'];
-			$container_compat = (int) $options['compat-mode'];
+			$container_on_off = isset( $options['container-on'] )
+				? (bool) $options['container-on']
+				: ( GTM4WP_PLACEMENT_OFF !== (int) $optionvalue );
+
+			$container_compat = isset( $options['compat-mode'] )
+				? (int) $options['compat-mode']
+				: (int) $optionvalue;
 
 			if ( ! $container_on_off ) {
 				$output[ $optionname ] = GTM4WP_PLACEMENT_OFF;
@@ -1298,6 +1303,19 @@ function gtm4wp_show_warning() {
 		);
 		echo '</strong></p></div>';
 	}
+
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ] && $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_WCBLOCKSADDTOCART ] ) {
+		$blocks_health = gtm4wp_get_blocks_integration_health_state();
+
+		if ( ! $blocks_health['store_api_route'] || ! $blocks_health['gtm4wp_product_api'] ) {
+			echo '<div class="gtm4wp-notice notice notice-warning" data-href="?wc-blocks-health"><p><strong>';
+			esc_html_e(
+				'WooCommerce Blocks add-to-cart tracking is enabled but its required REST endpoints are unavailable. Please ensure WooCommerce Blocks assets and the GTM4WP REST endpoints are accessible.',
+				'duracelltomi-google-tag-manager'
+			);
+			echo '</strong></p></div>';
+		}
+	}
 }
 
 /**
@@ -1381,6 +1399,82 @@ add_action( 'admin_init', 'gtm4wp_admin_init' );
 add_action( 'admin_menu', 'gtm4wp_add_admin_page' );
 add_action( 'admin_enqueue_scripts', 'gtm4wp_add_admin_js' );
 add_action( 'admin_notices', 'gtm4wp_show_warning' );
+
+/**
+ * Returns health status for WooCommerce Blocks add-to-cart integration.
+ *
+ * @return array<string,bool>
+ */
+function gtm4wp_get_blocks_integration_health_state() {
+	$result = array(
+		'store_api_route'    => false,
+		'gtm4wp_product_api' => false,
+	);
+
+	// First, try to exercise the endpoints directly so themes/hosts that lazy-load routes do not trigger false warnings.
+	$result['store_api_route']    = gtm4wp_rest_route_responds( '/wc/store/v1/cart', true );
+	$result['gtm4wp_product_api'] = gtm4wp_rest_route_responds( '/gtm4wp/v1/product/0', true );
+
+	if ( $result['store_api_route'] && $result['gtm4wp_product_api'] ) {
+		return $result;
+	}
+
+	if ( ! function_exists( 'rest_get_server' ) ) {
+		return $result;
+	}
+
+	$server = rest_get_server();
+
+	if ( ! $server ) {
+		return $result;
+	}
+
+	$routes = $server->get_routes();
+
+	foreach ( $routes as $route => $handler ) {
+		if ( ! $result['store_api_route'] && 0 === strpos( $route, '/wc/store/v1/cart' ) ) {
+			$result['store_api_route'] = true;
+		}
+
+		if ( ! $result['gtm4wp_product_api'] && 0 === strpos( $route, '/gtm4wp/v1/product' ) ) {
+			$result['gtm4wp_product_api'] = true;
+		}
+
+		if ( $result['store_api_route'] && $result['gtm4wp_product_api'] ) {
+			break;
+		}
+	}
+
+	return $result;
+}
+
+/**
+ * Checks if a REST route responds without returning rest_no_route.
+ *
+ * @param string $route Route path to check.
+ * @param bool   $allow_client_error Treat 4xx responses as success (route exists but request invalid).
+ * @return bool
+ */
+function gtm4wp_rest_route_responds( $route, $allow_client_error = false ) {
+	if ( ! class_exists( 'WP_REST_Request' ) || ! function_exists( 'rest_do_request' ) ) {
+		return false;
+	}
+
+	$request  = new WP_REST_Request( 'GET', $route );
+	$response = rest_do_request( $request );
+
+	if ( is_wp_error( $response ) ) {
+		return 'rest_no_route' !== $response->get_error_code();
+	}
+
+	$status = (int) $response->get_status();
+
+	if ( $allow_client_error ) {
+		return $status >= 200 && $status < 500;
+	}
+
+	return $status >= 200 && $status < 400;
+}
 add_action( 'admin_head', 'gtm4wp_admin_head' );
 add_filter( 'plugin_action_links', 'gtm4wp_add_plugin_action_links', 10, 2 );
 add_action( 'wp_ajax_gtm4wp_dismiss_notice', 'gtm4wp_dismiss_notice' );
