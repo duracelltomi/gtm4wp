@@ -224,6 +224,11 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 == Changelog ==
 
+= 1.22.3 =
+
+* Fixed: when timeout for the select_item event with WooCommerce is set to 0, plugin does not halt the browser from loading the product page
+* Fixed: properly reading timeout for select_item eventCallback
+
 = 1.22.2 =
 
 * Fixed: purchase event was not fired when is_order_received_page() WooCommerce tag was not supported by the template and the fallback method had to activate.
@@ -351,6 +356,10 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 * Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
 
 == Upgrade Notice ==
+
+= 1.22.3 =
+
+Bugfix release
 
 = 1.22.2 =
 

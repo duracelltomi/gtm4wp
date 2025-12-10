@@ -986,7 +986,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 			$js_var_value = "'" . esc_js( $js_var_value ) . "'";
 		}
 
-		if ( is_bool( $js_var_value ) || empty( $js_var_value ) ) {
+		if ( is_bool( $js_var_value ) || ( empty( $js_var_value ) && ( 0 !== $js_var_value ) ) ) {
 			$js_var_value = $js_var_value ? 'true' : 'false';
 		}
 

@@ -448,46 +448,53 @@ function gtm4wp_woocommerce_process_pages() {
 				return true;
 			}
 
-			const ctrl_key_pressed = e.ctrlKey || e.metaKey;
-			const target_new_tab = ( '_blank' === matching_link_element.target );
-
-			// save this info to prevent redirection if another plugin already prevented to event for some reason
-			let event_already_prevented = e.defaultPrevented;
-			if ( !event_already_prevented ) {
-				e.preventDefault();
-			}
-
-			if ( ctrl_key_pressed || target_new_tab ) {
-				// we need to open the new tab/page here so that popup blocker of the browser doesn't block our code
-				window.productpage_window = window.open( 'about:blank', '_blank' );
-			}
-
-			const productlink_to_redirect = productdata.productlink;
-			delete productdata.productlink;
-
 			let datalayer_timeout = 2000;
-			if (window.gtm4wp_datalayer_max_timeout) {
-				datalayer_timeout = window.gtm4wp_datalayer_max_timeout;
+			if (typeof gtm4wp_datalayer_max_timeout !== 'undefined') {
+				datalayer_timeout = gtm4wp_datalayer_max_timeout;
 			}
 
-			// fire ga4 version
-			gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
-				'currency': gtm4wp_currency
-			}, function( container_id ) {
-				if ( "undefined" !== typeof container_id && window.gtm4wp_first_container_id != container_id) {
-					// only call this for the first loaded container
-					return true;
+			if (datalayer_timeout > 0) {
+				const ctrl_key_pressed = e.ctrlKey || e.metaKey;
+				const target_new_tab = ( '_blank' === matching_link_element.target );
+
+				// save this info to prevent redirection if another plugin already prevented to event for some reason
+				let event_already_prevented = e.defaultPrevented;
+				if ( !event_already_prevented ) {
+					e.preventDefault();
 				}
 
-				if ( !event_already_prevented ) {
-					if ( ( target_new_tab || ctrl_key_pressed ) && productpage_window ) {
-						productpage_window.location.href = productlink_to_redirect;
-					} else {
-						document.location.href = productlink_to_redirect;
-					}
+				if ( ctrl_key_pressed || target_new_tab ) {
+					// we need to open the new tab/page here so that popup blocker of the browser doesn't block our code
+					window.productpage_window = window.open( 'about:blank', '_blank' );
 				}
-			},
-			datalayer_timeout);
+
+				const productlink_to_redirect = productdata.productlink;
+				delete productdata.productlink;
+
+				// fire ga4 version
+				gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
+					'currency': gtm4wp_currency
+				}, function( container_id ) {
+					if ( "undefined" !== typeof container_id && window.gtm4wp_first_container_id != container_id) {
+						// only call this for the first loaded container
+						return true;
+					}
+
+					if ( !event_already_prevented ) {
+						if ( ( target_new_tab || ctrl_key_pressed ) && productpage_window ) {
+							productpage_window.location.href = productlink_to_redirect;
+						} else {
+							document.location.href = productlink_to_redirect;
+						}
+					}
+				},
+				datalayer_timeout);
+			} else {
+				delete productdata.productlink;
+				gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
+					'currency': gtm4wp_currency
+				});
+			}
 		}
 	}, { capture: true } );
 
