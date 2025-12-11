@@ -5,6 +5,20 @@ window.gtm4wp_checkout_step_fired = []; // step 1 will be the billing section wh
 
 window.gtm4wp_first_container_id = "";
 
+function gtm4wp_woocommerce_console_log( message ) {
+	if ( typeof console !== 'undefined' && console.log ) {
+		if ( typeof message === 'object' ) {
+			message = JSON.stringify( message );
+		}
+
+		const d = new Date();
+		const time = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds() + '.' + d.getMilliseconds();
+		message = time + ' - ' + message;
+		
+		console.log( '[GTM4WP debug]: ' + message );
+	}
+}
+
 function gtm4wp_woocommerce_handle_cart_qty_change() {
 	document.querySelectorAll( '.product-quantity input.qty' ).forEach(function( qty_el ) {
 		const original_value = qty_el.defaultValue;
@@ -368,31 +382,24 @@ function gtm4wp_woocommerce_process_pages() {
 		}
 
 		// track clicks in product lists
-		if ( event_target_element.closest(
+		const matching_link_element = event_target_element.closest(
 			'.products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
 			+'.wc-block-grid__products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
 			+'.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
 			+'.widget-product-item,'
-			+'.woocommerce-grouped-product-list-item__label a' )
-		) {
-			// do nothing if GTM is blocked for some reason
+			+'.woocommerce-grouped-product-list-item__label a'
+		);
+		if ( matching_link_element) {
+			// Do nothing if GTM is blocked for some reason.
+			// At this point, we only know that Google Tag has been loaded.
+			// If only a Google Tag is loaded, it also populates the google_tag_manager object.
 			if ( 'undefined' == typeof google_tag_manager ) {
 				return true;
 			}
 
 			const event_target_element = e.target;
-			const matching_link_element = event_target_element.closest(
-				'.products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
-				+'.wc-block-grid__products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
-				+'.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),'
-				+'.widget-product-item,'
-				+'.woocommerce-grouped-product-list-item__label a'
-			);
 
-			if ( !matching_link_element ) {
-				return true;
-			}
-
+			// try to find product data as it is in different places depending on the clicked element.
 			let temp_selector = event_target_element.closest( '.product,.wc-block-grid__product' );
 			let productdata_el;
 
@@ -423,12 +430,13 @@ function gtm4wp_woocommerce_process_pages() {
 				}
 			}
 
+			// Extract product data from the found DOM node.
 			const productdata = gtm4wp_read_json_from_node( productdata_el, 'gtm4wp_product_data', ['internal_id'] );
 			if ( !productdata ) {
 				return true;
 			}
 
-			// only act on links pointing to the product detail page
+			// Only act on links pointing to the product detail page
 			if ( productdata.productlink != matching_link_element.getAttribute( 'href' ) ) {
 				return true;
 			}
@@ -442,8 +450,8 @@ function gtm4wp_woocommerce_process_pages() {
 				}
 			}
 
-			// do not do anything if GTM was not loaded
-			// and window.google_tag_manager is for some reason initialized (GA4 only setup?)
+			// Do not do anything if GTM was not loaded.
+			// The google_tag_manager object is still available if only Google Tag is loaded.
 			if ( "" === window.gtm4wp_first_container_id ) {
 				return true;
 			}
@@ -470,7 +478,6 @@ function gtm4wp_woocommerce_process_pages() {
 
 				const productlink_to_redirect = productdata.productlink;
 				delete productdata.productlink;
-
 				// fire ga4 version
 				gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
 					'currency': gtm4wp_currency
