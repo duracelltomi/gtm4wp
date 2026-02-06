@@ -1054,6 +1054,7 @@ function gtm4wp_wp_header_top( $echo = true ) {
 						'data-cfasync'            => array(),
 						'data-pagespeed-no-defer' => array(),
 						'data-cookieconsent'      => array(),
+						'nonce'                   => array(),
 					),
 				)
 			);
