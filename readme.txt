@@ -230,6 +230,7 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 * Fixed: nonce attribute should not be sanitized. Thanks [oxyc](https://github.com/oxyc)
 * Fixed: avoid warnings when saving settings. Thanks [mircobabini](https://github.com/mircobabini)
 * Fixed: only float number is returned in JavaScript processing. Thanks [gkipouros](https://github.com/gkipouros)
+* Updated: only load plugin files on frontend or on admin when the admin user has sufficient permissions.
 
 = 1.22.3 =
 
