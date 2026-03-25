@@ -1,3 +1,6 @@
+/**
+ * GTM4WP e-commerce generic helper functions.
+ */
 function gtm4wp_make_sure_is_float( probably_float ) {
 	let will_be_float = probably_float;
 
@@ -9,7 +12,7 @@ function gtm4wp_make_sure_is_float( probably_float ) {
 	} else if ( typeof will_be_float != "number" ) {
 		will_be_float = 0;
 	}
-	will_be_float = parseFloat(will_be_float.toFixed(2));
+	will_be_float = parseFloat( will_be_float.toFixed( 2 ) );
 
 	return will_be_float;
 }
@@ -19,9 +22,9 @@ function gtm4wp_push_ecommerce( event_name, items, extra_params, event_callback=
 	ecom_obj.items = items;
 
 	if ( gtm4wp_clear_ecommerce ) {
-		window[ gtm4wp_datalayer_name ].push({
+		window[ gtm4wp_datalayer_name ].push( {
 			ecommerce: null
-		});
+		} );
 	}
 
 	const dl_obj = {
@@ -29,12 +32,12 @@ function gtm4wp_push_ecommerce( event_name, items, extra_params, event_callback=
 		'ecommerce': ecom_obj
 	};
 
-	if (event_callback) {
+	if ( event_callback ) {
 		dl_obj.eventCallback = event_callback;
 		dl_obj.eventTimeout  = event_timeout;
 	}
 
-	window[ gtm4wp_datalayer_name ].push(dl_obj);
+	window[ gtm4wp_datalayer_name ].push( dl_obj );
 }
 
 function gtm4wp_read_from_json( json_data, exclude_keys=['productlink', 'internal_id'] ) {
@@ -46,14 +49,15 @@ function gtm4wp_read_from_json( json_data, exclude_keys=['productlink', 'interna
 			}
 
 			if ( exclude_keys && exclude_keys.length > 0 ) {
-				for ( let i = 0; i < exclude_keys.length; i++ ) {
+				const exclude_keys_length = exclude_keys.length;
+				for ( let i = 0; i < exclude_keys_length; i++ ) {
 					delete parsed_json[ exclude_keys[i] ];
 				}
 			}
 
 			return parsed_json;
 		}
-	} catch(e) {
+	} catch ( e ) {
 		console && console.error && console.error( e.message );
 	}
 
@@ -77,13 +81,13 @@ function gtm4wp_update_json_in_node( el, dataset_item_id, new_key, new_value ) {
 					parsed_json.price = gtm4wp_make_sure_is_float( parsed_json.price );
 				}
 
-                parsed_json[ new_key ] = new_value;
+				parsed_json[ new_key ] = new_value;
 
 				el.dataset[ dataset_item_id ] = JSON.stringify( parsed_json );
 
 				return true;
 			}
-		} catch(e) {
+		} catch ( e ) {
 			console && console.error && console.error( e.message );
 		}
 	}

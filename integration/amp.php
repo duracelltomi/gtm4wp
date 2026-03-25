@@ -121,7 +121,7 @@ function gtm4wp_amp_gtmcode() {
 				echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id=' . esc_url_raw( $gtm4wp_oneampid ) . '&gtm.url=SOURCE_URL" data-credentials="include"><script type="application/json">' . wp_json_encode( gtm4wp_amp_gtmvariables() ) . '</script></amp-analytics>';
 
 				// Add to counter.
-				$x++;
+				++$x;
 			}
 
 			// Check how many injections for return.

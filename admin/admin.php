@@ -702,11 +702,11 @@ function gtm4wp_sanitize_options( $options ) {
  * @return void
  */
 function gtm4wp_admin_init() {
-	require_once dirname( __FILE__ ) . '/admin-tab-basicdata.php';
-	require_once dirname( __FILE__ ) . '/admin-tab-events.php';
-	require_once dirname( __FILE__ ) . '/admin-tab-scrolltracking.php';
-	require_once dirname( __FILE__ ) . '/admin-tab-integrate.php';
-	require_once dirname( __FILE__ ) . '/admin-tab-advanced.php';
+	require_once __DIR__ . '/admin-tab-basicdata.php';
+	require_once __DIR__ . '/admin-tab-events.php';
+	require_once __DIR__ . '/admin-tab-scrolltracking.php';
+	require_once __DIR__ . '/admin-tab-integrate.php';
+	require_once __DIR__ . '/admin-tab-advanced.php';
 
 	global $gtm4wp_includefieldtexts, $gtm4wp_eventfieldtexts, $gtm4wp_integratefieldtexts, $gtm4wp_scrollerfieldtexts,
 		$gtm4wp_advancedfieldtexts, $gtm4wp_entity_ids;
@@ -973,9 +973,9 @@ function gtm4wp_admin_init() {
 	);
 
 	// Apply oembed code changes on the admin as well since the oembed call on the admin is cached by WordPress into a transient that is applied on the frontend later.
-	require_once dirname( __FILE__ ) . '/../integration/youtube.php';
-	require_once dirname( __FILE__ ) . '/../integration/vimeo.php';
-	require_once dirname( __FILE__ ) . '/../integration/soundcloud.php';
+	require_once __DIR__ . '/../integration/youtube.php';
+	require_once __DIR__ . '/../integration/vimeo.php';
+	require_once __DIR__ . '/../integration/soundcloud.php';
 }
 
 /**
@@ -1249,7 +1249,7 @@ function gtm4wp_show_warning() {
 
 	if ( ( '' === trim( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) ) && ( false === $gtm4wp_user_notices_dismisses['enter-gtm-code'] ) ) {
 		echo '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code"><p><strong>';
-		echo sprintf(
+		printf(
 			// translators: 1: opening anchor element pointing to the GTM4WP options page. 2: clsing anchor element.
 			esc_html__(
 				'To start using Google Tag Manager for WordPress, please %1$senter your GTM ID%2$s',
