@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 3.4.0
 Requires PHP: 7.4
-Tested up to: 6.9
-Stable tag: 1.22.3
+Tested up to: 6.9.4
+Stable tag: 1.22.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -224,6 +224,13 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 == Changelog ==
 
+= 1.22.4 =
+
+* Fixed: use proper JSON encoding for user input in dataLayer script context. Thanks [cyn](https://github.com/cyn8)
+* Fixed: nonce attribute should not be sanitized. Thanks [oxyc](https://github.com/oxyc)
+* Fixed: avoid warnings when saving settings. Thanks [mircobabini](https://github.com/mircobabini)
+* Fixed: only float number is returned in JavaScript processing. Thanks [gkipouros](https://github.com/gkipouros)
+
 = 1.22.3 =
 
 * Fixed: when timeout for the select_item event with WooCommerce is set to 0, plugin does not halt the browser from loading the product page
@@ -356,6 +363,10 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 * Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
 
 == Upgrade Notice ==
+
+= 1.22.4 =
+
+Bugfix release
 
 = 1.22.3 =
 

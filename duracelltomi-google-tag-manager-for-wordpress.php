@@ -11,7 +11,7 @@
  * Plugin Name: GTM4WP - A Google Tag Manager (GTM) plugin for WordPress
  * Plugin URI: https://gtm4wp.com/
  * Description: The first Google Tag Manager plugin for WordPress with business goals in mind
- * Version: 1.22.3
+ * Version: 1.22.4
  * Requires at least: 3.4.0
  * Requires PHP: 7.4
  * Author: Thomas Geiger
@@ -22,10 +22,10 @@
  * Domain Path: /languages
 
  * WC requires at least: 5.0
- * WC tested up to: 9.8
+ * WC tested up to: 10.6.1
  */
 
-define( 'GTM4WP_VERSION', '1.22.3' );
+define( 'GTM4WP_VERSION', '1.22.4' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
 
 global $gtp4wp_plugin_url, $gtp4wp_plugin_basename, $gtp4wp_script_path;
@@ -77,7 +77,7 @@ add_action( 'plugins_loaded', 'gtm4wp_plugins_loaded' );
  */
 add_action(
 	'before_woocommerce_init',
-	function() {
+	function () {
 		// Check if the FeaturesUtil class exists in the \Automattic\WooCommerce\Utilities namespace.
 		if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
 			// Declare compatibility with custom order tables using the FeaturesUtil class.
