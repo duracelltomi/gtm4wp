@@ -262,7 +262,7 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 	}
 
 	if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_POSTTITLE ] ) {
-		$data_layer['pageTitle'] = htmlspecialchars( wp_strip_all_tags( wp_title( '|', false, 'right' ) ) );
+		$data_layer['pageTitle'] = wp_strip_all_tags( wp_title( '|', false, 'right' ) );
 	}
 
 	if ( is_singular() ) {
@@ -437,7 +437,7 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 		$data_layer['pagePostType'] = 'search-results';
 
 		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_SEARCHDATA ] ) {
-			$data_layer['siteSearchTerm'] = htmlspecialchars( get_search_query() );
+			$data_layer['siteSearchTerm'] = get_search_query();
 			$data_layer['siteSearchFrom'] = '';
 			if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
 				$referer_url_parts            = explode( '?', esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) );
@@ -1136,7 +1136,7 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		$gtm4wp_datalayer_data = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, $gtm4wp_datalayer_data );
 
 		$script_tag .= '
-	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK ) . ';';
+	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK | JSON_HEX_TAG ) . ';';
 
 		$script_tag .= '
 	' . esc_js( $gtm4wp_datalayer_name ) . '.push( dataLayer_content );';
@@ -1387,7 +1387,7 @@ function gtm4wp_fire_additional_datalayer_pushes() {
 
 		if ( array_key_exists( 'datalayer_object', $one_event ) ) {
 			$datalayer_push_code .= '
-	' . esc_js( $gtm4wp_datalayer_name ) . '.push(' . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE ) . ');';
+	' . esc_js( $gtm4wp_datalayer_name ) . '.push(' . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG ) . ');';
 		}
 
 		if ( array_key_exists( 'js_after', $one_event ) ) {
