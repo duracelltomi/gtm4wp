@@ -30,3 +30,6 @@ composer.lock
 
 # NPM
 node_modules
+
+# LLM
+.claude/
