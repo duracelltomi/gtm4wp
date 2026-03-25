@@ -32,8 +32,6 @@ global $gtp4wp_plugin_url, $gtp4wp_plugin_basename, $gtp4wp_script_path;
 $gtp4wp_plugin_url      = plugin_dir_url( __FILE__ );
 $gtp4wp_plugin_basename = plugin_basename( __FILE__ );
 $gtp4wp_script_path     = $gtp4wp_plugin_url . ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : 'dist/' ) . 'js/';
-require_once GTM4WP_PATH . '/common/readoptions.php';
-
 /**
  * WordPress hook function to load translations
  *
@@ -54,9 +52,13 @@ add_action( 'init', 'gtm4wp_init' );
  * @return void
  */
 function gtm4wp_plugins_loaded() {
-	if ( is_admin() ) {
+	if ( is_admin() && current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) ) ) {
+		// Admin user with sufficient permissions, load admin-specific files.
+		require_once GTM4WP_PATH . '/common/readoptions.php';
 		require_once GTM4WP_PATH . '/admin/admin.php';
-	} else {
+	} elseif ( ! is_admin() ) {
+		// Frontend user, load frontend-specific files.
+		require_once GTM4WP_PATH . '/common/readoptions.php';
 		require_once GTM4WP_PATH . '/public/frontend.php';
 	}
 }
