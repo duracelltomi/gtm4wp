@@ -75,6 +75,10 @@ var adminsubtabs = {
 		"int-webtoffeegdpr": {
 			tabtext: gtm4wp.webtoffeetabtitle,
 			numitems: 1
+		},
+		"int-axeptio": {
+			tabtext: gtm4wp.axeptiotabtitle,
+			numitems: 4
 		}
 	}
 };

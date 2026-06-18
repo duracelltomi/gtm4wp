@@ -70,3 +70,8 @@
 .gtm4wp-phase-deprecated:before {
 	content: "deprecated";
 }
+
+/* Hide the Axeptio configuration */
+.form-table:has( #gtm4wp-options\[integrate-axeptio\]:not(:checked) ) tr:has( [id^="gtm4wp-options[integrate-axeptio-"] ) {
+	display: none !important;
+}

@@ -99,6 +99,12 @@ define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR', 'integrate-webtoffee-gdpr' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO', 'integrate-axeptio' );
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID', 'integrate-axeptio-projectid' );
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION', 'integrate-axeptio-cookies-version' );
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE', 'integrate-axeptio-consent-mode' );
+define( 'GTM4WP_WPFILTER_AXEPTIO_CONSENT_MODE_DEFAULT', 'gtm4wp_axeptio_consent_mode_default' );
+
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE', 'integrate-consent-mode' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS', 'integrate-consent-mode-ads' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA', 'integrate-consent-mode-ad-user-data' );
@@ -207,6 +213,11 @@ $gtm4wp_defaultoptions = array(
 	GTM4WP_OPTION_INTEGRATE_COOKIEBOT                => false,
 
 	GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR           => false,
+
+	GTM4WP_OPTION_INTEGRATE_AXEPTIO                  => false,
+	GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID        => '',
+	GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION  => '',
+	GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE      => false,
 
 	GTM4WP_OPTION_INTEGRATE_CONSENTMODE              => false,
 	GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS          => false,

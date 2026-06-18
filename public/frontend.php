@@ -1203,7 +1203,12 @@ function gtm4wp_wp_header_begin( $echo = true ) {
 		}
 	}
 
-	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE ] ) {
+	// When Axeptio handles Consent Mode v2, it already fires the consent default, so GTM4WP must not fire its own.
+	$axeptio_handles_consent_mode = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AXEPTIO ]
+		&& ( '' !== $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID ] )
+		&& $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE ];
+
+	if ( $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_CONSENTMODE ] && ! $axeptio_handles_consent_mode ) {
 		$script_tag = '
 ' . gtm4wp_generate_script_opening_tag() . '
 		if (typeof gtag == "undefined") {
@@ -1471,6 +1476,14 @@ if (
 	&& version_compare( WC()->version, '5.0', '>=' )
 ) {
 	require_once dirname( __FILE__ ) . '/../integration/woocommerce.php';
+}
+
+if (
+	isset( $GLOBALS['gtm4wp_options'] )
+	&& $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_AXEPTIO ]
+	&& '' !== $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID ]
+) {
+	require_once dirname( __FILE__ ) . '/../integration/axeptio.php';
 }
 
 if ( isset( $GLOBALS['gtm4wp_options'] ) && ( $GLOBALS['gtm4wp_options'][ GTM4WP_OPTION_EVENTS_USERLOGIN ] ) ) {

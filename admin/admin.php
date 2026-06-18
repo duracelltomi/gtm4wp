@@ -427,6 +427,22 @@ function gtm4wp_admin_output_field( $args ) {
 			}
 
 			break;
+
+		case GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION . ']':
+			$axeptio_cookies_version = $gtm4wp_options[ GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION ];
+
+			echo '<select id="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION . ']' ) . '" name="' . esc_attr( GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION . ']' ) . '" data-selected-version="' . esc_attr( $axeptio_cookies_version ) . '">';
+			// Pre-render the saved value so it survives a save even if the version list cannot be fetched.
+			if ( '' !== $axeptio_cookies_version ) {
+				echo '<option value="' . esc_attr( $axeptio_cookies_version ) . '" selected="selected">' . esc_html( $axeptio_cookies_version ) . '</option>';
+			}
+			echo '</select><br />';
+			echo '<span class="axeptio_cookies_version_error"></span>';
+
+			echo gtm4wp_safe_admin_html_with_links( $args['description'] ); // phpcs:ignore
+
+			break;
+
 		default:
 			if ( preg_match( '/' . GTM4WP_OPTIONS . '\\[blacklist\\-[^\\]]+\\]/i', $args['label_for'] ) ) {
 				if ( 'blacklist-sandboxed' === $args['entityid'] ) {
@@ -617,6 +633,13 @@ function gtm4wp_sanitize_options( $options ) {
 			} else {
 				$output[ $optionname ] = $newoptionvalue;
 			}
+		} elseif (
+			GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID === $optionname
+			|| GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION === $optionname
+		) {
+			// Must run before the generic "integrate-" branch below, otherwise these free-text values get cast to boolean.
+			$output[ $optionname ] = sanitize_text_field( $newoptionvalue );
+
 		} elseif ( substr( $optionname, 0, 10 ) === 'integrate-' ) {
 			// integrations.
 			$output[ $optionname ] = (bool) $newoptionvalue;
@@ -1055,6 +1078,7 @@ function gtm4wp_add_admin_js( $hook ) {
 			'misctabtitle'          => esc_html__( 'Misc', 'duracelltomi-google-tag-manager' ),
 			'consentmodetabtitle'   => esc_html__( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
 			'webtoffeetabtitle'     => esc_html__( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
+			'axeptiotabtitle'       => esc_html__( 'Axeptio', 'duracelltomi-google-tag-manager' ),
 		);
 		wp_localize_script( 'admin-subtabs', 'gtm4wp', $subtabtexts );
 
@@ -1062,6 +1086,14 @@ function gtm4wp_add_admin_js( $hook ) {
 
 		// phpcs ignore set due to in_footer set to true does not load the script.
 		wp_enqueue_script( 'admin-tabcreator', $gtp4wp_plugin_url . 'js/admin-tabcreator.js', array( 'jquery' ), GTM4WP_VERSION ); // phpcs:ignore
+
+		$axeptiotexts = array(
+			'non_existing_account_id' => esc_html__( 'We were unable to find your Axeptio project, or it has not been published yet.', 'duracelltomi-google-tag-manager' ),
+			'verification_error'      => esc_html__( 'Error while fetching the Axeptio project versions. Please try again.', 'duracelltomi-google-tag-manager' ),
+		);
+		wp_register_script( 'admin-axeptio', $gtp4wp_plugin_url . 'js/admin-axeptio.js', array(), GTM4WP_VERSION ); // phpcs:ignore
+		wp_localize_script( 'admin-axeptio', 'gtm4wpAxeptio', $axeptiotexts );
+		wp_enqueue_script( 'admin-axeptio' );
 
 		wp_enqueue_style( 'gtm4wp-admin-css', $gtp4wp_plugin_url . 'css/admin-gtm4wp.css', array(), GTM4WP_VERSION );
 	}
@@ -1084,6 +1116,7 @@ function gtm4wp_admin_head() {
 	.datalayername_validation_error,
 	.gtmauth_validation_error,
 	.gtmpreview_validation_error,
+	.axeptio_cookies_version_error,
 	.gtm_wpconfig_set	{
 		color: #c00;
 		font-weight: bold;
@@ -1094,7 +1127,8 @@ function gtm4wp_admin_head() {
 	.ampid_validation_error,
 	.datalayername_validation_error,
 	.gtmauth_validation_error,
-	.gtmpreview_validation_error {
+	.gtmpreview_validation_error,
+	.axeptio_cookies_version_error {
 		display: none;
 	}
 </style>
