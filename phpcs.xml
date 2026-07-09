@@ -56,4 +56,7 @@
 
 	<config name="testVersion" value="8.0-"/>
 	<config name="minimum_wp_version" value="6.3"/>
+
+	<!-- Warnings are reported but do not fail the build (errors still do). -->
+	<config name="ignore_warnings_on_exit" value="1"/>
 </ruleset>

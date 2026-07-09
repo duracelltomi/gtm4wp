@@ -11,6 +11,7 @@
 namespace GTM4WP;
 
 use GTM4WP\Compat\Globals;
+use GTM4WP\Frontend\Frontend;
 use GTM4WP\Module\Registry;
 use GTM4WP\Options\Options;
 
@@ -43,6 +44,13 @@ final class Plugin {
 	 * @var Options|null
 	 */
 	private ?Options $options = null;
+
+	/**
+	 * The frontend orchestrator, only set on frontend requests.
+	 *
+	 * @var Frontend|null
+	 */
+	private ?Frontend $frontend = null;
 
 	/**
 	 * Returns the singleton plugin instance.
@@ -117,11 +125,21 @@ final class Plugin {
 	}
 
 	/**
+	 * Returns the frontend orchestrator. Only available on frontend requests.
+	 *
+	 * @return Frontend|null
+	 */
+	public function frontend(): ?Frontend {
+		return $this->frontend;
+	}
+
+	/**
 	 * Boots the frontend code path.
 	 *
 	 * @return void
 	 */
 	private function boot_frontend(): void {
-		$this->registry->frontend( $this->options );
+		$this->frontend = new Frontend( $this->options, $this->registry );
+		$this->frontend->boot();
 	}
 }
