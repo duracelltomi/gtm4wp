@@ -31,5 +31,11 @@ composer.lock
 # NPM
 node_modules
 
+# Build output
+/build/
+.phpunit.result.cache
+
 # LLM
 .claude/
+
+.docs/

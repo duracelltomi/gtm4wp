@@ -1,21 +1,43 @@
 {
     "name": "duracelltomi/gtm4wp",
     "type": "wordpress-plugin",
-    "description": "The most populer Google Tag Manager plugin for WordPress",
+    "description": "The most popular Google Tag Manager plugin for WordPress",
     "homepage": "https://gtm4wp.com/",
-    "license": "LGPL-3.0-or-later",
+    "license": "GPL-3.0-or-later",
     "authors": [
         {
             "name": "Thomas Geiger",
             "email": "messenger@gtm4wp.com"
         }
     ],
-    "scripts": {
-        "install-codestandards": [
-            "Dealerdirect\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\Plugin::run"
-        ]
+    "require": {
+        "php": ">=8.0"
     },
     "require-dev": {
-        "squizlabs/php_codesniffer": "^3.7"
+        "squizlabs/php_codesniffer": "^3.7",
+        "wp-coding-standards/wpcs": "^3.1",
+        "phpcompatibility/php-compatibility": "^9.3",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpunit/phpunit": "^11.0",
+        "brain/monkey": "^2.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "GTM4WP\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "GTM4WP\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "phpcs": "phpcs",
+        "test": "phpunit"
     }
 }

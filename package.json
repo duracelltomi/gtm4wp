@@ -1,10 +1,12 @@
 {
   "name": "gtm4wp",
-  "version": "1.17.0",
+  "version": "2.0.0-dev",
   "description": "The first Google Tag Manager plugin for WordPress with business goals in mind",
-  "main": "index.js",
   "scripts": {
-    "build": "gulp"
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "test:unit": "wp-scripts test-unit-js --passWithNoTests",
+    "lint:js": "wp-scripts lint-js js"
   },
   "repository": {
     "type": "git",
@@ -21,11 +23,6 @@
   },
   "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
   "devDependencies": {
-    "@babel/core": "^7.21.4",
-    "@babel/preset-env": "^7.22.20",
-    "gulp": "^5.0.0",
-    "gulp-babel": "^8.0.0",
-    "gulp-clean-dir": "^1.0.2",
-    "gulp-uglify": "^3.0.2"
+    "@wordpress/scripts": "^30.0.0"
   }
 }

@@ -11,9 +11,9 @@
  * Plugin Name: GTM4WP - A Google Tag Manager (GTM) plugin for WordPress
  * Plugin URI: https://gtm4wp.com/
  * Description: The first Google Tag Manager plugin for WordPress with business goals in mind
- * Version: 1.22.4
- * Requires at least: 3.4.0
- * Requires PHP: 7.4
+ * Version: 2.0.0-dev
+ * Requires at least: 6.3
+ * Requires PHP: 8.0
  * Author: Thomas Geiger
  * Author URI: https://gtm4wp.com/
  * License: GPLv3
@@ -25,57 +25,72 @@
  * WC tested up to: 10.6.1
  */
 
-define( 'GTM4WP_VERSION', '1.22.4' );
+// This file must stay parseable on outdated PHP versions so that the
+// requirements notice below can render instead of a fatal error.
+// Do not use PHP 8+ syntax here.
+
+define( 'GTM4WP_VERSION', '2.0.0-dev' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
+define( 'GTM4WP_PLUGIN_FILE', __FILE__ );
 
 global $gtp4wp_plugin_url, $gtp4wp_plugin_basename, $gtp4wp_script_path;
 $gtp4wp_plugin_url      = plugin_dir_url( __FILE__ );
 $gtp4wp_plugin_basename = plugin_basename( __FILE__ );
-$gtp4wp_script_path     = $gtp4wp_plugin_url . ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : 'dist/' ) . 'js/';
+$gtp4wp_script_path     = $gtp4wp_plugin_url . 'build/';
+
 /**
- * WordPress hook function to load translations
- *
- * @see https://developer.wordpress.org/reference/hooks/init/
+ * Outputs an admin notice when the site does not fulfill the minimum
+ * PHP or WordPress version requirements of GTM4WP 2.x.
  *
  * @return void
  */
-function gtm4wp_init() {
-	load_plugin_textdomain( 'duracelltomi-google-tag-manager', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+function gtm4wp_requirements_notice() {
+	echo '<div class="notice notice-error"><p>';
+	printf(
+		/* translators: 1: required PHP version, 2: required WordPress version, 3: current PHP version, 4: current WordPress version. */
+		esc_html__(
+			'GTM4WP 2.x requires PHP %1$s and WordPress %2$s or newer. Your site runs PHP %3$s and WordPress %4$s, therefore the plugin is currently inactive. Please update your environment or downgrade to GTM4WP 1.x.',
+			'duracelltomi-google-tag-manager'
+		),
+		'8.0',
+		'6.3',
+		esc_html( PHP_VERSION ),
+		esc_html( $GLOBALS['wp_version'] )
+	);
+	echo '</p></div>';
 }
-add_action( 'init', 'gtm4wp_init' );
+
+if (
+	version_compare( PHP_VERSION, '8.0', '<' ) ||
+	version_compare( $GLOBALS['wp_version'], '6.3', '<' )
+) {
+	add_action( 'admin_notices', 'gtm4wp_requirements_notice' );
+	return;
+}
+
+require_once GTM4WP_PATH . 'src/Autoloader.php';
+\GTM4WP\Autoloader::register();
+
+require_once GTM4WP_PATH . 'compat/constants.php';
 
 /**
  * WordPress hook function run after plugins have been loaded.
+ * Boots the plugin core which routes between admin and frontend code paths.
  *
  * @see https://developer.wordpress.org/reference/hooks/plugins_loaded/
  *
  * @return void
  */
-function gtm4wp_plugins_loaded() {
-	if ( is_admin() && current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) ) ) {
-		// Admin user with sufficient permissions, load admin-specific files.
-		require_once GTM4WP_PATH . '/common/readoptions.php';
-		require_once GTM4WP_PATH . '/admin/admin.php';
-	} elseif ( ! is_admin() ) {
-		// Frontend user, load frontend-specific files.
-		require_once GTM4WP_PATH . '/common/readoptions.php';
-		require_once GTM4WP_PATH . '/public/frontend.php';
-	}
+function gtm4wp_bootstrap() {
+	\GTM4WP\Plugin::instance()->boot();
 }
-add_action( 'plugins_loaded', 'gtm4wp_plugins_loaded' );
+add_action( 'plugins_loaded', 'gtm4wp_bootstrap' );
 
 /**
  * Adds an action to declare compatibility with High Performance Order Storage (HPOS)
  * before WooCommerce initialization.
  *
  * @since 1.17
- *
- * @param string   $hook_name  The name of the action to which the callback function is hooked.
- * @param callable $callback   The callback function to be executed when the action is run.
- * @param int      $priority   Optional. The order in which the callback functions are executed. Default is 10.
- * @param int      $args_count Optional. The number of arguments the callback accepts. Default is 1.
- *
- * @return void
  */
 add_action(
 	'before_woocommerce_init',

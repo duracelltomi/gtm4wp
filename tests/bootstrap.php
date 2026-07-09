@@ -1,64 +1,31 @@
 <?php
 /**
- * PHPUnit bootstrap file for GTM4WP XSS fix testing
- * Provides minimal WordPress function mocks for encoding behavior tests
+ * PHPUnit bootstrap file for GTM4WP unit tests.
+ *
+ * Loads the Composer autoloader (plugin classes + Brain Monkey) and the
+ * backward compatible plugin constants. WordPress itself is never loaded;
+ * WordPress functions are stubbed per test through Brain Monkey.
+ *
+ * @package GTM4WP
  */
 
-// Mock WordPress functions for testing
-if ( ! function_exists( 'wp_json_encode' ) ) {
-	/**
-	 * Mock wp_json_encode - mirrors WordPress implementation
-	 *
-	 * @param mixed $data    Data to encode
-	 * @param int   $options JSON encoding options
-	 * @param int   $depth   Maximum depth
-	 * @return string|false JSON string or false on failure
-	 */
-	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
-		return json_encode( $data, $options, $depth );
-	}
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+
+// Satisfy the direct-access guards of the plugin files.
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', sys_get_temp_dir() . '/wordpress/' );
 }
 
-if ( ! function_exists( 'get_search_query' ) ) {
-	/**
-	 * Mock get_search_query - simulates WordPress behavior
-	 *
-	 * @param bool $escaped Whether to escape the result
-	 * @return string Search query string
-	 */
-	function get_search_query( $escaped = true ) {
-		global $test_search_query;
-		$query = $test_search_query ?? '';
-
-		if ( $escaped ) {
-			// Simulate esc_attr() behavior
-			$query = htmlspecialchars( $query, ENT_QUOTES, 'UTF-8' );
-		}
-
-		return $query;
-	}
+if ( ! defined( 'GTM4WP_VERSION' ) ) {
+	define( 'GTM4WP_VERSION', '2.0.0-test' );
 }
 
-if ( ! function_exists( 'esc_attr' ) ) {
-	/**
-	 * Mock esc_attr - WordPress escaping for HTML attributes
-	 *
-	 * @param string $text Text to escape
-	 * @return string Escaped text
-	 */
-	function esc_attr( $text ) {
-		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
-	}
+if ( ! defined( 'GTM4WP_PATH' ) ) {
+	define( 'GTM4WP_PATH', dirname( __DIR__ ) . '/' );
 }
 
-if ( ! function_exists( 'wp_strip_all_tags' ) ) {
-	/**
-	 * Mock wp_strip_all_tags - removes HTML tags
-	 *
-	 * @param string $text Text with HTML tags
-	 * @return string Text without HTML tags
-	 */
-	function wp_strip_all_tags( $text ) {
-		return strip_tags( $text );
-	}
+if ( ! defined( 'GTM4WP_PLUGIN_FILE' ) ) {
+	define( 'GTM4WP_PLUGIN_FILE', dirname( __DIR__ ) . '/duracelltomi-google-tag-manager-for-wordpress.php' );
 }
+
+require_once dirname( __DIR__ ) . '/compat/constants.php';
