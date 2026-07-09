@@ -26,7 +26,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'Media events', 'duracelltomi-google-tag-manager' );
+		return __( 'Media events', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -45,7 +45,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'players' => esc_html__( 'Media players', 'duracelltomi-google-tag-manager' ),
+			'players' => __( 'Media players', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -60,7 +60,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_YOUTUBE,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'YouTube video events', 'duracelltomi-google-tag-manager' ),
+				label: __( 'YouTube video events', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a YouTube video embeded on your site.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
@@ -69,7 +69,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_VIMEO,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Vimeo video events', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Vimeo video events', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Vimeo video embeded on your site.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
@@ -78,7 +78,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_SOUNDCLOUD,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Soundcloud events', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Soundcloud events', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Soundcloud media embeded on your site.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL

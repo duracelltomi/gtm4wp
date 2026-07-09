@@ -27,7 +27,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'Google Tag Manager container', 'duracelltomi-google-tag-manager' );
+		return __( 'Google Tag Manager container', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -54,8 +54,8 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'general'  => esc_html__( 'General', 'duracelltomi-google-tag-manager' ),
-			'advanced' => esc_html__( 'Advanced', 'duracelltomi-google-tag-manager' ),
+			'general'  => __( 'General', 'duracelltomi-google-tag-manager' ),
+			'advanced' => __( 'Advanced', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -81,7 +81,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_GTM_CONTAINERS,
 				type: Field::TYPE_TABLE,
 				default_value: array(),
-				label: esc_html__( 'Google Tag Manager containers', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Google Tag Manager containers', 'duracelltomi-google-tag-manager' ),
 				description: wp_kses(
 					__(
 						'Add one row for each Google Tag Manager container you want to load.<br />
@@ -97,27 +97,27 @@ final class AdminSchema implements AdminSchemaInterface {
 				columns: array(
 					array(
 						'key'         => ContainerRows::COLUMN_ID,
-						'label'       => esc_html__( 'Container ID', 'duracelltomi-google-tag-manager' ),
+						'label'       => __( 'Container ID', 'duracelltomi-google-tag-manager' ),
 						'placeholder' => 'GTM-XXXXXX',
 					),
 					array(
 						'key'         => ContainerRows::COLUMN_AUTH,
-						'label'       => esc_html__( 'Environment gtm_auth', 'duracelltomi-google-tag-manager' ),
+						'label'       => __( 'Environment gtm_auth', 'duracelltomi-google-tag-manager' ),
 						'placeholder' => '',
 					),
 					array(
 						'key'         => ContainerRows::COLUMN_PREVIEW,
-						'label'       => esc_html__( 'Environment gtm_preview', 'duracelltomi-google-tag-manager' ),
+						'label'       => __( 'Environment gtm_preview', 'duracelltomi-google-tag-manager' ),
 						'placeholder' => 'env-NN',
 					),
 					array(
 						'key'         => ContainerRows::COLUMN_DOMAIN,
-						'label'       => esc_html__( 'Custom domain', 'duracelltomi-google-tag-manager' ),
+						'label'       => __( 'Custom domain', 'duracelltomi-google-tag-manager' ),
 						'placeholder' => 'www.googletagmanager.com',
 					),
 					array(
 						'key'         => ContainerRows::COLUMN_PATH,
-						'label'       => esc_html__( 'Custom path', 'duracelltomi-google-tag-manager' ),
+						'label'       => __( 'Custom path', 'duracelltomi-google-tag-manager' ),
 						'placeholder' => 'gtm.js',
 					),
 				),
@@ -148,7 +148,7 @@ final class AdminSchema implements AdminSchemaInterface {
 								'gtm4wp_invalid_gtm_id',
 								sprintf(
 									/* translators: %s: the invalid container ID as entered by the user. */
-									esc_html__( 'Invalid or missing Google Tag Manager ID in one of the container rows: "%s". Valid ID format: GTM-XXXXX.', 'duracelltomi-google-tag-manager' ),
+									__( 'Invalid or missing Google Tag Manager ID in one of the container rows: "%s". Valid ID format: GTM-XXXXX.', 'duracelltomi-google-tag-manager' ),
 									$one_gtm_id
 								)
 							);
@@ -159,7 +159,7 @@ final class AdminSchema implements AdminSchemaInterface {
 								'gtm4wp_duplicate_gtm_id',
 								sprintf(
 									/* translators: %s: the duplicated container ID. */
-									esc_html__( 'The Google Tag Manager ID "%s" is listed more than once. Every container ID can only be entered in one row.', 'duracelltomi-google-tag-manager' ),
+									__( 'The Google Tag Manager ID "%s" is listed more than once. Every container ID can only be entered in one row.', 'duracelltomi-google-tag-manager' ),
 									$one_gtm_id
 								)
 							);
@@ -171,7 +171,7 @@ final class AdminSchema implements AdminSchemaInterface {
 								'gtm4wp_invalid_gtm_auth',
 								sprintf(
 									/* translators: %s: the container ID of the row with the invalid value. */
-									esc_html__( "Invalid gtm_auth environment parameter value in the row of container %s. It should only contain letters, numbers or the '-' and '_' characters.", 'duracelltomi-google-tag-manager' ),
+									__( "Invalid gtm_auth environment parameter value in the row of container %s. It should only contain letters, numbers or the '-' and '_' characters.", 'duracelltomi-google-tag-manager' ),
 									$one_gtm_id
 								)
 							);
@@ -182,7 +182,7 @@ final class AdminSchema implements AdminSchemaInterface {
 								'gtm4wp_invalid_gtm_preview',
 								sprintf(
 									/* translators: %s: the container ID of the row with the invalid value. */
-									esc_html__( "Invalid gtm_preview environment parameter value in the row of container %s. It should have the format 'env-NN' where NN is an integer number.", 'duracelltomi-google-tag-manager' ),
+									__( "Invalid gtm_preview environment parameter value in the row of container %s. It should have the format 'env-NN' where NN is an integer number.", 'duracelltomi-google-tag-manager' ),
 									$one_gtm_id
 								)
 							);
@@ -199,7 +199,7 @@ final class AdminSchema implements AdminSchemaInterface {
 									'gtm4wp_invalid_gtm_domain',
 									sprintf(
 										/* translators: %s: the container ID of the row with the invalid value. */
-										esc_html__( 'Invalid custom domain name in the row of container %s. Enter a valid domain name without the https:// prefix.', 'duracelltomi-google-tag-manager' ),
+										__( 'Invalid custom domain name in the row of container %s. Enter a valid domain name without the https:// prefix.', 'duracelltomi-google-tag-manager' ),
 										$one_gtm_id
 									)
 								);
@@ -213,7 +213,7 @@ final class AdminSchema implements AdminSchemaInterface {
 								'gtm4wp_invalid_custom_path',
 								sprintf(
 									/* translators: %s: the container ID of the row with the invalid value. */
-									esc_html__( 'Invalid custom domain path in the row of container %s. Value can include anything between a-z, A-Z, 0-9 or any of the characters . - _ /', 'duracelltomi-google-tag-manager' ),
+									__( 'Invalid custom domain path in the row of container %s. Value can include anything between a-z, A-Z, 0-9 or any of the characters . - _ /', 'duracelltomi-google-tag-manager' ),
 									$one_gtm_id
 								)
 							);
@@ -231,7 +231,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_GTM_PLACEMENT,
 				type: Field::TYPE_SELECT,
 				default_value: (string) GTM4WP_PLACEMENT_FOOTER,
-				label: esc_html__( 'Container code placement', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Container code placement', 'duracelltomi-google-tag-manager' ),
 				description: wp_kses(
 					__(
 						'Decides where to put the second, so called <code>&lt;noscript&gt;</code> part of the GTM container code. The main GTM container code will always be placed into the <code>&lt;head&gt;</code> section of your webpages.<br />
@@ -246,10 +246,10 @@ final class AdminSchema implements AdminSchemaInterface {
 				),
 				group: 'general',
 				choices: array(
-					(string) GTM4WP_PLACEMENT_FOOTER   => esc_html__( 'Footer of the page (no visitor loss, no Search Console verification)', 'duracelltomi-google-tag-manager' ),
-					(string) GTM4WP_PLACEMENT_BODYOPEN => esc_html__( 'Manually coded after the opening body tag', 'duracelltomi-google-tag-manager' ),
-					(string) GTM4WP_PLACEMENT_BODYOPEN_AUTO => esc_html__( 'Automatically after the opening body tag (theme must support wp_body_open)', 'duracelltomi-google-tag-manager' ),
-					(string) GTM4WP_PLACEMENT_OFF      => esc_html__( 'Off - container code turned off, data layer only', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_FOOTER   => __( 'Footer of the page (no visitor loss, no Search Console verification)', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_BODYOPEN => __( 'Manually coded after the opening body tag', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_BODYOPEN_AUTO => __( 'Automatically after the opening body tag (theme must support wp_body_open)', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_OFF      => __( 'Off - container code turned off, data layer only', 'duracelltomi-google-tag-manager' ),
 				),
 				sanitizer: static function ( $value ) {
 					$value = (int) $value;
@@ -265,7 +265,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_DATALAYER_NAME,
 				type: Field::TYPE_TEXT,
 				default_value: '',
-				label: esc_html__( 'dataLayer variable name', 'duracelltomi-google-tag-manager' ),
+				label: __( 'dataLayer variable name', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'In some cases you need to rename the dataLayer variable. You can enter your name here. Leave blank for default name: dataLayer', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
 				sanitizer: static function ( $value ) {
@@ -274,7 +274,7 @@ final class AdminSchema implements AdminSchemaInterface {
 					if ( ( '' !== $value ) && ( ! preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]*$/', $value ) ) ) {
 						return new \WP_Error(
 							'gtm4wp_invalid_datalayer_name',
-							esc_html__( "Invalid dataLayer variable name. Please start with a character from a-z or A-Z followed by characters from a-z, A-Z, 0-9 or '_' or '-'!", 'duracelltomi-google-tag-manager' )
+							__( "Invalid dataLayer variable name. Please start with a character from a-z or A-Z followed by characters from a-z, A-Z, 0-9 or '_' or '-'!", 'duracelltomi-google-tag-manager' )
 						);
 					}
 
@@ -285,7 +285,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_LOADEARLY,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Load GTM container as early as possible', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Load GTM container as early as possible', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Turning on this option will load your Google Tag Manager container as early as possible during page load. This can cause issues if you are using jQuery in your custom HTML tags that fire on \'Page View\' events.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced'
 			),
@@ -293,7 +293,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_NOCONSOLELOG,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Do not use console.log() messages on frontend', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Do not use console.log() messages on frontend', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'GTM4WP puts several useful messages into the console of your browser which can also help give proper support in some cases. If you see any issues regarding this functionality, you can disable it here.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced'
 			),
@@ -301,7 +301,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_NOGTMFORLOGGEDIN,
 				type: Field::TYPE_MULTISELECT,
 				default_value: '',
-				label: esc_html__( 'User roles to exclude', 'duracelltomi-google-tag-manager' ),
+				label: __( 'User roles to exclude', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Do not load the GTM container on the frontend when the logged in user has any of the checked roles.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
 				choices: $role_choices,

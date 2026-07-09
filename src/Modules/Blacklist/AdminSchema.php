@@ -157,7 +157,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'Tag restrictions', 'duracelltomi-google-tag-manager' );
+		return __( 'Tag restrictions', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -178,10 +178,10 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'mode'      => esc_html__( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
-			'tags'      => esc_html__( 'Tags', 'duracelltomi-google-tag-manager' ),
-			'triggers'  => esc_html__( 'Triggers', 'duracelltomi-google-tag-manager' ),
-			'variables' => esc_html__( 'Variables', 'duracelltomi-google-tag-manager' ),
+			'mode'      => __( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
+			'tags'      => __( 'Tags', 'duracelltomi-google-tag-manager' ),
+			'triggers'  => __( 'Triggers', 'duracelltomi-google-tag-manager' ),
+			'variables' => __( 'Variables', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -197,13 +197,13 @@ final class AdminSchema implements AdminSchemaInterface {
 	public function fields(): array {
 		$all_labels = array();
 		foreach ( self::tag_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', esc_html__( 'Tag', 'duracelltomi-google-tag-manager' ), $label );
+			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Tag', 'duracelltomi-google-tag-manager' ), $label );
 		}
 		foreach ( self::trigger_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', esc_html__( 'Trigger', 'duracelltomi-google-tag-manager' ), $label );
+			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Trigger', 'duracelltomi-google-tag-manager' ), $label );
 		}
 		foreach ( self::variable_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', esc_html__( 'Variable', 'duracelltomi-google-tag-manager' ), $label );
+			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Variable', 'duracelltomi-google-tag-manager' ), $label );
 		}
 
 		return array(
@@ -211,13 +211,13 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_BLACKLIST_ENABLE,
 				type: Field::TYPE_SELECT,
 				default_value: '0',
-				label: esc_html__( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select whether the checked entities below should be blacklisted (blocked) or whitelisted (everything else blocked).', 'duracelltomi-google-tag-manager' ),
 				group: 'mode',
 				choices: array(
-					'0' => esc_html__( 'Disabled', 'duracelltomi-google-tag-manager' ),
-					'1' => esc_html__( 'Blacklist selected entities', 'duracelltomi-google-tag-manager' ),
-					'2' => esc_html__( 'Whitelist selected entities', 'duracelltomi-google-tag-manager' ),
+					'0' => __( 'Disabled', 'duracelltomi-google-tag-manager' ),
+					'1' => __( 'Blacklist selected entities', 'duracelltomi-google-tag-manager' ),
+					'2' => __( 'Whitelist selected entities', 'duracelltomi-google-tag-manager' ),
 				),
 				sanitizer: static function ( $value ) {
 					$value = (int) $value;
@@ -233,7 +233,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_BLACKLIST_STATUS,
 				type: Field::TYPE_MULTISELECT,
 				default_value: '',
-				label: esc_html__( 'Restricted entities', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Restricted entities', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select the tag, trigger and variable types affected by the restriction mode above.', 'duracelltomi-google-tag-manager' ),
 				group: 'tags',
 				choices: $all_labels,

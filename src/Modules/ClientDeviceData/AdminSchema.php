@@ -26,7 +26,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'Browser, OS & device data', 'duracelltomi-google-tag-manager' );
+		return __( 'Browser, OS & device data', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -45,7 +45,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'device' => esc_html__( 'Collected data', 'duracelltomi-google-tag-manager' ),
+			'device' => __( 'Collected data', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -60,7 +60,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_INCLUDE_BROWSERDATA,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Browser data', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Browser data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the name and version of the browser the visitor uses.', 'duracelltomi-google-tag-manager' ),
 				group: 'device'
 			),
@@ -68,7 +68,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_INCLUDE_OSDATA,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'OS data', 'duracelltomi-google-tag-manager' ),
+				label: __( 'OS data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the name and version of the operating system the visitor uses.', 'duracelltomi-google-tag-manager' ),
 				group: 'device'
 			),
@@ -76,7 +76,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_INCLUDE_DEVICEDATA,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Device data', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Device data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the type of device the user is currently using (desktop or mobile) including model data where available.', 'duracelltomi-google-tag-manager' ),
 				group: 'device'
 			),

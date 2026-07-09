@@ -26,7 +26,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'AMP', 'duracelltomi-google-tag-manager' );
+		return __( 'AMP', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -45,7 +45,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'amp' => esc_html__( 'AMP', 'duracelltomi-google-tag-manager' ),
+			'amp' => __( 'AMP', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -60,7 +60,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_INTEGRATE_AMPID,
 				type: Field::TYPE_TEXT,
 				default_value: '',
-				label: esc_html__( "Google Tag Manager 'AMP' Container ID", 'duracelltomi-google-tag-manager' ),
+				label: __( "Google Tag Manager 'AMP' Container ID", 'duracelltomi-google-tag-manager' ),
 				description: sprintf(
 					/* translators: 1: opening anchor tag for a link pointing to the official GTM help center article about the AMP container snippet 2: Closing anchor tag. */
 					esc_html__(
@@ -83,7 +83,7 @@ final class AdminSchema implements AdminSchemaInterface {
 						if ( ! preg_match( '/^GTM-[A-Z0-9]+$/', $one_amp_id ) ) {
 							return new \WP_Error(
 								'gtm4wp_invalid_amp_id',
-								esc_html__( 'Invalid AMP Google Tag Manager Container ID. Valid ID format: GTM-XXXXX. Use comma without additional space (,) to enter more than one ID.', 'duracelltomi-google-tag-manager' )
+								__( 'Invalid AMP Google Tag Manager Container ID. Valid ID format: GTM-XXXXX. Use comma without additional space (,) to enter more than one ID.', 'duracelltomi-google-tag-manager' )
 							);
 						}
 					}

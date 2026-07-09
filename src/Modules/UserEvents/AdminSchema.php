@@ -26,7 +26,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'User events', 'duracelltomi-google-tag-manager' );
+		return __( 'User events', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -45,7 +45,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'events' => esc_html__( 'Events', 'duracelltomi-google-tag-manager' ),
+			'events' => __( 'Events', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -60,7 +60,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_FORMMOVE,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Form fill events (gtm4wp.formElementEnter & gtm4wp.formElementLeave)', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Form fill events (gtm4wp.formElementEnter & gtm4wp.formElementLeave)', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor moves between elements of a form (comment, contact, etc).', 'duracelltomi-google-tag-manager' ),
 				group: 'events'
 			),
@@ -68,7 +68,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_NEWUSERREG,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'New user registration', 'duracelltomi-google-tag-manager' ),
+				label: __( 'New user registration', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when a new user registration has been completed on the frontend of your site (admin events not included)', 'duracelltomi-google-tag-manager' ),
 				group: 'events'
 			),
@@ -76,7 +76,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_USERLOGIN,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'User logged in', 'duracelltomi-google-tag-manager' ),
+				label: __( 'User logged in', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when an existing user has been logged in on the frontend of your site (admin events not included)', 'duracelltomi-google-tag-manager' ),
 				group: 'events'
 			),

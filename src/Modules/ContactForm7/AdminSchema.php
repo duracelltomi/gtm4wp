@@ -27,7 +27,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return string
 	 */
 	public function title(): string {
-		return esc_html__( 'Contact Form 7', 'duracelltomi-google-tag-manager' );
+		return __( 'Contact Form 7', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -46,7 +46,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'cf7' => esc_html__( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
+			'cf7' => __( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -61,7 +61,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_INTEGRATE_WPCF7,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: esc_html__( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this to fire dataLayer events after Contact Form 7 submissions (supported events: invalid input, spam detected, form submitted, form submitted and mail sent, form submitted and mail send failed).', 'duracelltomi-google-tag-manager' ),
 				group: 'cf7'
 			),
