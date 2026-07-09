@@ -1,24 +1,70 @@
 /**
- * GTM4WP admin app layout: left pane navigation + accordion panel.
+ * GTM4WP admin app: left pane navigation + tabbed settings panel.
+ *
+ * Every size comes from the token block below — a single 13px anchored type
+ * scale and a 4px spacing scale — so nothing is picked ad hoc. The accent
+ * follows the visitor's WordPress admin colour scheme, with static fallbacks.
  */
 
 .gtm4wp-app {
-	margin-top: 16px;
+	// Typography — anchored to wp-admin's 13px base.
+	--gtm4wp-fs-page: 20px;
+	--gtm4wp-fs-panel: 16px;
+	--gtm4wp-fs-section: 14px;
+	--gtm4wp-fs-body: 13px;
+	--gtm4wp-fs-help: 12px;
+	--gtm4wp-fs-micro: 11px;
+
+	// Spacing — 4px base.
+	--gtm4wp-s1: 4px;
+	--gtm4wp-s2: 8px;
+	--gtm4wp-s3: 12px;
+	--gtm4wp-s4: 16px;
+	--gtm4wp-s5: 20px;
+	--gtm4wp-s6: 24px;
+	--gtm4wp-s8: 32px;
+
+	--gtm4wp-radius: 6px;
+	--gtm4wp-radius-sm: 4px;
+
+	// Surfaces, lines and text.
+	--gtm4wp-surface: #fff;
+	--gtm4wp-surface-2: #f6f7f7;
+	--gtm4wp-border: #dcdcde;
+	--gtm4wp-text: #1d2327;
+	--gtm4wp-text-2: #50575e;
+	--gtm4wp-text-3: #757575;
+	--gtm4wp-danger: #d63638;
+
+	// Accent tracks the admin colour scheme; static fallbacks for older browsers.
+	--gtm4wp-accent: var(--wp-admin-theme-color, #2271b1);
+	--gtm4wp-accent-hover: var(--wp-admin-theme-color-darker-10, #135e96);
+	--gtm4wp-accent-bg: #f0f6fc;
+	--gtm4wp-accent-bg: color-mix(in srgb, var(--gtm4wp-accent) 10%, #fff);
+
+	--gtm4wp-shadow-card: 0 1px 2px rgba(0, 0, 0, .05);
+	--gtm4wp-shadow-sticky: 0 1px 3px rgba(0, 0, 0, .06);
+
+	margin-top: var(--gtm4wp-s4);
 
 	&__header {
 		align-items: center;
-		background: #fff;
-		border: 1px solid #dcdcde;
-		border-radius: 4px;
+		background: var(--gtm4wp-surface);
+		border: 1px solid var(--gtm4wp-border);
+		border-radius: var(--gtm4wp-radius);
+		box-shadow: var(--gtm4wp-shadow-sticky);
 		display: flex;
+		gap: var(--gtm4wp-s4);
 		justify-content: space-between;
-		padding: 12px 20px;
+		padding: var(--gtm4wp-s3) var(--gtm4wp-s5);
 		position: sticky;
 		top: 42px;
 		z-index: 10;
 
 		h1 {
-			font-size: 1.2rem;
+			font-size: var(--gtm4wp-fs-page);
+			font-weight: 600;
+			letter-spacing: -.01em;
 			margin: 0;
 			padding: 0;
 		}
@@ -26,9 +72,9 @@
 
 	&__body {
 		display: grid;
-		gap: 16px;
+		gap: var(--gtm4wp-s5);
 		grid-template-columns: 240px minmax(0, 1fr);
-		margin-top: 16px;
+		margin-top: var(--gtm4wp-s5);
 
 		@media (max-width: 782px) {
 			grid-template-columns: 1fr;
@@ -36,7 +82,7 @@
 	}
 
 	&__snackbar {
-		bottom: 24px;
+		bottom: var(--gtm4wp-s6);
 		left: 50%;
 		position: fixed;
 		transform: translateX(-50%);
@@ -45,14 +91,16 @@
 }
 
 .gtm4wp-sidebar {
-	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	padding: 12px;
+	align-self: start;
+	background: var(--gtm4wp-surface);
+	border: 1px solid var(--gtm4wp-border);
+	border-radius: var(--gtm4wp-radius);
+	box-shadow: var(--gtm4wp-shadow-card);
+	padding: var(--gtm4wp-s3);
 
 	ul {
 		list-style: none;
-		margin: 12px 0 0;
+		margin: var(--gtm4wp-s3) 0 0;
 	}
 
 	li {
@@ -60,68 +108,104 @@
 	}
 
 	&__item {
+		align-items: center;
 		background: none;
 		border: none;
 		border-left: 3px solid transparent;
-		border-radius: 2px;
-		color: #1d2327;
+		border-radius: var(--gtm4wp-radius-sm);
+		color: var(--gtm4wp-text-2);
 		cursor: pointer;
 		display: flex;
-		font-size: 14px;
+		font-size: var(--gtm4wp-fs-body);
+		gap: var(--gtm4wp-s2);
 		justify-content: space-between;
-		padding: 8px 10px;
+		padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
 		text-align: left;
 		width: 100%;
 
 		&:hover {
-			background: #f0f0f1;
+			background: var(--gtm4wp-surface-2);
+			color: var(--gtm4wp-text);
 		}
 
 		&.is-active {
-			background: #f0f6fc;
-			border-left-color: #2271b1;
+			background: var(--gtm4wp-accent-bg);
+			border-left-color: var(--gtm4wp-accent);
+			color: var(--gtm4wp-text);
 			font-weight: 600;
 		}
 
 		&.is-unavailable {
-			color: #949494;
+			color: var(--gtm4wp-text-3);
 		}
 	}
 
 	&__dirty {
-		color: #d63638;
+		color: var(--gtm4wp-danger);
 	}
 
 	&__empty {
-		color: #757575;
-		margin: 12px 0 0;
+		color: var(--gtm4wp-text-3);
+		font-size: var(--gtm4wp-fs-help);
+		margin: var(--gtm4wp-s3) 0 0;
 	}
 }
 
 .gtm4wp-panel {
-	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	padding: 20px;
+	background: var(--gtm4wp-surface);
+	border: 1px solid var(--gtm4wp-border);
+	border-radius: var(--gtm4wp-radius);
+	box-shadow: var(--gtm4wp-shadow-card);
+	overflow: hidden;
 
 	h2 {
-		margin-top: 0;
+		font-size: var(--gtm4wp-fs-panel);
+		font-weight: 600;
+		letter-spacing: -.01em;
+		margin: 0;
+	}
+
+	&__head {
+		padding: var(--gtm4wp-s5) var(--gtm4wp-s6) var(--gtm4wp-s4);
+	}
+
+	&__body {
+		padding: var(--gtm4wp-s5) var(--gtm4wp-s6) var(--gtm4wp-s6);
 	}
 
 	&__intro {
-		color: #50575e;
-		margin-bottom: 16px;
-		max-width: 48em;
+		color: var(--gtm4wp-text-2);
+		margin: var(--gtm4wp-s2) 0 0;
+		max-width: 66ch;
+	}
+}
+
+// Section tabs (mirrors @wordpress/components TabPanel, full-bleed underline).
+.gtm4wp-tabs {
+	.components-tab-panel__tabs {
+		border-bottom: 1px solid var(--gtm4wp-border);
+		padding: 0 var(--gtm4wp-s6);
 	}
 
-	.components-panel {
-		border-left: none;
-		border-right: none;
+	.components-tab-panel__tabs-item {
+		font-size: var(--gtm4wp-fs-section);
+	}
+
+	// Red dot on tabs whose group holds a field the server rejected.
+	.gtm4wp-tab--has-error::after {
+		background: var(--gtm4wp-danger);
+		border-radius: 50%;
+		content: "";
+		display: inline-block;
+		height: 6px;
+		margin-inline-start: var(--gtm4wp-s1);
+		vertical-align: middle;
+		width: 6px;
 	}
 }
 
 .gtm4wp-field {
-	margin-bottom: 20px;
+	margin-bottom: var(--gtm4wp-s6);
 	max-width: 48em;
 
 	&:last-child {
@@ -130,38 +214,41 @@
 }
 
 .gtm4wp-field-label {
+	color: var(--gtm4wp-text);
 	font-weight: 600;
 }
 
 .gtm4wp-field-help {
-	color: #757575;
+	color: var(--gtm4wp-text-3);
 	display: block;
-	margin-top: 4px;
+	font-size: var(--gtm4wp-fs-help);
+	margin-top: var(--gtm4wp-s1);
 
 	code {
-		font-size: 12px;
+		font-size: var(--gtm4wp-fs-micro);
 	}
 }
 
 .gtm4wp-field-error {
-	color: #d63638;
+	color: var(--gtm4wp-danger);
 	display: block;
 	font-weight: 600;
-	margin-bottom: 4px;
+	margin-bottom: var(--gtm4wp-s1);
 }
 
 .gtm4wp-phase {
 	border-radius: 10px;
-	font-size: 11px;
+	font-size: var(--gtm4wp-fs-micro);
 	font-weight: 600;
-	margin-left: 8px;
+	letter-spacing: .03em;
+	margin-left: var(--gtm4wp-s2);
 	padding: 2px 8px;
 	text-transform: uppercase;
 	vertical-align: middle;
 
 	&--beta {
-		background: #f0f6fc;
-		color: #2271b1;
+		background: var(--gtm4wp-accent-bg);
+		color: var(--gtm4wp-accent);
 	}
 
 	&--experimental {
@@ -171,7 +258,7 @@
 
 	&--deprecated {
 		background: #fcf0f1;
-		color: #d63638;
+		color: var(--gtm4wp-danger);
 	}
 }
 
@@ -187,57 +274,69 @@
 	border: none;
 	margin: 0;
 	// Fieldsets default to min-inline-size: min-content, which would let the
-	// table push the whole panel beyond the viewport instead of scrolling
-	// inside the overflow wrapper below.
+	// table push the whole panel beyond the viewport.
 	min-inline-size: 0;
 	padding: 0;
 
 	&__scroll {
-		margin: 12px 0;
+		margin: var(--gtm4wp-s3) 0;
+		// Safety net only: the fluid table below fits its container, so this
+		// no longer shows a scrollbar at normal panel widths.
 		overflow-x: auto;
 	}
 
 	&__table {
-		background: #fff;
-		border: 1px solid #dcdcde;
+		background: var(--gtm4wp-surface);
+		border: 1px solid var(--gtm4wp-border);
 		border-collapse: collapse;
-		border-radius: 4px;
-		// Columns share the available width evenly; below the minimum the
-		// wrapper scrolls horizontally instead of breaking the page layout.
-		min-width: 760px;
+		border-radius: var(--gtm4wp-radius);
+		// Columns share the panel width evenly and shrink to fit instead of
+		// forcing a horizontal scrollbar.
 		table-layout: fixed;
 		width: 100%;
 
 		th {
-			background: #f6f7f7;
-			border-bottom: 1px solid #dcdcde;
+			background: var(--gtm4wp-surface-2);
+			border-bottom: 1px solid var(--gtm4wp-border);
+			color: var(--gtm4wp-text-2);
+			font-size: var(--gtm4wp-fs-micro);
 			font-weight: 600;
-			padding: 8px 12px;
+			letter-spacing: .04em;
+			padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
 			text-align: left;
+			text-transform: uppercase;
+			vertical-align: bottom;
 		}
 
 		th:last-child {
-			width: 56px;
+			width: 48px;
 		}
 
 		td {
-			border-bottom: 1px solid #f0f0f1;
-			padding: 8px 12px;
+			border-bottom: 1px solid var(--gtm4wp-border);
+			padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
 			vertical-align: middle;
 		}
 
 		tbody tr:last-child td {
 			border-bottom: none;
 		}
+
+		// Let the inputs shrink with their column rather than forcing overflow.
+		td .components-base-control,
+		td .components-base-control__field,
+		td input {
+			min-width: 0;
+		}
 	}
 
 	&__empty {
-		color: #757575;
+		color: var(--gtm4wp-text-3);
 		text-align: center;
 	}
 
 	&__actions {
-		text-align: right;
+		text-align: center;
 	}
 }
 
@@ -248,9 +347,9 @@
 
 	&__choices {
 		display: grid;
-		gap: 4px;
+		gap: var(--gtm4wp-s1);
 		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		margin-top: 12px;
+		margin-top: var(--gtm4wp-s3);
 		max-height: 420px;
 		overflow-y: auto;
 	}
