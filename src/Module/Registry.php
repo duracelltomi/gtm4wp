@@ -46,6 +46,7 @@ final class Registry {
 		\GTM4WP\Modules\ScrollTracking\ScrollTrackingModule::class,
 		\GTM4WP\Modules\ConsentMode\ConsentModeModule::class,
 		\GTM4WP\Modules\ContactForm7\ContactForm7Module::class,
+		\GTM4WP\Modules\WooCommerce\WooCommerceModule::class,
 		\GTM4WP\Modules\Amp\AmpModule::class,
 		\GTM4WP\Modules\Blacklist\BlacklistModule::class,
 	);

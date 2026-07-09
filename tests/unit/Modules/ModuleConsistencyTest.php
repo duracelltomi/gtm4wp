@@ -93,6 +93,7 @@ final class ModuleConsistencyTest extends TestCase {
 				'scroll-tracking',
 				'consent',
 				'contact-form-7',
+				'woocommerce',
 				'amp',
 				'blacklist',
 			),
