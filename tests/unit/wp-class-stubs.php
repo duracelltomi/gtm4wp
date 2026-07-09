@@ -21,6 +21,20 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_Term' ) ) {
+	class WP_Term {
+		public $term_id;
+		public $slug;
+		public $name;
+
+		public function __construct( array $fields = array() ) {
+			foreach ( $fields as $key => $value ) {
+				$this->$key = $value;
+			}
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		public function __construct( private $data = null, private int $status = 200 ) {}

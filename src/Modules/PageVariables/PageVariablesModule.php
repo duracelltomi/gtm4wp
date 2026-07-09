@@ -63,6 +63,17 @@ final class PageVariablesModule extends AbstractModule {
 			GTM4WP_OPTION_INCLUDE_MISCGEOCF         => false,
 			GTM4WP_OPTION_INCLUDE_SITEID            => false,
 			GTM4WP_OPTION_INCLUDE_SITENAME          => false,
+			GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT  => false,
+			GTM4WP_OPTION_INCLUDE_READINGTIME       => false,
+			GTM4WP_OPTION_INCLUDE_MODIFIEDDATE      => false,
+			GTM4WP_OPTION_INCLUDE_CONTENTAGE        => false,
+			GTM4WP_OPTION_INCLUDE_COMMENTCOUNT      => false,
+			GTM4WP_OPTION_INCLUDE_PAGETEMPLATE      => false,
+			GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE     => false,
+			GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY     => false,
+			GTM4WP_OPTION_INCLUDE_POSTSTICKY        => false,
+			GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY   => false,
+			GTM4WP_OPTION_INCLUDE_PAGELANGUAGE      => false,
 		);
 	}
 
@@ -147,6 +158,36 @@ final class PageVariablesModule extends AbstractModule {
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTITLE ) ) {
 			$data_layer['pageTitle'] = wp_strip_all_tags( wp_title( '|', false, 'right' ) );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGELANGUAGE ) ) {
+			$page_language = '';
+
+			// WPML exposes the currently active language through this filter.
+			if ( has_filter( 'wpml_current_language' ) ) {
+				$page_language = (string) apply_filters( 'wpml_current_language', null );
+			}
+
+			// Polylang exposes the currently active language through its own function.
+			if ( '' === $page_language && function_exists( 'pll_current_language' ) ) {
+				$page_language = (string) pll_current_language();
+			}
+
+			// Fall back to the site locale.
+			if ( '' === $page_language ) {
+				$page_language = get_locale();
+			}
+
+			/**
+			 * Filters the language code reported for the current page.
+			 *
+			 * @since 2.0
+			 *
+			 * @param string $page_language Detected language code (WPML/Polylang aware, falls back to the site locale).
+			 *
+			 * @return string Language code to output into the data layer.
+			 */
+			$data_layer['pageLanguage'] = (string) apply_filters( 'gtm4wp_page_language', $page_language );
 		}
 
 		if ( is_singular() ) {
@@ -245,6 +286,125 @@ final class PageVariablesModule extends AbstractModule {
 								$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
 							}
 						}
+					}
+				}
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) || $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) {
+				$post_content = (string) get_post_field( 'post_content', get_the_ID() );
+				$word_count   = str_word_count( wp_strip_all_tags( strip_shortcodes( $post_content ) ) );
+
+				if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) ) {
+					$data_layer['pageContentWordCount'] = (int) $word_count;
+				}
+
+				if ( $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) {
+					/**
+					 * Filters the words-per-minute reading speed used to estimate the
+					 * reading time of the current post.
+					 *
+					 * @since 2.0
+					 *
+					 * @param int $words_per_minute Default reading speed (200 words per minute).
+					 *
+					 * @return int Words-per-minute rate.
+					 */
+					$words_per_minute = (int) apply_filters( 'gtm4wp_reading_time_wpm', 200 );
+					if ( $words_per_minute < 1 ) {
+						$words_per_minute = 200;
+					}
+
+					$data_layer['pageReadingTime'] = (int) max( 1, (int) ceil( $word_count / $words_per_minute ) );
+				}
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_MODIFIEDDATE ) ) {
+				$data_layer['pageModifiedDate']        = get_the_modified_date();
+				$data_layer['pageModifiedDateYear']    = get_the_modified_date( 'Y' );
+				$data_layer['pageModifiedDateMonth']   = get_the_modified_date( 'm' );
+				$data_layer['pageModifiedDateDay']     = get_the_modified_date( 'd' );
+				$data_layer['pageModifiedDateDayName'] = get_the_modified_date( 'l' );
+				$data_layer['pageModifiedDateHour']    = get_the_modified_date( 'H' );
+				$data_layer['pageModifiedDateMinute']  = get_the_modified_date( 'i' );
+				$data_layer['pageModifiedDateIso']     = get_the_modified_date( 'c' );
+				$data_layer['pageModifiedDateUnix']    = get_the_modified_date( 'U' );
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTAGE ) ) {
+				$post_published_gmt = get_post_time( 'U', true );
+				if ( false !== $post_published_gmt ) {
+					$data_layer['pageContentAgeDays'] = (int) max( 0, floor( ( time() - $post_published_gmt ) / DAY_IN_SECONDS ) );
+				}
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_COMMENTCOUNT ) ) {
+				$data_layer['pageCommentCount']  = (int) get_comments_number( get_the_ID() );
+				$data_layer['pageCommentStatus'] = comments_open( get_the_ID() ) ? 'open' : 'closed';
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGETEMPLATE ) ) {
+				$page_template_slug         = (string) get_page_template_slug( get_the_ID() );
+				$data_layer['pageTemplate'] = ( '' === $page_template_slug ? 'default' : $page_template_slug );
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE ) ) {
+				$data_layer['pageHasFeaturedImage'] = has_post_thumbnail( get_the_ID() );
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY ) ) {
+				$data_layer['pageParentID'] = (int) $GLOBALS['post']->post_parent;
+				$data_layer['pageDepth']    = count( get_post_ancestors( get_the_ID() ) );
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTSTICKY ) ) {
+				$data_layer['pagePostSticky'] = is_sticky( get_the_ID() );
+			}
+
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY ) ) {
+				$primary_category_id = 0;
+
+				// Yoast SEO stores the chosen primary category id in post meta.
+				$yoast_primary = get_post_meta( get_the_ID(), '_yoast_wpseo_primary_category', true );
+				if ( '' !== $yoast_primary ) {
+					$primary_category_id = (int) $yoast_primary;
+				}
+
+				// Rank Math stores the chosen primary term id in post meta.
+				if ( 0 === $primary_category_id ) {
+					$rankmath_primary = get_post_meta( get_the_ID(), 'rank_math_primary_category', true );
+					if ( '' !== $rankmath_primary ) {
+						$primary_category_id = (int) $rankmath_primary;
+					}
+				}
+
+				// Fall back to the first category assigned to the post.
+				if ( 0 === $primary_category_id ) {
+					$post_categories = get_the_category();
+					if ( ! empty( $post_categories ) ) {
+						$primary_category_id = (int) $post_categories[0]->term_id;
+					}
+				}
+
+				/**
+				 * Filters the term id used as the primary category of the current post.
+				 *
+				 * Allows integrators to override the detected primary category, for
+				 * example when a different SEO plugin or a custom taxonomy is used.
+				 *
+				 * @since 2.0
+				 *
+				 * @param int $primary_category_id Detected primary category term id (0 when none found).
+				 * @param int $post_id             Id of the current post.
+				 *
+				 * @return int Term id to use as the primary category.
+				 */
+				$primary_category_id = (int) apply_filters( 'gtm4wp_primary_category_term_id', $primary_category_id, get_the_ID() );
+
+				if ( $primary_category_id > 0 ) {
+					$primary_category_term = get_term( $primary_category_id );
+					if ( $primary_category_term instanceof \WP_Term ) {
+						$data_layer['pagePrimaryCategory']     = $primary_category_term->slug;
+						$data_layer['pagePrimaryCategoryName'] = $primary_category_term->name;
 					}
 				}
 			}

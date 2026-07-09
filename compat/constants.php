@@ -65,6 +65,19 @@ define( 'GTM4WP_OPTION_INCLUDE_DEVICEDATA', 'include-devicedata' );
 define( 'GTM4WP_OPTION_INCLUDE_SITEID', 'include-siteid' );
 define( 'GTM4WP_OPTION_INCLUDE_SITENAME', 'include-sitename' );
 
+// New in 2.0: content and engagement page variables (all default off).
+define( 'GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT', 'include-content-word-count' );
+define( 'GTM4WP_OPTION_INCLUDE_READINGTIME', 'include-reading-time' );
+define( 'GTM4WP_OPTION_INCLUDE_MODIFIEDDATE', 'include-modified-date' );
+define( 'GTM4WP_OPTION_INCLUDE_CONTENTAGE', 'include-content-age' );
+define( 'GTM4WP_OPTION_INCLUDE_COMMENTCOUNT', 'include-comment-count' );
+define( 'GTM4WP_OPTION_INCLUDE_PAGETEMPLATE', 'include-page-template' );
+define( 'GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE', 'include-featured-image' );
+define( 'GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY', 'include-page-hierarchy' );
+define( 'GTM4WP_OPTION_INCLUDE_POSTSTICKY', 'include-post-sticky' );
+define( 'GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY', 'include-primary-category' );
+define( 'GTM4WP_OPTION_INCLUDE_PAGELANGUAGE', 'include-page-language' );
+
 // Removed in 2.0: geo and weather data. Constants kept for third party compatibility.
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEO', 'include-miscgeo' );
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEOAPI', 'geo-apikey' );

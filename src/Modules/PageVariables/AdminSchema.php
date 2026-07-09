@@ -47,6 +47,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	public function groups(): array {
 		return array(
 			'post'    => __( 'Post data', 'duracelltomi-google-tag-manager' ),
+			'content' => __( 'Content & engagement data', 'duracelltomi-google-tag-manager' ),
 			'search'  => __( 'Search data', 'duracelltomi-google-tag-manager' ),
 			'visitor' => __( 'Visitor data', 'duracelltomi-google-tag-manager' ),
 			'site'    => __( 'Site data', 'duracelltomi-google-tag-manager' ),
@@ -147,6 +148,96 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Post Terms', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include taxonomy values associated with a given post.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Content word count', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the number of words in the current post content. Useful to normalize scroll depth and engagement metrics against the length of the content.', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_READINGTIME,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Estimated reading time', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the estimated reading time of the current post in minutes (based on 200 words per minute, adjustable with the gtm4wp_reading_time_wpm filter).', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_MODIFIEDDATE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Last modified date', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the last modified date of the current post. This will include the same set of date variables as the post date option (full date, year, month, day, day name, hour, minute, ISO and Unix timestamp).', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_CONTENTAGE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Content age in days', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the number of days elapsed since the current post was published. Useful to segment engagement by fresh versus evergreen content.', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_COMMENTCOUNT,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Comment count', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the number of comments on the current post and whether commenting is open or closed.', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_PAGETEMPLATE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Page template', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the template file assigned to the current post or page (returns "default" when no custom template is used). Useful to segment behavior by page layout.', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Featured image presence', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include whether the current post has a featured image set.', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Page hierarchy', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the parent post ID and the depth of the current post in the page hierarchy (0 for top level pages).', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_POSTSTICKY,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Sticky post', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include whether the current post is marked as sticky.', 'duracelltomi-google-tag-manager' ),
+				group: 'content'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Primary category', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the primary category of the current post as chosen in Yoast SEO or Rank Math (falls back to the first assigned category). Useful as a single content grouping dimension.', 'duracelltomi-google-tag-manager' ),
+				group: 'content',
+				phase: Field::PHASE_BETA
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_PAGELANGUAGE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Page language', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the language code of the current page, detected from WPML or Polylang and falling back to the site locale. Useful to segment behavior on multilingual sites.', 'duracelltomi-google-tag-manager' ),
+				group: 'content',
+				phase: Field::PHASE_BETA
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_SEARCHDATA,

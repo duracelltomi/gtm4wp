@@ -28,5 +28,10 @@ if ( ! defined( 'GTM4WP_PLUGIN_FILE' ) ) {
 	define( 'GTM4WP_PLUGIN_FILE', dirname( __DIR__ ) . '/duracelltomi-google-tag-manager-for-wordpress.php' );
 }
 
+// WordPress time constants used by the plugin (WordPress always defines these).
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+	define( 'DAY_IN_SECONDS', 86400 );
+}
+
 require_once dirname( __DIR__ ) . '/compat/constants.php';
 require_once __DIR__ . '/unit/wp-class-stubs.php';

@@ -1,5 +1,15 @@
 # Full changelog for GTM4WP
 
+## 2.0
+
+* Added: new Page variables options in a "Content & engagement data" group, useful for behavior tracking and GA4 content grouping:
+	* Content word count (`pageContentWordCount`) and estimated reading time (`pageReadingTime`, adjustable with the `gtm4wp_reading_time_wpm` filter)
+	* Last modified date (`pageModifiedDate` and the `pageModifiedDate*` family) and content age in days (`pageContentAgeDays`)
+	* Comment count and status (`pageCommentCount`, `pageCommentStatus`)
+	* Page template (`pageTemplate`), featured image presence (`pageHasFeaturedImage`), page hierarchy (`pageParentID`, `pageDepth`) and sticky flag (`pagePostSticky`)
+	* Primary category (`pagePrimaryCategory`, `pagePrimaryCategoryName`) detected from Yoast SEO / Rank Math with a first-category fallback, overridable with the `gtm4wp_primary_category_term_id` filter
+	* Page language (`pageLanguage`) detected from WPML / Polylang with a site-locale fallback, overridable with the `gtm4wp_page_language` filter
+
 ## 1.21.1
 
 * Fix: undefined product_qty variable prevents add_to_cart in some cases. Thanks [diegoarda](https://github.com/diegoarda)

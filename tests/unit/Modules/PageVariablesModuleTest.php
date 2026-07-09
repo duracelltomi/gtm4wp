@@ -149,6 +149,228 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 42, $data_layer['postID'] );
 	}
 
+	public function test_content_word_count_and_reading_time(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'strip_shortcodes' )->returnArg();
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+		Functions\when( 'get_post_field' )->justReturn( implode( ' ', array_fill( 0, 450, 'word' ) ) );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT => true,
+				GTM4WP_OPTION_INCLUDE_READINGTIME      => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 450, $data_layer['pageContentWordCount'] );
+		// 450 words / 200 wpm rounds up to 3 minutes.
+		$this->assertSame( 3, $data_layer['pageReadingTime'] );
+	}
+
+	public function test_modified_date_family(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_modified_date' )->alias(
+			static fn ( string $format = '' ): string => 'MOD:' . $format
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_MODIFIEDDATE => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'MOD:', $data_layer['pageModifiedDate'] );
+		$this->assertSame( 'MOD:Y', $data_layer['pageModifiedDateYear'] );
+		$this->assertSame( 'MOD:c', $data_layer['pageModifiedDateIso'] );
+		$this->assertSame( 'MOD:U', $data_layer['pageModifiedDateUnix'] );
+	}
+
+	public function test_content_age_in_days(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_post_time' )->justReturn( time() - ( 5 * DAY_IN_SECONDS ) );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => false,
+				GTM4WP_OPTION_INCLUDE_CONTENTAGE => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 5, $data_layer['pageContentAgeDays'] );
+	}
+
+	public function test_comment_count_and_status(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_comments_number' )->justReturn( '5' );
+		Functions\when( 'comments_open' )->justReturn( true );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_COMMENTCOUNT => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 5, $data_layer['pageCommentCount'] );
+		$this->assertSame( 'open', $data_layer['pageCommentStatus'] );
+	}
+
+	public function test_layout_and_structure_variables(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_page_template_slug' )->justReturn( 'template-landing.php' );
+		Functions\when( 'has_post_thumbnail' )->justReturn( true );
+		Functions\when( 'get_post_ancestors' )->justReturn( array( 12, 5 ) );
+		Functions\when( 'is_sticky' )->justReturn( true );
+
+		$GLOBALS['post'] = (object) array(
+			'ID'          => 42,
+			'post_parent' => 12,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_PAGETEMPLATE  => true,
+				GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE => true,
+				GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY => true,
+				GTM4WP_OPTION_INCLUDE_POSTSTICKY    => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'template-landing.php', $data_layer['pageTemplate'] );
+		$this->assertTrue( $data_layer['pageHasFeaturedImage'] );
+		$this->assertSame( 12, $data_layer['pageParentID'] );
+		$this->assertSame( 2, $data_layer['pageDepth'] );
+		$this->assertTrue( $data_layer['pagePostSticky'] );
+	}
+
+	public function test_page_template_defaults_when_empty(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_page_template_slug' )->justReturn( '' );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_PAGETEMPLATE => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'default', $data_layer['pageTemplate'] );
+	}
+
+	public function test_primary_category_from_yoast_meta(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_meta' )->alias(
+			static function ( int $id, string $key ) {
+				return '_yoast_wpseo_primary_category' === $key ? '9' : '';
+			}
+		);
+		Functions\when( 'get_term' )->justReturn(
+			new \WP_Term(
+				array(
+					'term_id' => 9,
+					'slug'    => 'guides',
+					'name'    => 'Guides',
+				)
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'guides', $data_layer['pagePrimaryCategory'] );
+		$this->assertSame( 'Guides', $data_layer['pagePrimaryCategoryName'] );
+	}
+
+	public function test_primary_category_falls_back_to_first_category(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_meta' )->justReturn( '' );
+		Functions\when( 'get_the_category' )->justReturn(
+			array( (object) array( 'term_id' => 3 ) )
+		);
+		Functions\when( 'get_term' )->justReturn(
+			new \WP_Term(
+				array(
+					'term_id' => 3,
+					'slug'    => 'news',
+					'name'    => 'News',
+				)
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'news', $data_layer['pagePrimaryCategory'] );
+		$this->assertSame( 'News', $data_layer['pagePrimaryCategoryName'] );
+	}
+
+	public function test_page_language_falls_back_to_site_locale(): void {
+		Functions\when( 'get_locale' )->justReturn( 'en_US' );
+
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_PAGELANGUAGE => true ) );
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'en_US', $data_layer['pageLanguage'] );
+	}
+
 	public function test_404_page_type(): void {
 		Functions\when( 'is_404' )->justReturn( true );
 
