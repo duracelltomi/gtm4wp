@@ -193,8 +193,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 	public function test_header_begin_outputs_consent_defaults_before_loader(): void {
 		$container = $this->make_container(
 			array(
-				GTM4WP_OPTION_GTM_CODE                        => 'GTM-AAA111',
-				GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => true,
+				GTM4WP_OPTION_GTM_CODE              => 'GTM-AAA111',
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
 				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => true,
 			)
 		);

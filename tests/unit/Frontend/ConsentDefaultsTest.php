@@ -21,7 +21,7 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$consent = new ConsentDefaults(
 			$this->make_options(
 				array(
-					GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => false,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => false,
 					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => true,
 				)
 			)
@@ -35,9 +35,9 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$consent = new ConsentDefaults(
 			$this->make_options(
 				array(
-					GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => true,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
 					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => true,
-					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS       => false,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS => false,
 				)
 			)
 		);
@@ -64,7 +64,7 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$consent = new ConsentDefaults(
 			$this->make_options(
 				array(
-					GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => true,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
 					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => true,
 				)
 			)
@@ -76,9 +76,9 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 	public function test_script_block_contains_all_seven_signals(): void {
 		$options = $this->make_options(
 			array(
-				GTM4WP_OPTION_INTEGRATE_CONSENTMODE           => true,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE      => true,
 				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => true,
-				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC      => true,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC => true,
 			)
 		);
 

@@ -112,10 +112,10 @@ final class AdminSchema implements AdminSchemaInterface {
 				),
 				group: 'general',
 				choices: array(
-					(string) GTM4WP_PLACEMENT_FOOTER        => esc_html__( 'Footer of the page (no visitor loss, no Search Console verification)', 'duracelltomi-google-tag-manager' ),
-					(string) GTM4WP_PLACEMENT_BODYOPEN      => esc_html__( 'Manually coded after the opening body tag', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_FOOTER   => esc_html__( 'Footer of the page (no visitor loss, no Search Console verification)', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_BODYOPEN => esc_html__( 'Manually coded after the opening body tag', 'duracelltomi-google-tag-manager' ),
 					(string) GTM4WP_PLACEMENT_BODYOPEN_AUTO => esc_html__( 'Automatically after the opening body tag (theme must support wp_body_open)', 'duracelltomi-google-tag-manager' ),
-					(string) GTM4WP_PLACEMENT_OFF           => esc_html__( 'Off - container code turned off, data layer only', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_OFF      => esc_html__( 'Off - container code turned off, data layer only', 'duracelltomi-google-tag-manager' ),
 				),
 				sanitizer: static function ( $value ) {
 					$value = (int) $value;
