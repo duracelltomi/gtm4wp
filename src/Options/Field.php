@@ -27,6 +27,7 @@ final class Field {
 	public const TYPE_SELECT      = 'select';
 	public const TYPE_TEXTAREA    = 'textarea';
 	public const TYPE_MULTISELECT = 'multiselect';
+	public const TYPE_TABLE       = 'table';
 
 	public const PHASE_STABLE       = 'stable';
 	public const PHASE_BETA         = 'beta';
@@ -46,6 +47,11 @@ final class Field {
 	 * @param array         $choices       value => translated label map for TYPE_SELECT fields.
 	 * @param callable|null $sanitizer     Save-time sanitizer: fn( mixed $value ): mixed. When null,
 	 *                                     a type-based default sanitizer is applied by the REST controller.
+	 * @param array         $columns       Column definitions for TYPE_TABLE fields: a list of
+	 *                                     arrays with 'key', translated 'label' and optional 'placeholder'.
+	 * @param callable|null $derive        Optional fn( mixed $sanitized ): array returning additional
+	 *                                     option key => value pairs stored alongside this field
+	 *                                     (used to keep 1.x mirror options in sync).
 	 */
 	public function __construct(
 		public string $key,
@@ -56,8 +62,25 @@ final class Field {
 		public string $group = '',
 		public string $phase = self::PHASE_STABLE,
 		public array $choices = array(),
-		public $sanitizer = null
+		public $sanitizer = null,
+		public array $columns = array(),
+		public $derive = null
 	) {
+	}
+
+	/**
+	 * Returns the additional option key => value pairs derived from the
+	 * sanitized value of this field, empty when no derive callback is set.
+	 *
+	 * @param mixed $sanitized Sanitized field value.
+	 * @return array<string, mixed>
+	 */
+	public function derived_values( $sanitized ): array {
+		if ( null === $this->derive || ! is_callable( $this->derive ) ) {
+			return array();
+		}
+
+		return (array) call_user_func( $this->derive, $sanitized );
 	}
 
 	/**
@@ -101,6 +124,19 @@ final class Field {
 				}
 				return $values;
 
+			case self::TYPE_TABLE:
+				if ( ! is_array( $value ) ) {
+					return array();
+				}
+				return array_values(
+					array_map(
+						static fn ( $row ) => is_array( $row )
+							? array_map( static fn ( $cell ) => sanitize_text_field( (string) $cell ), $row )
+							: array(),
+						$value
+					)
+				);
+
 			case self::TYPE_TEXTAREA:
 				return sanitize_textarea_field( (string) $value );
 
@@ -123,6 +159,10 @@ final class Field {
 			case self::TYPE_INTEGER:
 				return 'integer';
 
+			case self::TYPE_TABLE:
+			case self::TYPE_MULTISELECT:
+				return 'array';
+
 			default:
 				return 'string';
 		}
@@ -144,6 +184,7 @@ final class Field {
 			'group'       => $this->group,
 			'phase'       => $this->phase,
 			'choices'     => $this->choices,
+			'columns'     => $this->columns,
 			'value'       => $current_value,
 		);
 	}

@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Admin;
 
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -96,17 +97,22 @@ final class Notices {
 			echo '</strong></p></div>';
 		}
 
-		if ( (
-			( '' !== $this->options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) ) && ( '' === $this->options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) )
-		) || (
-			( '' === $this->options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) ) && ( '' !== $this->options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) )
-		) ) {
-			echo '<div class="gtm4wp-notice notice notice-error" data-href="?incomplete-gtm-env-config"><p><strong>';
-			esc_html_e(
-				'Incomplete Google Tag Manager environment configuration: either gtm_preview or gtm_auth parameter value is missing!',
-				'duracelltomi-google-tag-manager'
-			);
-			echo '</strong></p></div>';
+		foreach ( (array) $this->options->get( GTM4WP_OPTION_GTM_CONTAINERS, array() ) as $one_container ) {
+			$gtm_auth    = (string) ( $one_container[ ContainerRows::COLUMN_AUTH ] ?? '' );
+			$gtm_preview = (string) ( $one_container[ ContainerRows::COLUMN_PREVIEW ] ?? '' );
+
+			if ( ( '' !== $gtm_auth ) !== ( '' !== $gtm_preview ) ) {
+				echo '<div class="gtm4wp-notice notice notice-error" data-href="?incomplete-gtm-env-config"><p><strong>';
+				printf(
+					/* translators: %s: the Google Tag Manager container ID with the incomplete environment configuration. */
+					esc_html__(
+						'Incomplete Google Tag Manager environment configuration of container %s: either the gtm_preview or the gtm_auth parameter value is missing!',
+						'duracelltomi-google-tag-manager'
+					),
+					esc_html( (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' ) )
+				);
+				echo '</strong></p></div>';
+			}
 		}
 
 		if ( function_exists( 'is_plugin_active' ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {

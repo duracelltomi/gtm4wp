@@ -46,6 +46,28 @@ describe( 'coerceValue', () => {
 		expect( coerceValue( field, '' ) ).toEqual( [] );
 		expect( coerceValue( field, [ 'html', '' ] ) ).toEqual( [ 'html' ] );
 	} );
+
+	it( 'coerces table rows to objects with every column as string', () => {
+		const field = {
+			type: 'table',
+			columns: [ { key: 'id' }, { key: 'gtm_auth' } ],
+		};
+
+		expect(
+			coerceValue( field, [
+				{ id: 'GTM-AAA111', gtm_auth: 'token', ignored: 'x' },
+				{ id: 'GTM-BBB222' },
+			] )
+		).toEqual( [
+			{ id: 'GTM-AAA111', gtm_auth: 'token' },
+			{ id: 'GTM-BBB222', gtm_auth: '' },
+		] );
+
+		expect( coerceValue( field, 'not-an-array' ) ).toEqual( [] );
+		expect( coerceValue( field, [ null ] ) ).toEqual( [
+			{ id: '', gtm_auth: '' },
+		] );
+	} );
 } );
 
 describe( 'changedValues', () => {

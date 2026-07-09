@@ -22,6 +22,7 @@ abstract class FrontendTestCase extends TestCase {
 	 * @var array<string, mixed>
 	 */
 	protected const OPTION_DEFAULTS = array(
+		GTM4WP_OPTION_GTM_CONTAINERS                     => array(),
 		GTM4WP_OPTION_GTM_CODE                           => '',
 		GTM4WP_OPTION_DATALAYER_NAME                     => '',
 		GTM4WP_OPTION_GTM_PLACEMENT                      => GTM4WP_PLACEMENT_FOOTER,

@@ -10,13 +10,16 @@
 
 namespace GTM4WP;
 
+use GTM4WP\Modules\Container\ContainerRows;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Cleans up stored options of features removed in 2.0. Runs at most once
- * per plugin version, only in the admin, and never touches options of
- * features that still exist - a downgrade to 1.x therefore stays possible
- * except for the removed features themselves.
+ * Cleans up stored options of features removed in 2.0 and seeds the
+ * per-container row option from the flat 1.x container options. Runs at
+ * most once per plugin version, only in the admin, and never touches
+ * options of features that still exist - a downgrade to 1.x therefore
+ * stays possible except for the removed features themselves.
  */
 final class Migration {
 
@@ -48,11 +51,19 @@ final class Migration {
 	private const REMOVED_BLACKLIST_ENTITIES = array( 'ua', 'mf' );
 
 	/**
-	 * Runs the pending migrations once per plugin version.
+	 * Runs the pending migrations.
+	 *
+	 * The container row seeding runs on every admin request (it is
+	 * idempotent, self-guarded and served from the options cache) so that
+	 * it cannot be skipped when two builds share the same version string -
+	 * e.g. upgrading between 2.0.0-dev snapshots. The remaining cleanup
+	 * steps run once per plugin version.
 	 *
 	 * @return void
 	 */
 	public static function maybe_run(): void {
+		self::seed_container_rows();
+
 		if ( GTM4WP_VERSION === get_option( self::VERSION_OPTION, '' ) ) {
 			return;
 		}
@@ -60,6 +71,34 @@ final class Migration {
 		self::cleanup_removed_options();
 
 		update_option( self::VERSION_OPTION, GTM4WP_VERSION, false );
+	}
+
+	/**
+	 * Builds the per-container row option (new in 2.0) from the flat 1.x
+	 * container options: every container ID inherits the previously shared
+	 * environment, domain and path values (see ContainerRows::from_legacy()
+	 * for the exact rules).
+	 *
+	 * The flat 1.x keys stay untouched in the option row so a downgrade to
+	 * 1.x keeps working; they are also kept in sync on every save of the
+	 * container table. Runs only once: an existing row option is never
+	 * overwritten.
+	 *
+	 * @return void
+	 */
+	private static function seed_container_rows(): void {
+		$stored = get_option( GTM4WP_OPTIONS, array() );
+		if ( ! is_array( $stored ) || array() === $stored ) {
+			return;
+		}
+
+		if ( array_key_exists( GTM4WP_OPTION_GTM_CONTAINERS, $stored ) ) {
+			return;
+		}
+
+		$stored[ GTM4WP_OPTION_GTM_CONTAINERS ] = ContainerRows::from_legacy( $stored );
+
+		update_option( GTM4WP_OPTIONS, $stored );
 	}
 
 	/**

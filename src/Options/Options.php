@@ -10,6 +10,8 @@
 
 namespace GTM4WP\Options;
 
+use GTM4WP\Modules\Container\ContainerRows;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -22,6 +24,11 @@ defined( 'ABSPATH' ) || exit;
  * - wp-config.php can hard code the GTM ID and environment parameters,
  * - the blacklist status option is stored as a comma separated string and
  *   exposed as an array.
+ *
+ * Since 2.0 the container list is stored as per-container rows
+ * (GTM4WP_OPTION_GTM_CONTAINERS, see ContainerRows). The flat 1.x options
+ * (gtm-code, gtm-env-*, gtm-domain-name, gtm-custom-path) are derived from
+ * the rows here so that $GLOBALS['gtm4wp_options'] readers keep working.
  */
 final class Options {
 
@@ -50,12 +57,12 @@ final class Options {
 			$values[ GTM4WP_OPTION_BLACKLIST_STATUS ] = explode( ',', $values[ GTM4WP_OPTION_BLACKLIST_STATUS ] );
 		}
 
-		if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ) {
-			$values[ GTM4WP_OPTION_ENV_GTM_AUTH ] = constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' );
-		}
+		$rows = ContainerRows::normalize( $values[ GTM4WP_OPTION_GTM_CONTAINERS ] ?? array() );
 
-		if ( defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ) {
-			$values[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] = constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' );
+		// Pre-migration fallback: build the rows from the flat 1.x options
+		// as long as the row option has never been saved.
+		if ( ! array_key_exists( GTM4WP_OPTION_GTM_CONTAINERS, $stored ) && array() === $rows ) {
+			$rows = ContainerRows::from_legacy( $values );
 		}
 
 		if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
@@ -66,24 +73,41 @@ final class Options {
 			$gtmid_haserror = false;
 
 			foreach ( $gtmid_list as $one_gtm_id ) {
-				$gtmid_haserror = $gtmid_haserror || ! preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id );
+				$gtmid_haserror = $gtmid_haserror || ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id );
 			}
 
 			if ( ! $gtmid_haserror ) {
-				$values[ GTM4WP_OPTION_GTM_CODE ] = $hardcoded_gtm_id;
+				$rows = ContainerRows::for_hardcoded_ids( $gtmid_list, $rows );
 			}
 		}
 
-		// Only load the first container if environment parameters are set.
-		if (
-			( '' !== ( $values[ GTM4WP_OPTION_ENV_GTM_AUTH ] ?? '' ) ) &&
-			( '' !== ( $values[ GTM4WP_OPTION_ENV_GTM_PREVIEW ] ?? '' ) )
-		) {
-			$gtmid_list = explode( ',', (string) ( $values[ GTM4WP_OPTION_GTM_CODE ] ?? '' ) );
-			if ( count( $gtmid_list ) > 0 ) {
-				$values[ GTM4WP_OPTION_GTM_CODE ] = $gtmid_list[0];
+		// The hard coded environment parameters are site wide overrides:
+		// they replace the environment values of every row.
+		$hardcoded_auth    = defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ? (string) constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) : null;
+		$hardcoded_preview = defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ? (string) constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) : null;
+
+		if ( ( null !== $hardcoded_auth ) || ( null !== $hardcoded_preview ) ) {
+			foreach ( $rows as &$one_row ) {
+				if ( null !== $hardcoded_auth ) {
+					$one_row[ ContainerRows::COLUMN_AUTH ] = $hardcoded_auth;
+				}
+				if ( null !== $hardcoded_preview ) {
+					$one_row[ ContainerRows::COLUMN_PREVIEW ] = $hardcoded_preview;
+				}
 			}
+			unset( $one_row );
 		}
+
+		// A complete site wide environment override belongs to exactly one
+		// container: keep the 1.x behavior and only load the first one.
+		if ( ( null !== $hardcoded_auth ) && ( '' !== $hardcoded_auth ) && ( null !== $hardcoded_preview ) && ( '' !== $hardcoded_preview ) ) {
+			$rows = array_slice( $rows, 0, 1 );
+		}
+
+		$values[ GTM4WP_OPTION_GTM_CONTAINERS ] = $rows;
+
+		// Read-only 1.x mirrors for $GLOBALS['gtm4wp_options'] consumers.
+		$values = array_merge( $values, ContainerRows::legacy_values( $rows ) );
 
 		$this->values = $values;
 	}

@@ -231,6 +231,8 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Minimum requirements raised: PHP 8.0 and WordPress 6.3.
 * New: complete object oriented architecture with a module system - each feature is a module that third party plugins can extend through the gtm4wp_register_modules action.
 * New: modern React based settings screen with left pane navigation, accordion option groups, option search and inline validation.
+* New: containers are managed in a data table where every Google Tag Manager ID has its own environment parameters (gtm_auth/gtm_preview), custom domain and custom path. Existing settings are migrated automatically; the flat 1.x option keys are kept in sync for third party code and downgrades.
+* Changed: with environment parameters configured, all containers are loaded now (1.x only loaded the first container in that case). Only the hard coded wp-config environment constants still limit output to the first container.
 * New: browser, OS and device data is now collected in the browser using User-Agent Client Hints and pushed as a gtm4wp.deviceData event (replaces the bundled WhichBrowser library; Safari and Firefox expose less detail).
 * Updated: tag blacklist entity list refreshed from Google's restriction documentation (added Google tag/GA4 tags and the Google Analytics Settings variable, removed Universal Analytics and Mouseflow).
 * Updated: frontend scripts load with the defer strategy where possible.

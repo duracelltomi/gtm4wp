@@ -67,6 +67,83 @@ final class MigrationTest extends TestCase {
 		$this->assertSame( GTM4WP_VERSION, $this->option_store['gtm4wp-plugin-version'] );
 	}
 
+	public function test_seeds_container_rows_from_legacy_options(): void {
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE      => 'GTM-AAA111,GTM-BBB222',
+			GTM4WP_OPTION_GTMDOMAIN     => 'gtm.example.com',
+			GTM4WP_OPTION_GTMCUSTOMPATH => 'custom/loader.js',
+		);
+
+		Migration::maybe_run();
+
+		$options = $this->option_store[ GTM4WP_OPTIONS ];
+
+		$this->assertSame(
+			array(
+				array(
+					'id'          => 'GTM-AAA111',
+					'gtm_auth'    => '',
+					'gtm_preview' => '',
+					'domain'      => 'gtm.example.com',
+					'path'        => 'custom/loader.js',
+				),
+				array(
+					'id'          => 'GTM-BBB222',
+					'gtm_auth'    => '',
+					'gtm_preview' => '',
+					'domain'      => 'gtm.example.com',
+					'path'        => 'custom/loader.js',
+				),
+			),
+			$options[ GTM4WP_OPTION_GTM_CONTAINERS ]
+		);
+
+		$this->assertSame( 'GTM-AAA111,GTM-BBB222', $options[ GTM4WP_OPTION_GTM_CODE ], 'Flat 1.x keys stay untouched for downgrades.' );
+		$this->assertSame( 'gtm.example.com', $options[ GTM4WP_OPTION_GTMDOMAIN ] );
+	}
+
+	public function test_seeding_applies_environment_to_every_container(): void {
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE        => 'GTM-AAA111,GTM-BBB222',
+			GTM4WP_OPTION_ENV_GTM_AUTH    => 'authtoken',
+			GTM4WP_OPTION_ENV_GTM_PREVIEW => 'env-2',
+		);
+
+		Migration::maybe_run();
+
+		$rows = $this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_GTM_CONTAINERS ];
+
+		$this->assertCount( 2, $rows, 'All containers are migrated even with environment parameters set.' );
+		$this->assertSame( 'authtoken', $rows[0]['gtm_auth'] );
+		$this->assertSame( 'authtoken', $rows[1]['gtm_auth'] );
+		$this->assertSame( 'env-2', $rows[1]['gtm_preview'] );
+	}
+
+	public function test_does_not_overwrite_existing_container_rows(): void {
+		$existing_rows = array(
+			array(
+				'id'          => 'GTM-KEEP1',
+				'gtm_auth'    => '',
+				'gtm_preview' => '',
+				'domain'      => '',
+				'path'        => '',
+			),
+		);
+
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE       => 'GTM-STALE1',
+			GTM4WP_OPTION_GTM_CONTAINERS => $existing_rows,
+		);
+
+		Migration::maybe_run();
+
+		$this->assertSame(
+			$existing_rows,
+			$this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_GTM_CONTAINERS ],
+			'An already seeded row option must never be rebuilt.'
+		);
+	}
+
 	public function test_runs_only_once_per_version(): void {
 		$this->option_store['gtm4wp-plugin-version'] = GTM4WP_VERSION;
 		$this->option_store[ GTM4WP_OPTIONS ]        = array(
@@ -79,6 +156,30 @@ final class MigrationTest extends TestCase {
 			GTM4WP_OPTION_INCLUDE_WEATHER,
 			$this->option_store[ GTM4WP_OPTIONS ],
 			'No cleanup runs when the version stamp matches.'
+		);
+	}
+
+	public function test_seeds_container_rows_even_when_version_stamp_matches(): void {
+		// Two builds sharing the same version string (e.g. 2.0.0-dev
+		// snapshots) must not skip the container row seeding.
+		$this->option_store['gtm4wp-plugin-version'] = GTM4WP_VERSION;
+		$this->option_store[ GTM4WP_OPTIONS ]        = array(
+			GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111',
+		);
+
+		Migration::maybe_run();
+
+		$this->assertSame(
+			array(
+				array(
+					'id'          => 'GTM-AAA111',
+					'gtm_auth'    => '',
+					'gtm_preview' => '',
+					'domain'      => '',
+					'path'        => '',
+				),
+			),
+			$this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_GTM_CONTAINERS ]
 		);
 	}
 

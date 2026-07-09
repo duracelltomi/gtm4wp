@@ -15,7 +15,10 @@ export default function ModulePanel( { module, values, errors, onChange } ) {
 				<h2>{ module.title }</h2>
 				<Notice status="warning" isDismissible={ false }>
 					{ module.unavailableMessage ||
-						__( 'This module is not available in your current environment.', 'duracelltomi-google-tag-manager' ) }
+						__(
+							'This module is not available in your current environment.',
+							'duracelltomi-google-tag-manager'
+						) }
 				</Notice>
 			</div>
 		);
@@ -46,7 +49,10 @@ export default function ModulePanel( { module, values, errors, onChange } ) {
 						initialOpen={ 0 === index }
 					>
 						{ group.fields.map( ( field ) => (
-							<div className="gtm4wp-field" key={ field.key }>
+							<div
+								className={ `gtm4wp-field gtm4wp-field--${ field.type }` }
+								key={ field.key }
+							>
 								<FieldControl
 									field={ field }
 									value={ values[ field.key ] }

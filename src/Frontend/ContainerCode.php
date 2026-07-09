@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Frontend;
 
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -209,14 +210,14 @@ final class ContainerCode {
 	public function header_begin( $echo = true ) {
 		$no_console_log = (bool) $this->options->get( GTM4WP_OPTION_NOCONSOLELOG );
 		$datalayer_name = $this->datalayer->name();
-		$gtm_code       = (string) $this->options->get( GTM4WP_OPTION_GTM_CODE );
+		$containers     = $this->containers();
 
 		$script_tag = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
 ' . $this->script_tag->opening_tag();
 
-		if ( '' !== $gtm_code ) {
+		if ( array() !== $containers ) {
 			$gtm4wp_datalayer_data = $this->datalayer->compile();
 
 			$script_tag .= '
@@ -275,21 +276,23 @@ final class ContainerCode {
 			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag ) );
 		}
 
-		if ( ( '' !== $gtm_code ) && $output_container_code ) {
-			$_gtm_codes = explode( ',', str_replace( array( ';', ' ' ), array( ',', '' ), $gtm_code ) );
+		if ( ( array() !== $containers ) && $output_container_code ) {
+			foreach ( $containers as $one_container ) {
+				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
 
-			foreach ( $_gtm_codes as $one_gtm_id ) {
-				if ( ! preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id ) ) {
+				if ( ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
 					continue;
 				}
+
+				$_gtm_env = $this->container_environment( $one_container );
 
 				$script_tag = '
 ' . $this->script_tag->opening_tag() . '
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
-\'//' . esc_js( $this->container_domain() ) . '/' . esc_js( $this->container_path() ) . '?id=\'+i+dl' .
-				( $this->has_environment() ? "+'&gtm_auth=" . esc_attr( $this->options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) ) . '&gtm_preview=' . esc_attr( $this->options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) ) . "&gtm_cookies_win=x'" : '' ) . ';f.parentNode.insertBefore(j,f);
+\'//' . esc_js( $this->container_domain( $one_container ) ) . '/' . esc_js( $this->container_path( $one_container ) ) . '?id=\'+i+dl' .
+				( '' !== $_gtm_env ? "+'" . $_gtm_env . "'" : '' ) . ';f.parentNode.insertBefore(j,f);
 })(window,document,\'script\',\'' . esc_js( $datalayer_name ) . '\',\'' . esc_js( $one_gtm_id ) . '\');
 </script>';
 
@@ -312,7 +315,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 */
 	public function get_tag(): string {
 		$no_console_log = (bool) $this->options->get( GTM4WP_OPTION_NOCONSOLELOG );
-		$gtm_code       = (string) $this->options->get( GTM4WP_OPTION_GTM_CODE );
+		$containers     = $this->containers();
 
 		$_gtm_tag = '
 <!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
@@ -328,20 +331,13 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 </script>';
 		}
 
-		if ( ( '' !== $gtm_code ) && ( ! ( $GLOBALS['gtm4wp_container_code_written'] ?? false ) ) ) {
-			$_gtm_codes = explode( ',', str_replace( array( ';', ' ' ), array( ',', '' ), $gtm_code ) );
+		if ( ( array() !== $containers ) && ( ! ( $GLOBALS['gtm4wp_container_code_written'] ?? false ) ) ) {
+			foreach ( $containers as $one_container ) {
+				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
 
-			$_gtm_env = '';
-			if ( $this->has_environment() ) {
-				$_gtm_env = '&gtm_auth=' . esc_attr( $this->options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) ) . '&gtm_preview=' . esc_attr( $this->options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) ) . '&gtm_cookies_win=x';
-			}
-
-			$_gtm_domain_name = $this->container_domain();
-
-			foreach ( $_gtm_codes as $one_gtm_id ) {
-				if ( preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id ) ) {
+				if ( preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
 					$_gtm_tag .= '
-				<noscript><iframe src="https://' . $_gtm_domain_name . '/ns.html?id=' . $one_gtm_id . $_gtm_env . '"
+				<noscript><iframe src="https://' . $this->container_domain( $one_container ) . '/ns.html?id=' . $one_gtm_id . $this->container_environment( $one_container ) . '"
 				height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe></noscript>';
 				}
 			}
@@ -418,23 +414,43 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	/**
-	 * Whether GTM environment parameters (auth + preview) are configured.
+	 * Returns the normalized container rows of the GTM4WP_OPTION_GTM_CONTAINERS
+	 * option: one row per container with its own environment parameters,
+	 * custom domain and custom path.
 	 *
-	 * @return bool
+	 * @return array<int, array<string, string>>
 	 */
-	private function has_environment(): bool {
-		return ( '' !== $this->options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) ) &&
-			( '' !== $this->options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) );
+	private function containers(): array {
+		return ContainerRows::normalize( $this->options->get( GTM4WP_OPTION_GTM_CONTAINERS, array() ) );
 	}
 
 	/**
-	 * Returns the validated GTM container domain, falling back to the
-	 * default Google domain on invalid custom values.
+	 * Returns the environment query string fragment of one container row,
+	 * empty unless both the gtm_auth and gtm_preview parameters are set.
 	 *
+	 * @param array<string, string> $container One container row.
 	 * @return string
 	 */
-	private function container_domain(): string {
-		$custom_domain    = (string) $this->options->get( GTM4WP_OPTION_GTMDOMAIN );
+	private function container_environment( array $container ): string {
+		$gtm_auth    = (string) ( $container[ ContainerRows::COLUMN_AUTH ] ?? '' );
+		$gtm_preview = (string) ( $container[ ContainerRows::COLUMN_PREVIEW ] ?? '' );
+
+		if ( ( '' === $gtm_auth ) || ( '' === $gtm_preview ) ) {
+			return '';
+		}
+
+		return '&gtm_auth=' . esc_attr( $gtm_auth ) . '&gtm_preview=' . esc_attr( $gtm_preview ) . '&gtm_cookies_win=x';
+	}
+
+	/**
+	 * Returns the validated GTM container domain of one container row,
+	 * falling back to the default Google domain on invalid custom values.
+	 *
+	 * @param array<string, string> $container One container row.
+	 * @return string
+	 */
+	private function container_domain( array $container ): string {
+		$custom_domain    = (string) ( $container[ ContainerRows::COLUMN_DOMAIN ] ?? '' );
 		$_gtm_domain_test = ( '' === $custom_domain ) ? 'www.googletagmanager.com' : strtolower( $custom_domain );
 		$_gtm_domain_name = filter_var( $_gtm_domain_test, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
 
@@ -446,13 +462,14 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	/**
-	 * Returns the validated GTM container script path, falling back to
-	 * gtm.js on invalid custom values.
+	 * Returns the validated GTM container script path of one container row,
+	 * falling back to gtm.js on invalid custom values.
 	 *
+	 * @param array<string, string> $container One container row.
 	 * @return string
 	 */
-	private function container_path(): string {
-		$custom_path      = (string) $this->options->get( GTM4WP_OPTION_GTMCUSTOMPATH );
+	private function container_path( array $container ): string {
+		$custom_path      = (string) ( $container[ ContainerRows::COLUMN_PATH ] ?? '' );
 		$_gtm_domain_path = ( '' === $custom_path ) ? 'gtm.js' : $custom_path;
 
 		if ( ! preg_match( '/^[a-zA-Z0-9\.\-\_\/]+$/', $_gtm_domain_path ) ) {

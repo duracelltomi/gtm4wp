@@ -35,20 +35,22 @@ final class ContainerModule extends AbstractModule {
 	}
 
 	/**
-	 * Option defaults, 1.x compatible.
+	 * Option defaults.
+	 *
+	 * Since 2.0 the container list is stored as per-container rows (ID +
+	 * environment + domain + path, see ContainerRows). The flat 1.x options
+	 * (gtm-code, gtm-env-*, gtm-domain-name, gtm-custom-path) are no longer
+	 * stored fields; the Options service derives them from the rows as
+	 * read-only mirrors.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public function defaults(): array {
 		return array(
-			GTM4WP_OPTION_GTM_CODE         => '',
+			GTM4WP_OPTION_GTM_CONTAINERS   => array(),
 			GTM4WP_OPTION_GTM_PLACEMENT    => GTM4WP_PLACEMENT_FOOTER,
 			GTM4WP_OPTION_DATALAYER_NAME   => '',
-			GTM4WP_OPTION_ENV_GTM_AUTH     => '',
-			GTM4WP_OPTION_ENV_GTM_PREVIEW  => '',
 			GTM4WP_OPTION_LOADEARLY        => false,
-			GTM4WP_OPTION_GTMDOMAIN        => '',
-			GTM4WP_OPTION_GTMCUSTOMPATH    => '',
 			GTM4WP_OPTION_NOGTMFORLOGGEDIN => '',
 			GTM4WP_OPTION_NOCONSOLELOG     => false,
 		);

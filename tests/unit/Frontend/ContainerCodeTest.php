@@ -227,6 +227,80 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( "'//gtm.example.com/custom/loader.js?id='+i+dl", $output );
 	}
 
+	public function test_get_tag_uses_per_container_environment_and_domain(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-AAA111',
+						'gtm_auth'    => 'authtoken',
+						'gtm_preview' => 'env-2',
+						'domain'      => '',
+						'path'        => '',
+					),
+					array(
+						'id'          => 'GTM-BBB222',
+						'gtm_auth'    => '',
+						'gtm_preview' => '',
+						'domain'      => 'gtm.example.com',
+						'path'        => '',
+					),
+				),
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringContainsString( 'https://www.googletagmanager.com/ns.html?id=GTM-AAA111&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x', $tag );
+		$this->assertStringContainsString( 'https://gtm.example.com/ns.html?id=GTM-BBB222"', $tag );
+	}
+
+	public function test_get_tag_row_with_partial_environment_omits_env_parameters(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'       => 'GTM-AAA111',
+						'gtm_auth' => 'authtoken',
+					),
+				),
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-AAA111"', $tag );
+		$this->assertStringNotContainsString( 'gtm_auth', $tag );
+	}
+
+	public function test_header_begin_uses_per_container_settings_in_loader(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-AAA111',
+						'gtm_auth'    => 'authtoken',
+						'gtm_preview' => 'env-2',
+						'domain'      => 'gtm.example.com',
+						'path'        => 'custom/loader.js',
+					),
+					array(
+						'id' => 'GTM-BBB222',
+					),
+				),
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//gtm.example.com/custom/loader.js?id='+i+dl+'&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x'", $output );
+		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl;", $output );
+		$this->assertStringContainsString( "'GTM-AAA111'", $output );
+		$this->assertStringContainsString( "'GTM-BBB222'", $output );
+	}
+
 	public function test_header_top_outputs_datalayer_initialization(): void {
 		$container = $this->make_container(
 			array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' )

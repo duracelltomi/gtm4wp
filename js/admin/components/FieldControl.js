@@ -12,6 +12,8 @@ import {
 import { RawHTML } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
+import TableControl from './TableControl';
+
 const PHASE_LABELS = {
 	beta: __( 'Beta', 'duracelltomi-google-tag-manager' ),
 	experimental: __( 'Experimental', 'duracelltomi-google-tag-manager' ),
@@ -23,7 +25,9 @@ function FieldLabel( { field } ) {
 		<span className="gtm4wp-field-label">
 			{ field.label }
 			{ PHASE_LABELS[ field.phase ] && (
-				<span className={ `gtm4wp-phase gtm4wp-phase--${ field.phase }` }>
+				<span
+					className={ `gtm4wp-phase gtm4wp-phase--${ field.phase }` }
+				>
 					{ PHASE_LABELS[ field.phase ] }
 				</span>
 			) }
@@ -35,7 +39,9 @@ function FieldHelp( { field, error } ) {
 	return (
 		<>
 			{ error && <span className="gtm4wp-field-error">{ error }</span> }
-			<RawHTML className="gtm4wp-field-help">{ field.description }</RawHTML>
+			<RawHTML className="gtm4wp-field-help">
+				{ field.description }
+			</RawHTML>
 		</>
 	);
 }
@@ -118,6 +124,17 @@ export default function FieldControl( { field, value, error, onChange } ) {
 				</fieldset>
 			);
 		}
+
+		case 'table':
+			return (
+				<TableControl
+					field={ field }
+					value={ value }
+					label={ label }
+					help={ help }
+					onChange={ onChange }
+				/>
+			);
 
 		case 'textarea':
 			return (

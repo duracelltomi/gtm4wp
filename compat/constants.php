@@ -22,6 +22,12 @@ define( 'GTM4WP_OPTIONS', 'gtm4wp-options' );
 define( 'GTM4WP_ADMINSLUG', 'gtm4wp-settings' );
 
 define( 'GTM4WP_OPTION_GTM_CODE', 'gtm-code' );
+
+// New in 2.0: array of per-container rows (ID, environment, domain, path).
+// The flat 1.x options below (gtm-code, gtm-env-*, gtm-domain-name,
+// gtm-custom-path) are kept as read-only mirrors derived from these rows.
+define( 'GTM4WP_OPTION_GTM_CONTAINERS', 'gtm-containers' );
+
 define( 'GTM4WP_OPTION_GTM_PLACEMENT', 'gtm-code-placement' );
 define( 'GTM4WP_OPTION_DATALAYER_NAME', 'gtm-datalayer-variable-name' );
 define( 'GTM4WP_OPTION_ENV_GTM_AUTH', 'gtm-env-gtm-auth' );

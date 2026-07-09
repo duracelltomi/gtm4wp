@@ -11,6 +11,7 @@
 namespace GTM4WP\Admin;
 
 use GTM4WP\Module\Registry;
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -89,7 +90,17 @@ final class RestController {
 			$stored = array();
 		}
 
-		return array_merge( $this->registry->defaults(), $stored );
+		$values = array_merge( $this->registry->defaults(), $stored );
+
+		// Mirror the fallback of the Options service: until the container
+		// row option is saved for the first time, expose the rows derived
+		// from the flat 1.x options so the admin UI always shows what the
+		// frontend actually loads.
+		if ( ! array_key_exists( GTM4WP_OPTION_GTM_CONTAINERS, $stored ) ) {
+			$values[ GTM4WP_OPTION_GTM_CONTAINERS ] = ContainerRows::from_legacy( $values );
+		}
+
+		return $values;
 	}
 
 	/**
@@ -136,6 +147,13 @@ final class RestController {
 			}
 
 			$stored[ $option_key ] = $sanitized;
+
+			// Store derived companion values (e.g. the flat 1.x mirrors of
+			// the container rows) so the raw option row stays coherent for
+			// third party readers and 1.x downgrades.
+			foreach ( $field->derived_values( $sanitized ) as $derived_key => $derived_value ) {
+				$stored[ $derived_key ] = $derived_value;
+			}
 		}
 
 		update_option( GTM4WP_OPTIONS, $stored );

@@ -28,6 +28,23 @@ export function coerceValue( field, raw ) {
 				.split( ',' )
 				.filter( ( entry ) => '' !== entry );
 
+		case 'table': {
+			const columns = Array.isArray( field.columns ) ? field.columns : [];
+			const rows = Array.isArray( raw ) ? raw : [];
+
+			return rows.map( ( row ) => {
+				const entry = {};
+
+				columns.forEach( ( column ) => {
+					entry[ column.key ] = String(
+						( row ? row[ column.key ] : '' ) ?? ''
+					);
+				} );
+
+				return entry;
+			} );
+		}
+
 		default:
 			return String( raw ?? '' );
 	}

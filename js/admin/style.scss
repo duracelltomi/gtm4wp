@@ -175,6 +175,72 @@
 	}
 }
 
+.gtm4wp-field--table {
+	max-width: none;
+
+	.gtm4wp-field-help {
+		max-width: 48em;
+	}
+}
+
+.gtm4wp-table {
+	border: none;
+	margin: 0;
+	// Fieldsets default to min-inline-size: min-content, which would let the
+	// table push the whole panel beyond the viewport instead of scrolling
+	// inside the overflow wrapper below.
+	min-inline-size: 0;
+	padding: 0;
+
+	&__scroll {
+		margin: 12px 0;
+		overflow-x: auto;
+	}
+
+	&__table {
+		background: #fff;
+		border: 1px solid #dcdcde;
+		border-collapse: collapse;
+		border-radius: 4px;
+		// Columns share the available width evenly; below the minimum the
+		// wrapper scrolls horizontally instead of breaking the page layout.
+		min-width: 760px;
+		table-layout: fixed;
+		width: 100%;
+
+		th {
+			background: #f6f7f7;
+			border-bottom: 1px solid #dcdcde;
+			font-weight: 600;
+			padding: 8px 12px;
+			text-align: left;
+		}
+
+		th:last-child {
+			width: 56px;
+		}
+
+		td {
+			border-bottom: 1px solid #f0f0f1;
+			padding: 8px 12px;
+			vertical-align: middle;
+		}
+
+		tbody tr:last-child td {
+			border-bottom: none;
+		}
+	}
+
+	&__empty {
+		color: #757575;
+		text-align: center;
+	}
+
+	&__actions {
+		text-align: right;
+	}
+}
+
 .gtm4wp-multiselect {
 	border: none;
 	margin: 0;

@@ -54,9 +54,8 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'general'     => esc_html__( 'General', 'duracelltomi-google-tag-manager' ),
-			'environment' => esc_html__( 'Container environment', 'duracelltomi-google-tag-manager' ),
-			'advanced'    => esc_html__( 'Advanced', 'duracelltomi-google-tag-manager' ),
+			'general'  => esc_html__( 'General', 'duracelltomi-google-tag-manager' ),
+			'advanced' => esc_html__( 'Advanced', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -68,30 +67,154 @@ final class AdminSchema implements AdminSchemaInterface {
 	public function fields(): array {
 		return array(
 			new Field(
-				key: GTM4WP_OPTION_GTM_CODE,
-				type: Field::TYPE_TEXT,
-				default_value: '',
-				label: esc_html__( 'Google Tag Manager ID', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enter your Google Tag Manager ID here. Use comma without space (,) to enter multiple IDs.', 'duracelltomi-google-tag-manager' ),
+				key: GTM4WP_OPTION_GTM_CONTAINERS,
+				type: Field::TYPE_TABLE,
+				default_value: array(),
+				label: esc_html__( 'Google Tag Manager containers', 'duracelltomi-google-tag-manager' ),
+				description: wp_kses(
+					__(
+						'Add one row for each Google Tag Manager container you want to load.<br />
+						The environment parameters (gtm_auth and gtm_preview) activate a specific container environment; both values are required to activate an environment, leave both empty to load the live version.<br />
+						Enter a custom domain name (without the https:// prefix) and a custom path if you are using a server side GTM container for tracking. Leave them empty to use www.googletagmanager.com and gtm.js.',
+						'duracelltomi-google-tag-manager'
+					),
+					array(
+						'br' => array(),
+					)
+				),
 				group: 'general',
+				columns: array(
+					array(
+						'key'         => ContainerRows::COLUMN_ID,
+						'label'       => esc_html__( 'Container ID', 'duracelltomi-google-tag-manager' ),
+						'placeholder' => 'GTM-XXXXXX',
+					),
+					array(
+						'key'         => ContainerRows::COLUMN_AUTH,
+						'label'       => esc_html__( 'Environment gtm_auth', 'duracelltomi-google-tag-manager' ),
+						'placeholder' => '',
+					),
+					array(
+						'key'         => ContainerRows::COLUMN_PREVIEW,
+						'label'       => esc_html__( 'Environment gtm_preview', 'duracelltomi-google-tag-manager' ),
+						'placeholder' => 'env-NN',
+					),
+					array(
+						'key'         => ContainerRows::COLUMN_DOMAIN,
+						'label'       => esc_html__( 'Custom domain', 'duracelltomi-google-tag-manager' ),
+						'placeholder' => 'www.googletagmanager.com',
+					),
+					array(
+						'key'         => ContainerRows::COLUMN_PATH,
+						'label'       => esc_html__( 'Custom path', 'duracelltomi-google-tag-manager' ),
+						'placeholder' => 'gtm.js',
+					),
+				),
 				sanitizer: static function ( $value ) {
-					$value = trim( (string) $value );
-
-					if ( '' === $value ) {
-						return '';
+					if ( ! is_array( $value ) ) {
+						$value = array();
 					}
 
-					foreach ( explode( ',', $value ) as $one_gtm_id ) {
-						if ( ! preg_match( '/^GTM-[A-Z0-9]+$/', $one_gtm_id ) ) {
+					$rows     = array();
+					$seen_ids = array();
+
+					foreach ( $value as $raw_row ) {
+						if ( ! is_array( $raw_row ) ) {
+							continue;
+						}
+
+						$row = ContainerRows::normalize_row( $raw_row );
+
+						// Rows with every cell empty are dropped silently.
+						if ( '' === implode( '', $row ) ) {
+							continue;
+						}
+
+						$one_gtm_id = $row[ ContainerRows::COLUMN_ID ];
+
+						if ( ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
 							return new \WP_Error(
 								'gtm4wp_invalid_gtm_id',
-								esc_html__( 'Invalid Google Tag Manager ID. Valid ID format: GTM-XXXXX. Use comma without additional space (,) to enter more than one container ID.', 'duracelltomi-google-tag-manager' )
+								sprintf(
+									/* translators: %s: the invalid container ID as entered by the user. */
+									esc_html__( 'Invalid or missing Google Tag Manager ID in one of the container rows: "%s". Valid ID format: GTM-XXXXX.', 'duracelltomi-google-tag-manager' ),
+									$one_gtm_id
+								)
 							);
 						}
+
+						if ( isset( $seen_ids[ $one_gtm_id ] ) ) {
+							return new \WP_Error(
+								'gtm4wp_duplicate_gtm_id',
+								sprintf(
+									/* translators: %s: the duplicated container ID. */
+									esc_html__( 'The Google Tag Manager ID "%s" is listed more than once. Every container ID can only be entered in one row.', 'duracelltomi-google-tag-manager' ),
+									$one_gtm_id
+								)
+							);
+						}
+						$seen_ids[ $one_gtm_id ] = true;
+
+						if ( ( '' !== $row[ ContainerRows::COLUMN_AUTH ] ) && ( ! preg_match( ContainerRows::AUTH_PATTERN, $row[ ContainerRows::COLUMN_AUTH ] ) ) ) {
+							return new \WP_Error(
+								'gtm4wp_invalid_gtm_auth',
+								sprintf(
+									/* translators: %s: the container ID of the row with the invalid value. */
+									esc_html__( "Invalid gtm_auth environment parameter value in the row of container %s. It should only contain letters, numbers or the '-' and '_' characters.", 'duracelltomi-google-tag-manager' ),
+									$one_gtm_id
+								)
+							);
+						}
+
+						if ( ( '' !== $row[ ContainerRows::COLUMN_PREVIEW ] ) && ( ! preg_match( ContainerRows::PREVIEW_PATTERN, $row[ ContainerRows::COLUMN_PREVIEW ] ) ) ) {
+							return new \WP_Error(
+								'gtm4wp_invalid_gtm_preview',
+								sprintf(
+									/* translators: %s: the container ID of the row with the invalid value. */
+									esc_html__( "Invalid gtm_preview environment parameter value in the row of container %s. It should have the format 'env-NN' where NN is an integer number.", 'duracelltomi-google-tag-manager' ),
+									$one_gtm_id
+								)
+							);
+						}
+
+						// Remove https:// prefix if used.
+						$domain = str_replace( 'https://', '', $row[ ContainerRows::COLUMN_DOMAIN ] );
+						$domain = trim( $domain, "/ \n\r\t\v\x00" );
+						if ( '' !== $domain ) {
+							$domain = filter_var( $domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
+
+							if ( false === $domain ) {
+								return new \WP_Error(
+									'gtm4wp_invalid_gtm_domain',
+									sprintf(
+										/* translators: %s: the container ID of the row with the invalid value. */
+										esc_html__( 'Invalid custom domain name in the row of container %s. Enter a valid domain name without the https:// prefix.', 'duracelltomi-google-tag-manager' ),
+										$one_gtm_id
+									)
+								);
+							}
+						}
+						$row[ ContainerRows::COLUMN_DOMAIN ] = (string) $domain;
+
+						$path = ltrim( $row[ ContainerRows::COLUMN_PATH ], '/' );
+						if ( ! preg_match( ContainerRows::PATH_PATTERN, $path ) ) {
+							return new \WP_Error(
+								'gtm4wp_invalid_custom_path',
+								sprintf(
+									/* translators: %s: the container ID of the row with the invalid value. */
+									esc_html__( 'Invalid custom domain path in the row of container %s. Value can include anything between a-z, A-Z, 0-9 or any of the characters . - _ /', 'duracelltomi-google-tag-manager' ),
+									$one_gtm_id
+								)
+							);
+						}
+						$row[ ContainerRows::COLUMN_PATH ] = $path;
+
+						$rows[] = $row;
 					}
 
-					return $value;
-				}
+					return $rows;
+				},
+				derive: static fn ( $rows ) => ContainerRows::legacy_values( is_array( $rows ) ? $rows : array() )
 			),
 			new Field(
 				key: GTM4WP_OPTION_GTM_PLACEMENT,
@@ -122,46 +245,6 @@ final class AdminSchema implements AdminSchemaInterface {
 
 					if ( ( $value < GTM4WP_PLACEMENT_FOOTER ) || ( $value > GTM4WP_PLACEMENT_OFF ) ) {
 						return GTM4WP_PLACEMENT_FOOTER;
-					}
-
-					return $value;
-				}
-			),
-			new Field(
-				key: GTM4WP_OPTION_ENV_GTM_AUTH,
-				type: Field::TYPE_TEXT,
-				default_value: '',
-				label: esc_html__( 'Environment gtm_auth parameter', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enter the gtm_auth parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.', 'duracelltomi-google-tag-manager' ),
-				group: 'environment',
-				sanitizer: static function ( $value ) {
-					$value = trim( (string) $value );
-
-					if ( ( '' !== $value ) && ( ! preg_match( '/^[a-zA-Z0-9-_]+$/', $value ) ) ) {
-						return new \WP_Error(
-							'gtm4wp_invalid_gtm_auth',
-							esc_html__( "Invalid gtm_auth environment parameter value. It should only contain letters, numbers or the '-' and '_' characters.", 'duracelltomi-google-tag-manager' )
-						);
-					}
-
-					return $value;
-				}
-			),
-			new Field(
-				key: GTM4WP_OPTION_ENV_GTM_PREVIEW,
-				type: Field::TYPE_TEXT,
-				default_value: '',
-				label: esc_html__( 'Environment gtm_preview parameter', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enter the gtm_preview parameter of the Google Tag Manager environment that has to be activated on this site. Both gtm_auth and gtm_preview parameters are required to activate the desired environment.', 'duracelltomi-google-tag-manager' ),
-				group: 'environment',
-				sanitizer: static function ( $value ) {
-					$value = trim( (string) $value );
-
-					if ( ( '' !== $value ) && ( ! preg_match( '/^env-[0-9]+$/', $value ) ) ) {
-						return new \WP_Error(
-							'gtm4wp_invalid_gtm_preview',
-							esc_html__( "Invalid gtm_preview environment parameter value. It should have the format 'env-NN' where NN is an integer number.", 'duracelltomi-google-tag-manager' )
-						);
 					}
 
 					return $value;
@@ -202,45 +285,6 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: esc_html__( 'Do not use console.log() messages on frontend', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'GTM4WP puts several useful messages into the console of your browser which can also help give proper support in some cases. If you see any issues regarding this functionality, you can disable it here.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced'
-			),
-			new Field(
-				key: GTM4WP_OPTION_GTMDOMAIN,
-				type: Field::TYPE_TEXT,
-				default_value: '',
-				label: esc_html__( 'Container domain name', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enter your custom domain name if you are using a server side GTM container for tracking. Do not include https:// prefix. Leave this blank to use www.googletagmanager.com', 'duracelltomi-google-tag-manager' ),
-				group: 'advanced',
-				sanitizer: static function ( $value ) {
-					// Remove https:// prefix if used.
-					$value = str_replace( 'https://', '', (string) $value );
-
-					$value = filter_var( $value, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME );
-					if ( false === $value ) {
-						$value = '';
-					}
-
-					return trim( (string) $value );
-				}
-			),
-			new Field(
-				key: GTM4WP_OPTION_GTMCUSTOMPATH,
-				type: Field::TYPE_TEXT,
-				default_value: '',
-				label: esc_html__( 'Container custom path', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enter a custom path for your custom domain name if it is not gtm.js. Do not include the / prefix. Leave this blank to use gtm.js', 'duracelltomi-google-tag-manager' ),
-				group: 'advanced',
-				sanitizer: static function ( $value ) {
-					$value = trim( (string) $value, "\n\r\t\v\x00" );
-
-					if ( ! preg_match( '/^[a-zA-Z0-9\.\-\_\/]*$/', $value ) ) {
-						return new \WP_Error(
-							'gtm4wp_invalid_custom_path',
-							esc_html__( 'Invalid GTM custom domain path. Value can include anything between a-z, A-Z, 0-9 or any of the characters . - _', 'duracelltomi-google-tag-manager' )
-						);
-					}
-
-					return $value;
-				}
 			),
 			new Field(
 				key: GTM4WP_OPTION_NOGTMFORLOGGEDIN,
