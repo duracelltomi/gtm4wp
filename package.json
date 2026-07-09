@@ -4,6 +4,7 @@
   "description": "The first Google Tag Manager plugin for WordPress with business goals in mind",
   "scripts": {
     "build": "wp-scripts build",
+    "postbuild": "npm run lint:js",
     "start": "wp-scripts start",
     "test:unit": "wp-scripts test-unit-js --passWithNoTests",
     "lint:js": "wp-scripts lint-js js",
@@ -25,6 +26,7 @@
   "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
   "devDependencies": {
     "@wordpress/scripts": "^30.0.0",
-    "adm-zip": "^0.5.18"
+    "adm-zip": "^0.5.18",
+    "typescript": "~5.3.3"
   }
 }

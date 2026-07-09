@@ -9,18 +9,18 @@
 ( function () {
 	'use strict';
 
-	var config = window.gtm4wp_clientdevice_config || {
+	const config = window.gtm4wp_clientdevice_config || {
 		browser: true,
 		os: true,
 		device: true,
 	};
-	var datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
+	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
 
 	function pushDeviceData( data ) {
-		var filtered = { event: 'gtm4wp.deviceData' };
+		const filtered = { event: 'gtm4wp.deviceData' };
 
 		Object.keys( data ).forEach( function ( key ) {
-			var enabled =
+			const enabled =
 				( 0 === key.indexOf( 'browser' ) && config.browser ) ||
 				( 0 === key.indexOf( 'os' ) && config.os ) ||
 				( 0 === key.indexOf( 'device' ) && config.device );
@@ -35,7 +35,7 @@
 	}
 
 	function significantBrand( brands ) {
-		var result = null;
+		let result = null;
 
 		( brands || [] ).forEach( function ( oneBrand ) {
 			if ( ! /not.?a.?brand|chromium/i.test( oneBrand.brand ) ) {
@@ -47,18 +47,18 @@
 	}
 
 	function detectWithClientHints( uaData ) {
-		var data = {
+		const data = {
 			deviceType: uaData.mobile ? 'mobile' : 'desktop',
 			osName: uaData.platform || '',
 		};
 
-		var brand = significantBrand( uaData.brands );
+		const brand = significantBrand( uaData.brands );
 		if ( brand ) {
 			data.browserName = brand.brand;
 			data.browserVersion = brand.version;
 		}
 
-		var wanted = [ 'platformVersion', 'model', 'fullVersionList' ];
+		const wanted = [ 'platformVersion', 'model', 'fullVersionList' ];
 
 		uaData
 			.getHighEntropyValues( wanted )
@@ -71,7 +71,9 @@
 					data.deviceModel = highEntropy.model;
 				}
 
-				var fullBrand = significantBrand( highEntropy.fullVersionList );
+				const fullBrand = significantBrand(
+					highEntropy.fullVersionList
+				);
 				if ( fullBrand ) {
 					data.browserName = fullBrand.brand;
 					data.browserVersion = fullBrand.version;
@@ -85,13 +87,13 @@
 	}
 
 	function detectWithUserAgent( userAgent ) {
-		var data = {
+		const data = {
 			deviceType: /Mobi|Android|iPhone|iPad|iPod/i.test( userAgent )
 				? 'mobile'
 				: 'desktop',
 		};
 
-		var browserMatchers = [
+		const browserMatchers = [
 			[ /Firefox\/([0-9.]+)/, 'Firefox' ],
 			[ /Edg[a-z]*\/([0-9.]+)/, 'Microsoft Edge' ],
 			[ /OPR\/([0-9.]+)/, 'Opera' ],
@@ -100,7 +102,7 @@
 		];
 
 		browserMatchers.some( function ( matcher ) {
-			var match = userAgent.match( matcher[ 0 ] );
+			const match = userAgent.match( matcher[ 0 ] );
 			if ( match ) {
 				data.browserName = matcher[ 1 ];
 				data.browserVersion = match[ 1 ];
@@ -109,7 +111,7 @@
 			return false;
 		} );
 
-		var osMatchers = [
+		const osMatchers = [
 			[ /Windows NT ([0-9.]+)/, 'Windows' ],
 			[ /Android ([0-9.]+)/, 'Android' ],
 			[ /(iPhone|iPad|iPod).+OS ([0-9_]+)/, 'iOS', 2 ],
@@ -118,10 +120,10 @@
 		];
 
 		osMatchers.some( function ( matcher ) {
-			var match = userAgent.match( matcher[ 0 ] );
+			const match = userAgent.match( matcher[ 0 ] );
 			if ( match ) {
 				data.osName = matcher[ 1 ];
-				var versionIndex = matcher[ 2 ] || 1;
+				const versionIndex = matcher[ 2 ] || 1;
 				if ( match[ versionIndex ] ) {
 					data.osVersion = match[ versionIndex ].replace( /_/g, '.' );
 				}

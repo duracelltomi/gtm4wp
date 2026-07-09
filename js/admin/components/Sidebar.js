@@ -20,10 +20,19 @@ export default function Sidebar( {
 	);
 
 	return (
-		<nav className="gtm4wp-sidebar" aria-label={ __( 'GTM4WP settings navigation', 'duracelltomi-google-tag-manager' ) }>
+		<nav
+			className="gtm4wp-sidebar"
+			aria-label={ __(
+				'GTM4WP settings navigation',
+				'duracelltomi-google-tag-manager'
+			) }
+		>
 			<SearchControl
 				__nextHasNoMarginBottom
-				label={ __( 'Search settings', 'duracelltomi-google-tag-manager' ) }
+				label={ __(
+					'Search settings',
+					'duracelltomi-google-tag-manager'
+				) }
 				value={ search }
 				onChange={ onSearch }
 			/>
@@ -34,9 +43,7 @@ export default function Sidebar( {
 							type="button"
 							className={ [
 								'gtm4wp-sidebar__item',
-								module.id === activeModuleId
-									? 'is-active'
-									: '',
+								module.id === activeModuleId ? 'is-active' : '',
 								module.available ? '' : 'is-unavailable',
 							]
 								.filter( Boolean )
@@ -47,7 +54,10 @@ export default function Sidebar( {
 							{ dirtyModules.includes( module.id ) && (
 								<span
 									className="gtm4wp-sidebar__dirty"
-									aria-label={ __( 'Unsaved changes', 'duracelltomi-google-tag-manager' ) }
+									aria-label={ __(
+										'Unsaved changes',
+										'duracelltomi-google-tag-manager'
+									) }
 								>
 									●
 								</span>
@@ -58,7 +68,10 @@ export default function Sidebar( {
 			</ul>
 			{ 0 === visibleModules.length && (
 				<p className="gtm4wp-sidebar__empty">
-					{ __( 'No settings match your search.', 'duracelltomi-google-tag-manager' ) }
+					{ __(
+						'No settings match your search.',
+						'duracelltomi-google-tag-manager'
+					) }
 				</p>
 			) }
 		</nav>

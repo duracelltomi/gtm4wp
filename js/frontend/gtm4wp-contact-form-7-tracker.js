@@ -1,18 +1,24 @@
 /**
  * GTM4WP Contact Form 7 tracker.
+ *
+ * Extracts the form ID and the submitted inputs from a Contact Form 7
+ * DOM event (wpcf7submit and friends).
+ *
+ * @param {CustomEvent} eventdata The event object dispatched by Contact Form 7.
+ * @return {Object} Form ID and inputs for the data layer.
  */
 function gtm4wp_prepare_cf7_data( eventdata ) {
-	let cf7data = {
+	const cf7data = {
 		formid: '(not set)',
-		inputs: []
-	}
+		inputs: [],
+	};
 
 	if ( eventdata && eventdata.detail && eventdata.detail.contactFormId ) {
 		cf7data.formid = eventdata.detail.contactFormId;
 	}
 
-	if ( event && event.detail && event.detail.inputs ) {
-		cf7data.inputs = event.detail.inputs;
+	if ( eventdata && eventdata.detail && eventdata.detail.inputs ) {
+		cf7data.inputs = eventdata.detail.inputs;
 	}
 
 	return cf7data;
@@ -22,7 +28,7 @@ function gtm4wp_prepare_cf7_data( eventdata ) {
  * Contact Form 7 DOM and Google Tag Manager for WordPress data layer event pairs.
  *
  * @see https://contactform7.com/dom-events/
- * @const
+ * @constant
  * @type {Object}
  */
 const gtm4wp_ctf7_event_pairs = {
@@ -43,17 +49,14 @@ const gtm4wp_ctf7_event_pairs = {
  * @return {void}
  */
 ( function ( w, d, p ) {
-	for ( let ctf7event in p ) {
-		d.addEventListener(
-			ctf7event,
-			function ( event ) {
-				const cf7data = gtm4wp_prepare_cf7_data( event );
-				w[ gtm4wp_datalayer_name ].push( {
-					'event': p[ ctf7event ],
-					'formid': cf7data.formid,
-					'inputs': cf7data.inputs
-				} );
-			}
-		);
+	for ( const ctf7event in p ) {
+		d.addEventListener( ctf7event, function ( event ) {
+			const cf7data = gtm4wp_prepare_cf7_data( event );
+			w[ gtm4wp_datalayer_name ].push( {
+				event: p[ ctf7event ],
+				formid: cf7data.formid,
+				inputs: cf7data.inputs,
+			} );
+		} );
 	}
-}( window, document, gtm4wp_ctf7_event_pairs ) );
+} )( window, document, gtm4wp_ctf7_event_pairs );

@@ -96,12 +96,18 @@ export default function App( { settings } ) {
 			setSnackbar(
 				response.saved
 					? __( 'Settings saved.', 'duracelltomi-google-tag-manager' )
-					: __( 'Saved with errors — please review the highlighted fields.', 'duracelltomi-google-tag-manager' )
+					: __(
+							'Saved with errors — please review the highlighted fields.',
+							'duracelltomi-google-tag-manager'
+					  )
 			);
 		} catch ( error ) {
 			setSnackbar(
 				error.message ||
-					__( 'Saving failed. Please try again.', 'duracelltomi-google-tag-manager' )
+					__(
+						'Saving failed. Please try again.',
+						'duracelltomi-google-tag-manager'
+					)
 			);
 		} finally {
 			setIsSaving( false );
@@ -112,7 +118,10 @@ export default function App( { settings } ) {
 		<div className="gtm4wp-app">
 			<header className="gtm4wp-app__header">
 				<h1>
-					{ __( 'Google Tag Manager for WordPress', 'duracelltomi-google-tag-manager' ) }
+					{ __(
+						'Google Tag Manager for WordPress',
+						'duracelltomi-google-tag-manager'
+					) }
 				</h1>
 				<Button
 					variant="primary"
@@ -122,7 +131,10 @@ export default function App( { settings } ) {
 				>
 					{ isSaving
 						? __( 'Saving…', 'duracelltomi-google-tag-manager' )
-						: __( 'Save changes', 'duracelltomi-google-tag-manager' ) }
+						: __(
+								'Save changes',
+								'duracelltomi-google-tag-manager'
+						  ) }
 				</Button>
 			</header>
 			<div className="gtm4wp-app__body">
