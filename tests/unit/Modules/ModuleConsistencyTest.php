@@ -32,6 +32,14 @@ final class ModuleConsistencyTest extends TestCase {
 			}
 		);
 		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
+		Functions\when( 'wp_roles' )->justReturn(
+			new class() {
+				public function get_names(): array {
+					return array();
+				}
+			}
+		);
+		Functions\when( 'translate_user_role' )->returnArg();
 	}
 
 	/**

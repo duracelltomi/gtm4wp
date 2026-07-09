@@ -65,6 +65,17 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * @return Field[]
 	 */
 	public function fields(): array {
+		// Build the list of user roles as checkboxes, as in 1.x. wp_roles()
+		// lives in wp-includes so it is available both on the settings page
+		// and during REST saves; the guard keeps unit tests (which never load
+		// WordPress) working with an empty choice list.
+		$role_choices = array();
+		if ( function_exists( 'wp_roles' ) ) {
+			foreach ( wp_roles()->get_names() as $role_slug => $role_name ) {
+				$role_choices[ $role_slug ] = translate_user_role( $role_name );
+			}
+		}
+
 		return array(
 			new Field(
 				key: GTM4WP_OPTION_GTM_CONTAINERS,
@@ -288,11 +299,12 @@ final class AdminSchema implements AdminSchemaInterface {
 			),
 			new Field(
 				key: GTM4WP_OPTION_NOGTMFORLOGGEDIN,
-				type: Field::TYPE_TEXT,
+				type: Field::TYPE_MULTISELECT,
 				default_value: '',
 				label: esc_html__( 'User roles to exclude', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Do not load GTM container on the frontend if role of the logged in user is any of this. Enter a comma separated list of role IDs (e.g. administrator,editor).', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Do not load the GTM container on the frontend when the logged in user has any of the checked roles.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
+				choices: $role_choices,
 				sanitizer: static function ( $value ) {
 					// The admin UI submits an array of role ids; stored as comma separated string as in 1.x.
 					if ( is_array( $value ) ) {
