@@ -24,7 +24,7 @@ a parallel 1.22.4 install where noted.
 ## 2. Upgrade from 1.22.4
 
 - [ ] Install 1.22.4, configure: GTM ID, custom data layer name, scroll tracking, WooCommerce tracking, consent mode flags, a few blacklist entities including `ua`.
-- [ ] Switch to 2.0 → every kept setting preserved; weather/geo + WP e-Commerce keys and the `ua` blacklist entry removed from the `gtm4wp-options` row (check via `wp option get gtm4wp-options`).
+- [ ] Switch to 2.0 → every kept setting preserved; weather/geo + WP e-Commerce + scroll tracking (`scroller-*`) keys and the `ua` blacklist entry removed from the `gtm4wp-options` row (check via `wp option get gtm4wp-options`).
 - [ ] `gtm4wp-plugin-version` option stamped.
 - [ ] Container table seeded from the 1.x options: one row per GTM ID, each inheriting the previously shared environment/domain/path values; flat 1.x keys still present in the option row. Expected behavior change vs 1.x: with env parameters and multiple IDs, ALL containers now load (1.x only loaded the first).
 - [ ] Frontend container output identical BEFORE visiting wp-admin (pre-migration legacy fallback in the Options service).

@@ -110,25 +110,6 @@ the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
 Tracking is supported for embedded media using the built-in oEmbed feature of WordPress as well as most other media plugins
 and copy/pasted codes. Players injected into the website after page load are not currently supported.
 
-= Scroll tracking =
-
-Fire tags based on how the visitor scrolls from the top to the bottom of a page.
-An example would be to separate "readers" (who spend a specified amount of time on a page) from "scrollers"
-(who only scroll through within seconds). You can use these events to fire Analytics tags and/or remarketing/conversion tags
-(for micro conversions).
-
-Scroll tracking is based on the solution originally created by
-
-* Nick Mihailovski
-* Thomas Baekdal
-* Avinash Kaushik
-* Joost de Valk
-* Eivind Savio
-* Justin Cutroni
-
-Original script:
-http://cutroni.com/blog/2012/02/21/advanced-content-tracking-with-google-analytics-part-1/
-
 = Blacklist & Whitelist Tag Manager tags, triggers and variables =
 
 To increase website security, you have the option to white- and blacklist tags/triggers/variables.
@@ -199,19 +180,9 @@ Regarding variables; ensure they are not part of any critical tags as blacklisti
 
 = How can I track scroll events in Google Tag Manager? =
 
-Google Tag Manager supports basic scroll depth tracking based on percentage or pixels natively. This plugin adds
-additional scroll tracking events, more focused on capturing the users' intent and/or engagement.
-
-There are five dataLayer events you can use in your rule definitions:
-
-* gtm4wp.reading.articleLoaded: the content has been loaded
-* gtm4wp.reading.startReading: the visitor started to scroll. The `timeToScroll` dataLayer variable stores duration since the article loaded (in seconds)
-* gtm4wp.reading.contentBottom: the visitor reached the end of the content (not the page!). `timeToScroll` dataLayer variable updated
-* gtm4wp.reading.pagebottom: the visitor reached the end of the page. `timeToScroll` dataLayer variable updated
-* gtm4wp.reading.readerType: based on time spent since article loaded we determine whether the user is a 'scanner' or 'reader' and store this in the `readerType` dataLayer variable
-
-Example use cases: using these events as triggers, you can fire Google Universal Analytics and/or Google Ads remarketing/conversion tags
-to report micro conversions and/or to serve ads only to visitors who spend more time reading your content.
+Google Tag Manager supports basic scroll depth tracking based on percentage or pixels natively. Add a Scroll Depth
+trigger in your container and use it to fire your Google Analytics 4 and/or Google Ads remarketing/conversion tags.
+(The plugin's own scroll tracking feature was removed in 2.0 in favor of this built-in GTM functionality.)
 
 == Screenshots ==
 
@@ -220,7 +191,6 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 3. Events
 4. Integration panel
 5. Advanced settings
-6. Scroll tracking
 
 == Changelog ==
 
@@ -238,6 +208,7 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Updated: frontend scripts load with the defer strategy where possible.
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
 * Removed: WP e-Commerce integration.
+* Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead.
 * Removed: unused blacklist "sandboxed scripts" flag.
 * Developer note: all public template functions (gtm4wp_the_gtm_tag() etc.), filter/action names, wp-config constants and the option storage key are unchanged - existing integrations keep working.
 

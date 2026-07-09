@@ -50,6 +50,8 @@ final class MigrationTest extends TestCase {
 			GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI => 'owm-key',
 			GTM4WP_OPTION_INTEGRATE_WPECOMMERCE => true,
 			GTM4WP_OPTION_BLACKLIST_SANDBOXED   => true,
+			GTM4WP_OPTION_SCROLLER_ENABLED      => true,
+			GTM4WP_OPTION_SCROLLER_CONTENTID    => 'content',
 			GTM4WP_OPTION_BLACKLIST_STATUS      => 'html,ua,gaawe,mf',
 		);
 
@@ -62,6 +64,8 @@ final class MigrationTest extends TestCase {
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_INCLUDE_WEATHER, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_INTEGRATE_WPECOMMERCE, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_BLACKLIST_SANDBOXED, $options );
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_ENABLED, $options );
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_CONTENTID, $options );
 		$this->assertSame( 'html,gaawe', $options[ GTM4WP_OPTION_BLACKLIST_STATUS ], 'Stale ua/mf entries are stripped.' );
 
 		$this->assertSame( GTM4WP_VERSION, $this->option_store['gtm4wp-plugin-version'] );

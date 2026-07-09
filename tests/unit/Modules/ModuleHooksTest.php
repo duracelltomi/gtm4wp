@@ -13,7 +13,6 @@ use GTM4WP\Module\ModuleInterface;
 use GTM4WP\Modules\Amp\AmpModule;
 use GTM4WP\Modules\ConsentMode\ConsentModeModule;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
-use GTM4WP\Modules\ScrollTracking\ScrollTrackingModule;
 use GTM4WP\Modules\UserEvents\UserEventsModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
@@ -36,45 +35,6 @@ final class ModuleHooksTest extends TestCase {
 		$module->frontend( new Options( $module->defaults() ) );
 
 		return $module;
-	}
-
-	public function test_scroll_tracking_registers_hooks_only_when_enabled(): void {
-		$module = $this->boot( new ScrollTrackingModule(), array( GTM4WP_OPTION_SCROLLER_ENABLED => true ) );
-
-		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $module, 'enqueue_scripts' ) ) );
-		$this->assertNotFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $module, 'add_header_js' ) ) );
-	}
-
-	public function test_scroll_tracking_inactive_when_disabled(): void {
-		$module = $this->boot( new ScrollTrackingModule() );
-
-		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $module, 'enqueue_scripts' ) ) );
-		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $module, 'add_header_js' ) ) );
-	}
-
-	public function test_scroll_tracking_header_js_contains_configuration(): void {
-		$module = new ScrollTrackingModule();
-		$this->boot(
-			$module,
-			array(
-				GTM4WP_OPTION_SCROLLER_ENABLED      => true,
-				GTM4WP_OPTION_SCROLLER_DEBUGMODE    => true,
-				GTM4WP_OPTION_SCROLLER_CALLBACKTIME => 250,
-				GTM4WP_OPTION_SCROLLER_DISTANCE     => 300,
-				GTM4WP_OPTION_SCROLLER_CONTENTID    => 'main',
-				GTM4WP_OPTION_SCROLLER_READERTIME   => 90,
-			)
-		);
-
-		Functions\stubEscapeFunctions();
-
-		$js = $module->add_header_js( '' );
-
-		$this->assertStringContainsString( 'const gtm4wp_scrollerscript_debugmode         = true;', $js );
-		$this->assertStringContainsString( 'const gtm4wp_scrollerscript_callbacktime      = 250;', $js );
-		$this->assertStringContainsString( 'const gtm4wp_scrollerscript_readerlocation    = 300;', $js );
-		$this->assertStringContainsString( 'const gtm4wp_scrollerscript_contentelementid  = "main";', $js );
-		$this->assertStringContainsString( 'const gtm4wp_scrollerscript_scannertime       = 90;', $js );
 	}
 
 	public function test_consent_mode_registers_webtoffee_js_when_enabled(): void {

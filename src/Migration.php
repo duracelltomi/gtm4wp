@@ -27,8 +27,8 @@ final class Migration {
 
 	/**
 	 * Option keys of features removed in 2.0:
-	 * weather + geo data, WP e-Commerce integration and the unused
-	 * blacklist-sandboxed flag.
+	 * weather + geo data, WP e-Commerce integration, scroll tracking and the
+	 * unused blacklist-sandboxed flag.
 	 *
 	 * @var string[]
 	 */
@@ -40,6 +40,12 @@ final class Migration {
 		GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI,
 		GTM4WP_OPTION_INTEGRATE_WPECOMMERCE,
 		GTM4WP_OPTION_BLACKLIST_SANDBOXED,
+		GTM4WP_OPTION_SCROLLER_ENABLED,
+		GTM4WP_OPTION_SCROLLER_DEBUGMODE,
+		GTM4WP_OPTION_SCROLLER_CALLBACKTIME,
+		GTM4WP_OPTION_SCROLLER_DISTANCE,
+		GTM4WP_OPTION_SCROLLER_CONTENTID,
+		GTM4WP_OPTION_SCROLLER_READERTIME,
 	);
 
 	/**

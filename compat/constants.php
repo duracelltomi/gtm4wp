@@ -7,8 +7,9 @@
  * third party plugins and themes use them to read plugin options and to hook
  * into the data layer. All values must stay unchanged forever.
  *
- * Constants of features removed in 2.0 (WP e-Commerce, weather and geo data)
- * are also kept so that third party code referencing them does not fatal.
+ * Constants of features removed in 2.0 (WP e-Commerce, weather and geo data,
+ * scroll tracking) are also kept so that third party code referencing them
+ * does not fatal.
  *
  * @package GTM4WP
  * @author Thomas Geiger
@@ -80,6 +81,9 @@ define( 'GTM4WP_OPTION_EVENTS_YOUTUBE', 'event-youtube' );
 define( 'GTM4WP_OPTION_EVENTS_VIMEO', 'event-vimeo' );
 define( 'GTM4WP_OPTION_EVENTS_SOUNDCLOUD', 'event-soundcloud' );
 
+// Scroll tracking was removed in 2.0 (GTM has built-in scroll depth
+// tracking); the option keys are kept here for third party compatibility and
+// their stored values are cleaned up by GTM4WP\Migration.
 define( 'GTM4WP_OPTION_SCROLLER_ENABLED', 'scroller-enabled' );
 define( 'GTM4WP_OPTION_SCROLLER_DEBUGMODE', 'scroller-debug-mode' );
 define( 'GTM4WP_OPTION_SCROLLER_CALLBACKTIME', 'scroller-callback-time' );

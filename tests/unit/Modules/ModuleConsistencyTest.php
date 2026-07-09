@@ -99,7 +99,6 @@ final class ModuleConsistencyTest extends TestCase {
 				'client-device-data',
 				'user-events',
 				'media-events',
-				'scroll-tracking',
 				'consent',
 				'contact-form-7',
 				'woocommerce',

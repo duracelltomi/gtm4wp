@@ -147,7 +147,7 @@ final class RestControllerTest extends TestCase {
 							),
 						),
 						GTM4WP_OPTION_INCLUDE_LOGGEDIN => 1,
-						GTM4WP_OPTION_SCROLLER_CALLBACKTIME => '250',
+						GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION => '250',
 					),
 				)
 			)
@@ -172,7 +172,7 @@ final class RestControllerTest extends TestCase {
 			'Rows are trimmed, the https:// prefix and the leading path slash are stripped.'
 		);
 		$this->assertTrue( $this->saved[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ], 'Checkbox values are cast to bool.' );
-		$this->assertSame( 250, $this->saved[ GTM4WP_OPTION_SCROLLER_CALLBACKTIME ], 'Integer values are cast to int.' );
+		$this->assertSame( 250, $this->saved[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ], 'Integer values are cast to int.' );
 	}
 
 	public function test_saving_container_rows_syncs_legacy_mirror_options(): void {

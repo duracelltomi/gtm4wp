@@ -24,11 +24,6 @@ module.exports = {
 				// Printed inline by ContainerCode::header_top() and the
 				// GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter (PHP side).
 				gtm4wp_datalayer_name: 'readonly',
-				gtm4wp_scrollerscript_debugmode: 'readonly',
-				gtm4wp_scrollerscript_callbacktime: 'readonly',
-				gtm4wp_scrollerscript_readerlocation: 'readonly',
-				gtm4wp_scrollerscript_contentelementid: 'readonly',
-				gtm4wp_scrollerscript_scannertime: 'readonly',
 				gtm4wp_currency: 'readonly',
 				gtm4wp_clear_ecommerce: 'readonly',
 				gtm4wp_use_sku_instead: 'readonly',

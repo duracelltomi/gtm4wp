@@ -29,8 +29,8 @@ final class ContainerCode {
 
 	/**
 	 * Internal filter that modules use to append inline JavaScript to the
-	 * data layer initialization block in the <head> (scroll tracking
-	 * constants, consent tool callbacks).
+	 * data layer initialization block in the <head> (e.g. consent tool
+	 * callbacks).
 	 *
 	 * @since 2.0.0
 	 */
@@ -166,8 +166,8 @@ final class ContainerCode {
 
 		/**
 		 * Filters the additional inline JavaScript appended to the data layer
-		 * initialization block. Modules (scroll tracking, consent tool
-		 * integrations) add their 1.x-identical code snippets here.
+		 * initialization block. Modules (e.g. consent tool integrations) add
+		 * their 1.x-identical code snippets here.
 		 *
 		 * @since 2.0.0
 		 *
