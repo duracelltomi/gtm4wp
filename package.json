@@ -6,7 +6,8 @@
     "build": "wp-scripts build",
     "start": "wp-scripts start",
     "test:unit": "wp-scripts test-unit-js --passWithNoTests",
-    "lint:js": "wp-scripts lint-js js"
+    "lint:js": "wp-scripts lint-js js",
+    "release": "node tools/build-release.js"
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,7 @@
   },
   "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
   "devDependencies": {
-    "@wordpress/scripts": "^30.0.0"
+    "@wordpress/scripts": "^30.0.0",
+    "adm-zip": "^0.5.18"
   }
 }

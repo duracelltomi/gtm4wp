@@ -101,13 +101,15 @@ final class SettingsPage {
 
 		wp_enqueue_style( 'wp-components' );
 
-		if ( is_file( GTM4WP_PATH . 'build/admin.css' ) ) {
+		// wp-scripts emits CSS imported from the entry point as style-<entry>.css.
+		if ( is_file( GTM4WP_PATH . 'build/style-admin.css' ) ) {
 			wp_enqueue_style(
 				'gtm4wp-admin-app',
-				plugins_url( 'build/admin.css', GTM4WP_PLUGIN_FILE ),
+				plugins_url( 'build/style-admin.css', GTM4WP_PLUGIN_FILE ),
 				array( 'wp-components' ),
 				$asset['version']
 			);
+			wp_style_add_data( 'gtm4wp-admin-app', 'rtl', 'replace' );
 		}
 
 		wp_add_inline_script(

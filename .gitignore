@@ -33,6 +33,7 @@ node_modules
 
 # Build output
 /build/
+/release/
 .phpunit.result.cache
 
 # LLM
