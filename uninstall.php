@@ -1,7 +1,7 @@
 <?php
 /**
- * Loaded when GTM4WP was uninstalled.
- * Deletes plugin options from database.
+ * Loaded when GTM4WP is uninstalled.
+ * Deletes plugin options and per-user notice states from the database.
  *
  * @package GTM4WP
  * @author Thomas Geiger
@@ -9,11 +9,13 @@
  * @license GNU General Public License, version 3
  */
 
-// if uninstall.php is not called by WordPress, die.
+// If uninstall.php is not called by WordPress, die.
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	die;
 }
 
-require_once __DIR__ . '/common/readoptions.php';
+delete_option( 'gtm4wp-options' );
+delete_option( 'gtm4wp-plugin-version' );
 
-delete_option( GTM4WP_OPTIONS );
+// Per-user dismissed notice states.
+delete_metadata( 'user', 0, 'gtm4wp_user_notices_dismisses_json', '', true );

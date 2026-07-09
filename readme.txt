@@ -2,8 +2,8 @@
 Contributors: duracelltomi
 Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google ads, google analytics
-Requires at least: 3.4.0
-Requires PHP: 7.4
+Requires at least: 6.3
+Requires PHP: 8.0
 Tested up to: 6.9.4
 Stable tag: 1.22.4
 License: GPLv3
@@ -22,7 +22,7 @@ Multiple containers are also supported!
 The plugin complements your GTM setup by pushing page meta data and user information into the so called data layer.
 Google's official help pages includes [more details about the data layer](https://developers.google.com/tag-platform/tag-manager/datalayer#datalayer).
 
-**PHP 7.4 is required to use this plugin.**
+**PHP 8.0 and WordPress 6.3 are required to use this plugin.**
 
 = GTM container code placement =
 
@@ -224,6 +224,21 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 == Changelog ==
 
+= 2.0.0 =
+
+Major rewrite of the plugin. Please read the announcement post on gtm4wp.com before upgrading!
+
+* Minimum requirements raised: PHP 8.0 and WordPress 6.3.
+* New: complete object oriented architecture with a module system - each feature is a module that third party plugins can extend through the gtm4wp_register_modules action.
+* New: modern React based settings screen with left pane navigation, accordion option groups, option search and inline validation.
+* New: browser, OS and device data is now collected in the browser using User-Agent Client Hints and pushed as a gtm4wp.deviceData event (replaces the bundled WhichBrowser library; Safari and Firefox expose less detail).
+* Updated: tag blacklist entity list refreshed from Google's restriction documentation (added Google tag/GA4 tags and the Google Analytics Settings variable, removed Universal Analytics and Mouseflow).
+* Updated: frontend scripts load with the defer strategy where possible.
+* Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
+* Removed: WP e-Commerce integration.
+* Removed: unused blacklist "sandboxed scripts" flag.
+* Developer note: all public template functions (gtm4wp_the_gtm_tag() etc.), filter/action names, wp-config constants and the option storage key are unchanged - existing integrations keep working.
+
 = 1.22.4 =
 
 * Fixed: use proper JSON encoding for user input in dataLayer script context. Thanks [cyn](https://github.com/cyn8)
@@ -364,6 +379,10 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 * Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
 
 == Upgrade Notice ==
+
+= 2.0.0 =
+Major rewrite: requires PHP 8.0 and WordPress 6.3. Weather/geo data, WP e-Commerce integration and the bundled WhichBrowser library were removed. Public API (template functions, hooks, options) is unchanged.
+
 
 = 1.22.4 =
 

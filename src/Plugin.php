@@ -131,6 +131,8 @@ final class Plugin {
 	 * @return void
 	 */
 	private function boot_admin(): void {
+		Migration::maybe_run();
+
 		( new Admin\Admin( $this->registry, $this->options ) )->boot();
 	}
 
