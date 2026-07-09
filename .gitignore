@@ -30,13 +30,17 @@ composer.lock
 
 # NPM
 node_modules
+npm-debug.log*
+yarn-error.log
 
 # Build output
 /build/
 /release/
 .phpunit.result.cache
 
-# LLM
-.claude/
+# LLM: project instructions and skills are committed,
+# personal permission settings are not.
+.claude/settings.json
+.claude/settings.local.json
 
 .docs/
