@@ -31,6 +31,7 @@ final class ModuleConsistencyTest extends TestCase {
 				return $content;
 			}
 		);
+		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
 	}
 
 	/**

@@ -417,8 +417,7 @@ final class ListTracking {
 			$itemix = $woocommerce_loop['loop'];
 		}
 
-		// No need to escape here as everything is handled within the function call with esc_attr() and esc_url().
-		echo $this->get_product_list_item_extra_tag( //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		$extra_tag = $this->get_product_list_item_extra_tag(
 			$product,
 			$listtype,
 			$itemix,
@@ -428,6 +427,9 @@ final class ListTracking {
 				0
 			)
 		);
+
+		// No need to escape here as everything is handled within the function call with esc_attr() and esc_url().
+		echo $extra_tag; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	/**

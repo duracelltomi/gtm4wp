@@ -1,0 +1,168 @@
+<?php
+/**
+ * Settings page with the React admin app.
+ *
+ * @package GTM4WP
+ * @author Thomas Geiger
+ * @copyright 2013- Geiger Tamás e.v. (Thomas Geiger s.e.)
+ * @license GNU General Public License, version 3
+ */
+
+namespace GTM4WP\Admin;
+
+use GTM4WP\Module\Registry;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Registers the options page under Settings and loads the React app with
+ * its bootstrap data (module schemas + current values).
+ */
+final class SettingsPage {
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Registry       $registry The module registry.
+	 * @param RestController $rest     The settings REST controller (for current values).
+	 */
+	public function __construct( private Registry $registry, private RestController $rest ) {
+	}
+
+	/**
+	 * Registers the admin hooks.
+	 *
+	 * @return void
+	 */
+	public function register_hooks(): void {
+		add_action( 'admin_menu', array( $this, 'add_admin_page' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+	}
+
+	/**
+	 * Adds the plugin options page into the Settings menu of the WordPress admin.
+	 * The capability can be changed with the gtm4wp_admin_page_capability filter.
+	 *
+	 * @return void
+	 */
+	public function add_admin_page(): void {
+		/** This filter is documented in src/Plugin.php */
+		$capability = apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' );
+
+		add_options_page(
+			esc_html__( 'Google Tag Manager for WordPress settings', 'duracelltomi-google-tag-manager' ),
+			esc_html__( 'Google Tag Manager', 'duracelltomi-google-tag-manager' ),
+			$capability,
+			GTM4WP_ADMINSLUG,
+			array( $this, 'render' )
+		);
+	}
+
+	/**
+	 * Renders the React app container.
+	 *
+	 * @return void
+	 */
+	public function render(): void {
+		echo '<div class="wrap">';
+		echo '<h1 class="screen-reader-text">' . esc_html__( 'Google Tag Manager for WordPress options', 'duracelltomi-google-tag-manager' ) . '</h1>';
+		echo '<div id="gtm4wp-admin-app"></div>';
+		echo '</div>';
+	}
+
+	/**
+	 * Loads the built React app on the settings page only.
+	 *
+	 * @param string $hook The ID of the admin page that is currently being shown.
+	 * @return void
+	 */
+	public function enqueue_assets( $hook ): void {
+		if ( 'settings_page_' . GTM4WP_ADMINSLUG !== $hook ) {
+			return;
+		}
+
+		$asset_file = GTM4WP_PATH . 'build/admin.asset.php';
+		$asset      = is_file( $asset_file )
+			? require $asset_file
+			: array(
+				'dependencies' => array(),
+				'version'      => GTM4WP_VERSION,
+			);
+
+		wp_enqueue_script(
+			'gtm4wp-admin-app',
+			plugins_url( 'build/admin.js', GTM4WP_PLUGIN_FILE ),
+			$asset['dependencies'],
+			$asset['version'],
+			true
+		);
+
+		wp_set_script_translations( 'gtm4wp-admin-app', 'duracelltomi-google-tag-manager' );
+
+		wp_enqueue_style( 'wp-components' );
+
+		if ( is_file( GTM4WP_PATH . 'build/admin.css' ) ) {
+			wp_enqueue_style(
+				'gtm4wp-admin-app',
+				plugins_url( 'build/admin.css', GTM4WP_PLUGIN_FILE ),
+				array( 'wp-components' ),
+				$asset['version']
+			);
+		}
+
+		wp_add_inline_script(
+			'gtm4wp-admin-app',
+			'var gtm4wpSettings = ' . wp_json_encode( $this->bootstrap_data(), JSON_HEX_TAG ) . ';',
+			'before'
+		);
+	}
+
+	/**
+	 * Collects the bootstrap data of the React app: every module with its
+	 * admin schema (title, intro, accordion groups, fields with current
+	 * values) plus the REST endpoint location.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function bootstrap_data(): array {
+		$values  = $this->rest->current_values();
+		$modules = array();
+
+		foreach ( $this->registry->all() as $module ) {
+			$schema_class = $module->admin_schema();
+			if ( ! class_exists( $schema_class ) ) {
+				continue;
+			}
+
+			$schema = new $schema_class();
+
+			$fields = array();
+			foreach ( $schema->fields() as $field ) {
+				$fields[] = $field->to_ui_array( $values[ $field->key ] ?? $field->default_value );
+			}
+
+			$groups = array();
+			foreach ( $schema->groups() as $group_id => $group_label ) {
+				$groups[] = array(
+					'id'    => $group_id,
+					'label' => $group_label,
+				);
+			}
+
+			$modules[] = array(
+				'id'                 => $module->id(),
+				'title'              => $schema->title(),
+				'intro'              => $schema->intro(),
+				'groups'             => $groups,
+				'fields'             => $fields,
+				'available'          => $module->is_available(),
+				'unavailableMessage' => $schema->unavailable_message(),
+			);
+		}
+
+		return array(
+			'modules'  => $modules,
+			'restPath' => RestController::REST_NAMESPACE . RestController::REST_ROUTE,
+		);
+	}
+}

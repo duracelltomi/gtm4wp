@@ -79,6 +79,16 @@ final class Plugin {
 
 		Globals::populate( $this->options );
 
+		// The settings REST endpoint must be reachable on REST requests where
+		// is_admin() is false; the controller class only loads when a REST
+		// request actually initializes.
+		add_action(
+			'rest_api_init',
+			function () {
+				( new Admin\RestController( $this->registry ) )->register_routes();
+			}
+		);
+
 		if ( is_admin() ) {
 			/**
 			 * Filters the capability needed to see and manage the GTM4WP settings page.
@@ -121,7 +131,7 @@ final class Plugin {
 	 * @return void
 	 */
 	private function boot_admin(): void {
-		// Admin settings page and REST controller are added in a later phase.
+		( new Admin\Admin( $this->registry, $this->options ) )->boot();
 	}
 
 	/**

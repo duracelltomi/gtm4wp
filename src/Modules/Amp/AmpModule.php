@@ -3,8 +3,7 @@
  * AMP (Accelerated Mobile Pages) module (lean frontend class).
  *
  * @package GTM4WP
- * @author Thomas Geiger
- * @author Vincent Koc <https://github.com/koconder/>
+ * @author Thomas Geiger (original AMP integration by Vincent Koc <https://github.com/koconder/>)
  * @copyright 2013- Geiger Tamás e.v. (Thomas Geiger s.e.)
  * @license GNU General Public License, version 3
  */

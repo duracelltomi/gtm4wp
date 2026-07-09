@@ -29,3 +29,4 @@ if ( ! defined( 'GTM4WP_PLUGIN_FILE' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/compat/constants.php';
+require_once __DIR__ . '/unit/wp-class-stubs.php';

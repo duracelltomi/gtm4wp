@@ -47,6 +47,10 @@
 		<exclude-pattern>*/tests/*</exclude-pattern>
 	</rule>
 
+	<rule ref="WordPress.WP.GlobalVariablesOverride">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+
 	<!-- Legacy 1.x test files, absorbed into tests/unit in later phases. -->
 	<exclude-pattern>*/tests/test-*.php</exclude-pattern>
 
