@@ -21,11 +21,12 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Field {
 
-	public const TYPE_CHECKBOX = 'checkbox';
-	public const TYPE_TEXT     = 'text';
-	public const TYPE_INTEGER  = 'integer';
-	public const TYPE_SELECT   = 'select';
-	public const TYPE_TEXTAREA = 'textarea';
+	public const TYPE_CHECKBOX    = 'checkbox';
+	public const TYPE_TEXT        = 'text';
+	public const TYPE_INTEGER     = 'integer';
+	public const TYPE_SELECT      = 'select';
+	public const TYPE_TEXTAREA    = 'textarea';
+	public const TYPE_MULTISELECT = 'multiselect';
 
 	public const PHASE_STABLE       = 'stable';
 	public const PHASE_BETA         = 'beta';
@@ -86,6 +87,19 @@ final class Field {
 					return $this->default_value;
 				}
 				return $value;
+
+			case self::TYPE_MULTISELECT:
+				$values = is_array( $value ) ? $value : explode( ',', (string) $value );
+				$values = array_map( 'sanitize_text_field', array_map( 'strval', $values ) );
+				if ( array() !== $this->choices ) {
+					$values = array_values(
+						array_filter(
+							$values,
+							fn ( $one_value ) => array_key_exists( $one_value, $this->choices )
+						)
+					);
+				}
+				return $values;
 
 			case self::TYPE_TEXTAREA:
 				return sanitize_textarea_field( (string) $value );

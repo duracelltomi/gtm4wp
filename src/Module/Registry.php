@@ -37,7 +37,18 @@ final class Registry {
 	 *
 	 * @var string[]
 	 */
-	private const BUILTIN_MODULES = array();
+	private const BUILTIN_MODULES = array(
+		\GTM4WP\Modules\Container\ContainerModule::class,
+		\GTM4WP\Modules\PageVariables\PageVariablesModule::class,
+		\GTM4WP\Modules\ClientDeviceData\ClientDeviceDataModule::class,
+		\GTM4WP\Modules\UserEvents\UserEventsModule::class,
+		\GTM4WP\Modules\MediaEvents\MediaEventsModule::class,
+		\GTM4WP\Modules\ScrollTracking\ScrollTrackingModule::class,
+		\GTM4WP\Modules\ConsentMode\ConsentModeModule::class,
+		\GTM4WP\Modules\ContactForm7\ContactForm7Module::class,
+		\GTM4WP\Modules\Amp\AmpModule::class,
+		\GTM4WP\Modules\Blacklist\BlacklistModule::class,
+	);
 
 	/**
 	 * Creates a registry with all built-in modules and applies the
