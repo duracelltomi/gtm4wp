@@ -4,6 +4,17 @@
 
 WordPress plugin that integrates Google Tag Manager into WordPress websites with comprehensive WooCommerce e-commerce tracking (GA4). The plugin manages GTM container code injection, data layer population, and event tracking for product impressions, cart actions, checkout steps, and purchases.
 
+## Security review system
+
+This repo has a cumulative security-review system under `.security/`:
+
+- **Before writing or modifying any PHP/JS**, read `.security/pre-flight-check.md` and follow it — it points to `.security/code-review-patterns.md` (accumulated recurring issues, project anti-patterns, and false-positive suppressions) which you must actively avoid.
+- **`/code-review`** (`.claude/commands/code-review.md`) runs a cumulative review that updates `.security/code-review-checklist.md` (coverage matrix + known findings) and the patterns file, and saves a report to `.security/code-review-report-{date}-{time}.md`. The `code-reviewer` subagent (`.claude/agents/code-reviewer.md`) encodes the same checklist.
+- The single most important rule (from the first review): **anything written into the dataLayer or an inline `<script>` must go through `wp_json_encode` with `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS`; never blanket-`htmlspecialchars_decode()` script output; `esc_js()` is not for raw `<script>` bodies.**
+- ⛔ **Disclosure rule (hard):** this is a public repo — committed == published. Never put a working exploit payload, reproduction steps, or the detail of an unfixed finding into any committed file (security docs, code comments, commit messages). That detail lives only in the git-ignored `.security/code-review-report-*.md`; the canonical rule is at the top of `.security/code-review-checklist.md`.
+
+@.security/pre-flight-check.md
+
 ## Architecture
 
 - **Procedural PHP** - No classes or namespaces. All code uses prefixed functions (`gtm4wp_*`) and global arrays.

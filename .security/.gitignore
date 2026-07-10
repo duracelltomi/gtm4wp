@@ -1,0 +1,5 @@
+# Detailed review reports contain exploit PoCs and may describe not-yet-fixed
+# findings. GTM4WP is a public plugin, so keep them out of version control —
+# they are regenerated per run. The cumulative framework (checklist, patterns,
+# pre-flight) IS tracked and shared; only the verbose reports stay local.
+code-review-report-*.md
