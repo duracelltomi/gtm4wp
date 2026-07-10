@@ -235,7 +235,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: wp_kses(
 					__(
 						'Decides where to put the second, so called <code>&lt;noscript&gt;</code> part of the GTM container code. The main GTM container code will always be placed into the <code>&lt;head&gt;</code> section of your webpages.<br />
-						If you select "Manually coded", add <code>&lt;?php if ( function_exists( \'gtm4wp_the_gtm_tag\' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code> just after the opening &lt;body&gt; tag in your template.<br />
+						If you select "Manually coded", add the following code just after the opening &lt;body&gt; tag in your template:<br />
+						<code>&lt;?php if ( function_exists( \'gtm4wp_the_gtm_tag\' ) ) { gtm4wp_the_gtm_tag(); } ?&gt;</code><br />
 						Selecting "Off" removes both parts of the container code but leaves data layer codes working.',
 						'duracelltomi-google-tag-manager'
 					),
@@ -246,7 +247,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				),
 				group: 'general',
 				choices: array(
-					(string) GTM4WP_PLACEMENT_FOOTER   => __( 'Footer of the page (no visitor loss, no Search Console verification)', 'duracelltomi-google-tag-manager' ),
+					(string) GTM4WP_PLACEMENT_FOOTER   => __( 'Footer of the page (compatible with all WP themes, no Search Console verification)', 'duracelltomi-google-tag-manager' ),
 					(string) GTM4WP_PLACEMENT_BODYOPEN => __( 'Manually coded after the opening body tag', 'duracelltomi-google-tag-manager' ),
 					(string) GTM4WP_PLACEMENT_BODYOPEN_AUTO => __( 'Automatically after the opening body tag (theme must support wp_body_open)', 'duracelltomi-google-tag-manager' ),
 					(string) GTM4WP_PLACEMENT_OFF      => __( 'Off - container code turned off, data layer only', 'duracelltomi-google-tag-manager' ),
