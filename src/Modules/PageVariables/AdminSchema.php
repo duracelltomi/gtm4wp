@@ -227,8 +227,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Primary category', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the primary category of the current post as chosen in Yoast SEO or Rank Math (falls back to the first assigned category). Useful as a single content grouping dimension.', 'duracelltomi-google-tag-manager' ),
-				group: 'content',
-				phase: Field::PHASE_BETA
+				group: 'content'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_PAGELANGUAGE,
@@ -236,8 +235,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Page language', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the language code of the current page, detected from WPML or Polylang and falling back to the site locale. Useful to segment behavior on multilingual sites.', 'duracelltomi-google-tag-manager' ),
-				group: 'content',
-				phase: Field::PHASE_BETA
+				group: 'content'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_SEARCHDATA,
