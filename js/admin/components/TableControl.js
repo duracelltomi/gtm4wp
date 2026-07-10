@@ -3,8 +3,14 @@
  * one text input per schema-defined column, with add/remove row actions.
  */
 
-import { Button, TextControl } from '@wordpress/components';
+import { Button, CheckboxControl, TextControl } from '@wordpress/components';
 import { sprintf, __ } from '@wordpress/i18n';
+
+// A stored checkbox cell is the canonical string '1' (on) or '' (off); older
+// or programmatic values may arrive as booleans, so normalize them all.
+function isChecked( value ) {
+	return value === true || value === '1' || value === 1;
+}
 
 function emptyRow( columns ) {
 	const row = {};
@@ -81,35 +87,79 @@ export default function TableControl( {
 						) }
 						{ rows.map( ( row, rowIndex ) => (
 							<tr key={ rowIndex }>
-								{ columns.map( ( column ) => (
-									<td key={ column.key }>
-										<TextControl
-											__next40pxDefaultSize
-											__nextHasNoMarginBottom
-											hideLabelFromVision
-											label={ sprintf(
-												/* translators: 1: column label. 2: row number. */
-												__(
-													'%1$s, row %2$d',
-													'duracelltomi-google-tag-manager'
-												),
-												column.label,
-												rowIndex + 1
-											) }
-											placeholder={ column.placeholder }
-											value={ String(
-												row[ column.key ] ?? ''
-											) }
-											onChange={ ( next ) =>
-												updateCell(
-													rowIndex,
-													column.key,
-													next
-												)
-											}
-										/>
-									</td>
-								) ) }
+								{ columns.map( ( column ) => {
+									const cellLabel = sprintf(
+										/* translators: 1: column label. 2: row number. */
+										__(
+											'%1$s, row %2$d',
+											'duracelltomi-google-tag-manager'
+										),
+										column.label,
+										rowIndex + 1
+									);
+
+									if ( 'checkbox' === column.type ) {
+										// A checkbox column can depend on another
+										// cell (e.g. omitting the container ID
+										// only makes sense with a custom path):
+										// keep it disabled and unchecked until
+										// that cell is filled in.
+										const enabled =
+											! column.depends_on ||
+											'' !==
+												String(
+													row[ column.depends_on ] ??
+														''
+												);
+
+										return (
+											<td key={ column.key }>
+												<CheckboxControl
+													__nextHasNoMarginBottom
+													aria-label={ cellLabel }
+													disabled={ ! enabled }
+													checked={
+														enabled &&
+														isChecked(
+															row[ column.key ]
+														)
+													}
+													onChange={ ( next ) =>
+														updateCell(
+															rowIndex,
+															column.key,
+															next ? '1' : ''
+														)
+													}
+												/>
+											</td>
+										);
+									}
+
+									return (
+										<td key={ column.key }>
+											<TextControl
+												__next40pxDefaultSize
+												__nextHasNoMarginBottom
+												hideLabelFromVision
+												label={ cellLabel }
+												placeholder={
+													column.placeholder
+												}
+												value={ String(
+													row[ column.key ] ?? ''
+												) }
+												onChange={ ( next ) =>
+													updateCell(
+														rowIndex,
+														column.key,
+														next
+													)
+												}
+											/>
+										</td>
+									);
+								} ) }
 								<td className="gtm4wp-table__actions">
 									<Button
 										icon="trash"

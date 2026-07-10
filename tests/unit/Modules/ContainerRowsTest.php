@@ -37,10 +37,26 @@ final class ContainerRowsTest extends TestCase {
 					'gtm_preview' => '',
 					'domain'      => '',
 					'path'        => '',
+					'no_id'       => '',
 				),
 			),
 			$rows
 		);
+	}
+
+	public function test_normalize_retains_the_no_id_flag(): void {
+		$rows = ContainerRows::normalize(
+			array(
+				array(
+					'id'    => 'GTM-AAA111',
+					'path'  => 'custom/loader.js',
+					'no_id' => '1',
+				),
+			)
+		);
+
+		$this->assertSame( '1', $rows[0]['no_id'] );
+		$this->assertSame( 'custom/loader.js', $rows[0]['path'] );
 	}
 
 	public function test_normalize_returns_empty_list_for_non_array_values(): void {
@@ -162,6 +178,7 @@ final class ContainerRowsTest extends TestCase {
 					'gtm_preview' => '',
 					'domain'      => '',
 					'path'        => '',
+					'no_id'       => '',
 				),
 			),
 			$rows

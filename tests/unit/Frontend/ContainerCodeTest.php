@@ -301,6 +301,91 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( "'GTM-BBB222'", $output );
 	}
 
+	public function test_header_begin_omits_container_id_when_flagged_with_custom_path(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'     => 'GTM-AAA111',
+						'domain' => 'sgtm.example.com',
+						'path'   => 'custom/loader.js',
+						'no_id'  => '1',
+					),
+				),
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//sgtm.example.com/custom/loader.js?'+dl;", $output );
+		$this->assertStringNotContainsString( "?id='+i", $output );
+		// The container ID is still passed to the loader function as its argument.
+		$this->assertStringContainsString( "'GTM-AAA111'", $output );
+	}
+
+	public function test_header_begin_omit_id_keeps_environment_parameters(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-AAA111',
+						'gtm_auth'    => 'authtoken',
+						'gtm_preview' => 'env-2',
+						'domain'      => 'sgtm.example.com',
+						'path'        => 'custom/loader.js',
+						'no_id'       => '1',
+					),
+				),
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//sgtm.example.com/custom/loader.js?'+dl+'&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x'", $output );
+	}
+
+	public function test_header_begin_omit_id_flag_ignored_without_custom_path(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'    => 'GTM-AAA111',
+						'no_id' => '1',
+					),
+				),
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl;", $output );
+	}
+
+	public function test_get_tag_keeps_container_id_in_noscript_when_flagged(): void {
+		// The "omit container ID" flag only affects the head loader; the
+		// noscript iframe keeps the id so the container still loads there.
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'     => 'GTM-AAA111',
+						'domain' => 'sgtm.example.com',
+						'path'   => 'custom/loader.js',
+						'no_id'  => '1',
+					),
+				),
+			)
+		);
+
+		$this->assertStringContainsString( 'https://sgtm.example.com/ns.html?id=GTM-AAA111', $container->get_tag() );
+	}
+
 	public function test_header_top_outputs_datalayer_initialization(): void {
 		$container = $this->make_container(
 			array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' )

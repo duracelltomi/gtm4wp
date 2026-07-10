@@ -286,12 +286,18 @@ final class ContainerCode {
 
 				$_gtm_env = $this->container_environment( $one_container );
 
+				// Server side GTM containers can be configured to serve a
+				// single container from the loader path itself; in that case the
+				// container ID is omitted from the query string ("?" instead of
+				// "?id=") so no ID leaks into the request.
+				$_gtm_loader_query = $this->container_omit_id( $one_container ) ? '?\'+dl' : '?id=\'+i+dl';
+
 				$script_tag = '
 ' . $this->script_tag->opening_tag() . '
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
-\'//' . esc_js( $this->container_domain( $one_container ) ) . '/' . esc_js( $this->container_path( $one_container ) ) . '?id=\'+i+dl' .
+\'//' . esc_js( $this->container_domain( $one_container ) ) . '/' . esc_js( $this->container_path( $one_container ) ) . $_gtm_loader_query .
 				( '' !== $_gtm_env ? "+'" . $_gtm_env . "'" : '' ) . ';f.parentNode.insertBefore(j,f);
 })(window,document,\'script\',\'' . esc_js( $datalayer_name ) . '\',\'' . esc_js( $one_gtm_id ) . '\');
 </script>';
@@ -440,6 +446,26 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 		}
 
 		return '&gtm_auth=' . esc_attr( $gtm_auth ) . '&gtm_preview=' . esc_attr( $gtm_preview ) . '&gtm_cookies_win=x';
+	}
+
+	/**
+	 * Tells whether the GTM container ID must be left out of the container
+	 * loader URL of one container row.
+	 *
+	 * This is only honored together with a custom loader path: it targets
+	 * server side GTM setups where the container is selected by the request
+	 * path/domain and the ID is configured on the server. Without a custom
+	 * path the checkbox has no effect, so the default www.googletagmanager.com
+	 * loader never ends up without an ID.
+	 *
+	 * @param array<string, string> $container One container row.
+	 * @return bool
+	 */
+	private function container_omit_id( array $container ): bool {
+		$no_id       = '' !== (string) ( $container[ ContainerRows::COLUMN_NO_ID ] ?? '' );
+		$custom_path = '' !== (string) ( $container[ ContainerRows::COLUMN_PATH ] ?? '' );
+
+		return $no_id && $custom_path;
 	}
 
 	/**

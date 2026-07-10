@@ -166,6 +166,7 @@ final class RestControllerTest extends TestCase {
 					'gtm_preview' => 'env-2',
 					'domain'      => 'gtm.example.com',
 					'path'        => 'custom/loader.js',
+					'no_id'       => '',
 				),
 			),
 			$this->saved[ GTM4WP_OPTION_GTM_CONTAINERS ],

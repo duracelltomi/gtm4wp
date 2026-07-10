@@ -15,7 +15,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Value helper for the GTM4WP_OPTION_GTM_CONTAINERS option: an array of rows
  * where every Google Tag Manager container has its own environment
- * parameters, custom domain and custom path.
+ * parameters, custom domain, custom path and an optional flag to omit the
+ * container ID from the loader URL (server side GTM setups).
  *
  * Introduced in 2.0 as the replacement of the flat 1.x options (a single
  * comma separated gtm-code plus one shared environment/domain/path). The
@@ -32,6 +33,7 @@ final class ContainerRows {
 	public const COLUMN_PREVIEW = 'gtm_preview';
 	public const COLUMN_DOMAIN  = 'domain';
 	public const COLUMN_PATH    = 'path';
+	public const COLUMN_NO_ID   = 'no_id';
 
 	public const GTM_ID_PATTERN  = '/^GTM-[A-Z0-9]+$/';
 	public const AUTH_PATTERN    = '/^[a-zA-Z0-9\-_]+$/';
@@ -47,7 +49,7 @@ final class ContainerRows {
 	public static function normalize_row( array $row ): array {
 		$normalized = array();
 
-		foreach ( array( self::COLUMN_ID, self::COLUMN_AUTH, self::COLUMN_PREVIEW, self::COLUMN_DOMAIN, self::COLUMN_PATH ) as $column ) {
+		foreach ( array( self::COLUMN_ID, self::COLUMN_AUTH, self::COLUMN_PREVIEW, self::COLUMN_DOMAIN, self::COLUMN_PATH, self::COLUMN_NO_ID ) as $column ) {
 			$value = $row[ $column ] ?? '';
 
 			$normalized[ $column ] = is_scalar( $value ) ? trim( (string) $value ) : '';

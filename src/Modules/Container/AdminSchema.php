@@ -86,7 +86,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					__(
 						'Add one row for each Google Tag Manager container you want to load.<br />
 						The environment parameters (gtm_auth and gtm_preview) activate a specific container environment; both values are required to activate an environment, leave both empty to load the live version.<br />
-						Enter a custom domain name (without the https:// prefix) and a custom path if you are using a server side GTM container for tracking. Leave them empty to use www.googletagmanager.com and gtm.js.',
+						Enter a custom domain name (without the https:// prefix) and a custom path if you are using a server side GTM container for tracking. Leave them empty to use www.googletagmanager.com and gtm.js.<br />
+						When a custom path is set you can also turn on "Omit container ID" so that the container ID is left out of the loader URL - use this when your server side GTM container is selected by its path and expects no id parameter.',
 						'duracelltomi-google-tag-manager'
 					),
 					array(
@@ -119,6 +120,12 @@ final class AdminSchema implements AdminSchemaInterface {
 						'key'         => ContainerRows::COLUMN_PATH,
 						'label'       => __( 'Custom path', 'duracelltomi-google-tag-manager' ),
 						'placeholder' => 'gtm.js',
+					),
+					array(
+						'key'        => ContainerRows::COLUMN_NO_ID,
+						'label'      => __( 'Omit container ID', 'duracelltomi-google-tag-manager' ),
+						'type'       => 'checkbox',
+						'depends_on' => ContainerRows::COLUMN_PATH,
 					),
 				),
 				sanitizer: static function ( $value ) {
@@ -219,6 +226,12 @@ final class AdminSchema implements AdminSchemaInterface {
 							);
 						}
 						$row[ ContainerRows::COLUMN_PATH ] = $path;
+
+						// The "omit container ID" flag is stored as '1' / '' and
+						// only kept when a custom path is present: it has no
+						// meaning for the default www.googletagmanager.com loader.
+						$omit_id                            = ( '' !== $row[ ContainerRows::COLUMN_NO_ID ] ) && ( '0' !== $row[ ContainerRows::COLUMN_NO_ID ] );
+						$row[ ContainerRows::COLUMN_NO_ID ] = ( $omit_id && ( '' !== $path ) ) ? '1' : '';
 
 						$rows[] = $row;
 					}

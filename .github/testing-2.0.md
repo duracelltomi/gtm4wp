@@ -20,6 +20,7 @@ a parallel 1.22.4 install where noted.
 - [ ] Settings → Google Tag Manager opens the React app: left pane navigation, accordion groups, option search.
 - [ ] Enter an invalid GTM ID in a container table row → inline validation error, stored value unchanged. Enter a valid ID → saved, snackbar shown.
 - [ ] Container table: add row / remove row works, an all-empty row is dropped on save, duplicate container IDs are rejected with an error.
+- [ ] Container table "Omit container ID": the checkbox is disabled until a custom path is entered in the same row. With a custom path + checkbox on and saved, the `<head>` loader `j.src` uses `.../<path>?'+dl` (no `id='+i`), while the noscript `<iframe>` still uses `ns.html?id=GTM-...`. Turning the checkbox off restores `?id='+i+dl`.
 
 ## 2. Upgrade from 1.22.4
 
