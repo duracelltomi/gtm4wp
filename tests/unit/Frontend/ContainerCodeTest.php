@@ -153,6 +153,36 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $output );
 	}
 
+	public function test_header_begin_does_not_decode_html_entities_in_datalayer_values(): void {
+		// get_search_query() returns esc_attr'd output, so a double quote in the
+		// ?s= parameter reaches the data layer already encoded as &quot;. Because
+		// ScriptTag::print_script_block() runs htmlspecialchars_decode() on the whole
+		// block, the JSON must hex-encode the ampersand; otherwise &quot; is decoded
+		// back into a raw " that breaks out of the JS string (reflected XSS via ?s=).
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn( array( 'siteSearchTerm' => '&quot;-alert(document.domain)-&quot;' ) );
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringNotContainsString(
+			'""-alert(document.domain)-""',
+			$output,
+			'HTML entities must not be decoded into raw quotes that break out of the data layer JS string.'
+		);
+		// The ampersand is hex-encoded, so the entity survives htmlspecialchars_decode()
+		// as an inert JS string literal instead of a raw quote. Build the expected,
+		// safely-encoded fragment the same way the data layer output does.
+		$safe_fragment = trim(
+			(string) wp_json_encode( '&quot;-alert(document.domain)-&quot;', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ),
+			'"'
+		);
+		$this->assertStringContainsString( $safe_fragment, $output );
+	}
+
 	public function test_header_begin_omits_loader_when_placement_off(): void {
 		$container = $this->make_container(
 			array(

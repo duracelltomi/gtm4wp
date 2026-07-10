@@ -150,7 +150,7 @@ final class DataLayer {
 
 			if ( array_key_exists( 'datalayer_object', $one_event ) ) {
 				$datalayer_push_code .= '
-	' . esc_js( $datalayer_name ) . '.push(' . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG ) . ');';
+	' . esc_js( $datalayer_name ) . '.push(' . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ');';
 			}
 
 			if ( array_key_exists( 'js_after', $one_event ) ) {

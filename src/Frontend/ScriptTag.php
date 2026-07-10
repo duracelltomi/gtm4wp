@@ -67,19 +67,31 @@ final class ScriptTag {
 	/**
 	 * Safely outputs an inline script block.
 	 *
-	 * Sanitizes with wp_kses() then decodes entities so that the JavaScript
-	 * source inside the block is not HTML-encoded, exactly as 1.x did.
+	 * The block is sanitized with wp_kses() so only the allow-listed <script>
+	 * tag and its attributes survive. wp_kses() also entity-encodes every bare
+	 * ampersand (& becomes &amp;), which would break JavaScript operators such
+	 * as && and query string separators such as &l=, so the ampersand — and
+	 * only the ampersand — is restored afterwards.
+	 *
+	 * Earlier versions ran htmlspecialchars_decode() over the whole block, which
+	 * also turned &quot;, &lt;, &gt; and &#039; back into raw ", <, > and '
+	 * characters. Inside a <script> element the browser never HTML-decodes
+	 * entities, so those escaped sequences are already inert and decoding them
+	 * only re-enabled string/tag break-outs from values escaped with esc_js() or
+	 * esc_attr() (e.g. the site search term reaching the data layer as &quot;).
+	 * Leaving everything but the ampersand encoded keeps such values safe while
+	 * the trusted JavaScript still runs.
 	 *
 	 * @param string     $block The full script block including the <script> tags.
 	 * @param array|null $rules Optional wp_kses() rule set override.
 	 * @return void
 	 */
 	public function print_script_block( string $block, ?array $rules = null ): void {
-		echo htmlspecialchars_decode( //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses sanitized, entity decode required for inline JS as in 1.x.
-			wp_kses(
-				$block,
-				$rules ?? self::sanitize_rules()
-			)
+		$sanitized = wp_kses(
+			$block,
+			$rules ?? self::sanitize_rules()
 		);
+
+		echo str_replace( '&amp;', '&', $sanitized ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses() sanitized above; only the ampersand entity is restored so inline JS operators and URLs stay valid.
 	}
 }

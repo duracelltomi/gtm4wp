@@ -130,7 +130,7 @@ final class PurchaseTracking {
 			$script_tag = '
 ' . $this->script_tag->opening_tag() . '
 	window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];
-	window.' . esc_js( $datalayer_name ) . '.push(' . wp_json_encode( $data_layer, JSON_HEX_TAG ) . ');
+	window.' . esc_js( $datalayer_name ) . '.push(' . wp_json_encode( $data_layer, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ');
 </script>';
 
 			$this->script_tag->print_script_block( $script_tag );

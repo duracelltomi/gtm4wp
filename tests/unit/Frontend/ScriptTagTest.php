@@ -80,4 +80,22 @@ final class ScriptTagTest extends FrontendTestCase {
 
 		$this->assertSame( '<script>var a = 1 && 2;</script>', $output );
 	}
+
+	public function test_print_script_block_does_not_decode_quote_and_tag_entities(): void {
+		// wp_kses() encodes bare ampersands but leaves other named entities intact.
+		// print_script_block() must restore only the ampersand: decoding &quot;,
+		// &lt; or &gt; would turn an escaped value back into a raw quote or a
+		// literal </script> and allow a break-out from the inline script.
+		$tag = new ScriptTag( $this->make_options() );
+
+		ob_start();
+		$tag->print_script_block( '<script>var s = "&quot;&lt;/script&gt;&#039;" &amp;&amp; done;</script>' );
+		$output = ob_get_clean();
+
+		// The ampersand operator is restored so the JavaScript stays valid...
+		$this->assertStringContainsString( '&& done;', $output );
+		// ...but the quote/tag entities stay encoded and inert.
+		$this->assertStringContainsString( '&quot;&lt;/script&gt;&#039;', $output );
+		$this->assertStringNotContainsString( '"</script>\'', $output );
+	}
 }

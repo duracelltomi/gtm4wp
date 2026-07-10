@@ -220,8 +220,13 @@ final class ContainerCode {
 		if ( array() !== $containers ) {
 			$gtm4wp_datalayer_data = $this->datalayer->compile();
 
+			// Encode <, >, &, " and ' as \uXXXX so the data layer JSON is safe in
+			// any inline-script context. This is defense in depth on top of
+			// ScriptTag::print_script_block(): even a value that arrives here already
+			// HTML-entity encoded (e.g. get_search_query() returns esc_attr'd output,
+			// so a " becomes &quot;) can never break out of the JS string literal.
 			$script_tag .= '
-	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK | JSON_HEX_TAG ) . ';';
+	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';';
 
 			$script_tag .= '
 	' . esc_js( $datalayer_name ) . '.push( dataLayer_content );';
