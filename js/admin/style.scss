@@ -35,6 +35,8 @@
 	--gtm4wp-text-2: #50575e;
 	--gtm4wp-text-3: #757575;
 	--gtm4wp-danger: #d63638;
+	--gtm4wp-danger-bg: #fcf0f0;
+	--gtm4wp-danger-bg: color-mix(in srgb, var(--gtm4wp-danger) 8%, #fff);
 
 	// Accent tracks the admin colour scheme; static fallbacks for older browsers.
 	--gtm4wp-accent: var(--wp-admin-theme-color, #2271b1);
@@ -230,10 +232,14 @@
 }
 
 .gtm4wp-field-error {
+	background: var(--gtm4wp-danger-bg);
+	border-inline-start: 3px solid var(--gtm4wp-danger);
+	border-radius: var(--gtm4wp-radius-sm);
 	color: var(--gtm4wp-danger);
 	display: block;
 	font-weight: 600;
-	margin-bottom: var(--gtm4wp-s1);
+	margin-block: var(--gtm4wp-s2) var(--gtm4wp-s3);
+	padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
 }
 
 .gtm4wp-phase {
