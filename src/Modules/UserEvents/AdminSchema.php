@@ -60,7 +60,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				key: GTM4WP_OPTION_EVENTS_FORMMOVE,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: __( 'Form fill events (gtm4wp.formElementEnter & gtm4wp.formElementLeave)', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Form fill events', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor moves between elements of a form (comment, contact, etc).', 'duracelltomi-google-tag-manager' ),
 				group: 'events'
 			),
