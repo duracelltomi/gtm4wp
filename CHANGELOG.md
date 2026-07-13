@@ -2,6 +2,16 @@
 
 ## 2.0
 
+Major rewrite of the plugin - please read the announcement post on gtm4wp.com before upgrading.
+
+* Changed: complete object-oriented rewrite. Every feature is now a module that third-party plugins can extend through the `gtm4wp_register_modules` action. All public template functions (`gtm4wp_the_gtm_tag()` etc.), filter/action names, wp-config constants and the `gtm4wp-options` storage key are unchanged, so existing integrations keep working.
+* Changed: minimum requirements raised to PHP 8.0 and WordPress 6.3.
+* Added: modern React-based settings screen with left pane navigation, tabbed option groups, option search and inline per-field validation.
+* Added: every Google Tag Manager container ID now has its own environment parameters (`gtm_auth`/`gtm_preview`), custom domain and custom path, managed in a data table (new `gtm-containers` option). Existing settings are migrated automatically; the flat 1.x option keys are kept in sync for third-party code and downgrades.
+* Changed: with environment parameters configured, all containers are loaded now (1.x only loaded the first container in that case). Only the hard-coded wp-config environment constants still limit output to the first container.
+* Changed: browser, OS and device data is now collected in the browser using User-Agent Client Hints and pushed as a `gtm4wp.deviceData` event (replaces the bundled WhichBrowser library; Safari and Firefox expose less detail).
+* Updated: frontend scripts now load with the `defer` strategy where possible.
+* Updated: tag blacklist entity list refreshed from Google's restriction documentation (added the Google tag / GA4 tags and the Google Analytics Settings variable, removed Universal Analytics and Mouseflow).
 * Added: per-container "Omit container ID" option in the container table. When a custom path is set (server side GTM), turning it on drops the container ID from the loader URL (`gtm.js?'+dl` instead of `gtm.js?id='+i+dl`) for setups where the container is selected by its path.
 * Added: new Page variables options in a "Content & engagement data" group, useful for behavior tracking and GA4 content grouping:
 	* Content word count (`pageContentWordCount`) and estimated reading time (`pageReadingTime`, adjustable with the `gtm4wp_reading_time_wpm` filter)
@@ -10,11 +20,20 @@
 	* Page template (`pageTemplate`), featured image presence (`pageHasFeaturedImage`), page hierarchy (`pageParentID`, `pageDepth`) and sticky flag (`pagePostSticky`)
 	* Primary category (`pagePrimaryCategory`, `pagePrimaryCategoryName`) detected from Yoast SEO / Rank Math with a first-category fallback, overridable with the `gtm4wp_primary_category_term_id` filter
 	* Page language (`pageLanguage`) detected from WPML / Polylang with a site-locale fallback, overridable with the `gtm4wp_page_language` filter
+* Changed: Vimeo media tracking is promoted from experimental to stable
+* Updated: Vimeo tracker modernized against the Player SDK - tracks playback-rate, quality, fullscreen and Picture-in-Picture changes, maps buffering to Google Tag Manager's built-in video status, fires the start event on real playback (the `playing` event), and initializes reliably when loaded after the page is parsed (defer/async or late injection)
 * Changed: SoundCloud media tracking is promoted from experimental to stable
 * Updated: SoundCloud tracker hardened - bails out gracefully when the SoundCloud Widget API is blocked (consent manager, ad blocker, network error), still initializes when the script loads after the page is parsed (defer/async or late injection), and now reports the correct track metadata for playlist / multi-track widgets
 * Changed: HTML5 `<video>`/`<audio>` media tracking is promoted from experimental to stable
 * Updated: HTML5 media tracker modernized - rewritten in vanilla JS (no more jQuery dependency), fires the ready event with the real media duration, tracks buffering (the `waiting` event) plus Picture-in-Picture and fullscreen changes on video, normalizes the event mediaType to `html5media`, and initializes reliably when loaded after the page is parsed (defer/async or late injection)
 * Added: media player tracking for eight more players, each as its own opt-in option under Media events → Media players (experimental): Dailymotion, Mixcloud, Cloudflare Stream, Wistia, JW Player, VideoPress, Spotify and Twitch. Each fires the same `gtm4wp.media*` events (ready, state change, playback percentage, player event) as the existing players and also populates Google Tag Manager's built-in Video variables. Notes: Spotify derives play/pause/finished states from its periodic playback updates (the only signal the Spotify embed exposes); Twitch reports current time and duration for videos (VODs) only, not live streams
+* Deprecated: the "YouTube video events" option - Google Tag Manager now ships a native YouTube Video trigger, so YouTube tracking should be migrated to it; the plugin continues to populate GTM's built-in Video variables for the other players.
+* Updated: WooCommerce 10.4 compatibility - the checkout inline script no longer uses the deprecated `wc_enqueue_js()` function.
+* Fixed: AMP data layer injection - 1.x checked a never-populated global and never injected the data layer into AMP pages.
+* Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
+* Removed: WP e-Commerce integration.
+* Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead. The `GTM4WP_OPTION_SCROLLER_*` constants remain in place for backward compatibility.
+* Removed: unused blacklist "sandboxed scripts" flag.
 
 ## 1.21.1
 
