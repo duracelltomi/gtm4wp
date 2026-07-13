@@ -382,7 +382,7 @@ final class PageDataLayer {
 
 	/**
 	 * Fires the GA4 begin_checkout event for the current cart and exposes the
-	 * cart products to the checkout tracker via wc_enqueue_js. No-op unless
+	 * cart products to the checkout tracker as an inline script. No-op unless
 	 * e-commerce tracking is enabled.
 	 *
 	 * @param mixed $woo The WooCommerce store object (WC()).
@@ -437,10 +437,15 @@ final class PageDataLayer {
 			);
 		}
 
-		wc_enqueue_js(
+		// Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4). The two
+		// window.* assignments never needed jQuery; 'before' placement emits them
+		// just ahead of the gtm4wp-woocommerce tracker that reads them.
+		wp_add_inline_script(
+			'gtm4wp-woocommerce',
 			'
-			window.gtm4wp_checkout_products = ' . wp_json_encode( $gtm4wp_checkout_products, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
-			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';'
+			window.gtm4wp_checkout_products = ' . wp_json_encode( $gtm4wp_checkout_products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
+			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';',
+			'before'
 		);
 	}
 

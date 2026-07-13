@@ -27,18 +27,27 @@ require_once __DIR__ . '/wc-datastore-stub.php';
 final class PageDataLayerTest extends TestCase {
 
 	/**
-	 * Captures window.gtm4wp_checkout_products output (wc_enqueue_js).
+	 * Guards that the deprecated wc_enqueue_js() (WooCommerce 10.4) is never
+	 * called: any output captured here is a migration regression.
 	 *
 	 * @var string
 	 */
 	private string $enqueued_js = '';
 
 	/**
-	 * Captures additional data layer push output (wp_add_inline_script).
+	 * Concatenated code of every wp_add_inline_script() call across all handles.
 	 *
 	 * @var string
 	 */
 	private string $inline_js = '';
+
+	/**
+	 * Structured record of every wp_add_inline_script() call so a test can
+	 * assert which handle and position a payload was attached to.
+	 *
+	 * @var array<int, array{handle: string, code: string, position: string}>
+	 */
+	private array $inline_scripts = array();
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -72,16 +81,22 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'is_checkout' )->justReturn( false );
 
 		// Capture the two script sinks.
-		$this->enqueued_js = '';
-		$this->inline_js   = '';
+		$this->enqueued_js    = '';
+		$this->inline_js      = '';
+		$this->inline_scripts = array();
 		Functions\when( 'wc_enqueue_js' )->alias(
 			function ( $code ) {
 				$this->enqueued_js .= $code;
 			}
 		);
 		Functions\when( 'wp_add_inline_script' )->alias(
-			function ( $handle, $code ) {
-				$this->inline_js .= $code;
+			function ( $handle, $code, $position = 'after' ) {
+				$this->inline_js       .= $code;
+				$this->inline_scripts[] = array(
+					'handle'   => $handle,
+					'code'     => $code,
+					'position' => $position,
+				);
 			}
 		);
 
@@ -175,6 +190,30 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'WC' )->justReturn( $store );
 	}
 
+	/**
+	 * Returns the concatenated inline-script code attached to a given handle,
+	 * plus the position of its last wp_add_inline_script() call.
+	 *
+	 * @param string $handle The script handle to filter by.
+	 * @return array{code: string, position: ?string}
+	 */
+	private function inline_for( string $handle ): array {
+		$code     = '';
+		$position = null;
+
+		foreach ( $this->inline_scripts as $script ) {
+			if ( $handle === $script['handle'] ) {
+				$code    .= $script['code'];
+				$position = $script['position'];
+			}
+		}
+
+		return array(
+			'code'     => $code,
+			'position' => $position,
+		);
+	}
+
 	public function test_returns_early_on_ajax_request(): void {
 		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
 		$this->stub_wc();
@@ -182,10 +221,11 @@ final class PageDataLayerTest extends TestCase {
 		$result = $this->make_page_datalayer()->add_datalayer_data( array( 'marker' => 'kept' ) );
 
 		$this->assertSame( array( 'marker' => 'kept' ), $result, 'AJAX requests must return the data layer untouched.' );
-		$this->assertSame( '', $this->enqueued_js );
+		$this->assertSame( '', $this->enqueued_js, 'The deprecated wc_enqueue_js() must never be called.' );
+		$this->assertSame( '', $this->inline_js, 'AJAX requests must not emit any inline script.' );
 	}
 
-	public function test_checkout_enqueues_hex_encoded_products_and_fires_begin_checkout(): void {
+	public function test_checkout_adds_hex_encoded_products_inline_and_fires_begin_checkout(): void {
 		Functions\when( 'is_checkout' )->justReturn( true );
 
 		$product = new \WC_Product(
@@ -200,11 +240,19 @@ final class PageDataLayerTest extends TestCase {
 		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
 			->add_datalayer_data( array() );
 
+		// The deprecated wc_enqueue_js() (WooCommerce 10.4) must not be used; the
+		// checkout globals are attached to the gtm4wp-woocommerce tracker handle
+		// via wp_add_inline_script( ..., 'before' ) instead.
+		$this->assertSame( '', $this->enqueued_js, 'wc_enqueue_js() must not be called after the 10.4 migration.' );
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $checkout['code'] );
+		$this->assertSame( 'before', $checkout['position'], 'The checkout globals must be injected before the tracker script.' );
+
 		// #7: the checkout product JSON must be hex-encoded so a product name can
-		// not break out of the wc_enqueue_js <script> block.
-		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $this->enqueued_js );
-		$this->assertStringContainsString( 'Poster\u003', $this->enqueued_js, 'The < must be hex-encoded (JSON_HEX_TAG).' );
-		$this->assertStringNotContainsString( 'Poster</script>', $this->enqueued_js );
+		// not break out of the inline <script> block.
+		$this->assertStringContainsString( 'Poster\u003', $checkout['code'], 'The < must be hex-encoded (JSON_HEX_TAG).' );
+		$this->assertStringNotContainsString( 'Poster</script>', $checkout['code'] );
 
 		// The begin_checkout event is queued and flushed as an inline push.
 		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
