@@ -100,6 +100,25 @@ back — use the `Options`/`Frontend` services instead.
   - `npm run release` — package a release ZIP via `tools/build-release.js`
 - Always run `npm run build` (and fix `lint:js`) after modifying anything under `js/`
 
+## Changelog policy
+
+Every change to **production code** ships a matching bullet under the top `## 2.0`
+heading in `CHANGELOG.md` (`* Added:` / `* Changed:` / `* Updated:` / `* Fixed:`).
+"Production code" = `src/**.php`, `compat/**.php`, `js/frontend/**.js`, `js/admin/**.js`,
+the main plugin file and `uninstall.php`; tests, docs and `.security/`/`.testing/`
+housekeeping are exempt.
+
+This is enforced automatically by one shared script, `.claude/hooks/require-changelog.sh`:
+
+- a Claude Code **`Stop` hook** (in `.claude/settings.json`) blocks wrapping up a turn
+  that left production code modified without a `CHANGELOG.md` change;
+- a git **`commit-msg` hook** (`.githooks/commit-msg`) rejects a commit that stages
+  production code without staging `CHANGELOG.md`. Escape hatch for non-user-facing
+  commits: put `[skip changelog]` in the commit message (or `git commit --no-verify`).
+
+**One-time setup after cloning** (the git hook lives in a tracked dir, so it must be
+activated once per clone): `git config core.hooksPath .githooks`.
+
 ## Testing
 
 - **PHP**: PHPUnit 11 with Brain\Monkey for WordPress function mocking; bootstrap `tests/bootstrap.php`, WP/WC stubs under `tests/unit/`. Tests live in `tests/unit/` mirroring the `src/` namespaces (files suffixed `Test.php`). Run `vendor/bin/phpunit` (or `composer test`).
