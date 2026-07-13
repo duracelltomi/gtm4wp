@@ -153,7 +153,7 @@ final class ContainerCode {
 			}
 
 			if ( is_array( $js_var_value ) ) {
-				$js_var_value = wp_json_encode( $js_var_value );
+				$js_var_value = wp_json_encode( $js_var_value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 			}
 
 			if ( is_null( $js_var_value ) ) {
@@ -212,6 +212,63 @@ final class ContainerCode {
 		$datalayer_name = $this->datalayer->name();
 		$containers     = $this->containers();
 
+		$this->script_tag->print_script_block( $this->datalayer_block( $containers, $datalayer_name ) );
+
+		do_action( GTM4WP_WPACTION_AFTER_DATALAYER );
+
+		$output_container_code = ( GTM4WP_PLACEMENT_OFF !== $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) );
+
+		if ( ! $no_console_log && ! $output_container_code ) {
+			$this->script_tag->print_script_block( $this->console_off_warning() );
+		}
+
+		$disabled_roles = explode( ',', (string) $this->options->get( GTM4WP_OPTION_NOGTMFORLOGGEDIN ) );
+		$current_user   = wp_get_current_user();
+		foreach ( $current_user->roles as $user_role ) {
+			if ( in_array( $user_role, $disabled_roles, true ) ) {
+				$output_container_code = false;
+
+				if ( ! $no_console_log ) {
+					$this->script_tag->print_script_block( $this->disabled_role_warning( $user_role ) );
+				}
+
+				break;
+			}
+		}
+
+		if ( $this->consent->enabled() ) {
+			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag ) );
+		}
+
+		if ( ( array() !== $containers ) && $output_container_code ) {
+			foreach ( $containers as $one_container ) {
+				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
+
+				if ( ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
+					continue;
+				}
+
+				$this->script_tag->print_script_block( $this->container_loader( $one_container, $datalayer_name ) );
+			}
+		}
+
+		do_action( GTM4WP_WPACTION_AFTER_CONTAINER_CODE );
+
+		echo '
+<!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
+	}
+
+	/**
+	 * Builds the header comment, the data layer initialization variable and
+	 * the first push of the compiled data layer content. Compiling the data
+	 * layer here also populates the backward compatible global and the
+	 * DataLayer::compiled() cache used by the AMP module.
+	 *
+	 * @param array<int, array<string, string>> $containers     Normalized container rows.
+	 * @param string                            $datalayer_name Data layer JS variable name.
+	 * @return string
+	 */
+	private function datalayer_block( array $containers, string $datalayer_name ): string {
 		$script_tag = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
@@ -235,86 +292,67 @@ final class ContainerCode {
 		$script_tag .= '
 </script>';
 
-		$this->script_tag->print_script_block( $script_tag );
+		return $script_tag;
+	}
 
-		do_action( GTM4WP_WPACTION_AFTER_DATALAYER );
-
-		$output_container_code = true;
-		if ( GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) ) {
-			$output_container_code = false;
-		}
-
-		if ( ! $no_console_log && ! $output_container_code ) {
-			$script_tag = '
+	/**
+	 * Console warning shown when the container code placement is set to OFF but
+	 * the data layer is still active.
+	 *
+	 * @return string
+	 */
+	private function console_off_warning(): string {
+		return '
 ' . $this->script_tag->opening_tag() . '
 	console.warn && console.warn("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
 </script>';
+	}
 
-			$this->script_tag->print_script_block( $script_tag );
-		}
-
-		$disabled_roles = explode( ',', (string) $this->options->get( GTM4WP_OPTION_NOGTMFORLOGGEDIN ) );
-		if ( count( $disabled_roles ) > 0 ) {
-			$current_user = wp_get_current_user();
-			foreach ( $current_user->roles as $user_role ) {
-				if ( in_array( $user_role, $disabled_roles, true ) ) {
-					$output_container_code = false;
-
-					if ( ! $no_console_log ) {
-						$script_tag = '
+	/**
+	 * Console warning shown when the container code is omitted because the
+	 * current user has an excluded role.
+	 *
+	 * @param string $user_role The excluded role that matched the current user.
+	 * @return string
+	 */
+	private function disabled_role_warning( string $user_role ): string {
+		return '
 ' . $this->script_tag->opening_tag() . '
 	console.warn && console.warn("[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . esc_js( $user_role ) . ' !!!");
 	console.warn && console.warn("[GTM4WP] Logout or login with a user having a different user role!");
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
 </script>';
+	}
 
-						$this->script_tag->print_script_block( $script_tag );
-					}
+	/**
+	 * Builds the GTM container loader snippet for one container row. The
+	 * domain, path and ID are validated/escaped by their helper methods.
+	 *
+	 * @param array<string, string> $one_container  One normalized container row.
+	 * @param string                $datalayer_name Data layer JS variable name.
+	 * @return string
+	 */
+	private function container_loader( array $one_container, string $datalayer_name ): string {
+		$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
 
-					break;
-				}
-			}
-		}
+		$_gtm_env = $this->container_environment( $one_container );
 
-		if ( $this->consent->enabled() ) {
-			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag ) );
-		}
+		// Server side GTM containers can be configured to serve a
+		// single container from the loader path itself; in that case the
+		// container ID is omitted from the query string ("?" instead of
+		// "?id=") so no ID leaks into the request.
+		$_gtm_loader_query = $this->container_omit_id( $one_container ) ? '?\'+dl' : '?id=\'+i+dl';
 
-		if ( ( array() !== $containers ) && $output_container_code ) {
-			foreach ( $containers as $one_container ) {
-				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
-
-				if ( ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
-					continue;
-				}
-
-				$_gtm_env = $this->container_environment( $one_container );
-
-				// Server side GTM containers can be configured to serve a
-				// single container from the loader path itself; in that case the
-				// container ID is omitted from the query string ("?" instead of
-				// "?id=") so no ID leaks into the request.
-				$_gtm_loader_query = $this->container_omit_id( $one_container ) ? '?\'+dl' : '?id=\'+i+dl';
-
-				$script_tag = '
+		return '
 ' . $this->script_tag->opening_tag() . '
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 \'//' . esc_js( $this->container_domain( $one_container ) ) . '/' . esc_js( $this->container_path( $one_container ) ) . $_gtm_loader_query .
-				( '' !== $_gtm_env ? "+'" . $_gtm_env . "'" : '' ) . ';f.parentNode.insertBefore(j,f);
+			( '' !== $_gtm_env ? "+'" . $_gtm_env . "'" : '' ) . ';f.parentNode.insertBefore(j,f);
 })(window,document,\'script\',\'' . esc_js( $datalayer_name ) . '\',\'' . esc_js( $one_gtm_id ) . '\');
 </script>';
-
-				$this->script_tag->print_script_block( $script_tag );
-			}
-		}
-
-		do_action( GTM4WP_WPACTION_AFTER_CONTAINER_CODE );
-
-		echo '
-<!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
 	}
 
 	/**

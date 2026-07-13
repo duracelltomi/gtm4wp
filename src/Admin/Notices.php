@@ -161,6 +161,14 @@ final class Notices {
 	public function dismiss_notice(): void {
 		check_ajax_referer( 'gtm4wp-notice-dismiss-nonce', 'nonce' );
 
+		// The hook is only registered for users with the settings capability
+		// (see Plugin::boot()), but the handler re-checks it so it stays safe
+		// on its own regardless of how it is wired up.
+		/** This filter is documented in src/Plugin.php */
+		if ( ! current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) ) ) {
+			wp_die( -1, 403 );
+		}
+
 		$dismisses = $this->user_dismisses();
 
 		$noticeid = isset( $_POST['noticeid'] ) ? esc_url_raw( wp_unslash( $_POST['noticeid'] ) ) : '';

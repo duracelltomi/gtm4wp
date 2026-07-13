@@ -93,6 +93,7 @@ define( 'GTM4WP_OPTION_EVENTS_USERLOGIN', 'event-user-logged-in' );
 define( 'GTM4WP_OPTION_EVENTS_YOUTUBE', 'event-youtube' );
 define( 'GTM4WP_OPTION_EVENTS_VIMEO', 'event-vimeo' );
 define( 'GTM4WP_OPTION_EVENTS_SOUNDCLOUD', 'event-soundcloud' );
+define( 'GTM4WP_OPTION_EVENTS_HTML5MEDIA', 'event-html5-media' );
 
 // Scroll tracking was removed in 2.0 (GTM has built-in scroll depth
 // tracking); the option keys are kept here for third party compatibility and

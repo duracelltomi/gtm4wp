@@ -83,6 +83,15 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_HTML5MEDIA,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'HTML5 video and audio events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a native HTML5 <video> or <audio> player embeded on your site.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
 		);
 	}
 

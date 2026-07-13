@@ -153,7 +153,11 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
-			$data_layer['visitorIP'] = esc_js( VisitorIp::get( (string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) ) );
+			// Passed raw: the data layer output sink runs every value through
+			// wp_json_encode() with the full hex flag set, which is the correct
+			// escaper for the inline-script context. VisitorIp::get() already
+			// validates the value with filter_var( FILTER_VALIDATE_IP ).
+			$data_layer['visitorIP'] = VisitorIp::get( (string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTITLE ) ) {
@@ -520,7 +524,10 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_MISCGEOCF ) && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
-			$data_layer['geoCloudflareCountryCode'] = esc_js( sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) );
+			// Sanitized but not esc_js'd: the data layer output sink hex-encodes
+			// every value via wp_json_encode(), so pre-escaping would only
+			// corrupt the country code for special-character inputs.
+			$data_layer['geoCloudflareCountryCode'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) );
 		}
 
 		return $data_layer;

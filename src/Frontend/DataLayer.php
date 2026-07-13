@@ -26,6 +26,16 @@ defined( 'ABSPATH' ) || exit;
 final class DataLayer {
 
 	/**
+	 * The most recently compiled data layer content, or null before the
+	 * first compile() call. Lets consumers (e.g. the AMP module) read the
+	 * compiled data without re-running the compile filter and its side
+	 * effects.
+	 *
+	 * @var array<string, mixed>|null
+	 */
+	private ?array $compiled = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -57,9 +67,22 @@ final class DataLayer {
 	 */
 	public function compile(): array {
 		$data                             = (array) apply_filters( GTM4WP_WPFILTER_COMPILE_DATALAYER, array() );
+		$this->compiled                   = $data;
 		$GLOBALS['gtm4wp_datalayer_data'] = $data;
 
 		return $data;
+	}
+
+	/**
+	 * Returns the data layer content produced by the last compile() call,
+	 * or an empty array if compile() has not run yet. Does not re-run the
+	 * compile filter, so it is safe to read after the container code has
+	 * already been generated.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function compiled(): array {
+		return $this->compiled ?? array();
 	}
 
 	/**

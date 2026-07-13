@@ -90,7 +90,7 @@ final class ClientDeviceDataModule extends AbstractModule {
 
 		wp_add_inline_script(
 			'gtm4wp-client-device-data',
-			'var gtm4wp_clientdevice_config = ' . wp_json_encode( $config, JSON_HEX_TAG ) . ';',
+			'var gtm4wp_clientdevice_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 			'before'
 		);
 	}

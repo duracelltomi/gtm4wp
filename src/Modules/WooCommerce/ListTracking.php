@@ -540,6 +540,11 @@ final class ListTracking {
 	public function add_productdata_to_wc_block( $content, $data, $product ) {
 		$product_data_tag = $this->get_product_list_item_extra_tag( $product, '', 0, $data->permalink );
 
-		return preg_replace( '/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', '$0' . $product_data_tag, $content );
+		// $product_data_tag carries esc_attr'd JSON that may contain literal $n / \1
+		// sequences; escape them so preg_replace does not treat them as backreferences
+		// in the replacement string (the leading $0 keeps the matched <li> element).
+		$replacement = '$0' . addcslashes( (string) $product_data_tag, '\\$' );
+
+		return preg_replace( '/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', $replacement, $content );
 	}
 }

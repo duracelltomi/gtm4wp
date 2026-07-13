@@ -40,6 +40,7 @@ final class MediaEventsModule extends AbstractModule {
 			GTM4WP_OPTION_EVENTS_YOUTUBE    => false,
 			GTM4WP_OPTION_EVENTS_VIMEO      => false,
 			GTM4WP_OPTION_EVENTS_SOUNDCLOUD => false,
+			GTM4WP_OPTION_EVENTS_HTML5MEDIA => false,
 		);
 	}
 
@@ -118,6 +119,14 @@ final class MediaEventsModule extends AbstractModule {
 
 			wp_enqueue_script( 'gtm4wp-soundcloud-api', 'https://w.soundcloud.com/player/api.js', array(), '1.0', $in_footer );
 			$this->enqueue_script( 'gtm4wp-soundcloud', 'gtm4wp-soundcloud.js', array(), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_HTML5MEDIA ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_html5media', true );
+
+			// The tracker binds to <video>/<audio> elements through jQuery's
+			// event system, so it declares a jquery dependency.
+			$this->enqueue_script( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array( 'jquery' ), $in_footer );
 		}
 	}
 }

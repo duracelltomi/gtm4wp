@@ -59,8 +59,14 @@ final class RestController {
 					'permission_callback' => array( $this, 'can_manage' ),
 					'args'                => array(
 						'values' => array(
-							'type'     => 'object',
-							'required' => true,
+							'type'       => 'object',
+							'required'   => true,
+							// Per-field types derived from the module schemas, so the
+							// REST layer validates each value's type before it reaches
+							// the schema-driven sanitizer. Unknown keys stay allowed
+							// (save_settings() ignores them) so third party option
+							// values keep round-tripping.
+							'properties' => $this->value_schema(),
 						),
 					),
 				),
@@ -165,6 +171,25 @@ final class RestController {
 				'values' => $this->current_values(),
 			)
 		);
+	}
+
+	/**
+	 * Builds the JSON schema properties of the settings object from the
+	 * registered fields: each option key maps to its REST value type. Used
+	 * to give the POST endpoint per-field type validation.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	private function value_schema(): array {
+		$properties = array();
+
+		foreach ( $this->fields_by_key() as $option_key => $field ) {
+			$properties[ $option_key ] = array(
+				'type' => $field->rest_type(),
+			);
+		}
+
+		return $properties;
 	}
 
 	/**

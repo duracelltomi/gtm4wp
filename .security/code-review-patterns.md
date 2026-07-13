@@ -35,6 +35,8 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **PA-4** — `esc_js()` is for HTML-attribute JS, not raw `<script>` bodies; use `wp_json_encode` (hex flags) for inline-script values.
 - **PA-5** — options read via `Options::get()` with `GTM4WP_OPTION_*` constants and sanitized on save in the module's admin schema; the stored value is not assumed safe at output.
 - **PA-6** — a new module registers through the `src/Module/` framework (AbstractModule + Registry + AdminSchema), not ad-hoc `add_action` scattered in the bootstrap.
+- **PA-7** — a data-bearing string used as the *replacement* arg of `preg_replace`/`str_replace` (product-list attribute injection) is mangled by `$n`/`\1` sequences; use `preg_replace_callback` or `addcslashes(…, '\\$')`.
+- **`wc_enqueue_js()` is a raw-`<script>` sink** — JSON put through it needs the RI-2 hex flags (see RI-2 script-context matrix). Easy to miss; it doesn't look like a `<script>` echo.
 
 **False Positive Suppressions (FP) — do NOT flag:**
 - **FP-1** — `echo` in `ScriptTag::print_script_block()` with `phpcs:ignore WordPress.Security.EscapeOutput` — the string is `wp_kses`-sanitized and only the ampersand is restored; intentional and reviewed.
@@ -53,6 +55,12 @@ Any PHP value serialized into the dataLayer or an inline `<script>` must use `wp
 
 Confirmed 2026-07-10: the site search term (`siteSearchTerm` from `?s=`) broke out of the dataLayer JS string with only `JSON_HEX_TAG` set. Fixed at `src/Frontend/ContainerCode.php`, `src/Frontend/DataLayer.php`, `src/Modules/WooCommerce/PurchaseTracking.php` by adding `JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS`. `JSON_HEX_AMP` is the decisive flag when the output later passes through any entity decode. Check every new `wp_json_encode` that feeds a script context.
 
+**Script-context matrix (Review 2, 2026-07-10) — which sink needs what:**
+- **Raw `echo '<script>…'` that passes through `print_script_block()`** → needs the **full flag set** (the ampersand-restore makes `JSON_HEX_AMP` load-bearing). The three genuine dataLayer sinks already do this.
+- **`wc_enqueue_js( '… = ' . wp_json_encode(...) . ';' )`** → this is ALSO a raw-`<script>` sink (WooCommerce prints it un-decoded in the footer). It must get at least `JSON_HEX_TAG`; treat it like any inline-script echo. This is the easy one to miss — `wc_enqueue_js` doesn't *look* like a `<script>` echo. (Finding #7, `PageDataLayer.php`, checkout products — was the lone unflagged raw sink.)
+- **`esc_attr( wp_json_encode(...) )` into an HTML attribute** (e.g. `data-…="…"`, hidden-input `value`) → **safe as-is**; `esc_attr` is the correct attribute-context escaper (encodes `<`/`>`/`"`/`&`/`'`). Do NOT flag these for missing JSON flags. The WooCommerce product-list markup uses this pattern correctly at 6 sites.
+- **`wp_add_inline_script(...)` / `<script type="application/json">`** → WordPress/AMP print these without any `htmlspecialchars_decode`, so `JSON_HEX_TAG` alone prevents the only real break-out (`</script>`). Non-exploitable without the amp/quot flags, but add the full set anyway for uniformity — especially on extension points that accept third-party data (`GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY`). (Finding #11.)
+
 ### RI-3: Never reintroduce a blanket `htmlspecialchars_decode()` on script output ⭐
 Inside a `<script>` element the browser never HTML-decodes entities — only a literal `</script` can break out. So `&quot;`, `&lt;`, `&#039;` in a script body are already inert. Running `htmlspecialchars_decode()` over the block turns them back into raw `"`, `<`, `'` and re-enables string/tag break-outs from any value escaped with `esc_js()`/`esc_attr()`.
 
@@ -60,6 +68,8 @@ Inside a `<script>` element the browser never HTML-decodes entities — only a l
 
 ### RI-4: Pre-HTML-encoded values reaching a script sink are a trap ⭐
 `get_search_query()` returns `esc_attr()`'d output; `esc_js()` emits `&quot;`/`&amp;`/`&lt;`. When such a value is then `wp_json_encode`'d (which cannot re-escape an already-`&quot;` sequence) and later decoded, the entity is resurrected into a raw quote/bracket and breaks out. Two robust fixes, applied together here: (1) hex-encode the ampersand at the JSON layer (RI-2), and (2) do not blanket-decode at the output layer (RI-3). When adding a dataLayer value, prefer passing the **raw** value and letting `wp_json_encode` do all escaping, rather than pre-escaping with `esc_attr`/`esc_js`.
+
+**Post-hardening consequence (Review 2, 2026-07-10):** once RI-3 removed the blanket `htmlspecialchars_decode()`, the leftover `esc_js()` pre-escaping stopped being an XSS trap but started **corrupting the data**: `&`/`'`/`"`/`<` in a value now render in the dataLayer as `&amp;`/`\'`/`&quot;`/`&lt;` instead of the real character (`Marks & Spencer` → `Marks &amp; Spencer`). So "remove the redundant `esc_js`" is not just cosmetic — it fixes a live data-quality bug. Known residues to strip: `ProductData::get_raw_order_datalayer()` (~30 order/billing/shipping fields, finding #8) and `PageVariablesModule` `visitorIP`/`geoCloudflareCountryCode` (finding #12). The correct sibling pattern is `get_purchase_datalayer()` / `PageDataLayer` customer fields, which pass raw values. **Rule: a value destined for a `wp_json_encode` dataLayer sink must arrive raw — never `esc_js`/`esc_attr`-pre-escaped.**
 
 ### RI-5: Missing i18n / text domain
 Every user-facing string uses `__()`, `esc_html__()`, `esc_attr__()`, etc. with the text domain `duracelltomi-google-tag-manager`. Flag hardcoded English in admin UI and notices.
@@ -98,6 +108,9 @@ Options are read via `Options::get()` with `GTM4WP_OPTION_*` constants and sanit
 ### PA-6: Module wiring outside the framework
 New features register through the `src/Module/` framework (implement the module interface, register in the `Registry`, declare an `AdminSchema`). Ad-hoc `add_action`/`add_filter` scattered in the bootstrap for a feature that should be a module is a drift signal.
 
+### PA-7: Data-bearing string as a `preg_replace`/`str_replace` *replacement* argument
+The WooCommerce product-list markup injects `data-…` attributes into template HTML by using a built (data-bearing) string as the **replacement** argument of `preg_replace`/`str_replace` (e.g. `ListTracking::add_productdata_to_wc_block`, `after_template_part`). In `preg_replace` the replacement interprets `$0`/`$1`/`${1}`/`\1`, so a product field containing a `$`+digit or `\`+digit sequence gets mangled or duplicated (not XSS — the injected value is `esc_attr`'d — but a correctness bug). When the replacement carries data, use `preg_replace_callback`, or `addcslashes( $replacement, '\\$' )` first. Finding #16.
+
 ---
 
 ## False Positive Suppressions
@@ -118,3 +131,4 @@ Carries a `phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped`. The b
 | Date | Action |
 |---|---|
 | 2026-07-10 (Review 1) | Seeded the patterns file. Added RI-2/RI-3/RI-4 (dataLayer/inline-script escaping: full hex flag set, no blanket `htmlspecialchars_decode`, pre-encoded-value trap) and PA-3/PA-4 (request-sourced dataLayer fields, `esc_js` misuse) from the reflected-XSS review that fixed `?s=` search-term break-out via `print_script_block`. Added core WordPress-plugin RI/PA/FP (ABSPATH guard, i18n, superglobal sanitization, `$wpdb->prepare`, WC CRUD/HPOS, JS rebuild; nonce+capability, option-at-sink validation, module framework; print_script_block + wp_add_inline_script + `$echo` suppressions). |
+| 2026-07-10 (Review 2) | Extended **RI-2** with the script-context matrix (which sink needs which flags; flagged `wc_enqueue_js` as a raw-`<script>` sink and `esc_attr(wp_json_encode)` in attributes as already-safe). Extended **RI-4** with the post-hardening data-corruption consequence (leftover `esc_js` now mangles dataLayer data, not just an XSS trap). Added **PA-7** (data-bearing string as a `preg_replace`/`str_replace` replacement arg). From the first full pass over the previously-unreviewed component groups + all six whole-repo sweeps (report `-1606`). |

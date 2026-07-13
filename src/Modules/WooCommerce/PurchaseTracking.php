@@ -68,19 +68,8 @@ final class PurchaseTracking {
 
 		$data_layer = array();
 
-		if ( isset( $order ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ) ) {
-			$now = new \DateTime( 'now', $order->get_date_created()->getTimezone() );
-			if ( $order->is_paid() && $order->get_date_paid() ) {
-				$diff    = $now->diff( $order->get_date_paid() );
-				$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
-			} else {
-				$diff    = $now->diff( $order->get_date_created() );
-				$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
-			}
-
-			if ( $minutes > $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ) ) {
-				unset( $order );
-			}
+		if ( isset( $order ) && $this->product_data->is_order_older_than_max_age( $order ) ) {
+			unset( $order );
 		}
 
 		$order_items = null;
@@ -92,17 +81,8 @@ final class PurchaseTracking {
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 		}
 
-		$do_not_flag_tracked_order = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG );
-		if ( isset( $order ) && ( 1 === (int) $order->get_meta( '_ga_tracked', true ) ) && ! $do_not_flag_tracked_order ) {
+		if ( isset( $order ) && $this->product_data->is_purchase_already_tracked( $order, (int) $order_id ) ) {
 			unset( $order );
-		}
-
-		if ( isset( $_COOKIE['gtm4wp_orderid_tracked'] ) ) {
-			$tracked_order_id = filter_var( wp_unslash( $_COOKIE['gtm4wp_orderid_tracked'] ), FILTER_VALIDATE_INT );
-
-			if ( $tracked_order_id && ( $tracked_order_id === $order_id ) && ! $do_not_flag_tracked_order ) {
-				unset( $order );
-			}
 		}
 
 		if ( isset( $order ) && ( 'failed' === $order->get_status() ) ) {
@@ -111,18 +91,11 @@ final class PurchaseTracking {
 		}
 
 		if ( isset( $order ) ) {
-			/**
-			 * Variable for Google Smart Shopping campaign new customer reporting.
-			 *
-			 * @see https://support.google.com/google-ads/answer/9917012?hl=en-AU#zippy=%2Cinstall-with-google-tag-manager
-			 */
-			$data_layer['new_customer'] = \Automattic\WooCommerce\Admin\API\Reports\Orders\Stats\DataStore::is_returning_customer( $order ) === false;
-
-			$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
+			$data_layer['new_customer'] = $this->product_data->is_new_customer( $order );
 
 			$data_layer = array_merge(
 				$data_layer,
-				$purchase_data_layer
+				$this->product_data->get_purchase_datalayer( $order, $order_items )
 			);
 
 			$datalayer_name = $this->datalayer->name();
@@ -135,10 +108,7 @@ final class PurchaseTracking {
 
 			$this->script_tag->print_script_block( $script_tag );
 
-			if ( ! $do_not_flag_tracked_order ) {
-				$order->update_meta_data( '_ga_tracked', 1 );
-				$order->save();
-			}
+			$this->product_data->flag_order_tracked( $order );
 		}
 	}
 }

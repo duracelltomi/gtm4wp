@@ -263,6 +263,33 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 70.0, $no_tax_no_shipping['ecommerce']['value'] );
 	}
 
+	public function test_raw_order_datalayer_passes_values_without_entity_escaping(): void {
+		$order = new \WC_Order(
+			array(
+				'order_number'       => '1001',
+				'order_key'          => 'wc_order_abc',
+				'billing_company'    => 'Marks & Spencer',
+				'billing_first_name' => "O'Brien",
+				'billing_last_name'  => '<b>Smith</b>',
+				'billing_address_1'  => '"Villa" 5',
+				'billing_email'      => 'john@example.com',
+				'shipping_city'      => 'A & B',
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		// esc_js() would have turned these into &amp; / \' / &lt; / &quot;. The
+		// values must stay raw so the single output sink (wp_json_encode with the
+		// full hex flag set) can escape them for the inline script without
+		// corrupting the order data (see review finding #8, RI-4).
+		$this->assertSame( 'Marks & Spencer', $raw['customer']['billing']['company'] );
+		$this->assertSame( "O'Brien", $raw['customer']['billing']['first_name'] );
+		$this->assertSame( '<b>Smith</b>', $raw['customer']['billing']['last_name'] );
+		$this->assertSame( '"Villa" 5', $raw['customer']['billing']['address_1'] );
+		$this->assertSame( 'A & B', $raw['customer']['shipping']['city'] );
+	}
+
 	public function test_helpers_email_normalization(): void {
 		$this->assertSame(
 			hash( 'sha256', 'johndoe@gmail.com' ),

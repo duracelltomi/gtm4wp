@@ -177,7 +177,10 @@ final class AmpModule extends AbstractModule {
 
 		$this->body_injected = true;
 
-		$datalayer_data = $GLOBALS['gtm4wp_datalayer_data'] ?? array();
+		// Read the data layer compiled earlier in the AMP flow (render_header_begin)
+		// from the service instead of the backward compatible global; compiled()
+		// does not re-run the compile filter, so WooCommerce events are not fired twice.
+		$datalayer_data = Plugin::instance()->frontend()->datalayer()->compiled();
 
 		// Check the data layer is loaded from the plugin.
 		if ( ! empty( $datalayer_data ) ) {
@@ -190,7 +193,7 @@ final class AmpModule extends AbstractModule {
 			if ( count( $gtm4wp_ampids ) > 0 ) {
 				foreach ( $gtm4wp_ampids as $gtm4wp_oneampid ) {
 					// Docs: https://developers.google.com/analytics/devguides/collection/amp-analytics/.
-					echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id=' . esc_url_raw( $gtm4wp_oneampid ) . '&gtm.url=SOURCE_URL" data-credentials="include"><script type="application/json">' . wp_json_encode( array( 'vars' => $datalayer_data ), JSON_HEX_TAG ) . '</script></amp-analytics>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id=' . esc_url_raw( $gtm4wp_oneampid ) . '&gtm.url=SOURCE_URL" data-credentials="include"><script type="application/json">' . wp_json_encode( array( 'vars' => $datalayer_data ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . '</script></amp-analytics>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 					++$injected_count;
 				}

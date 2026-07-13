@@ -57,7 +57,7 @@ final class PluginRow {
 	 */
 	public function show_upgrade_notification( $current_plugin_metadata, $new_plugin_metadata ): void {
 		if ( isset( $new_plugin_metadata->upgrade_notice ) && strlen( trim( $new_plugin_metadata->upgrade_notice ) ) > 0 ) {
-			echo '<p style="background-color: #d54e21; padding: 10px; color: #f9f9f9; margin-top: 10px"><strong>Important Upgrade Notice:</strong> ';
+			echo '<p style="background-color: #d54e21; padding: 10px; color: #f9f9f9; margin-top: 10px"><strong>' . esc_html__( 'Important Upgrade Notice:', 'duracelltomi-google-tag-manager' ) . '</strong> ';
 			echo esc_html( $new_plugin_metadata->upgrade_notice ), '</p>';
 		}
 	}

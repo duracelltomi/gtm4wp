@@ -234,6 +234,12 @@ final class ProductData {
 		$billing_last_hash  = Helpers::normalize_and_hash( 'sha256', $order->get_billing_last_name(), false );
 		$billing_phone_hash = Helpers::normalize_and_hash( 'sha256', $order->get_billing_phone(), true );
 
+		// Values are passed raw: the single output sink (the purchase data
+		// layer) runs everything through wp_json_encode() with the full hex
+		// flag set, which is the correct escaper for an inline-script context.
+		// Pre-escaping with esc_js() here would corrupt the data instead
+		// (e.g. "Marks & Spencer" -> "Marks &amp; Spencer") because
+		// ScriptTag::print_script_block() no longer HTML-decodes the block.
 		$order_data = array(
 			'attributes' => array(
 				'date'                 => $order->get_date_created()->date( 'c' ),
@@ -241,60 +247,60 @@ final class ProductData {
 				'order_number'         => $order->get_order_number(),
 				'order_key'            => $order->get_order_key(),
 
-				'payment_method'       => esc_js( $order->get_payment_method() ),
-				'payment_method_title' => esc_js( $order->get_payment_method_title() ),
+				'payment_method'       => $order->get_payment_method(),
+				'payment_method_title' => $order->get_payment_method_title(),
 
-				'shipping_method'      => esc_js( $order->get_shipping_method() ),
+				'shipping_method'      => $order->get_shipping_method(),
 
-				'status'               => esc_js( $order->get_status() ),
+				'status'               => $order->get_status(),
 
 				'coupons'              => implode( ', ', $order->get_coupon_codes() ),
 			),
 			'totals'     => array(
-				'currency'       => esc_js( $order->get_currency() ),
-				'discount_total' => esc_js( $order->get_discount_total() ),
-				'discount_tax'   => esc_js( $order->get_discount_tax() ),
-				'shipping_total' => esc_js( $order->get_shipping_total() ),
-				'shipping_tax'   => esc_js( $order->get_shipping_tax() ),
-				'cart_tax'       => esc_js( $order->get_cart_tax() ),
-				'total'          => esc_js( $order->get_total() ),
-				'total_tax'      => esc_js( $order->get_total_tax() ),
-				'total_discount' => esc_js( $order->get_total_discount() ),
-				'subtotal'       => esc_js( $order->get_subtotal() ),
+				'currency'       => $order->get_currency(),
+				'discount_total' => $order->get_discount_total(),
+				'discount_tax'   => $order->get_discount_tax(),
+				'shipping_total' => $order->get_shipping_total(),
+				'shipping_tax'   => $order->get_shipping_tax(),
+				'cart_tax'       => $order->get_cart_tax(),
+				'total'          => $order->get_total(),
+				'total_tax'      => $order->get_total_tax(),
+				'total_discount' => $order->get_total_discount(),
+				'subtotal'       => $order->get_subtotal(),
 				'tax_totals'     => $order->get_tax_totals(),
 			),
 			'customer'   => array(
 				'id'       => $order->get_customer_id(),
 
 				'billing'  => array(
-					'first_name'      => esc_js( $order->get_billing_first_name() ),
-					'first_name_hash' => esc_js( $billing_first_hash ),
-					'last_name'       => esc_js( $order->get_billing_last_name() ),
-					'last_name_hash'  => esc_js( $billing_last_hash ),
-					'company'         => esc_js( $order->get_billing_company() ),
-					'address_1'       => esc_js( $order->get_billing_address_1() ),
-					'address_2'       => esc_js( $order->get_billing_address_2() ),
-					'city'            => esc_js( $order->get_billing_city() ),
-					'state'           => esc_js( $order->get_billing_state() ),
-					'postcode'        => esc_js( $order->get_billing_postcode() ),
-					'country'         => esc_js( $order->get_billing_country() ),
-					'email'           => esc_js( $order->get_billing_email() ),
-					'emailhash'       => esc_js( $billing_email_hash ), // deprecated.
-					'email_hash'      => esc_js( $billing_email_hash ),
-					'phone'           => esc_js( $order->get_billing_phone() ),
-					'phone_hash'      => esc_js( $billing_phone_hash ),
+					'first_name'      => $order->get_billing_first_name(),
+					'first_name_hash' => $billing_first_hash,
+					'last_name'       => $order->get_billing_last_name(),
+					'last_name_hash'  => $billing_last_hash,
+					'company'         => $order->get_billing_company(),
+					'address_1'       => $order->get_billing_address_1(),
+					'address_2'       => $order->get_billing_address_2(),
+					'city'            => $order->get_billing_city(),
+					'state'           => $order->get_billing_state(),
+					'postcode'        => $order->get_billing_postcode(),
+					'country'         => $order->get_billing_country(),
+					'email'           => $order->get_billing_email(),
+					'emailhash'       => $billing_email_hash, // deprecated.
+					'email_hash'      => $billing_email_hash,
+					'phone'           => $order->get_billing_phone(),
+					'phone_hash'      => $billing_phone_hash,
 				),
 
 				'shipping' => array(
-					'first_name' => esc_js( $order->get_shipping_first_name() ),
-					'last_name'  => esc_js( $order->get_shipping_last_name() ),
-					'company'    => esc_js( $order->get_shipping_company() ),
-					'address_1'  => esc_js( $order->get_shipping_address_1() ),
-					'address_2'  => esc_js( $order->get_shipping_address_2() ),
-					'city'       => esc_js( $order->get_shipping_city() ),
-					'state'      => esc_js( $order->get_shipping_state() ),
-					'postcode'   => esc_js( $order->get_shipping_postcode() ),
-					'country'    => esc_js( $order->get_shipping_country() ),
+					'first_name' => $order->get_shipping_first_name(),
+					'last_name'  => $order->get_shipping_last_name(),
+					'company'    => $order->get_shipping_company(),
+					'address_1'  => $order->get_shipping_address_1(),
+					'address_2'  => $order->get_shipping_address_2(),
+					'city'       => $order->get_shipping_city(),
+					'state'      => $order->get_shipping_state(),
+					'postcode'   => $order->get_shipping_postcode(),
+					'country'    => $order->get_shipping_country(),
 				),
 
 			),
@@ -366,5 +372,93 @@ final class ProductData {
 		 * @param WC_Order $order The WooCommerce order that needs to be transformed into an ecommerce data layer.
 		 */
 		return apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer, $order );
+	}
+
+	/**
+	 * Whether the order is older than the configured maximum tracking age.
+	 * Returns false when no maximum age is configured. The timezone passed to
+	 * "now" does not change the computed difference (DateTime::diff compares
+	 * instants), so the paid/created reference date is used directly.
+	 *
+	 * @param \WC_Order $order The order to check.
+	 * @return bool
+	 */
+	public function is_order_older_than_max_age( \WC_Order $order ): bool {
+		$max_age = (int) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE );
+		if ( $max_age <= 0 ) {
+			return false;
+		}
+
+		if ( $order->is_paid() && $order->get_date_paid() ) {
+			$reference = $order->get_date_paid();
+		} else {
+			$reference = $order->get_date_created();
+		}
+
+		$now     = new \DateTime( 'now', $reference->getTimezone() );
+		$diff    = $now->diff( $reference );
+		$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
+
+		return $minutes > $max_age;
+	}
+
+	/**
+	 * Whether this purchase has already been tracked - either flagged on the
+	 * order (_ga_tracked meta) or recorded in the visitor's browser cookie.
+	 * Always false when the "do not use the order tracked flag" option is on,
+	 * matching the 1.x behavior where that option disables both checks.
+	 *
+	 * @param \WC_Order $order    The order to check.
+	 * @param int       $order_id The order id of the current request.
+	 * @return bool
+	 */
+	public function is_purchase_already_tracked( \WC_Order $order, int $order_id ): bool {
+		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ) ) {
+			return false;
+		}
+
+		if ( 1 === (int) $order->get_meta( '_ga_tracked', true ) ) {
+			return true;
+		}
+
+		if ( isset( $_COOKIE['gtm4wp_orderid_tracked'] ) ) {
+			$tracked_order_id = filter_var( wp_unslash( $_COOKIE['gtm4wp_orderid_tracked'] ), FILTER_VALIDATE_INT );
+
+			if ( $tracked_order_id && ( $tracked_order_id === $order_id ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Flags the order as tracked (via the _ga_tracked meta) so the purchase is
+	 * not counted twice. No-op when the "do not use the order tracked flag"
+	 * option is on.
+	 *
+	 * @param \WC_Order $order The order to flag.
+	 * @return void
+	 */
+	public function flag_order_tracked( \WC_Order $order ): void {
+		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ) ) {
+			return;
+		}
+
+		$order->update_meta_data( '_ga_tracked', 1 );
+		$order->save();
+	}
+
+	/**
+	 * Whether the order belongs to a new (first time) customer, used for the
+	 * Google Smart Shopping campaign new-customer reporting variable.
+	 *
+	 * @see https://support.google.com/google-ads/answer/9917012
+	 *
+	 * @param \WC_Order $order The order to check.
+	 * @return bool
+	 */
+	public function is_new_customer( \WC_Order $order ): bool {
+		return \Automattic\WooCommerce\Admin\API\Reports\Orders\Stats\DataStore::is_returning_customer( $order ) === false;
 	}
 }
