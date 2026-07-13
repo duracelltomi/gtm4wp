@@ -59,7 +59,7 @@ yet still carry `[ ]` cells — presence ≠ reviewed-and-complete.
 | **WooCommerce Module** (`src/Modules/WooCommerce/` — PurchaseTracking, ProductData, PageDataLayer, ListTracking, Helpers, Module) | `Modules/PurchaseTrackingTest`, `ProductDataTest`, `PageDataLayerTest`, `ListTrackingTest`, `HelpersTest` | [x] | [ ] | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [ ] |
 | **ConsentMode Module** (`src/Modules/ConsentMode/`) | `Modules/ModuleHooksTest` (gate + webtoffee only) | [x] | [ ] | [ ] | [-] | [ ] | [ ] |
 | **UserEvents Module** (`src/Modules/UserEvents/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
-| **MediaEvents Module** (`src/Modules/MediaEvents/`) | `Modules/ModuleHooksTest` (youtube gate only) | [x] 2026-07-13 | [ ] | [ ] | [-] | [ ] | [ ] |
+| **MediaEvents Module** (`src/Modules/MediaEvents/` — 12 trackers) | `Modules/MediaEventsModuleTest` (enqueue gate + oEmbed rewrite), `ModuleHooksTest` (youtube gate), `ModuleConsistencyTest` (12 opts); JS: 14 tracker tests + `native-video-params` | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [-] | [x] 2026-07-13 | [x] 2026-07-13 |
 | **ContactForm7 Module** (`src/Modules/ContactForm7/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [-] | [-] | [ ] |
 | **Blacklist Module** (`src/Modules/Blacklist/`) | `Modules/BlacklistModuleTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`) | `Modules/ClientDeviceDataModuleTest`, `ModuleHooksTest` (gate) | [x] 2026-07-13 | [x] 2026-07-13 | [ ] | [-] | [ ] | [ ] |
@@ -67,7 +67,7 @@ yet still carry `[ ]` cells — presence ≠ reviewed-and-complete.
 | **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | `Admin/NoticesTest` | [x] 2026-07-13 | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **Module Admin Schemas** (`src/Modules/*/AdminSchema.php`) | `Modules/ModuleConsistencyTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
-| **Frontend JS** (`js/frontend/` — 9 trackers) | `js/frontend/test/ecommerce-generic.test.js`, `form-move-tracker.test.js` (2 of 9) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **Frontend JS** (`js/frontend/` — 17 trackers + `lib/native-video-params`) | 15 `js/frontend/test/*.test.js` (15 of 17 trackers + lib) | [~] 2026-07-13 | [~] 2026-07-13 | [~] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Admin JS** (`js/admin/`) | `js/admin/test/utils.test.js` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 > **Seed note (2026-07-13):** only **Frontend Core** has been through a full
@@ -86,11 +86,11 @@ review; treat a sweep older than ~4 weeks or predating a feature landing as stal
 
 | Sweep | Last run | Result summary |
 |---|---|---|
-| **Missing test file** (`src/**/*.php` with no dedicated or documented-indirect test) | 2026-07-13 (Run 1) | 46 src classes. Run 1 added test files for `ListTracking`, `Notices`, `Field`, `Helpers`, `Globals`, `ClientDeviceData`, `Amp` + JS `ecommerce-generic`/`form-move-tracker`, and gate coverage for `MediaEvents`. Real gaps remaining: `Admin/{Admin,PluginRow,SettingsPage}`, `Plugin`, `WooCommerce/WooCommerceModule`, 7 of 9 JS trackers. Blessed N/A (BE-3): interfaces, `Frontend`, `Autoloader`; SettingsPage/Admin/Plugin are wiring-heavy (see gaps T15). |
-| **Untested public methods** (in classes that *do* have a test file — TS-10) | 2026-07-13 (Run 1) | Frontend Core cleared (Run 0). `ListTracking`: PA-7 path + shared builder covered; ~15 list-name setters / echo hook callbacks still untested (low value). `Notices`: `dismiss_notice` + `show_notices` covered; `print_dismiss_script` untested. `Amp`: body-injection + is_amp_request covered; header-render delegators untested (thin). |
-| **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-13 (Run 1) | Frontend dataLayer + additional-pushes covered (Run 0). **Run 1 closed:** `PageVariables` geoCF (finding #12) + `visitorIP`; `WooCommerce/ListTracking` PA-7 (finding #16); `Admin/Notices` dismiss allow-list (finding #18); `Amp` render_amp_gtm_code hex flags (finding #11, proved fails-without-flags). ClientDeviceData config sink = N/A (booleans only, no break-out possible). **Open:** `SettingsPage` bootstrap_data hex sink (admin-context, no regression test — T13). |
-| **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-13 (Run 1) | Findings #1–#6 (Frontend XSS tests); #8 (`ProductDataTest`); #11 AMP sink (`AmpModuleTest`, Run 1); #12 (`PageVariablesModuleTest`); #13/#14 (`PageDataLayerTest`/`PurchaseTrackingTest`); #16 (`ListTrackingTest`); #18 (`NoticesTest`). **Unverified:** #11 SettingsPage sink (T13); ClientDeviceData portion N/A (booleans). |
-| **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-13 (Run 1) | Harness established under `js/frontend/test/`. **Run 1 added:** `ecommerce-generic` (public 1.x JS API incl. product-JSON reader) + `form-move-tracker` (DOM event → dataLayer). 25 JS tests green. **Remaining (T16):** 7 trackers — `woocommerce`, `client-device-data`, and the media-player wrappers (`youtube`/`vimeo`/`soundcloud`/`html5media`, which need external player-API mocks). |
+| **Missing test file** (`src/**/*.php` with no dedicated or documented-indirect test) | 2026-07-13 (Run 2) | No new PHP classes since Run 1; Run 2 added `MediaEventsModuleTest`. Real PHP gaps unchanged: `Admin/{Admin,PluginRow,SettingsPage}`, `Plugin`, `WooCommerce/WooCommerceModule`. **JS:** Run 2 closed `youtube` (T17, +bug fix); untested trackers now 3: `woocommerce`, `client-device-data`, `contact-form-7-tracker`. Blessed N/A (BE-3): interfaces, `Frontend`, `Autoloader`. |
+| **Untested public methods** (in classes that *do* have a test file — TS-10) | 2026-07-13 (Run 2) | Frontend Core cleared (Run 0). Run 2 closed **`MediaEventsModule::enqueue_scripts()` + `enable_youtube_js_api()`** (`MediaEventsModuleTest`, T18/T19). Remaining low-value: `ListTracking` ~15 list-name setters; `Notices::print_dismiss_script`; `Amp` header-render delegators (thin). |
+| **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-13 (Run 2) | Run 0/1 Frontend + module sinks covered. **Run 2:** MediaEvents PHP = N/A (`[-]`) — no request/header data reaches a `<script>` sink; `enable_youtube_js_api` uses trusted `site_url()`. JS trackers push **structured** dataLayer objects (not HTML). The one untrusted-input surface — VideoPress postMessage origin check — is tested on the security-critical **reject** side; accept-branches thin (T20). **Open (unchanged):** `SettingsPage` bootstrap_data hex sink (T13). |
+| **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-13 (Run 2) | Unchanged from Run 1: #1–#6 (Frontend); #8 (`ProductDataTest`); #11 AMP (`AmpModuleTest`); #12 (`PageVariablesModuleTest`); #13/#14; #16 (`ListTrackingTest`); #18 (`NoticesTest`). No new `.security` findings from the media batch. **Unverified:** #11 SettingsPage sink (T13). |
+| **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-13 (Run 2) | **JS suite 25 → 138 green (16 suites)** after closing T17 (`youtube-tracker.test.js`, 9 tests + the strict-mode bug fix) and extending VideoPress (8 → 14, T20). Media batch tests are high-quality (full-shape, state maps, ms→s, error branches, fake-timer polling). **Remaining:** `woocommerce`, `client-device-data`, `contact-form-7-tracker`. (A concurrent `/code-review` also landed fixes to several tracker sources; final tree green — JS 16 suites / 150 tests.) |
 | **Assertion quality** (mutation testing — Infection, optional) | never | Not yet enabled. See `.claude/commands/test-review.md` § Optional tooling to install `infection/infection` + a coverage driver. |
 
 ---
@@ -146,6 +146,24 @@ round). Suite 198 → 240 PHP tests + 25 JS tests, all green; phpcs 0 errors; no
 | — | Low | addressed | `Notices::show_notices` output branches — missing-GTM-ID, incomplete env-config, dismissed-state (closes T14). | `tests/unit/Admin/NoticesTest.php` |
 | — | Med | addressed | `Frontend JS` harness established + `ecommerce-generic` (public 1.x JS API incl. product-JSON reader) + `form-move-tracker` (DOM event→dataLayer). Closes 2 of 9 (T10 → T16). | `js/frontend/test/*.test.js` |
 
+### Run 2: media-tracker batch review — 2026-07-13
+
+Reviewed commits `b196d45`..`44d5296` (native-video-params lib, modernized
+YouTube/Vimeo/SoundCloud/HTML5, 8 new trackers, rewritten `MediaEvents` PHP
+module). Report-only pass, then the user approved closing all four gaps.
+**All addressed in the same session** — and a concurrent `/code-review` then
+landed its own fixes to the same tracker sources. **Final settled tree is green:**
+PHP 253 tests / 778 assertions, JS 16 suites / 150 tests, phpcs 0 errors, build +
+lint clean. **A latent bug surfaced and was fixed** (see T17). Full detail in the
+git-ignored `test-review-report-2026-07-13-2121.md`.
+
+| # | Sev | Status | Summary | File(s) |
+|---|-----|--------|---------|---------|
+| T17 | High | addressed | `gtm4wp-youtube.js` had no dedicated test; writing it (TC-10 harness) **surfaced a latent bug** — an undeclared `player = new YT.Player(...)` threw `ReferenceError` in the strict-mode 2.0 module on every page with a YouTube embed. Fixed (dropped the dead assignment) + `youtube-tracker.test.js` (9 tests, incl. a not-throw regression proven to fail pre-fix). | `js/frontend/gtm4wp-youtube.js`, `js/frontend/test/youtube-tracker.test.js` |
+| T18 | Med | addressed | `MediaEventsModule::enqueue_scripts()` — youtube block/`<iframe>`-content detection + option gates now tested (`MediaEventsModuleTest`). | `tests/unit/Modules/MediaEventsModuleTest.php` |
+| T19 | Low | addressed | `MediaEventsModule::enable_youtube_js_api()` — oEmbed rewrite / non-youtube / non-string branches (`MediaEventsModuleTest`). | `tests/unit/Modules/MediaEventsModuleTest.php` |
+| T20 | Low | addressed | VideoPress `gtm4wp_isVideoPressOrigin()` — subdomain + `video.wordpress.com` accept, look-alike + non-string + bad-JSON reject (`videopress-tracker.test.js` 8 → 14). | `js/frontend/test/videopress-tracker.test.js` |
+
 ### Open gaps (prioritized by the sweeps above)
 
 Terse, non-exploit; prioritized by the sweeps above.
@@ -161,4 +179,4 @@ Terse, non-exploit; prioritized by the sweeps above.
 | T13 | Med | open | Finding #11: AMP sink now guarded (`AmpModuleTest`). **Remaining:** `SettingsPage::bootstrap_data` hex sink has no regression test (admin-context, needs the registry+REST+schema harness). ClientDeviceData = N/A (booleans). | `src/Admin/SettingsPage.php` |
 | T14 | Low | addressed | `Notices::show_notices` branches — `NoticesTest`. | `tests/unit/Admin/NoticesTest.php` |
 | T15 | Low | open | `Admin/{SettingsPage,PluginRow,Admin}` + `Plugin` + `WooCommerce/WooCommerceModule` untested (wiring-heavy; several are BE-3 candidates — record `[-]` N/A with a reason before writing stub-asserting tests). | (various) |
-| T16 | Med | open | 7 of 9 `js/frontend/` trackers still untested: `woocommerce`, `client-device-data`, and the media-player wrappers (`youtube`/`vimeo`/`soundcloud`/`html5media`, which need external player-API mocks). | `js/frontend/*.js` |
+| T16 | Med | addressed | Media batch (Run 2) added 12 tracker tests + `native-video-params`; JS 25 → 123 green. Untested trackers now 3: `woocommerce`, `client-device-data`, `contact-form-7-tracker` (→ tracked in the Run 2 sweep). `youtube` split out as its own new-code gap T17. | `js/frontend/test/*` |

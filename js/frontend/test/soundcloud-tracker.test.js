@@ -183,6 +183,22 @@ describe( 'gtm4wp-soundcloud', () => {
 		} );
 	} );
 
+	it( 'pushes no percentage milestone when the sound duration is 0 (regression: Infinity milestones)', () => {
+		loadTracker();
+
+		// A live/broken sound can report duration 0 while the position advances.
+		// Without the guard, position / 0 = Infinity, which is > every mark and
+		// would push them all.
+		widget.currentSound.duration = 0;
+		window.dataLayer = [];
+		widget.emit( SC_EVENTS.PLAY_PROGRESS, { currentPosition: 60000 } );
+
+		const marks = window.dataLayer.filter(
+			( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
+		);
+		expect( marks ).toHaveLength( 0 );
+	} );
+
 	it( 'tracks CLICK_DOWNLOAD as a player event using the position read from the widget', () => {
 		loadTracker();
 		widget.position = 45000;

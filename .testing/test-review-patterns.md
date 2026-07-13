@@ -51,6 +51,8 @@ on every review before anything else.
 - **TC-7** — to test a handler that calls `wp_die()`/`exit` and then continues, stub it to throw (`Functions\expect('wp_die')->…->andThrow(\RuntimeException::class, 'wp_die')`), catch it, and assert the *post-halt* side effect never ran (e.g. `update_user_meta` count 0). Proves the gate actually stops execution.
 - **TC-8** — to unit-test a method coupled to the `Plugin` singleton chain (`Plugin::instance()->frontend()->datalayer()`), build the intermediates with `ReflectionClass::newInstanceWithoutConstructor()`, set their private props via reflection, install the singleton with a `ReflectionProperty` on `Plugin::$instance`, and **reset it to `null` in tearDown** (TS-7). Seed `DataLayer`'s private `compiled` directly rather than running the compile filter.
 - **TC-9 (JS)** — to test a side-effect frontend tracker (`js/frontend/*.js`): set the bare globals it reads (`global.gtm4wp_datalayer_name = 'dataLayer'`), `import '../tracker'` for its side effects, reset `window.dataLayer = []` per test, build a jsdom fixture and dispatch a **bubbling** event, then assert the `window.dataLayer` push. For the window-attached helper API (ecommerce-generic), import once then call `window.gtm4wp_*`. Tests live in `js/frontend/test/`; run `npm run test:unit` + `npm run lint:js` (no `npm run build` — test files are not bundled).
+- **TC-10 (JS)** — to test a tracker that wraps an **external player SDK global** (`YT.Player`, `Twitch.Player`, `SC.Widget`, VideoPress postMessage): stub the SDK global with a fake constructor that **captures** the events/handlers config the tracker registers, load via `jest.isolateModules(() => require('../tracker'))`, then **drive the captured handlers** with a mock player exposing `getCurrentTime`/`getDuration`/`getVideoData` (or emit a `MessageEvent`). Use `jest.useFakeTimers()` + `advanceTimersByTime` for interval-polled progress, and assert missing-SDK / no-embed = no push, no throw. This is the concrete recipe for closing the `youtube` gap (T17).
+- **TC-11 (JS)** — a JS tracker's `window.dataLayer.push({...})` is a **structured object sink**, not an HTML string sink: the `</script>`-into-`<script>` output-encoding lens (TS-1/TS-2/TC-5) does **not** apply at the push site, so do not flag a JS tracker for "missing hostile-input encoding test." The real untrusted-input surface for a JS tracker is a **message/origin boundary** (e.g. VideoPress `postMessage` origin validation) — that validator gets a both-directions test (accept the legit hosts, reject spoofed origin + malformed payload). A raw-passthrough assertion (guid `</script>&x` present verbatim, no entity-encoding) is a mild belt-and-suspenders documentation of intent, welcome but not required.
 - **TC-1** — every security-relevant code change ships a PHPUnit regression test in the same change (shared rule with `.security/`; the guard tests live in `tests/unit/Frontend/`).
 - **TC-2** — the Brain Monkey `wp_json_encode` stub honors the JSON flags, so build the expected encoded output by calling `wp_json_encode(...)` the way the source does — never hand-type `\uXXXX` literals.
 - **TC-3** — extend the right base: `FrontendTestCase` for services that read `Options` (it provides the Options factory + global reset); the plain `TestCase` for pure/static helpers with no Options dependency (`VisitorIp`).
@@ -204,6 +206,44 @@ registration gets an enabled test **and** a disabled test (the `ModuleHooksTest`
 pattern). This is the accepted way to test `register_hooks()`/`frontend()` wiring
 without booting WordPress.
 
+### TC-10: Player-SDK tracker harness (capture-and-drive)
+The media trackers wrap an external player SDK (`YT.Player`, `Twitch.Player`,
+`SC.Widget`) or a `postMessage` stream (VideoPress). The blessed way to unit-test
+them (confirmed 2026-07-13 across `twitch`/`soundcloud`/`videopress` tests):
+
+1. Stub the SDK global with a fake **constructor** that stores `this` and captures
+   the handlers the tracker registers — e.g. `Ctor.prototype.addEventListener =
+   function (e, cb) { this.handlers[e] = cb; }`, plus `getCurrentTime`/`getDuration`/
+   `getVideoData` accessors the tracker reads. Expose the SDK's event-name
+   constants (`Ctor.PLAY`, `YT.PlayerState.PLAYING`, …).
+2. Render the provider iframe into `document.body`, then load with
+   `jest.isolateModules(() => require('../tracker'))` (fresh module state per test).
+3. Capture the constructed player, **drive** its handlers directly
+   (`player.emit(Ctor.PLAY)` or `events.onStateChange({ target, data })`) and assert
+   the `window.dataLayer` push shape + the flat `gtm.video*` keys.
+4. `jest.useFakeTimers()` + `advanceTimersByTime(1000)` for interval-polled
+   percentage milestones (Twitch/YouTube have no native time event); restore in a
+   `finally`. Always add a missing-SDK / no-embed case: no throw, no push.
+
+This recipe is exactly what closes the `youtube` gap (T17) — YouTube exposes its
+handlers via `new YT.Player(id, { events: { onStateChange, … } })`, so capture the
+`events` config and call `onStateChange({ target: mockPlayer, data: YT.PlayerState.PLAYING })`.
+
+### TC-11: A JS dataLayer push is a structured sink, not an HTML sink
+`window.dataLayer.push({ ... })` writes a JavaScript **object**; nothing is
+concatenated into HTML at the push site, so the `</script>`-breakout /
+output-encoding lens (TS-1/TS-2/TC-5) that governs the PHP `<script>` sinks does
+**not** apply to a JS tracker. Do not flag a JS tracker for a "missing hostile-input
+encoding test." The genuine untrusted-input surface for a JS tracker is a
+**message/origin boundary**: VideoPress reads `postMessage` from any origin and
+gates it with `gtm4wp_isVideoPressOrigin()` — *that* validator earns a
+both-directions test (accept the legit hosts incl. subdomains + `video.wordpress.com`,
+reject a spoofed origin and a malformed/non-JSON payload), the TS-5/TC-1 form. A
+raw-passthrough assertion (a `</script>&x` guid appears verbatim, not
+entity-encoded) is a welcome documentation of intent but is not the load-bearing
+guard. Confirmed 2026-07-13: `videopress-tracker.test.js` does the origin-reject
+and raw-passthrough correctly; its accept-branch coverage is thin (T20).
+
 ---
 
 ## Blessed Exceptions
@@ -235,6 +275,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-13 (Run 2 — gaps closed) | Closed T17–T20 after approval. **TC-10 paid off immediately:** applying the player-SDK harness to the untested `youtube` tracker **surfaced a latent bug** — an undeclared `player = new YT.Player(...)` throwing `ReferenceError` in the strict-mode 2.0 module (fixed; regression test proven to fail pre-fix). This is the second time a zero-test class hid a live defect (cf. the OFF-placement iframe leak, Run 0/T3): **write the missing test for a whole-untested class before assuming it works.** Added `MediaEventsModuleTest` (PHP enqueue gate + oEmbed rewrite) and extended VideoPress (origin accept/reject branches). |
+| 2026-07-13 (Run 2) | Media-tracker batch review (12 trackers + `native-video-params`, rewritten `MediaEvents` PHP module). Added **TC-10** (player-SDK capture-and-drive harness — the recipe to close the `youtube` gap T17) and **TC-11** (a JS dataLayer push is a structured object sink, not an HTML sink — the output-encoding lens doesn't apply; validate JS trackers at the message/origin boundary instead). No tests written; report-only. New gaps T17–T20. Derived from reviewing the 12 new JS test files (all high-quality) against the untested `youtube` tracker + `MediaEventsModule` PHP branches. |
 | 2026-07-13 (Run 1 continued) | Full remaining-gap sweep. Added **TC-8** (reflection injection for `Plugin`-singleton-coupled code — AMP finding #11), **TC-9** (JS side-effect tracker harness under `js/frontend/test/`), and extended **TC-2** with the `\xNN` + `json_encode`-computed-expected corollary (from the AMP test, after tooling HTML-encoded literal break-out chars). Derived from closing T9/T11/T12/T13(AMP)/T14 and starting T10 (JS). |
 | 2026-07-13 (Run 1) | Module/admin security-sink pass. Added **TS-11** (upstream raw-passthrough contract — the `geoCloudflareCountryCode` benign-only sink), **TC-6** (PA-7 `addcslashes` regression needs a `$n` input; JSON doubles `\`), **TC-7** (test `wp_die`/exit handlers by stubbing to throw + asserting no post-halt side effect), **BE-4** (`$_POST` snapshot in test setUp trips NonceVerification — scoped `phpcs:ignore`). Derived from closing T7 (`ListTrackingTest`, finding #16), T8 (`NoticesTest`, finding #18) and the PageVariables finding-#12 regression. |
 | 2026-07-13 | Seeded the patterns file from the `tests/unit/Frontend/` coverage review. Added TS-1..TS-10 (covered-≠-asserted, both-direction escaping, assert-the-effect, tautological, happy-path-only, zero-test class, state leakage, non-determinism, over-coupling, untested method/branch), TC-1..TC-4 (regression-with-change, build-expected-encoding, right base case, hook-both-ways) and BE-1..BE-3 (1.x byte-exact blessing, unused stub params, intentionally-untested classes). Derived from the session that added `VisitorIpTest` and 31 Frontend tests + fixed the OFF-placement iframe leak. |

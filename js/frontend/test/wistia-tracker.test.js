@@ -49,6 +49,9 @@ describe( 'gtm4wp-wistia', () => {
 	beforeEach( () => {
 		window.dataLayer = [];
 		window._wq = [];
+		// The tracker guards against double-init via this window flag; clear it
+		// so each isolated re-require re-registers the _wq onReady handler.
+		delete window.gtm4wp_wistia_inited;
 		video = new FakeWistiaVideo();
 	} );
 
@@ -184,5 +187,21 @@ describe( 'gtm4wp-wistia', () => {
 		expect( window.dataLayer[ 0 ].mediaData.title ).not.toContain(
 			'&amp;'
 		);
+	} );
+
+	it( 'registers the _wq onReady only once when the bundle loads twice (regression: double-init)', () => {
+		jest.isolateModules( () => {
+			require( '../gtm4wp-wistia' );
+		} );
+		const lenAfterFirst = window._wq.length;
+
+		// A second execution of the same bundle (e.g. re-injected by a tag
+		// manager) must not push a second onReady handler, which would double
+		// every Wistia event in the data layer.
+		jest.isolateModules( () => {
+			require( '../gtm4wp-wistia' );
+		} );
+
+		expect( window._wq.length ).toBe( lenAfterFirst );
 	} );
 } );

@@ -158,6 +158,91 @@ describe( 'gtm4wp-videopress', () => {
 		expect( window.dataLayer ).toHaveLength( 0 );
 	} );
 
+	it( 'accepts a videopress.com subdomain origin', () => {
+		loadTracker();
+
+		dispatch(
+			{
+				event: 'videopress_loadedmetadata',
+				id: 'AbCdEfGh',
+				durationMs: 1000,
+			},
+			'https://videos.videopress.com'
+		);
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+		expect( window.dataLayer[ 0 ].event ).toBe( 'gtm4wp.mediaPlayerReady' );
+	} );
+
+	it( 'accepts the video.wordpress.com origin', () => {
+		loadTracker();
+
+		dispatch(
+			{
+				event: 'videopress_loadedmetadata',
+				id: 'AbCdEfGh',
+				durationMs: 1000,
+			},
+			'https://video.wordpress.com'
+		);
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+		expect( window.dataLayer[ 0 ].event ).toBe( 'gtm4wp.mediaPlayerReady' );
+	} );
+
+	it( 'rejects a look-alike origin that only ends with the bare domain', () => {
+		loadTracker();
+
+		// `evilvideopress.com` must NOT satisfy the `.videopress.com` suffix check.
+		dispatch(
+			{ event: 'videopress_playing', id: 'AbCdEfGh', durationMs: 1000 },
+			'https://evilvideopress.com'
+		);
+
+		expect( window.dataLayer ).toHaveLength( 0 );
+	} );
+
+	it( 'parses a JSON string payload from a valid origin', () => {
+		loadTracker();
+
+		// VideoPress may deliver event.data as a JSON string rather than an object.
+		dispatch(
+			JSON.stringify( {
+				event: 'videopress_loadedmetadata',
+				id: 'AbCdEfGh',
+				durationMs: 2000,
+			} )
+		);
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+		expect( window.dataLayer[ 0 ].mediaData.duration ).toBe( 2 );
+	} );
+
+	it( 'ignores a string payload that is not valid JSON', () => {
+		loadTracker();
+
+		dispatch( 'not-json-at-all' );
+
+		expect( window.dataLayer ).toHaveLength( 0 );
+	} );
+
+	it( 'ignores a message with a non-string origin', () => {
+		loadTracker();
+
+		// A MessageEvent coerces origin to a string, so drive the bound handler
+		// directly to reach the `typeof origin !== 'string'` guard.
+		window.gtm4wp_videopress_handler( {
+			origin: null,
+			data: {
+				event: 'videopress_playing',
+				id: 'AbCdEfGh',
+				durationMs: 1000,
+			},
+		} );
+
+		expect( window.dataLayer ).toHaveLength( 0 );
+	} );
+
 	it( 'pushes the guid into the data layer object verbatim (no HTML entity-encoding)', () => {
 		loadTracker();
 

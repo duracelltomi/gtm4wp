@@ -87,3 +87,60 @@ export function gtm4wpNativeVideoParams( {
 		'gtm.videoPercent': pct,
 	};
 }
+
+/**
+ * Fires each not-yet-reached percentage milestone once.
+ *
+ * Every media tracker records the milestones it has already pushed per media
+ * item and, on each progress tick, fires the callback for each `step`-sized mark
+ * (0, 10, 20, …) the current `percentage` has newly crossed. This helper holds
+ * that shared bookkeeping so each tracker only supplies its own push payload.
+ *
+ * Callers must guard against a zero/absent duration before computing
+ * `percentage` (e.g. `if ( ! duration ) return;`): `time / 0` is `Infinity`,
+ * which is greater than every mark and would fire them all.
+ *
+ * @param {Object}   marks       Per-key store of already-fired marks (mutated).
+ * @param {string}   key         Media item key (video id / uri / currentSrc).
+ * @param {number}   percentage  Integer playback percentage (0-100).
+ * @param {number}   step        Milestone granularity, e.g. 10.
+ * @param {Function} onMilestone Called with each newly crossed mark `i`.
+ * @return {void}
+ */
+export function gtm4wpMediaMilestones(
+	marks,
+	key,
+	percentage,
+	step,
+	onMilestone
+) {
+	if ( typeof marks[ key ] === 'undefined' ) {
+		marks[ key ] = [];
+	}
+
+	for ( let i = 0; i < 100; i += step ) {
+		if ( percentage > i && marks[ key ].indexOf( i ) === -1 ) {
+			marks[ key ].push( i );
+			onMilestone( i );
+		}
+	}
+}
+
+/**
+ * Runs a tracker's init once the DOM is ready.
+ *
+ * A tracker bundle may execute before or after the DOM has finished parsing
+ * (defer/async strategy, or late injection by a tag manager). This runs the
+ * init immediately when parsing is already done, otherwise on DOMContentLoaded,
+ * so nothing is left silently uninitialized.
+ *
+ * @param {Function} callback The tracker init function.
+ * @return {void}
+ */
+export function gtm4wpOnReady( callback ) {
+	if ( document.readyState === 'loading' ) {
+		window.addEventListener( 'DOMContentLoaded', callback );
+	} else {
+		callback();
+	}
+}

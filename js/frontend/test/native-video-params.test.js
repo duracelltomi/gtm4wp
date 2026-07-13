@@ -8,6 +8,8 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaMilestones,
+	gtm4wpOnReady,
 } from '../lib/native-video-params';
 
 describe( 'gtm4wpNativeVideoStatus', () => {
@@ -120,5 +122,111 @@ describe( 'gtm4wpNativeVideoParams', () => {
 		expect( params[ 'gtm.videoCurrentTime' ] ).toBe( 0 );
 		expect( params[ 'gtm.videoDuration' ] ).toBe( 0 );
 		expect( params[ 'gtm.videoPercent' ] ).toBe( 0 );
+	} );
+} );
+
+describe( 'gtm4wpMediaMilestones', () => {
+	it( 'fires each newly-crossed mark once and records it', () => {
+		const marks = {};
+		const fired = [];
+
+		// 25% crosses the 0, 10 and 20 marks in one tick.
+		gtm4wpMediaMilestones( marks, 'vid1', 25, 10, ( i ) =>
+			fired.push( i )
+		);
+
+		expect( fired ).toEqual( [ 0, 10, 20 ] );
+		expect( marks.vid1 ).toEqual( [ 0, 10, 20 ] );
+	} );
+
+	it( 'does not re-fire marks already recorded on a later tick', () => {
+		const marks = {};
+		const fired = [];
+
+		gtm4wpMediaMilestones( marks, 'vid1', 25, 10, ( i ) =>
+			fired.push( i )
+		);
+		fired.length = 0;
+		// A later tick at 45% must fire only the newly crossed 30 and 40 marks.
+		gtm4wpMediaMilestones( marks, 'vid1', 45, 10, ( i ) =>
+			fired.push( i )
+		);
+
+		expect( fired ).toEqual( [ 30, 40 ] );
+		expect( marks.vid1 ).toEqual( [ 0, 10, 20, 30, 40 ] );
+	} );
+
+	it( 'keeps marks independent per key', () => {
+		const marks = {};
+
+		gtm4wpMediaMilestones( marks, 'a', 25, 10, () => {} );
+		const firedForB = [];
+		gtm4wpMediaMilestones( marks, 'b', 15, 10, ( i ) =>
+			firedForB.push( i )
+		);
+
+		// 'b' is a fresh key: its 0 and 10 marks fire even though 'a' passed them.
+		expect( firedForB ).toEqual( [ 0, 10 ] );
+		expect( marks.a ).toEqual( [ 0, 10, 20 ] );
+		expect( marks.b ).toEqual( [ 0, 10 ] );
+	} );
+
+	it( 'fires nothing below the first mark', () => {
+		const marks = {};
+		const fired = [];
+
+		// Strictly-greater-than: at exactly 0% no mark has been passed yet.
+		gtm4wpMediaMilestones( marks, 'v', 0, 10, ( i ) => fired.push( i ) );
+
+		expect( fired ).toEqual( [] );
+		expect( marks.v ).toEqual( [] );
+	} );
+
+	it( 'fires every mark for a non-finite percentage (why callers must guard duration)', () => {
+		const marks = {};
+		const fired = [];
+
+		// time / 0 = Infinity, which is > every mark. This documents the
+		// contract: trackers must `if ( ! duration ) return;` before calling.
+		gtm4wpMediaMilestones( marks, 'v', Infinity, 10, ( i ) =>
+			fired.push( i )
+		);
+
+		expect( fired ).toEqual( [ 0, 10, 20, 30, 40, 50, 60, 70, 80, 90 ] );
+	} );
+} );
+
+describe( 'gtm4wpOnReady', () => {
+	afterEach( () => {
+		// Restore jsdom's default readyState getter between tests.
+		delete document.readyState;
+	} );
+
+	it( 'runs the callback synchronously when the DOM is already parsed', () => {
+		Object.defineProperty( document, 'readyState', {
+			value: 'complete',
+			configurable: true,
+		} );
+		const cb = jest.fn();
+
+		gtm4wpOnReady( cb );
+
+		expect( cb ).toHaveBeenCalledTimes( 1 );
+	} );
+
+	it( 'defers to DOMContentLoaded while the document is still loading', () => {
+		Object.defineProperty( document, 'readyState', {
+			value: 'loading',
+			configurable: true,
+		} );
+		const cb = jest.fn();
+
+		gtm4wpOnReady( cb );
+		// Not called yet: it waits for the DOM to finish parsing.
+		expect( cb ).not.toHaveBeenCalled();
+
+		// The helper listens on window, so dispatch there directly.
+		window.dispatchEvent( new window.Event( 'DOMContentLoaded' ) );
+		expect( cb ).toHaveBeenCalledTimes( 1 );
 	} );
 } );

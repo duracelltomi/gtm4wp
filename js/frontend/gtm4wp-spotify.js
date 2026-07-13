@@ -1,6 +1,7 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaMilestones,
 } from './lib/native-video-params';
 
 const gtm4wp_spotify_percentage_tracking = 10;
@@ -66,19 +67,12 @@ function gtm4wp_onSpotifyPercentageChange( uri, currentTime, duration ) {
 
 	const videoPercentage = Math.floor( ( currentTime / duration ) * 100 );
 
-	if (
-		typeof gtm4wp_spotify_percentage_tracking_marks[ uri ] === 'undefined'
-	) {
-		gtm4wp_spotify_percentage_tracking_marks[ uri ] = [];
-	}
-
-	for ( let i = 0; i < 100; i += gtm4wp_spotify_percentage_tracking ) {
-		if (
-			videoPercentage > i &&
-			gtm4wp_spotify_percentage_tracking_marks[ uri ].indexOf( i ) == -1
-		) {
-			gtm4wp_spotify_percentage_tracking_marks[ uri ].push( i );
-
+	gtm4wpMediaMilestones(
+		gtm4wp_spotify_percentage_tracking_marks,
+		uri,
+		videoPercentage,
+		gtm4wp_spotify_percentage_tracking,
+		function ( i ) {
 			const info = gtm4wp_spotifyMediaData( uri, duration );
 			window[ gtm4wp_datalayer_name ].push( {
 				event: 'gtm4wp.mediaPlaybackPercentage',
@@ -97,7 +91,7 @@ function gtm4wp_onSpotifyPercentageChange( uri, currentTime, duration ) {
 				} ),
 			} );
 		}
-	}
+	);
 }
 
 function gtm4wp_bindSpotifyController( controller, frame ) {
@@ -160,6 +154,14 @@ function gtm4wp_bindSpotifyController( controller, frame ) {
 }
 
 function gtm4wp_initSpotifyTracking() {
+	// Register once: if this bundle is executed twice (e.g. re-injected by a tag
+	// manager) it would chain its own onSpotifyIframeApiReady onto itself and
+	// create a controller per iframe twice, doubling every data layer push.
+	if ( window.gtm4wp_spotify_inited ) {
+		return;
+	}
+	window.gtm4wp_spotify_inited = true;
+
 	// The Spotify iFrame API invokes the global onSpotifyIframeApiReady callback
 	// when it loads. A previously registered callback (another integration) is
 	// preserved and chained so this tracker does not clobber it. If the API never

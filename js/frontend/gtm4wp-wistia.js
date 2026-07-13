@@ -1,12 +1,21 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaMilestones,
 } from './lib/native-video-params';
 
 const gtm4wp_wistia_percentage_tracking = 10;
 const gtm4wp_wistia_percentage_tracking_marks = {};
 
 function gtm4wp_initWistiaTracking() {
+	// Bind once: if this bundle is executed twice (e.g. re-injected by a tag
+	// manager) a second `_wq` push would register `onReady` again and every
+	// Wistia event would be pushed to the data layer twice.
+	if ( window.gtm4wp_wistia_inited ) {
+		return;
+	}
+	window.gtm4wp_wistia_inited = true;
+
 	// Wistia's Player API is consumed through the global `_wq` ready queue rather
 	// than a script we enqueue: pushing a handler with id '_all' registers an
 	// onReady callback for every Wistia video on the page, and Wistia's own embed
@@ -67,29 +76,12 @@ function gtm4wp_initWistiaTracking() {
 			const gtm4wp_onWistiaPercentageChange = function ( percent ) {
 				const videoPercentage = Math.floor( percent * 100 );
 
-				if (
-					typeof gtm4wp_wistia_percentage_tracking_marks[
-						videoid
-					] === 'undefined'
-				) {
-					gtm4wp_wistia_percentage_tracking_marks[ videoid ] = [];
-				}
-
-				for (
-					let i = 0;
-					i < 100;
-					i += gtm4wp_wistia_percentage_tracking
-				) {
-					if (
-						videoPercentage > i &&
-						gtm4wp_wistia_percentage_tracking_marks[
-							videoid
-						].indexOf( i ) == -1
-					) {
-						gtm4wp_wistia_percentage_tracking_marks[ videoid ].push(
-							i
-						);
-
+				gtm4wpMediaMilestones(
+					gtm4wp_wistia_percentage_tracking_marks,
+					videoid,
+					videoPercentage,
+					gtm4wp_wistia_percentage_tracking,
+					function ( i ) {
 						window[ gtm4wp_datalayer_name ].push( {
 							event: 'gtm4wp.mediaPlaybackPercentage',
 							mediaType: 'wistia',
@@ -107,7 +99,7 @@ function gtm4wp_initWistiaTracking() {
 							} ),
 						} );
 					}
-				}
+				);
 			};
 
 			window[ gtm4wp_datalayer_name ].push( {

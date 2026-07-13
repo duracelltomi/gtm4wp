@@ -36,6 +36,9 @@ describe( 'gtm4wp-spotify', () => {
 
 	beforeEach( () => {
 		window.dataLayer = [];
+		// The tracker guards against double-init via this window flag; clear it
+		// so each isolated re-require re-registers onSpotifyIframeApiReady.
+		delete window.gtm4wp_spotify_inited;
 		controller = new FakeSpotifyController();
 		document.body.innerHTML =
 			'<iframe src="https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT"></iframe>';
@@ -198,5 +201,20 @@ describe( 'gtm4wp-spotify', () => {
 		// onSpotifyIframeApiReady is defined but never called by the (absent) SDK.
 		expect( typeof window.onSpotifyIframeApiReady ).toBe( 'function' );
 		expect( window.dataLayer ).toHaveLength( 0 );
+	} );
+
+	it( 'does not re-register onSpotifyIframeApiReady when the bundle loads twice (regression: double-init)', () => {
+		jest.isolateModules( () => {
+			require( '../gtm4wp-spotify' );
+		} );
+		const firstCallback = window.onSpotifyIframeApiReady;
+
+		// A second execution (e.g. re-injected by a tag manager) must bail so it
+		// does not chain onto itself and create a controller per iframe twice.
+		jest.isolateModules( () => {
+			require( '../gtm4wp-spotify' );
+		} );
+
+		expect( window.onSpotifyIframeApiReady ).toBe( firstCallback );
 	} );
 } );

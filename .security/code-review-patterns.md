@@ -29,6 +29,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-7** — `$wpdb` queries with input use `$wpdb->prepare()`; no string-interpolated SQL.
 - **RI-8** — WooCommerce order/customer data via WC CRUD API, never `get_post_meta()` on orders (HPOS).
 - **RI-9** — a change to any `js/**/*.js` source is rebuilt into `build/` (`npm run build`) in the same commit.
+- **RI-10** — every variable in a frontend JS file is declared with `const`/`let`; the files are ES modules bundled `"use strict"`, so a bare undeclared assignment (`player = …`) throws a `ReferenceError` at runtime.
 
 **Project-Specific Anti-Patterns (PA):**
 - **PA-2** — container ID/domain/path re-validated at the output sink (`GTM_ID_PATTERN`, `filter_var(FILTER_VALIDATE_DOMAIN)`, path allow-list), not trusted just because stored.
@@ -37,6 +38,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **PA-6** — a new module registers through the `src/Module/` framework (AbstractModule + Registry + AdminSchema), not ad-hoc `add_action` scattered in the bootstrap.
 - **PA-7** — a data-bearing string used as the *replacement* arg of `preg_replace`/`str_replace` (product-list attribute injection) is mangled by `$n`/`\1` sequences; use `preg_replace_callback` or `addcslashes(…, '\\$')`.
 - **PA-8** — `wc_enqueue_js()` is deprecated (WC 10.4); do not reintroduce it — emit inline JS via `wp_add_inline_script()`. It was also a raw-`<script>` sink, so JSON in any inline-script body still needs the RI-2 hex flags.
+- **PA-9** — a new embedded-media tracker follows the tracker template: a raw `window` `message` listener MUST validate `event.origin` against a host allow-list before trusting the payload (VideoPress is the reference; SDK callbacks are exempt); push only to `window[gtm4wp_datalayer_name]` (never an HTML/JS sink); parse only the embed iframe's own `src` (never `location.search`/`hash`/`referrer`/`cookie`); guard `if ( ! duration ) return;` before any percentage division; and guard against double-init.
 
 **False Positive Suppressions (FP) — do NOT flag:**
 - **FP-1** — `echo` in `ScriptTag::print_script_block()` with `phpcs:ignore WordPress.Security.EscapeOutput` — the string is `wp_kses`-sanitized and only the ampersand is restored; intentional and reviewed.
@@ -84,7 +86,10 @@ Any `$wpdb->query`/`get_var`/`get_results` with interpolated input must use `$wp
 Never use `get_post_meta()`/`update_post_meta()` for order data — use the WC CRUD API (`$order->get_*()`/`$order->update_meta_data()`) so the plugin stays HPOS-compatible. Applies to any new order-touching code.
 
 ### RI-9: JS source changed without rebuilding `build/`
-`js/**/*.js` is compiled to `build/` by `wp-scripts`. A change to a source file without a matching regenerated `build/` artifact ships stale runtime code. After editing `js/`, run `npm run build` and `npm run lint:js` and commit the `build/` output.
+`js/**/*.js` is compiled to `build/` by `wp-scripts`. A change to a source file without a matching regenerated `build/` artifact ships stale runtime code. After editing `js/`, run `npm run build` and `npm run lint:js`. (Note: `build/` is git-ignored in this repo — the release ZIP is produced by `tools/build-release.js` — so "commit `build/`" does not apply here; regenerate it for local verification.)
+
+### RI-10: Undeclared variable in a frontend JS file
+Every `js/frontend/**/*.js` file is an ES module (it `import`s helpers) and is bundled by `wp-scripts` into a `"use strict"` IIFE. A bare assignment to an undeclared identifier (e.g. `player = new YT.Player(...)` with no `var`/`let`/`const`) is a silent auto-global in sloppy mode but throws `ReferenceError` under strict mode — the exact context these bundles run in. Such a throw inside a `forEach`/loop aborts the remaining iterations. Confirmed 2026-07-13: `gtm4wp-youtube.js:58` (finding #19) breaks multi-video tracking. Flag any assignment whose left side is never declared. ESLint's `no-undef` catches this if the global isn't whitelisted — do not add tracker-local names to the `.eslintrc.js` `globals` list to silence it.
 
 ---
 
@@ -116,6 +121,13 @@ WooCommerce deprecated `wc_enqueue_js()` in 10.4 (removal in a future version): 
 
 ---
 
+### PA-9: Embedded-media tracker template conventions
+The `js/frontend/gtm4wp-*.js` media trackers form a family with a shared contract; a new one (or a modification) must keep to it:
+- **Origin validation (security):** if the tracker attaches a raw `window.addEventListener('message', …)` listener, it MUST validate `event.origin` against a host allow-list (parse `new URL(origin).host`, allow-list exact host + known subdomain suffixes) before trusting `event.data`, and guard the `JSON.parse`. `gtm4wp-videopress.js` is the reference. Trackers driven by a vendor SDK callback (`controller.addListener`, `player.addEventListener`, `_wq` ready queue) are exempt — the SDK gates origin.
+- **Sink:** push only to `window[gtm4wp_datalayer_name]` (a JS object push). No tracker builds HTML/JS — no `innerHTML`/`eval`/`document.write`/`element.src = <data>`. Escaping any value a downstream GTM tag writes to the DOM is the GTM tag's job, not the tracker's, so SDK/iframe-`src`-sourced strings are pushed raw (correct).
+- **Provenance:** parse only the embed iframe's own `src` (`new URL(frame.getAttribute('src'), location.href)` — `location.href` is only the resolution base). Never read `location.search`/`hash`/`document.referrer`/`document.cookie`.
+- **Consistency:** guard `if ( ! duration ) return;` before any percentage division (avoids `NaN`, matches siblings); guard against double-init (remove-before-rebind, or a `window.gtm4wp_<provider>_inited` flag) so a re-injected bundle does not double-push.
+
 ## False Positive Suppressions
 
 ### FP-1: `echo` in `ScriptTag::print_script_block()`
@@ -136,3 +148,4 @@ Carries a `phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped`. The b
 | 2026-07-10 (Review 1) | Seeded the patterns file. Added RI-2/RI-3/RI-4 (dataLayer/inline-script escaping: full hex flag set, no blanket `htmlspecialchars_decode`, pre-encoded-value trap) and PA-3/PA-4 (request-sourced dataLayer fields, `esc_js` misuse) from the reflected-XSS review that fixed `?s=` search-term break-out via `print_script_block`. Added core WordPress-plugin RI/PA/FP (ABSPATH guard, i18n, superglobal sanitization, `$wpdb->prepare`, WC CRUD/HPOS, JS rebuild; nonce+capability, option-at-sink validation, module framework; print_script_block + wp_add_inline_script + `$echo` suppressions). |
 | 2026-07-10 (Review 2) | Extended **RI-2** with the script-context matrix (which sink needs which flags; flagged `wc_enqueue_js` as a raw-`<script>` sink and `esc_attr(wp_json_encode)` in attributes as already-safe). Extended **RI-4** with the post-hardening data-corruption consequence (leftover `esc_js` now mangles dataLayer data, not just an XSS trap). Added **PA-7** (data-bearing string as a `preg_replace`/`str_replace` replacement arg). From the first full pass over the previously-unreviewed component groups + all six whole-repo sweeps (report `-1606`). |
 | 2026-07-13 | Migrated the plugin's only `wc_enqueue_js()` call (checkout `window.gtm4wp_checkout_*` globals in `PageDataLayer`) to `wp_add_inline_script( 'gtm4wp-woocommerce', …, 'before' )` per the WC 10.4 deprecation, with the full hex-flag set on that JSON. Promoted the `wc_enqueue_js` note to **PA-8** (deprecated — don't reintroduce; use `wp_add_inline_script`) and updated the RI-2 script-context matrix to match. |
+| 2026-07-13 (Review 3) | Reviewed the MediaEvents expansion (11 media trackers incl. 8 new, `lib/native-video-params.js`, 12 `EVENTS_*` options). Added **RI-10** (undeclared variable → strict-mode `ReferenceError` in the ES-module bundle; from finding #19, `gtm4wp-youtube.js`) and **PA-9** (embedded-media tracker template conventions: origin-validate raw `postMessage`, dataLayer-only sink, parse own iframe `src` only, `if(!duration)return` guard, double-init guard). Clarified RI-9 that `build/` is git-ignored here. Trackers confirmed free of HTML/JS injection sinks; VideoPress origin-validation is the reference for message handlers. |

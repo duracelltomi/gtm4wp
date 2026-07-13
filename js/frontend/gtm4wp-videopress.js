@@ -1,6 +1,8 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaMilestones,
+	gtm4wpOnReady,
 } from './lib/native-video-params';
 
 const gtm4wp_videopress_percentage_tracking = 10;
@@ -66,22 +68,12 @@ function gtm4wp_initVideoPressTracking() {
 
 		const videoPercentage = Math.floor( ( currentTime / duration ) * 100 );
 
-		if (
-			typeof gtm4wp_videopress_percentage_tracking_marks[ guid ] ===
-			'undefined'
-		) {
-			gtm4wp_videopress_percentage_tracking_marks[ guid ] = [];
-		}
-
-		for ( let i = 0; i < 100; i += gtm4wp_videopress_percentage_tracking ) {
-			if (
-				videoPercentage > i &&
-				gtm4wp_videopress_percentage_tracking_marks[ guid ].indexOf(
-					i
-				) == -1
-			) {
-				gtm4wp_videopress_percentage_tracking_marks[ guid ].push( i );
-
+		gtm4wpMediaMilestones(
+			gtm4wp_videopress_percentage_tracking_marks,
+			guid,
+			videoPercentage,
+			gtm4wp_videopress_percentage_tracking,
+			function ( i ) {
 				window[ gtm4wp_datalayer_name ].push( {
 					event: 'gtm4wp.mediaPlaybackPercentage',
 					mediaType: 'videopress',
@@ -99,7 +91,7 @@ function gtm4wp_initVideoPressTracking() {
 					} ),
 				} );
 			}
-		}
+		);
 	};
 
 	const gtm4wp_onVideoPressStateChange = function (
@@ -241,15 +233,4 @@ function gtm4wp_initVideoPressTracking() {
 	window.addEventListener( 'message', gtm4wp_onVideoPressMessage );
 }
 
-// The tracker bundle may execute before or after the DOM has finished parsing
-// (e.g. when loaded with a defer/async strategy or injected late by a tag
-// manager). Guard against a DOMContentLoaded event that has already fired,
-// which would otherwise leave the tracking silently uninitialized.
-if ( document.readyState === 'loading' ) {
-	window.addEventListener(
-		'DOMContentLoaded',
-		gtm4wp_initVideoPressTracking
-	);
-} else {
-	gtm4wp_initVideoPressTracking();
-}
+gtm4wpOnReady( gtm4wp_initVideoPressTracking );

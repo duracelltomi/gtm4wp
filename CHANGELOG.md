@@ -30,6 +30,10 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 * Deprecated: the "YouTube video events" option - Google Tag Manager now ships a native YouTube Video trigger, so YouTube tracking should be migrated to it; the plugin continues to populate GTM's built-in Video variables for the other players.
 * Updated: WooCommerce 10.4 compatibility - the checkout inline script no longer uses the deprecated `wc_enqueue_js()` function.
 * Fixed: AMP data layer injection - 1.x checked a never-populated global and never injected the data layer into AMP pages.
+* Fixed: YouTube media tracking threw a script error ("player is not defined") as soon as a video was embedded, because the 2.0 tracker runs in strict mode; this aborted wiring for any additional YouTube embeds on the same page.
+* Fixed: the YouTube tracker now loads for modern block-editor embeds and classic URL auto-embeds, not only the legacy embed block or a hand-written `<iframe>`.
+* Fixed: the YouTube embed URL could receive a malformed query string (`?&enablejsapi=1`) when the embed carried no existing query parameters.
+* Fixed: media players that report a zero or unknown duration (e.g. live streams) no longer emit every playback-percentage milestone at once.
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
 * Removed: WP e-Commerce integration.
 * Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead. The `GTM4WP_OPTION_SCROLLER_*` constants remain in place for backward compatibility.

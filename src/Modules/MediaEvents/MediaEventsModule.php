@@ -108,14 +108,25 @@ final class MediaEventsModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_YOUTUBE ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_youtube', true );
 
-			if (
-				isset( $GLOBALS['post'] )
-				&& (
+			if ( isset( $GLOBALS['post'] ) ) {
+				$post_content = (string) $GLOBALS['post']->post_content;
+
+				// Enqueue the YouTube tracker whenever the post can render a
+				// YouTube embed. Besides the legacy core-embed/youtube block,
+				// this covers the modern core/embed block and classic-editor URL
+				// auto-embeds (whose stored content holds only the bare URL,
+				// never an <iframe>), plus manually pasted iframes - all of which
+				// carry a youtube.com / youtu.be URL. The tracker bails harmlessly
+				// if the rendered page contains no YouTube player iframe.
+				$has_youtube_embed = (
 					has_block( 'core-embed/youtube', $GLOBALS['post'] )
-					|| ( strpos( $GLOBALS['post']->post_content, '<iframe' ) !== false && strpos( $GLOBALS['post']->post_content, 'youtu' ) !== false )
-				)
-			) {
-				$this->enqueue_script( 'gtm4wp-youtube', 'gtm4wp-youtube.js', array(), $in_footer );
+					|| false !== strpos( $post_content, 'youtube.com' )
+					|| false !== strpos( $post_content, 'youtu.be' )
+				);
+
+				if ( $has_youtube_embed ) {
+					$this->enqueue_script( 'gtm4wp-youtube', 'gtm4wp-youtube.js', array(), $in_footer );
+				}
 			}
 		}
 

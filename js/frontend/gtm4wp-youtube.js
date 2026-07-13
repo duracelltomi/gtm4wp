@@ -1,6 +1,7 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaMilestones,
 } from './lib/native-video-params';
 
 const gtm4wp_youtube_percentage_tracking = 10;
@@ -42,12 +43,18 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 
 			let gtm4wp_yturl = youtube_frame.getAttribute( 'src' );
 			if ( gtm4wp_yturl.indexOf( 'enablejsapi=1' ) == -1 ) {
-				if ( gtm4wp_yturl.indexOf( '?' ) == -1 ) {
-					gtm4wp_yturl += '?';
-				}
+				// Use the correct query separator: '?' when the src carries no
+				// query yet, '&' otherwise. (The previous code always appended
+				// '?' and then '&enablejsapi=1', producing a stray '?&'.) The
+				// origin is a scheme://host built from location, which the
+				// YouTube API expects raw and un-encoded - matching the
+				// server-side enable_youtube_js_api() oEmbed filter.
+				const gtm4wp_ytsep =
+					gtm4wp_yturl.indexOf( '?' ) == -1 ? '?' : '&';
 
 				gtm4wp_yturl +=
-					'&enablejsapi=1&origin=' +
+					gtm4wp_ytsep +
+					'enablejsapi=1&origin=' +
 					document.location.protocol +
 					'//' +
 					document.location.hostname;
@@ -55,7 +62,7 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 				youtube_frame.setAttribute( 'src', gtm4wp_yturl );
 			}
 
-			player = new YT.Player( playerID, {
+			new YT.Player( playerID, {
 				events: {
 					onReady: gtm4wp_onYouTubePlayerReady,
 					onStateChange: gtm4wp_onYouTubePlayerStateChange,
@@ -239,30 +246,24 @@ function gtm4wp_onYouTubeApiChange( event ) {
 }
 
 function gtm4wp_onYouTubePercentageChange( event ) {
+	const videoDuration = event.target.getDuration();
+	if ( ! videoDuration ) {
+		return;
+	}
 	const videoId = event.target.getVideoData().video_id;
 	const videoCurrentTime = event.target.getCurrentTime();
-	const videoDuration = event.target.getDuration();
 	const videoPercentage = Math.floor(
 		( videoCurrentTime / videoDuration ) * 100
 	);
 
-	if (
-		typeof gtm4wp_youtube_percentage_tracking_marks[ videoId ] ===
-		'undefined'
-	) {
-		gtm4wp_youtube_percentage_tracking_marks[ videoId ] = [];
-	}
-
 	const videodata = event.target.getVideoData();
 
-	for ( let i = 0; i < 100; i += gtm4wp_youtube_percentage_tracking ) {
-		if (
-			videoPercentage > i &&
-			gtm4wp_youtube_percentage_tracking_marks[ videoId ].indexOf( i ) ==
-				-1
-		) {
-			gtm4wp_youtube_percentage_tracking_marks[ videoId ].push( i );
-
+	gtm4wpMediaMilestones(
+		gtm4wp_youtube_percentage_tracking_marks,
+		videoId,
+		videoPercentage,
+		gtm4wp_youtube_percentage_tracking,
+		function ( i ) {
 			window[ gtm4wp_datalayer_name ].push( {
 				event: 'gtm4wp.mediaPlaybackPercentage',
 				mediaType: 'youtube',
@@ -286,5 +287,5 @@ function gtm4wp_onYouTubePercentageChange( event ) {
 				} ),
 			} );
 		}
-	}
+	);
 }
