@@ -15,9 +15,13 @@ use GTM4WP\Module\AbstractModule;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Loads the YouTube, Vimeo and SoundCloud interaction tracking scripts.
- * Port of integration/youtube.php, integration/vimeo.php and
- * integration/soundcloud.php from 1.x.
+ * Loads the embedded media player interaction tracking scripts.
+ *
+ * YouTube, Vimeo, SoundCloud and native HTML5 media are ports of the 1.x
+ * integration/*.php trackers. Dailymotion, Mixcloud, Cloudflare Stream, Wistia,
+ * JW Player, VideoPress, Spotify and Twitch are 2.0 additions; every tracker
+ * pushes the same gtm4wp.media* data layer shape and populates GTM's built-in
+ * Video variables via js/frontend/lib/native-video-params.js.
  */
 final class MediaEventsModule extends AbstractModule {
 
@@ -37,10 +41,18 @@ final class MediaEventsModule extends AbstractModule {
 	 */
 	public function defaults(): array {
 		return array(
-			GTM4WP_OPTION_EVENTS_YOUTUBE    => false,
-			GTM4WP_OPTION_EVENTS_VIMEO      => false,
-			GTM4WP_OPTION_EVENTS_SOUNDCLOUD => false,
-			GTM4WP_OPTION_EVENTS_HTML5MEDIA => false,
+			GTM4WP_OPTION_EVENTS_YOUTUBE          => false,
+			GTM4WP_OPTION_EVENTS_VIMEO            => false,
+			GTM4WP_OPTION_EVENTS_SOUNDCLOUD       => false,
+			GTM4WP_OPTION_EVENTS_HTML5MEDIA       => false,
+			GTM4WP_OPTION_EVENTS_DAILYMOTION      => false,
+			GTM4WP_OPTION_EVENTS_MIXCLOUD         => false,
+			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM => false,
+			GTM4WP_OPTION_EVENTS_WISTIA           => false,
+			GTM4WP_OPTION_EVENTS_JWPLAYER         => false,
+			GTM4WP_OPTION_EVENTS_VIDEOPRESS       => false,
+			GTM4WP_OPTION_EVENTS_SPOTIFY          => false,
+			GTM4WP_OPTION_EVENTS_TWITCH           => false,
 		);
 	}
 
@@ -129,6 +141,89 @@ final class MediaEventsModule extends AbstractModule {
 			// Vanilla tracker: it binds to <video>/<audio> elements with the
 			// native addEventListener API and needs no external dependency.
 			$this->enqueue_script( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_DAILYMOTION ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_dailymotion', true );
+
+			// Dailymotion JS SDK: exposes the `DM` global used to wrap each
+			// dailymotion.com/dai.ly iframe embedded via WordPress oEmbed.
+			wp_enqueue_script( 'gtm4wp-dailymotion-api', 'https://api.dmcdn.net/all.js', array(), '1.0', $in_footer );
+			$this->enqueue_script( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', array( 'gtm4wp-dailymotion-api' ), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_MIXCLOUD ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_mixcloud', true );
+
+			// Mixcloud Widget API: exposes the `Mixcloud` global used to build a
+			// PlayerWidget for each mixcloud.com iframe (audio, like SoundCloud).
+			wp_enqueue_script( 'gtm4wp-mixcloud-api', 'https://widget.mixcloud.com/media/js/widgetApi.js', array(), '1.0', $in_footer );
+			$this->enqueue_script( 'gtm4wp-mixcloud', 'gtm4wp-mixcloud.js', array( 'gtm4wp-mixcloud-api' ), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_cloudflarestream', true );
+
+			// Cloudflare Stream Player SDK: exposes the `Stream` global used to
+			// wrap each cloudflarestream.com/videodelivery.net iframe.
+			wp_enqueue_script( 'gtm4wp-cloudflarestream-api', 'https://embed.cloudflarestream.com/embed/sdk.latest.js', array(), '1.0', $in_footer );
+			$this->enqueue_script( 'gtm4wp-cloudflarestream', 'gtm4wp-cloudflarestream.js', array( 'gtm4wp-cloudflarestream-api' ), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_WISTIA ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_wistia', true );
+
+			// No SDK is enqueued: Wistia's embed loads its own player runtime and
+			// the tracker binds through the global `window._wq` ready queue, so it
+			// works whether the embed script is already present or loads later.
+			$this->enqueue_script( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_JWPLAYER ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_jwplayer', true );
+
+			// No SDK is enqueued: the site already loads its own JW Player
+			// library; the tracker only hooks the existing `jwplayer` global.
+			$this->enqueue_script( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', array(), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_VIDEOPRESS ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_videopress', true );
+
+			// No SDK is enqueued: VideoPress uses a postMessage API, so the
+			// tracker listens for messages from the player iframes directly.
+			$this->enqueue_script( 'gtm4wp-videopress', 'gtm4wp-videopress.js', array(), $in_footer );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_SPOTIFY ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_spotify', true );
+
+			// Spotify iFrame API: calls the global `onSpotifyIframeApiReady`
+			// callback with the IFrameAPI used to control each open.spotify.com
+			// embed. The tracker defines that callback, so it must run before the
+			// SDK: the SDK depends on the tracker handle and is loaded with the
+			// same defer strategy so both execute in dependency order.
+			$this->enqueue_script( 'gtm4wp-spotify', 'gtm4wp-spotify.js', array(), $in_footer );
+			wp_enqueue_script(
+				'gtm4wp-spotify-api',
+				'https://open.spotify.com/embed/iframe-api/v1',
+				array( 'gtm4wp-spotify' ),
+				'1.0',
+				array(
+					'in_footer' => $in_footer,
+					'strategy'  => 'defer',
+				)
+			);
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_TWITCH ) ) {
+			$in_footer = (bool) apply_filters( 'gtm4wp_twitch', true );
+
+			// Twitch Embed API: exposes the `Twitch` global. The tracker upgrades
+			// each Twitch embed container into a Twitch.Embed so it can subscribe
+			// to player events (a plain iframe cannot be wrapped after the fact).
+			wp_enqueue_script( 'gtm4wp-twitch-api', 'https://embed.twitch.tv/embed/v1.js', array(), '1.0', $in_footer );
+			$this->enqueue_script( 'gtm4wp-twitch', 'gtm4wp-twitch.js', array( 'gtm4wp-twitch-api' ), $in_footer );
 		}
 	}
 }

@@ -94,6 +94,14 @@ define( 'GTM4WP_OPTION_EVENTS_YOUTUBE', 'event-youtube' );
 define( 'GTM4WP_OPTION_EVENTS_VIMEO', 'event-vimeo' );
 define( 'GTM4WP_OPTION_EVENTS_SOUNDCLOUD', 'event-soundcloud' );
 define( 'GTM4WP_OPTION_EVENTS_HTML5MEDIA', 'event-html5-media' );
+define( 'GTM4WP_OPTION_EVENTS_DAILYMOTION', 'event-dailymotion' );
+define( 'GTM4WP_OPTION_EVENTS_MIXCLOUD', 'event-mixcloud' );
+define( 'GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM', 'event-cloudflare-stream' );
+define( 'GTM4WP_OPTION_EVENTS_WISTIA', 'event-wistia' );
+define( 'GTM4WP_OPTION_EVENTS_JWPLAYER', 'event-jwplayer' );
+define( 'GTM4WP_OPTION_EVENTS_VIDEOPRESS', 'event-videopress' );
+define( 'GTM4WP_OPTION_EVENTS_SPOTIFY', 'event-spotify' );
+define( 'GTM4WP_OPTION_EVENTS_TWITCH', 'event-twitch' );
 
 // Scroll tracking was removed in 2.0 (GTM has built-in scroll depth
 // tracking); the option keys are kept here for third party compatibility and

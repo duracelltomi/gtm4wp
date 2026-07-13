@@ -14,6 +14,7 @@
 * Updated: SoundCloud tracker hardened - bails out gracefully when the SoundCloud Widget API is blocked (consent manager, ad blocker, network error), still initializes when the script loads after the page is parsed (defer/async or late injection), and now reports the correct track metadata for playlist / multi-track widgets
 * Changed: HTML5 `<video>`/`<audio>` media tracking is promoted from experimental to stable
 * Updated: HTML5 media tracker modernized - rewritten in vanilla JS (no more jQuery dependency), fires the ready event with the real media duration, tracks buffering (the `waiting` event) plus Picture-in-Picture and fullscreen changes on video, normalizes the event mediaType to `html5media`, and initializes reliably when loaded after the page is parsed (defer/async or late injection)
+* Added: media player tracking for eight more players, each as its own opt-in option under Media events → Media players (experimental): Dailymotion, Mixcloud, Cloudflare Stream, Wistia, JW Player, VideoPress, Spotify and Twitch. Each fires the same `gtm4wp.media*` events (ready, state change, playback percentage, player event) as the existing players and also populates Google Tag Manager's built-in Video variables. Notes: Spotify derives play/pause/finished states from its periodic playback updates (the only signal the Spotify embed exposes); Twitch reports current time and duration for videos (VODs) only, not live streams
 
 ## 1.21.1
 

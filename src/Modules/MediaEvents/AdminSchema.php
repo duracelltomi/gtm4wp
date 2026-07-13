@@ -89,6 +89,78 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a native HTML5 <video> or <audio> player embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
 				group: 'players'
 			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_DAILYMOTION,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Dailymotion video events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Dailymotion video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_MIXCLOUD,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Mixcloud events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Mixcloud show embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Cloudflare Stream video events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Cloudflare Stream video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_WISTIA,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Wistia video events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Wistia video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_JWPLAYER,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'JW Player video events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a JW Player video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_VIDEOPRESS,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'VideoPress video events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a VideoPress (Jetpack/WordPress.com) video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_SPOTIFY,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Spotify events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Spotify track, episode or playlist embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables. Note: the Spotify embed only reports periodic playback updates, so play, pause and finished states are derived from those updates.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_TWITCH,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Twitch events', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Twitch stream or video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables. Note: current time and duration are only available for videos (VODs), not live streams.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
 		);
 	}
 

@@ -102,9 +102,18 @@ Track users' interaction with any embedded media:
 * Vimeo
 * Soundcloud
 * HTML5 audio and video
+* Dailymotion
+* Mixcloud
+* Cloudflare Stream
+* Wistia
+* JW Player
+* VideoPress
+* Spotify
+* Twitch
 
 DataLayer events can be chosen to fire upon media player load, media is being played, paused/stopped and optionally when
-the user reaches 10, 20, 30, ..., 90, 100% of the media duration.
+the user reaches 10, 20, 30, ..., 90, 100% of the media duration. Each event also populates Google Tag Manager's built-in
+Video variables (Video Status, Video URL, Video Title, Video Provider, Video Duration, Video Current Time, Video Percent).
 
 Tracking is supported for embedded media using the built-in oEmbed feature of WordPress as well as most other media plugins
 and copy/pasted codes. Players injected into the website after page load are not currently supported.
@@ -203,6 +212,7 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * New: containers are managed in a data table where every Google Tag Manager ID has its own environment parameters (gtm_auth/gtm_preview), custom domain and custom path. Existing settings are migrated automatically; the flat 1.x option keys are kept in sync for third party code and downgrades.
 * Changed: with environment parameters configured, all containers are loaded now (1.x only loaded the first container in that case). Only the hard coded wp-config environment constants still limit output to the first container.
 * New: browser, OS and device data is now collected in the browser using User-Agent Client Hints and pushed as a gtm4wp.deviceData event (replaces the bundled WhichBrowser library; Safari and Firefox expose less detail).
+* New: media player tracking added for Dailymotion, Mixcloud, Cloudflare Stream, Wistia, JW Player, VideoPress, Spotify and Twitch (alongside the existing YouTube, Vimeo, Soundcloud and HTML5 players); every media event also populates Google Tag Manager's built-in Video variables.
 * Updated: tag blacklist entity list refreshed from Google's restriction documentation (added Google tag/GA4 tags and the Google Analytics Settings variable, removed Universal Analytics and Mouseflow).
 * Updated: frontend scripts load with the defer strategy where possible.
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).

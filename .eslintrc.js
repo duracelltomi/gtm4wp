@@ -47,6 +47,11 @@ module.exports = {
 				YT: 'readonly',
 				SC: 'readonly',
 				Vimeo: 'readonly',
+				DM: 'readonly',
+				Mixcloud: 'readonly',
+				Stream: 'readonly',
+				jwplayer: 'readonly',
+				Twitch: 'readonly',
 			},
 			rules: {
 				// gtm4wp_* snake_case identifiers are the public 1.x JS API.
