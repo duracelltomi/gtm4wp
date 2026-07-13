@@ -73,6 +73,26 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$this->assertSame( 'denied', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ) );
 	}
 
+	public function test_flag_filter_can_grant_a_disabled_option(): void {
+		// The overwrite filter works in both directions: it can also turn a
+		// disabled option into "granted".
+		Filters\expectApplied( GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG )
+			->once()
+			->with( false, GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS )
+			->andReturn( true );
+
+		$consent = new ConsentDefaults(
+			$this->make_options(
+				array(
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS => false,
+				)
+			)
+		);
+
+		$this->assertSame( 'granted', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
+	}
+
 	public function test_script_block_contains_all_seven_signals(): void {
 		$options = $this->make_options(
 			array(

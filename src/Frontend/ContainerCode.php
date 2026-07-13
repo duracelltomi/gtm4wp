@@ -370,14 +370,22 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 <!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
 <!-- Google Tag Manager (noscript) -->';
 
-		if ( ( GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) ) && ( ! $no_console_log ) ) {
+		if ( GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) ) {
+			// Placement OFF means the container code (both the head loader and
+			// this noscript iframe) is never auto-emitted; only the data layer
+			// stays active. Mark the code as "written" regardless of the
+			// console-log setting so the iframe block below is always skipped -
+			// otherwise, with console logging disabled, the iframe would still
+			// be output despite the OFF placement.
 			$GLOBALS['gtm4wp_container_code_written'] = true;
 
-			$_gtm_tag .= '
+			if ( ! $no_console_log ) {
+				$_gtm_tag .= '
 ' . $this->script_tag->opening_tag() . '
 	console.warn && console.warn("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
 </script>';
+			}
 		}
 
 		if ( ( array() !== $containers ) && ( ! ( $GLOBALS['gtm4wp_container_code_written'] ?? false ) ) ) {

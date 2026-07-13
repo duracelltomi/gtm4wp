@@ -135,6 +135,24 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringNotContainsString( 'ns.html', $tag );
 	}
 
+	public function test_get_tag_off_placement_suppresses_iframe_even_without_console_log(): void {
+		// Regression: placement OFF must never emit the container iframe, even
+		// when console logging is disabled (so no warning marks the code as
+		// written). Only the data layer stays active in that case.
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE      => 'GTM-ABC123',
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_OFF,
+				GTM4WP_OPTION_NOCONSOLELOG  => true,
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringNotContainsString( 'ns.html', $tag, 'Placement OFF must not emit the iframe with console logging off.' );
+		$this->assertStringNotContainsString( 'container code placement set to OFF', $tag, 'No console warning is emitted when console logging is disabled.' );
+	}
+
 	public function test_header_begin_outputs_datalayer_and_container_loader(): void {
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_CONTAINER_CODE )->once();
@@ -218,6 +236,68 @@ final class ContainerCodeTest extends FrontendTestCase {
 
 		$this->assertStringContainsString( 'disabled for this user role: editor', $output );
 		$this->assertStringNotContainsString( 'gtm.js?id=', $output );
+	}
+
+	public function test_header_begin_off_placement_silent_when_console_log_disabled(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE      => 'GTM-AAA111',
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_OFF,
+				GTM4WP_OPTION_NOCONSOLELOG  => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content', $output, 'The data layer is still output with the container off.' );
+		$this->assertStringNotContainsString( 'console.warn', $output, 'No console warning is emitted when console logging is disabled.' );
+		$this->assertStringNotContainsString( 'gtm.js?id=', $output );
+	}
+
+	public function test_header_begin_disabled_role_silent_when_console_log_disabled(): void {
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array( 'roles' => array( 'editor' ) )
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE         => 'GTM-AAA111',
+				GTM4WP_OPTION_NOGTMFORLOGGEDIN => 'administrator,editor',
+				GTM4WP_OPTION_NOCONSOLELOG     => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringNotContainsString( 'console.warn', $output, 'The disabled-role warning is suppressed when console logging is off.' );
+		$this->assertStringNotContainsString( 'gtm.js?id=', $output, 'The container loader is still omitted for the disabled role.' );
+	}
+
+	public function test_header_begin_falls_back_to_default_path_on_invalid_custom_path(): void {
+		// The custom loader path is re-validated at the output sink (PA-2); an
+		// invalid value falls back to gtm.js instead of reaching the script src.
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'     => 'GTM-AAA111',
+						'domain' => 'gtm.example.com',
+						'path'   => 'bad path!.js',
+					),
+				),
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//gtm.example.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringNotContainsString( 'bad path', $output );
 	}
 
 	public function test_header_begin_outputs_consent_defaults_before_loader(): void {
@@ -471,5 +551,142 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$output = ob_get_clean();
 
 		$this->assertSame( '', $output );
+	}
+
+	public function test_header_top_returns_markup_when_echo_disabled(): void {
+		// The $echo = false path (used by the AMP integration) returns the
+		// markup instead of printing it.
+		$container = $this->make_container( array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' ) );
+
+		ob_start();
+		$result = $container->header_top( false );
+		$echoed = ob_get_clean();
+
+		$this->assertSame( '', $echoed, 'With $echo = false nothing is printed.' );
+		$this->assertIsString( $result );
+		$this->assertStringContainsString( 'var customDL = customDL || [];', $result );
+		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $result );
+	}
+
+	public function test_header_top_appends_header_top_inline_js_filter(): void {
+		// Modules (e.g. consent tool integrations) append their inline JS to the
+		// data layer initialization through the FILTER_HEADER_TOP_JS filter.
+		Filters\expectApplied( ContainerCode::FILTER_HEADER_TOP_JS )
+			->once()
+			->andReturn( "\n\tgtm4wp_consent_tool_ready();" );
+
+		$container = $this->make_container();
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'gtm4wp_consent_tool_ready();', $output );
+	}
+
+	public function test_body_open_outputs_iframe_for_body_placement(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE      => 'GTM-ABC123',
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_BODYOPEN,
+			)
+		);
+
+		ob_start();
+		$container->body_open();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123', $output );
+	}
+
+	public function test_body_open_outputs_nothing_for_footer_placement(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE      => 'GTM-ABC123',
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_FOOTER,
+			)
+		);
+
+		ob_start();
+		$container->body_open();
+		$output = ob_get_clean();
+
+		$this->assertSame( '', $output, 'The body-open hook stays silent when placement is Footer.' );
+	}
+
+	public function test_footer_outputs_iframe_for_footer_placement(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE      => 'GTM-ABC123',
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_FOOTER,
+			)
+		);
+
+		ob_start();
+		$container->footer();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123', $output );
+	}
+
+	public function test_footer_outputs_nothing_for_body_placement(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE      => 'GTM-ABC123',
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_BODYOPEN,
+			)
+		);
+
+		ob_start();
+		$container->footer();
+		$output = ob_get_clean();
+
+		$this->assertSame( '', $output, 'The footer hook stays silent when placement is Body open.' );
+	}
+
+	public function test_the_tag_wraps_get_tag_through_kses_with_iframe_rules(): void {
+		$captured_rules = null;
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) use ( &$captured_rules ) {
+				$captured_rules = $allowed_html;
+				return $content;
+			}
+		);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+
+		ob_start();
+		$container->the_tag();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123', $output );
+		$this->assertArrayHasKey( 'script', $captured_rules );
+		$this->assertArrayHasKey( 'noscript', $captured_rules, 'the_tag() must allow the noscript wrapper through wp_kses().' );
+		$this->assertArrayHasKey( 'iframe', $captured_rules, 'the_tag() must allow the container iframe through wp_kses().' );
+	}
+
+	public function test_register_hooks_uses_early_priority_when_loadearly_enabled(): void {
+		$container = $this->make_container( array( GTM4WP_OPTION_LOADEARLY => true ) );
+		$container->register_hooks();
+
+		$this->assertSame( 2, has_action( 'wp_head', array( $container, 'header_begin' ) ), 'Load-early moves header_begin to priority 2.' );
+		$this->assertSame( 1, has_action( 'wp_head', array( $container, 'header_top' ) ) );
+	}
+
+	public function test_register_hooks_uses_default_priority_without_loadearly(): void {
+		$container = $this->make_container( array( GTM4WP_OPTION_LOADEARLY => false ) );
+		$container->register_hooks();
+
+		$this->assertSame( 10, has_action( 'wp_head', array( $container, 'header_begin' ) ) );
+		$this->assertNotFalse( has_action( 'wp_footer', array( $container, 'footer' ) ) );
+	}
+
+	public function test_rocket_excluded_inline_js_content_adds_gtm_patterns(): void {
+		$container = $this->make_container();
+
+		$this->assertSame(
+			array( 'existing', 'dataLayer', 'gtm4wp' ),
+			$container->rocket_excluded_inline_js_content( array( 'existing' ) )
+		);
 	}
 }

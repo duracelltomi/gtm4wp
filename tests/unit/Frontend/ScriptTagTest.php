@@ -61,6 +61,25 @@ final class ScriptTagTest extends FrontendTestCase {
 		);
 	}
 
+	public function test_opening_tag_combines_all_attributes(): void {
+		// No html5 support + Cookiebot + a CSP nonce all at once, in the fixed
+		// attribute order the source produces them.
+		Functions\when( 'current_theme_supports' )->justReturn( false );
+		Filters\expectApplied( GTM4WP_WPFILTER_GET_CSP_NONCE )
+			->once()
+			->with( '' )
+			->andReturn( 'testnonce123' );
+
+		$tag = new ScriptTag(
+			$this->make_options( array( GTM4WP_OPTION_INTEGRATE_COOKIEBOT => true ) )
+		);
+
+		$this->assertSame(
+			'<script data-cfasync="false" data-pagespeed-no-defer type="text/javascript" data-cookieconsent="ignore" nonce="testnonce123">',
+			$tag->opening_tag()
+		);
+	}
+
 	public function test_sanitize_rules_allow_expected_attributes(): void {
 		$rules = ScriptTag::sanitize_rules();
 
@@ -97,5 +116,46 @@ final class ScriptTagTest extends FrontendTestCase {
 		// ...but the quote/tag entities stay encoded and inert.
 		$this->assertStringContainsString( '&quot;&lt;/script&gt;&#039;', $output );
 		$this->assertStringNotContainsString( '"</script>\'', $output );
+	}
+
+	public function test_print_script_block_forwards_custom_rules_to_wp_kses(): void {
+		// A caller-supplied rule set (e.g. ContainerCode::the_tag() adding the
+		// noscript iframe) must reach wp_kses() instead of the default rules.
+		$custom_rules   = array( 'span' => array( 'class' => array() ) );
+		$captured_rules = null;
+
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) use ( &$captured_rules ) {
+				$captured_rules = $allowed_html;
+				return $content;
+			}
+		);
+
+		$tag = new ScriptTag( $this->make_options() );
+
+		ob_start();
+		$tag->print_script_block( '<span class="x">hi</span>', $custom_rules );
+		ob_get_clean();
+
+		$this->assertSame( $custom_rules, $captured_rules );
+	}
+
+	public function test_print_script_block_defaults_to_sanitize_rules(): void {
+		$captured_rules = null;
+
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) use ( &$captured_rules ) {
+				$captured_rules = $allowed_html;
+				return $content;
+			}
+		);
+
+		$tag = new ScriptTag( $this->make_options() );
+
+		ob_start();
+		$tag->print_script_block( '<script>var a = 1;</script>' );
+		ob_get_clean();
+
+		$this->assertSame( ScriptTag::sanitize_rules(), $captured_rules );
 	}
 }
