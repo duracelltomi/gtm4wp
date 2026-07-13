@@ -1,3 +1,8 @@
+import {
+	gtm4wpNativeVideoStatus,
+	gtm4wpNativeVideoParams,
+} from './lib/native-video-params';
+
 const gtm4wp_soundclound_percentage_tracking = 10;
 const gtm4wp_soundclound_percentage_tracking_marks = {};
 
@@ -105,6 +110,15 @@ window.addEventListener( 'DOMContentLoaded', function () {
 				},
 				mediaCurrentTime: eventData.currentPosition,
 				mediaPlayerState: playerState,
+				...gtm4wpNativeVideoParams( {
+					provider: 'soundcloud',
+					status: gtm4wpNativeVideoStatus( playerState ),
+					url: sound.permalink_url,
+					title: sound.title,
+					// SoundCloud reports milliseconds; gtm.video* wants seconds.
+					currentTime: eventData.currentPosition / 1000,
+					duration: sound.duration / 1000,
+				} ),
 			} );
 		};
 
@@ -148,6 +162,16 @@ window.addEventListener( 'DOMContentLoaded', function () {
 						},
 						mediaCurrentTime: eventData.currentPosition,
 						mediaPercentage: i,
+						...gtm4wpNativeVideoParams( {
+							provider: 'soundcloud',
+							status: 'progress',
+							url: sound.permalink_url,
+							title: sound.title,
+							// SoundCloud reports ms; gtm.video* wants seconds.
+							currentTime: eventData.currentPosition / 1000,
+							duration: sound.duration / 1000,
+							percent: i,
+						} ),
 					} );
 				}
 			}

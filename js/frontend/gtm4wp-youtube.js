@@ -1,3 +1,8 @@
+import {
+	gtm4wpNativeVideoStatus,
+	gtm4wpNativeVideoParams,
+} from './lib/native-video-params';
+
 const gtm4wp_youtube_percentage_tracking = 10;
 const gtm4wp_youtube_percentage_tracking_timeouts = {};
 const gtm4wp_youtube_percentage_tracking_marks = {};
@@ -146,6 +151,14 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 		},
 		mediaPlayerState: playerState,
 		mediaCurrentTime: event.target.getCurrentTime(),
+		...gtm4wpNativeVideoParams( {
+			provider: 'youtube',
+			status: gtm4wpNativeVideoStatus( playerState ),
+			url: event.target.getVideoUrl(),
+			title: videodata.title,
+			currentTime: event.target.getCurrentTime(),
+			duration: event.target.getDuration(),
+		} ),
 	} );
 }
 
@@ -262,6 +275,15 @@ function gtm4wp_onYouTubePercentageChange( event ) {
 				},
 				mediaCurrentTime: event.target.getCurrentTime(),
 				mediaPercentage: i,
+				...gtm4wpNativeVideoParams( {
+					provider: 'youtube',
+					status: 'progress',
+					url: event.target.getVideoUrl(),
+					title: videodata.title,
+					currentTime: event.target.getCurrentTime(),
+					duration: event.target.getDuration(),
+					percent: i,
+				} ),
 			} );
 		}
 	}

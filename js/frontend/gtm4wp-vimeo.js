@@ -1,3 +1,8 @@
+import {
+	gtm4wpNativeVideoStatus,
+	gtm4wpNativeVideoParams,
+} from './lib/native-video-params';
+
 const gtm4wp_vimeo_percentage_tracking = 10;
 const gtm4wp_vimeo_percentage_tracking_marks = {};
 
@@ -246,6 +251,14 @@ window.addEventListener( 'DOMContentLoaded', function () {
 				},
 				mediaPlayerState: player_state,
 				mediaCurrentTime: data.seconds,
+				...gtm4wpNativeVideoParams( {
+					provider: 'vimeo',
+					status: gtm4wpNativeVideoStatus( player_state ),
+					url: vimeo_frame.getAttribute( 'data-player_url' ),
+					title: vimeo_frame.getAttribute( 'data-player_title' ),
+					currentTime: data.seconds,
+					duration: data.duration,
+				} ),
 			} );
 		};
 
@@ -285,6 +298,17 @@ window.addEventListener( 'DOMContentLoaded', function () {
 						},
 						mediaCurrentTime: data.seconds,
 						mediaPercentage: i,
+						...gtm4wpNativeVideoParams( {
+							provider: 'vimeo',
+							status: 'progress',
+							url: vimeo_frame.getAttribute( 'data-player_url' ),
+							title: vimeo_frame.getAttribute(
+								'data-player_title'
+							),
+							currentTime: data.seconds,
+							duration: videoDuration,
+							percent: i,
+						} ),
 					} );
 				}
 			}

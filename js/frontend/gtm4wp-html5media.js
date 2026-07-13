@@ -1,3 +1,8 @@
+import {
+	gtm4wpNativeVideoStatus,
+	gtm4wpNativeVideoParams,
+} from './lib/native-video-params';
+
 const gtm4wp_html5media_percentage_tracking = 10;
 const gtm4wp_html5media_percentage_tracking_marks = {};
 
@@ -37,6 +42,16 @@ jQuery( function () {
 				mediaCurrentTime: isNaN( this.currentTime )
 					? 0
 					: this.currentTime, // not available until video has be started to play
+				...gtm4wpNativeVideoParams( {
+					provider: 'html5',
+					status: gtm4wpNativeVideoStatus( e.type ),
+					url: this.currentSrc,
+					title: html5media_filename,
+					currentTime: isNaN( this.currentTime )
+						? 0
+						: this.currentTime,
+					duration: isNaN( this.duration ) ? 0 : this.duration,
+				} ),
 			} );
 		} );
 
@@ -151,6 +166,15 @@ jQuery( function () {
 						},
 						mediaCurrentTime: videoCurrentTime,
 						mediaPercentage: i,
+						...gtm4wpNativeVideoParams( {
+							provider: 'html5',
+							status: 'progress',
+							url: this.currentSrc,
+							title: html5media_filename,
+							currentTime: videoCurrentTime,
+							duration: videoDuration,
+							percent: i,
+						} ),
 					} );
 				}
 			}

@@ -61,16 +61,16 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'YouTube video events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a YouTube video embeded on your site.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a YouTube video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables (Video Status, Video URL, Video Title, Video Provider, Video Duration, Video Current Time, Video Percent). Deprecated: Google Tag Manager now ships its own native YouTube Video trigger, which is the recommended way to measure YouTube playback going forward.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_DEPRECATED
 			),
 			new Field(
 				key: GTM4WP_OPTION_EVENTS_VIMEO,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Vimeo video events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Vimeo video embeded on your site.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Vimeo video embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
@@ -79,7 +79,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Soundcloud events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Soundcloud media embeded on your site.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Soundcloud media embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
@@ -88,7 +88,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'HTML5 video and audio events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a native HTML5 <video> or <audio> player embeded on your site.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a native HTML5 <video> or <audio> player embeded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
