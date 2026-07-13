@@ -38,6 +38,7 @@
     },
     "scripts": {
         "phpcs": "phpcs",
-        "test": "phpunit"
+        "test": "phpunit",
+        "test:coverage": "phpunit --coverage-text"
     }
 }

@@ -1,0 +1,6 @@
+# Detailed test-review reports are per-run working artifacts and may quote
+# unfixed security-sink gaps. GTM4WP is a public plugin, so keep them out of
+# version control — they are regenerated per run. The cumulative framework
+# (checklist, patterns, pre-flight) IS tracked and shared; only the verbose
+# reports stay local.
+test-review-report-*.md

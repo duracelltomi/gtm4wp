@@ -15,6 +15,19 @@ This repo has a cumulative security-review system under `.security/`:
 
 @.security/pre-flight-check.md
 
+## Test review system
+
+This repo has a cumulative **test-review** system under `.testing/`, the
+test-quality sibling of the security system above (same shape, so the two align):
+
+- **Before writing or modifying any test**, read `.testing/pre-flight-check.md` and follow it — it points to `.testing/test-review-patterns.md` (accumulated test smells, project test conventions, and blessed exceptions) which you must actively avoid. A security-relevant code change ships its regression test in the same change.
+- **`/test-review`** (`.claude/commands/test-review.md`) reviews the *test suite* (not the code — that is `/code-review`) for coverage completeness and assertion quality, updates `.testing/test-review-checklist.md` (coverage matrix + Test Debt Sweeps + gaps log) and the patterns file, and saves a report to `.testing/test-review-report-{date}-{time}.md`. The `test-reviewer` subagent (`.claude/agents/test-reviewer.md`) encodes the same checklist.
+- The single most important rule: **a line that is covered is not a behavior that is asserted** — every value reaching a `<script>`/dataLayer sink needs a regression test with a *hostile* input, not just benign data. Coverage tooling can't see this; the review is what catches it.
+- Coverage (optional) is scoped to `src/` in `phpunit.xml`; `composer test:coverage` reports once a PCOV/Xdebug driver is installed. The system also runs without a driver, on mechanical missing-test sweeps + judgment.
+- ⛔ **Disclosure rule (hard):** same as the security system — a test gap on a security sink can point at an unfixed vuln, so keep committed `.testing/` notes terse and defer live-vuln detail to the git-ignored `.security/` report.
+
+@.testing/pre-flight-check.md
+
 ## Architecture
 
 Version 2.0 is a full OOP rewrite (see the 2.0-dev branch). The public 1.x
@@ -45,6 +58,7 @@ integration surface — hooks, template functions, wp-config constants and the
 - `tests/` — PHPUnit unit tests under `tests/unit/`; JS tests under `js/admin/test/`
 - `tools/` — release build script (`build-release.js`)
 - `.security/` — cumulative security-review system (see above)
+- `.testing/` — cumulative test-review system (see above; mirrors `.security/`)
 
 ### Global data (backward-compatible, read-only)
 
@@ -91,6 +105,7 @@ back — use the `Options`/`Frontend` services instead.
 - **PHP**: PHPUnit 11 with Brain\Monkey for WordPress function mocking; bootstrap `tests/bootstrap.php`, WP/WC stubs under `tests/unit/`. Tests live in `tests/unit/` mirroring the `src/` namespaces (files suffixed `Test.php`). Run `vendor/bin/phpunit` (or `composer test`).
 - **JS**: `npm run test:unit` (`wp-scripts test-unit-js`); tests under `js/admin/test/`.
 - **Security regression tests**: JSON-encoding / XSS guards live in `tests/unit/Frontend/` — every security-relevant change ships one.
+- **Test quality & coverage**: the `.testing/` test-review system (see above) tracks suite coverage and assertion quality. Follow `.testing/pre-flight-check.md` when writing tests; run `/test-review` to audit them. `composer test:coverage` gives a `src/`-scoped coverage report once a PCOV/Xdebug driver is installed.
 
 ## WooCommerce Integration
 

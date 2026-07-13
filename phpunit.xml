@@ -7,4 +7,15 @@
 			<directory suffix="Test.php">./tests/unit/</directory>
 		</testsuite>
 	</testsuites>
+	<!--
+		Scopes code coverage to the production classes so a coverage run
+		(composer test:coverage) reports on src/ and lists 0%-covered files.
+		Inert on a normal run and when no PCOV/Xdebug driver is loaded. See
+		.claude/commands/test-review.md for the test-review workflow.
+	-->
+	<source>
+		<include>
+			<directory suffix=".php">./src/</directory>
+		</include>
+	</source>
 </phpunit>
