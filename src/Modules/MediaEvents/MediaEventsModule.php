@@ -126,9 +126,9 @@ final class MediaEventsModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_HTML5MEDIA ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_html5media', true );
 
-			// The tracker binds to <video>/<audio> elements through jQuery's
-			// event system, so it declares a jquery dependency.
-			$this->enqueue_script( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array( 'jquery' ), $in_footer );
+			// Vanilla tracker: it binds to <video>/<audio> elements with the
+			// native addEventListener API and needs no external dependency.
+			$this->enqueue_script( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer );
 		}
 	}
 }

@@ -101,6 +101,7 @@ Track users' interaction with any embedded media:
 * YouTube
 * Vimeo
 * Soundcloud
+* HTML5 audio and video
 
 DataLayer events can be chosen to fire upon media player load, media is being played, paused/stopped and optionally when
 the user reaches 10, 20, 30, ..., 90, 100% of the media duration.

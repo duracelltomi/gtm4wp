@@ -12,6 +12,8 @@
 	* Page language (`pageLanguage`) detected from WPML / Polylang with a site-locale fallback, overridable with the `gtm4wp_page_language` filter
 * Changed: SoundCloud media tracking is promoted from experimental to stable
 * Updated: SoundCloud tracker hardened - bails out gracefully when the SoundCloud Widget API is blocked (consent manager, ad blocker, network error), still initializes when the script loads after the page is parsed (defer/async or late injection), and now reports the correct track metadata for playlist / multi-track widgets
+* Changed: HTML5 `<video>`/`<audio>` media tracking is promoted from experimental to stable
+* Updated: HTML5 media tracker modernized - rewritten in vanilla JS (no more jQuery dependency), fires the ready event with the real media duration, tracks buffering (the `waiting` event) plus Picture-in-Picture and fullscreen changes on video, normalizes the event mediaType to `html5media`, and initializes reliably when loaded after the page is parsed (defer/async or late injection)
 
 ## 1.21.1
 
