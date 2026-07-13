@@ -1,0 +1,142 @@
+/**
+ * Unit tests for the generic GA4 e-commerce helper functions
+ * (js/frontend/gtm4wp-ecommerce-generic.js). These are the public 1.x JS API
+ * attached to window and consumed by gtm4wp-woocommerce.js and third parties.
+ */
+
+import '../gtm4wp-ecommerce-generic';
+
+describe( 'gtm4wp-ecommerce-generic', () => {
+	beforeAll( () => {
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_clear_ecommerce = true;
+	} );
+
+	beforeEach( () => {
+		window.dataLayer = [];
+	} );
+
+	describe( 'gtm4wp_make_sure_is_float', () => {
+		it( 'parses numeric strings to two-decimal floats', () => {
+			expect( window.gtm4wp_make_sure_is_float( '19.999' ) ).toBe( 20 );
+			expect( window.gtm4wp_make_sure_is_float( '10.5' ) ).toBe( 10.5 );
+			expect( window.gtm4wp_make_sure_is_float( 7 ) ).toBe( 7 );
+		} );
+
+		it( 'returns 0 for values that cannot be parsed', () => {
+			expect( window.gtm4wp_make_sure_is_float( 'abc' ) ).toBe( 0 );
+			expect( window.gtm4wp_make_sure_is_float( null ) ).toBe( 0 );
+			expect( window.gtm4wp_make_sure_is_float( {} ) ).toBe( 0 );
+		} );
+	} );
+
+	describe( 'gtm4wp_read_from_json', () => {
+		it( 'parses product JSON, coerces price and strips excluded keys', () => {
+			const result = window.gtm4wp_read_from_json(
+				JSON.stringify( {
+					item_id: 123,
+					price: '19.999',
+					productlink: 'https://example.com/p',
+					internal_id: 5,
+				} )
+			);
+
+			expect( result.item_id ).toBe( 123 );
+			expect( result.price ).toBe( 20 );
+			expect( result.productlink ).toBeUndefined();
+			expect( result.internal_id ).toBeUndefined();
+		} );
+
+		it( 'returns false for malformed JSON', () => {
+			const spy = jest
+				.spyOn( console, 'error' )
+				.mockImplementation( () => {} );
+
+			expect( window.gtm4wp_read_from_json( '{not valid json' ) ).toBe(
+				false
+			);
+
+			spy.mockRestore();
+		} );
+	} );
+
+	describe( 'gtm4wp_read_json_from_node', () => {
+		it( 'reads and parses a data attribute from a node', () => {
+			const el = document.createElement( 'span' );
+			el.dataset.gtm4wpProductData = JSON.stringify( {
+				item_id: 7,
+				price: 5,
+			} );
+
+			const result = window.gtm4wp_read_json_from_node(
+				el,
+				'gtm4wpProductData'
+			);
+
+			expect( result.item_id ).toBe( 7 );
+		} );
+
+		it( 'returns false when the attribute is absent', () => {
+			const el = document.createElement( 'span' );
+
+			expect(
+				window.gtm4wp_read_json_from_node( el, 'gtm4wpProductData' )
+			).toBe( false );
+		} );
+	} );
+
+	describe( 'gtm4wp_update_json_in_node', () => {
+		it( 'merges a new key into the node JSON', () => {
+			const el = document.createElement( 'span' );
+			el.dataset.gtm4wpProductData = JSON.stringify( {
+				item_id: 7,
+				price: '5.00',
+			} );
+
+			const ok = window.gtm4wp_update_json_in_node(
+				el,
+				'gtm4wpProductData',
+				'quantity',
+				3
+			);
+
+			expect( ok ).toBe( true );
+			expect( JSON.parse( el.dataset.gtm4wpProductData ).quantity ).toBe(
+				3
+			);
+		} );
+
+		it( 'returns false for a node without the attribute', () => {
+			const el = document.createElement( 'span' );
+
+			expect(
+				window.gtm4wp_update_json_in_node( el, 'missing', 'k', 'v' )
+			).toBe( false );
+		} );
+	} );
+
+	describe( 'gtm4wp_push_ecommerce', () => {
+		it( 'clears the previous ecommerce object then pushes the event', () => {
+			window.gtm4wp_push_ecommerce( 'add_to_cart', [ { item_id: 1 } ], {
+				currency: 'EUR',
+			} );
+
+			expect( window.dataLayer[ 0 ] ).toEqual( { ecommerce: null } );
+			expect( window.dataLayer[ 1 ].event ).toBe( 'add_to_cart' );
+			expect( window.dataLayer[ 1 ].ecommerce.currency ).toBe( 'EUR' );
+			expect( window.dataLayer[ 1 ].ecommerce.items ).toEqual( [
+				{ item_id: 1 },
+			] );
+		} );
+
+		it( 'attaches the event callback and timeout when provided', () => {
+			const callback = () => {};
+
+			window.gtm4wp_push_ecommerce( 'purchase', [], {}, callback, 1500 );
+
+			const last = window.dataLayer[ window.dataLayer.length - 1 ];
+			expect( last.eventCallback ).toBe( callback );
+			expect( last.eventTimeout ).toBe( 1500 );
+		} );
+	} );
+} );

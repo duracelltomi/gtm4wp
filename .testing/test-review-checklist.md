@@ -49,25 +49,25 @@ yet still carry `[ ]` cells — presence ≠ reviewed-and-complete.
 | Component Group | Test file(s) | Exists | Public API | Edge/Err | Sec-input | Regr | Isol |
 |---|---|---|---|---|---|---|---|
 | **Plugin Bootstrap** (main file, `uninstall.php`, `Plugin.php`, `Autoloader.php`) | — | [ ] | [ ] | [ ] | [-] | [-] | [ ] |
-| **Options** (`src/Options/` — Options, Field) | `Options/OptionsTest` | [x] | [ ] | [ ] | [-] | [ ] | [ ] |
-| **Compat Layer** (`compat/*.php`, `src/Compat/Globals.php`) | — | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **Options** (`src/Options/` — Options, Field) | `Options/OptionsTest`, `Options/FieldTest` | [x] | [x] 2026-07-13 | [x] 2026-07-13 | [-] | [ ] | [ ] |
+| **Compat Layer** (`compat/*.php`, `src/Compat/Globals.php`) | `Compat/GlobalsTest` | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [ ] | [ ] | [x] 2026-07-13 |
 | **Migration** (`src/Migration.php`) | `MigrationTest` | [x] | [ ] | [ ] | [-] | [-] | [ ] |
 | **Frontend Core** (`src/Frontend/` — DataLayer, ScriptTag, ContainerCode, ConsentDefaults, VisitorIp; Frontend = N/A) | `Frontend/DataLayerTest`, `ScriptTagTest`, `ContainerCodeTest`, `ConsentDefaultsTest`, `VisitorIpTest` | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Module Framework** (`src/Module/`) | `Module/RegistryTest`, `Modules/ModuleConsistencyTest`, `ModuleHooksTest` | [x] | [ ] | [ ] | [-] | [-] | [ ] |
-| **PageVariables Module** (`src/Modules/PageVariables/`) | `Modules/PageVariablesModuleTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **PageVariables Module** (`src/Modules/PageVariables/`) | `Modules/PageVariablesModuleTest` | [x] | [ ] | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Container Module** (`src/Modules/Container/`) | `Modules/ContainerRowsTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| **WooCommerce Module** (`src/Modules/WooCommerce/` — PurchaseTracking, ProductData, PageDataLayer, **ListTracking**, **Helpers**, Module) | `Modules/PurchaseTrackingTest`, `ProductDataTest`, `PageDataLayerTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **WooCommerce Module** (`src/Modules/WooCommerce/` — PurchaseTracking, ProductData, PageDataLayer, ListTracking, Helpers, Module) | `Modules/PurchaseTrackingTest`, `ProductDataTest`, `PageDataLayerTest`, `ListTrackingTest`, `HelpersTest` | [x] | [ ] | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [ ] |
 | **ConsentMode Module** (`src/Modules/ConsentMode/`) | `Modules/ModuleHooksTest` (gate + webtoffee only) | [x] | [ ] | [ ] | [-] | [ ] | [ ] |
 | **UserEvents Module** (`src/Modules/UserEvents/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
-| **MediaEvents Module** (`src/Modules/MediaEvents/`) | — | [ ] | [ ] | [ ] | [-] | [ ] | [ ] |
+| **MediaEvents Module** (`src/Modules/MediaEvents/`) | `Modules/ModuleHooksTest` (youtube gate only) | [x] 2026-07-13 | [ ] | [ ] | [-] | [ ] | [ ] |
 | **ContactForm7 Module** (`src/Modules/ContactForm7/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [-] | [-] | [ ] |
 | **Blacklist Module** (`src/Modules/Blacklist/`) | `Modules/BlacklistModuleTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`) | — | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| **AMP Module** (`src/Modules/Amp/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | — | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`) | `Modules/ClientDeviceDataModuleTest`, `ModuleHooksTest` (gate) | [x] 2026-07-13 | [x] 2026-07-13 | [ ] | [-] | [ ] | [ ] |
+| **AMP Module** (`src/Modules/Amp/`) | `Modules/AmpModuleTest`, `ModuleHooksTest` (gate) | [x] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
+| **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | `Admin/NoticesTest` | [x] 2026-07-13 | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **Module Admin Schemas** (`src/Modules/*/AdminSchema.php`) | `Modules/ModuleConsistencyTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
-| **Frontend JS** (`js/frontend/` — 9 trackers) | — | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **Frontend JS** (`js/frontend/` — 9 trackers) | `js/frontend/test/ecommerce-generic.test.js`, `form-move-tracker.test.js` (2 of 9) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **Admin JS** (`js/admin/`) | `js/admin/test/utils.test.js` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 > **Seed note (2026-07-13):** only **Frontend Core** has been through a full
@@ -86,11 +86,11 @@ review; treat a sweep older than ~4 weeks or predating a feature landing as stal
 
 | Sweep | Last run | Result summary |
 |---|---|---|
-| **Missing test file** (`src/**/*.php` with no dedicated or documented-indirect test) | 2026-07-13 | 47 src classes / 18 test files. Real gaps (excluding interfaces + `ModuleHooksTest`-covered gate-only modules): `Admin/{Admin,Notices,PluginRow,SettingsPage}`, `Compat/Globals`, `Plugin`, `Options/Field`, `WooCommerce/{ListTracking,Helpers,WooCommerceModule}`, `Modules/{ClientDeviceData,MediaEvents}Module`. Blessed N/A (BE-3): interfaces, `Frontend`, `Autoloader`. |
-| **Untested public methods** (in classes that *do* have a test file — TS-10) | 2026-07-13 | Cleared for Frontend Core this session (compiled/name-fallback/echo=false/body_open/footer/the_tag/register_hooks/rocket). Not yet swept elsewhere. |
-| **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-13 | Frontend dataLayer + additional-pushes covered. **Open:** `PageVariables` (`geoCloudflareCountryCode`/`siteSearchFrom`/`visitorIP` — regression tests added during the security review, re-verify), `WooCommerce/ListTracking` (PA-7 `preg_replace` replacement injection — untested), `Admin/Notices` dismiss input. |
-| **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-13 | Findings #1–#6 guarded by the two `tests/unit/Frontend` XSS tests; #8 by `ProductDataTest`; #13/#14 by `PageDataLayerTest`/`PurchaseTrackingTest`. **Unverified:** #11 (4-sink flag drift — SettingsPage/ClientDeviceData/Amp), #16 (ListTracking `addcslashes`), #18 (Notices capability re-check). |
-| **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-13 | Near-zero: 9 frontend trackers with **0** dedicated tests; `js/admin/` has 1 (`utils.test.js`). Largest hole in the suite. |
+| **Missing test file** (`src/**/*.php` with no dedicated or documented-indirect test) | 2026-07-13 (Run 1) | 46 src classes. Run 1 added test files for `ListTracking`, `Notices`, `Field`, `Helpers`, `Globals`, `ClientDeviceData`, `Amp` + JS `ecommerce-generic`/`form-move-tracker`, and gate coverage for `MediaEvents`. Real gaps remaining: `Admin/{Admin,PluginRow,SettingsPage}`, `Plugin`, `WooCommerce/WooCommerceModule`, 7 of 9 JS trackers. Blessed N/A (BE-3): interfaces, `Frontend`, `Autoloader`; SettingsPage/Admin/Plugin are wiring-heavy (see gaps T15). |
+| **Untested public methods** (in classes that *do* have a test file — TS-10) | 2026-07-13 (Run 1) | Frontend Core cleared (Run 0). `ListTracking`: PA-7 path + shared builder covered; ~15 list-name setters / echo hook callbacks still untested (low value). `Notices`: `dismiss_notice` + `show_notices` covered; `print_dismiss_script` untested. `Amp`: body-injection + is_amp_request covered; header-render delegators untested (thin). |
+| **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-13 (Run 1) | Frontend dataLayer + additional-pushes covered (Run 0). **Run 1 closed:** `PageVariables` geoCF (finding #12) + `visitorIP`; `WooCommerce/ListTracking` PA-7 (finding #16); `Admin/Notices` dismiss allow-list (finding #18); `Amp` render_amp_gtm_code hex flags (finding #11, proved fails-without-flags). ClientDeviceData config sink = N/A (booleans only, no break-out possible). **Open:** `SettingsPage` bootstrap_data hex sink (admin-context, no regression test — T13). |
+| **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-13 (Run 1) | Findings #1–#6 (Frontend XSS tests); #8 (`ProductDataTest`); #11 AMP sink (`AmpModuleTest`, Run 1); #12 (`PageVariablesModuleTest`); #13/#14 (`PageDataLayerTest`/`PurchaseTrackingTest`); #16 (`ListTrackingTest`); #18 (`NoticesTest`). **Unverified:** #11 SettingsPage sink (T13); ClientDeviceData portion N/A (booleans). |
+| **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-13 (Run 1) | Harness established under `js/frontend/test/`. **Run 1 added:** `ecommerce-generic` (public 1.x JS API incl. product-JSON reader) + `form-move-tracker` (DOM event → dataLayer). 25 JS tests green. **Remaining (T16):** 7 trackers — `woocommerce`, `client-device-data`, and the media-player wrappers (`youtube`/`vimeo`/`soundcloud`/`html5media`, which need external player-API mocks). |
 | **Assertion quality** (mutation testing — Infection, optional) | never | Not yet enabled. See `.claude/commands/test-review.md` § Optional tooling to install `infection/infection` + a coverage driver. |
 
 ---
@@ -118,15 +118,47 @@ leak"). Recorded here as the seed baseline.
 | T5 | Low | addressed | Untested methods/branches of covered classes (TS-10): `compiled()`, `name()` non-string, `header_top($echo=false)`, `FILTER_HEADER_TOP_JS`, `body_open`/`footer`/`the_tag`, `register_hooks` LOADEARLY priority, rocket exclusion, combined `opening_tag()`, print_script_block rules override, consent denied→granted filter. | `tests/unit/Frontend/*` |
 | T6 | Low | addressed | `enqueue_push_handle()` asserted register/enqueue but not the flush (TS-3). Strengthened. | `tests/unit/Frontend/DataLayerTest.php` |
 
-### Open gaps (from the seed sweeps — to be worked by `/test-review` runs)
+### Run 1: module/admin security-sink pass — 2026-07-13
+
+First cumulative run. Prioritized the open security-input + regression-per-bug
+sweeps; proved each gap with a regression test (the PA-7 one by reverting the
+source guard and watching it fail). All addressed in the same session; suite
+187 → 198 green, phpcs clean.
+
+| # | Sev | Status | Summary | File(s) |
+|---|-----|--------|---------|---------|
+| — | High | addressed | `ListTracking::add_productdata_to_wc_block` PA-7 `preg_replace`-replacement path (finding #16) proved un-guarded-would-mangle, now regression-tested (closes T7). | `tests/unit/Modules/ListTrackingTest.php` |
+| — | High | addressed | `PageVariables` `geoCloudflareCountryCode` was benign-only (TS-1); `visitorIP` module branch untested. Added raw-passthrough (finding #12) + branch tests, plus `$_SERVER` isolation. | `tests/unit/Modules/PageVariablesModuleTest.php` |
+| — | Med | addressed | `Notices::dismiss_notice` nonce + capability re-check (finding #18) + `basename`/allow-list on `noticeid` now tested (closes T8). | `tests/unit/Admin/NoticesTest.php` |
+
+### Run 1 (continued): full remaining-gap sweep — 2026-07-13
+
+Second batch of the same run (user asked to close every remaining gap found this
+round). Suite 198 → 240 PHP tests + 25 JS tests, all green; phpcs 0 errors; no
+`src/` changes (AMP flag revert used only to prove the regression, then restored).
+
+| # | Sev | Status | Summary | File(s) |
+|---|-----|--------|---------|---------|
+| — | Med | addressed | `Amp::render_amp_gtm_code` hex-flag sink (finding #11) — reflection-injected Plugin→Frontend→DataLayer chain; proved fails-without-flags (raw `</script>` breakout), then restored. Closes the AMP part of T13. | `tests/unit/Modules/AmpModuleTest.php` |
+| — | Med | addressed | `Compat/Globals::populate()` — datalayer-name fallback + no-clobber branches (closes T9). | `tests/unit/Compat/GlobalsTest.php` |
+| — | Low | addressed | `Options/Field` per-type sanitizer + choice fallback + derive + rest_type + to_ui_array; `WooCommerce/Helpers` string/id/taxonomy helpers (closes T11 pure-logic part). | `tests/unit/Options/FieldTest.php`, `tests/unit/Modules/HelpersTest.php` |
+| — | Low | addressed | `ClientDeviceData` + `MediaEvents` hook-gate (closes T12); ClientDeviceData config-output structure. | `tests/unit/Modules/ModuleHooksTest.php`, `ClientDeviceDataModuleTest.php` |
+| — | Low | addressed | `Notices::show_notices` output branches — missing-GTM-ID, incomplete env-config, dismissed-state (closes T14). | `tests/unit/Admin/NoticesTest.php` |
+| — | Med | addressed | `Frontend JS` harness established + `ecommerce-generic` (public 1.x JS API incl. product-JSON reader) + `form-move-tracker` (DOM event→dataLayer). Closes 2 of 9 (T10 → T16). | `js/frontend/test/*.test.js` |
+
+### Open gaps (prioritized by the sweeps above)
 
 Terse, non-exploit; prioritized by the sweeps above.
 
 | # | Sev | Status | Summary | File(s) |
 |---|-----|--------|---------|---------|
-| T7 | High | open | `WooCommerce/ListTracking` has no test — includes the PA-7 `preg_replace` replacement-injection path (`addcslashes` guard, finding #16). Whole-class gap on a data-bearing output builder. | `src/Modules/WooCommerce/ListTracking.php` |
-| T8 | Med | open | `Admin/Notices` dismiss handler (nonce + capability, finding #18) has no test — a state-changing AJAX path. | `src/Admin/Notices.php` |
-| T9 | Med | open | `Compat/Globals` (read-only 1.x mirror population) untested — third-party BC surface. | `src/Compat/Globals.php` |
-| T10 | Med | open | `Frontend JS` trackers (9 files) have zero unit tests — the suite's largest hole. | `js/frontend/*.js` |
-| T11 | Low | open | `Options/Field`, `WooCommerce/Helpers`, `ClientDeviceData`/`MediaEvents` modules, `Admin/{SettingsPage,PluginRow,Admin}` untested (whole-class). | (various) |
-| T12 | Low | open | `ClientDeviceData`/`MediaEvents` module hook gating not covered by `ModuleHooksTest` (unlike Consent/CF7/UserEvents/AMP). | `src/Modules/{ClientDeviceData,MediaEvents}/` |
+| T7 | High | addressed | `WooCommerce/ListTracking` PA-7 replacement-injection (finding #16) — `ListTrackingTest`. | `tests/unit/Modules/ListTrackingTest.php` |
+| T8 | Med | addressed | `Admin/Notices` dismiss handler (finding #18) — `NoticesTest`. | `tests/unit/Admin/NoticesTest.php` |
+| T9 | Med | addressed | `Compat/Globals` populate() — `GlobalsTest`. | `tests/unit/Compat/GlobalsTest.php` |
+| T10 | Med | addressed | JS harness established; 2 of 9 trackers covered. Remaining trackers → T16. | `js/frontend/test/*` |
+| T11 | Low | addressed | `Options/Field` + `WooCommerce/Helpers` + `ClientDeviceData`/`MediaEvents` covered. `Admin/{SettingsPage,PluginRow,Admin}` remain → T15. | (various) |
+| T12 | Low | addressed | `ClientDeviceData`/`MediaEvents` gate now in `ModuleHooksTest`. | `tests/unit/Modules/ModuleHooksTest.php` |
+| T13 | Med | open | Finding #11: AMP sink now guarded (`AmpModuleTest`). **Remaining:** `SettingsPage::bootstrap_data` hex sink has no regression test (admin-context, needs the registry+REST+schema harness). ClientDeviceData = N/A (booleans). | `src/Admin/SettingsPage.php` |
+| T14 | Low | addressed | `Notices::show_notices` branches — `NoticesTest`. | `tests/unit/Admin/NoticesTest.php` |
+| T15 | Low | open | `Admin/{SettingsPage,PluginRow,Admin}` + `Plugin` + `WooCommerce/WooCommerceModule` untested (wiring-heavy; several are BE-3 candidates — record `[-]` N/A with a reason before writing stub-asserting tests). | (various) |
+| T16 | Med | open | 7 of 9 `js/frontend/` trackers still untested: `woocommerce`, `client-device-data`, and the media-player wrappers (`youtube`/`vimeo`/`soundcloud`/`html5media`, which need external player-API mocks). | `js/frontend/*.js` |

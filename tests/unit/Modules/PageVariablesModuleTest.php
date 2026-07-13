@@ -19,8 +19,18 @@ use GTM4WP\Tests\unit\TestCase;
  */
 final class PageVariablesModuleTest extends TestCase {
 
+	/**
+	 * Snapshot of $_SERVER, restored in tearDown so header-reading tests do
+	 * not leak state into siblings even if an assertion fails early (TS-7).
+	 *
+	 * @var array<string, mixed>
+	 */
+	private array $server_backup = array();
+
 	protected function setUp(): void {
 		parent::setUp();
+
+		$this->server_backup = $_SERVER;
 
 		Functions\stubEscapeFunctions();
 
@@ -55,6 +65,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 	protected function tearDown(): void {
 		unset( $GLOBALS['wp_query'], $GLOBALS['post'] );
+		$_SERVER = $this->server_backup;
 		parent::tearDown();
 	}
 
@@ -423,6 +434,70 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 'HU', $data_layer['geoCloudflareCountryCode'] );
 
 		unset( $_SERVER['HTTP_CF_IPCOUNTRY'] );
+	}
+
+	/**
+	 * Regression for review finding #12 (RI-4): the spoofable HTTP_CF_IPCOUNTRY
+	 * value must reach the data layer RAW so the single output sink
+	 * (wp_json_encode with the full hex flag set) can escape it for the inline
+	 * script. Re-introducing an esc_js()/esc_attr() pre-escape here would
+	 * corrupt the value (& -> &amp;, " -> &quot;, < -> &lt;) — this test fails
+	 * if that regression returns. The XSS itself is guarded at the sink
+	 * (ContainerCodeTest / DataLayerTest); here we pin the "arrives raw" contract.
+	 */
+	public function test_cloudflare_country_code_reaches_data_layer_without_entity_escaping(): void {
+		Functions\when( 'sanitize_text_field' )->returnArg();
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		// A spoofed, hostile country header carrying every break-out character.
+		$hostile = 'A&"<B';
+
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = $hostile;
+
+		$module     = $this->make_module( array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		// Present: the raw value, byte-for-byte.
+		$this->assertSame( $hostile, $data_layer['geoCloudflareCountryCode'] );
+		// Absent: any HTML-entity encoding an esc_js()/esc_attr() pre-escape would add.
+		$this->assertStringNotContainsString( '&amp;', $data_layer['geoCloudflareCountryCode'] );
+		$this->assertStringNotContainsString( '&quot;', $data_layer['geoCloudflareCountryCode'] );
+		$this->assertStringNotContainsString( '&lt;', $data_layer['geoCloudflareCountryCode'] );
+
+		unset( $_SERVER['HTTP_CF_IPCOUNTRY'] );
+	}
+
+	/**
+	 * The GTM4WP_OPTION_INCLUDE_VISITOR_IP branch was previously untested at the
+	 * module level (VisitorIp::get() is covered in isolation by VisitorIpTest,
+	 * but its integration into the data layer was not). Proves the branch wires
+	 * the validated IP into visitorIP raw (finding #12 sibling; TS-10 branch).
+	 */
+	public function test_visitor_ip_added_to_data_layer(): void {
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		// A public, non-reserved IP passes VisitorIp::get()'s FILTER_VALIDATE_IP.
+		$_SERVER['REMOTE_ADDR'] = '8.8.8.8';
+
+		$module     = $this->make_module( array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( '8.8.8.8', $data_layer['visitorIP'] );
+
+		unset( $_SERVER['REMOTE_ADDR'] );
+	}
+
+	public function test_visitor_ip_absent_when_option_disabled(): void {
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		$_SERVER['REMOTE_ADDR'] = '8.8.8.8';
+
+		$module     = $this->make_module( array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => false ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'visitorIP', $data_layer );
+
+		unset( $_SERVER['REMOTE_ADDR'] );
 	}
 
 	public function test_disabled_options_produce_empty_data_layer(): void {

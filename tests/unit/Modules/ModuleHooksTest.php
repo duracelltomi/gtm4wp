@@ -11,8 +11,10 @@ use Brain\Monkey\Functions;
 use GTM4WP\Frontend\ContainerCode;
 use GTM4WP\Module\ModuleInterface;
 use GTM4WP\Modules\Amp\AmpModule;
+use GTM4WP\Modules\ClientDeviceData\ClientDeviceDataModule;
 use GTM4WP\Modules\ConsentMode\ConsentModeModule;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
+use GTM4WP\Modules\MediaEvents\MediaEventsModule;
 use GTM4WP\Modules\UserEvents\UserEventsModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
@@ -89,5 +91,25 @@ final class ModuleHooksTest extends TestCase {
 	public function test_amp_hooks_inactive_without_amp_container_id(): void {
 		$disabled = $this->boot( new AmpModule() );
 		$this->assertFalse( has_action( 'amp_post_template_head', array( $disabled, 'render_header_begin' ) ) );
+	}
+
+	public function test_client_device_data_enqueues_when_any_signal_enabled(): void {
+		$enabled = $this->boot( new ClientDeviceDataModule(), array( GTM4WP_OPTION_INCLUDE_BROWSERDATA => true ) );
+		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $enabled, 'enqueue_scripts' ) ) );
+	}
+
+	public function test_client_device_data_inactive_when_all_signals_disabled(): void {
+		$disabled = $this->boot( new ClientDeviceDataModule() );
+		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $disabled, 'enqueue_scripts' ) ) );
+	}
+
+	public function test_media_events_youtube_filter_active_when_enabled(): void {
+		$enabled = $this->boot( new MediaEventsModule(), array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
+		$this->assertNotFalse( has_filter( 'oembed_result', array( $enabled, 'enable_youtube_js_api' ) ) );
+	}
+
+	public function test_media_events_youtube_filter_inactive_when_disabled(): void {
+		$disabled = $this->boot( new MediaEventsModule() );
+		$this->assertFalse( has_filter( 'oembed_result', array( $disabled, 'enable_youtube_js_api' ) ) );
 	}
 }

@@ -72,12 +72,15 @@ Rank gaps: **security-sink hostile-input** > **whole untested security-relevant
 class** > **untested error/edge branch** > **weak assertion** > **pure-logic
 coverage**. Do not chase coverage for its own sake — a getter or mock-echo test is
 negative value; recommend `[-]` N/A with a reason instead (BE-3). Where feasible,
-prove a gap by writing the missing test and observing it pass (correct code) or
-**fail (latent bug)**.
+verify a gap with a **throwaway** probe (a scratch test or tiny repro you run and
+discard) to observe it pass (correct code) or **fail (latent bug)**.
 
+**You review and report only — you never modify the suite.** Do not add or change
+any test file, and do not touch production code; you have no write tools by design.
 Report gaps grouped by severity (high / medium / low), each with the smell id, the
-`file:line`, the concrete uncovered input→sink or branch, and the suggested test.
-Separately list components confirmed well-guarded (cite the guarding test).
+`file:line`, the concrete uncovered input→sink or branch, and the suggested test —
+for the user (or the calling command) to close on request. Separately list
+components confirmed well-guarded (cite the guarding test).
 
 ⛔ **Disclosure rule (hard):** public repo — committed == published. Put any
 exploit/unfixed-vuln detail ONLY in your returned report (the git-ignored

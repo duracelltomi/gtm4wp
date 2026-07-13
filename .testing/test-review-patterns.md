@@ -37,6 +37,7 @@ on every review before anything else.
 - **TS-6** — a whole class with **zero** tests is the cheapest, highest-value find. Run the missing-test-file sweep first every review.
 
 **Test Smells (TS):**
+- **TS-11** — upstream raw-passthrough contract: a module that hands a value to a *shared downstream JSON sink* needs a **special-character** input proving it does NOT pre-escape (`esc_js`/`esc_attr`). With benign data (`'HU'`) an accidental pre-escape is invisible and coverage stays green (the module-boundary form of TS-1 / RI-4).
 - **TS-3** — the test asserts it *ran* (a call happened, a handle registered) but not the *effect* (the queue flushed, the value changed).
 - **TS-4** — tautological test: it asserts the value a stub/mock was told to return, exercising nothing real.
 - **TS-5** — happy-path only: no error / empty / boundary / invalid-input branch (a valid custom value tested, the fallback path not).
@@ -46,12 +47,17 @@ on every review before anything else.
 - **TS-10** — an untested public method or branch of an *otherwise-covered* class (a getter, an alternate `$echo`/placement path, a priority branch).
 
 **Project-Specific Test Conventions (TC):**
+- **TC-6** — to regression-test a PA-7 `addcslashes( …, '\\$' )` guard (data-bearing `preg_replace` replacement), the input must carry a literal `$`+digit; assert it survives verbatim (without the guard `$1` resolves to the capture group). Note JSON doubles `\`, so assert on the `$n` form, not `\n`.
+- **TC-7** — to test a handler that calls `wp_die()`/`exit` and then continues, stub it to throw (`Functions\expect('wp_die')->…->andThrow(\RuntimeException::class, 'wp_die')`), catch it, and assert the *post-halt* side effect never ran (e.g. `update_user_meta` count 0). Proves the gate actually stops execution.
+- **TC-8** — to unit-test a method coupled to the `Plugin` singleton chain (`Plugin::instance()->frontend()->datalayer()`), build the intermediates with `ReflectionClass::newInstanceWithoutConstructor()`, set their private props via reflection, install the singleton with a `ReflectionProperty` on `Plugin::$instance`, and **reset it to `null` in tearDown** (TS-7). Seed `DataLayer`'s private `compiled` directly rather than running the compile filter.
+- **TC-9 (JS)** — to test a side-effect frontend tracker (`js/frontend/*.js`): set the bare globals it reads (`global.gtm4wp_datalayer_name = 'dataLayer'`), `import '../tracker'` for its side effects, reset `window.dataLayer = []` per test, build a jsdom fixture and dispatch a **bubbling** event, then assert the `window.dataLayer` push. For the window-attached helper API (ecommerce-generic), import once then call `window.gtm4wp_*`. Tests live in `js/frontend/test/`; run `npm run test:unit` + `npm run lint:js` (no `npm run build` — test files are not bundled).
 - **TC-1** — every security-relevant code change ships a PHPUnit regression test in the same change (shared rule with `.security/`; the guard tests live in `tests/unit/Frontend/`).
 - **TC-2** — the Brain Monkey `wp_json_encode` stub honors the JSON flags, so build the expected encoded output by calling `wp_json_encode(...)` the way the source does — never hand-type `\uXXXX` literals.
 - **TC-3** — extend the right base: `FrontendTestCase` for services that read `Options` (it provides the Options factory + global reset); the plain `TestCase` for pure/static helpers with no Options dependency (`VisitorIp`).
 - **TC-4** — assert hook registration via `has_action`/`has_filter` (they return the priority integer), and prove **both** the enabled and the disabled state (the `ModuleHooksTest` gate pattern).
 
 **Blessed Exceptions (BE) — do NOT flag:**
+- **BE-4** — snapshotting `$_POST`/`$_GET` in a test `setUp` (for TS-7 isolation) trips `WordPress.Security.NonceVerification.Missing` (a phpcs *error*, not warning). Suppress with a scoped `// phpcs:ignore WordPress.Security.NonceVerification.Missing -- test isolation snapshot; the handler's own nonce check is asserted`.
 - **BE-1** — byte-exact `<script>` string assertions in `ContainerCodeTest`/`ConsentDefaultsTest` are intentional (1.x-parity port); this coupling is deliberate there, not a TS-9 smell.
 - **BE-2** — unused `$handle`/`$position` params in `wp_add_inline_script` stub closures match the existing test style; phpcs warns, accepted.
 - **BE-3** — some classes are intentionally not unit-tested (interfaces, the `Frontend` orchestrator, `Autoloader`); record `[-]` N/A in the checklist — not a gap.
@@ -141,6 +147,21 @@ methods and each conditional branch; map them to assertions.
 
 ---
 
+### TS-11: Upstream raw-passthrough contract
+A value that a module hands to a *shared downstream sink* (the `wp_json_encode`
+hex-flag dataLayer/inline-script path) must arrive **raw** so the sink can escape
+it once and correctly (RI-4). The regression that guards this lives at the module
+boundary, not the sink: assert the special-character value is present **raw** and
+absent in entity-encoded form. Confirmed 2026-07-13: `geoCloudflareCountryCode`
+was exercised only with `'HU'` — a value with no special characters — so a
+re-introduced `esc_js()`/`esc_attr()` pre-escape (finding #12 / RI-4 data
+corruption) would pass unnoticed with green coverage. The fix uses a hostile
+`A&"<B` header and asserts `assertSame('A&"<B', …)` **plus**
+`assertStringNotContainsString('&amp;'/'&quot;'/'&lt;', …)`; because the test case
+calls `stubEscapeFunctions()` (real `htmlspecialchars`), a re-added `esc_js` makes
+the assertion fail. This is TS-1 applied one hop upstream of the sink — check it
+for every module field that feeds the dataLayer with request/header data.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -159,6 +180,13 @@ the same call the source uses —
 — and assert on that. Do **not** hand-type `<`-style literals: they are
 error-prone (tooling may re-decode them) and drift from the source's flag set.
 See `ContainerCodeTest::test_header_begin_does_not_decode_html_entities_in_datalayer_values`.
+
+Corollary for the *hostile input itself*: write break-out characters with `\xNN`
+escapes in a double-quoted string (`"x\x22y\x26z"` for `x"y&z`) so no literal
+`<`/`"`/`&` appears in the test source, then compute the expected encoded fragment
+with `json_encode( $value, $flags )` (trimming the surrounding quotes). This keeps
+the assertion in lock-step with the source's flags and sidesteps editor/tooling
+that HTML-encodes literal break-out chars. See `AmpModuleTest::encoded_fragment()`.
 
 ### TC-3: Extend the right base test case
 - `GTM4WP\Tests\unit\Frontend\FrontendTestCase` — services that read `Options`
@@ -207,4 +235,6 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-13 (Run 1 continued) | Full remaining-gap sweep. Added **TC-8** (reflection injection for `Plugin`-singleton-coupled code — AMP finding #11), **TC-9** (JS side-effect tracker harness under `js/frontend/test/`), and extended **TC-2** with the `\xNN` + `json_encode`-computed-expected corollary (from the AMP test, after tooling HTML-encoded literal break-out chars). Derived from closing T9/T11/T12/T13(AMP)/T14 and starting T10 (JS). |
+| 2026-07-13 (Run 1) | Module/admin security-sink pass. Added **TS-11** (upstream raw-passthrough contract — the `geoCloudflareCountryCode` benign-only sink), **TC-6** (PA-7 `addcslashes` regression needs a `$n` input; JSON doubles `\`), **TC-7** (test `wp_die`/exit handlers by stubbing to throw + asserting no post-halt side effect), **BE-4** (`$_POST` snapshot in test setUp trips NonceVerification — scoped `phpcs:ignore`). Derived from closing T7 (`ListTrackingTest`, finding #16), T8 (`NoticesTest`, finding #18) and the PageVariables finding-#12 regression. |
 | 2026-07-13 | Seeded the patterns file from the `tests/unit/Frontend/` coverage review. Added TS-1..TS-10 (covered-≠-asserted, both-direction escaping, assert-the-effect, tautological, happy-path-only, zero-test class, state leakage, non-determinism, over-coupling, untested method/branch), TC-1..TC-4 (regression-with-change, build-expected-encoding, right base case, hook-both-ways) and BE-1..BE-3 (1.x byte-exact blessing, unused stub params, intentionally-untested classes). Derived from the session that added `VisitorIpTest` and 31 Frontend tests + fixed the OFF-placement iframe leak. |

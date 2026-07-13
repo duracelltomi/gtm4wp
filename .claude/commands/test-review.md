@@ -1,8 +1,9 @@
 Perform an in-depth review of the GTM4WP **unit-test suite** — not the production
 code (that is `/code-review`). The goal is *behavioral confidence*, not a coverage
 number: find code the tests don't guard, sinks exercised only with benign data,
-weak/tautological assertions, and whole untested classes — then close the highest-
-value gaps.
+weak/tautological assertions, and whole untested classes — then report them,
+ranked, so the user decides which to close. **Like `/code-review`, this command
+does not write or change any test without the user's go-ahead** (see § Rules).
 
 This plugin builds a JavaScript `dataLayer` from request state, so the dimension
 that matters most is: **does a regression test guard every value that reaches a
@@ -69,7 +70,7 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
      doesn't exist yet?" yes → patterns file; file-specific → gaps log only).
    - Promote a smell seen twice to a numbered entry; dedupe; append a Changelog row.
 
-### Post-work steps (only after tests are added/changed)
+### Post-work steps (only after the user approves closing gaps and tests are added)
 
 1. Run — only after all edits are applied:
    - `vendor/bin/phpunit` — the full suite must stay green.
@@ -139,19 +140,25 @@ Apply `.testing/test-review-patterns.md` to each prioritized component:
   covered vs N/A (BE-3, with a recorded reason).
 
 For each candidate, confirm it is real before logging: read the code path and the
-existing test. Where feasible, prove the gap by writing the missing test and
-watching it (a) pass against correct code, or (b) **fail — surfacing a latent
-bug**, as the OFF-placement iframe leak did this cycle.
+existing test. Where feasible, verify the gap with a **throwaway** probe — a scratch
+test (e.g. under the scratchpad dir) or a tiny repro you run and then discard — to
+watch it (a) pass against correct code, or (b) **fail — surfacing a latent bug**, as
+the OFF-placement iframe leak did. Do **not** add a test to the committed suite to
+prove a gap; adding tests is the gated close step (§C), done only on the user's word.
 
-### C. Prioritize & (optionally) close
+### C. Prioritize & report (close only on request)
 
 Rank gaps: **security-sink hostile-input** > **whole untested security-relevant
 class** > **untested error/edge branch** > **weak assertion** > **pure-logic
 coverage**. Do not chase coverage for its own sake — a getter test or a
 mock-echo test (TS-4) is negative value; prefer recording `[-]` N/A with a reason.
 
-If the user asked to *fix* (not just report): add the highest-value tests, follow
-`.testing/pre-flight-check.md` while writing them, then run the Post-work steps.
+**The review itself never writes into the committed test suite.** Exactly like
+`/code-review`, it stops at the report: save it, present the ranked gaps, and ask
+which the user wants closed. Only after the user picks specific gaps do you add the
+tests — follow `.testing/pre-flight-check.md` while writing them, then run the
+Post-work steps. If the user's invocation already told you to fix (e.g. "review the
+tests **and close the gaps**"), that is the go-ahead; otherwise report first and wait.
 
 ---
 
@@ -179,7 +186,7 @@ sink, never restate exploit detail; defer to `.security/`.
 
 ## Judgment findings (by severity)
 
-### High (close now)
+### High (highest-value to close)
 | # | Smell | Component | File:Line | Gap | Suggested test |
 |---|-------|-----------|-----------|-----|----------------|
 
@@ -216,10 +223,16 @@ sink, never restate exploit detail; defer to `.security/`.
   shared rule is TC-1 (a security change ships a regression test).
 - Read the code path and the existing test before logging a gap — no guessing from
   names. Reference `file:line`.
-- Prefer proving a gap by writing the failing/passing test over asserting it
-  abstractly.
+- Verify a gap with a **throwaway** probe (a scratch test or tiny repro you discard),
+  not by committing a test to the suite — mirror `/code-review`'s scratch-repro rule.
+- ⛔ **No changes without permission.** The review's only writes are the git-ignored
+  report and the terse checklist/patterns updates (its own cumulative tracking
+  artifacts, exactly like `/code-review`). Do **not** create or modify any test file
+  under `tests/` or `js/**/test/`, and do not touch production `src/`/`js/` code, as
+  part of the review. Adding or changing tests happens only after the user picks
+  which gaps to close (§C) — then follow the Post-work steps.
 - After saving the report, present a summary and ask which gaps the user wants
-  closed.
+  closed. Do not start writing tests until they answer.
 
 ---
 
