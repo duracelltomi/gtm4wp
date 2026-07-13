@@ -6,7 +6,16 @@ import {
 const gtm4wp_soundclound_percentage_tracking = 10;
 const gtm4wp_soundclound_percentage_tracking_marks = {};
 
-window.addEventListener( 'DOMContentLoaded', function () {
+function gtm4wp_initSoundCloudTracking() {
+	// The SoundCloud Widget API (w.soundcloud.com/player/api.js) is enqueued as
+	// a dependency of this tracker, but it can still be missing at runtime if a
+	// consent manager, an ad blocker or a network error stopped it from
+	// loading. Without it there is nothing to hook into, so bail out gracefully
+	// instead of throwing on `SC.Widget()`.
+	if ( typeof SC === 'undefined' || typeof SC.Widget === 'undefined' ) {
+		return;
+	}
+
 	const gtm4wp_soundcloud_frames = document.querySelectorAll(
 		'iframe[src*="soundcloud.com"]'
 	);
@@ -18,41 +27,60 @@ window.addEventListener( 'DOMContentLoaded', function () {
 		const widget = SC.Widget( soundcloud_frame );
 		let sound = {};
 
-		widget.bind( SC.Widget.Events.READY, function () {
+		// Reads the widget's current sound, refreshes the cached `sound` and the
+		// data-player_* attributes, then runs `done`. SoundCloud widgets can host
+		// a playlist, so the current sound changes as playback advances between
+		// tracks; refreshing on READY and on every PLAY keeps each push tied to
+		// the track that is actually playing (and keeps the percentage marks
+		// keyed by the right sound id).
+		const gtm4wp_refreshSoundCloudCurrentSound = function ( done ) {
 			widget.getCurrentSound( function ( soundData ) {
-				soundcloud_frame.setAttribute( 'data-player_id', soundData.id );
-				soundcloud_frame.setAttribute(
-					'data-player_author',
-					soundData.user.username
-				);
-				soundcloud_frame.setAttribute(
-					'data-player_title',
-					soundData.title
-				);
-				soundcloud_frame.setAttribute(
-					'data-player_url',
-					soundData.permalink_url
-				);
-				soundcloud_frame.setAttribute(
-					'data-player_duration',
-					soundData.duration
-				);
+				if ( soundData ) {
+					sound = soundData;
 
-				sound = soundData;
+					soundcloud_frame.setAttribute(
+						'data-player_id',
+						soundData.id
+					);
+					soundcloud_frame.setAttribute(
+						'data-player_author',
+						soundData.user?.username
+					);
+					soundcloud_frame.setAttribute(
+						'data-player_title',
+						soundData.title
+					);
+					soundcloud_frame.setAttribute(
+						'data-player_url',
+						soundData.permalink_url
+					);
+					soundcloud_frame.setAttribute(
+						'data-player_duration',
+						soundData.duration
+					);
+				}
 
+				if ( done ) {
+					done();
+				}
+			} );
+		};
+
+		widget.bind( SC.Widget.Events.READY, function () {
+			gtm4wp_refreshSoundCloudCurrentSound( function () {
 				window[ gtm4wp_datalayer_name ].push( {
 					event: 'gtm4wp.mediaPlayerReady',
 					mediaType: 'soundcloud',
 					mediaData: {
-						id: soundData.id,
-						author: soundData.user.username,
-						title: soundData.title,
-						url: soundData.permalink_url,
-						duration: soundData.duration,
+						id: sound.id,
+						author: sound.user?.username,
+						title: sound.title,
+						url: sound.permalink_url,
+						duration: sound.duration,
 					},
 					mediaCurrentTime: 0,
 				} );
-			} ); // end of api call getDuration
+			} ); // end of api call getCurrentSound
 
 			widget.bind(
 				SC.Widget.Events.PLAY_PROGRESS,
@@ -62,7 +90,12 @@ window.addEventListener( 'DOMContentLoaded', function () {
 			);
 
 			widget.bind( SC.Widget.Events.PLAY, function ( eventData ) {
-				gtm4wp_onSoundCloudPlayerStateChange( eventData, 'play' );
+				// Refresh the current sound first so a playlist advancing to the
+				// next track reports that track's metadata instead of the first
+				// sound's, then push the state change.
+				gtm4wp_refreshSoundCloudCurrentSound( function () {
+					gtm4wp_onSoundCloudPlayerStateChange( eventData, 'play' );
+				} );
 			} );
 
 			widget.bind( SC.Widget.Events.PAUSE, function ( eventData ) {
@@ -103,7 +136,7 @@ window.addEventListener( 'DOMContentLoaded', function () {
 				mediaType: 'soundcloud',
 				mediaData: {
 					id: sound.id,
-					author: sound.user.username,
+					author: sound.user?.username,
 					title: sound.title,
 					url: sound.permalink_url,
 					duration: sound.duration,
@@ -155,7 +188,7 @@ window.addEventListener( 'DOMContentLoaded', function () {
 						mediaType: 'soundcloud',
 						mediaData: {
 							id: sound.id,
-							author: sound.user.username,
+							author: sound.user?.username,
 							title: sound.title,
 							url: sound.permalink_url,
 							duration: sound.duration,
@@ -184,7 +217,7 @@ window.addEventListener( 'DOMContentLoaded', function () {
 					mediaType: 'soundcloud',
 					mediaData: {
 						id: sound.id,
-						author: sound.user.username,
+						author: sound.user?.username,
 						title: sound.title,
 						url: sound.permalink_url,
 						duration: sound.duration,
@@ -195,4 +228,17 @@ window.addEventListener( 'DOMContentLoaded', function () {
 			} );
 		};
 	} );
-} );
+}
+
+// The tracker bundle may execute before or after the DOM has finished parsing
+// (e.g. when loaded with a defer/async strategy or injected late by a tag
+// manager). Guard against a DOMContentLoaded event that has already fired,
+// which would otherwise leave the tracking silently uninitialized.
+if ( document.readyState === 'loading' ) {
+	window.addEventListener(
+		'DOMContentLoaded',
+		gtm4wp_initSoundCloudTracking
+	);
+} else {
+	gtm4wp_initSoundCloudTracking();
+}

@@ -96,8 +96,6 @@ https://ipstack.com/product
 
 = Media player events =
 
-(experimental)
-
 Track users' interaction with any embedded media:
 
 * YouTube

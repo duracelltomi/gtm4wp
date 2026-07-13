@@ -10,6 +10,8 @@
 	* Page template (`pageTemplate`), featured image presence (`pageHasFeaturedImage`), page hierarchy (`pageParentID`, `pageDepth`) and sticky flag (`pagePostSticky`)
 	* Primary category (`pagePrimaryCategory`, `pagePrimaryCategoryName`) detected from Yoast SEO / Rank Math with a first-category fallback, overridable with the `gtm4wp_primary_category_term_id` filter
 	* Page language (`pageLanguage`) detected from WPML / Polylang with a site-locale fallback, overridable with the `gtm4wp_page_language` filter
+* Changed: SoundCloud media tracking is promoted from experimental to stable
+* Updated: SoundCloud tracker hardened - bails out gracefully when the SoundCloud Widget API is blocked (consent manager, ad blocker, network error), still initializes when the script loads after the page is parsed (defer/async or late injection), and now reports the correct track metadata for playlist / multi-track widgets
 
 ## 1.21.1
 
