@@ -6,7 +6,16 @@ import {
 const gtm4wp_vimeo_percentage_tracking = 10;
 const gtm4wp_vimeo_percentage_tracking_marks = {};
 
-window.addEventListener( 'DOMContentLoaded', function () {
+function gtm4wp_initVimeoTracking() {
+	// The Vimeo Player SDK (player.vimeo.com/api/player.js) is enqueued as a
+	// dependency of this tracker, but it can still be missing at runtime if a
+	// consent manager, an ad blocker or a network error stopped it from
+	// loading. Without it there is nothing to hook into, so bail out
+	// gracefully instead of throwing on `new Vimeo.Player()`.
+	if ( typeof Vimeo === 'undefined' || typeof Vimeo.Player === 'undefined' ) {
+		return;
+	}
+
 	const gtm4wp_vimeo_frames = document.querySelectorAll(
 		'iframe[src*="vimeo.com"]'
 	);
@@ -40,6 +49,10 @@ window.addEventListener( 'DOMContentLoaded', function () {
 							mediaType: 'vimeo',
 							mediaData: {
 								id: videoid,
+								// The Vimeo Player SDK exposes no owner/author
+								// name (only getVideoTitle/getVideoId/getDuration
+								// and friends), so `author` is intentionally left
+								// empty here and in every push below.
 								author: '',
 								title: vimeo_frame.getAttribute(
 									'data-player_title'
@@ -86,7 +99,12 @@ window.addEventListener( 'DOMContentLoaded', function () {
 				} );
 			} ); // end of api call getVideoTitle
 
-		vimeoapi.on( 'play', function ( data ) {
+		// Vimeo fires "play" as soon as playback is requested and "playing"
+		// once it actually starts (after any initial buffering). We track
+		// "playing" so the start signal matches the YouTube and SoundCloud
+		// trackers, which report on the real playing state, and pair it with
+		// the bufferstart/bufferend handlers below.
+		vimeoapi.on( 'playing', function ( data ) {
 			gtm4wp_onVimeoPlayerStateChange( 'play', data );
 		} );
 
@@ -102,138 +120,102 @@ window.addEventListener( 'DOMContentLoaded', function () {
 			gtm4wp_onVimeoPlayerStateChange( 'seeked', data );
 		} );
 
+		// bufferstart/bufferend carry no data payload, so the current time is
+		// read from the player. "bufferstart" maps to GTM's built-in
+		// "buffering" video status (matching the YouTube tracker); "bufferend"
+		// has no native equivalent and reports an empty native status.
+		vimeoapi.on( 'bufferstart', function () {
+			gtm4wp_onVimeoBufferStateChange( 'buffering' );
+		} );
+
+		vimeoapi.on( 'bufferend', function () {
+			gtm4wp_onVimeoBufferStateChange( 'bufferend' );
+		} );
+
 		vimeoapi.on( 'texttrackchange', function ( data ) {
-			vimeoapi
-				.getCurrentTime()
-				.then( function ( seconds ) {
-					window[ gtm4wp_datalayer_name ].push( {
-						event: 'gtm4wp.mediaPlayerEvent',
-						mediaType: 'vimeo',
-						mediaData: {
-							id: videoid,
-							author: '',
-							title: vimeo_frame.getAttribute(
-								'data-player_title'
-							),
-							url: vimeo_frame.getAttribute( 'data-player_url' ),
-							duration: vimeo_frame.getAttribute(
-								'data-player_duration'
-							),
-						},
-						mediaPlayerEvent: 'texttrackchange',
-						mediaPlayerEventParam: data,
-						mediaCurrentTime: seconds,
-					} );
-				} )
-				.catch( function ( error ) {
-					window[ gtm4wp_datalayer_name ].push( {
-						event: 'gtm4wp.mediaPlayerEvent',
-						mediaType: 'vimeo',
-						mediaData: {
-							id: videoid,
-							author: '',
-							title: 'Unknown title',
-							url: videourl,
-							duration: vimeo_frame.getAttribute(
-								'data-player_duration'
-							),
-						},
-						mediaCurrentTime: 0,
-						mediaPlayerEvent: 'error',
-						mediaPlayerEventParam: error,
-					} );
-				} ); // end call api getCurrentTime()
+			gtm4wp_pushVimeoPlayerEvent( 'texttrackchange', data );
 		} );
 
 		vimeoapi.on( 'volumechange', function ( data ) {
-			vimeoapi
-				.getCurrentTime()
-				.then( function ( seconds ) {
-					window[ gtm4wp_datalayer_name ].push( {
-						event: 'gtm4wp.mediaPlayerEvent',
-						mediaType: 'vimeo',
-						mediaData: {
-							id: videoid,
-							author: '',
-							title: vimeo_frame.getAttribute(
-								'data-player_title'
-							),
-							url: vimeo_frame.getAttribute( 'data-player_url' ),
-							duration: vimeo_frame.getAttribute(
-								'data-player_duration'
-							),
-						},
-						mediaPlayerEvent: 'volumechange',
-						mediaPlayerEventParam: data.volume,
-						mediaCurrentTime: seconds,
-					} );
-				} )
-				.catch( function ( error ) {
-					window[ gtm4wp_datalayer_name ].push( {
-						event: 'gtm4wp.mediaPlayerEvent',
-						mediaType: 'vimeo',
-						mediaData: {
-							id: videoid,
-							author: '',
-							title: 'Unknown title',
-							url: videourl,
-							duration: vimeo_frame.getAttribute(
-								'data-player_duration'
-							),
-						},
-						mediaCurrentTime: 0,
-						mediaPlayerEvent: 'error',
-						mediaPlayerEventParam: error,
-					} );
-				} ); // end call api getCurrentTime()
+			gtm4wp_pushVimeoPlayerEvent( 'volumechange', data.volume );
+		} );
+
+		vimeoapi.on( 'playbackratechange', function ( data ) {
+			gtm4wp_pushVimeoPlayerEvent(
+				'playbackratechange',
+				data.playbackRate
+			);
+		} );
+
+		vimeoapi.on( 'qualitychange', function ( data ) {
+			gtm4wp_pushVimeoPlayerEvent( 'qualitychange', data.quality );
+		} );
+
+		vimeoapi.on( 'fullscreenchange', function ( data ) {
+			gtm4wp_pushVimeoPlayerEvent( 'fullscreenchange', data.fullscreen );
+		} );
+
+		vimeoapi.on( 'enterpictureinpicture', function () {
+			gtm4wp_pushVimeoPlayerEvent( 'enterpictureinpicture', true );
+		} );
+
+		vimeoapi.on( 'leavepictureinpicture', function () {
+			gtm4wp_pushVimeoPlayerEvent( 'leavepictureinpicture', true );
 		} );
 
 		vimeoapi.on( 'error', function ( data ) {
-			vimeoapi
-				.getCurrentTime()
-				.then( function ( seconds ) {
-					window[ gtm4wp_datalayer_name ].push( {
-						event: 'gtm4wp.mediaPlayerEvent',
-						mediaType: 'vimeo',
-						mediaData: {
-							id: videoid,
-							author: '',
-							title: vimeo_frame.getAttribute(
-								'data-player_title'
-							),
-							url: vimeo_frame.getAttribute( 'data-player_url' ),
-							duration: vimeo_frame.getAttribute(
-								'data-player_duration'
-							),
-						},
-						mediaPlayerEvent: 'error',
-						mediaPlayerEventParam: data,
-						mediaCurrentTime: seconds,
-					} );
-				} )
-				.catch( function ( error ) {
-					window[ gtm4wp_datalayer_name ].push( {
-						event: 'gtm4wp.mediaPlayerEvent',
-						mediaType: 'vimeo',
-						mediaData: {
-							id: videoid,
-							author: '',
-							title: 'Unknown title',
-							url: videourl,
-							duration: vimeo_frame.getAttribute(
-								'data-player_duration'
-							),
-						},
-						mediaCurrentTime: 0,
-						mediaPlayerEvent: 'error',
-						mediaPlayerEventParam: error,
-					} );
-				} ); // end call api getCurrentTime()
+			gtm4wp_pushVimeoPlayerEvent( 'error', data );
 		} );
 
 		vimeoapi.on( 'timeupdate', function ( data ) {
 			gtm4wp_onVimeoPercentageChange( data );
 		} );
+
+		// Pushes a gtm4wp.mediaPlayerEvent for player events that are not state
+		// changes. Most of these events do not report the current position, so
+		// it is fetched from the player before the push.
+		const gtm4wp_pushVimeoPlayerEvent = function ( eventName, eventParam ) {
+			vimeoapi
+				.getCurrentTime()
+				.then( function ( seconds ) {
+					window[ gtm4wp_datalayer_name ].push( {
+						event: 'gtm4wp.mediaPlayerEvent',
+						mediaType: 'vimeo',
+						mediaData: {
+							id: videoid,
+							author: '',
+							title: vimeo_frame.getAttribute(
+								'data-player_title'
+							),
+							url: vimeo_frame.getAttribute( 'data-player_url' ),
+							duration: vimeo_frame.getAttribute(
+								'data-player_duration'
+							),
+						},
+						mediaPlayerEvent: eventName,
+						mediaPlayerEventParam: eventParam,
+						mediaCurrentTime: seconds,
+					} );
+				} )
+				.catch( function ( error ) {
+					window[ gtm4wp_datalayer_name ].push( {
+						event: 'gtm4wp.mediaPlayerEvent',
+						mediaType: 'vimeo',
+						mediaData: {
+							id: videoid,
+							author: '',
+							title: 'Unknown title',
+							url: videourl,
+							duration: vimeo_frame.getAttribute(
+								'data-player_duration'
+							),
+						},
+						mediaCurrentTime: 0,
+						mediaPlayerEvent: 'error',
+						mediaPlayerEventParam: error,
+					} );
+				} ); // end call api getCurrentTime()
+		};
 
 		const gtm4wp_onVimeoPlayerStateChange = function (
 			player_state,
@@ -260,6 +242,63 @@ window.addEventListener( 'DOMContentLoaded', function () {
 					duration: data.duration,
 				} ),
 			} );
+		};
+
+		// bufferstart/bufferend arrive without a data payload, so the same
+		// mediaPlayerStateChange shape is rebuilt from the fetched current time
+		// and the duration stored on the iframe once the player became ready.
+		const gtm4wp_onVimeoBufferStateChange = function ( player_state ) {
+			vimeoapi
+				.getCurrentTime()
+				.then( function ( seconds ) {
+					const duration = Number(
+						vimeo_frame.getAttribute( 'data-player_duration' )
+					);
+
+					window[ gtm4wp_datalayer_name ].push( {
+						event: 'gtm4wp.mediaPlayerStateChange',
+						mediaType: 'vimeo',
+						mediaData: {
+							id: videoid,
+							author: '',
+							title: vimeo_frame.getAttribute(
+								'data-player_title'
+							),
+							url: vimeo_frame.getAttribute( 'data-player_url' ),
+							duration,
+						},
+						mediaPlayerState: player_state,
+						mediaCurrentTime: seconds,
+						...gtm4wpNativeVideoParams( {
+							provider: 'vimeo',
+							status: gtm4wpNativeVideoStatus( player_state ),
+							url: vimeo_frame.getAttribute( 'data-player_url' ),
+							title: vimeo_frame.getAttribute(
+								'data-player_title'
+							),
+							currentTime: seconds,
+							duration,
+						} ),
+					} );
+				} )
+				.catch( function ( error ) {
+					window[ gtm4wp_datalayer_name ].push( {
+						event: 'gtm4wp.mediaPlayerEvent',
+						mediaType: 'vimeo',
+						mediaData: {
+							id: videoid,
+							author: '',
+							title: 'Unknown title',
+							url: videourl,
+							duration: vimeo_frame.getAttribute(
+								'data-player_duration'
+							),
+						},
+						mediaCurrentTime: 0,
+						mediaPlayerEvent: 'error',
+						mediaPlayerEventParam: error,
+					} );
+				} ); // end call api getCurrentTime()
 		};
 
 		const gtm4wp_onVimeoPercentageChange = function ( data ) {
@@ -314,4 +353,14 @@ window.addEventListener( 'DOMContentLoaded', function () {
 			}
 		};
 	} );
-} );
+}
+
+// The tracker bundle may execute before or after the DOM has finished parsing
+// (e.g. when loaded with a defer/async strategy or injected late by a tag
+// manager). Guard against a DOMContentLoaded event that has already fired,
+// which would otherwise leave the tracking silently uninitialized.
+if ( document.readyState === 'loading' ) {
+	window.addEventListener( 'DOMContentLoaded', gtm4wp_initVimeoTracking );
+} else {
+	gtm4wp_initVimeoTracking();
+}

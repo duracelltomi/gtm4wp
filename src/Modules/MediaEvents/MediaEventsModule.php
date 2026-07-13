@@ -111,7 +111,9 @@ final class MediaEventsModule extends AbstractModule {
 			$in_footer = (bool) apply_filters( 'gtm4wp_vimeo', true );
 
 			wp_enqueue_script( 'gtm4wp-vimeo-api', 'https://player.vimeo.com/api/player.js', array(), '1.0', $in_footer );
-			$this->enqueue_script( 'gtm4wp-vimeo', 'gtm4wp-vimeo.js', array(), $in_footer );
+			// Depend on the Vimeo Player SDK handle so WordPress always prints
+			// it before the tracker, guaranteeing the `Vimeo` global exists.
+			$this->enqueue_script( 'gtm4wp-vimeo', 'gtm4wp-vimeo.js', array( 'gtm4wp-vimeo-api' ), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_SOUNDCLOUD ) ) {

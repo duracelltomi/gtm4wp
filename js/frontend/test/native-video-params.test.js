@@ -22,6 +22,9 @@ describe( 'gtm4wpNativeVideoStatus', () => {
 	it( 'returns an empty string for states with no native equivalent', () => {
 		expect( gtm4wpNativeVideoStatus( 'cued' ) ).toBe( '' );
 		expect( gtm4wpNativeVideoStatus( 'unstarted' ) ).toBe( '' );
+		// The Vimeo tracker emits a 'bufferend' state (buffering resumed);
+		// GTM has no native status for it, so it must resolve to ''.
+		expect( gtm4wpNativeVideoStatus( 'bufferend' ) ).toBe( '' );
 		expect( gtm4wpNativeVideoStatus( undefined ) ).toBe( '' );
 	} );
 } );
