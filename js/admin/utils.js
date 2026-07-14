@@ -108,3 +108,56 @@ export function moduleMatchesSearch( module, term ) {
 export function stripTags( html ) {
 	return String( html ?? '' ).replace( /<[^>]*>/g, '' );
 }
+
+/**
+ * Builds the SelectControl option list for the Axeptio cookies-version field
+ * from the versions fetched from the Axeptio project, keeping the currently
+ * saved value representable even when the fetch fails or the version was
+ * removed from the project (so a save never silently drops it).
+ *
+ * @param {Array}  cookies          The `cookies` array of the Axeptio project JSON.
+ * @param {string} currentValue     The currently saved cookies version.
+ * @param {string} placeholderLabel Label of the leading empty option, shown only
+ *                                  when no version is selected yet.
+ * @return {Array} `{ value, label }` options for `SelectControl`.
+ */
+export function axeptioVersionOptions(
+	cookies,
+	currentValue,
+	placeholderLabel
+) {
+	const current = String( currentValue ?? '' );
+	const list = Array.isArray( cookies ) ? cookies : [];
+	const options = [];
+	const names = new Set();
+
+	// A leading empty option so an unset value stays representable.
+	if ( '' === current ) {
+		options.push( { value: '', label: placeholderLabel ?? '' } );
+	}
+
+	list.forEach( ( cookie ) => {
+		if ( ! cookie || ! cookie.name ) {
+			return;
+		}
+
+		const name = String( cookie.name );
+		if ( names.has( name ) ) {
+			return;
+		}
+
+		names.add( name );
+		options.push( {
+			value: name,
+			label: String( cookie.title || cookie.name ),
+		} );
+	} );
+
+	// Preserve a saved value that is no longer published (or that could not be
+	// loaded) so submitting the form does not wipe it.
+	if ( '' !== current && ! names.has( current ) ) {
+		options.push( { value: current, label: current } );
+	}
+
+	return options;
+}

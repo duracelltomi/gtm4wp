@@ -12,6 +12,7 @@ import {
 import { RawHTML } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
+import AxeptioVersionControl from './AxeptioVersionControl';
 import TableControl from './TableControl';
 
 const PHASE_LABELS = {
@@ -46,11 +47,28 @@ function FieldHelp( { field, error } ) {
 	);
 }
 
-export default function FieldControl( { field, value, error, onChange } ) {
+export default function FieldControl( {
+	field,
+	value,
+	values,
+	error,
+	onChange,
+} ) {
 	const help = <FieldHelp field={ field } error={ error } />;
 	const label = <FieldLabel field={ field } />;
 
 	switch ( field.type ) {
+		case 'axeptio-version':
+			return (
+				<AxeptioVersionControl
+					value={ value }
+					allValues={ values }
+					label={ label }
+					help={ help }
+					onChange={ ( next ) => onChange( next ) }
+				/>
+			);
+
 		case 'checkbox':
 			return (
 				<ToggleControl

@@ -146,6 +146,11 @@ define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR', 'integrate-webtoffee-gdpr' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO', 'integrate-axeptio' );
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID', 'integrate-axeptio-projectid' );
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION', 'integrate-axeptio-cookies-version' );
+define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE', 'integrate-axeptio-consent-mode' );
+
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE', 'integrate-consent-mode' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS', 'integrate-consent-mode-ads' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA', 'integrate-consent-mode-ad-user-data' );
@@ -194,6 +199,13 @@ define( 'GTM4WP_WPFILTER_GET_CSP_NONCE', 'gtm4wp_get_csp_nonce' );
  * Constant that can be used to overwrite the stored default value of a consent mode flag.
  */
 define( 'GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG', 'gtm4wp_overwrite_consent_mode_flag' );
+
+/**
+ * Constant used by the Axeptio integration to filter the Google Consent Mode v2
+ * default state (all denied) handed to the Axeptio SDK, e.g. to grant signals
+ * for non-GDPR audiences.
+ */
+define( 'GTM4WP_WPFILTER_AXEPTIO_CONSENT_MODE_DEFAULT', 'gtm4wp_axeptio_consent_mode_default' );
 
 /**
  * Constants used by the WooCommerce integration as WordPress filters to allow

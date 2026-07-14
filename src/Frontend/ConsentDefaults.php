@@ -23,6 +23,16 @@ defined( 'ABSPATH' ) || exit;
 final class ConsentDefaults {
 
 	/**
+	 * Internal filter that lets a CMP integration suppress the GTM4WP consent
+	 * mode default block when the CMP fires the "default" command itself (so
+	 * it is not sent twice). The Axeptio module returns false here when it
+	 * drives Google Consent Mode v2.
+	 *
+	 * @since 2.0.0
+	 */
+	public const FILTER_DEFAULT_ENABLED = 'gtm4wp_consent_mode_default_enabled';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -36,7 +46,19 @@ final class ConsentDefaults {
 	 * @return bool
 	 */
 	public function enabled(): bool {
-		return (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_CONSENTMODE );
+		$enabled = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_CONSENTMODE );
+
+		/**
+		 * Filters whether GTM4WP outputs its own Google Consent Mode "default"
+		 * command. A CMP integration that fires the consent default itself
+		 * (e.g. Axeptio driving Consent Mode v2) returns false here so the
+		 * default is not sent twice.
+		 *
+		 * @since 2.0.0
+		 *
+		 * @param bool $enabled Whether the consent default block is output.
+		 */
+		return (bool) apply_filters( self::FILTER_DEFAULT_ENABLED, $enabled );
 	}
 
 	/**

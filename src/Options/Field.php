@@ -29,6 +29,14 @@ final class Field {
 	public const TYPE_MULTISELECT = 'multiselect';
 	public const TYPE_TABLE       = 'table';
 
+	/**
+	 * A single-select whose options are fetched client side from the Axeptio
+	 * project API (the published cookies versions cannot be known server side).
+	 * Behaves like a free-text string for REST typing and save-time
+	 * sanitization; the React app renders it with a custom dropdown control.
+	 */
+	public const TYPE_AXEPTIO_VERSION = 'axeptio-version';
+
 	public const PHASE_STABLE       = 'stable';
 	public const PHASE_BETA         = 'beta';
 	public const PHASE_EXPERIMENTAL = 'experimental';

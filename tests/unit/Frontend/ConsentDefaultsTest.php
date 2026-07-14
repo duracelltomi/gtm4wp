@@ -47,6 +47,22 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$this->assertSame( 'denied', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
 	}
 
+	public function test_enabled_can_be_suppressed_by_filter(): void {
+		// A CMP integration (e.g. Axeptio driving Consent Mode v2) fires the
+		// consent default itself and vetoes the GTM4WP one via this filter, so
+		// it is never sent twice.
+		Filters\expectApplied( ConsentDefaults::FILTER_DEFAULT_ENABLED )
+			->once()
+			->with( true )
+			->andReturn( false );
+
+		$consent = new ConsentDefaults(
+			$this->make_options( array( GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true ) )
+		);
+
+		$this->assertFalse( $consent->enabled() );
+	}
+
 	public function test_unknown_flag_is_always_denied(): void {
 		$consent = new ConsentDefaults(
 			$this->make_options( array( GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true ) )

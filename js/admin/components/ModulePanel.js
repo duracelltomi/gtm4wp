@@ -20,6 +20,7 @@ function GroupFields( { fields, values, errors, onChange } ) {
 					<FieldControl
 						field={ field }
 						value={ values[ field.key ] }
+						values={ values }
 						error={ errors[ field.key ] }
 						onChange={ ( next ) => onChange( field.key, next ) }
 					/>

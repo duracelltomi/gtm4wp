@@ -100,6 +100,7 @@ final class ModuleConsistencyTest extends TestCase {
 				'user-events',
 				'media-events',
 				'consent',
+				'axeptio',
 				'contact-form-7',
 				'woocommerce',
 				'amp',

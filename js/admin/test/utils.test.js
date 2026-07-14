@@ -3,6 +3,7 @@
  */
 
 import {
+	axeptioVersionOptions,
 	changedValues,
 	coerceValue,
 	moduleMatchesSearch,
@@ -126,5 +127,73 @@ describe( 'stripTags', () => {
 			'a link here'
 		);
 		expect( stripTags( null ) ).toBe( '' );
+	} );
+} );
+
+describe( 'axeptioVersionOptions', () => {
+	const cookies = [
+		{ name: 'proj-v1', title: 'Project v1' },
+		{ name: 'proj-v2', title: 'Project v2' },
+	];
+
+	it( 'maps fetched versions to value/label options, using name as fallback label', () => {
+		const options = axeptioVersionOptions(
+			[ { name: 'proj-v1', title: 'Project v1' }, { name: 'proj-v2' } ],
+			'proj-v1',
+			'placeholder'
+		);
+
+		expect( options ).toEqual( [
+			{ value: 'proj-v1', label: 'Project v1' },
+			{ value: 'proj-v2', label: 'proj-v2' },
+		] );
+	} );
+
+	it( 'prepends a placeholder option only when no version is selected', () => {
+		const options = axeptioVersionOptions( cookies, '', 'Select…' );
+
+		expect( options[ 0 ] ).toEqual( { value: '', label: 'Select…' } );
+		expect( options ).toHaveLength( 3 );
+	} );
+
+	it( 'preserves a saved value that is no longer published so a save never drops it', () => {
+		const options = axeptioVersionOptions( cookies, 'removed-v0', '' );
+
+		expect( options ).toContainEqual( {
+			value: 'removed-v0',
+			label: 'removed-v0',
+		} );
+		// The saved value is not duplicated as a placeholder (it is non-empty).
+		expect(
+			options.filter( ( option ) => option.value === '' )
+		).toHaveLength( 0 );
+	} );
+
+	it( 'does not re-add the saved value when it is still published', () => {
+		const options = axeptioVersionOptions( cookies, 'proj-v2', '' );
+
+		expect(
+			options.filter( ( option ) => option.value === 'proj-v2' )
+		).toHaveLength( 1 );
+	} );
+
+	it( 'skips entries without a name and dedupes repeated names', () => {
+		const options = axeptioVersionOptions(
+			[
+				{ title: 'No name' },
+				{ name: 'dup', title: 'First' },
+				{ name: 'dup', title: 'Second' },
+			],
+			'dup',
+			''
+		);
+
+		expect( options ).toEqual( [ { value: 'dup', label: 'First' } ] );
+	} );
+
+	it( 'tolerates a non-array cookies argument', () => {
+		expect( axeptioVersionOptions( undefined, '', 'ph' ) ).toEqual( [
+			{ value: '', label: 'ph' },
+		] );
 	} );
 } );
