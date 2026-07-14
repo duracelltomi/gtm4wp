@@ -94,6 +94,14 @@ if ( ! class_exists( 'WC_Order' ) ) {
 			return $this->value( 'items', array() );
 		}
 		public function get_item_total( $order_item, $inc_tax ) {
+			// Reflect the requested tax basis when fixtures provide both, so tests
+			// can assert whether tax was included; otherwise fall back to item_total.
+			if ( $inc_tax && array_key_exists( 'item_total_incl', $this->data ) ) {
+				return $this->data['item_total_incl'];
+			}
+			if ( ! $inc_tax && array_key_exists( 'item_total_excl', $this->data ) ) {
+				return $this->data['item_total_excl'];
+			}
 			return $this->value( 'item_total', 0 );
 		}
 

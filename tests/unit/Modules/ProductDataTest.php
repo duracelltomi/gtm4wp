@@ -446,6 +446,74 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 70.0, $no_tax_no_shipping['ecommerce']['value'] );
 	}
 
+	/**
+	 * Builds an order carrying a single line item, with fixtures for the
+	 * tax-inclusive and tax-exclusive per-item totals.
+	 *
+	 * @param float $incl Per-item total including tax.
+	 * @param float $excl Per-item total excluding tax.
+	 * @param int   $qty  Line quantity.
+	 * @return \WC_Order
+	 */
+	private function make_order_with_item( float $incl, float $excl, int $qty = 1 ): \WC_Order {
+		$product    = $this->make_product();
+		$order_item = new class( $product, $qty ) {
+			public function __construct( private $product, private int $qty ) {}
+			public function get_product() {
+				return $this->product;
+			}
+			public function get_quantity() {
+				return $this->qty;
+			}
+		};
+
+		return new \WC_Order(
+			array(
+				'items'           => array( $order_item ),
+				'item_total_incl' => $incl,
+				'item_total_excl' => $excl,
+			)
+		);
+	}
+
+	public function test_order_item_price_excludes_tax_when_exclude_tax_option_on(): void {
+		// #176: with WCEXCLUDETAX on, the transaction value is tax-exclusive, so the
+		// per-item price (product performance) must be tax-exclusive too - regardless
+		// of the shop's tax-inclusive display setting - to reconcile the two reports.
+		Functions\when( 'get_option' )->alias(
+			static function ( $key ) {
+				if ( 'woocommerce_tax_display_shop' === $key ) {
+					return 'incl';
+				}
+				return array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => true );
+			}
+		);
+
+		$product_data = new ProductData( new Options( ( new WooCommerceModule() )->defaults() ) );
+		$items        = $product_data->process_order_items( $this->make_order_with_item( 24.0, 20.0, 2 ) );
+
+		$this->assertSame( 20.0, $items[0]['price'], 'With WCEXCLUDETAX on, the item price must exclude tax.' );
+		$this->assertSame( 2, $items[0]['quantity'] );
+	}
+
+	public function test_order_item_price_follows_shop_display_when_exclude_tax_off(): void {
+		// Default: WCEXCLUDETAX off, so the item price follows the shop's inclusive
+		// display setting and stays tax-inclusive.
+		Functions\when( 'get_option' )->alias(
+			static function ( $key ) {
+				if ( 'woocommerce_tax_display_shop' === $key ) {
+					return 'incl';
+				}
+				return array();
+			}
+		);
+
+		$product_data = new ProductData( new Options( ( new WooCommerceModule() )->defaults() ) );
+		$items        = $product_data->process_order_items( $this->make_order_with_item( 24.0, 20.0 ) );
+
+		$this->assertSame( 24.0, $items[0]['price'], 'With WCEXCLUDETAX off and inclusive display, the item price includes tax.' );
+	}
+
 	public function test_raw_order_datalayer_passes_values_without_entity_escaping(): void {
 		$order = new \WC_Order(
 			array(

@@ -212,8 +212,19 @@ final class ProductData {
 					continue;
 				}
 
-				$product       = $order_item->get_product();
-				$inc_tax       = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+				$product = $order_item->get_product();
+
+				// Report the per-item price on the same tax basis as the transaction
+				// value so GA4 item-level revenue (product performance) reconciles with
+				// the transaction total (sales performance). By default this follows the
+				// shop's price-display setting, but when the admin excludes tax from
+				// purchase revenue (WCEXCLUDETAX) the item price is reported excluding tax
+				// too - otherwise the items stay tax-inclusive while the total is not (#176).
+				if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ) ) {
+					$inc_tax = false;
+				} else {
+					$inc_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+				}
 				$product_price = round( (float) $order->get_item_total( $order_item, $inc_tax ), 2 );
 
 				$eec_product_array = $this->process_product(
