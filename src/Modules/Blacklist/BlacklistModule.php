@@ -21,9 +21,10 @@ defined( 'ABSPATH' ) || exit;
  *
  * The entity ID list below is refreshed from Google's restriction
  * documentation (https://developers.google.com/tag-platform/tag-manager/restrict)
- * and contains individual entity IDs only, no group classes.
- * Compared to 1.x: added gaawc, gaawe (tags) and gas (variable);
- * removed ua (Universal Analytics) and mf (Mouseflow).
+ * and contains individual entity IDs only. Compared to 1.x: added gaawc,
+ * gaawe (tags) and gas (variable); removed ua (Universal Analytics) and mf
+ * (Mouseflow). Group classes (which have no individual entity ID) live in
+ * the separate GROUP_CLASS_IDS list; `sandboxedScripts` is supported there.
  *
  * Only the plain ID list lives here (needed for frontend validation);
  * the human readable labels live in the admin-only AdminSchema class.
@@ -151,6 +152,21 @@ final class BlacklistModule extends AbstractModule {
 	);
 
 	/**
+	 * Valid group class IDs.
+	 *
+	 * Group classes restrict whole families of entities that have no
+	 * individual entity ID. `sandboxedScripts` covers the sandboxed
+	 * JavaScript of custom tag/variable templates - the only restriction
+	 * target that cannot be expressed as one of the entity IDs above.
+	 * See https://developers.google.com/tag-platform/tag-manager/restrict.
+	 *
+	 * @var string[]
+	 */
+	public const GROUP_CLASS_IDS = array(
+		'sandboxedScripts',
+	);
+
+	/**
 	 * Module id.
 	 *
 	 * @return string
@@ -162,10 +178,12 @@ final class BlacklistModule extends AbstractModule {
 	/**
 	 * Option defaults, 1.x compatible.
 	 *
-	 * The blacklist-sandboxed option of 1.x is intentionally not carried
-	 * over: it was stored but never used on the frontend, and its only
-	 * conceivable purpose (the sandboxedScripts group class) is out of
-	 * scope since 2.0 manages individual entity IDs only.
+	 * The standalone blacklist-sandboxed option of 1.x is intentionally not
+	 * carried over: it was stored but never emitted on the frontend (a
+	 * non-functional checkbox). Its purpose - restricting the sandboxed
+	 * scripts of custom tag/variable templates - is now served properly by
+	 * the `sandboxedScripts` group class, selectable in the same
+	 * blacklist-status list as the individual entity IDs.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -201,12 +219,32 @@ final class BlacklistModule extends AbstractModule {
 	}
 
 	/**
-	 * Returns every valid entity ID.
+	 * Returns every valid entity ID (individual tags, triggers and variables).
 	 *
 	 * @return string[]
 	 */
 	public static function valid_entity_ids(): array {
 		return array_merge( self::TAG_IDS, self::TRIGGER_IDS, self::VARIABLE_IDS );
+	}
+
+	/**
+	 * Returns every valid group class ID.
+	 *
+	 * @return string[]
+	 */
+	public static function valid_group_classes(): array {
+		return self::GROUP_CLASS_IDS;
+	}
+
+	/**
+	 * Returns every valid restriction target: individual entity IDs plus the
+	 * supported group classes. This is the allow-list a stored blacklist
+	 * entry must match before it is emitted into the data layer.
+	 *
+	 * @return string[]
+	 */
+	public static function valid_restrictions(): array {
+		return array_merge( self::valid_entity_ids(), self::valid_group_classes() );
 	}
 
 	/**
@@ -220,14 +258,14 @@ final class BlacklistModule extends AbstractModule {
 
 		// Because of security reasons, we loop through each stored entity in the options and validate them
 		// to make sure nobody has entered some 'funny' item manually.
-		$valid_entity_ids = self::valid_entity_ids();
-		$stored_entities  = $this->opt( GTM4WP_OPTION_BLACKLIST_STATUS );
+		$valid_restrictions = self::valid_restrictions();
+		$stored_entities    = $this->opt( GTM4WP_OPTION_BLACKLIST_STATUS );
 		if ( ! is_array( $stored_entities ) ) {
 			$stored_entities = explode( ',', (string) $stored_entities );
 		}
 
 		foreach ( $stored_entities as $listed_entity ) {
-			if ( in_array( $listed_entity, $valid_entity_ids, true ) ) {
+			if ( in_array( $listed_entity, $valid_restrictions, true ) ) {
 				$_gtmrestrictlistitems[] = $listed_entity;
 			}
 		}

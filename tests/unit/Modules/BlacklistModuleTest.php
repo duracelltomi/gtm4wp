@@ -83,6 +83,50 @@ final class BlacklistModuleTest extends TestCase {
 		$this->assertSame( array(), $data_layer['gtm.blacklist'] );
 	}
 
+	public function test_sandboxed_scripts_group_class_is_restrictable(): void {
+		// sandboxedScripts is a valid GTM group class with no individual entity
+		// ID equivalent - it lives in the group-class list, not the entity table.
+		$this->assertContains( 'sandboxedScripts', BlacklistModule::valid_group_classes() );
+		$this->assertContains( 'sandboxedScripts', BlacklistModule::valid_restrictions() );
+		$this->assertNotContains( 'sandboxedScripts', BlacklistModule::valid_entity_ids() );
+
+		$blacklist = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'html,sandboxedScripts',
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'html', 'sandboxedScripts' ), $blacklist['gtm.blacklist'] );
+		$this->assertSame( array(), $blacklist['gtm.whitelist'] );
+
+		$whitelist = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 2,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'sandboxedScripts',
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'sandboxedScripts' ), $whitelist['gtm.whitelist'] );
+		$this->assertSame( array(), $whitelist['gtm.blacklist'] );
+	}
+
+	public function test_unsupported_group_classes_and_hostile_input_are_filtered_out(): void {
+		// Only sandboxedScripts is supported: other group classes, and a script
+		// break-out string, must be dropped by the allow-list before emission,
+		// so nothing but the one supported class reaches the data layer sink.
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'sandboxedScripts,customScripts,google,' . "\x3c/script\x3e" . ',nonGoogleScripts',
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'sandboxedScripts' ), $data_layer['gtm.blacklist'] );
+	}
+
 	public function test_invalid_and_stale_entities_are_filtered_out(): void {
 		$module = $this->make_module(
 			array(

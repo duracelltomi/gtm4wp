@@ -16,6 +16,7 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 * Changed: browser, OS and device data is now collected in the browser using User-Agent Client Hints and pushed as a `gtm4wp.deviceData` event (replaces the bundled WhichBrowser library; Safari and Firefox expose less detail).
 * Updated: frontend scripts now load with the `defer` strategy where possible.
 * Updated: tag blacklist entity list refreshed from Google's restriction documentation (added the Google tag / GA4 tags and the Google Analytics Settings variable, removed Universal Analytics and Mouseflow).
+* Added: the tag restriction list can now restrict sandboxed scripts (custom tag/variable templates) through Google Tag Manager's `sandboxedScripts` group class. 1.x had a "Custom tag/variable templates" checkbox for this, but it was never emitted to the container, so it had no effect; it is now a proper, working entry in the restriction list.
 * Added: per-container "Omit container ID" option in the container table. When a custom path is set (server side GTM), turning it on drops the container ID from the loader URL (`gtm.js?'+dl` instead of `gtm.js?id='+i+dl`) for setups where the container is selected by its path.
 * Added: new Page variables options in a "Content & engagement data" group, useful for behavior tracking and GA4 content grouping:
 	* Content word count (`pageContentWordCount`) and estimated reading time (`pageReadingTime`, adjustable with the `gtm4wp_reading_time_wpm` filter)
@@ -47,7 +48,6 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
 * Removed: WP e-Commerce integration.
 * Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead. The `GTM4WP_OPTION_SCROLLER_*` constants remain in place for backward compatibility.
-* Removed: unused blacklist "sandboxed scripts" flag.
 
 ## 1.21.1
 

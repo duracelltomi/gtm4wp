@@ -20,8 +20,9 @@ defined( 'ABSPATH' ) || exit;
  *
  * The entity labels are refreshed from Google's restriction documentation
  * (https://developers.google.com/tag-platform/tag-manager/restrict),
- * individual entity IDs only. Vendor names are product names and are not
- * translated, matching 1.x behavior.
+ * individual entity IDs plus the supported `sandboxedScripts` group class.
+ * Vendor names are product names and are not translated, matching 1.x
+ * behavior.
  */
 final class AdminSchema implements AdminSchemaInterface {
 
@@ -152,6 +153,21 @@ final class AdminSchema implements AdminSchemaInterface {
 	}
 
 	/**
+	 * Human readable labels of the group class IDs.
+	 *
+	 * Group classes restrict families of entities that have no individual
+	 * entity ID; `sandboxedScripts` covers the sandboxed scripts of custom
+	 * tag/variable templates.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function group_class_labels(): array {
+		return array(
+			'sandboxedScripts' => __( 'Sandboxed custom template scripts', 'duracelltomi-google-tag-manager' ),
+		);
+	}
+
+	/**
 	 * Module title.
 	 *
 	 * @return string
@@ -205,6 +221,9 @@ final class AdminSchema implements AdminSchemaInterface {
 		foreach ( self::variable_labels() as $entity_id => $label ) {
 			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Variable', 'duracelltomi-google-tag-manager' ), $label );
 		}
+		foreach ( self::group_class_labels() as $entity_id => $label ) {
+			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Group', 'duracelltomi-google-tag-manager' ), $label );
+		}
 
 		return array(
 			new Field(
@@ -239,7 +258,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				choices: $all_labels,
 				sanitizer: static function ( $value ) {
 					$values = is_array( $value ) ? $value : explode( ',', (string) $value );
-					$valid  = BlacklistModule::valid_entity_ids();
+					$valid  = BlacklistModule::valid_restrictions();
 
 					$values = array_values(
 						array_filter(

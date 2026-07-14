@@ -28,7 +28,10 @@ final class Migration {
 	/**
 	 * Option keys of features removed in 2.0:
 	 * weather + geo data, WP e-Commerce integration, scroll tracking and the
-	 * unused blacklist-sandboxed flag.
+	 * non-functional 1.x blacklist-sandboxed flag (2.0 restricts sandboxed
+	 * template scripts through the `sandboxedScripts` group class in the
+	 * blacklist-status list instead, so the standalone flag is not migrated -
+	 * a fresh opt-in avoids silently blocking custom templates on upgrade).
 	 *
 	 * @var string[]
 	 */

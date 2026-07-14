@@ -227,11 +227,11 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * New: media player tracking added for Dailymotion, Mixcloud, Cloudflare Stream, Wistia, JW Player, VideoPress, Spotify and Twitch (alongside the existing YouTube, Vimeo, Soundcloud and HTML5 players); every media event also populates Google Tag Manager's built-in Video variables.
 * New: optional "Content & engagement data" page variables for behavior tracking and GA4 content grouping - content word count and estimated reading time, last modified date and content age, comment count and status, page template, featured image presence, page hierarchy and sticky flag, primary category (Yoast / Rank Math) and page language (WPML / Polylang).
 * Updated: tag blacklist entity list refreshed from Google's restriction documentation (added Google tag/GA4 tags and the Google Analytics Settings variable, removed Universal Analytics and Mouseflow).
+* New: the tag restriction list can now restrict sandboxed scripts (custom tag/variable templates) through Google Tag Manager's sandboxedScripts group class. The 1.x "Custom tag/variable templates" checkbox for this never actually took effect; it is now a proper, working entry in the restriction list.
 * Updated: frontend scripts load with the defer strategy where possible.
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
 * Removed: WP e-Commerce integration.
 * Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead.
-* Removed: unused blacklist "sandboxed scripts" flag.
 * Deprecated: the "YouTube video events" option - Google Tag Manager now ships a native YouTube Video trigger; migrate YouTube tracking to it. The plugin still populates GTM's built-in Video variables for the other players.
 * Deprecated: the "WebToffee GDPR Cookie Consent (v2.x)" integration - it only targets the long-outdated v2.x product line. WebToffee v3.x and above integrate with Google Tag Manager natively; upgrade the WebToffee plugin instead of using this option.
 * Developer note: all public template functions (gtm4wp_the_gtm_tag() etc.), filter/action names, wp-config constants and the option storage key are unchanged - existing integrations keep working.
