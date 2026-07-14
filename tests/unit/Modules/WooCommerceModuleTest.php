@@ -11,13 +11,24 @@ use Brain\Monkey\Functions;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
+use Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils;
+
+require_once __DIR__ . '/wc-blocks-stub.php';
 
 /**
- * Covers WooCommerceModule::filter_is_order_received_page(), which lets the
- * custom order-received page option promote a bespoke page to the WooCommerce
- * order-received page so the purchase event fires on it.
+ * Covers WooCommerceModule::filter_is_order_received_page() (custom order-received
+ * page promotion) and is_block_cart_or_checkout() (block vs. classic detection
+ * that decides which tracker bundle loads).
  */
 final class WooCommerceModuleTest extends TestCase {
+
+	protected function setUp(): void {
+		parent::setUp();
+
+		// Reset the block-detection stub between tests (TS-7 isolation).
+		CartCheckoutUtils::$checkout_block = false;
+		CartCheckoutUtils::$cart_block     = false;
+	}
 
 	/**
 	 * Builds a WooCommerceModule with the given stored options injected, without
@@ -73,5 +84,53 @@ final class WooCommerceModuleTest extends TestCase {
 		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) );
 
 		$this->assertFalse( $module->filter_is_order_received_page( false ), 'The custom-page promotion must not run on admin screens.' );
+	}
+
+	public function test_block_checkout_page_is_detected(): void {
+		CartCheckoutUtils::$checkout_block = true;
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$this->assertTrue( ( new WooCommerceModule() )->is_block_cart_or_checkout() );
+	}
+
+	public function test_block_cart_page_is_detected(): void {
+		CartCheckoutUtils::$cart_block = true;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( true );
+
+		$this->assertTrue( ( new WooCommerceModule() )->is_block_cart_or_checkout() );
+	}
+
+	public function test_classic_checkout_is_not_treated_as_block(): void {
+		// The utils report the classic (shortcode) checkout.
+		CartCheckoutUtils::$checkout_block = false;
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$this->assertFalse( ( new WooCommerceModule() )->is_block_cart_or_checkout() );
+	}
+
+	public function test_order_received_page_is_not_treated_as_block_checkout(): void {
+		CartCheckoutUtils::$checkout_block = true;
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$this->assertFalse(
+			( new WooCommerceModule() )->is_block_cart_or_checkout(),
+			'The order-received endpoint is excluded; its purchase event is server-side.'
+		);
+	}
+
+	public function test_non_cart_checkout_page_is_not_block(): void {
+		CartCheckoutUtils::$checkout_block = true;
+		CartCheckoutUtils::$cart_block     = true;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$this->assertFalse( ( new WooCommerceModule() )->is_block_cart_or_checkout() );
 	}
 }

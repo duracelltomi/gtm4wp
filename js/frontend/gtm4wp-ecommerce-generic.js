@@ -48,6 +48,20 @@ function gtm4wp_push_ecommerce(
 		dl_obj.eventTimeout = event_timeout;
 	}
 
+	// Debug aid: log the pushed event when the admin has left frontend
+	// console output enabled (the site-wide "Do not use console.log()" option).
+	if (
+		typeof gtm4wp_console_log !== 'undefined' &&
+		gtm4wp_console_log &&
+		typeof console !== 'undefined' &&
+		console.log
+	) {
+		console.log(
+			'[GTM4WP] Pushing ecommerce event: ' + event_name,
+			dl_obj
+		);
+	}
+
 	window[ gtm4wp_datalayer_name ].push( dl_obj );
 }
 

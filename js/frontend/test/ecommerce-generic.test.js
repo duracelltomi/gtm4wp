@@ -14,6 +14,7 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 
 	beforeEach( () => {
 		window.dataLayer = [];
+		global.gtm4wp_console_log = false;
 	} );
 
 	describe( 'gtm4wp_make_sure_is_float', () => {
@@ -137,6 +138,35 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			const last = window.dataLayer[ window.dataLayer.length - 1 ];
 			expect( last.eventCallback ).toBe( callback );
 			expect( last.eventTimeout ).toBe( 1500 );
+		} );
+
+		it( 'logs the pushed event when console logging is enabled', () => {
+			global.gtm4wp_console_log = true;
+			const spy = jest
+				.spyOn( console, 'log' )
+				.mockImplementation( () => {} );
+
+			window.gtm4wp_push_ecommerce( 'view_item', [ { item_id: 9 } ], {} );
+
+			expect( spy ).toHaveBeenCalledWith(
+				expect.stringContaining( 'view_item' ),
+				expect.objectContaining( { event: 'view_item' } )
+			);
+
+			spy.mockRestore();
+		} );
+
+		it( 'stays silent when console logging is disabled', () => {
+			global.gtm4wp_console_log = false;
+			const spy = jest
+				.spyOn( console, 'log' )
+				.mockImplementation( () => {} );
+
+			window.gtm4wp_push_ecommerce( 'view_item', [ { item_id: 9 } ], {} );
+
+			expect( spy ).not.toHaveBeenCalled();
+
+			spy.mockRestore();
 		} );
 	} );
 } );

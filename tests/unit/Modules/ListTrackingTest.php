@@ -38,6 +38,11 @@ final class ListTrackingTest extends TestCase {
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'sanitize_text_field' )->returnArg();
 
+		// process_product() derives item_list_id from the list name via sanitize_title.
+		Functions\when( 'sanitize_title' )->alias(
+			static fn ( $title ) => strtolower( trim( (string) preg_replace( '/[^a-z0-9]+/i', '-', (string) $title ), '-' ) )
+		);
+
 		// ProductData dependencies (mirrors ProductDataTest::setUp()).
 		Functions\when( 'wc_get_price_to_display' )->justReturn( 9.99 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );

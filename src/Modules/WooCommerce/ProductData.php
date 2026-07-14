@@ -138,6 +138,17 @@ final class ProductData {
 
 		$_temp_productdata = array_merge( $_temp_productdata, $additional_product_attributes );
 
+		// GA4 list attribution: pair every item_list_name with a stable
+		// item_list_id (slug of the name) so lists can be reported by id too.
+		// A caller may pass its own item_list_id to override this default.
+		if (
+			isset( $_temp_productdata['item_list_name'] )
+			&& '' !== $_temp_productdata['item_list_name']
+			&& ! isset( $_temp_productdata['item_list_id'] )
+		) {
+			$_temp_productdata['item_list_id'] = sanitize_title( (string) $_temp_productdata['item_list_name'] );
+		}
+
 		/**
 		 * Filters the ecommerce array before using it for tracking.
 		 * Can be used to add custom dimensions and metrics on your own or to alter existing product attributes based on your own logic.
@@ -370,6 +381,17 @@ final class ProductData {
 			if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {
 				$data_layer['ecommerce']['items'] = $_order_items;
 			}
+
+			// Google Ads / GA4 Enhanced Conversions user-provided data, built from
+			// the order (so guest checkouts are covered too). Opt-in via the same
+			// "Customer data in data layer" option; only attached when it carries
+			// at least one identifier.
+			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA ) ) {
+				$user_data = $this->get_enhanced_conversion_user_data( $order );
+				if ( array() !== $user_data ) {
+					$data_layer['user_data'] = $user_data;
+				}
+			}
 		}
 
 		/**
@@ -380,6 +402,65 @@ final class ProductData {
 		 * @param WC_Order $order The WooCommerce order that needs to be transformed into an ecommerce data layer.
 		 */
 		return apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer, $order );
+	}
+
+	/**
+	 * Builds the GA4 / Google Ads Enhanced Conversions user-provided data block
+	 * from an order's billing details: SHA-256 hashed email, phone and name, plus
+	 * the plaintext address components Google expects. Empty fields are omitted,
+	 * and an empty array is returned when there is no usable identifier.
+	 *
+	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web
+	 *
+	 * @param \WC_Order $order The order to read the customer identifiers from.
+	 * @return array<string, mixed>
+	 */
+	private function get_enhanced_conversion_user_data( \WC_Order $order ): array {
+		$user_data = array();
+
+		$email = (string) $order->get_billing_email();
+		if ( '' !== $email ) {
+			$user_data['sha256_email_address'] = Helpers::normalize_and_hash_email_address( 'sha256', $email );
+		}
+
+		$phone = (string) $order->get_billing_phone();
+		if ( '' !== $phone ) {
+			$user_data['sha256_phone_number'] = Helpers::normalize_and_hash( 'sha256', $phone, true );
+		}
+
+		$address    = array();
+		$first_name = (string) $order->get_billing_first_name();
+		if ( '' !== $first_name ) {
+			$address['sha256_first_name'] = Helpers::normalize_and_hash( 'sha256', $first_name, false );
+		}
+
+		$last_name = (string) $order->get_billing_last_name();
+		if ( '' !== $last_name ) {
+			$address['sha256_last_name'] = Helpers::normalize_and_hash( 'sha256', $last_name, false );
+		}
+
+		$street = trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() );
+		if ( '' !== $street ) {
+			$address['street'] = $street;
+		}
+
+		$address_fields = array(
+			'city'        => (string) $order->get_billing_city(),
+			'region'      => (string) $order->get_billing_state(),
+			'postal_code' => (string) $order->get_billing_postcode(),
+			'country'     => (string) $order->get_billing_country(),
+		);
+		foreach ( $address_fields as $key => $value ) {
+			if ( '' !== $value ) {
+				$address[ $key ] = $value;
+			}
+		}
+
+		if ( array() !== $address ) {
+			$user_data['address'] = $address;
+		}
+
+		return $user_data;
 	}
 
 	/**

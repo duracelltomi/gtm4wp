@@ -28,6 +28,7 @@ module.exports = {
 				gtm4wp_clear_ecommerce: 'readonly',
 				gtm4wp_use_sku_instead: 'readonly',
 				gtm4wp_product_per_impression: 'readonly',
+				gtm4wp_console_log: 'readonly',
 
 				// Shared helpers exposed on window by gtm4wp-ecommerce-generic.js.
 				gtm4wp_make_sure_is_float: 'readonly',

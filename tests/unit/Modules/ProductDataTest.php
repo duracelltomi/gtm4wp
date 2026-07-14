@@ -31,6 +31,10 @@ final class ProductDataTest extends TestCase {
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
 		Functions\when( 'get_term_parents_list' )->justReturn( '' );
+		// process_product() derives item_list_id from the list name via sanitize_title.
+		Functions\when( 'sanitize_title' )->alias(
+			static fn ( $title ) => strtolower( trim( (string) preg_replace( '/[^a-z0-9]+/i', '-', (string) $title ), '-' ) )
+		);
 	}
 
 	/**
@@ -104,6 +108,112 @@ final class ProductDataTest extends TestCase {
 
 		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'pending' ) ) ) );
 		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'failed' ) ) ) );
+	}
+
+	public function test_item_list_id_is_derived_from_the_item_list_name(): void {
+		$product_data = $this->make_product_data();
+
+		$item = $product_data->process_product(
+			$this->make_product(),
+			array( 'item_list_name' => 'Related Products' ),
+			'productlist'
+		);
+
+		$this->assertSame( 'Related Products', $item['item_list_name'] );
+		$this->assertSame( 'related-products', $item['item_list_id'], 'GA4 list attribution needs an item_list_id alongside the name.' );
+	}
+
+	public function test_item_list_id_absent_without_a_list_name(): void {
+		$product_data = $this->make_product_data();
+
+		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertArrayNotHasKey( 'item_list_id', $item, 'No list context means no item_list_id.' );
+	}
+
+	public function test_explicit_item_list_id_overrides_the_derived_one(): void {
+		$product_data = $this->make_product_data();
+
+		$item = $product_data->process_product(
+			$this->make_product(),
+			array(
+				'item_list_name' => 'Related Products',
+				'item_list_id'   => 'custom_list_42',
+			),
+			'productlist'
+		);
+
+		$this->assertSame( 'custom_list_42', $item['item_list_id'], 'A caller-supplied item_list_id must be preserved.' );
+	}
+
+	public function test_purchase_datalayer_adds_enhanced_conversions_user_data_when_customer_data_on(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		$order = new \WC_Order(
+			array(
+				'order_number'       => '1001',
+				'total'              => 100.0,
+				'currency'           => 'EUR',
+				'billing_email'      => 'John.Doe@Gmail.com',
+				'billing_phone'      => '+1 555 123',
+				'billing_first_name' => 'John',
+				'billing_last_name'  => 'Doe',
+				'billing_address_1'  => '1 Main St',
+				'billing_city'       => 'Town',
+				'billing_state'      => 'CA',
+				'billing_postcode'   => '90001',
+				'billing_country'    => 'US',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'] ?? null;
+
+		$this->assertIsArray( $user_data );
+		// gmail dots are stripped and the address is lowercased before hashing.
+		$this->assertSame( hash( 'sha256', 'johndoe@gmail.com' ), $user_data['sha256_email_address'] );
+		// Phone: all spaces removed, then hashed.
+		$this->assertSame( hash( 'sha256', '+1555123' ), $user_data['sha256_phone_number'] );
+		$this->assertSame( hash( 'sha256', 'john' ), $user_data['address']['sha256_first_name'] );
+		$this->assertSame( hash( 'sha256', 'doe' ), $user_data['address']['sha256_last_name'] );
+		// Address components stay plaintext (Google hashes them on send).
+		$this->assertSame( '1 Main St', $user_data['address']['street'] );
+		$this->assertSame( 'Town', $user_data['address']['city'] );
+		$this->assertSame( 'US', $user_data['address']['country'] );
+	}
+
+	public function test_purchase_datalayer_omits_user_data_when_customer_data_off(): void {
+		$product_data = $this->make_product_data();
+
+		$order = new \WC_Order(
+			array(
+				'order_number'  => '1001',
+				'total'         => 10.0,
+				'currency'      => 'EUR',
+				'billing_email' => 'a@b.com',
+			)
+		);
+
+		$this->assertArrayNotHasKey( 'user_data', $product_data->get_purchase_datalayer( $order, array() ) );
+	}
+
+	public function test_user_data_omits_empty_identifier_fields(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		// Only the email is set; nothing else must be fabricated.
+		$order = new \WC_Order(
+			array(
+				'order_number'  => '1001',
+				'total'         => 10.0,
+				'currency'      => 'EUR',
+				'billing_email' => 'a@b.com',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'];
+
+		$this->assertArrayHasKey( 'sha256_email_address', $user_data );
+		$this->assertArrayNotHasKey( 'sha256_phone_number', $user_data, 'An empty phone must not be hashed.' );
+		$this->assertArrayNotHasKey( 'address', $user_data, 'No name/address fields means no address block.' );
 	}
 
 	public function test_order_status_trackable_is_filterable(): void {

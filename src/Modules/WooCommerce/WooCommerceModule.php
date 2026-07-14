@@ -100,6 +100,12 @@ final class WooCommerceModule extends AbstractModule {
 		$page_datalayer    = new PageDataLayer( $this->options, $product_data, $frontend->datalayer() );
 		$list_tracking     = new ListTracking( $this->options, $product_data );
 		$purchase_tracking = new PurchaseTracking( $this->options, $product_data, $frontend->datalayer(), $frontend->script_tag() );
+		$store_api_data    = new StoreApiData( $product_data );
+
+		// Expose the GA4 item array on the Store API so the Cart & Checkout blocks
+		// carry the same product data as the classic path (consumed by the
+		// gtm4wp-woocommerce-blocks tracker).
+		add_action( 'woocommerce_blocks_loaded', array( $store_api_data, 'register' ) );
 
 		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = false;
 
@@ -181,6 +187,11 @@ final class WooCommerceModule extends AbstractModule {
 		$return_vars['gtm4wp_clear_ecommerce']        = (bool) $this->opt( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL );
 		$return_vars['gtm4wp_datalayer_max_timeout']  = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT );
 
+		// Mirror the site-wide "Do not use console.log() messages on frontend"
+		// option so the ecommerce tracker can log the events it pushes only when
+		// the admin has left console output enabled.
+		$return_vars['gtm4wp_console_log'] = ! (bool) $this->opt( GTM4WP_OPTION_NOCONSOLELOG );
+
 		return $return_vars;
 	}
 
@@ -223,6 +234,67 @@ final class WooCommerceModule extends AbstractModule {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE, true );
 
 		$this->enqueue_script( 'gtm4wp-ecommerce-generic', 'gtm4wp-ecommerce-generic.js', array(), $in_footer );
-		$this->enqueue_script( 'gtm4wp-woocommerce', 'gtm4wp-woocommerce.js', array( 'jquery' ), $in_footer, '' );
+
+		if ( $this->is_block_cart_or_checkout() ) {
+			// The Cart & Checkout blocks are React-based and never fire the classic
+			// jQuery events the gtm4wp-woocommerce tracker listens for. On those
+			// pages load the block tracker (which reads the WooCommerce data stores)
+			// and skip the classic one so cart/checkout events are not tracked twice.
+			$this->enqueue_script(
+				'gtm4wp-woocommerce-blocks',
+				'gtm4wp-woocommerce-blocks.js',
+				array( 'wp-data', 'gtm4wp-ecommerce-generic' ),
+				$in_footer
+			);
+		} else {
+			$this->enqueue_script( 'gtm4wp-woocommerce', 'gtm4wp-woocommerce.js', array( 'jquery' ), $in_footer, '' );
+		}
+	}
+
+	/**
+	 * Whether the current page is the Cart or Checkout page rendered with the
+	 * WooCommerce block (as opposed to the classic shortcode). Detection is
+	 * content-driven, never visitor-driven, so it is safe under full-page caching.
+	 * The order-received endpoint is excluded (its purchase event is server-side).
+	 *
+	 * @return bool
+	 */
+	public function is_block_cart_or_checkout(): bool {
+		if (
+			function_exists( 'is_checkout' ) && is_checkout()
+			&& ! ( function_exists( 'is_order_received_page' ) && is_order_received_page() )
+		) {
+			return $this->page_uses_block( 'woocommerce/checkout' );
+		}
+
+		if ( function_exists( 'is_cart' ) && is_cart() ) {
+			return $this->page_uses_block( 'woocommerce/cart' );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether the given WooCommerce block backs the current cart/checkout page.
+	 * Prefers WooCommerce's canonical CartCheckoutUtils check and falls back to
+	 * scanning the current page content for the block.
+	 *
+	 * @param string $block_name The block name (woocommerce/cart or woocommerce/checkout).
+	 * @return bool
+	 */
+	private function page_uses_block( string $block_name ): bool {
+		$utils = '\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils';
+
+		if ( 'woocommerce/checkout' === $block_name && method_exists( $utils, 'is_checkout_block_default' ) ) {
+			return (bool) $utils::is_checkout_block_default();
+		}
+
+		if ( 'woocommerce/cart' === $block_name && method_exists( $utils, 'is_cart_block_default' ) ) {
+			return (bool) $utils::is_cart_block_default();
+		}
+
+		$post = function_exists( 'get_post' ) ? get_post() : null;
+
+		return ( $post instanceof \WP_Post ) && function_exists( 'has_block' ) && has_block( $block_name, $post );
 	}
 }
