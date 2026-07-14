@@ -233,6 +233,7 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead.
 * Removed: unused blacklist "sandboxed scripts" flag.
 * Deprecated: the "YouTube video events" option - Google Tag Manager now ships a native YouTube Video trigger; migrate YouTube tracking to it. The plugin still populates GTM's built-in Video variables for the other players.
+* Deprecated: the "WebToffee GDPR Cookie Consent (v2.x)" integration - it only targets the long-outdated v2.x product line. WebToffee v3.x and above integrate with Google Tag Manager natively; upgrade the WebToffee plugin instead of using this option.
 * Developer note: all public template functions (gtm4wp_the_gtm_tag() etc.), filter/action names, wp-config constants and the option storage key are unchanged - existing integrations keep working.
 
 = 1.22.4 =

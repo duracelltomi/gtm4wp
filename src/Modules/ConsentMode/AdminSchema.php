@@ -153,10 +153,11 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'WebToffee GDPR Cookie Consent (v2.x)', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found. You do not need to use this integration with v3.x or above since it includes all the necessary codes to integrate the consent banner with Google Tag Manager.',
+					'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found. Deprecated: this integration only targets the long-outdated WebToffee GDPR Cookie Consent v2.x product line. You do not need it with v3.x or above, which ships all the necessary code to integrate the consent banner with Google Tag Manager natively - please upgrade the WebToffee plugin instead of using this option.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'webtoffee'
+				group: 'webtoffee',
+				phase: Field::PHASE_DEPRECATED
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO,
