@@ -85,11 +85,13 @@ final class ModuleHooksTest extends TestCase {
 	public function test_contact_form_7_active_when_enabled(): void {
 		$enabled = $this->boot( new ContactForm7Module(), array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
 		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $enabled, 'enqueue_scripts' ) ) );
+		$this->assertNotFalse( has_filter( 'wpcf7_form_additional_atts', array( $enabled, 'add_form_name_attribute' ) ) );
 	}
 
 	public function test_contact_form_7_inactive_when_disabled(): void {
 		$disabled = $this->boot( new ContactForm7Module() );
 		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $disabled, 'enqueue_scripts' ) ) );
+		$this->assertFalse( has_filter( 'wpcf7_form_additional_atts', array( $disabled, 'add_form_name_attribute' ) ) );
 	}
 
 	public function test_user_events_login_hook_active_when_enabled(): void {

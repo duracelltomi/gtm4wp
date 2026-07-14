@@ -118,6 +118,8 @@ define( 'GTM4WP_OPTION_BLACKLIST_SANDBOXED', 'blacklist-sandboxed' );
 define( 'GTM4WP_OPTION_BLACKLIST_STATUS', 'blacklist-status' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
+define( 'GTM4WP_OPTION_INTEGRATE_WPCF7_INPUTS', 'integrate-wpcf7-inputs' );
+define( 'GTM4WP_OPTION_INTEGRATE_WPCF7_GA4EVENTS', 'integrate-wpcf7-ga4events' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE', 'integrate-woocommerce-track-enhanced-ecommerce' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION', 'integrate-woocommerce-product-per-impression' );
