@@ -208,6 +208,20 @@ final class ContainerCode {
 	 * @return void
 	 */
 	public function header_begin( $echo = true ) {
+		// On an AMP page the standard GTM container <script> is invalid AMP markup
+		// and is stripped by the AMP sanitizer; the AMP module injects an
+		// amp-analytics tag instead. Still compile the data layer (so its values,
+		// the AFTER_DATALAYER hook and the backward-compatible global stay
+		// available to the AMP integration and third-party consumers), then skip
+		// emitting the container code.
+		if ( apply_filters( self::FILTER_AMP_RUNNING, false ) ) {
+			$this->datalayer->compile();
+
+			do_action( GTM4WP_WPACTION_AFTER_DATALAYER );
+
+			return;
+		}
+
 		$no_console_log = (bool) $this->options->get( GTM4WP_OPTION_NOCONSOLELOG );
 		$datalayer_name = $this->datalayer->name();
 		$containers     = $this->containers();

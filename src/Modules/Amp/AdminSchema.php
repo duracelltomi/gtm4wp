@@ -71,7 +71,6 @@ final class AdminSchema implements AdminSchemaInterface {
 					'</a>'
 				),
 				group: 'amp',
-				phase: Field::PHASE_EXPERIMENTAL,
 				sanitizer: static function ( $value ) {
 					$value = trim( (string) $value );
 

@@ -171,6 +171,25 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $output );
 	}
 
+	public function test_header_begin_suppresses_container_code_on_amp(): void {
+		// On an AMP page (FILTER_AMP_RUNNING true) the invalid GTM container
+		// <script> must not be emitted - the AMP module injects an amp-analytics
+		// tag instead. The data layer is still compiled (AFTER_DATALAYER fires,
+		// the compat global is populated), but no container code is output.
+		Filters\expectApplied( ContainerCode::FILTER_AMP_RUNNING )->andReturn( true );
+		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
+		Actions\expectDone( GTM4WP_WPACTION_AFTER_CONTAINER_CODE )->never();
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertSame( '', $output, 'No container/script markup is emitted on AMP pages.' );
+		$this->assertSame( array(), $GLOBALS['gtm4wp_datalayer_data'], 'The data layer is still compiled for the AMP integration.' );
+	}
+
 	public function test_header_begin_does_not_decode_html_entities_in_datalayer_values(): void {
 		// get_search_query() returns esc_attr'd output, so a double quote in the
 		// ?s= parameter reaches the data layer already encoded as &quot;. Because

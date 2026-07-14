@@ -106,13 +106,14 @@ final class ModuleHooksTest extends TestCase {
 
 	public function test_amp_hooks_active_with_amp_container_id(): void {
 		$enabled = $this->boot( new AmpModule(), array( GTM4WP_OPTION_INTEGRATE_AMPID => 'GTM-AMP1' ) );
-		$this->assertNotFalse( has_action( 'amp_post_template_head', array( $enabled, 'render_header_begin' ) ) );
+		$this->assertNotFalse( has_filter( 'amp_analytics_entries', array( $enabled, 'add_amp_analytics_entries' ) ) );
 		$this->assertNotFalse( has_filter( ContainerCode::FILTER_AMP_RUNNING, array( $enabled, 'is_amp_request' ) ) );
 	}
 
 	public function test_amp_hooks_inactive_without_amp_container_id(): void {
 		$disabled = $this->boot( new AmpModule() );
-		$this->assertFalse( has_action( 'amp_post_template_head', array( $disabled, 'render_header_begin' ) ) );
+		$this->assertFalse( has_filter( 'amp_analytics_entries', array( $disabled, 'add_amp_analytics_entries' ) ) );
+		$this->assertFalse( has_filter( ContainerCode::FILTER_AMP_RUNNING, array( $disabled, 'is_amp_request' ) ) );
 	}
 
 	public function test_client_device_data_enqueues_when_any_signal_enabled(): void {
