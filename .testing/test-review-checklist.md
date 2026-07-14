@@ -52,22 +52,22 @@ yet still carry `[ ]` cells — presence ≠ reviewed-and-complete.
 | **Options** (`src/Options/` — Options, Field) | `Options/OptionsTest`, `Options/FieldTest` | [x] | [x] 2026-07-13 | [x] 2026-07-13 | [-] | [ ] | [ ] |
 | **Compat Layer** (`compat/*.php`, `src/Compat/Globals.php`) | `Compat/GlobalsTest` | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [ ] | [ ] | [x] 2026-07-13 |
 | **Migration** (`src/Migration.php`) | `MigrationTest` | [x] | [ ] | [ ] | [-] | [-] | [ ] |
-| **Frontend Core** (`src/Frontend/` — DataLayer, ScriptTag, ContainerCode, ConsentDefaults, VisitorIp; Frontend = N/A) | `Frontend/DataLayerTest`, `ScriptTagTest`, `ContainerCodeTest`, `ConsentDefaultsTest`, `VisitorIpTest` | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
+| **Frontend Core** (`src/Frontend/` — DataLayer, ScriptTag, ContainerCode, ConsentDefaults, VisitorIp; Frontend = N/A) | `Frontend/DataLayerTest`, `ScriptTagTest`, `ContainerCodeTest`, `ConsentDefaultsTest`, `VisitorIpTest` | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Module Framework** (`src/Module/`) | `Module/RegistryTest`, `Modules/ModuleConsistencyTest`, `ModuleHooksTest` | [x] | [ ] | [ ] | [-] | [-] | [ ] |
 | **PageVariables Module** (`src/Modules/PageVariables/`) | `Modules/PageVariablesModuleTest` | [x] | [ ] | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Container Module** (`src/Modules/Container/`) | `Modules/ContainerRowsTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **WooCommerce Module** (`src/Modules/WooCommerce/` — PurchaseTracking, ProductData, PageDataLayer, ListTracking, Helpers, Module) | `Modules/PurchaseTrackingTest`, `ProductDataTest`, `PageDataLayerTest`, `ListTrackingTest`, `HelpersTest` | [x] | [ ] | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [ ] |
-| **ConsentMode Module** (`src/Modules/ConsentMode/`) | `Modules/ModuleHooksTest` (gate + webtoffee only) | [x] | [ ] | [ ] | [-] | [ ] | [ ] |
+| **ConsentMode Module** (`src/Modules/ConsentMode/` — incl. Axeptio handler) | `Modules/ConsentModeAxeptioTest`, `ModuleHooksTest` (gate + webtoffee + axeptio wiring) | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **UserEvents Module** (`src/Modules/UserEvents/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
 | **MediaEvents Module** (`src/Modules/MediaEvents/` — 12 trackers) | `Modules/MediaEventsModuleTest` (enqueue gate + oEmbed rewrite), `ModuleHooksTest` (youtube gate), `ModuleConsistencyTest` (12 opts); JS: 14 tracker tests + `native-video-params` | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [-] | [x] 2026-07-13 | [x] 2026-07-13 |
-| **ContactForm7 Module** (`src/Modules/ContactForm7/`) | `Modules/ModuleHooksTest` (gate only) | [x] | [ ] | [ ] | [-] | [-] | [ ] |
-| **Blacklist Module** (`src/Modules/Blacklist/`) | `Modules/BlacklistModuleTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`) | `Modules/ClientDeviceDataModuleTest`, `ModuleHooksTest` (gate) | [x] 2026-07-13 | [x] 2026-07-13 | [ ] | [-] | [ ] | [ ] |
-| **AMP Module** (`src/Modules/Amp/`) | `Modules/AmpModuleTest`, `ModuleHooksTest` (gate) | [x] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
+| **ContactForm7 Module** (`src/Modules/ContactForm7/` — incl. tracker JS) | `Modules/ContactForm7ModuleTest`, `ModuleHooksTest` (gate); JS: `contact-form-7-tracker` | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
+| **Blacklist Module** (`src/Modules/Blacklist/` — incl. `sandboxedScripts` group class) | `Modules/BlacklistModuleTest` | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
+| **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`; JS tracker) | `Modules/ClientDeviceDataModuleTest`, `ModuleHooksTest` (gate); JS: `client-device-data-tracker` | [x] 2026-07-13 | [x] 2026-07-14 | [x] 2026-07-14 | [-] | [x] 2026-07-14 | [x] 2026-07-14 |
+| **AMP Module** (`src/Modules/Amp/` — amp-wp 2.x `amp_analytics_entries` sink) | `Modules/AmpModuleTest`, `ModuleHooksTest` (gate) | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | `Admin/NoticesTest` | [x] 2026-07-13 | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
-| **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest`, `SettingsPageTest`, `PluginRowTest` | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Module Admin Schemas** (`src/Modules/*/AdminSchema.php`) | `Modules/ModuleConsistencyTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
-| **Frontend JS** (`js/frontend/` — 17 trackers + `lib/native-video-params`) | 15 `js/frontend/test/*.test.js` (15 of 17 trackers + lib) | [~] 2026-07-13 | [~] 2026-07-13 | [~] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
+| **Frontend JS** (`js/frontend/` — 17 trackers + `lib/native-video-params`) | 17 `js/frontend/test/*.test.js` (16 of 17 trackers + lib; untested: `woocommerce` — left open pending tracker review) | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Admin JS** (`js/admin/`) | `js/admin/test/utils.test.js` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 > **Seed note (2026-07-13):** only **Frontend Core** has been through a full
@@ -86,11 +86,11 @@ review; treat a sweep older than ~4 weeks or predating a feature landing as stal
 
 | Sweep | Last run | Result summary |
 |---|---|---|
-| **Missing test file** (`src/**/*.php` with no dedicated or documented-indirect test) | 2026-07-13 (Run 2) | No new PHP classes since Run 1; Run 2 added `MediaEventsModuleTest`. Real PHP gaps unchanged: `Admin/{Admin,PluginRow,SettingsPage}`, `Plugin`, `WooCommerce/WooCommerceModule`. **JS:** Run 2 closed `youtube` (T17, +bug fix); untested trackers now 3: `woocommerce`, `client-device-data`, `contact-form-7-tracker`. Blessed N/A (BE-3): interfaces, `Frontend`, `Autoloader`. |
-| **Untested public methods** (in classes that *do* have a test file — TS-10) | 2026-07-13 (Run 2) | Frontend Core cleared (Run 0). Run 2 closed **`MediaEventsModule::enqueue_scripts()` + `enable_youtube_js_api()`** (`MediaEventsModuleTest`, T18/T19). Remaining low-value: `ListTracking` ~15 list-name setters; `Notices::print_dismiss_script`; `Amp` header-render delegators (thin). |
-| **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-13 (Run 2) | Run 0/1 Frontend + module sinks covered. **Run 2:** MediaEvents PHP = N/A (`[-]`) — no request/header data reaches a `<script>` sink; `enable_youtube_js_api` uses trusted `site_url()`. JS trackers push **structured** dataLayer objects (not HTML). The one untrusted-input surface — VideoPress postMessage origin check — is tested on the security-critical **reject** side; accept-branches thin (T20). **Open (unchanged):** `SettingsPage` bootstrap_data hex sink (T13). |
-| **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-13 (Run 2) | Unchanged from Run 1: #1–#6 (Frontend); #8 (`ProductDataTest`); #11 AMP (`AmpModuleTest`); #12 (`PageVariablesModuleTest`); #13/#14; #16 (`ListTrackingTest`); #18 (`NoticesTest`). No new `.security` findings from the media batch. **Unverified:** #11 SettingsPage sink (T13). |
-| **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-13 (Run 2) | **JS suite 25 → 138 green (16 suites)** after closing T17 (`youtube-tracker.test.js`, 9 tests + the strict-mode bug fix) and extending VideoPress (8 → 14, T20). Media batch tests are high-quality (full-shape, state maps, ms→s, error branches, fake-timer polling). **Remaining:** `woocommerce`, `client-device-data`, `contact-form-7-tracker`. (A concurrent `/code-review` also landed fixes to several tracker sources; final tree green — JS 16 suites / 150 tests.) |
+| **Missing test file** (`src/**/*.php` with no dedicated or documented-indirect test) | 2026-07-14 (Run 3 + closes) | Run 3 closes: `Admin/SettingsPage` (`SettingsPageTest`) + `Admin/PluginRow` (`PluginRowTest`) now tested. Remaining PHP BE-3 N/A: `Plugin`, `Frontend`, `Autoloader`, `Admin/Admin`, `WooCommerce/WooCommerceModule`, interfaces. **JS:** `client-device-data` closed; only `woocommerce` untested (left open pending tracker review). Standalone `Modules/Axeptio/` removed (moved under `ConsentMode/Axeptio.php`, tested by `ConsentModeAxeptioTest`). |
+| **Untested public methods** (in classes that *do* have a test file — TS-10) | 2026-07-14 (Run 3 + closes) | Run 3: `Axeptio::*`, `ContactForm7Module::*`, `AmpModule::*`, `Blacklist::valid_*` covered. Closes: `SettingsPage::{enqueue_assets,bootstrap_data}` (`SettingsPageTest`), `PluginRow::{add_action_links,show_upgrade_notification}` (`PluginRowTest`). Remaining low-value: `ListTracking` ~15 list-name setters; `Notices::print_dismiss_script`. |
+| **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-14 (Run 3 + closes) | Run 3 batch clean: Axeptio head-JS both-directions (`ConsentModeAxeptioTest`); Blacklist allow-list hostile `</script>` filtered (`BlacklistModuleTest`); ContainerCode `header_top` ampersand-restore both-directions (`ContainerCodeTest` #29); AMP delegated-sink raw-passthrough (`AmpModuleTest`); CF7 form-title raw-passthrough (`ContactForm7ModuleTest`). **Closed:** `SettingsPage` bootstrap hex sink now hostile-input both-directions + fails-without-a-flag (`SettingsPageTest`, T13); `PluginRow` remote upgrade-notice both-directions escape (`PluginRowTest`, #15). **No open hostile-input sink gaps remain.** |
+| **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-14 (Run 3 + closes) | #28 (CF7 double-init, `contact-form-7-tracker.test.js`); #29 (`header_top` ampersand-restore, `ContainerCodeTest`); #30 wontfix; AMP #11 re-expressed for the delegated sink (`AmpModuleTest`). **Closed:** #11 `SettingsPage` sink now guarded (`SettingsPageTest`); #15 `PluginRow` i18n/escape now guarded (`PluginRowTest`). Prior #1–#6/#8/#12/#13/#14/#16/#18 unchanged. **No unverified findings remain.** |
+| **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-14 (Run 3 + closes) | **JS suite 161 → 167 green (17 → 18 suites)** after closing `client-device-data-tracker.test.js` (6 tests: both detection paths, config gating, reject branch, no-push guard). CF7 tracker (finding #28) verified high-quality. **Remaining:** `woocommerce` only — left `open` at the user's request (tracker under review). |
 | **Assertion quality** (mutation testing — Infection, optional) | never | Not yet enabled. See `.claude/commands/test-review.md` § Optional tooling to install `infection/infection` + a coverage driver. |
 
 ---
@@ -164,6 +164,22 @@ git-ignored `test-review-report-2026-07-13-2121.md`.
 | T19 | Low | addressed | `MediaEventsModule::enable_youtube_js_api()` — oEmbed rewrite / non-youtube / non-string branches (`MediaEventsModuleTest`). | `tests/unit/Modules/MediaEventsModuleTest.php` |
 | T20 | Low | addressed | VideoPress `gtm4wp_isVideoPressOrigin()` — subdomain + `video.wordpress.com` accept, look-alike + non-string + bad-JSON reject (`videopress-tracker.test.js` 8 → 14). | `js/frontend/test/videopress-tracker.test.js` |
 
+### Run 3: 2026-07-14 batch review (Axeptio / CF7 / AMP / Blacklist / ContainerCode) — 2026-07-14
+
+Report-only cumulative pass over `d36bca3..780875c`. The concurrent `/code-review`
+(`.security` Report 4) shipped its TC-1 regression tests with the fixes; **Run 3
+audited the quality of those shipped tests** and found the whole batch well-guarded
+(hostile-input both-directions on every new sink; correct raw-passthrough contract
+on the two delegated sinks). No latent bug surfaced. **No tests written this run.**
+Baseline: PHP 282/863 green, JS 17 suites/161 green. Full detail in the git-ignored
+`test-review-report-2026-07-14-1338.md`.
+
+| # | Sev | Status | Summary | File(s) |
+|---|-----|--------|---------|---------|
+| — | — | verified | Axeptio head-JS sink hostile-input both-directions + wiring + consumer-suppress (both ends of `FILTER_DEFAULT_ENABLED`). | `tests/unit/Modules/ConsentModeAxeptioTest.php`, `tests/unit/Frontend/ConsentDefaultsTest.php`, `ModuleHooksTest.php` |
+| — | — | verified | AMP delegated sink rewritten (`add_amp_analytics_entries`) — hostile raw-passthrough (finding #11 guard re-expressed), on-demand compile, fallback chain. | `tests/unit/Modules/AmpModuleTest.php` |
+| — | — | verified | Blacklist `sandboxedScripts` group class + hostile `</script>` allow-list filter; CF7 form-title raw-passthrough + double-init (#28); `header_top` ampersand-restore (#29). | `BlacklistModuleTest`, `ContactForm7ModuleTest`, `contact-form-7-tracker.test.js`, `ContainerCodeTest` |
+
 ### Open gaps (prioritized by the sweeps above)
 
 Terse, non-exploit; prioritized by the sweeps above.
@@ -176,7 +192,8 @@ Terse, non-exploit; prioritized by the sweeps above.
 | T10 | Med | addressed | JS harness established; 2 of 9 trackers covered. Remaining trackers → T16. | `js/frontend/test/*` |
 | T11 | Low | addressed | `Options/Field` + `WooCommerce/Helpers` + `ClientDeviceData`/`MediaEvents` covered. `Admin/{SettingsPage,PluginRow,Admin}` remain → T15. | (various) |
 | T12 | Low | addressed | `ClientDeviceData`/`MediaEvents` gate now in `ModuleHooksTest`. | `tests/unit/Modules/ModuleHooksTest.php` |
-| T13 | Med | open | Finding #11: AMP sink now guarded (`AmpModuleTest`). **Remaining:** `SettingsPage::bootstrap_data` hex sink has no regression test (admin-context, needs the registry+REST+schema harness). ClientDeviceData = N/A (booleans). | `src/Admin/SettingsPage.php` |
+| T13 | Med | addressed | `SettingsPage` bootstrap hex sink now regression-tested: `SettingsPageTest` drives `enqueue_assets()` with a hostile stored container domain (all four hex flags) and captures `wp_add_inline_script`; proved fails-without-a-flag via a throwaway probe, then restored. Closes the `SettingsPage` part of #11. | `tests/unit/Admin/SettingsPageTest.php` |
 | T14 | Low | addressed | `Notices::show_notices` branches — `NoticesTest`. | `tests/unit/Admin/NoticesTest.php` |
-| T15 | Low | open | `Admin/{SettingsPage,PluginRow,Admin}` + `Plugin` + `WooCommerce/WooCommerceModule` untested (wiring-heavy; several are BE-3 candidates — record `[-]` N/A with a reason before writing stub-asserting tests). | (various) |
+| T15 | Low | addressed | `Admin/PluginRow` now tested (`PluginRowTest`): action-link gating + `show_upgrade_notification` both-directions escaping of the remote notice (finding #15) + empty/blank branches. Remaining untested classes `Plugin`, `Frontend`, `Autoloader`, `Admin/Admin`, `WooCommerce/WooCommerceModule` recorded **BE-3 N/A** (orchestrators; WC logic in tested helpers). | `tests/unit/Admin/PluginRowTest.php` |
+| T16b | Low | addressed | `client-device-data` JS tracker now tested (`client-device-data-tracker.test.js`, 6 tests): both detection paths + config gating + reject branch + no-push guard. **`woocommerce` tracker left `open`** at the user's request (tracker under review / possible changes). | `js/frontend/test/client-device-data-tracker.test.js` |
 | T16 | Med | addressed | Media batch (Run 2) added 12 tracker tests + `native-video-params`; JS 25 → 123 green. Untested trackers now 3: `woocommerce`, `client-device-data`, `contact-form-7-tracker` (→ tracked in the Run 2 sweep). `youtube` split out as its own new-code gap T17. | `js/frontend/test/*` |

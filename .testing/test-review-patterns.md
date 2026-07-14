@@ -50,9 +50,10 @@ on every review before anything else.
 - **TC-6** — to regression-test a PA-7 `addcslashes( …, '\\$' )` guard (data-bearing `preg_replace` replacement), the input must carry a literal `$`+digit; assert it survives verbatim (without the guard `$1` resolves to the capture group). Note JSON doubles `\`, so assert on the `$n` form, not `\n`.
 - **TC-7** — to test a handler that calls `wp_die()`/`exit` and then continues, stub it to throw (`Functions\expect('wp_die')->…->andThrow(\RuntimeException::class, 'wp_die')`), catch it, and assert the *post-halt* side effect never ran (e.g. `update_user_meta` count 0). Proves the gate actually stops execution.
 - **TC-8** — to unit-test a method coupled to the `Plugin` singleton chain (`Plugin::instance()->frontend()->datalayer()`), build the intermediates with `ReflectionClass::newInstanceWithoutConstructor()`, set their private props via reflection, install the singleton with a `ReflectionProperty` on `Plugin::$instance`, and **reset it to `null` in tearDown** (TS-7). Seed `DataLayer`'s private `compiled` directly rather than running the compile filter.
-- **TC-9 (JS)** — to test a side-effect frontend tracker (`js/frontend/*.js`): set the bare globals it reads (`global.gtm4wp_datalayer_name = 'dataLayer'`), `import '../tracker'` for its side effects, reset `window.dataLayer = []` per test, build a jsdom fixture and dispatch a **bubbling** event, then assert the `window.dataLayer` push. For the window-attached helper API (ecommerce-generic), import once then call `window.gtm4wp_*`. Tests live in `js/frontend/test/`; run `npm run test:unit` + `npm run lint:js` (no `npm run build` — test files are not bundled).
+- **TC-9 (JS)** — to test a side-effect frontend tracker (`js/frontend/*.js`): set the bare globals it reads (`global.gtm4wp_datalayer_name = 'dataLayer'`), `import '../tracker'` for its side effects, reset `window.dataLayer = []` per test, build a jsdom fixture and dispatch a **bubbling** event, then assert the `window.dataLayer` push. For the window-attached helper API (ecommerce-generic), import once then call `window.gtm4wp_*`. For a **load-time detection** tracker that reads `navigator` (`client-device-data`), override `navigator.userAgent`/`userAgentData` with `Object.defineProperty(window.navigator, …, {value, configurable:true})` **before** each fresh `jest.isolateModules(() => require('../tracker'))` (the IIFE re-runs against that state; always set both so nothing leaks — TS-7), and `await` a macrotask flush (`new Promise(r => setTimeout(r, 0))`) for the Client-Hints `getHighEntropyValues().then/catch` chain; assert the reject branch still pushes and the no-`navigator` case does not throw and does not push. Tests live in `js/frontend/test/`; run `npm run test:unit` + `npm run lint:js` (no `npm run build` — test files are not bundled).
 - **TC-10 (JS)** — to test a tracker that wraps an **external player SDK global** (`YT.Player`, `Twitch.Player`, `SC.Widget`, VideoPress postMessage): stub the SDK global with a fake constructor that **captures** the events/handlers config the tracker registers, load via `jest.isolateModules(() => require('../tracker'))`, then **drive the captured handlers** with a mock player exposing `getCurrentTime`/`getDuration`/`getVideoData` (or emit a `MessageEvent`). Use `jest.useFakeTimers()` + `advanceTimersByTime` for interval-polled progress, and assert missing-SDK / no-embed = no push, no throw. This is the concrete recipe for closing the `youtube` gap (T17).
 - **TC-11 (JS)** — a JS tracker's `window.dataLayer.push({...})` is a **structured object sink**, not an HTML string sink: the `</script>`-into-`<script>` output-encoding lens (TS-1/TS-2/TC-5) does **not** apply at the push site, so do not flag a JS tracker for "missing hostile-input encoding test." The real untrusted-input surface for a JS tracker is a **message/origin boundary** (e.g. VideoPress `postMessage` origin validation) — that validator gets a both-directions test (accept the legit hosts, reject spoofed origin + malformed payload). A raw-passthrough assertion (guid `</script>&x` present verbatim, no entity-encoding) is a mild belt-and-suspenders documentation of intent, welcome but not required.
+- **TC-12** — an admin inline-`<script>` hex sink whose `wp_json_encode(..., HEX_FLAGS)` lives in the **enqueue method** (not the data-builder) is regression-tested by driving the enqueue method and capturing `wp_add_inline_script` with a hostile stored field value; pick a payload with `<>"&'` so dropping any one of the four flags fails. A raw-passthrough test on the data-builder alone does not guard the flags.
 - **TC-1** — every security-relevant code change ships a PHPUnit regression test in the same change (shared rule with `.security/`; the guard tests live in `tests/unit/Frontend/`).
 - **TC-2** — the Brain Monkey `wp_json_encode` stub honors the JSON flags, so build the expected encoded output by calling `wp_json_encode(...)` the way the source does — never hand-type `\uXXXX` literals.
 - **TC-3** — extend the right base: `FrontendTestCase` for services that read `Options` (it provides the Options factory + global reset); the plain `TestCase` for pure/static helpers with no Options dependency (`VisitorIp`).
@@ -206,6 +207,34 @@ registration gets an enabled test **and** a disabled test (the `ModuleHooksTest`
 pattern). This is the accepted way to test `register_hooks()`/`frontend()` wiring
 without booting WordPress.
 
+### TC-12: Admin inline-`<script>` hex-sink capture harness
+When a hex-flag `<script>` sink lives in an **enqueue method** (the
+`wp_json_encode(..., HEX_FLAGS)` is at the `wp_add_inline_script` call site, not in
+the data-builder it wraps — e.g. `SettingsPage::enqueue_assets()` vs.
+`bootstrap_data()`), the regression test must drive the **enqueue method** and
+capture the inline script; a raw-passthrough test on the data-builder alone does
+NOT guard the flags. Recipe (confirmed 2026-07-14, `SettingsPageTest`, T13):
+
+1. Build the real `Registry::with_default_modules()` and share it with the
+   `RestController` (exactly as `Plugin` wires them). Building every module schema
+   needs the `RestControllerTest` stub set (`stubTranslationFunctions` +
+   `stubEscapeFunctions` + `wp_kses`/`sanitize_text_field`/`sanitize_key`/
+   `get_object_taxonomies`/`wp_roles`/`translate_user_role`).
+2. Stub `get_option` to seed a **hostile value at a real settings field** — a
+   container `domain` is admin free-text that reaches the sink un-sanitized (only
+   the REST *save* path sanitizes; `current_values()` returns the raw stored value).
+3. Stub the enqueue machinery as no-ops (`wp_enqueue_script`/`wp_enqueue_style`/
+   `wp_set_script_translations`/`wp_style_add_data`/`plugins_url`) and capture
+   `wp_add_inline_script`. Do **not** stub `is_file` — it is a PHP internal
+   Patchwork can't redefine, and the inline script fires whether the build asset
+   exists or not, so the assertion doesn't depend on it.
+4. Pick a payload that exercises **all four** flags (`</script>"&'` →
+   `\x3C/script\x3E\x22\x26\x27`) so dropping ANY of JSON_HEX_TAG/AMP/QUOT/APOS
+   changes the encoded fragment and fails the test; assert the fragment (computed
+   with `json_encode($v, HEX_FLAGS)`, TC-2) present + raw `</script>` absent. Also
+   cover the wrong-`$hook` early return (TS-5). Proven by a throwaway probe:
+   dropping `JSON_HEX_APOS` from the source failed the test.
+
 ### TC-10: Player-SDK tracker harness (capture-and-drive)
 The media trackers wrap an external player SDK (`YT.Player`, `Twitch.Player`,
 `SC.Widget`) or a `postMessage` stream (VideoPress). The blessed way to unit-test
@@ -275,6 +304,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-14 (Run 3 — gaps closed) | Closed T13 (`SettingsPageTest` — admin bootstrap hex sink, throwaway-probe-proven), T15 (`PluginRowTest` — action links + remote-notice both-directions escape), and T16's `client-device-data` half (`client-device-data-tracker.test.js` — both detection paths, config gating, reject branch, no-push guard); `woocommerce` tracker left open per the user (under review). Added **TC-12** (admin enqueue-method hex-sink capture harness — the encode is at the `wp_add_inline_script` call site, so drive the enqueue method, not the data-builder) and extended **TC-9** with the `navigator` override + Client-Hints promise-flush recipe. PHP 282→290, JS 161→167, all green; phpcs/lint clean; tests-only (no CHANGELOG). |
+| 2026-07-14 (Run 3 — report only) | Audited the 2026-07-14 code batch (Axeptio CMP, CF7, AMP amp-wp 2.x, Blacklist `sandboxedScripts`, ContainerCode `header_top`). A concurrent `/code-review` had already shipped the TC-1 regression tests, so Run 3's job was **quality-auditing the shipped tests, not finding zero-test classes** — and every one held up (hostile-input both-directions on each new `<script>` sink; correct raw-passthrough on the two delegated sinks: AMP→amp-wp, CF7 title→`wpcf7_format_atts`). **No new pattern** — the batch confirms TS-1/TS-2/TS-11/TC-2/TC-4/TC-11/BE-3 at fresh sites. Process note (no numbered entry): when a code-review lands regression tests for a range, do **not** skip that range next `/test-review` — "tests exist" ≠ "tests are hostile-input"; read each against its sink. Confirmed `AmpModuleTest`'s delegated-sink raw-passthrough as the canonical TS-11 shape for a downstream-encodes sink. No tests written. |
 | 2026-07-13 (Run 2 — gaps closed) | Closed T17–T20 after approval. **TC-10 paid off immediately:** applying the player-SDK harness to the untested `youtube` tracker **surfaced a latent bug** — an undeclared `player = new YT.Player(...)` throwing `ReferenceError` in the strict-mode 2.0 module (fixed; regression test proven to fail pre-fix). This is the second time a zero-test class hid a live defect (cf. the OFF-placement iframe leak, Run 0/T3): **write the missing test for a whole-untested class before assuming it works.** Added `MediaEventsModuleTest` (PHP enqueue gate + oEmbed rewrite) and extended VideoPress (origin accept/reject branches). |
 | 2026-07-13 (Run 2) | Media-tracker batch review (12 trackers + `native-video-params`, rewritten `MediaEvents` PHP module). Added **TC-10** (player-SDK capture-and-drive harness — the recipe to close the `youtube` gap T17) and **TC-11** (a JS dataLayer push is a structured object sink, not an HTML sink — the output-encoding lens doesn't apply; validate JS trackers at the message/origin boundary instead). No tests written; report-only. New gaps T17–T20. Derived from reviewing the 12 new JS test files (all high-quality) against the untested `youtube` tracker + `MediaEventsModule` PHP branches. |
 | 2026-07-13 (Run 1 continued) | Full remaining-gap sweep. Added **TC-8** (reflection injection for `Plugin`-singleton-coupled code — AMP finding #11), **TC-9** (JS side-effect tracker harness under `js/frontend/test/`), and extended **TC-2** with the `\xNN` + `json_encode`-computed-expected corollary (from the AMP test, after tooling HTML-encoded literal break-out chars). Derived from closing T9/T11/T12/T13(AMP)/T14 and starting T10 (JS). |
