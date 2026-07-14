@@ -174,6 +174,15 @@ function gtm4wp_cf7_push_ga4( w, name, form ) {
  * @return {void}
  */
 ( function ( w, d, p ) {
+	// Guard against double registration: a re-injected bundle (AJAX navigation,
+	// a page builder duplicating the handle) would otherwise attach the CF7
+	// listeners twice and double-push every event. Mirrors the media trackers'
+	// window.gtm4wp_<provider>_inited flag.
+	if ( w.gtm4wp_cf7_inited ) {
+		return;
+	}
+	w.gtm4wp_cf7_inited = true;
+
 	for ( const ctf7event in p ) {
 		d.addEventListener( ctf7event, function ( event ) {
 			const cf7data = gtm4wp_prepare_cf7_data( event );

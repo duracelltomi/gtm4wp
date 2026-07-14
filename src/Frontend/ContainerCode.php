@@ -182,17 +182,14 @@ final class ContainerCode {
 
 		if ( ! apply_filters( self::FILTER_AMP_RUNNING, false ) ) {
 			if ( $echo_output ) {
-				echo wp_kses(
-					$_gtm_top_content,
-					array(
-						'script' => array(
-							'data-cfasync'            => array(),
-							'data-pagespeed-no-defer' => array(),
-							'data-cookieconsent'      => array(),
-							'nonce'                   => array(),
-						),
-					)
-				);
+				// Emit through print_script_block() - the same sanitizer the
+				// container code in header_begin() uses - so consent-tool JS added
+				// via FILTER_HEADER_TOP_JS is sanitized identically and, crucially,
+				// gets the ampersand restored. wp_kses() alone turns every bare &
+				// into &amp; with no restore step, which would silently break JS
+				// operators like && and &-joined loader URLs in the head block.
+				// See ScriptTag::print_script_block() (RI-3) for the contract.
+				$this->script_tag->print_script_block( $_gtm_top_content );
 			} else {
 				return $_gtm_top_content;
 			}

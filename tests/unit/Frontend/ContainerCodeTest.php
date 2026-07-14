@@ -603,6 +603,34 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( 'gtm4wp_consent_tool_ready();', $output );
 	}
 
+	public function test_header_top_restores_ampersands_in_head_block_js(): void {
+		// header_top must emit through ScriptTag::print_script_block(), which
+		// restores the ampersand that wp_kses() entity-encodes. Model a realistic
+		// wp_kses() that turns every bare & into &amp; (the real one does), so a
+		// consent-tool integration appending JS with && and an &-joined loader URL
+		// via FILTER_HEADER_TOP_JS survives. A raw wp_kses() echo without the
+		// restore would leave &amp;&amp; / x=1&amp;y=2 and break the script.
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) {
+				return str_replace( '&', '&amp;', (string) $content );
+			}
+		);
+
+		Filters\expectApplied( ContainerCode::FILTER_HEADER_TOP_JS )
+			->once()
+			->andReturn( "\n\tif ( a && b ) { loadCmp('https://cmp.example/sdk?x=1&y=2'); }" );
+
+		$container = $this->make_container();
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'if ( a && b )', $output );
+		$this->assertStringContainsString( 'x=1&y=2', $output );
+		$this->assertStringNotContainsString( '&amp;', $output );
+	}
+
 	public function test_body_open_outputs_iframe_for_body_placement(): void {
 		$container = $this->make_container(
 			array(
