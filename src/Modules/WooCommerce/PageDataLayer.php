@@ -609,7 +609,18 @@ final class PageDataLayer {
 
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
 
-		list( $before_purchase_dl_push, $after_purchase_dl_push ) = $this->purchase_dedupe_guard( $order );
+		// The browser-side duplicate guard records this order in the
+		// gtm4wp_orderid_tracked cookie / localStorage. When the "Do not flag orders
+		// as being tracked" option is on, the admin has asked the plugin not to
+		// remember tracked orders anywhere, so the browser guard is skipped as well -
+		// matching the server-side is_purchase_already_tracked() / flag_order_tracked()
+		// short-circuits, which otherwise leave a stale localStorage flag behind (#369).
+		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ) ) {
+			$before_purchase_dl_push = '';
+			$after_purchase_dl_push  = '';
+		} else {
+			list( $before_purchase_dl_push, $after_purchase_dl_push ) = $this->purchase_dedupe_guard( $order );
+		}
 
 		$this->datalayer->queue_push(
 			$purchase_data_layer['event'],

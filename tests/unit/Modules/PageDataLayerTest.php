@@ -434,6 +434,44 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'ORD</script>', $this->inline_js, 'The raw </script> must never appear in the fallback purchase push.' );
 	}
 
+	public function test_purchase_dedupe_guard_emitted_by_default(): void {
+		// By default the browser-side gtm4wp_orderid_tracked guard wraps the push.
+		$order = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertStringContainsString( 'gtm4wp_orderid_tracked', $this->inline_js, 'The browser dedupe guard is emitted by default.' );
+	}
+
+	public function test_purchase_dedupe_guard_skipped_when_do_not_flag_option_is_on(): void {
+		// #369: with "Do not flag orders as being tracked" on, the plugin must not
+		// remember the order anywhere - so the browser-side gtm4wp_orderid_tracked
+		// localStorage/cookie guard is skipped too, not just the server _ga_tracked meta.
+		$order = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE     => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE  => true,
+				GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The purchase must still fire.' );
+		$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_js, 'No browser dedupe guard may be written when the tracked flag is disabled.' );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The server _ga_tracked flag must not be written either.' );
+	}
+
 	public function test_custom_order_received_page_resolves_order_from_session(): void {
 		// The custom-page filter has made is_order_received_page() true, but the
 		// bespoke page URL carries no order id or key, so the order is resolved
