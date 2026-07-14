@@ -294,6 +294,36 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'blue,xl', $item['item_variant'] );
 	}
 
+	public function test_subscription_variation_still_gets_variant_group_and_parent_category(): void {
+		// #264: a WooCommerce Subscriptions variation reports type
+		// 'subscription_variation' (not 'variation') but extends
+		// WC_Product_Variation, so it must still expose item_variant, item_group_id
+		// and the parent product's category - not empty values.
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static function ( $product_id ) {
+				// Category terms live on the parent (99), not on the variation.
+				return 99 === $product_id
+					? array( (object) array( 'name' => 'Coffee', 'term_id' => 5 ) ) // phpcs:ignore
+					: array();
+			}
+		);
+
+		$product = new \WC_Product_Variation(
+			array(
+				'id'                   => 501,
+				'type'                 => 'subscription_variation',
+				'parent_id'            => 99,
+				'variation_attributes' => array( 'attribute_pa_size' => '1kg' ),
+			)
+		);
+
+		$item = $this->make_product_data()->process_product( $product, array(), 'productdetail' );
+
+		$this->assertSame( 99, $item['item_group_id'], 'A subscription variation must expose its parent as item_group_id.' );
+		$this->assertSame( '1kg', $item['item_variant'], 'A subscription variation must expose its variant attributes.' );
+		$this->assertSame( 'Coffee', $item['item_category'], 'Category must be resolved from the parent product.' );
+	}
+
 	public function test_category_path_split_into_max_five_levels(): void {
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( 7 );
 		Functions\when( 'get_term' )->justReturn( (object) array( 'term_id' => 7, 'name' => 'Leaf' ) ); // phpcs:ignore

@@ -81,7 +81,14 @@ final class ProductData {
 		$remarketing_id = $product_id;
 		$product_sku    = $product->get_sku();
 
-		if ( 'variation' === $product_type ) {
+		// Detect variations structurally: WooCommerce Subscriptions (and similar
+		// extensions) report a type other than "variation" - e.g.
+		// "subscription_variation" - yet their product object still extends
+		// WC_Product_Variation, so the variant / parent-category / item_group_id
+		// handling below must apply to them as well (#264).
+		$is_variation = ( 'variation' === $product_type ) || ( $product instanceof \WC_Product_Variation );
+
+		if ( $is_variation ) {
 			$parent_product_id = $product->get_parent_id();
 			$product_cat       = Helpers::get_product_category( $parent_product_id, $use_full_category_path );
 		} else {
@@ -104,7 +111,7 @@ final class ProductData {
 			'google_business_vertical' => $this->business_vertical(),
 		);
 
-		if ( 'variation' === $product_type ) {
+		if ( $is_variation ) {
 			$_temp_productdata['item_group_id'] = $parent_product_id;
 		}
 
@@ -132,7 +139,7 @@ final class ProductData {
 			$_temp_productdata['item_brand'] = Helpers::get_product_term( $product_id_to_query, $brand_taxonomy );
 		}
 
-		if ( 'variation' === $product_type ) {
+		if ( $is_variation ) {
 			$_temp_productdata['item_variant'] = implode( ',', $product->get_variation_attributes() );
 		}
 

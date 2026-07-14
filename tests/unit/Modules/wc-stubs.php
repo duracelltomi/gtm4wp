@@ -57,6 +57,13 @@ if ( ! class_exists( 'WC_Product' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WC_Product_Variation' ) ) {
+	// Real product variations - and WooCommerce Subscriptions variations, which
+	// report get_type() === 'subscription_variation' - both extend this class.
+	// The 'type' is still supplied through the constructor data.
+	class WC_Product_Variation extends WC_Product {}
+}
+
 if ( ! class_exists( 'WC_Order' ) ) {
 	class WC_Order {
 		public function __construct( private array $data = array() ) {}
