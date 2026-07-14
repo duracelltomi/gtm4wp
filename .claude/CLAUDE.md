@@ -100,6 +100,26 @@ back — use the `Options`/`Frontend` services instead.
   - `npm run release` — package a release ZIP via `tools/build-release.js`
 - Always run `npm run build` (and fix `lint:js`) after modifying anything under `js/`
 
+### Script loading & minification (design decision)
+
+The plugin **minifies but does not combine** its frontend scripts — this is
+intentional, so don't re-add a plugin-local script concatenator/combiner or a
+"load everything in one file" option (1.x had a minifier/combiner; 2.0 dropped
+it on purpose):
+
+- **Minification** is handled by the production build: `npm run build` runs
+  `wp-scripts build` in webpack production mode (Terser), so every file in
+  `build/` is already minified.
+- **Combination** is delegated to caching/optimization plugins (WP Rocket,
+  Autoptimize, LiteSpeed, …). They combine across the whole site and adapt to the
+  host's HTTP setup; a plugin-local combiner would only ever see its own handful
+  of files.
+- **Conditional, per-feature loading** is the point of the one-entry-point-per-file
+  design (`webpack.config.js`): each module enqueues only its own script, only
+  when its option is enabled (and, for media, only when the page contains that
+  embed), all with the `defer` strategy via `AbstractModule::enqueue_script()`.
+  On HTTP/2 this beats a single always-loaded bundle.
+
 ## Changelog policy
 
 Every change to **production code** ships a matching bullet under the top `## 2.0`

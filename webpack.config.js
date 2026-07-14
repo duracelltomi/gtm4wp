@@ -5,6 +5,11 @@
  * points: every file in js/frontend/ becomes its own bundle (per-feature
  * scripts, enqueued only when the owning module is enabled), plus the React
  * admin app from js/admin/.
+ *
+ * `npm run build` runs webpack in production mode, so each bundle is already
+ * minified. Combining bundles into one file is intentionally left to caching /
+ * optimization plugins (WP Rocket, Autoptimize, LiteSpeed, …) — do not add a
+ * concatenation step here. See "Script loading & minification" in .claude/CLAUDE.md.
  */
 
 const fs = require( 'fs' );

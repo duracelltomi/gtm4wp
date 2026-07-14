@@ -192,6 +192,18 @@ Google Tag Manager supports basic scroll depth tracking based on percentage or p
 trigger in your container and use it to fire your Google Analytics 4 and/or Google Ads remarketing/conversion tags.
 (The plugin's own scroll tracking feature was removed in 2.0 in favor of this built-in GTM functionality.)
 
+= Why does the plugin load several separate JavaScript files instead of one? =
+
+Each tracking feature (WooCommerce, each media player, Contact Form 7, device data, etc.) is its own small
+JavaScript file, and the plugin loads only the files a page actually needs - the YouTube tracker, for instance,
+loads only on pages that embed a YouTube video, and with the "defer" strategy so it never blocks rendering.
+Those files are already minified by the plugin's build.
+
+Merging several files into one is intentionally left to a caching / performance plugin (WP Rocket, Autoptimize,
+LiteSpeed Cache, etc.), which can combine scripts across your whole site and in a way that suits your hosting and
+HTTP setup. On modern HTTP/2 hosting, many small conditionally-loaded files usually perform as well as one combined
+file. (1.x combined its own scripts; 2.0 delegates this.)
+
 == Screenshots ==
 
 1. Admin panel
