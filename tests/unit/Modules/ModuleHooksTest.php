@@ -49,6 +49,26 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $disabled, 'add_webtoffee_header_js' ) ) );
 	}
 
+	public function test_consent_mode_wires_axeptio_when_enabled(): void {
+		// Axeptio is owned by the consent module; enabling it (with a project ID)
+		// must register a head-block callback via the delegated handler.
+		$this->boot(
+			new ConsentModeModule(),
+			array(
+				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
+				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
+			)
+		);
+
+		$this->assertNotFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
+	}
+
+	public function test_consent_mode_does_not_wire_any_head_js_when_all_tools_disabled(): void {
+		$this->boot( new ConsentModeModule() );
+
+		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
+	}
+
 	public function test_webtoffee_header_js_uses_custom_datalayer_name(): void {
 		Functions\stubEscapeFunctions();
 

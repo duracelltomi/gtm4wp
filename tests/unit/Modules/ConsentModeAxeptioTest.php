@@ -1,6 +1,6 @@
 <?php
 /**
- * Unit tests for the Axeptio integration module.
+ * Unit tests for the Axeptio consent tool handler of the consent module.
  *
  * @package GTM4WP
  */
@@ -11,13 +11,14 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\ConsentDefaults;
 use GTM4WP\Frontend\ContainerCode;
-use GTM4WP\Modules\Axeptio\AxeptioModule;
+use GTM4WP\Modules\ConsentMode\Axeptio;
+use GTM4WP\Modules\ConsentMode\ConsentModeModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Frontend\FrontendTestCase;
 
 /**
  * Covers the Axeptio head block (SDK loader, consent default, data layer
- * bridge) and the hook gating.
+ * bridge) and the hook gating of the consent module's Axeptio handler.
  *
  * The security-relevant assertion is the RI-2 hex-flag regression: the
  * window.axeptioSettings object is written into an inline script that the head
@@ -27,23 +28,21 @@ use GTM4WP\Tests\unit\Frontend\FrontendTestCase;
  * are written with \xNN escapes and the expected fragments are computed with
  * json_encode() using the same flags the source uses (TC-2).
  */
-final class AxeptioModuleTest extends FrontendTestCase {
+final class ConsentModeAxeptioTest extends FrontendTestCase {
 
 	private const HEX_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS;
 
 	/**
-	 * Boots an Axeptio module with the given stored options.
+	 * Builds an Axeptio handler with the given stored options, merged over the
+	 * consent module defaults (which own the Axeptio option keys).
 	 *
 	 * @param array<string, mixed> $stored Stored option values.
-	 * @return AxeptioModule
+	 * @return Axeptio
 	 */
-	private function boot( array $stored ): AxeptioModule {
-		\Brain\Monkey\Functions\when( 'get_option' )->justReturn( $stored );
+	private function make_axeptio( array $stored ): Axeptio {
+		Functions\when( 'get_option' )->justReturn( $stored );
 
-		$module = new AxeptioModule();
-		$module->frontend( new Options( $module->defaults() ) );
-
-		return $module;
+		return new Axeptio( new Options( ( new ConsentModeModule() )->defaults() ) );
 	}
 
 	/**
@@ -60,14 +59,14 @@ final class AxeptioModuleTest extends FrontendTestCase {
 		// \x3C < , \x3E > , \x22 " , \x26 &  (no literal break-out char in source).
 		$project_id = "GTM\x3C/script\x3E\x22\x26x";
 
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => $project_id,
 			)
 		);
 
-		$js = $module->add_axeptio_head_js( '', 'dataLayer' );
+		$js = $axeptio->add_head_js( '', 'dataLayer' );
 
 		// Present: the hex-encoded form as the source's wp_json_encode() emits it.
 		$this->assertStringContainsString( $this->encoded_fragment( $project_id ), $js );
@@ -78,14 +77,14 @@ final class AxeptioModuleTest extends FrontendTestCase {
 	}
 
 	public function test_head_js_includes_sdk_loader_and_datalayer_bridge(): void {
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 			)
 		);
 
-		$js = $module->add_axeptio_head_js( '', 'customDL' );
+		$js = $axeptio->add_head_js( '', 'customDL' );
 
 		$this->assertStringContainsString( 'window.axeptioSettings = ', $js );
 		$this->assertStringContainsString( '"clientId":"my-project"', $js );
@@ -97,39 +96,39 @@ final class AxeptioModuleTest extends FrontendTestCase {
 	}
 
 	public function test_head_js_preserves_accumulated_inline_js(): void {
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 			)
 		);
 
-		$js = $module->add_axeptio_head_js( '/* earlier */', 'dataLayer' );
+		$js = $axeptio->add_head_js( '/* earlier */', 'dataLayer' );
 
 		$this->assertStringStartsWith( '/* earlier */', $js );
 	}
 
 	public function test_cookies_version_included_only_when_set(): void {
-		$with_version = $this->boot(
+		$with_version = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION => 'my-project-v3',
 			)
 		);
-		$this->assertStringContainsString( '"cookiesVersion":"my-project-v3"', $with_version->add_axeptio_head_js( '', 'dataLayer' ) );
+		$this->assertStringContainsString( '"cookiesVersion":"my-project-v3"', $with_version->add_head_js( '', 'dataLayer' ) );
 
-		$without_version = $this->boot(
+		$without_version = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 			)
 		);
-		$this->assertStringNotContainsString( 'cookiesVersion', $without_version->add_axeptio_head_js( '', 'dataLayer' ) );
+		$this->assertStringNotContainsString( 'cookiesVersion', $without_version->add_head_js( '', 'dataLayer' ) );
 	}
 
 	public function test_consent_mode_default_present_only_when_enabled(): void {
-		$enabled = $this->boot(
+		$enabled = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
@@ -137,7 +136,7 @@ final class AxeptioModuleTest extends FrontendTestCase {
 			)
 		);
 
-		$js = $enabled->add_axeptio_head_js( '', 'dataLayer' );
+		$js = $enabled->add_head_js( '', 'dataLayer' );
 		$this->assertStringContainsString( '"googleConsentMode"', $js );
 		$this->assertStringContainsString( '"analytics_storage":"denied"', $js );
 		$this->assertStringContainsString( '"ad_storage":"denied"', $js );
@@ -145,13 +144,13 @@ final class AxeptioModuleTest extends FrontendTestCase {
 		$this->assertStringContainsString( '"ad_personalization":"denied"', $js );
 		$this->assertStringContainsString( '"wait_for_update":500', $js );
 
-		$disabled = $this->boot(
+		$disabled = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 			)
 		);
-		$this->assertStringNotContainsString( 'googleConsentMode', $disabled->add_axeptio_head_js( '', 'dataLayer' ) );
+		$this->assertStringNotContainsString( 'googleConsentMode', $disabled->add_head_js( '', 'dataLayer' ) );
 	}
 
 	public function test_consent_mode_default_can_be_filtered(): void {
@@ -164,7 +163,7 @@ final class AxeptioModuleTest extends FrontendTestCase {
 				)
 			);
 
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
@@ -172,55 +171,60 @@ final class AxeptioModuleTest extends FrontendTestCase {
 			)
 		);
 
-		$js = $module->add_axeptio_head_js( '', 'dataLayer' );
+		$js = $axeptio->add_head_js( '', 'dataLayer' );
 		$this->assertStringContainsString( '"analytics_storage":"granted"', $js );
 		$this->assertStringContainsString( '"wait_for_update":1000', $js );
 	}
 
 	public function test_registers_head_js_when_enabled_with_project_id(): void {
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 			)
 		);
+		$axeptio->register_hooks();
 
-		$this->assertNotFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $module, 'add_axeptio_head_js' ) ) );
+		$this->assertNotFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $axeptio, 'add_head_js' ) ) );
 	}
 
 	public function test_inactive_when_disabled(): void {
-		$module = $this->boot( array( GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project' ) );
+		$axeptio = $this->make_axeptio( array( GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project' ) );
+		$axeptio->register_hooks();
 
-		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $module, 'add_axeptio_head_js' ) ) );
+		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $axeptio, 'add_head_js' ) ) );
 	}
 
 	public function test_inactive_when_enabled_without_project_id(): void {
-		$module = $this->boot( array( GTM4WP_OPTION_INTEGRATE_AXEPTIO => true ) );
+		$axeptio = $this->make_axeptio( array( GTM4WP_OPTION_INTEGRATE_AXEPTIO => true ) );
+		$axeptio->register_hooks();
 
-		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $module, 'add_axeptio_head_js' ) ) );
+		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $axeptio, 'add_head_js' ) ) );
 	}
 
 	public function test_suppresses_consent_default_when_consent_mode_enabled(): void {
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE => true,
 			)
 		);
+		$axeptio->register_hooks();
 
-		$this->assertNotFalse( has_filter( ConsentDefaults::FILTER_DEFAULT_ENABLED, array( $module, 'suppress_consent_default' ) ) );
-		$this->assertFalse( $module->suppress_consent_default() );
+		$this->assertNotFalse( has_filter( ConsentDefaults::FILTER_DEFAULT_ENABLED, array( $axeptio, 'suppress_consent_default' ) ) );
+		$this->assertFalse( $axeptio->suppress_consent_default() );
 	}
 
 	public function test_does_not_suppress_consent_default_when_consent_mode_disabled(): void {
-		$module = $this->boot(
+		$axeptio = $this->make_axeptio(
 			array(
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
 				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
 			)
 		);
+		$axeptio->register_hooks();
 
-		$this->assertFalse( has_filter( ConsentDefaults::FILTER_DEFAULT_ENABLED, array( $module, 'suppress_consent_default' ) ) );
+		$this->assertFalse( has_filter( ConsentDefaults::FILTER_DEFAULT_ENABLED, array( $axeptio, 'suppress_consent_default' ) ) );
 	}
 }

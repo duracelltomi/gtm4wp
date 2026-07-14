@@ -45,8 +45,10 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'consent-mode'  => __( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
-			'consent-tools' => __( 'Consent management tools', 'duracelltomi-google-tag-manager' ),
+			'consent-mode' => __( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
+			'cookiebot'    => __( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
+			'webtoffee'    => __( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
+			'axeptio'      => __( 'Axeptio', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -143,7 +145,7 @@ final class AdminSchema implements AdminSchemaInterface {
 					'<a href="https://support.cookiebot.com/hc/en-us/articles/360009192739-Google-Tag-Manager-and-Automatic-cookie-blocking" target="_blank" rel="noopener">',
 					'</a>'
 				),
-				group: 'consent-tools'
+				group: 'cookiebot'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
@@ -154,7 +156,51 @@ final class AdminSchema implements AdminSchemaInterface {
 					'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found. You do not need to use this integration with v3.x or above since it includes all the necessary codes to integrate the consent banner with Google Tag Manager.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'consent-tools'
+				group: 'webtoffee'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Enable Axeptio', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Enable this to let GTM4WP load the Axeptio CMP SDK directly. No separate Axeptio plugin is required. Enter your Axeptio project ID and cookies version below.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'axeptio'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID,
+				type: Field::TYPE_TEXT,
+				default_value: '',
+				label: __( 'Axeptio Project ID', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Your Axeptio project identifier, passed to the SDK as the clientId. You can find it in your Axeptio dashboard.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'axeptio'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION,
+				type: Field::TYPE_AXEPTIO_VERSION,
+				default_value: '',
+				label: __( 'Cookies version', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'The cookies version (cookiesVersion) loaded by the SDK. The list is fetched automatically from your Axeptio project once a valid Project ID is set above.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'axeptio'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Enable Google Consent Mode v2', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'When enabled, Axeptio drives Google Consent Mode v2: it fires both the "default" (everything denied) and the "update" commands using its certified vendor mapping. Use this instead of the plugin\'s own "Google Consent Mode" feature, and do not enable both. A dedicated dataLayer event (gtm4wp.axeptioConsentUpdate) is also pushed whenever the visitor updates their choices.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'axeptio'
 			),
 		);
 	}

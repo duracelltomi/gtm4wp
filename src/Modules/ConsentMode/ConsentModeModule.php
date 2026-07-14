@@ -53,6 +53,10 @@ final class ConsentModeModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY  => false,
 			GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false,
 			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR        => false,
+			GTM4WP_OPTION_INTEGRATE_AXEPTIO               => false,
+			GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID     => '',
+			GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION => '',
+			GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE   => false,
 		);
 	}
 
@@ -65,6 +69,10 @@ final class ConsentModeModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR ) ) {
 			add_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $this, 'add_webtoffee_header_js' ), 20, 2 );
 		}
+
+		// Axeptio is a consent management tool owned by this module; its own
+		// enabling option and project ID gate the registration.
+		( new Axeptio( $this->options ) )->register_hooks();
 	}
 
 	/**
