@@ -72,11 +72,9 @@ final class ListTracking {
 	 * when the cart item is rendered.
 	 *
 	 * @param \WC_Product $product A WooCommerce product that is shown in the cart.
-	 * @param string      $cart_item Not used by this hook.
-	 * @param string      $cart_id Not used by this hook.
 	 * @return \WC_Product The unchanged product.
 	 */
-	public function cart_item_product_filter( $product, $cart_item = '', $cart_id = '' ) {
+	public function cart_item_product_filter( $product ) {
 		$eec_product_array = $this->product_data->process_product(
 			$product,
 			array(
@@ -284,10 +282,9 @@ final class ListTracking {
 	 * Starts output buffering in order to be able to add product data attributes to the link element
 	 * of a product list (classic) widget.
 	 *
-	 * @param string $template_name The template part that is being rendered.
 	 * @return void
 	 */
-	public function before_template_part( $template_name ): void {
+	public function before_template_part(): void {
 		ob_start();
 	}
 
