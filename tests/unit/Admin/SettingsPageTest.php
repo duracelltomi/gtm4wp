@@ -51,6 +51,8 @@ final class SettingsPageTest extends TestCase {
 			static fn ( $value ) => preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $value ) )
 		);
 		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
+		Functions\when( 'wc_get_order_statuses' )->justReturn( array() );
+		Functions\when( 'get_pages' )->justReturn( array() );
 		Functions\when( 'wp_roles' )->justReturn(
 			new class() {
 				public function get_names(): array {

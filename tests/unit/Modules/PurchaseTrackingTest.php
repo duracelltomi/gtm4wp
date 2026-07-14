@@ -38,6 +38,7 @@ final class PurchaseTrackingTest extends TestCase {
 		);
 		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => $content );
 		Functions\when( 'wp_unslash' )->returnArg();
+		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
 		Functions\when( 'current_theme_supports' )->justReturn( true );
 		Functions\when( 'is_order_received_page' )->justReturn( false );
 
@@ -195,6 +196,85 @@ final class PurchaseTrackingTest extends TestCase {
 		$output = $this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $this->make_order(), 1001 );
 
 		$this->assertStringNotContainsString( 'purchase', $output, 'An order id matching the browser cookie must be treated as already tracked.' );
+	}
+
+	/**
+	 * Stubs WC() to return a store with a session that records set() calls.
+	 *
+	 * @param array<string, mixed> $session_values Values the session get() returns.
+	 * @return object The session object (inspect its ->sets array).
+	 */
+	private function stub_wc_with_session( array $session_values = array() ): object {
+		$session = new class( $session_values ) {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function __construct( private array $values ) {}
+
+			public function get( $key ) {
+				return $this->values[ $key ] ?? null;
+			}
+
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		$store          = new \stdClass();
+		$store->session = $session;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		return $session;
+	}
+
+	public function test_remember_order_seeds_a_trackable_order_into_the_session(): void {
+		$session = $this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_order() ); // A processing order is trackable.
+
+		$this->make_tracking()->remember_order( 1001 );
+
+		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'A placed, trackable order must be remembered for the next-page fallback.' );
+	}
+
+	public function test_remember_order_skips_a_non_trackable_status(): void {
+		$session = $this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_order( array( 'status' => 'pending' ) ) );
+
+		$this->make_tracking()->remember_order( 1001 );
+
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'A still-pending order must not be seeded.' );
+	}
+
+	public function test_remember_order_skips_an_invalid_order_id(): void {
+		$session = $this->stub_wc_with_session();
+
+		$this->make_tracking()->remember_order( 0 );
+
+		$this->assertSame( array(), $session->sets );
+	}
+
+	public function test_remember_order_skips_a_missing_order(): void {
+		$session = $this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( false );
+
+		$this->make_tracking()->remember_order( 1001 );
+
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets );
+	}
+
+	public function test_remember_order_does_nothing_without_a_session(): void {
+		$store          = new \stdClass();
+		$store->session = null;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		// Without a session the order can never be looked up.
+		Functions\expect( 'wc_get_order' )->never();
+
+		$this->make_tracking()->remember_order( 1001 );
 	}
 
 	public function test_purchase_datalayer_is_hex_encoded_in_script_context(): void {

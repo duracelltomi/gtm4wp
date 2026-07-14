@@ -65,6 +65,9 @@ final class WooCommerceModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG  => false,
 			GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL    => false,
 			GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT        => 2000,
+			GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES    => array( 'processing', 'on-hold', 'completed' ),
+			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE   => false,
+			GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '',
 		);
 	}
 
@@ -113,6 +116,25 @@ final class WooCommerceModule extends AbstractModule {
 
 		add_action( 'woocommerce_thankyou', array( $purchase_tracking, 'on_thankyou' ) );
 
+		// Reliable purchase tracking and the custom order-received page both rely on
+		// the placed order being remembered in the session, so register the seed
+		// hooks when either feature is enabled. The union of these three hooks fires
+		// for every payment method: payment_complete for instant gateways and the
+		// order-pay flow, the status change for Cash on Delivery / bank transfer,
+		// and the thank-you render as a final safety net.
+		$purchase_on_any_page = ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) );
+		$custom_received_page = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE );
+
+		if ( $purchase_on_any_page || $custom_received_page > 0 ) {
+			add_action( 'woocommerce_payment_complete', array( $purchase_tracking, 'remember_order' ) );
+			add_action( 'woocommerce_order_status_changed', array( $purchase_tracking, 'remember_order' ) );
+			add_action( 'woocommerce_thankyou', array( $purchase_tracking, 'remember_order' ) );
+		}
+
+		if ( $custom_received_page > 0 ) {
+			add_filter( 'woocommerce_is_order_received_page', array( $this, 'filter_is_order_received_page' ) );
+		}
+
 		add_action( 'woocommerce_before_template_part', array( $list_tracking, 'before_template_part' ) );
 		add_action( 'woocommerce_after_template_part', array( $list_tracking, 'after_template_part' ) );
 		add_filter( 'widget_title', array( $list_tracking, 'widget_title_filter' ) );
@@ -160,6 +182,30 @@ final class WooCommerceModule extends AbstractModule {
 		$return_vars['gtm4wp_datalayer_max_timeout']  = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT );
 
 		return $return_vars;
+	}
+
+	/**
+	 * Forces WooCommerce's is_order_received_page() to return true on the page
+	 * selected in the "Custom order received page" option, so a bespoke thank-you
+	 * page fires the purchase event through the standard order-received data layer
+	 * path (which resolves the order from the session on such pages). Only hooked
+	 * to woocommerce_is_order_received_page when that option is set.
+	 *
+	 * @param bool $is_order_received_page Whether WooCommerce already considers this the order-received page.
+	 * @return bool
+	 */
+	public function filter_is_order_received_page( $is_order_received_page ): bool {
+		if ( $is_order_received_page ) {
+			return true;
+		}
+
+		if ( is_admin() && ! wp_doing_ajax() ) {
+			return false;
+		}
+
+		$page_id = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE );
+
+		return $page_id > 0 && function_exists( 'is_page' ) && is_page( $page_id );
 	}
 
 	/**

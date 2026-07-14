@@ -287,6 +287,171 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta );
 	}
 
+	/**
+	 * Stubs WC() with a cart plus a session that reports the given pending-purchase
+	 * order id and records its set() calls, so the reliable-tracking fallback and
+	 * the custom order-received page resolution can be exercised.
+	 *
+	 * @param int $pending_order_id The order id the session get() should return.
+	 * @return object The session object (inspect its ->sets array).
+	 */
+	private function stub_wc_pending( int $pending_order_id ): object {
+		$session = new class( $pending_order_id ) {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function __construct( private int $pending ) {}
+
+			public function get( $key ) {
+				if ( ProductData::PENDING_PURCHASE_SESSION_KEY === $key && $this->pending > 0 ) {
+					return $this->pending;
+				}
+				return null;
+			}
+
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		$cart = new class() {
+			public function get_cart() {
+				return array();
+			}
+			public function get_cart_item( $key ) {
+				return null;
+			}
+			public function get_applied_coupons() {
+				return array();
+			}
+			public function get_discount_total() {
+				return 0;
+			}
+			public function get_subtotal() {
+				return 0;
+			}
+			public function get_cart_contents_total() {
+				return 0;
+			}
+		};
+
+		$store           = new \stdClass();
+		$store->session  = $session;
+		$store->cart     = $cart;
+		$store->customer = null;
+
+		Functions\when( 'WC' )->justReturn( $store );
+
+		return $session;
+	}
+
+	/**
+	 * Builds a recent, trackable order with the given overrides.
+	 *
+	 * @param array<string, mixed> $data Order overrides.
+	 * @return \WC_Order
+	 */
+	private function make_recent_order( array $data = array() ): \WC_Order {
+		return new \WC_Order(
+			array_merge(
+				array(
+					'order_number' => '1001',
+					'order_key'    => 'k',
+					'status'       => 'processing',
+					'total'        => 100.0,
+					'currency'     => 'EUR',
+					'items'        => array(),
+				),
+				$data
+			)
+		);
+	}
+
+	public function test_pending_purchase_fallback_emits_on_a_later_page_when_enabled(): void {
+		// A normal page view after checkout (not the order-received page).
+		$order = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The purchase must be emitted on a later page when reliable tracking is on.' );
+		$this->assertStringContainsString( '"transaction_id":"1001"', $this->inline_js );
+		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'The tracked order must be flagged so it is not counted again.' );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The pending marker must be consumed.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ], 'The pending marker must be cleared to null after emitting.' );
+		$this->assertNotEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+	}
+
+	public function test_pending_purchase_fallback_ignored_when_option_disabled(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'The fallback must not fire unless the reliable-tracking option is on.' );
+	}
+
+	public function test_pending_purchase_fallback_skips_an_already_tracked_order(): void {
+		$order = $this->make_recent_order( array( 'meta' => array( '_ga_tracked' => 1 ) ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'An order already flagged tracked must not fire again via the fallback.' );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The stale pending marker must still be consumed.' );
+	}
+
+	public function test_pending_purchase_fallback_hex_encodes_a_hostile_order_number(): void {
+		$order = $this->make_recent_order( array( 'order_number' => 'ORD</script>' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( 'ORD\u003', $this->inline_js, 'The < must be hex-encoded (JSON_HEX_TAG) in the fallback purchase push.' );
+		$this->assertStringNotContainsString( 'ORD</script>', $this->inline_js, 'The raw </script> must never appear in the fallback purchase push.' );
+	}
+
+	public function test_custom_order_received_page_resolves_order_from_session(): void {
+		// The custom-page filter has made is_order_received_page() true, but the
+		// bespoke page URL carries no order id or key, so the order is resolved
+		// from the browser session instead.
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+
+		$order = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'A custom thank-you page must resolve the order from the session and fire the purchase.' );
+		$this->assertStringContainsString( '"transaction_id":"1001"', $this->inline_js );
+		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null );
+	}
+
 	public function test_order_received_outputs_raw_order_data_with_matching_key(): void {
 		Functions\when( 'is_order_received_page' )->justReturn( true );
 

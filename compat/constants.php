@@ -138,6 +138,9 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING', 'integrate-woocommerce-excl
 define( 'GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG', 'integrate-woocommerce-do-not-use-order-tracked-flag' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL', 'integrate-woocommerce-clear-ecommerce-datalayer' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT', 'integrate-woocommerce-datalayer-max-timeout' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES', 'integrate-woocommerce-purchase-track-statuses' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE', 'integrate-woocommerce-purchase-track-on-any-page' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE', 'integrate-woocommerce-custom-order-received-page' );
 
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );

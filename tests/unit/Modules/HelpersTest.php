@@ -78,6 +78,8 @@ final class HelpersTest extends TestCase {
 	}
 
 	public function test_get_product_category_uses_first_assigned_category(): void {
+		// No Yoast primary term, so the first assigned category is used.
+		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'wp_get_post_terms' )->justReturn(
 			array( (object) array( 'name' => 'Shoes', 'term_id' => 3 ) ) // phpcs:ignore
 		);
@@ -86,6 +88,7 @@ final class HelpersTest extends TestCase {
 	}
 
 	public function test_get_product_category_empty_when_no_terms(): void {
+		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 
 		$this->assertSame( '', Helpers::get_product_category( 7 ) );

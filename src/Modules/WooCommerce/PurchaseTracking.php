@@ -85,8 +85,9 @@ final class PurchaseTracking {
 			unset( $order );
 		}
 
-		if ( isset( $order ) && ( 'failed' === $order->get_status() ) ) {
-			// Do not track order where payment failed.
+		if ( isset( $order ) && ! $this->product_data->is_order_status_trackable( $order ) ) {
+			// Only track orders whose status is configured as a purchase (default:
+			// processing, on-hold, completed); skips failed and still-pending orders.
 			unset( $order );
 		}
 
@@ -110,5 +111,42 @@ final class PurchaseTracking {
 
 			$this->product_data->flag_order_tracked( $order );
 		}
+	}
+
+	/**
+	 * Remembers a placed order in the WooCommerce session so the reliable-purchase
+	 * fallback can emit its purchase event on the next page the customer views.
+	 * Hooked (only when the "purchase on any page" or custom order-received page
+	 * option is on) to woocommerce_payment_complete, woocommerce_order_status_changed
+	 * and woocommerce_thankyou - the union of these fires for every payment method:
+	 * instant gateways and the order-pay flow (payment_complete), Cash on Delivery
+	 * and bank transfer (status change to processing/on-hold) and any thank-you
+	 * page render. Only trackable-status orders are remembered, so a still-pending
+	 * order awaiting payment is never seeded.
+	 *
+	 * @param int $order_id The id of the order that reached a placed/paid state.
+	 * @return void
+	 */
+	public function remember_order( $order_id ): void {
+		$order_id = absint( $order_id );
+		if ( $order_id <= 0 ) {
+			return;
+		}
+
+		$woo = function_exists( 'WC' ) ? WC() : null;
+		if ( ! $woo || empty( $woo->session ) ) {
+			return;
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! ( $order instanceof \WC_Order ) ) {
+			return;
+		}
+
+		if ( ! $this->product_data->is_order_status_trackable( $order ) ) {
+			return;
+		}
+
+		$woo->session->set( ProductData::PENDING_PURCHASE_SESSION_KEY, $order_id );
 	}
 }

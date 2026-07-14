@@ -75,7 +75,51 @@ final class AdminSchema implements AdminSchemaInterface {
 		);
 		if ( function_exists( 'get_object_taxonomies' ) ) {
 			foreach ( get_object_taxonomies( 'product', 'objects' ) as $taxonomy_slug => $taxonomy_object ) {
+				// Only offer taxonomies a store owner would use as a brand: those
+				// with a public archive and an admin UI, matching the 1.x filter
+				// ( public + show_ui + non-builtin ). This drops WooCommerce's
+				// internal product_type / product_visibility taxonomies and
+				// cross-cutting ones other plugins attach to the product post
+				// type (e.g. WPML's non-public "translation_priority").
+				if ( ! $taxonomy_object->public || ! $taxonomy_object->show_ui || $taxonomy_object->_builtin ) {
+					continue;
+				}
+
 				$taxonomy_choices[ $taxonomy_slug ] = $taxonomy_object->label;
+			}
+		}
+
+		// Order-status choices for the "statuses that trigger the purchase event"
+		// field. wc_get_order_statuses() keys are prefixed with "wc-" while
+		// WC_Order::get_status() returns the bare slug, so strip the prefix to
+		// keep the stored values comparable. Fall back to the core statuses when
+		// WooCommerce is not loaded (so the field is always usable in the admin).
+		$order_status_choices = array();
+		if ( function_exists( 'wc_get_order_statuses' ) ) {
+			foreach ( wc_get_order_statuses() as $status_key => $status_label ) {
+				$status_slug                          = ( 'wc-' === substr( (string) $status_key, 0, 3 ) ) ? substr( (string) $status_key, 3 ) : (string) $status_key;
+				$order_status_choices[ $status_slug ] = $status_label;
+			}
+		}
+		if ( array() === $order_status_choices ) {
+			$order_status_choices = array(
+				'pending'    => __( 'Pending payment', 'duracelltomi-google-tag-manager' ),
+				'processing' => __( 'Processing', 'duracelltomi-google-tag-manager' ),
+				'on-hold'    => __( 'On hold', 'duracelltomi-google-tag-manager' ),
+				'completed'  => __( 'Completed', 'duracelltomi-google-tag-manager' ),
+				'cancelled'  => __( 'Cancelled', 'duracelltomi-google-tag-manager' ),
+				'refunded'   => __( 'Refunded', 'duracelltomi-google-tag-manager' ),
+				'failed'     => __( 'Failed', 'duracelltomi-google-tag-manager' ),
+			);
+		}
+
+		// Page choices for the custom order-received page selector.
+		$order_received_page_choices = array(
+			'' => __( '(use the standard WooCommerce order received page)', 'duracelltomi-google-tag-manager' ),
+		);
+		if ( function_exists( 'get_pages' ) ) {
+			foreach ( (array) get_pages() as $page ) {
+				$order_received_page_choices[ (string) $page->ID ] = $page->post_title;
 			}
 		}
 
@@ -229,6 +273,35 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Do not flag orders as being tracked', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Turn this on to prevent the plugin from flagging orders as being already tracked. Leaving this unchecked ensures that no order data will be tracked multiple times in any ad or measurement system. Please only turn this feature on if you really need it!', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES,
+				type: Field::TYPE_MULTISELECT,
+				default_value: array( 'processing', 'on-hold', 'completed' ),
+				label: __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The purchase event is sent when an order first reaches one of these statuses, i.e. at order placement - not when payment physically clears. This is why Cash on Delivery (Processing) and bank transfer (On hold) orders are tracked at checkout even though the money arrives later. Leave Failed, Cancelled and Pending payment unchecked so unpaid orders are not counted as sales.', 'duracelltomi-google-tag-manager' ),
+				group: 'purchase',
+				phase: Field::PHASE_BETA,
+				choices: $order_status_choices
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Turn this on if some purchases are missing. When the customer lands on a heavily customized thank-you page, or on the order-pay page instead of the order received page, the purchase event is emitted on the next page they view in the same browser session instead. The order tracked flag and browser cookie still prevent double counting. Note: this cannot capture orders where the buyer pays via an asynchronous gateway and never returns to the site - that case needs server side tracking.', 'duracelltomi-google-tag-manager' ),
+				group: 'purchase',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE,
+				type: Field::TYPE_SELECT,
+				default_value: '',
+				label: __( 'Custom order received (thank-you) page', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'If your theme or another plugin shows the order confirmation on a custom page instead of the standard WooCommerce order received endpoint, select it here so the purchase event fires on it. The order is resolved from the current browser session.', 'duracelltomi-google-tag-manager' ),
+				group: 'purchase',
+				phase: Field::PHASE_BETA,
+				choices: $order_received_page_choices
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL,

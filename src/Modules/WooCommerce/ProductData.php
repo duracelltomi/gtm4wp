@@ -24,6 +24,14 @@ defined( 'ABSPATH' ) || exit;
 final class ProductData {
 
 	/**
+	 * WooCommerce session key that holds the id of an order placed in this
+	 * browser session and still waiting to have its purchase event emitted.
+	 * Written by PurchaseTracking::remember_order() and consumed by
+	 * PageDataLayer's session fallback / custom order-received page resolution.
+	 */
+	public const PENDING_PURCHASE_SESSION_KEY = 'gtm4wp_pending_purchase';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -400,6 +408,40 @@ final class ProductData {
 		$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
 
 		return $minutes > $max_age;
+	}
+
+	/**
+	 * Whether the order's current status makes it eligible for the GA4 purchase
+	 * event. The purchase fires at order *placement* - whenever the order reaches
+	 * one of the configured statuses - not when payment physically clears. So a
+	 * Cash on Delivery order (processing) or a bank-transfer order (on-hold) is
+	 * tracked at checkout even though the money arrives later, while a failed or
+	 * still-pending order is not.
+	 *
+	 * The status list is the WCPURCHASESTATUSES option (default: processing,
+	 * on-hold, completed) and is filterable. An empty list falls back to tracking
+	 * any order that did not outright fail, so a misconfiguration can never
+	 * silently disable all purchase tracking.
+	 *
+	 * @param \WC_Order $order The order to check.
+	 * @return bool
+	 */
+	public function is_order_status_trackable( \WC_Order $order ): bool {
+		$statuses = (array) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES );
+
+		/**
+		 * Filters the order statuses whose orders are eligible for the purchase event.
+		 *
+		 * @param string[]  $statuses Order status slugs without the wc- prefix.
+		 * @param \WC_Order $order    The order being evaluated.
+		 */
+		$statuses = (array) apply_filters( 'gtm4wp_purchase_trackable_statuses', $statuses, $order );
+
+		if ( array() === $statuses ) {
+			return 'failed' !== $order->get_status();
+		}
+
+		return in_array( $order->get_status(), $statuses, true );
 	}
 
 	/**

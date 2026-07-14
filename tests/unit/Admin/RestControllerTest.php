@@ -42,6 +42,8 @@ final class RestControllerTest extends TestCase {
 			}
 		);
 		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
+		Functions\when( 'wc_get_order_statuses' )->justReturn( array() );
+		Functions\when( 'get_pages' )->justReturn( array() );
 		Functions\when( 'wp_roles' )->justReturn(
 			new class() {
 				public function get_names(): array {

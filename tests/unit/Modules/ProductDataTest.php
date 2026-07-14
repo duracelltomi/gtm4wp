@@ -71,6 +71,49 @@ final class ProductDataTest extends TestCase {
 		$this->assertFalse( $product_data->process_product( 'not a product', array(), 'productdetail' ) );
 	}
 
+	public function test_order_status_trackable_uses_the_default_placement_statuses(): void {
+		$product_data = $this->make_product_data();
+
+		// Placement statuses fire the purchase - Cash on Delivery (processing) and
+		// bank transfer (on-hold) count at checkout even though payment is not yet in.
+		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'processing' ) ) ) );
+		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'on-hold' ) ) ) );
+		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'completed' ) ) ) );
+
+		// Non-placed / failed orders are not sales and must not fire the purchase.
+		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'pending' ) ) ) );
+		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'failed' ) ) ) );
+		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'cancelled' ) ) ) );
+	}
+
+	public function test_order_status_trackable_honors_a_custom_status_list(): void {
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES => array( 'completed' ) )
+		);
+
+		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'completed' ) ) ) );
+		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'processing' ) ) ), 'A status not in the configured list must not be trackable.' );
+	}
+
+	public function test_order_status_trackable_empty_list_falls_back_to_anything_but_failed(): void {
+		// A misconfigured empty list must never silently disable all purchase
+		// tracking; it falls back to the pre-2.0 "anything but failed" rule.
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES => array() )
+		);
+
+		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'pending' ) ) ) );
+		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'failed' ) ) ) );
+	}
+
+	public function test_order_status_trackable_is_filterable(): void {
+		Filters\expectApplied( 'gtm4wp_purchase_trackable_statuses' )->andReturn( array( 'refunded' ) );
+
+		$product_data = $this->make_product_data();
+
+		$this->assertTrue( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'refunded' ) ) ), 'The filter must be able to add trackable statuses.' );
+	}
+
 	public function test_simple_product_mapping(): void {
 		Functions\when( 'wp_get_post_terms' )->justReturn(
 			array( (object) array( 'name' => 'Shoes', 'term_id' => 5 ) ) // phpcs:ignore

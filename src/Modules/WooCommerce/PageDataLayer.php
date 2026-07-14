@@ -69,6 +69,12 @@ final class PageDataLayer {
 
 		$this->maybe_add_readded_to_cart( $woo );
 
+		// Reliable purchase tracking: if the order-received page was missed (custom
+		// thank-you page, order-pay landing, a gateway that never reached it), emit
+		// the purchase for the order remembered in this session on whatever page the
+		// customer views next. No-op unless the feature is enabled.
+		$data_layer = $this->maybe_add_pending_purchase( $data_layer );
+
 		$this->datalayer->flush_pushes();
 
 		return apply_filters( GTM4WP_WPFILTER_EEC_DATALAYER_PAGELOAD, $data_layer );
@@ -478,15 +484,34 @@ final class PageDataLayer {
 		$order_key = isset( $_GET['key'] ) ? wc_clean( sanitize_text_field( wp_unslash( $_GET['key'] ) ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$order_key = apply_filters( 'woocommerce_thankyou_order_key', $order_key );
 
+		$order = null;
+
 		if ( $order_id > 0 ) {
 			$order = wc_get_order( $order_id );
 
 			if ( $order instanceof \WC_Order ) {
 				if ( $order->get_order_key() !== $order_key ) {
-					unset( $order );
+					$order = null;
 				}
 			} else {
-				unset( $order );
+				$order = null;
+			}
+		}
+
+		// Custom order-received page: a bespoke thank-you page (selected in the
+		// "Custom order received page" option) carries no order id or key in its
+		// URL, so resolve the order from this browser's session instead. The
+		// session belongs to the buyer, so no order-key check is possible or needed.
+		if ( ! ( $order instanceof \WC_Order ) ) {
+			$session_order_id = $this->pending_session_order_id();
+
+			if ( $session_order_id > 0 ) {
+				$session_order = wc_get_order( $session_order_id );
+
+				if ( $session_order instanceof \WC_Order ) {
+					$order    = $session_order;
+					$order_id = $session_order_id;
+				}
 			}
 		}
 
@@ -498,34 +523,119 @@ final class PageDataLayer {
 		 */
 		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
 
-		if ( isset( $order ) && $this->product_data->is_order_older_than_max_age( $order ) ) {
-			unset( $order );
+		if ( ! ( $order instanceof \WC_Order ) ) {
+			return $data_layer;
+		}
+
+		return $this->add_purchase_for_order( $data_layer, $order, (int) $order_id );
+	}
+
+	/**
+	 * Reliable purchase tracking fallback. When the "purchase on any page" option
+	 * is on and the order-received page did not already fire the purchase this
+	 * request, emit the purchase for the order remembered in this browser's
+	 * session (seeded by PurchaseTracking::remember_order() at payment/status
+	 * time). This fires on whatever page the customer views next - so a customized
+	 * thank-you page, or landing on the order-pay page, no longer loses the sale.
+	 * The order-tracked flag, age gate and browser cookie prevent double counting.
+	 *
+	 * @param array<string, mixed> $data_layer The data layer collected so far.
+	 * @return array<string, mixed>
+	 */
+	private function maybe_add_pending_purchase( array $data_layer ): array {
+		if ( true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+			return $data_layer;
+		}
+
+		if ( ! empty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ) ) {
+			return $data_layer;
+		}
+
+		$order_id = $this->pending_session_order_id();
+		if ( $order_id <= 0 ) {
+			return $data_layer;
+		}
+
+		$order = wc_get_order( $order_id );
+
+		// Consume the pending marker regardless of the outcome so the fallback does
+		// not re-evaluate the same order on every subsequent page view.
+		$this->clear_pending_session_order();
+		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
+
+		if ( ! ( $order instanceof \WC_Order ) ) {
+			return $data_layer;
+		}
+
+		return $this->add_purchase_for_order( $data_layer, $order, $order_id );
+	}
+
+	/**
+	 * Runs the purchase eligibility gauntlet on a resolved order and, when it
+	 * passes, adds the raw order data, queues the GA4 purchase event wrapped in the
+	 * browser-side duplicate guard and flags the order as tracked. Shared by the
+	 * standard order-received page and the session fallback so both apply the same
+	 * age / already-tracked / trackable-status rules and produce identical output.
+	 *
+	 * @param array<string, mixed> $data_layer The data layer collected so far.
+	 * @param \WC_Order            $order      The resolved order.
+	 * @param int                  $order_id   The order id (for the cookie dedupe check).
+	 * @return array<string, mixed>
+	 */
+	private function add_purchase_for_order( array $data_layer, \WC_Order $order, int $order_id ): array {
+		if ( $this->product_data->is_order_older_than_max_age( $order ) ) {
+			return $data_layer;
 		}
 
 		$order_items = null;
 
 		// Raw order data will be output regardless of whether the purchase has been already tracked previously, since this data is not meant to track using GA.
-		if ( isset( $order ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERDATA ) ) {
+		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERDATA ) ) {
 			$order_items             = $this->product_data->process_order_items( $order );
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 		}
 
-		if ( isset( $order ) && $this->product_data->is_purchase_already_tracked( $order, (int) $order_id ) ) {
-			unset( $order );
+		if ( $this->product_data->is_purchase_already_tracked( $order, $order_id ) ) {
+			return $data_layer;
 		}
 
-		if ( isset( $order ) && ( 'failed' === $order->get_status() ) ) {
-			// Do not track order where payment failed.
-			unset( $order );
-		}
-
-		if ( ! isset( $order ) ) {
+		if ( ! $this->product_data->is_order_status_trackable( $order ) ) {
+			// Only track orders whose status is configured as a purchase (default:
+			// processing, on-hold, completed); skips failed and still-pending orders.
 			return $data_layer;
 		}
 
 		$data_layer['new_customer'] = $this->product_data->is_new_customer( $order );
 
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
+
+		list( $before_purchase_dl_push, $after_purchase_dl_push ) = $this->purchase_dedupe_guard( $order );
+
+		$this->datalayer->queue_push(
+			$purchase_data_layer['event'],
+			$purchase_data_layer,
+			$before_purchase_dl_push,
+			$after_purchase_dl_push
+		);
+
+		$this->product_data->flag_order_tracked( $order );
+		$this->clear_pending_session_order();
+
+		return $data_layer;
+	}
+
+	/**
+	 * Builds the browser-side duplicate-tracking guard wrapped around the purchase
+	 * push: a "before" fragment that only pushes when this order id is not already
+	 * recorded in the cookie / local storage, and an "after" fragment that records
+	 * it. Extracted so the order-received page and the session fallback share the
+	 * exact same guard.
+	 *
+	 * @param \WC_Order $order The order being tracked.
+	 * @return array{0:string,1:string} The before and after JavaScript fragments.
+	 */
+	private function purchase_dedupe_guard( \WC_Order $order ): array {
+		$order_number = esc_js( $order->get_order_number() );
 
 		$before_purchase_dl_push = '
 			// Check whether this order has been already tracked in this browser.
@@ -545,7 +655,7 @@ final class PageDataLayer {
 
 			// Check whether this order has been already tracked before in this browser.
 			let gtm4wp_order_already_tracked = false;
-			if ( gtm4wp_orderid_tracked && ( "' . esc_js( $order->get_order_number() ) . '" == gtm4wp_orderid_tracked ) ) {
+			if ( gtm4wp_orderid_tracked && ( "' . $order_number . '" == gtm4wp_orderid_tracked ) ) {
 				gtm4wp_order_already_tracked = true;
 			}
 
@@ -560,20 +670,48 @@ final class PageDataLayer {
 				var gtm4wp_orderid_cookie_expire = new Date();
 				gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
 				var gtm4wp_orderid_cookie_expires_part = "expires=" + gtm4wp_orderid_cookie_expire.toUTCString();
-				document.cookie = "gtm4wp_orderid_tracked=" + "' . esc_js( $order->get_order_number() ) . '" + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
+				document.cookie = "gtm4wp_orderid_tracked=" + "' . $order_number . '" + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
 			} else {
-				window.localStorage.setItem( "gtm4wp_orderid_tracked", "' . esc_js( $order->get_order_number() ) . '" );
+				window.localStorage.setItem( "gtm4wp_orderid_tracked", "' . $order_number . '" );
 			}';
 
-		$this->datalayer->queue_push(
-			$purchase_data_layer['event'],
-			$purchase_data_layer,
-			$before_purchase_dl_push,
-			$after_purchase_dl_push
-		);
+		return array( $before_purchase_dl_push, $after_purchase_dl_push );
+	}
 
-		$this->product_data->flag_order_tracked( $order );
+	/**
+	 * Returns the id of the order remembered in this browser's WooCommerce session
+	 * waiting for its purchase event, or 0 when there is none. Prefers the marker
+	 * seeded by PurchaseTracking::remember_order() and falls back to WooCommerce's
+	 * own "order awaiting payment" value (useful for a custom thank-you page where
+	 * the seed hooks did not run). The eligibility gauntlet still gates whether the
+	 * resolved order is actually tracked.
+	 *
+	 * @return int
+	 */
+	private function pending_session_order_id(): int {
+		$woo = function_exists( 'WC' ) ? WC() : null;
+		if ( ! $woo || empty( $woo->session ) ) {
+			return 0;
+		}
 
-		return $data_layer;
+		$order_id = absint( $woo->session->get( ProductData::PENDING_PURCHASE_SESSION_KEY ) );
+		if ( $order_id <= 0 ) {
+			$order_id = absint( $woo->session->get( 'order_awaiting_payment' ) );
+		}
+
+		return $order_id;
+	}
+
+	/**
+	 * Clears the pending-purchase marker from the WooCommerce session (only the
+	 * plugin's own key, never WooCommerce's order_awaiting_payment).
+	 *
+	 * @return void
+	 */
+	private function clear_pending_session_order(): void {
+		$woo = function_exists( 'WC' ) ? WC() : null;
+		if ( $woo && ! empty( $woo->session ) ) {
+			$woo->session->set( ProductData::PENDING_PURCHASE_SESSION_KEY, null );
+		}
 	}
 }
