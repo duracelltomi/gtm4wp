@@ -164,4 +164,130 @@ final class ListTrackingTest extends TestCase {
 		// (the class-attribute opening quote), producing `Deal " special`.
 		$this->assertStringContainsString( 'Deal $1 special', $result );
 	}
+
+	/**
+	 * The Product Collection block renders each product as a
+	 * <li class="wc-block-product post-{ID} ..."> without firing the classic
+	 * list hooks, so add_productdata_to_product_collection_block() must inject one
+	 * hidden data span per product item.
+	 */
+	public function test_product_collection_injects_span_for_each_product(): void {
+		$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		Functions\when( 'wc_get_product' )->alias(
+			fn ( $id ) => $this->make_product( array( 'id' => (int) $id ) )
+		);
+
+		$block   = array(
+			'blockName' => 'woocommerce/product-collection',
+			'attrs'     => array(),
+		);
+		$content = '<ul class="wc-block-product-template">'
+			. '<li class="wc-block-product post-123 type-product"><a href="/p1/">A</a></li>'
+			. '<li class="wc-block-product post-456 type-product"><a href="/p2/">B</a></li>'
+			. '</ul>';
+
+		$result = $list_tracking->add_productdata_to_product_collection_block( $content, $block );
+
+		$this->assertSame( 2, substr_count( $result, 'class="gtm4wp_productdata"' ), 'One data span per product item.' );
+		// Default collection reports the generic list name.
+		$this->assertStringContainsString( 'Product Collection', $result );
+		// Original markup is preserved (the span is appended after the <li> tag).
+		$this->assertStringContainsString( 'post-123', $result );
+		$this->assertStringContainsString( 'post-456', $result );
+	}
+
+	/**
+	 * The filter runs on every render_block, so it must be a no-op for any block
+	 * other than woocommerce/product-collection.
+	 */
+	public function test_product_collection_ignores_other_blocks(): void {
+		$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		$content = '<li class="wc-block-product post-123">X</li>';
+		$result  = $list_tracking->add_productdata_to_product_collection_block(
+			$content,
+			array(
+				'blockName' => 'core/paragraph',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertSame( $content, $result );
+		$this->assertStringNotContainsString( 'gtm4wp_productdata', $result );
+	}
+
+	/**
+	 * A non-product <li> inside the collection (pagination, layout wrappers) has
+	 * neither the wc-block-product class nor a post-{ID}, so it must be left alone.
+	 */
+	public function test_product_collection_skips_non_product_list_items(): void {
+		$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		Functions\when( 'wc_get_product' )->alias(
+			fn ( $id ) => $this->make_product( array( 'id' => (int) $id ) )
+		);
+
+		$content = '<ul class="wc-block-product-template">'
+			. '<li class="wc-block-pagination-numbers">1</li>'
+			. '<li class="wc-block-product post-123">P</li>'
+			. '</ul>';
+
+		$result = $list_tracking->add_productdata_to_product_collection_block(
+			$content,
+			array(
+				'blockName' => 'woocommerce/product-collection',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertSame( 1, substr_count( $result, 'class="gtm4wp_productdata"' ) );
+	}
+
+	/**
+	 * The block's "collection" preset attribute maps to a friendlier GA4
+	 * item_list_name (mirroring the shortcode/widget list names).
+	 */
+	public function test_product_collection_maps_preset_to_list_name(): void {
+		$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		Functions\when( 'wc_get_product' )->alias(
+			fn ( $id ) => $this->make_product( array( 'id' => (int) $id ) )
+		);
+
+		$result = $list_tracking->add_productdata_to_product_collection_block(
+			'<li class="wc-block-product post-123">P</li>',
+			array(
+				'blockName' => 'woocommerce/product-collection',
+				'attrs'     => array( 'collection' => 'woocommerce/product-collection/on-sale' ),
+			)
+		);
+
+		$this->assertStringContainsString( 'Sale Products', $result );
+	}
+
+	/**
+	 * PA-7 / TC-6: the injection uses preg_replace_callback (not a data-bearing
+	 * replacement string), so a product field carrying a literal `$1` survives
+	 * verbatim rather than being interpreted as a backreference.
+	 */
+	public function test_product_collection_preserves_dollar_sequences_in_product_name(): void {
+		$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		Functions\when( 'wc_get_product' )->alias(
+			fn ( $id ) => $this->make_product(
+				array(
+					'id'    => (int) $id,
+					'title' => 'Deal $1 special',
+				)
+			)
+		);
+
+		$result = $list_tracking->add_productdata_to_product_collection_block(
+			'<li class="wc-block-product post-123">ITEM</li>',
+			array(
+				'blockName' => 'woocommerce/product-collection',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertStringContainsString( 'Deal $1 special', $result );
+		$this->assertStringContainsString( 'ITEM', $result );
+	}
 }

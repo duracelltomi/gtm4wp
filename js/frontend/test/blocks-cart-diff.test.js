@@ -7,6 +7,7 @@ import {
 	gtm4wp_parse_block_item,
 	gtm4wp_normalize_cart_items,
 	gtm4wp_diff_cart_items,
+	gtm4wp_normalize_crosssell_items,
 	gtm4wp_selected_shipping_tier,
 } from '../lib/gtm4wp-blocks-cart-diff';
 
@@ -103,6 +104,47 @@ describe( 'gtm4wp_diff_cart_items', () => {
 		const { added, removed } = gtm4wp_diff_cart_items( [ a, b ], [ a, b ] );
 		expect( added ).toEqual( [] );
 		expect( removed ).toEqual( [] );
+	} );
+} );
+
+describe( 'gtm4wp_normalize_crosssell_items', () => {
+	it( 'extracts the GA4 item (object or JSON string) and keeps id/permalink', () => {
+		const normalized = gtm4wp_normalize_crosssell_items( [
+			{
+				id: 7,
+				permalink: 'https://shop/p7',
+				extensions: { gtm4wp: { item: { item_id: 7 } } },
+			},
+			{
+				id: 8,
+				permalink: 'https://shop/p8',
+				extensions: {
+					gtm4wp: { item: JSON.stringify( { item_id: 8 } ) },
+				},
+			},
+		] );
+
+		expect( normalized ).toEqual( [
+			{ id: 7, permalink: 'https://shop/p7', item: { item_id: 7 } },
+			{ id: 8, permalink: 'https://shop/p8', item: { item_id: 8 } },
+		] );
+	} );
+
+	it( 'drops products without GA4 item data and handles non-arrays', () => {
+		expect(
+			gtm4wp_normalize_crosssell_items( [
+				{ id: 1, permalink: 'https://shop/p1' },
+				{
+					id: 2,
+					permalink: 'https://shop/p2',
+					extensions: { gtm4wp: { item: { item_id: 2 } } },
+				},
+			] )
+		).toEqual( [
+			{ id: 2, permalink: 'https://shop/p2', item: { item_id: 2 } },
+		] );
+
+		expect( gtm4wp_normalize_crosssell_items( null ) ).toEqual( [] );
 	} );
 } );
 

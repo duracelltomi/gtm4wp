@@ -547,4 +547,112 @@ final class ListTracking {
 
 		return preg_replace( '/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', $replacement, $content );
 	}
+
+	/**
+	 * Executed during render_block.
+	 * Injects the hidden product-data span into every product rendered by the
+	 * WooCommerce Product Collection block (woocommerce/product-collection). Unlike
+	 * the classic product loop, that block fires neither woocommerce_after_shop_loop_item
+	 * nor woocommerce_blocks_product_grid_item_html, so without this the frontend
+	 * tracker would have no data to report view_item_list / select_item for it.
+	 *
+	 * Each product is rendered as a <li class="wc-block-product post-{ID} ...">, so
+	 * the product id is read from the post-{ID} class and the span appended right
+	 * after the opening tag. preg_replace_callback (not a data-bearing replacement
+	 * string) keeps this free of the $n/\1 backreference hazard.
+	 *
+	 * @param string $block_content The rendered block HTML.
+	 * @param array  $block         The parsed block (blockName + attrs).
+	 * @return string The block HTML, each product item carrying a hidden product-data span.
+	 */
+	public function add_productdata_to_product_collection_block( $block_content, $block ) {
+		if ( ! is_array( $block ) || ! isset( $block['blockName'] ) || 'woocommerce/product-collection' !== $block['blockName'] ) {
+			return $block_content;
+		}
+
+		if ( false === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {
+			return $block_content;
+		}
+
+		if ( ! is_string( $block_content ) || false === strpos( $block_content, 'wc-block-product' ) ) {
+			return $block_content;
+		}
+
+		$collection = isset( $block['attrs']['collection'] ) ? (string) $block['attrs']['collection'] : '';
+		$list_name  = $this->product_collection_list_name( $collection );
+
+		$index = 0;
+
+		return (string) preg_replace_callback(
+			'/<li\b[^>]*>/i',
+			function ( $matches ) use ( $list_name, &$index ) {
+				$li_tag = $matches[0];
+
+				// Only product items carry the wc-block-product class and a post-{ID}.
+				if ( false === strpos( $li_tag, 'wc-block-product' ) || ! preg_match( '/\bpost-(\d+)\b/', $li_tag, $id_match ) ) {
+					return $li_tag;
+				}
+
+				$product = wc_get_product( (int) $id_match[1] );
+				if ( ! ( $product instanceof \WC_Product ) ) {
+					return $li_tag;
+				}
+
+				++$index;
+
+				$extra_tag = $this->get_product_list_item_extra_tag(
+					$product,
+					$list_name,
+					$index,
+					$product->get_permalink()
+				);
+
+				if ( ! is_string( $extra_tag ) || '' === $extra_tag ) {
+					return $li_tag;
+				}
+
+				return $li_tag . $extra_tag;
+			},
+			$block_content
+		);
+	}
+
+	/**
+	 * Maps a Product Collection preset (the block's "collection" attribute) to a
+	 * human-readable GA4 item_list_name, mirroring the shortcode / widget list
+	 * names. Falls back to a generic name for the default catalog and custom queries.
+	 *
+	 * @param string $collection The block's collection attribute (e.g. woocommerce/product-collection/on-sale).
+	 * @return string The translated list name.
+	 */
+	private function product_collection_list_name( string $collection ): string {
+		switch ( $collection ) {
+			case 'woocommerce/product-collection/on-sale':
+				return __( 'Sale Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/best-sellers':
+				return __( 'Best Selling Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/top-rated':
+				return __( 'Top Rated Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/new-arrivals':
+				return __( 'New Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/featured':
+				return __( 'Featured Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/related':
+				return __( 'Related Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/upsells':
+				return __( 'Upsell Products', 'duracelltomi-google-tag-manager' );
+
+			case 'woocommerce/product-collection/cross-sells':
+				return __( 'Cross-Sell Products', 'duracelltomi-google-tag-manager' );
+
+			default:
+				return __( 'Product Collection', 'duracelltomi-google-tag-manager' );
+		}
+	}
 }

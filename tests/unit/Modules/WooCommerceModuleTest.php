@@ -133,4 +133,82 @@ final class WooCommerceModuleTest extends TestCase {
 
 		$this->assertFalse( ( new WooCommerceModule() )->is_block_cart_or_checkout() );
 	}
+
+	/**
+	 * Drives enqueue_scripts() with the script machinery stubbed, capturing which
+	 * bundles were enqueued and the inline "window.gtm4wp_blocks_context" it sets.
+	 *
+	 * @param WooCommerceModule $module The module under test.
+	 * @return array{scripts: array<int, string>, inline: array<string, string>}
+	 */
+	private function run_enqueue( WooCommerceModule $module ): array {
+		$enqueued = array();
+		$inline   = array();
+
+		Functions\when( 'apply_filters' )->returnArg( 2 );
+		Functions\when( 'plugins_url' )->justReturn( 'https://example.com/build/x.js' );
+		Functions\when( 'wp_json_encode' )->alias(
+			static fn ( $data, $options = 0 ) => json_encode( $data, $options ) // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		);
+		Functions\when( 'wp_enqueue_script' )->alias(
+			static function ( $handle ) use ( &$enqueued ) {
+				$enqueued[] = $handle;
+			}
+		);
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code = '', $position = 'after' ) use ( &$inline ) {
+				$inline[ $handle ] = $code;
+			}
+		);
+
+		$module->enqueue_scripts();
+
+		return array(
+			'scripts' => $enqueued,
+			'inline'  => $inline,
+		);
+	}
+
+	public function test_block_cart_page_loads_block_tracker_in_cartcheckout_context(): void {
+		CartCheckoutUtils::$cart_block = true;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+
+		$result = $this->run_enqueue( $this->make_module() );
+
+		$this->assertContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
+		$this->assertNotContains( 'gtm4wp-woocommerce', $result['scripts'], 'The classic tracker is skipped on a block Cart page (no double counting).' );
+		$this->assertStringContainsString( 'cartcheckout', $result['inline']['gtm4wp-woocommerce-blocks'] );
+		$this->assertStringNotContainsString( 'minicart', $result['inline']['gtm4wp-woocommerce-blocks'] );
+	}
+
+	public function test_block_store_ordinary_page_loads_classic_and_minicart_tracker(): void {
+		// A block store (cart is block-based) on a page that is neither cart nor
+		// checkout: the classic tracker runs and the block tracker rides along in
+		// minicart mode to catch Mini-Cart removals.
+		CartCheckoutUtils::$cart_block = true;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$result = $this->run_enqueue( $this->make_module() );
+
+		$this->assertContains( 'gtm4wp-woocommerce', $result['scripts'] );
+		$this->assertContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
+		$this->assertStringContainsString( 'minicart', $result['inline']['gtm4wp-woocommerce-blocks'] );
+	}
+
+	public function test_classic_store_ordinary_page_loads_classic_tracker_only(): void {
+		// Neither cart nor checkout is block-based: the block tracker never loads.
+		CartCheckoutUtils::$cart_block     = false;
+		CartCheckoutUtils::$checkout_block = false;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$result = $this->run_enqueue( $this->make_module() );
+
+		$this->assertContains( 'gtm4wp-woocommerce', $result['scripts'] );
+		$this->assertNotContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
+		$this->assertArrayNotHasKey( 'gtm4wp-woocommerce-blocks', $result['inline'] );
+	}
 }

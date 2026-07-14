@@ -71,8 +71,10 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		mockActivePaymentMethod = '';
 		mockHasPaymentStore = false;
 		window.gtm4wp_woocommerce_blocks_inited = false;
+		window.gtm4wp_blocks_context = undefined;
 		window.gtm4wp_push_ecommerce = jest.fn();
 		global.gtm4wp_currency = 'EUR';
+		document.body.innerHTML = '';
 	} );
 
 	it( 'baselines the first snapshot without reporting existing items', () => {
@@ -198,5 +200,117 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		);
 		expect( repeated ).not.toContain( 'add_shipping_info' );
 		expect( repeated ).not.toContain( 'add_payment_info' );
+	} );
+
+	it( 'in minicart context fires remove_from_cart but never add_to_cart', () => {
+		window.gtm4wp_blocks_context = 'minicart';
+		mockCartData = {
+			items: [ cartLine( 'A', 3, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+		};
+		const subscriber = loadTracker();
+		subscriber(); // baseline: qty 3
+
+		// Remove two units in the Mini-Cart drawer.
+		mockCartData = {
+			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+		};
+		subscriber();
+
+		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
+			( call ) => call[ 0 ]
+		);
+		expect( events ).toContain( 'remove_from_cart' );
+		expect( events ).not.toContain( 'add_to_cart' );
+	} );
+
+	it( 'in minicart context does not fire add_to_cart when a line is added (classic tracker owns adds)', () => {
+		window.gtm4wp_blocks_context = 'minicart';
+		const subscriber = loadTracker();
+		subscriber(); // baseline: empty cart
+
+		mockCartData = {
+			items: [ cartLine( 'A', 2, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+		};
+		subscriber();
+
+		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
+			( call ) => call[ 0 ]
+		);
+		expect( events ).not.toContain( 'add_to_cart' );
+	} );
+
+	it( 'fires view_item_list once for cart cross-sells', () => {
+		mockCartData = {
+			items: [],
+			totals: { currency_code: 'EUR' },
+			crossSells: [
+				{
+					id: 9,
+					permalink: 'https://shop/p9',
+					extensions: { gtm4wp: { item: { item_id: 9, price: 4 } } },
+				},
+			],
+		};
+		const subscriber = loadTracker();
+		subscriber();
+
+		const call = window.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'view_item_list'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ] ).toEqual( [
+			expect.objectContaining( {
+				item_id: 9,
+				item_list_name: 'Cross-Sells',
+				item_list_id: 'cross-sells',
+			} ),
+		] );
+
+		// The list impression is not reported again on a later store change.
+		window.gtm4wp_push_ecommerce.mockClear();
+		subscriber();
+		const repeated = window.gtm4wp_push_ecommerce.mock.calls.map(
+			( c ) => c[ 0 ]
+		);
+		expect( repeated ).not.toContain( 'view_item_list' );
+	} );
+
+	it( 'fires select_item when a cross-sell product link is clicked', () => {
+		mockCartData = {
+			items: [],
+			totals: { currency_code: 'EUR' },
+			crossSells: [
+				{
+					id: 9,
+					permalink: 'https://shop/p9',
+					extensions: { gtm4wp: { item: { item_id: 9, price: 4 } } },
+				},
+			],
+		};
+		const subscriber = loadTracker();
+		subscriber(); // resolves crossSells into the click-listener closure
+
+		document.body.innerHTML =
+			'<div class="wp-block-woocommerce-cart-cross-sells-block">' +
+			'<a href="https://shop/p9">Buy</a></div>';
+		document
+			.querySelector( 'a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = window.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'select_item'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ] ).toEqual( [
+			expect.objectContaining( {
+				item_id: 9,
+				item_list_name: 'Cross-Sells',
+			} ),
+		] );
 	} );
 } );

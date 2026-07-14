@@ -113,6 +113,42 @@ export function gtm4wp_diff_cart_items( previous, current ) {
 }
 
 /**
+ * Normalizes the raw `wc/store/cart` crossSells array (cross-sell products the
+ * Cart block renders) into a compact list of { id, permalink, item } entries,
+ * dropping any product without GA4 item data. Cross-sell products are serialized
+ * through the Store API ProductSchema, so they carry the same
+ * extensions.gtm4wp.item the product endpoint exposes.
+ *
+ * @param {Array} cross_sells The getCartData().crossSells array.
+ * @return {Array<{id: number, permalink: string, item: Object}>} Normalized items.
+ */
+export function gtm4wp_normalize_crosssell_items( cross_sells ) {
+	if ( ! Array.isArray( cross_sells ) ) {
+		return [];
+	}
+
+	return cross_sells
+		.map( ( product ) => {
+			const extensions =
+				product && product.extensions && product.extensions.gtm4wp;
+			const item = extensions
+				? gtm4wp_parse_block_item( extensions.item )
+				: null;
+
+			if ( ! item ) {
+				return null;
+			}
+
+			return {
+				id: product.id,
+				permalink: product.permalink,
+				item,
+			};
+		} )
+		.filter( Boolean );
+}
+
+/**
  * Returns the name of the currently selected shipping rate from the cart data,
  * or an empty string when none is selected.
  *

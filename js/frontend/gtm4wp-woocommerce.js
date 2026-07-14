@@ -260,7 +260,7 @@ function gtm4wp_woocommerce_process_pages() {
 				)
 			) {
 				const product_el = event_target_element.closest(
-					'.product,.wc-block-grid__product'
+					'.product,.wc-block-grid__product,.wc-block-product'
 				);
 
 				const productdata_el =
@@ -483,6 +483,7 @@ function gtm4wp_woocommerce_process_pages() {
 			const matching_link_element = event_target_element.closest(
 				'.products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),' +
 					'.wc-block-grid__products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),' +
+					'.wc-block-product-template li.wc-block-product a:not(.add_to_cart_button):not(.quick-view-button),' +
 					'.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),' +
 					'.widget-product-item,' +
 					'.woocommerce-grouped-product-list-item__label a'
@@ -499,7 +500,7 @@ function gtm4wp_woocommerce_process_pages() {
 
 				// try to find product data as it is in different places depending on the clicked element.
 				let temp_selector = event_target_element.closest(
-					'.product,.wc-block-grid__product'
+					'.product,.wc-block-grid__product,.wc-block-product'
 				);
 				let productdata_el;
 
