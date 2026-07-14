@@ -148,7 +148,7 @@ final class WooCommerceModule extends AbstractModule {
 		add_action( 'wc_quick_view_before_single_product', array( $list_tracking, 'quick_view_before_single_product' ) );
 		add_filter( 'woocommerce_grouped_product_list_column_label', array( $list_tracking, 'grouped_product_list_column_label' ), 10, 2 );
 
-		add_filter( 'woocommerce_cart_item_product', array( $list_tracking, 'cart_item_product_filter' ) );
+		add_filter( 'woocommerce_cart_item_product', array( $list_tracking, 'cart_item_product_filter' ), 10, 2 );
 		add_filter( 'woocommerce_cart_item_remove_link', array( $list_tracking, 'cart_item_remove_link_filter' ) );
 		add_action( 'woocommerce_cart_item_restored', array( $list_tracking, 'cart_item_restored' ) );
 

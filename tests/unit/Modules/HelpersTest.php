@@ -77,6 +77,55 @@ final class HelpersTest extends TestCase {
 		$this->assertSame( '', Helpers::get_product_term( 7, 'product_brand' ) );
 	}
 
+	public function test_cart_line_display_price_excludes_tax_by_default(): void {
+		// #436: the per-unit price comes from the already-calculated line totals
+		// (line_subtotal / quantity) instead of recomputing wc_get_price_to_display().
+		$this->assertSame(
+			20.0,
+			Helpers::cart_line_display_price(
+				array(
+					'line_subtotal'     => 40.0,
+					'line_subtotal_tax' => 8.0,
+					'quantity'          => 2,
+				),
+				false
+			)
+		);
+	}
+
+	public function test_cart_line_display_price_includes_tax_when_requested(): void {
+		$this->assertSame(
+			24.0,
+			Helpers::cart_line_display_price(
+				array(
+					'line_subtotal'     => 40.0,
+					'line_subtotal_tax' => 8.0,
+					'quantity'          => 2,
+				),
+				true
+			),
+			'Including tax adds line_subtotal_tax before dividing by quantity.'
+		);
+	}
+
+	public function test_cart_line_display_price_null_without_line_totals(): void {
+		// No line totals yet (e.g. cart not calculated) - caller falls back to
+		// wc_get_price_to_display() rather than fabricating a price.
+		$this->assertNull( Helpers::cart_line_display_price( array( 'quantity' => 2 ), false ) );
+	}
+
+	public function test_cart_line_display_price_null_for_zero_quantity(): void {
+		$this->assertNull(
+			Helpers::cart_line_display_price(
+				array(
+					'line_subtotal' => 40.0,
+					'quantity'      => 0,
+				),
+				false
+			)
+		);
+	}
+
 	public function test_get_product_category_uses_first_assigned_category(): void {
 		// No Yoast primary term, so the first assigned category is used.
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );

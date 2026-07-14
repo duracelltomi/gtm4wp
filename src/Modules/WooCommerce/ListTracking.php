@@ -71,15 +71,30 @@ final class ListTracking {
 	 * Stores the ecommerce product data into a global variable to be processed
 	 * when the cart item is rendered.
 	 *
-	 * @param \WC_Product $product A WooCommerce product that is shown in the cart.
+	 * @param \WC_Product          $product   A WooCommerce product that is shown in the cart.
+	 * @param array<string, mixed> $cart_item The cart item; its already-calculated line
+	 *                                        totals supply the price so process_product()
+	 *                                        does not recompute wc_get_price_to_display()
+	 *                                        once per cart item (#436).
 	 * @return \WC_Product The unchanged product.
 	 */
-	public function cart_item_product_filter( $product ) {
+	public function cart_item_product_filter( $product, $cart_item = array() ) {
+		$attributes = array(
+			'productlink' => apply_filters( 'the_permalink', get_permalink(), 0 ),
+		);
+
+		if ( is_array( $cart_item ) ) {
+			$include_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+
+			$price = Helpers::cart_line_display_price( $cart_item, $include_tax );
+			if ( null !== $price ) {
+				$attributes['price'] = $price;
+			}
+		}
+
 		$eec_product_array = $this->product_data->process_product(
 			$product,
-			array(
-				'productlink' => apply_filters( 'the_permalink', get_permalink(), 0 ),
-			),
+			$attributes,
 			'cart'
 		);
 

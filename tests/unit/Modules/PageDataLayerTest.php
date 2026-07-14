@@ -258,6 +258,38 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
 	}
 
+	public function test_checkout_prices_items_from_cart_line_totals_not_price_display(): void {
+		// #436: the begin_checkout products must be priced from the cart's
+		// already-calculated line totals (line_subtotal / quantity), not by calling
+		// wc_get_price_to_display() once per cart item.
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'wc_get_price_to_display' )->justReturn( 9.99 );
+
+		$product = new \WC_Product(
+			array(
+				'id'    => 7,
+				'title' => 'Mug',
+				'sku'   => 'SKU-7',
+			)
+		);
+		$this->stub_wc(
+			array(
+				'item-1' => array(
+					'data'          => $product,
+					'quantity'      => 2,
+					'line_subtotal' => 40.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' );
+		$this->assertStringContainsString( '"price":20', $checkout['code'], 'The item price must be line_subtotal / quantity (40 / 2 = 20).' );
+		$this->assertStringNotContainsString( '9.99', $checkout['code'], 'wc_get_price_to_display() must not price a cart line whose totals are known.' );
+	}
+
 	public function test_order_received_requires_matching_order_key(): void {
 		Functions\when( 'is_order_received_page' )->justReturn( true );
 

@@ -134,6 +134,32 @@ final class PageDataLayer {
 	}
 
 	/**
+	 * Builds the process_product() attributes for a cart line, adding the display
+	 * price derived from WooCommerce's already-calculated line totals so
+	 * process_product() does not recompute wc_get_price_to_display() for every cart
+	 * item - the cause of the reported cart/checkout memory exhaustion (#436). The
+	 * price is omitted (and process_product() computes it) when the line totals are
+	 * not yet available.
+	 *
+	 * @param array<string, mixed> $cart_item_data The WooCommerce cart item.
+	 * @return array<string, mixed>
+	 */
+	private function cart_line_attributes( array $cart_item_data ): array {
+		$attributes = array(
+			'quantity' => $cart_item_data['quantity'],
+		);
+
+		$include_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+
+		$price = Helpers::cart_line_display_price( $cart_item_data, $include_tax );
+		if ( null !== $price ) {
+			$attributes['price'] = $price;
+		}
+
+		return $attributes;
+	}
+
+	/**
 	 * Adds the current cart content (totals + visible items) to the data layer
 	 * when the cart-content feature is enabled. Present on every page view.
 	 *
@@ -186,9 +212,7 @@ final class PageDataLayer {
 
 			$eec_product_array = $this->product_data->process_product(
 				$product,
-				array(
-					'quantity' => $cart_item_data['quantity'],
-				),
+				$this->cart_line_attributes( $cart_item_data ),
 				'cart'
 			);
 
@@ -309,9 +333,7 @@ final class PageDataLayer {
 
 			$eec_product_array = $this->product_data->process_product(
 				$product,
-				array(
-					'quantity' => $cart_item_data['quantity'],
-				),
+				$this->cart_line_attributes( $cart_item_data ),
 				'cart'
 			);
 
@@ -362,9 +384,7 @@ final class PageDataLayer {
 
 			$eec_product_array = $this->product_data->process_product(
 				$product,
-				array(
-					'quantity' => $cart_item['quantity'],
-				),
+				$this->cart_line_attributes( $cart_item ),
 				'readdedtocart'
 			);
 
@@ -417,9 +437,7 @@ final class PageDataLayer {
 
 			$eec_product_array = $this->product_data->process_product(
 				$product,
-				array(
-					'quantity' => $cart_item_data['quantity'],
-				),
+				$this->cart_line_attributes( $cart_item_data ),
 				'checkout'
 			);
 

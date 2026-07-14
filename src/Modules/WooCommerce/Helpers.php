@@ -79,6 +79,38 @@ final class Helpers {
 	}
 
 	/**
+	 * Per-unit display price for a WooCommerce cart line, taken from the line
+	 * totals WooCommerce has already calculated (line_subtotal / line_subtotal_tax)
+	 * instead of recomputing wc_get_price_to_display() per item. That call is
+	 * expensive in the cart/checkout context and, run once per cart item, caused
+	 * memory exhaustion on carts after a WooCommerce update (#436).
+	 *
+	 * Returns null when the line totals are not available (e.g. before the cart is
+	 * calculated), so the caller can fall back to wc_get_price_to_display().
+	 *
+	 * @param array<string, mixed> $cart_item_data A WooCommerce cart item.
+	 * @param bool                 $include_tax    Whether to include tax (the shop's price-display setting).
+	 * @return float|null The per-unit display price rounded to 2 decimals, or null when it cannot be derived.
+	 */
+	public static function cart_line_display_price( array $cart_item_data, bool $include_tax ): ?float {
+		if ( ! isset( $cart_item_data['line_subtotal'] ) ) {
+			return null;
+		}
+
+		$quantity = (float) ( $cart_item_data['quantity'] ?? 0 );
+		if ( $quantity <= 0 ) {
+			return null;
+		}
+
+		$line = (float) $cart_item_data['line_subtotal'];
+		if ( $include_tax ) {
+			$line += (float) ( $cart_item_data['line_subtotal_tax'] ?? 0 );
+		}
+
+		return round( $line / $quantity, 2 );
+	}
+
+	/**
 	 * Given a category ID, this function returns the full path to this category separated with the / character.
 	 *
 	 * @param int    $category_id The ID of the category that needs to be scanned for parents.

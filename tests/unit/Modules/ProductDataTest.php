@@ -410,6 +410,43 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 5.5, $item['price'], 'Order item price overrides the display price.' );
 	}
 
+	public function test_display_price_not_recomputed_when_a_price_is_supplied(): void {
+		// #436: wc_get_price_to_display() is expensive in the cart/checkout context.
+		// When the caller already supplies a price (cart line price / order line total)
+		// it must be skipped, so it is not called once per cart item.
+		$called = false;
+		Functions\when( 'wc_get_price_to_display' )->alias(
+			static function () use ( &$called ) {
+				$called = true;
+				return 99.0;
+			}
+		);
+
+		$item = $this->make_product_data()->process_product(
+			$this->make_product(),
+			array( 'price' => 5.5 ),
+			'cart'
+		);
+
+		$this->assertFalse( $called, 'wc_get_price_to_display() must not run when a price is supplied.' );
+		$this->assertSame( 5.5, $item['price'] );
+	}
+
+	public function test_display_price_computed_when_no_price_supplied(): void {
+		$called = false;
+		Functions\when( 'wc_get_price_to_display' )->alias(
+			static function () use ( &$called ) {
+				$called = true;
+				return 12.0;
+			}
+		);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertTrue( $called, 'Without a supplied price the display price is computed as before.' );
+		$this->assertSame( 12.0, $item['price'] );
+	}
+
 	public function test_purchase_datalayer_revenue_math(): void {
 		$order = new \WC_Order(
 			array(

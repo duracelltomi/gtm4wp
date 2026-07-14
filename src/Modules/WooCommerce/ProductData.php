@@ -100,12 +100,23 @@ final class ProductData {
 			$remarketing_id = $product_sku;
 		}
 
+		// wc_get_price_to_display() is expensive in the cart/checkout context. Skip it
+		// when the caller already supplies a price - the order line total on the purchase
+		// path, and the cart line price the cart callers now pass - which array_merge()
+		// applies below anyway. This avoids one costly call per cart item, the cause of
+		// the reported memory exhaustion on cart/checkout pages (#436).
+		if ( array_key_exists( 'price', $additional_product_attributes ) ) {
+			$display_price = (float) $additional_product_attributes['price'];
+		} else {
+			$display_price = (float) wc_get_price_to_display( $product );
+		}
+
 		$_temp_productdata = array(
 			'internal_id'              => $product_id,
 			'item_id'                  => $remarketing_id,
 			'item_name'                => $product->get_title(),
 			'sku'                      => $product_sku ? $product_sku : $product_id,
-			'price'                    => round( (float) wc_get_price_to_display( $product ), 2 ), // Unfortunately this does not force a .00 postfix for integers.
+			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
 			'stocklevel'               => $product->get_stock_quantity(),
 			'stockstatus'              => $product->get_stock_status(),
 			'google_business_vertical' => $this->business_vertical(),
