@@ -37,6 +37,35 @@ final class Field {
 	 */
 	public const TYPE_AXEPTIO_VERSION = 'axeptio-version';
 
+	/**
+	 * Option maturity phases.
+	 *
+	 * A phase is a per-option (per Field) maturity signal, not a module-wide
+	 * status — a stable module can still expose an experimental option. It is
+	 * rendered as a badge next to the field label in the admin UI; STABLE shows
+	 * no badge. When adding a Field, choose the phase by these criteria:
+	 *
+	 * - EXPERIMENTAL: correctness depends on factors GTM4WP cannot verify on
+	 *   every site — the active theme, a third-party embed/player API, external
+	 *   infrastructure (e.g. Cloudflare), or timing/logic that still needs
+	 *   real-world validation. May not work, or work inconsistently, on some
+	 *   installs. Keep it off by default and spell out the caveat in the field
+	 *   description.
+	 * - BETA: implementation is complete and expected to work on any standard
+	 *   WP/WC install with no known environment dependency; held in beta only
+	 *   until it has accumulated enough real-world usage to be declared stable.
+	 * - STABLE (default): proven in the field with no open reproducible issues.
+	 *   Promote an experimental/beta option here only after it has shipped for a
+	 *   meaningful period (~5 months / a few release cycles) AND has real
+	 *   adoption AND has no confirmed reproducible defect. Promotion is a
+	 *   deliberate act — change the constant and add a CHANGELOG bullet; it is
+	 *   never automatic, and "no reports" on an unused option is not evidence of
+	 *   stability.
+	 * - DEPRECATED: still works but is superseded (e.g. a native GTM trigger) and
+	 *   receives no new development. Discourage new use and name the recommended
+	 *   replacement in the field description; kept for backward compatibility,
+	 *   not removed yet.
+	 */
 	public const PHASE_STABLE       = 'stable';
 	public const PHASE_BETA         = 'beta';
 	public const PHASE_EXPERIMENTAL = 'experimental';

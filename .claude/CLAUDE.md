@@ -42,6 +42,25 @@ integration surface — hooks, template functions, wp-config constants and the
 - **Custom hooks**: defined as constants in `compat/constants.php` (e.g. `GTM4WP_WPFILTER_COMPILE_DATALAYER`).
 - **Migration**: `src/Migration.php` runs on admin boot to clean up removed 1.x options.
 
+### Option maturity phases (`Field::PHASE_*`)
+
+Each option carries a per-*field* maturity signal (there is no module-level
+status), rendered as an admin badge; `stable` shows none. Full criteria live in
+the doc block on the constants in `src/Options/Field.php` — in short:
+
+- **experimental** — correctness depends on things GTM4WP can't verify on every
+  site (theme, a third-party embed/player API, external infra like Cloudflare, or
+  logic still needing real-world validation). Off by default; caveat in the field
+  description.
+- **beta** — complete and expected to work on any standard WP/WC install; held in
+  beta only until it has enough real-world usage to be called stable.
+- **stable** (default, no badge) — proven in the field, no open reproducible
+  issues. Promote experimental/beta → stable deliberately (change the constant +
+  CHANGELOG bullet) after ~5 months / a few release cycles WITH real adoption AND
+  no confirmed reproducible defect.
+- **deprecated** — still works but superseded; no new development, replacement
+  named in the description, kept for back-compat.
+
 ### Key directories
 
 - `src/` — OOP source (PSR-4 `GTM4WP\`)
