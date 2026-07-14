@@ -128,10 +128,10 @@ final class ContainerCode {
 	 * Function executed during wp_head with high priority.
 	 * Outputs some global JavaScript variables that need to be accessible by other parts of the plugin.
 	 *
-	 * @param boolean $echo If set to true and AMP is not generating the page content, the HTML is output immediately.
-	 * @return string|void Returns the HTML if the $echo parameter is set to false or when AMP page generation is running.
+	 * @param boolean $echo_output If set to true and AMP is not generating the page content, the HTML is output immediately.
+	 * @return string|void Returns the HTML if the $echo_output parameter is set to false or when AMP page generation is running.
 	 */
-	public function header_top( $echo = true ) {
+	public function header_top( $echo_output = true ) {
 		$datalayer_name = $this->datalayer->name();
 
 		// The data layer initialization has to use 'var' instead of 'let' since 'let' can break related browser extensions and 3rd party scripts.
@@ -181,7 +181,7 @@ final class ContainerCode {
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
 
 		if ( ! apply_filters( self::FILTER_AMP_RUNNING, false ) ) {
-			if ( $echo ) {
+			if ( $echo_output ) {
 				echo wp_kses(
 					$_gtm_top_content,
 					array(
@@ -204,10 +204,9 @@ final class ContainerCode {
 	 * Outputs the main Google Tag Manager container code together with the
 	 * compiled data layer and the consent mode default block.
 	 *
-	 * @param boolean $echo Present for 1.x signature compatibility (AMP integration).
 	 * @return void
 	 */
-	public function header_begin( $echo = true ) {
+	public function header_begin() {
 		// On an AMP page the standard GTM container <script> is invalid AMP markup
 		// and is stripped by the AMP sanitizer; the AMP module injects an
 		// amp-analytics tag instead. Still compile the data layer (so its values,

@@ -8,6 +8,7 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 * Changed: the AMP container ID setting is promoted from experimental to stable.
 * Fixed: the standard GTM container `<script>` is no longer emitted on AMP pages (it was invalid AMP and stripped by the AMP sanitizer anyway); the data layer is still compiled so the amp-analytics integration keeps its values.
 
+* Changed: internal container-code cleanup — dropped an unused parameter from the `header_begin` method and renamed a reserved-word parameter (`$echo` → `$echo_output`) on `header_top` (no functional change).
 * Changed: complete object-oriented rewrite. Every feature is now a module that third-party plugins can extend through the `gtm4wp_register_modules` action. All public template functions (`gtm4wp_the_gtm_tag()` etc.), filter/action names, wp-config constants and the `gtm4wp-options` storage key are unchanged, so existing integrations keep working.
 * Changed: minimum requirements raised to PHP 8.0 and WordPress 6.3.
 * Added: modern React-based settings screen with left pane navigation, tabbed option groups, option search and inline per-field validation.

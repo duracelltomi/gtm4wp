@@ -137,8 +137,8 @@ Carries a `phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped`. The b
 ### FP-2: Additional data layer pushes without the hex-amp flag are still safe
 `DataLayer::flush_pushes()` emits via `wp_add_inline_script`, which WordPress prints without any `htmlspecialchars_decode`, so `&quot;`-style entities remain inert there regardless of flags. The hex flags were added anyway for consistency; do not flag the wp_add_inline_script path as a break-out risk on the grounds it "relies on" the flags.
 
-### FP-3: `$echo` reserved-word parameter warnings in `ContainerCode.php`
-`header_top($echo = true)` / `header_begin($echo = true)` keep the 1.x method signature for AMP-integration compatibility. PHPCS warns about the reserved-word parameter name; it is cosmetic, not a security or correctness issue. Do not raise as a finding (may be noted as low-priority tidy-up).
+### FP-3: `$echo` reserved-word parameter warnings in `ContainerCode.php` (resolved)
+Historical: `header_top($echo = true)` / `header_begin($echo = true)` used to keep the 1.x-style `$echo` parameter, which PHPCS flagged (reserved-word parameter name) — cosmetic, not a security/correctness issue. Both are now resolved: `header_begin`'s parameter was removed (it was dead — never read, hooked with 0 accepted args, no caller passes it) and `header_top`'s was renamed to `$echo_output` (still functional; its `false` branch returns the markup). No `$echo` reserved-word warning remains in `ContainerCode.php`; kept here as history.
 
 ---
 
