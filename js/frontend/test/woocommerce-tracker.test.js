@@ -364,3 +364,117 @@ describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
 		expect( item.item_id ).toBe( 456 );
 	} );
 } );
+
+describe( 'gtm4wp-woocommerce exposed add_to_cart trackers (#273)', () => {
+	const PRODUCT = { item_id: 77, item_name: 'API Product', price: 12 };
+
+	beforeEach( () => {
+		document.body.className = '';
+		document.body.innerHTML = '';
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_from_json = ( json ) => {
+			const parsed = JSON.parse( json );
+			delete parsed.productlink;
+			delete parsed.internal_id;
+			return parsed;
+		};
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+		global.gtm4wp_push_ecommerce.mockClear();
+	} );
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	it( 'exposes the add_to_cart trackers on window', () => {
+		expect( typeof window.gtm4wp_track_single_add_to_cart ).toBe(
+			'function'
+		);
+		expect( typeof window.gtm4wp_track_list_add_to_cart ).toBe(
+			'function'
+		);
+	} );
+
+	it( 'gtm4wp_track_single_add_to_cart tracks a form + button directly', () => {
+		// What a theme with its own AJAX add to cart would call from its success
+		// handler, instead of copying the tracker (#273).
+		document.body.innerHTML =
+			'<form class="cart">' +
+			'<input type="hidden" name="gtm4wp_product_data" />' +
+			'<input type="number" name="quantity" value="2" />' +
+			'<button type="button" class="single_add_to_cart_button">Add</button>' +
+			'</form>';
+		document.querySelector( '[name=gtm4wp_product_data]' ).value =
+			JSON.stringify( PRODUCT );
+
+		const tracked = window.gtm4wp_track_single_add_to_cart(
+			document.querySelector( '.single_add_to_cart_button' ),
+			document.querySelector( 'form.cart' )
+		);
+
+		expect( tracked ).toBe( true );
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 77 } )
+		);
+		expect( call[ 1 ][ 0 ].quantity ).toBe( '2' );
+	} );
+
+	it( 'gtm4wp_track_list_add_to_cart tracks a list button directly', () => {
+		document.body.innerHTML =
+			'<div class="product">' +
+			'<span class="gtm4wp_productdata"></span>' +
+			'<a class="add_to_cart_button product_type_simple">Add</a>' +
+			'</div>';
+		document
+			.querySelector( '.gtm4wp_productdata' )
+			.setAttribute(
+				'data-gtm4wp_product_data',
+				JSON.stringify( PRODUCT )
+			);
+
+		const tracked = window.gtm4wp_track_list_add_to_cart(
+			document.querySelector( '.add_to_cart_button' )
+		);
+
+		expect( tracked ).toBe( true );
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 77 } )
+		);
+	} );
+} );

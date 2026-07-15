@@ -129,6 +129,212 @@ function gtm4wp_woocommerce_handle_shipping_method_change() {
 	gtm4wp_checkout_step_fired.push( 'shipping_method' );
 }
 
+/**
+ * Fires the GA4 add_to_cart event for a product added from its product detail
+ * page - the variable, grouped and simple cases. Exposed on window so a theme
+ * that handles add to cart with its own AJAX (and calls e.preventDefault() on the
+ * button, which stops the built-in click tracking) can fire the event from its own
+ * success handler without copying the tracker (#273).
+ *
+ * @param {Element} trigger_element The clicked add-to-cart button (or a descendant).
+ * @param {Element} [product_form]  The product's form.cart; derived from the button when omitted.
+ * @return {boolean} Whether an add_to_cart event was tracked.
+ */
+function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
+	if ( ! trigger_element || ! trigger_element.closest ) {
+		return false;
+	}
+
+	const add_to_cart_button =
+		trigger_element.closest( '.single_add_to_cart_button' ) ||
+		trigger_element;
+
+	if (
+		add_to_cart_button.classList &&
+		( add_to_cart_button.classList.contains( 'disabled' ) ||
+			add_to_cart_button.disabled )
+	) {
+		// do not track clicks on disabled buttons
+		return false;
+	}
+
+	const form = product_form || trigger_element.closest( 'form.cart' );
+	if ( ! form ) {
+		return false;
+	}
+
+	// Do not fire add_to_cart when the browser would block the form submit for
+	// unfilled required fields (e.g. Product Add-ons): the item is not actually
+	// added, so reporting it would be a false event (#274). Server-side-only
+	// validation still cannot be seen from here.
+	if ( typeof form.checkValidity === 'function' && ! form.checkValidity() ) {
+		return false;
+	}
+
+	const product_variant_id = form.querySelectorAll( '[name=variation_id]' );
+	const product_is_grouped =
+		form.classList && form.classList.contains( 'grouped_form' );
+
+	if ( product_variant_id.length > 0 ) {
+		if ( gtm4wp_last_selected_product_variation ) {
+			const qty_el = form.querySelector( '[name=quantity]' );
+			gtm4wp_last_selected_product_variation.quantity =
+				( qty_el && qty_el.value ) || 1;
+
+			gtm4wp_push_ecommerce(
+				'add_to_cart',
+				[ gtm4wp_last_selected_product_variation ],
+				{
+					currency: gtm4wp_currency,
+					value: (
+						gtm4wp_last_selected_product_variation.price *
+						gtm4wp_last_selected_product_variation.quantity
+					).toFixed( 2 ),
+				}
+			);
+		}
+	} else if ( product_is_grouped ) {
+		const products_in_group = document.querySelectorAll(
+			'.grouped_form .gtm4wp_productdata'
+		);
+		const products = [];
+		let sum_value = 0;
+
+		products_in_group.forEach( function ( product_data_el ) {
+			const productdata = gtm4wp_read_json_from_node(
+				product_data_el,
+				'gtm4wp_product_data',
+				[ 'productlink' ]
+			);
+			if ( ! productdata ) {
+				return true;
+			}
+
+			let product_qty = 0;
+			const product_qty_input = document.querySelectorAll(
+				'input[name=quantity\\[' + productdata.internal_id + '\\]]'
+			);
+			if ( product_qty_input.length > 0 ) {
+				product_qty =
+					( product_qty_input[ 0 ] &&
+						product_qty_input[ 0 ].value ) ||
+					1;
+			} else {
+				return true;
+			}
+
+			if ( 0 == product_qty ) {
+				return true;
+			}
+			productdata.quantity = product_qty;
+
+			delete productdata.internal_id;
+
+			products.push( productdata );
+			sum_value += productdata.price * productdata.quantity;
+		} );
+
+		if ( 0 == products.length ) {
+			return false;
+		}
+
+		gtm4wp_push_ecommerce( 'add_to_cart', products, {
+			currency: gtm4wp_currency,
+			value: sum_value.toFixed( 2 ),
+		} );
+	} else {
+		const product_data_el = form.querySelector(
+			'[name=gtm4wp_product_data]'
+		);
+		if ( ! product_data_el ) {
+			return false;
+		}
+
+		const productdata = gtm4wp_read_from_json( product_data_el.value );
+		productdata.quantity =
+			form.querySelector( '[name=quantity]' ) &&
+			form.querySelector( '[name=quantity]' ).value;
+		if ( isNaN( productdata.quantity ) ) {
+			productdata.quantity = 1;
+		}
+
+		gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
+			currency: gtm4wp_currency,
+			value: productdata.price * productdata.quantity,
+		} );
+	}
+
+	return true;
+}
+
+/**
+ * Fires the GA4 add_to_cart event for a simple product added from a product list
+ * (category/shop page, block grid, or the [add_to_cart] shortcode). Exposed on
+ * window for the same reason as gtm4wp_track_single_add_to_cart() (#273).
+ *
+ * @param {Element} trigger_element The clicked add-to-cart button (or a descendant).
+ * @return {boolean} Whether an add_to_cart event was tracked.
+ */
+function gtm4wp_track_list_add_to_cart( trigger_element ) {
+	if ( ! trigger_element || ! trigger_element.closest ) {
+		return false;
+	}
+
+	const product_el = trigger_element.closest(
+		'.product,.wc-block-grid__product,.wc-block-product'
+	);
+	const productdata_el =
+		product_el && product_el.querySelector( '.gtm4wp_productdata' );
+
+	let productdata;
+	if ( productdata_el ) {
+		productdata = gtm4wp_read_json_from_node(
+			productdata_el,
+			'gtm4wp_product_data'
+		);
+	} else {
+		// Standalone [add_to_cart] shortcode button: it has no list markup, so
+		// the product data is attached to the button itself (#110).
+		const shortcode_button = trigger_element.closest(
+			'.add_to_cart_button'
+		);
+		productdata =
+			shortcode_button &&
+			gtm4wp_read_json_from_node(
+				shortcode_button,
+				'gtm4wp_product_data'
+			);
+	}
+	if ( ! productdata ) {
+		return false;
+	}
+
+	if (
+		'variable' === productdata.product_type ||
+		'grouped' === productdata.product_type
+	) {
+		return false;
+	}
+
+	if ( productdata.productlink ) {
+		delete productdata.productlink;
+	}
+	delete productdata.product_type;
+	productdata.quantity = 1;
+
+	gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
+		currency: gtm4wp_currency,
+		value: productdata.price,
+	} );
+
+	return true;
+}
+
+// Expose the add-to-cart trackers so a theme with custom / AJAX add to cart can
+// fire the events without duplicating the tracker code (#273).
+window.gtm4wp_track_single_add_to_cart = gtm4wp_track_single_add_to_cart;
+window.gtm4wp_track_list_add_to_cart = gtm4wp_track_list_add_to_cart;
+
 function gtm4wp_woocommerce_process_pages() {
 	// loop through WC blocks to set proper listname and position parameters
 	const gtm4wp_product_block_names = {
@@ -259,55 +465,7 @@ function gtm4wp_woocommerce_process_pages() {
 					'.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .product_type_bundle_input_required, .single_add_to_cart_button)'
 				)
 			) {
-				const product_el = event_target_element.closest(
-					'.product,.wc-block-grid__product,.wc-block-product'
-				);
-
-				const productdata_el =
-					product_el &&
-					product_el.querySelector( '.gtm4wp_productdata' );
-
-				let productdata;
-				if ( productdata_el ) {
-					productdata = gtm4wp_read_json_from_node(
-						productdata_el,
-						'gtm4wp_product_data'
-					);
-				} else {
-					// Standalone [add_to_cart] shortcode button: it has no list
-					// markup, so the product data is attached to the button itself
-					// (#110).
-					const shortcode_button = event_target_element.closest(
-						'.add_to_cart_button'
-					);
-					productdata =
-						shortcode_button &&
-						gtm4wp_read_json_from_node(
-							shortcode_button,
-							'gtm4wp_product_data'
-						);
-				}
-				if ( ! productdata ) {
-					return true;
-				}
-
-				if (
-					'variable' === productdata.product_type ||
-					'grouped' === productdata.product_type
-				) {
-					return true;
-				}
-
-				if ( productdata.productlink ) {
-					delete productdata.productlink;
-				}
-				delete productdata.product_type;
-				productdata.quantity = 1;
-
-				gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
-					currency: gtm4wp_currency,
-					value: productdata.price,
-				} );
+				gtm4wp_track_list_add_to_cart( event_target_element );
 			}
 
 			// track add to cart events for products on product detail pages
@@ -315,131 +473,7 @@ function gtm4wp_woocommerce_process_pages() {
 				'.single_add_to_cart_button'
 			);
 			if ( add_to_cart_button ) {
-				if (
-					add_to_cart_button.classList.contains( 'disabled' ) ||
-					add_to_cart_button.disabled
-				) {
-					// do not track clicks on disabled buttons
-					return true;
-				}
-
-				const product_form =
-					event_target_element.closest( 'form.cart' );
-				if ( ! product_form ) {
-					return true;
-				}
-
-				// Do not fire add_to_cart when the browser would block the form
-				// submit for unfilled required fields (e.g. Product Add-ons): the
-				// item is not actually added, so reporting it would be a false event
-				// (#274). Server-side-only validation still cannot be seen from here.
-				if (
-					typeof product_form.checkValidity === 'function' &&
-					! product_form.checkValidity()
-				) {
-					return true;
-				}
-
-				const product_variant_id = product_form.querySelectorAll(
-					'[name=variation_id]'
-				);
-				const product_is_grouped =
-					product_form.classList &&
-					product_form.classList.contains( 'grouped_form' );
-
-				if ( product_variant_id.length > 0 ) {
-					if ( gtm4wp_last_selected_product_variation ) {
-						const qty_el =
-							product_form.querySelector( '[name=quantity]' );
-						gtm4wp_last_selected_product_variation.quantity =
-							( qty_el && qty_el.value ) || 1;
-
-						gtm4wp_push_ecommerce(
-							'add_to_cart',
-							[ gtm4wp_last_selected_product_variation ],
-							{
-								currency: gtm4wp_currency,
-								value: (
-									gtm4wp_last_selected_product_variation.price *
-									gtm4wp_last_selected_product_variation.quantity
-								).toFixed( 2 ),
-							}
-						);
-					}
-				} else if ( product_is_grouped ) {
-					const products_in_group = document.querySelectorAll(
-						'.grouped_form .gtm4wp_productdata'
-					);
-					const products = [];
-					let sum_value = 0;
-
-					products_in_group.forEach( function ( product_data_el ) {
-						const productdata = gtm4wp_read_json_from_node(
-							product_data_el,
-							'gtm4wp_product_data',
-							[ 'productlink' ]
-						);
-						if ( ! productdata ) {
-							return true;
-						}
-
-						let product_qty = 0;
-						const product_qty_input = document.querySelectorAll(
-							'input[name=quantity\\[' +
-								productdata.internal_id +
-								'\\]]'
-						);
-						if ( product_qty_input.length > 0 ) {
-							product_qty =
-								( product_qty_input[ 0 ] &&
-									product_qty_input[ 0 ].value ) ||
-								1;
-						} else {
-							return true;
-						}
-
-						if ( 0 == product_qty ) {
-							return true;
-						}
-						productdata.quantity = product_qty;
-
-						delete productdata.internal_id;
-
-						products.push( productdata );
-						sum_value += productdata.price * productdata.quantity;
-					} );
-
-					if ( 0 == products.length ) {
-						return true;
-					}
-
-					gtm4wp_push_ecommerce( 'add_to_cart', products, {
-						currency: gtm4wp_currency,
-						value: sum_value.toFixed( 2 ),
-					} );
-				} else {
-					const product_data_el = product_form.querySelector(
-						'[name=gtm4wp_product_data]'
-					);
-					if ( ! product_data_el ) {
-						return true;
-					}
-
-					const productdata = gtm4wp_read_from_json(
-						product_data_el.value
-					);
-					productdata.quantity =
-						product_form.querySelector( '[name=quantity]' ) &&
-						product_form.querySelector( '[name=quantity]' ).value;
-					if ( isNaN( productdata.quantity ) ) {
-						productdata.quantity = 1;
-					}
-
-					gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
-						currency: gtm4wp_currency,
-						value: productdata.price * productdata.quantity,
-					} );
-				}
+				gtm4wp_track_single_add_to_cart( add_to_cart_button );
 			}
 
 			// track remove links in mini cart widget and on cart page
