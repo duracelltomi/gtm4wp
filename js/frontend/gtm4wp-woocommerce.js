@@ -316,6 +316,17 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
+				// Do not fire add_to_cart when the browser would block the form
+				// submit for unfilled required fields (e.g. Product Add-ons): the
+				// item is not actually added, so reporting it would be a false event
+				// (#274). Server-side-only validation still cannot be seen from here.
+				if (
+					typeof product_form.checkValidity === 'function' &&
+					! product_form.checkValidity()
+				) {
+					return true;
+				}
+
 				const product_variant_id = product_form.querySelectorAll(
 					'[name=variation_id]'
 				);

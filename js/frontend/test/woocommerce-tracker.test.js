@@ -97,3 +97,96 @@ describe( 'gtm4wp-woocommerce Product Collection select_item', () => {
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'productlink' );
 	} );
 } );
+
+describe( 'gtm4wp-woocommerce PDP add_to_cart validation guard (#274)', () => {
+	const buildForm = ( requiredEmpty ) =>
+		'<form class="cart" method="post" action="https://shop/p42">' +
+		'<input type="text" name="addon"' +
+		( requiredEmpty ? ' required' : ' value="filled"' ) +
+		' />' +
+		'<input type="hidden" name="gtm4wp_product_data" />' +
+		'<input type="number" name="quantity" value="1" />' +
+		// type=button (not submit) so jsdom does not attempt a real form
+		// submission (requestSubmit is unimplemented); the tracker fires on the
+		// click regardless of the button type.
+		'<button type="button" class="single_add_to_cart_button">Add</button>' +
+		'</form>';
+
+	beforeEach( () => {
+		document.body.className = '';
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_from_json = ( json ) => {
+			const parsed = JSON.parse( json );
+			delete parsed.productlink;
+			delete parsed.internal_id;
+			return parsed;
+		};
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	} );
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	const clickAddToCart = () => {
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers(); // binds the delegated click listener
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.single_add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		return global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+	};
+
+	it( 'does not fire add_to_cart when a required field is empty', () => {
+		document.body.innerHTML = buildForm( true );
+		document.querySelector( '[name=gtm4wp_product_data]' ).value =
+			JSON.stringify( PRODUCT_DATA );
+
+		expect( clickAddToCart() ).toBeUndefined();
+	} );
+
+	it( 'fires add_to_cart when the form passes validation', () => {
+		document.body.innerHTML = buildForm( false );
+		document.querySelector( '[name=gtm4wp_product_data]' ).value =
+			JSON.stringify( PRODUCT_DATA );
+
+		const call = clickAddToCart();
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 42 } )
+		);
+	} );
+} );
