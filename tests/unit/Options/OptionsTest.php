@@ -255,6 +255,49 @@ final class OptionsTest extends TestCase {
 		$this->assertSame( 'x', $options->get( 'unknown-key', 'x' ) );
 	}
 
+	public function test_fresh_install_uses_container_placement_default(): void {
+		// Regression for #302: a brand-new install has no gtm4wp-options row,
+		// so get_option() returns the empty-array default. Options must merge
+		// module defaults over it, so the container placement comes back at its
+		// default (container not silently off) instead of a missing key.
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$defaults = self::DEFAULTS + array(
+			GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_FOOTER,
+		);
+
+		$options = new Options( $defaults );
+
+		$this->assertSame(
+			GTM4WP_PLACEMENT_FOOTER,
+			$options->get( GTM4WP_OPTION_GTM_PLACEMENT ),
+			'A missing options row must fall through to the placement default.'
+		);
+	}
+
+	public function test_stored_off_placement_overrides_default(): void {
+		// The override direction of #302: once a site explicitly turns the
+		// container off, the stored placement must win over the default so the
+		// merge never silently flips it back on.
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_OFF,
+			)
+		);
+
+		$defaults = self::DEFAULTS + array(
+			GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_FOOTER,
+		);
+
+		$options = new Options( $defaults );
+
+		$this->assertSame(
+			GTM4WP_PLACEMENT_OFF,
+			$options->get( GTM4WP_OPTION_GTM_PLACEMENT ),
+			'An explicit "Off" placement must be honored over the default.'
+		);
+	}
+
 	/**
 	 * Defines the GTM4WP_HARDCODED_GTM_ID wp-config override for the current test.
 	 *
