@@ -136,11 +136,16 @@ final class DataLayer {
 		}
 
 		$GLOBALS['gtm4wp_additional_datalayer_pushes'][] = array(
+			// Serialize `event` first so server-pushed events match what the
+			// client-side gtm4wp_push_ecommerce() already emits (event before
+			// ecommerce). Key order is irrelevant to GTM/GA4; this is consistency
+			// only. array_merge keeps an existing `event` key (e.g. the purchase
+			// data layer already sets it first) in place (#348).
 			'datalayer_object' => array_merge(
-				$event_data,
 				array(
 					'event' => $event_name,
-				)
+				),
+				$event_data
 			),
 			'js_before'        => $js_before,
 			'js_after'         => $js_after,

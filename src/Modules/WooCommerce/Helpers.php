@@ -111,6 +111,46 @@ final class Helpers {
 	}
 
 	/**
+	 * Per-unit discount for a WooCommerce cart line: the gap between the
+	 * pre-discount subtotal (line_subtotal) and the post-discount total
+	 * (line_total), on the same tax basis as cart_line_display_price(), divided
+	 * by the line quantity. Used to add GA4's per-item `discount` field where a
+	 * coupon or sale reduced the line (#348).
+	 *
+	 * Returns null when the totals are not available or when there is no discount
+	 * (≤ 0), so the caller can simply omit the field on undiscounted lines rather
+	 * than emit a 0.
+	 *
+	 * @param array<string, mixed> $cart_item_data A WooCommerce cart item.
+	 * @param bool                 $include_tax    Whether to include tax (the shop's price-display setting).
+	 * @return float|null The per-unit discount rounded to 2 decimals, or null when there is none.
+	 */
+	public static function cart_line_discount( array $cart_item_data, bool $include_tax ): ?float {
+		if ( ! isset( $cart_item_data['line_subtotal'], $cart_item_data['line_total'] ) ) {
+			return null;
+		}
+
+		$quantity = (float) ( $cart_item_data['quantity'] ?? 0 );
+		if ( $quantity <= 0 ) {
+			return null;
+		}
+
+		$subtotal = (float) $cart_item_data['line_subtotal'];
+		$total    = (float) $cart_item_data['line_total'];
+		if ( $include_tax ) {
+			$subtotal += (float) ( $cart_item_data['line_subtotal_tax'] ?? 0 );
+			$total    += (float) ( $cart_item_data['line_total_tax'] ?? 0 );
+		}
+
+		$discount = round( ( $subtotal - $total ) / $quantity, 2 );
+		if ( $discount <= 0 ) {
+			return null;
+		}
+
+		return $discount;
+	}
+
+	/**
 	 * Given a category ID, this function returns the full path to this category separated with the / character.
 	 *
 	 * @param int    $category_id The ID of the category that needs to be scanned for parents.

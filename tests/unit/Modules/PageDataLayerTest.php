@@ -258,6 +258,46 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
 	}
 
+	public function test_view_item_carries_quantity_one(): void {
+		// #348: the simple-product view_item item must carry an explicit quantity of 1.
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"view_item"', $this->inline_js );
+		$this->assertStringContainsString( '"quantity":1', $this->inline_js, 'view_item must report quantity 1 on the item.' );
+	}
+
+	public function test_checkout_items_carry_per_unit_discount(): void {
+		// #348: a discounted checkout line exposes the per-unit discount on the item.
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc(
+			array(
+				'item-1' => array(
+					'data'          => $product,
+					'quantity'      => 2,
+					'line_subtotal' => 40.0,
+					'line_total'    => 30.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' );
+		// (40 - 30) / 2 = 5 per unit.
+		$this->assertStringContainsString( '"discount":5', $checkout['code'], 'A discounted checkout line must report its per-unit discount.' );
+	}
+
 	public function test_checkout_prices_items_from_cart_line_totals_not_price_display(): void {
 		// #436: the begin_checkout products must be priced from the cart's
 		// already-calculated line totals (line_subtotal / quantity), not by calling

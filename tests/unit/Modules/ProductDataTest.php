@@ -131,6 +131,29 @@ final class ProductDataTest extends TestCase {
 		$this->assertArrayNotHasKey( 'item_list_id', $item, 'No list context means no item_list_id.' );
 	}
 
+	public function test_affiliation_absent_by_default(): void {
+		// #348: item-level affiliation is empty by default (WooCommerce has no native
+		// value), so the item carries no affiliation key unless a filter supplies one.
+		$product_data = $this->make_product_data();
+
+		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertArrayNotHasKey( 'affiliation', $item, 'No affiliation must be added when the filter returns empty.' );
+	}
+
+	public function test_affiliation_added_from_filter(): void {
+		// A non-empty gtm4wp_eec_item_affiliation filter value is attached to the item.
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION )
+			->once()
+			->andReturn( 'Google Store' );
+
+		$product_data = $this->make_product_data();
+
+		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 'Google Store', $item['affiliation'] );
+	}
+
 	public function test_explicit_item_list_id_overrides_the_derived_one(): void {
 		$product_data = $this->make_product_data();
 
@@ -487,20 +510,28 @@ final class ProductDataTest extends TestCase {
 	 * Builds an order carrying a single line item, with fixtures for the
 	 * tax-inclusive and tax-exclusive per-item totals.
 	 *
-	 * @param float $incl Per-item total including tax.
-	 * @param float $excl Per-item total excluding tax.
-	 * @param int   $qty  Line quantity.
+	 * @param float $incl     Per-item total including tax.
+	 * @param float $excl     Per-item total excluding tax.
+	 * @param int   $qty      Line quantity.
+	 * @param float $subtotal Line subtotal before discount (ex-tax); 0 = no discount.
+	 * @param float $total    Line total after discount (ex-tax); 0 = no discount.
 	 * @return \WC_Order
 	 */
-	private function make_order_with_item( float $incl, float $excl, int $qty = 1 ): \WC_Order {
+	private function make_order_with_item( float $incl, float $excl, int $qty = 1, float $subtotal = 0.0, float $total = 0.0 ): \WC_Order {
 		$product    = $this->make_product();
-		$order_item = new class( $product, $qty ) {
-			public function __construct( private $product, private int $qty ) {}
+		$order_item = new class( $product, $qty, $subtotal, $total ) {
+			public function __construct( private $product, private int $qty, private float $subtotal, private float $total ) {}
 			public function get_product() {
 				return $this->product;
 			}
 			public function get_quantity() {
 				return $this->qty;
+			}
+			public function get_subtotal() {
+				return $this->subtotal;
+			}
+			public function get_total() {
+				return $this->total;
 			}
 		};
 
@@ -549,6 +580,32 @@ final class ProductDataTest extends TestCase {
 		$items        = $product_data->process_order_items( $this->make_order_with_item( 24.0, 20.0 ) );
 
 		$this->assertSame( 24.0, $items[0]['price'], 'With WCEXCLUDETAX off and inclusive display, the item price includes tax.' );
+	}
+
+	public function test_order_item_carries_per_unit_discount_when_line_discounted(): void {
+		// #348: a line with subtotal 30 (pre-discount) and total 20 (after a coupon)
+		// over quantity 2 exposes a per-unit discount of (30 - 20) / 2 = 5 on the item.
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$product_data = new ProductData( new Options( ( new WooCommerceModule() )->defaults() ) );
+		$items        = $product_data->process_order_items(
+			$this->make_order_with_item( 24.0, 20.0, 2, 30.0, 20.0 )
+		);
+
+		$this->assertSame( 5.0, $items[0]['discount'], 'The per-unit order-item discount must be reported for a discounted line.' );
+	}
+
+	public function test_order_item_omits_discount_when_line_not_discounted(): void {
+		// An undiscounted line (subtotal == total) carries no discount key, so GA4
+		// never receives a spurious 0 discount.
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$product_data = new ProductData( new Options( ( new WooCommerceModule() )->defaults() ) );
+		$items        = $product_data->process_order_items(
+			$this->make_order_with_item( 24.0, 20.0, 2, 40.0, 40.0 )
+		);
+
+		$this->assertArrayNotHasKey( 'discount', $items[0] );
 	}
 
 	public function test_raw_order_datalayer_passes_values_without_entity_escaping(): void {

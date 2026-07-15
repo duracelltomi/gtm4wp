@@ -54,6 +54,15 @@ if ( ! class_exists( 'WC_Product' ) ) {
 		public function get_permalink() {
 			return $this->value( 'permalink', '' );
 		}
+		public function get_rating_counts() {
+			return $this->value( 'rating_counts', array() );
+		}
+		public function get_average_rating() {
+			return $this->value( 'average_rating', 0 );
+		}
+		public function get_review_count() {
+			return $this->value( 'review_count', 0 );
+		}
 	}
 }
 

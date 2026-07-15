@@ -126,6 +126,73 @@ final class HelpersTest extends TestCase {
 		);
 	}
 
+	public function test_cart_line_discount_returns_per_unit_gap_excluding_tax(): void {
+		// #348: per-unit discount = (line_subtotal - line_total) / quantity, on the
+		// same tax basis as the price. subtotal 40 (pre-discount), total 30 (after a
+		// coupon), quantity 2 => (40 - 30) / 2 = 5.
+		$this->assertSame(
+			5.0,
+			Helpers::cart_line_discount(
+				array(
+					'line_subtotal' => 40.0,
+					'line_total'    => 30.0,
+					'quantity'      => 2,
+				),
+				false
+			)
+		);
+	}
+
+	public function test_cart_line_discount_includes_tax_on_both_sides_when_requested(): void {
+		// Including tax adds line_subtotal_tax and line_total_tax before the gap:
+		// (40 + 8) - (30 + 6) = 12, / 2 = 6.
+		$this->assertSame(
+			6.0,
+			Helpers::cart_line_discount(
+				array(
+					'line_subtotal'     => 40.0,
+					'line_subtotal_tax' => 8.0,
+					'line_total'        => 30.0,
+					'line_total_tax'    => 6.0,
+					'quantity'          => 2,
+				),
+				true
+			)
+		);
+	}
+
+	public function test_cart_line_discount_null_when_no_discount(): void {
+		// An undiscounted line (subtotal == total) yields null so the caller omits
+		// the field rather than emitting a 0 discount.
+		$this->assertNull(
+			Helpers::cart_line_discount(
+				array(
+					'line_subtotal' => 40.0,
+					'line_total'    => 40.0,
+					'quantity'      => 2,
+				),
+				false
+			)
+		);
+	}
+
+	public function test_cart_line_discount_null_without_line_totals(): void {
+		$this->assertNull( Helpers::cart_line_discount( array( 'quantity' => 2 ), false ) );
+	}
+
+	public function test_cart_line_discount_null_for_zero_quantity(): void {
+		$this->assertNull(
+			Helpers::cart_line_discount(
+				array(
+					'line_subtotal' => 40.0,
+					'line_total'    => 30.0,
+					'quantity'      => 0,
+				),
+				false
+			)
+		);
+	}
+
 	public function test_get_product_category_uses_first_assigned_category(): void {
 		// No Yoast primary term, so the first assigned category is used.
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );

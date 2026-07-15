@@ -167,6 +167,24 @@ final class ProductData {
 			$_temp_productdata['item_list_id'] = sanitize_title( (string) $_temp_productdata['item_list_name'] );
 		}
 
+		// GA4 item-level affiliation (the storefront/marketplace the item was sold
+		// through). WooCommerce has no native value for this, so it stays empty by
+		// default and is only added when 3rd party code supplies one - keeping the
+		// item payload free of empty affiliation strings (#348).
+		if ( ! isset( $_temp_productdata['affiliation'] ) ) {
+			/**
+			 * Filters the GA4 item-level affiliation for a product.
+			 *
+			 * @param string $affiliation         The affiliation value; empty by default.
+			 * @param mixed  $product             The WC_Product being processed.
+			 * @param string $attributes_used_for The ecommerce action the item is used for.
+			 */
+			$affiliation = (string) apply_filters( GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION, '', $product, $attributes_used_for );
+			if ( '' !== $affiliation ) {
+				$_temp_productdata['affiliation'] = $affiliation;
+			}
+		}
+
 		/**
 		 * Filters the ecommerce array before using it for tracking.
 		 * Can be used to add custom dimensions and metrics on your own or to alter existing product attributes based on your own logic.
@@ -238,12 +256,25 @@ final class ProductData {
 				}
 				$product_price = round( (float) $order->get_item_total( $order_item, $inc_tax ), 2 );
 
+				$item_attributes = array(
+					'quantity' => $order_item->get_quantity(),
+					'price'    => $product_price,
+				);
+
+				// GA4 per-item discount: the gap between the line subtotal (pre-discount)
+				// and total (post-discount), per unit. WooCommerce tracks these ex-tax on
+				// the order item; only added when the line was actually discounted (#348).
+				$quantity = (float) $order_item->get_quantity();
+				if ( $quantity > 0 ) {
+					$line_discount = round( ( (float) $order_item->get_subtotal() - (float) $order_item->get_total() ) / $quantity, 2 );
+					if ( $line_discount > 0 ) {
+						$item_attributes['discount'] = $line_discount;
+					}
+				}
+
 				$eec_product_array = $this->process_product(
 					$product,
-					array(
-						'quantity' => $order_item->get_quantity(),
-						'price'    => $product_price,
-					),
+					$item_attributes,
 					'purchase'
 				);
 

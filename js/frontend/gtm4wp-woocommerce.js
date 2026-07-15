@@ -790,6 +790,10 @@ function gtm4wp_woocommerce_process_pages() {
 
 			delete current_product_detail_data.internal_id;
 
+			// GA4 expects a quantity on the view_item item; a product view is a single
+			// unit (#348). add_to_cart later overwrites this with the chosen quantity.
+			current_product_detail_data.quantity = 1;
+
 			// fire ga4 version
 			gtm4wp_push_ecommerce(
 				'view_item',

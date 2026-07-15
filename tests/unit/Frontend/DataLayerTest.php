@@ -86,9 +86,10 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertCount( 1, $GLOBALS['gtm4wp_additional_datalayer_pushes'] );
 		$this->assertSame(
 			array(
+				// #348: event serializes first, matching the client-side push helper.
 				'datalayer_object' => array(
-					'foo'   => 'bar',
 					'event' => 'gtm4wp.test',
+					'foo'   => 'bar',
 				),
 				'js_before'        => 'before();',
 				'js_after'         => 'after();',
@@ -114,7 +115,7 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertSame( 'gtm4wp-additional-datalayer-pushes', $captured[0][0] );
 		$this->assertSame( 'after', $captured[0][2] );
 		$this->assertStringContainsString( '// before', $captured[0][1] );
-		$this->assertStringContainsString( 'dataLayer.push({"value":42,"event":"gtm4wp.test"});', $captured[0][1] );
+		$this->assertStringContainsString( 'dataLayer.push({"event":"gtm4wp.test","value":42});', $captured[0][1] );
 		$this->assertStringContainsString( '// after', $captured[0][1] );
 
 		$this->assertSame( array(), $GLOBALS['gtm4wp_additional_datalayer_pushes'] );
@@ -194,8 +195,8 @@ final class DataLayerTest extends FrontendTestCase {
 		// the assertion tracks the real output instead of a hand-typed literal.
 		$expected_json = wp_json_encode(
 			array(
-				'evil'  => '</script><svg onload=alert(1)> & "quote"',
 				'event' => 'gtm4wp.test',
+				'evil'  => '</script><svg onload=alert(1)> & "quote"',
 			),
 			JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);

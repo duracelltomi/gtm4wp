@@ -355,6 +355,8 @@ describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
 		expect( item.id ).toBe( 'woocommerce_gpf_456' );
 		expect( item.item_id ).toBe( 456 );
 		expect( item.item_group_id ).toBe( 'woocommerce_gpf_10' );
+		// #348: the variation view_item must carry an explicit quantity of 1.
+		expect( item.quantity ).toBe( 1 );
 	} );
 
 	it( 'leaves the id unprefixed and numeric when no prefix is set', () => {

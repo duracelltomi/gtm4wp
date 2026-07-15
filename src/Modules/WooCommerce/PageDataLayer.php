@@ -156,6 +156,13 @@ final class PageDataLayer {
 			$attributes['price'] = $price;
 		}
 
+		// GA4 per-item discount, added only when a coupon/sale actually reduced the
+		// line (#348); omitted otherwise so undiscounted items carry no discount key.
+		$discount = Helpers::cart_line_discount( $cart_item_data, $include_tax );
+		if ( null !== $discount ) {
+			$attributes['discount'] = $discount;
+		}
+
 		return $attributes;
 	}
 
@@ -240,9 +247,11 @@ final class PageDataLayer {
 		$postid  = get_the_ID();
 		$product = wc_get_product( $postid );
 
+		// GA4 expects a quantity on the view_item item; it defaults to 1 for a single
+		// product view (#348). Making it explicit keeps the payload spec-complete.
 		$eec_product_array = $this->product_data->process_product(
 			$product,
-			array(),
+			array( 'quantity' => 1 ),
 			'productdetail'
 		);
 
