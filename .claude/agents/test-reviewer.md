@@ -15,6 +15,10 @@ give real behavioral confidence.
 Your goal is confidence, not a coverage number. The failure mode you exist to
 catch: **a sink that is line-covered but exercised only with benign data**, so
 coverage is green while the security/edge behavior is unguarded (patterns TS-1).
+A second, quieter failure mode (TS-12): **an authorization gate — a
+`permission_callback` or a filterable capability — that no test exercises at all**,
+invisible because its component is marked `[x]` for the *output* dimensions. The
+XSS/output-sink lens will not prompt for it, so check access-control explicitly.
 
 ## Learned Patterns
 
@@ -36,6 +40,13 @@ and the Known Test-Gaps Log so you don't re-log addressed gaps.
   the sweeps — never fabricate coverage numbers.
 - **Untested public methods (TS-10):** for a class with a test file, grep its
   `public function` names and confirm each is referenced in the test.
+- **Access-control-gate sweep (TS-12):** grep for `permission_callback`,
+  `current_user_can`, `add_options_page`/`add_menu_page`, and
+  `apply_filters( '..._capability'`; confirm each gate has a **grant + deny** test,
+  and each filterable capability has a test that the filter changes the required
+  cap (and that the default is unchanged when unfiltered). Gates are frequently
+  executed by *no* test — the unit tests call REST handlers directly, bypassing
+  `permission_callback` — so a coverage driver shows them at 0%.
 - **Mutation (optional):** if `infection/infection` + a driver are present, a
   surviving mutant on a `<script>`/dataLayer line is a real gap even at 100% lines.
 
@@ -47,6 +58,11 @@ and the Known Test-Gaps Log so you don't re-log addressed gaps.
 - **Security-input coverage (TC-5) ⭐:** every request/header-sourced dataLayer
   field (`get_search_query`/`?s=`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, cookies,
   `$_SERVER`, WooCommerce billing/shipping) has a hostile-input regression test.
+- **Access-control (TS-12) ⭐:** an authorization gate is its own surface, not an
+  output sink — assert **grant AND deny**, and that a filterable capability
+  (`gtm4wp_admin_page_capability`) both defaults unchanged and is customized by the
+  filter (recipe TC-13). The XSS-first lens never prompts for this, and a
+  component's `[x]` output cells do not imply its gate is tested.
 - **Assert the effect not the call (TS-3); tautological tests (TS-4); happy-path
   only (TS-5); untested branches (TS-10); state leakage / non-determinism
   (TS-7/TS-8); over-coupling (TS-9, but respect BE-1).**
@@ -68,9 +84,9 @@ and the Known Test-Gaps Log so you don't re-log addressed gaps.
 
 ## Prioritize & report
 
-Rank gaps: **security-sink hostile-input** > **whole untested security-relevant
-class** > **untested error/edge branch** > **weak assertion** > **pure-logic
-coverage**. Do not chase coverage for its own sake — a getter or mock-echo test is
+Rank gaps: **security-sink hostile-input** > **untested authorization gate
+(TS-12)** > **whole untested security-relevant class** > **untested error/edge
+branch** > **weak assertion** > **pure-logic coverage**. Do not chase coverage for its own sake — a getter or mock-echo test is
 negative value; recommend `[-]` N/A with a reason instead (BE-3). Where feasible,
 verify a gap with a **throwaway** probe (a scratch test or tiny repro you run and
 discard) to observe it pass (correct code) or **fail (latent bug)**.

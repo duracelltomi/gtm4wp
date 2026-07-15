@@ -35,6 +35,7 @@ on every review before anything else.
 - **TS-2** — an escaping/XSS test must assert **both** that the safe form is present **and** that the raw break-out char is absent. One direction alone gives false confidence.
 - **TC-5** — every request/header-sourced dataLayer field (a `.security` PA-3 sink: `?s=`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, cookies, `$_SERVER`) ships a hostile-input regression test. This is the intersection of the two review systems.
 - **TS-6** — a whole class with **zero** tests is the cheapest, highest-value find. Run the missing-test-file sweep first every review.
+- **TS-12** — an authorization gate (a `permission_callback`, a `current_user_can()` check, a filterable capability like `gtm4wp_admin_page_capability`) is a test surface in its own right: it needs a **grant + deny** test and, if filterable, a test that the filter changes the required capability while the default stays unchanged. The XSS/output-sink lens (TS-1/TS-2/TC-5) never prompts for it, so an untested gate hides inside a component the matrix already marks `[x]`.
 
 **Test Smells (TS):**
 - **TS-11** — upstream raw-passthrough contract: a module that hands a value to a *shared downstream JSON sink* needs a **special-character** input proving it does NOT pre-escape (`esc_js`/`esc_attr`). With benign data (`'HU'`) an accidental pre-escape is invisible and coverage stays green (the module-boundary form of TS-1 / RI-4).
@@ -58,6 +59,7 @@ on every review before anything else.
 - **TC-2** — the Brain Monkey `wp_json_encode` stub honors the JSON flags, so build the expected encoded output by calling `wp_json_encode(...)` the way the source does — never hand-type `\uXXXX` literals.
 - **TC-3** — extend the right base: `FrontendTestCase` for services that read `Options` (it provides the Options factory + global reset); the plain `TestCase` for pure/static helpers with no Options dependency (`VisitorIp`).
 - **TC-4** — assert hook registration via `has_action`/`has_filter` (they return the priority integer), and prove **both** the enabled and the disabled state (the `ModuleHooksTest` gate pattern).
+- **TC-13** — the Brain Monkey recipe for a TS-12 capability gate: simulate the filter with `Filters\expectApplied( 'gtm4wp_admin_page_capability' )->andReturn( 'custom_cap' )` (omit it for the default-unchanged case — `apply_filters` passes the default through), assert `current_user_can` is called `->with()` that cap for grant/deny, and capture the `add_options_page()` 3rd arg for the menu/render gate (`AdminCapabilityFilterTest`).
 
 **Blessed Exceptions (BE) — do NOT flag:**
 - **BE-4** — snapshotting `$_POST`/`$_GET` in a test `setUp` (for TS-7 isolation) trips `WordPress.Security.NonceVerification.Missing` (a phpcs *error*, not warning). Suppress with a scoped `// phpcs:ignore WordPress.Security.NonceVerification.Missing -- test isolation snapshot; the handler's own nonce check is asserted`.
@@ -179,6 +181,35 @@ calls `stubEscapeFunctions()` (real `htmlspecialchars`), a re-added `esc_js` mak
 the assertion fail. This is TS-1 applied one hop upstream of the sink — check it
 for every module field that feeds the dataLayer with request/header data.
 
+### TS-12: Authorization/access-control gates are their own test surface ⭐
+A `permission_callback`, a `current_user_can()` gate, or a filterable required
+capability is a security control, but the review's XSS-first lens (TS-1/TS-2/TC-5,
+all about *output* sinks) never prompts for it — so an untested gate hides inside a
+component the matrix already marks `[x]`. Two things must be asserted, or the guard
+can be removed without a test going red:
+
+1. **Grant AND deny.** Drive the gate with a capable and an incapable user and
+   assert access is allowed vs refused (for a handler that `wp_die()`s, use the
+   TC-7 throw-and-observe form: stub `wp_die` to throw and assert the post-halt
+   side effect never ran).
+2. **The filter actually customizes the capability.** For a filterable cap
+   (`gtm4wp_admin_page_capability`, default `manage_options`), assert (a) the
+   default is checked when the filter is absent — so nothing changes unless
+   filtered — and (b) a filtered custom cap is the one passed to
+   `current_user_can()` / `add_options_page()`, granting or denying accordingly.
+
+Confirmed 2026-07-15 (issue #143): the `gtm4wp_admin_page_capability` filter gates
+`RestController::can_manage()` (the REST `permission_callback`) and
+`SettingsPage::add_admin_page()` (the `add_options_page()` capability argument =
+the Settings submenu **and** the page render guard), yet **no** test executed
+either method — the unit tests call the REST handlers directly, bypassing
+`permission_callback`, so even a coverage driver would have shown `can_manage()` at
+0%. `NoticesTest` had a deny-direction test only because a *finding* (#18) forced
+it; the settings/REST gate had no finding, so nothing demanded one — the pattern of
+the miss. Closed by `tests/unit/Admin/AdminCapabilityFilterTest.php`. Recipe:
+TC-13. How the flow was hardened so a future run catches this class: the
+**Access-control coverage** Test Debt Sweep in the checklist.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -287,6 +318,25 @@ entity-encoded) is a welcome documentation of intent but is not the load-bearing
 guard. Confirmed 2026-07-13: `videopress-tracker.test.js` does the origin-reject
 and raw-passthrough correctly; its accept-branch coverage is thin (T20).
 
+### TC-13: Capability-gate / filterable-capability test recipe
+The Brain Monkey recipe for a TS-12 gate (canonical example
+`tests/unit/Admin/AdminCapabilityFilterTest.php`):
+
+- **Filterable capability.** Simulate the filter with
+  `Filters\expectApplied( 'gtm4wp_admin_page_capability' )->once()->with( 'manage_options' )->andReturn( 'custom_cap' )`.
+  For the *default* (unfiltered) case set **no** `expectApplied` — Brain Monkey's
+  `apply_filters` returns the first arg unchanged, which is exactly the "nothing
+  changes unless filtered" assertion.
+- **Grant vs deny.** `Functions\expect( 'current_user_can' )->once()->with( $cap )->andReturn( true|false )`
+  and assert the method's boolean; a separate test per direction (TS-5).
+- **Menu/render capability.** `add_options_page()` enforces the cap for both the
+  submenu and the page render, so capture its 3rd argument
+  (`Functions\when( 'add_options_page' )->alias( fn( $t, $m, $cap, ... ) => $captured = $cap )`)
+  and assert it equals the filtered / default capability — no need to boot the menu.
+- The registry is irrelevant to `can_manage()` / `add_admin_page()`, so a bare
+  `new Registry()` (empty) keeps the test focused and skips the schema-building
+  stub set the other Admin tests need.
+
 ---
 
 ## Blessed Exceptions
@@ -318,6 +368,7 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-15 (issue #143) | Added **TS-12** (authorization/access-control gates are their own test surface — grant+deny + the filter customizes the required cap; the XSS-first lens never prompted for it, so the untested `gtm4wp_admin_page_capability` gate hid in an `[x]` component) and **TC-13** (the Brain Monkey capability-gate recipe). Prompted by closing the #143 gap with `AdminCapabilityFilterTest`. Also added the **Access-control coverage** Test Debt Sweep to the checklist and an access-control bullet to the pre-flight + the `test-reviewer` agent + the `/test-review` command, so the lens is applied mechanically on future runs. |
 | 2026-07-15 (Run 4 — gaps closed) | Closed T21–T26 on the user's "fix all" go-ahead. **PHP 381→416, JS 214→231, all green; phpcs 0 errors; lint:js clean; tests-only (no CHANGELOG).** Two security-contract tests throwaway-probe-verified (T21 `StoreApiData` fails if `item_name` pre-escaped; T22 purchase orderData fails if JSON_HEX_AMP dropped). New process lessons reinforced: (a) the **ListTracking constructor seeds four cross-request globals** (`gtm4wp_product_counter/last_widget_title/grouped_product_ix/cart_item_proddata`) — stage per-item test state AFTER `make_list_tracking()`, not before, or the constructor clobbers it; (b) TS-11 raw-passthrough for a delegated REST sink (`StoreApiData`) is written by asserting the value round-trips the callback verbatim with `stubEscapeFunctions()` installed, so a re-added `esc_*` fails; (c) the TC-8 Plugin-singleton harness extends to `WooCommerceModule::register_frontend_hooks()` (protected → `ReflectionMethod::invoke`; needs `Frontend` with both `datalayer` and `script_tag` props). New test stub `store-api-stub.php` (fake `StoreApi`/`ExtendSchema`/schemas + `ARRAY_A`). |
 | 2026-07-15 (Run 4 — report only) | Audited the shipped tests for the WooCommerce overhaul + CookieYes/CheckoutWC bridges (`780875c..HEAD`). **Security/XSS well-guarded, no High gap, no latent bug** — the previously-open `woocommerce` JS tracker gap is closed (793-line suite), the block cart-diff lib is fully covered, and the one new untrusted request surface (list-attribution cookie #405) is hostile-input both-directions. Extended **TS-7** with the JS delegated-`document`-listener leak across `jest.isolateModules`. **No new numbered pattern.** Two process lessons (no numbered entry): (a) a `ProductData` eligibility-helper branch is often exercised through `PurchaseTracking::on_thankyou`, not `ProductDataTest` — read the sibling test file before logging a helper branch as untested (two Run-4 fan-out Mediums collapsed this way: the age-gate TRUE branch and the `$_COOKIE[...tracked]` dedupe branch); (b) a delegated REST/Store-API sink still earns a **raw-passthrough contract** test (TS-11), even though it's FP-4 for XSS — it's the only place the sink's item passthrough is asserted. Gaps T21–T26. No tests written. |
 | 2026-07-14 (Run 3 — gaps closed) | Closed T13 (`SettingsPageTest` — admin bootstrap hex sink, throwaway-probe-proven), T15 (`PluginRowTest` — action links + remote-notice both-directions escape), and T16's `client-device-data` half (`client-device-data-tracker.test.js` — both detection paths, config gating, reject branch, no-push guard); `woocommerce` tracker left open per the user (under review). Added **TC-12** (admin enqueue-method hex-sink capture harness — the encode is at the `wp_add_inline_script` call site, so drive the enqueue method, not the data-builder) and extended **TC-9** with the `navigator` override + Client-Hints promise-flush recipe. PHP 282→290, JS 161→167, all green; phpcs/lint clean; tests-only (no CHANGELOG). |

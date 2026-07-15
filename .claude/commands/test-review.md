@@ -10,6 +10,13 @@ that matters most is: **does a regression test guard every value that reaches a
 `<script>`/HTML sink, with a hostile input?** Treat that as the default lens, the
 mirror of `/code-review`'s output-escaping focus.
 
+A **second lens**, easy to forget precisely because it is not an output sink:
+**access control.** Every `permission_callback`, `current_user_can()` gate and
+filterable capability (`gtm4wp_admin_page_capability`) needs a **grant + deny**
+test, and every filterable cap needs a test that the filter customizes it while the
+default stays unchanged (TS-12/TC-13). These gates are often executed by no test at
+all, so coverage never flags them — the Access-control sweep exists to catch this.
+
 The system is a **hybrid**: a cheap, objective *mechanical* layer (missing-test
 detection, coverage if a driver is present, mutation testing if enabled) finds
 candidates; the *judgment* layer classifies them and finds what tooling can't see
@@ -44,7 +51,7 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
    new commits and no `[ ]`/`[~]` cells, this is the trigger to **go deep**, not to
    stop:
    - Run **every** Test Debt Sweep (missing-file, untested-method, security-input,
-     regression-per-bug, JS, and — if enabled — mutation testing).
+     access-control, regression-per-bug, JS, and — if enabled — mutation testing).
    - Re-audit the **oldest-reviewed or highest-risk `[x]` components** (sort the
      matrix by date; take the ~5 oldest plus anything that outputs into a
      `<script>`/HTML context, handles order/customer data, or reads request
@@ -109,7 +116,17 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
    list its public methods (`Grep 'public function'`) and check each name appears
    in the test file. Missing names are candidate gaps (mind hook callbacks reached
    only via `add_action`).
-4. **Mutation testing (if enabled — TS-1's mechanical form).** If
+4. **Access-control-gate sweep (TS-12).** Grep for `permission_callback`,
+   `current_user_can`, `add_options_page`/`add_menu_page`, and
+   `apply_filters( '..._capability'`; for each gate confirm a **grant + deny** test,
+   and for each filterable capability a test that the filter changes the required
+   cap (default unchanged when unfiltered). Gates are often executed by no test —
+   the unit tests call REST handlers directly, bypassing `permission_callback` — so
+   coverage shows them at 0%. Recipe: TC-13.
+   ```bash
+   grep -rnE "permission_callback|current_user_can|add_(options|menu)_page|apply_filters\( *'[a-z0-9_]*capability" src/
+   ```
+5. **Mutation testing (if enabled — TS-1's mechanical form).** If
    `infection/infection` is installed and a coverage driver is present, run it on
    the changed component; a surviving mutant on a security sink is a real gap even
    at 100% line coverage. Optional; note if skipped.
@@ -124,6 +141,12 @@ Apply `.testing/test-review-patterns.md` to each prioritized component:
   PA-3/RI-2 sink (`get_search_query`/`?s=`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`,
   cookies, `$_SERVER`, WooCommerce billing/shipping) has a hostile-input case
   (TC-5).
+- **Access-control gates (TS-12).** An authorization gate is its own surface, not
+  an output sink: for every `permission_callback` / `current_user_can()` gate,
+  assert **grant AND deny**; for every filterable capability
+  (`gtm4wp_admin_page_capability`), assert the default is unchanged when unfiltered
+  AND a filtered custom cap is the one enforced (recipe TC-13). A component's `[x]`
+  output cells never imply its gate is tested.
 - **One-directional escaping tests (TS-2).** Flag XSS guards that assert only the
   safe form OR only the absent raw char, not both.
 - **Assert-the-call-not-the-effect (TS-3)** and **tautological (TS-4)** tests.
@@ -148,10 +171,11 @@ prove a gap; adding tests is the gated close step (§C), done only on the user's
 
 ### C. Prioritize & report (close only on request)
 
-Rank gaps: **security-sink hostile-input** > **whole untested security-relevant
-class** > **untested error/edge branch** > **weak assertion** > **pure-logic
-coverage**. Do not chase coverage for its own sake — a getter test or a
-mock-echo test (TS-4) is negative value; prefer recording `[-]` N/A with a reason.
+Rank gaps: **security-sink hostile-input** > **untested authorization gate
+(TS-12)** > **whole untested security-relevant class** > **untested error/edge
+branch** > **weak assertion** > **pure-logic coverage**. Do not chase coverage for
+its own sake — a getter test or a mock-echo test (TS-4) is negative value; prefer
+recording `[-]` N/A with a reason.
 
 **The review itself never writes into the committed test suite.** Exactly like
 `/code-review`, it stops at the report: save it, present the ranked gaps, and ask
@@ -182,6 +206,7 @@ sink, never restate exploit detail; defer to `.security/`.
 - Missing test files: {classified list}
 - Coverage: {numbers, or "no driver — sweeps only"}
 - Untested public methods: {list}
+- Access-control gates: {each permission_callback / capability filter → grant+deny + filter-customization tested? or none}
 - Mutation survivors: {list, or "not run"}
 
 ## Judgment findings (by severity)

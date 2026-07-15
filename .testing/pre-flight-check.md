@@ -27,6 +27,13 @@ Pay special attention to (⭐ = highest impact):
 - **⭐ Every request/header-sourced dataLayer field (TC-5)** — `?s=`,
   `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, cookies, `$_SERVER` — ships a hostile-input
   regression test.
+- **⭐ Access-control gates (TS-12/TC-13):** a `permission_callback`, a
+  `current_user_can()` check, or a filterable required capability
+  (`gtm4wp_admin_page_capability`) ships a **grant + deny** regression test — and a
+  filterable cap ships a test that the default (`manage_options`) is unchanged AND a
+  filtered custom cap is the one enforced. This is a *second lens* alongside the
+  output-sink one; coverage/XSS tooling never prompts for it, and a component's
+  `[x]` output cells do not imply its gate is tested.
 - **Assert the effect, not the call (TS-3):** if a method does N things, assert N
   (the queue flushed, the value changed) — not just that it ran.
 - **Cover the edge/error branch (TS-5):** empty, invalid, boundary, and the

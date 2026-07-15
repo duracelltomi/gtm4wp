@@ -38,6 +38,13 @@ changed after the review date. Check with `git log --since="YYYY-MM-DD" -- <src>
 - *Regr* — a regression test exists for each past bug/finding touching the component (`.security` Known Findings + this log), or `[-]`.
 - *Isol* — tests are deterministic and leak no global/superglobal state (TS-7/TS-8).
 
+> **Access-control (authZ) is not a per-component column.** Authorization gates —
+> `permission_callback`s, `current_user_can()` checks, filterable capabilities
+> (`gtm4wp_admin_page_capability`) — are sparse and cross-cutting, so they are
+> tracked by the **Access-control coverage** Test Debt Sweep below, not a matrix
+> cell (TS-12/TC-13). A component's `[x]` cells cover its *output* behavior; they
+> do **not** imply its capability gate is tested.
+
 ---
 
 ## Coverage Matrix
@@ -65,7 +72,7 @@ yet still carry `[ ]` cells — presence ≠ reviewed-and-complete.
 | **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`; JS tracker) | `Modules/ClientDeviceDataModuleTest`, `ModuleHooksTest` (gate); JS: `client-device-data-tracker` | [x] 2026-07-13 | [x] 2026-07-14 | [x] 2026-07-14 | [-] | [x] 2026-07-14 | [x] 2026-07-14 |
 | **AMP Module** (`src/Modules/Amp/` — amp-wp 2.x `amp_analytics_entries` sink) | `Modules/AmpModuleTest`, `ModuleHooksTest` (gate) | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | `Admin/NoticesTest` | [x] 2026-07-13 | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
-| **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest`, `SettingsPageTest`, `PluginRowTest` | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
+| **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest`, `SettingsPageTest`, `PluginRowTest`, `AdminCapabilityFilterTest` | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Module Admin Schemas** (`src/Modules/*/AdminSchema.php`) | `Modules/ModuleConsistencyTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
 | **Frontend JS** (`js/frontend/` — 18 trackers + `lib/native-video-params` + `lib/blocks-cart-diff`) | 20 `js/frontend/test/*.test.js` (all trackers + libs; `woocommerce`/`woocommerce-blocks`/`blocks-cart-diff` now covered — the previously-open `woocommerce` gap is closed) | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 |
 | **Admin JS** (`js/admin/`) | `js/admin/test/utils.test.js` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
@@ -91,6 +98,7 @@ review; treat a sweep older than ~4 weeks or predating a feature landing as stal
 | **Security-input coverage** (every `.security` PA-3/RI-2 sink has a hostile-input test — TS-1/TC-5) | 2026-07-15 (Run 4) | **Batch clean — no open hostile-input sink gap.** Verified both-directions: list-attribution cookie #405 (the one new untrusted request surface — `ProductDataTest`+`PageDataLayerTest`); product-title + order-number `<script>` sinks; raw order billing/shipping passthrough (#8 contract); PA-7 replacement injectors (#16); CookieYes datalayer-name `esc_js` (`ConsentModeCookieYesTest`). Store-API block sink is a delegated REST sink (FP-4) — the only *open* item is a raw-passthrough **contract** test (T21, data-integrity not XSS) + `item_category` benign-only (T23). |
 | **Regression-per-bug** (every `.security` Known Finding has a live regression test) | 2026-07-15 (Run 4) | `.security` Review 5 landed one Low (#31 block cross-sell `internal_id` strip) with a both-directions regression in `woocommerce-blocks-tracker.test.js` — verified live. Prior #1–#6/#8/#11–#18/#28–#30 unchanged. **No unverified findings remain.** |
 | **JS test coverage** (`js/frontend/` trackers, `js/admin/` app) | 2026-07-15 (Run 4 + closes) | **JS suite 214 → 231 green (21 suites)** after closing T25 (classic cart qty-change + remove-link + variable/grouped/disabled add_to_cart + chunking + parse catches) and T26 (delegated-listener isolation harness, probe-verified). Also confirmed Run-4 baseline: `woocommerce` (last open tracker gap, now closed), `woocommerce-blocks`, `blocks-cart-diff`, `ecommerce-generic` all covered; pure cart-diff lib + block tracker core well-covered (real `subscribe()` drive, TC-10). **No open JS gaps.** |
+| **Access-control coverage** (every `permission_callback` / capability gate has a grant+deny test; every filterable capability — `gtm4wp_admin_page_capability` — has a test that the filter customizes the required cap while the default stays unchanged — TS-12/TC-13) | 2026-07-15 (issue #143) | **Closed the one open gap.** `RestController::can_manage()` (REST `permission_callback`) and `SettingsPage::add_admin_page()` (`add_options_page()` cap arg = menu + render guard) were executed by **no** test — the unit tests call the REST handlers directly, bypassing the permission callback, so a coverage driver would show `can_manage()` at 0%. Added `AdminCapabilityFilterTest` (default `manage_options` unchanged + filtered-cap grant/deny at both sites). `Notices::dismiss_notice` deny-direction already covered (finding #18, T8). Module frontend hooks gate on *options*, not capability, so they are out of scope for this sweep. |
 | **Assertion quality** (mutation testing — Infection, optional) | never | Not yet enabled. See `.claude/commands/test-review.md` § Optional tooling to install `infection/infection` + a coverage driver. |
 
 ---
@@ -207,6 +215,19 @@ JSON_HEX_AMP is dropped from the purchase sink). New test stub
 | T24 | Low | addressed | `item_category`/variant/brand + coupon raw-passthrough; `StoreApiData::register()`; `is_order_older_than_max_age` paid-date branch; PageDataLayer event cluster (view_cart/cartContent/re-added/variable-on-parent/grouped); WC AdminSchema trim sanitizers; `add_global_vars` CheckoutWC/list flags; `queue_push` precedence; `Field::to_ui_array` phase. | `tests/unit/Modules/*`, `tests/unit/Frontend/DataLayerTest.php`, `Options/FieldTest.php` |
 | T25 | Med | addressed | Classic JS cart handlers now tested (exact counts): qty-change add/remove net-delta, remove-link (input + textContent qty + qty-0 guard), variable/grouped/disabled add_to_cart, view_item_list chunking, QuickView + found_variation parse catches. | `js/frontend/test/woocommerce-tracker.test.js` |
 | T26 | Low | addressed | TS-7 JS isolation fixed in-test: a `bootWithCapture`/`detachCaptured` harness records and `afterEach`-removes the module-load delegated `document` listeners; probe-verified (neutralizing the detach double-fired `remove_from_cart`), enabling exact-count assertions. | `js/frontend/test/woocommerce-tracker.test.js`, `woocommerce-blocks-tracker.test.js` |
+
+### Access-control coverage — new sweep/dimension — 2026-07-15
+
+Triggered by issue #143: the `gtm4wp_admin_page_capability` filter (delegate GTM4WP
+settings to a non-admin role) turned out to be **already implemented** (since 1.20,
+from @emreerkan) and applied at every gate, but was **never regression-tested**.
+Added the **Access-control coverage** sweep + patterns TS-12 / TC-13 and wired the
+lens into the pre-flight, the `test-reviewer` agent and the `/test-review` command.
+Tests-only (CHANGELOG exempt); suite PHP 439 → 444 green, phpcs 0 errors.
+
+| # | Sev | Status | Summary | File(s) |
+|---|-----|--------|---------|---------|
+| T27 | Med | addressed | `gtm4wp_admin_page_capability` gate untested: `RestController::can_manage()` + `SettingsPage::add_admin_page()` had **zero** executing tests (TS-12). Added default-unchanged + filtered-cap grant/deny at both sites. **Why it slipped:** the review's XSS-first lens has no authZ dimension; the missing-test-file sweep (TS-6) is file-granular so both files counted as "covered"; and capability tests were only ever written where a `.security` finding forced one (Notices #18) — this gate never had a finding. | `tests/unit/Admin/AdminCapabilityFilterTest.php` |
 
 ### Open gaps (prioritized by the sweeps above)
 
