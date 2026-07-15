@@ -53,6 +53,7 @@ final class ContainerModule extends AbstractModule {
 			GTM4WP_OPTION_LOADEARLY        => false,
 			GTM4WP_OPTION_NOGTMFORLOGGEDIN => '',
 			GTM4WP_OPTION_NOCONSOLELOG     => false,
+			GTM4WP_OPTION_PRODUCTIONONLY   => false,
 		);
 	}
 

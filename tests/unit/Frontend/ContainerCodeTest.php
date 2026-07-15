@@ -153,6 +153,57 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringNotContainsString( 'container code placement set to OFF', $tag, 'No console warning is emitted when console logging is disabled.' );
 	}
 
+	public function test_get_tag_suppresses_iframe_on_non_production_when_production_only_enabled(): void {
+		// Kill switch: with the production-only option on, a non-production
+		// environment (staging/clone) never emits the noscript iframe; the code
+		// is marked as written so the iframe block is skipped, exactly like OFF.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-ABC123',
+				GTM4WP_OPTION_PRODUCTIONONLY => true,
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringNotContainsString( 'ns.html', $tag, 'The noscript iframe must be suppressed on a non-production environment.' );
+		$this->assertStringContainsString( 'container code output has been suppressed', $tag );
+		$this->assertTrue( $GLOBALS['gtm4wp_container_code_written'] );
+	}
+
+	public function test_get_tag_suppresses_iframe_when_output_filter_returns_false(): void {
+		// The gtm4wp_output_container filter suppresses the noscript iframe too.
+		Filters\expectApplied( GTM4WP_WPFILTER_OUTPUT_CONTAINER )
+			->andReturn( false );
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+
+		$tag = $container->get_tag();
+
+		$this->assertStringNotContainsString( 'ns.html', $tag, 'A false gtm4wp_output_container filter must suppress the iframe.' );
+		$this->assertTrue( $GLOBALS['gtm4wp_container_code_written'] );
+	}
+
+	public function test_get_tag_outputs_iframe_on_production_when_production_only_enabled(): void {
+		// The production-only option must NOT suppress the iframe on a real
+		// production environment.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-ABC123',
+				GTM4WP_OPTION_PRODUCTIONONLY => true,
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123', $tag );
+		$this->assertStringNotContainsString( 'container code output has been suppressed', $tag );
+	}
+
 	public function test_header_begin_outputs_datalayer_and_container_loader(): void {
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_CONTAINER_CODE )->once();
@@ -294,6 +345,111 @@ final class ContainerCodeTest extends FrontendTestCase {
 
 		$this->assertStringNotContainsString( 'console.warn', $output, 'The disabled-role warning is suppressed when console logging is off.' );
 		$this->assertStringNotContainsString( 'gtm.js?id=', $output, 'The container loader is still omitted for the disabled role.' );
+	}
+
+	public function test_header_begin_suppresses_container_on_non_production_when_production_only_enabled(): void {
+		// Kill switch: with the production-only option on, a non-production
+		// environment (staging/clone) gets the data layer but no container
+		// loader - so it never sends hits to the live GTM container.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
+		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-AAA111',
+				GTM4WP_OPTION_PRODUCTIONONLY => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content', $output, 'The data layer must still be compiled when the container is suppressed.' );
+		$this->assertStringContainsString( 'container code output has been suppressed', $output );
+		$this->assertStringNotContainsString( 'gtm.js?id=', $output, 'The container loader must not be emitted on a non-production environment.' );
+	}
+
+	public function test_header_begin_outputs_container_on_production_when_production_only_enabled(): void {
+		// The production-only option must NOT suppress the container on a real
+		// production environment.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-AAA111',
+				GTM4WP_OPTION_PRODUCTIONONLY => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringNotContainsString( 'container code output has been suppressed', $output );
+	}
+
+	public function test_header_begin_outputs_container_on_non_production_when_production_only_disabled(): void {
+		// With the option off (default) the environment type is irrelevant: the
+		// container is still emitted on staging, preserving 1.x behavior. This
+		// is the else branch of the production-only gate.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-AAA111',
+				GTM4WP_OPTION_PRODUCTIONONLY => false,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringNotContainsString( 'container code output has been suppressed', $output );
+	}
+
+	public function test_header_begin_suppresses_container_when_output_filter_returns_false(): void {
+		// The gtm4wp_output_container filter is the programmatic kill switch: a
+		// site returns false from an mu-plugin/wp-config to suppress the
+		// container while keeping the data layer active.
+		Filters\expectApplied( GTM4WP_WPFILTER_OUTPUT_CONTAINER )
+			->andReturn( false );
+		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content', $output, 'The data layer must still be compiled when the filter suppresses the container.' );
+		$this->assertStringContainsString( 'container code output has been suppressed', $output );
+		$this->assertStringNotContainsString( 'gtm.js?id=', $output );
+	}
+
+	public function test_header_begin_suppressed_container_silent_when_console_log_disabled(): void {
+		// No console warning is emitted for the suppressed container when console
+		// logging is turned off; the loader is still omitted.
+		Filters\expectApplied( GTM4WP_WPFILTER_OUTPUT_CONTAINER )
+			->andReturn( false );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE     => 'GTM-AAA111',
+				GTM4WP_OPTION_NOCONSOLELOG => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content', $output );
+		$this->assertStringNotContainsString( 'console.warn', $output, 'No console warning is emitted when console logging is disabled.' );
+		$this->assertStringNotContainsString( 'gtm.js?id=', $output );
 	}
 
 	public function test_header_begin_falls_back_to_default_path_on_invalid_custom_path(): void {

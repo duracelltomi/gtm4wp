@@ -312,6 +312,15 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'advanced'
 			),
 			new Field(
+				key: GTM4WP_OPTION_PRODUCTIONONLY,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Only output the container on production environments', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'When turned on, the GTM container code is only output when WordPress reports the environment type as "production". On any other environment (local, development, staging) the container is suppressed while the data layer stays active - so a cloned or staging copy of your site does not send hits to your live Google Tag Manager container without deactivating the plugin. This relies on the WP_ENVIRONMENT_TYPE constant (or WP_ENVIRONMENT_TYPE environment variable) being set on non-production copies; it defaults to "production" when unset. For host-based control without an option, return false from the gtm4wp_output_container filter.', 'duracelltomi-google-tag-manager' ),
+				group: 'advanced',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
 				key: GTM4WP_OPTION_NOGTMFORLOGGEDIN,
 				type: Field::TYPE_MULTISELECT,
 				default_value: '',

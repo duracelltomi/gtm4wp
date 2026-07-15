@@ -38,6 +38,7 @@ define( 'GTM4WP_OPTION_GTMDOMAIN', 'gtm-domain-name' );
 define( 'GTM4WP_OPTION_GTMCUSTOMPATH', 'gtm-custom-path' );
 define( 'GTM4WP_OPTION_NOGTMFORLOGGEDIN', 'gtm-no-gtm-for-logged-in' );
 define( 'GTM4WP_OPTION_NOCONSOLELOG', 'gtm-no-console-log' );
+define( 'GTM4WP_OPTION_PRODUCTIONONLY', 'gtm-production-only' );
 
 define( 'GTM4WP_OPTION_INCLUDE_LOGGEDIN', 'include-loggedin' );
 define( 'GTM4WP_OPTION_INCLUDE_USERROLE', 'include-userrole' );
@@ -191,6 +192,17 @@ define( 'GTM4WP_WPACTION_AFTER_DATALAYER', 'gtm4wp_output_after_datalayer' );
  * to fire additional data layer events after the main GTM container code.
  */
 define( 'GTM4WP_WPACTION_AFTER_CONTAINER_CODE', 'gtm4wp_after_container_code' );
+
+/**
+ * Constant used by GTM4WP as a WordPress filter to decide whether the GTM
+ * container code (the <head> loader and the <noscript> iframe) is output on
+ * the current request. Defaults to true. Returning false from an mu-plugin or
+ * wp-config snippet suppresses the container - based on the host name,
+ * WP_ENVIRONMENT_TYPE or any custom condition - while the data layer stays
+ * active, so a cloned/staging copy of a site does not send hits to the
+ * production container without deactivating the plugin.
+ */
+define( 'GTM4WP_WPFILTER_OUTPUT_CONTAINER', 'gtm4wp_output_container' );
 
 /**
  * Constant that GTM4WP itself and 3rd party plugins can use to add JavaScript

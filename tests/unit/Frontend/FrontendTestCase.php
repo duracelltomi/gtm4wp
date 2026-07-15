@@ -33,6 +33,7 @@ abstract class FrontendTestCase extends TestCase {
 		GTM4WP_OPTION_GTMCUSTOMPATH                      => '',
 		GTM4WP_OPTION_NOGTMFORLOGGEDIN                   => '',
 		GTM4WP_OPTION_NOCONSOLELOG                       => false,
+		GTM4WP_OPTION_PRODUCTIONONLY                     => false,
 		GTM4WP_OPTION_INTEGRATE_COOKIEBOT                => false,
 		GTM4WP_OPTION_INTEGRATE_CONSENTMODE              => false,
 		GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS          => false,

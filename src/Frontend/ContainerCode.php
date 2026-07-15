@@ -232,6 +232,18 @@ final class ContainerCode {
 			$this->script_tag->print_script_block( $this->console_off_warning() );
 		}
 
+		// Kill switch: the production-only option or the gtm4wp_output_container
+		// filter can suppress the container on a cloned/staging copy. Mirrors the
+		// placement-OFF behavior above - the data layer stays active, only the
+		// container loader below is skipped.
+		if ( $output_container_code && ! $this->should_output_container() ) {
+			$output_container_code = false;
+
+			if ( ! $no_console_log ) {
+				$this->script_tag->print_script_block( $this->container_suppressed_warning() );
+			}
+		}
+
 		$disabled_roles = explode( ',', (string) $this->options->get( GTM4WP_OPTION_NOGTMFORLOGGEDIN ) );
 		$current_user   = wp_get_current_user();
 		foreach ( $current_user->roles as $user_role ) {
@@ -336,6 +348,21 @@ final class ContainerCode {
 	}
 
 	/**
+	 * Console warning shown when the container code is suppressed by the
+	 * production-only option or the gtm4wp_output_container filter (the kill
+	 * switch) while the data layer stays active.
+	 *
+	 * @return string
+	 */
+	private function container_suppressed_warning(): string {
+		return '
+' . $this->script_tag->opening_tag() . '
+	console.warn && console.warn("[GTM4WP] Google Tag Manager container code output has been suppressed on this environment !!!");
+	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
+</script>';
+	}
+
+	/**
 	 * Builds the GTM container loader snippet for one container row. The
 	 * domain, path and ID are validated/escaped by their helper methods.
 	 *
@@ -395,6 +422,16 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	console.warn && console.warn("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
 </script>';
+			}
+		} elseif ( ! $this->should_output_container() ) {
+			// Kill switch (production-only option / gtm4wp_output_container
+			// filter): suppress the noscript iframe exactly like placement OFF -
+			// mark the code as "written" so the iframe block below is skipped
+			// while the data layer stays active.
+			$GLOBALS['gtm4wp_container_code_written'] = true;
+
+			if ( ! $no_console_log ) {
+				$_gtm_tag .= $this->container_suppressed_warning();
 			}
 		}
 
@@ -489,6 +526,51 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 */
 	private function containers(): array {
 		return ContainerRows::normalize( $this->options->get( GTM4WP_OPTION_GTM_CONTAINERS, array() ) );
+	}
+
+	/**
+	 * Kill switch: decides whether the GTM container code (the <head> loader
+	 * and the <noscript> iframe) may be emitted on the current request. Two
+	 * independent gates can suppress it while keeping the data layer active
+	 * (like placement OFF), so a cloned/staging copy of a site does not send
+	 * hits to the production container without deactivating the plugin:
+	 *
+	 * 1. The gtm4wp_output_container filter (default true): return false from
+	 *    an mu-plugin or wp-config snippet to suppress the container based on
+	 *    the host name, WP_ENVIRONMENT_TYPE or any custom condition.
+	 * 2. The "Only output on production environments" option: when enabled the
+	 *    container is emitted only when wp_get_environment_type() is
+	 *    'production' (WordPress derives it from the WP_ENVIRONMENT_TYPE
+	 *    constant / environment variable, defaulting to 'production').
+	 *
+	 * @return bool
+	 */
+	private function should_output_container(): bool {
+		/**
+		 * Filters whether the Google Tag Manager container code is output on
+		 * the current request. Return false to suppress the container <script>
+		 * and the noscript iframe while keeping the data layer active - e.g.
+		 * from an mu-plugin on a staging/clone copy of the site.
+		 *
+		 * @since 2.0.0
+		 *
+		 * @param bool $output_container Whether to output the container. Default true.
+		 */
+		if ( ! apply_filters( GTM4WP_WPFILTER_OUTPUT_CONTAINER, true ) ) {
+			return false;
+		}
+
+		if ( $this->options->get( GTM4WP_OPTION_PRODUCTIONONLY ) ) {
+			// wp_get_environment_type() ships with WordPress 5.5+; the guard
+			// keeps the unit tests (which never load WordPress) working.
+			$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
+
+			if ( 'production' !== $environment ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
