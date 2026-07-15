@@ -120,10 +120,14 @@ function gtm4wp_blocks_currency( cart_data ) {
  * @return {Object} The GA4 item.
  */
 function gtm4wp_blocks_to_crosssell_item( entry ) {
-	return Object.assign( {}, entry.item, {
+	const item = Object.assign( {}, entry.item, {
 		item_list_name: CROSS_SELL_LIST_NAME,
 		item_list_id: CROSS_SELL_LIST_ID,
 	} );
+	// internal_id is a server-side bookkeeping key that must never reach GA4;
+	// strip it here exactly as gtm4wp_blocks_to_item() does for cart lines.
+	delete item.internal_id;
+	return item;
 }
 
 /**

@@ -278,6 +278,54 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		expect( repeated ).not.toContain( 'view_item_list' );
 	} );
 
+	it( 'strips internal_id from cross-sell view_item_list / select_item items', () => {
+		mockCartData = {
+			items: [],
+			totals: { currency_code: 'EUR' },
+			crossSells: [
+				{
+					id: 9,
+					permalink: 'https://shop/p9',
+					extensions: {
+						gtm4wp: {
+							item: { item_id: 9, price: 4, internal_id: 9 },
+						},
+					},
+				},
+			],
+		};
+		const subscriber = loadTracker();
+		subscriber(); // fires view_item_list and resolves the click closure
+
+		const view = window.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'view_item_list'
+		);
+		expect( view ).toBeDefined();
+		// Both directions: the list identity is present AND the bookkeeping key is gone.
+		expect( view[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( {
+				item_id: 9,
+				item_list_name: 'Cross-Sells',
+			} )
+		);
+		expect( view[ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
+
+		document.body.innerHTML =
+			'<div class="wp-block-woocommerce-cart-cross-sells-block">' +
+			'<a href="https://shop/p9">Buy</a></div>';
+		document
+			.querySelector( 'a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const select = window.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'select_item'
+		);
+		expect( select ).toBeDefined();
+		expect( select[ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
+	} );
+
 	it( 'fires select_item when a cross-sell product link is clicked', () => {
 		mockCartData = {
 			items: [],
