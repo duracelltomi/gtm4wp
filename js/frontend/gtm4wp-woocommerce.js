@@ -228,6 +228,14 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 			}
 			productdata.quantity = product_qty;
 
+			// #405: carry the originating list onto this add_to_cart item (opt-in).
+			if ( window.gtm4wp_list_attribution ) {
+				gtm4wp_apply_stored_item_list(
+					productdata,
+					productdata.internal_id
+				);
+			}
+
 			delete productdata.internal_id;
 
 			products.push( productdata );
@@ -250,13 +258,26 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 			return false;
 		}
 
-		const productdata = gtm4wp_read_from_json( product_data_el.value );
+		// Keep internal_id from being excluded so #405 can look up the stored list
+		// by product id; it is deleted again before the push below.
+		const productdata = gtm4wp_read_from_json( product_data_el.value, [
+			'productlink',
+		] );
 		productdata.quantity =
 			form.querySelector( '[name=quantity]' ) &&
 			form.querySelector( '[name=quantity]' ).value;
 		if ( isNaN( productdata.quantity ) ) {
 			productdata.quantity = 1;
 		}
+
+		// #405: carry the originating list onto this add_to_cart item (opt-in).
+		if ( window.gtm4wp_list_attribution ) {
+			gtm4wp_apply_stored_item_list(
+				productdata,
+				productdata.internal_id
+			);
+		}
+		delete productdata.internal_id;
 
 		gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
 			currency: gtm4wp_currency,
@@ -616,6 +637,28 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
+				// #405: persist this list attribution (keyed by product id) so the
+				// later view_item / add_to_cart / checkout / purchase events can be
+				// attributed back to the originating list. internal_id was excluded
+				// above, so read it straight from the node. Opt-in only.
+				if (
+					window.gtm4wp_list_attribution &&
+					productdata.item_list_name
+				) {
+					const list_source = gtm4wp_read_json_from_node(
+						productdata_el,
+						'gtm4wp_product_data',
+						[]
+					);
+					if ( list_source && list_source.internal_id ) {
+						gtm4wp_store_item_list_attribution(
+							list_source.internal_id,
+							productdata.item_list_name,
+							productdata.item_list_id
+						);
+					}
+				}
+
 				// Look at first GTM container ID in case there are multiple GTM containers live on the page
 				// since eventCallback is called on every container and we only need this executed once in this case.
 				for ( const i in window.google_tag_manager ) {
@@ -788,11 +831,23 @@ function gtm4wp_woocommerce_process_pages() {
 			gtm4wp_last_selected_product_variation =
 				current_product_detail_data;
 
+			// #405: the parent product id (internal_id, about to be deleted) is what
+			// the list stored the attribution under; use it to enrich this view_item
+			// (and the add_to_cart that reuses this object) from the cookie. Opt-in.
+			const list_product_id = current_product_detail_data.internal_id;
+
 			delete current_product_detail_data.internal_id;
 
 			// GA4 expects a quantity on the view_item item; a product view is a single
 			// unit (#348). add_to_cart later overwrites this with the chosen quantity.
 			current_product_detail_data.quantity = 1;
+
+			if ( window.gtm4wp_list_attribution ) {
+				gtm4wp_apply_stored_item_list(
+					current_product_detail_data,
+					list_product_id
+				);
+			}
 
 			// fire ga4 version
 			gtm4wp_push_ecommerce(

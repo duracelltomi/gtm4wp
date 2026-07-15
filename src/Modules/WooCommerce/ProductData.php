@@ -32,6 +32,26 @@ final class ProductData {
 	public const PENDING_PURCHASE_SESSION_KEY = 'gtm4wp_pending_purchase';
 
 	/**
+	 * Contexts (process_product $attributes_used_for values) whose output is
+	 * built on pages/requests that are never full-page cached, so the list
+	 * attribution cookie may be merged server-side there without making cacheable
+	 * HTML visitor-specific. The product-detail / product-list contexts are
+	 * excluded on purpose and enriched client-side instead (#405).
+	 *
+	 * @var string[]
+	 */
+	private const LIST_ATTRIBUTION_CONTEXTS = array( 'cart', 'checkout', 'purchase', 'readdedtocart', 'block' );
+
+	/**
+	 * Per-request cache of the parsed list-attribution cookie (product id => list
+	 * data), or null before it is first read. Avoids re-decoding the cookie for
+	 * every item built in a request.
+	 *
+	 * @var array<int, array{item_list_name: string, item_list_id: string}>|null
+	 */
+	private ?array $list_attribution_map = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -167,6 +187,28 @@ final class ProductData {
 			$_temp_productdata['item_list_id'] = sanitize_title( (string) $_temp_productdata['item_list_name'] );
 		}
 
+		// GA4 list attribution carried across the funnel (#405): when the opt-in
+		// option is on and this item is not already part of a rendered list, fill
+		// item_list_name / item_list_id from the first-party cookie the tracker wrote
+		// on the originating select_item click. Restricted to the never-cached
+		// contexts (cart / checkout / purchase / re-added / block); the cacheable
+		// product-detail and list pages are enriched client-side instead, so their
+		// HTML stays cacheable. The cookie was keyed by the list item's product id,
+		// which is the parent id for a variation, so a variation matches on either.
+		if (
+			! isset( $_temp_productdata['item_list_name'] )
+			&& in_array( $attributes_used_for, self::LIST_ATTRIBUTION_CONTEXTS, true )
+			&& true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION )
+		) {
+			$map    = $this->list_attribution_map();
+			$stored = $map[ $product_id ] ?? ( isset( $parent_product_id ) ? ( $map[ $parent_product_id ] ?? null ) : null );
+
+			if ( null !== $stored ) {
+				$_temp_productdata['item_list_name'] = $stored['item_list_name'];
+				$_temp_productdata['item_list_id']   = $stored['item_list_id'];
+			}
+		}
+
 		// GA4 item-level affiliation (the storefront/marketplace the item was sold
 		// through). WooCommerce has no native value for this, so it stays empty by
 		// default and is only added when 3rd party code supplies one - keeping the
@@ -206,6 +248,21 @@ final class ProductData {
 		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used
 		 */
 		return apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, $attributes_used_for );
+	}
+
+	/**
+	 * Returns the parsed list-attribution cookie map, reading and validating it
+	 * once per request (see Helpers::read_item_list_cookie()) and caching the
+	 * result so building many items in one request does not re-decode the cookie.
+	 *
+	 * @return array<int, array{item_list_name: string, item_list_id: string}>
+	 */
+	private function list_attribution_map(): array {
+		if ( null === $this->list_attribution_map ) {
+			$this->list_attribution_map = Helpers::read_item_list_cookie();
+		}
+
+		return $this->list_attribution_map;
 	}
 
 	/**

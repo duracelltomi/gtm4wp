@@ -480,3 +480,169 @@ describe( 'gtm4wp-woocommerce exposed add_to_cart trackers (#273)', () => {
 		);
 	} );
 } );
+
+describe( 'gtm4wp-woocommerce list attribution cookie (#405)', () => {
+	const LIST_PRODUCT = {
+		item_id: 42,
+		item_name: 'PC Product',
+		price: 5,
+		productlink: 'https://shop/p42',
+		internal_id: 42,
+		item_list_name: 'Summer Sale',
+		item_list_id: 'summer-sale',
+	};
+
+	const setCommonGlobals = () => {
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+		window.gtm4wp_list_attribution = 1; // opt-in ON
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_store_item_list_attribution = jest.fn();
+		// A faithful merge helper so tests can assert the enriched item, not just
+		// that the call happened.
+		global.gtm4wp_apply_stored_item_list = ( item, id ) => {
+			const stored = {
+				42: {
+					item_list_name: 'Summer Sale',
+					item_list_id: 'summer-sale',
+				},
+			};
+			if ( item && id && ! item.item_list_name && stored[ id ] ) {
+				item.item_list_name = stored[ id ].item_list_name;
+				item.item_list_id = stored[ id ].item_list_id;
+			}
+			return item;
+		};
+		// exclude-aware reads so internal_id survives when the tracker keeps it.
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+		global.gtm4wp_read_from_json = (
+			json,
+			exclude = [ 'productlink', 'internal_id' ]
+		) => {
+			const parsed = JSON.parse( json );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	};
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+		delete window.gtm4wp_list_attribution;
+	} );
+
+	it( 'writes the list attribution cookie on a select_item click', () => {
+		document.body.className = '';
+		document.body.innerHTML =
+			'<ul class="products"><li class="product">' +
+			'<span class="gtm4wp_productdata" data-gtm4wp_product_data=\'' +
+			JSON.stringify( LIST_PRODUCT ) +
+			"'></span>" +
+			'<a href="https://shop/p42">PC Product</a>' +
+			'</li></ul>';
+		setCommonGlobals();
+
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+
+		document
+			.querySelector( 'a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect(
+			global.gtm4wp_store_item_list_attribution
+		).toHaveBeenCalledWith( 42, 'Summer Sale', 'summer-sale' );
+	} );
+
+	it( 'does not write the cookie when the option is off', () => {
+		document.body.className = '';
+		document.body.innerHTML =
+			'<ul class="products"><li class="product">' +
+			'<span class="gtm4wp_productdata" data-gtm4wp_product_data=\'' +
+			JSON.stringify( LIST_PRODUCT ) +
+			"'></span>" +
+			'<a href="https://shop/p42">PC Product</a>' +
+			'</li></ul>';
+		setCommonGlobals();
+		window.gtm4wp_list_attribution = 0; // opt-in OFF
+
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+
+		document
+			.querySelector( 'a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect(
+			global.gtm4wp_store_item_list_attribution
+		).not.toHaveBeenCalled();
+	} );
+
+	it( 'carries the stored list onto a product-page add_to_cart', () => {
+		document.body.className = '';
+		document.body.innerHTML =
+			'<form class="cart">' +
+			'<input type="hidden" name="gtm4wp_product_data" value=\'' +
+			JSON.stringify( {
+				item_id: 42,
+				price: 5,
+				internal_id: 42,
+				productlink: 'https://shop/p42',
+			} ) +
+			"' />" +
+			'<input type="number" name="quantity" value="1" />' +
+			'<button type="button" class="single_add_to_cart_button">Add</button>' +
+			'</form>';
+		setCommonGlobals();
+
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.single_add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( {
+				item_id: 42,
+				item_list_name: 'Summer Sale',
+				item_list_id: 'summer-sale',
+			} )
+		);
+		// internal_id must not leak into the pushed item.
+		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
+	} );
+} );

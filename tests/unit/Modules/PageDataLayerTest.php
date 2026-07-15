@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Modules\WooCommerce\PageDataLayer;
 use GTM4WP\Modules\WooCommerce\ProductData;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
@@ -62,6 +63,9 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => $content );
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'sanitize_text_field' )->returnArg();
+		Functions\when( 'sanitize_title' )->alias(
+			static fn ( $title ) => strtolower( trim( (string) preg_replace( '/[^a-z0-9]+/i', '-', (string) $title ), '-' ) )
+		);
 		Functions\when( 'wc_clean' )->returnArg();
 		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
 		Functions\when( 'current_theme_supports' )->justReturn( true );
@@ -107,6 +111,7 @@ final class PageDataLayerTest extends TestCase {
 			$_GET['order'],
 			$_GET['key'],
 			$_COOKIE['gtm4wp_orderid_tracked'],
+			$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ],
 			$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'],
 			$GLOBALS['gtm4wp_additional_datalayer_pushes']
 		);
@@ -120,6 +125,7 @@ final class PageDataLayerTest extends TestCase {
 			$_GET['order'],
 			$_GET['key'],
 			$_COOKIE['gtm4wp_orderid_tracked'],
+			$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ],
 			$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'],
 			$GLOBALS['gtm4wp_additional_datalayer_pushes']
 		);
@@ -272,6 +278,31 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertStringContainsString( '"event":"view_item"', $this->inline_js );
 		$this->assertStringContainsString( '"quantity":1', $this->inline_js, 'view_item must report quantity 1 on the item.' );
+	}
+
+	public function test_checkout_hex_encodes_hostile_list_attribution_cookie(): void {
+		// #405 / TC-5: the list-attribution cookie is untrusted input reaching the
+		// begin_checkout inline <script>. Even if the sanitizer let a </script> through,
+		// the wp_json_encode() hex flags on the sink must keep it from breaking out.
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 7 => array( 'item_list_name' => "\x3C/script\x3EList", 'item_list_id' => 'x' ) ) // phpcs:ignore
+		);
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 1, 'line_subtotal' => 10.0 ) ) ); // phpcs:ignore
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => true,
+				GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' );
+		$this->assertStringContainsString( 'List', $checkout['code'], 'The list-name value must reach the checkout products.' );
+		$this->assertStringNotContainsString( '</script', $checkout['code'], 'The < of the list name must be hex-encoded (JSON_HEX_TAG); no raw </script may survive.' );
 	}
 
 	public function test_checkout_items_carry_per_unit_discount(): void {

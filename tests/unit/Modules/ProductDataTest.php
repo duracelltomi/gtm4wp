@@ -35,6 +35,27 @@ final class ProductDataTest extends TestCase {
 		Functions\when( 'sanitize_title' )->alias(
 			static fn ( $title ) => strtolower( trim( (string) preg_replace( '/[^a-z0-9]+/i', '-', (string) $title ), '-' ) )
 		);
+
+		// Helpers for the list-attribution cookie reader (#405). sanitize_text_field
+		// strips tags and collapses whitespace but preserves & / " (no entity
+		// encoding), so downstream wp_json_encode escapes them once and correctly.
+		Functions\when( 'wp_unslash' )->returnArg();
+		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
+		Functions\when( 'sanitize_text_field' )->alias(
+			static function ( $value ) {
+				$value = (string) preg_replace( '/<[^>]*>/', '', (string) $value );
+				return trim( (string) preg_replace( '/[\r\n\t ]+/', ' ', $value ) );
+			}
+		);
+
+		// Isolate the cookie superglobal between tests (TS-7).
+		unset( $_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] );
+	}
+
+	protected function tearDown(): void {
+		unset( $_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] );
+
+		parent::tearDown();
 	}
 
 	/**
@@ -152,6 +173,116 @@ final class ProductDataTest extends TestCase {
 		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 'Google Store', $item['affiliation'] );
+	}
+
+	public function test_list_attribution_merged_from_cookie_in_checkout_context(): void {
+		// #405: with the opt-in option on, a checkout item picks up the list
+		// attribution the tracker stored (keyed by product id) on the originating
+		// select_item click.
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 123 => array( 'item_list_name' => 'Summer Sale', 'item_list_id' => 'summer-sale' ) ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$item         = $product_data->process_product( $this->make_product(), array(), 'checkout' );
+
+		$this->assertSame( 'Summer Sale', $item['item_list_name'] );
+		$this->assertSame( 'summer-sale', $item['item_list_id'] );
+	}
+
+	public function test_list_attribution_not_merged_when_option_off(): void {
+		// The feature is opt-in: with the option off (default) the cookie is ignored,
+		// so a store already doing this in GTM is never double-attributed.
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 123 => array( 'item_list_name' => 'Summer Sale' ) ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data();
+		$item         = $product_data->process_product( $this->make_product(), array(), 'checkout' );
+
+		$this->assertArrayNotHasKey( 'item_list_name', $item, 'With the option off the cookie must be ignored.' );
+	}
+
+	public function test_list_attribution_not_merged_in_cacheable_context(): void {
+		// The product-detail context is served from a cacheable page, so it is never
+		// enriched server-side (that would make the HTML visitor-specific); the client
+		// merges it there instead.
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 123 => array( 'item_list_name' => 'Summer Sale' ) ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$item         = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertArrayNotHasKey( 'item_list_name', $item, 'A cacheable context must not be enriched server-side.' );
+	}
+
+	public function test_list_attribution_matches_variation_by_parent_id(): void {
+		// The list showed the parent product, so the cookie is keyed by the parent id;
+		// a variation in the cart/checkout matches on its parent id.
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 123 => array( 'item_list_name' => 'Summer Sale', 'item_list_id' => 'summer-sale' ) ) // phpcs:ignore
+		);
+
+		$variation = new \WC_Product_Variation(
+			array( 'id' => 456, 'type' => 'variation', 'parent_id' => 123 ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$item         = $product_data->process_product( $variation, array(), 'purchase' );
+
+		$this->assertSame( 'Summer Sale', $item['item_list_name'], 'A variation must match its parent id in the cookie.' );
+	}
+
+	public function test_list_attribution_does_not_override_a_rendered_list_name(): void {
+		// An item already tagged with a rendered list name (view_item_list / select_item)
+		// keeps it; the cookie only fills items that have none.
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 123 => array( 'item_list_name' => 'Summer Sale' ) ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$item         = $product_data->process_product(
+			$this->make_product(),
+			array( 'item_list_name' => 'Related Products' ),
+			'cart'
+		);
+
+		$this->assertSame( 'Related Products', $item['item_list_name'], 'A rendered list name must not be overwritten by the cookie.' );
+	}
+
+	public function test_list_attribution_ignores_a_malformed_cookie(): void {
+		// A non-JSON cookie is ignored without error.
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = 'not-json{';
+
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$item         = $product_data->process_product( $this->make_product(), array(), 'checkout' );
+
+		$this->assertArrayNotHasKey( 'item_list_name', $item );
+	}
+
+	public function test_list_attribution_sanitizes_hostile_cookie_value(): void {
+		// TC-5 / RI-6: the cookie is untrusted input. A hostile item_list_name has its
+		// tags stripped (sanitize_text_field) but keeps & and " RAW - not entity
+		// encoded - so the downstream wp_json_encode() hex-flag sink escapes them once
+		// and correctly (RI-4 / TS-11). The </script> break-out itself is proven at the
+		// sink by DataLayerTest::test_flush_pushes_hex_encodes_script_breakout_characters
+		// and by PageDataLayerTest.
+		$hostile = 'Deals ' . "\x3C/script\x3E" . ' ' . "\x26" . ' ' . "\x22" . 'x' . "\x22";
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 123 => array( 'item_list_name' => $hostile ) ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$item         = $product_data->process_product( $this->make_product(), array(), 'checkout' );
+
+		$name = $item['item_list_name'];
+		$this->assertStringNotContainsString( '<', $name, 'Tags must be stripped from the cookie value.' );
+		$this->assertStringNotContainsString( 'script', $name );
+		$this->assertStringContainsString( "\x26", $name, 'A raw & must survive for the JSON sink to hex-encode.' );
+		$this->assertStringContainsString( "\x22", $name, 'A raw " must survive for the JSON sink to hex-encode.' );
+		$this->assertStringNotContainsString( '&amp;', $name, 'The value must not be entity-encoded upstream of the sink.' );
+		$this->assertStringNotContainsString( '&quot;', $name );
 	}
 
 	public function test_explicit_item_list_id_overrides_the_derived_one(): void {

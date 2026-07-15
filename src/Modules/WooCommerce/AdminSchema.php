@@ -218,6 +218,15 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'products'
 			),
 			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Persist product list attribution across the funnel', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'When a visitor clicks a product in a list, remember which list it was (item_list_name / item_list_id) in a first-party cookie and carry it onto the later add_to_cart, begin_checkout, add_shipping_info, add_payment_info and purchase events, so GA4 can attribute the whole funnel to the originating list. Only enable this if you are NOT already doing the same with custom JavaScript in Google Tag Manager, otherwise the attribution would be set twice. Note: a simple product\'s view_item may still miss the list name when the product page is served from a full-page cache.', 'duracelltomi-google-tag-manager' ),
+				group: 'products',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,

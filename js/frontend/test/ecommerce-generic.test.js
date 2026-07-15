@@ -116,6 +116,71 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 		} );
 	} );
 
+	describe( 'list attribution cookie (#405)', () => {
+		beforeEach( () => {
+			// Clear the cookie between tests (jsdom keeps it otherwise).
+			document.cookie =
+				'gtm4wp_item_list_attr=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+		} );
+
+		it( 'round-trips a stored list attribution by product id', () => {
+			window.gtm4wp_store_item_list_attribution(
+				42,
+				'Summer Sale',
+				'summer-sale'
+			);
+
+			const map = window.gtm4wp_read_item_list_cookie();
+			expect( map[ 42 ] ).toEqual( {
+				item_list_name: 'Summer Sale',
+				item_list_id: 'summer-sale',
+			} );
+		} );
+
+		it( 'does not store without a product id or a list name', () => {
+			window.gtm4wp_store_item_list_attribution( 0, 'X', 'x' );
+			window.gtm4wp_store_item_list_attribution( 42, '', '' );
+
+			expect( window.gtm4wp_read_item_list_cookie() ).toEqual( {} );
+		} );
+
+		it( 'merges the stored list onto an item by product id', () => {
+			window.gtm4wp_store_item_list_attribution(
+				42,
+				'Summer Sale',
+				'summer-sale'
+			);
+
+			const item = { item_id: 7 };
+			window.gtm4wp_apply_stored_item_list( item, 42 );
+
+			expect( item.item_list_name ).toBe( 'Summer Sale' );
+			expect( item.item_list_id ).toBe( 'summer-sale' );
+		} );
+
+		it( 'does not overwrite an item that already has a list name', () => {
+			window.gtm4wp_store_item_list_attribution( 42, 'Summer Sale' );
+
+			const item = { item_id: 7, item_list_name: 'Related Products' };
+			window.gtm4wp_apply_stored_item_list( item, 42 );
+
+			expect( item.item_list_name ).toBe( 'Related Products' );
+		} );
+
+		it( 'leaves the item untouched when nothing is stored for the id', () => {
+			const item = { item_id: 7 };
+			window.gtm4wp_apply_stored_item_list( item, 999 );
+
+			expect( item.item_list_name ).toBeUndefined();
+		} );
+
+		it( 'returns an empty map for a malformed cookie', () => {
+			document.cookie = 'gtm4wp_item_list_attr=not-json%7B; path=/';
+
+			expect( window.gtm4wp_read_item_list_cookie() ).toEqual( {} );
+		} );
+	} );
+
 	describe( 'gtm4wp_push_ecommerce', () => {
 		it( 'clears the previous ecommerce object then pushes the event', () => {
 			window.gtm4wp_push_ecommerce( 'add_to_cart', [ { item_id: 1 } ], {

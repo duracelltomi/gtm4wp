@@ -68,6 +68,7 @@ final class WooCommerceModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES    => array( 'processing', 'on-hold', 'completed' ),
 			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE   => false,
 			GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '',
+			GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION     => false,
 		);
 	}
 
@@ -197,6 +198,11 @@ final class WooCommerceModule extends AbstractModule {
 		// The dynamic-remarketing product-id prefix, so the found_variation handler can
 		// re-apply it to a selected variation's id (it is otherwise dropped, #383).
 		$return_vars['gtm4wp_remarketing_prod_id_prefix'] = (string) $this->opt( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX );
+
+		// Whether to persist GA4 list attribution across the funnel via a first-party
+		// cookie (#405). Off by default (opt-in); when off the tracker never writes or
+		// reads the cookie, so stores already doing this in GTM are untouched.
+		$return_vars['gtm4wp_list_attribution'] = (int) ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION ) );
 
 		return $return_vars;
 	}

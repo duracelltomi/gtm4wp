@@ -30,6 +30,7 @@ module.exports = {
 				gtm4wp_product_per_impression: 'readonly',
 				gtm4wp_console_log: 'readonly',
 				gtm4wp_remarketing_prod_id_prefix: 'readonly',
+				gtm4wp_list_attribution: 'readonly',
 
 				// Shared helpers exposed on window by gtm4wp-ecommerce-generic.js.
 				gtm4wp_make_sure_is_float: 'readonly',
@@ -37,6 +38,9 @@ module.exports = {
 				gtm4wp_read_from_json: 'readonly',
 				gtm4wp_read_json_from_node: 'readonly',
 				gtm4wp_update_json_in_node: 'readonly',
+				gtm4wp_read_item_list_cookie: 'readonly',
+				gtm4wp_store_item_list_attribution: 'readonly',
+				gtm4wp_apply_stored_item_list: 'readonly',
 
 				// Cross-handler state assigned as window.* properties and
 				// accessed as bare identifiers (1.x compatible behavior).

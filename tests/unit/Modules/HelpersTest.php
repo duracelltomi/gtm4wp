@@ -18,6 +18,72 @@ use GTM4WP\Tests\unit\TestCase;
  */
 final class HelpersTest extends TestCase {
 
+	protected function tearDown(): void {
+		unset( $_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] );
+
+		parent::tearDown();
+	}
+
+	/**
+	 * Installs the sanitizer stubs the cookie reader needs. sanitize_text_field
+	 * strips tags but keeps & / " so the value reaches the JSON sink raw.
+	 *
+	 * @return void
+	 */
+	private function stub_cookie_sanitizers(): void {
+		Functions\when( 'wp_unslash' )->returnArg();
+		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => trim( (string) preg_replace( '/<[^>]*>/', '', (string) $value ) )
+		);
+		Functions\when( 'sanitize_title' )->alias(
+			static fn ( $title ) => strtolower( trim( (string) preg_replace( '/[^a-z0-9]+/i', '-', (string) $title ), '-' ) )
+		);
+	}
+
+	public function test_read_item_list_cookie_ignores_oversized_cookie(): void {
+		// A crafted, bloated cookie is rejected wholesale so the reader never does
+		// unbounded work.
+		$this->stub_cookie_sanitizers();
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = str_repeat( 'a', Helpers::LIST_ATTRIBUTION_COOKIE_MAX_BYTES + 1 );
+
+		$this->assertSame( array(), Helpers::read_item_list_cookie() );
+	}
+
+	public function test_read_item_list_cookie_caps_the_number_of_entries(): void {
+		$this->stub_cookie_sanitizers();
+
+		$entries = array();
+		for ( $i = 1; $i <= Helpers::LIST_ATTRIBUTION_MAX_ENTRIES + 5; $i++ ) {
+			$entries[ $i ] = array( 'item_list_name' => 'List ' . $i );
+		}
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( $entries ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+
+		$this->assertCount(
+			Helpers::LIST_ATTRIBUTION_MAX_ENTRIES,
+			Helpers::read_item_list_cookie(),
+			'No more than the entry cap is ever processed.'
+		);
+	}
+
+	public function test_read_item_list_cookie_skips_invalid_entries(): void {
+		// A zero/negative id or an entry without a list name is dropped.
+		$this->stub_cookie_sanitizers();
+		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array(
+				0   => array( 'item_list_name' => 'Zero id dropped' ),
+				7   => array( 'item_list_id' => 'no-name-dropped' ),
+				9   => array( 'item_list_name' => 'Kept' ),
+			)
+		);
+
+		$map = Helpers::read_item_list_cookie();
+
+		$this->assertSame( array( 9 ), array_keys( $map ) );
+		$this->assertSame( 'Kept', $map[9]['item_list_name'] );
+		$this->assertSame( 'kept', $map[9]['item_list_id'], 'Missing item_list_id is derived from the name.' );
+	}
+
 	public function test_str_replace_first_replaces_only_the_first_occurrence(): void {
 		$this->assertSame(
 			'X-href="a" href="b"',

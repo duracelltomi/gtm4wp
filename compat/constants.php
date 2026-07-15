@@ -141,6 +141,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT', 'integrate-woocommerce-datalay
 define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES', 'integrate-woocommerce-purchase-track-statuses' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE', 'integrate-woocommerce-purchase-track-on-any-page' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE', 'integrate-woocommerce-custom-order-received-page' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION', 'integrate-woocommerce-persist-list-attribution' );
 
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );

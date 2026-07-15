@@ -47,6 +47,22 @@ final class Helpers {
 	);
 
 	/**
+	 * Name of the first-party cookie that carries GA4 list attribution
+	 * (item_list_name / item_list_id keyed by product id) across the funnel
+	 * (#405). Written client-side by the WooCommerce tracker on a select_item
+	 * list click; must match the literal used in js/frontend/gtm4wp-woocommerce.js.
+	 */
+	public const LIST_ATTRIBUTION_COOKIE = 'gtm4wp_item_list_attr';
+
+	/**
+	 * Hard caps on the list-attribution cookie so a crafted or bloated cookie
+	 * can never make the reader do unbounded work: entries beyond the limit are
+	 * dropped and an oversized cookie is ignored wholesale.
+	 */
+	public const LIST_ATTRIBUTION_MAX_ENTRIES      = 20;
+	public const LIST_ATTRIBUTION_COOKIE_MAX_BYTES = 4096;
+
+	/**
 	 * Replace only the first occurrence of the search string with the replacement string.
 	 *
 	 * @param string $search The value being searched for, otherwise known as the needle.
@@ -148,6 +164,70 @@ final class Helpers {
 		}
 
 		return $discount;
+	}
+
+	/**
+	 * Reads and validates the first-party list-attribution cookie (#405) into a
+	 * map of product id => array( item_list_name, item_list_id ). The cookie is
+	 * untrusted client input, so every part is sanitized here: the id via absint,
+	 * the list name via sanitize_text_field and the id via sanitize_title. The
+	 * sanitized values are returned RAW (not entity-encoded) so the downstream
+	 * wp_json_encode() dataLayer sink can escape them once and correctly. A
+	 * malformed, non-JSON or oversized cookie yields an empty map, and no more
+	 * than LIST_ATTRIBUTION_MAX_ENTRIES entries are ever processed.
+	 *
+	 * @return array<int, array{item_list_name: string, item_list_id: string}>
+	 */
+	public static function read_item_list_cookie(): array {
+		if ( ! isset( $_COOKIE[ self::LIST_ATTRIBUTION_COOKIE ] ) ) {
+			return array();
+		}
+
+		// The raw value is a JSON container, not a value used at any output sink; it
+		// is json_decode'd below and every extracted field is individually sanitized
+		// (absint on ids, sanitize_text_field on names, sanitize_title on ids). A
+		// blanket sanitizer here would corrupt valid multi-entry JSON, so it is
+		// unslashed only and each field is sanitized after decoding.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$raw = wp_unslash( $_COOKIE[ self::LIST_ATTRIBUTION_COOKIE ] );
+		if ( ! is_string( $raw ) || strlen( $raw ) > self::LIST_ATTRIBUTION_COOKIE_MAX_BYTES ) {
+			return array();
+		}
+
+		$decoded = json_decode( $raw, true );
+		if ( ! is_array( $decoded ) ) {
+			return array();
+		}
+
+		$map   = array();
+		$count = 0;
+		foreach ( $decoded as $product_id => $entry ) {
+			if ( $count >= self::LIST_ATTRIBUTION_MAX_ENTRIES ) {
+				break;
+			}
+
+			$pid = absint( $product_id );
+			if ( $pid <= 0 || ! is_array( $entry ) ) {
+				continue;
+			}
+
+			$name = isset( $entry['item_list_name'] ) ? sanitize_text_field( (string) $entry['item_list_name'] ) : '';
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$id = ( isset( $entry['item_list_id'] ) && '' !== $entry['item_list_id'] )
+				? sanitize_title( (string) $entry['item_list_id'] )
+				: sanitize_title( $name );
+
+			$map[ $pid ] = array(
+				'item_list_name' => $name,
+				'item_list_id'   => $id,
+			);
+			++$count;
+		}
+
+		return $map;
 	}
 
 	/**

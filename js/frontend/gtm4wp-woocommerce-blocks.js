@@ -159,6 +159,21 @@ function gtm4wp_blocks_bind_crosssell_clicks( get_items ) {
 			return;
 		}
 
+		// #405: persist the cross-sell list attribution (keyed by product id) so a
+		// later add_to_cart / checkout / purchase for this product can be attributed
+		// to it, matching the classic select_item behavior. Opt-in only.
+		if (
+			window.gtm4wp_list_attribution &&
+			match.id &&
+			typeof window.gtm4wp_store_item_list_attribution === 'function'
+		) {
+			window.gtm4wp_store_item_list_attribution(
+				match.id,
+				CROSS_SELL_LIST_NAME,
+				CROSS_SELL_LIST_ID
+			);
+		}
+
 		gtm4wp_blocks_push(
 			'select_item',
 			[ gtm4wp_blocks_to_crosssell_item( match ) ],
