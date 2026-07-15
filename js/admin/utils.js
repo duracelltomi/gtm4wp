@@ -51,6 +51,51 @@ export function coerceValue( field, raw ) {
 }
 
 /**
+ * Builds the option key => UI value map for every field of every module,
+ * coercing each raw value into the shape its control expects. Used both for
+ * the initial load (no overrides) and after an import, where the freshly
+ * stored values returned by the server replace the current UI state.
+ *
+ * @param {Array}  modules   Module descriptions from the bootstrap data.
+ * @param {Object} overrides Optional option key => raw value map that takes
+ *                           precedence over each field's own `value`.
+ * @return {Object} Option key => coerced UI value map.
+ */
+export function buildValueMap( modules, overrides = {} ) {
+	const values = {};
+
+	modules.forEach( ( module ) => {
+		module.fields.forEach( ( field ) => {
+			const raw = Object.prototype.hasOwnProperty.call(
+				overrides,
+				field.key
+			)
+				? overrides[ field.key ]
+				: field.value;
+
+			values[ field.key ] = coerceValue( field, raw );
+		} );
+	} );
+
+	return values;
+}
+
+/**
+ * Builds the file name a settings export is downloaded as. The date is
+ * injected so the value is deterministic and testable.
+ *
+ * @param {Date} date Date used for the file name stamp.
+ * @return {string} File name, e.g. `gtm4wp-settings-2026-07-15.json`.
+ */
+export function exportFilename( date = new Date() ) {
+	const stamp = ( date instanceof Date ? date : new Date() )
+		.toISOString()
+		.slice( 0, 10 );
+
+	return `gtm4wp-settings-${ stamp }.json`;
+}
+
+/**
  * Returns the map of values that differ between the initial and the
  * current state, ready to be submitted to the REST endpoint.
  *

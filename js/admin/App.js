@@ -8,27 +8,16 @@ import { Button, Snackbar } from '@wordpress/components';
 import { useMemo, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
+import ImportExport from './components/ImportExport';
 import ModulePanel from './components/ModulePanel';
 import Sidebar from './components/Sidebar';
-import { changedValues, coerceValue } from './utils';
-
-function initialValueMap( modules ) {
-	const values = {};
-
-	modules.forEach( ( module ) => {
-		module.fields.forEach( ( field ) => {
-			values[ field.key ] = coerceValue( field, field.value );
-		} );
-	} );
-
-	return values;
-}
+import { buildValueMap, changedValues } from './utils';
 
 export default function App( { settings } ) {
 	const modules = settings.modules;
 
 	const [ initialValues, setInitialValues ] = useState( () =>
-		initialValueMap( modules )
+		buildValueMap( modules )
 	);
 	const [ values, setValues ] = useState( initialValues );
 	const [ errors, setErrors ] = useState( {} );
@@ -66,6 +55,16 @@ export default function App( { settings } ) {
 
 	const onFieldChange = ( key, next ) => {
 		setValues( ( previous ) => ( { ...previous, [ key ]: next } ) );
+	};
+
+	// After an import the server returns the freshly stored, sanitized values;
+	// adopt them as the new baseline so nothing shows up as unsaved and the
+	// panels reflect exactly what was persisted.
+	const onImported = ( serverValues ) => {
+		const next = buildValueMap( modules, serverValues );
+		setInitialValues( next );
+		setValues( next );
+		setErrors( {} );
 	};
 
 	const onSave = async () => {
@@ -123,19 +122,27 @@ export default function App( { settings } ) {
 						'duracelltomi-google-tag-manager'
 					) }
 				</h1>
-				<Button
-					variant="primary"
-					disabled={ ! isDirty || isSaving }
-					isBusy={ isSaving }
-					onClick={ onSave }
-				>
-					{ isSaving
-						? __( 'Saving…', 'duracelltomi-google-tag-manager' )
-						: __(
-								'Save changes',
-								'duracelltomi-google-tag-manager'
-						  ) }
-				</Button>
+				<div className="gtm4wp-app__actions">
+					<ImportExport
+						exportPath={ settings.exportPath }
+						importPath={ settings.importPath }
+						onImported={ onImported }
+						onNotice={ setSnackbar }
+					/>
+					<Button
+						variant="primary"
+						disabled={ ! isDirty || isSaving }
+						isBusy={ isSaving }
+						onClick={ onSave }
+					>
+						{ isSaving
+							? __( 'Saving…', 'duracelltomi-google-tag-manager' )
+							: __(
+									'Save changes',
+									'duracelltomi-google-tag-manager'
+							  ) }
+					</Button>
+				</div>
 			</header>
 			<div className="gtm4wp-app__body">
 				<Sidebar

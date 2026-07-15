@@ -57,6 +57,11 @@ final class RestControllerTest extends TestCase {
 				return $thing instanceof \WP_Error;
 			}
 		);
+		Functions\when( 'wp_json_encode' )->alias(
+			static function ( $data, $options = 0, $depth = 512 ) {
+				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			}
+		);
 
 		$this->saved = null;
 		Functions\when( 'update_option' )->alias(
@@ -294,5 +299,285 @@ final class RestControllerTest extends TestCase {
 		);
 
 		$this->assertSame( 'html,gaawe', $this->saved[ GTM4WP_OPTION_BLACKLIST_STATUS ], 'Only valid entity ids are stored, as comma separated string.' );
+	}
+
+	/**
+	 * Collects the option keys of every registered field, the way the
+	 * controller's own fields_by_key() does. Used by the two "control" tests
+	 * that pin export and import to the schema, so a newly added Field is
+	 * automatically covered by both without a list to maintain.
+	 *
+	 * @return string[]
+	 */
+	private function registered_field_keys(): array {
+		$keys = array();
+
+		foreach ( Registry::with_default_modules()->all() as $module ) {
+			$schema_class = $module->admin_schema();
+			if ( ! class_exists( $schema_class ) ) {
+				continue;
+			}
+
+			$schema = new $schema_class();
+			foreach ( $schema->fields() as $field ) {
+				$keys[] = $field->key;
+			}
+		}
+
+		return $keys;
+	}
+
+	public function test_export_returns_envelope_with_current_values(): void {
+		$controller = $this->make_controller(
+			array( GTM4WP_OPTION_GTM_CODE => 'GTM-EXPORTED' )
+		);
+
+		$data = $controller->export_settings()->get_data();
+
+		$this->assertSame( 'gtm4wp', $data['plugin'] );
+		$this->assertSame( RestController::EXPORT_TYPE, $data['type'] );
+		$this->assertSame( GTM4WP_VERSION, $data['version'] );
+		$this->assertSame( 'GTM-EXPORTED', $data['options'][ GTM4WP_OPTION_GTM_CODE ] );
+	}
+
+	/**
+	 * Pre-flight control (export half): every registered option is exported.
+	 * Because the export is schema driven (current_values() merges the module
+	 * defaults), adding a Field automatically adds it to the export; this test
+	 * fails the day the export stops being schema-complete.
+	 */
+	public function test_export_includes_every_registered_option(): void {
+		$controller = $this->make_controller();
+
+		$options = $controller->export_data()['options'];
+
+		foreach ( $this->registered_field_keys() as $key ) {
+			$this->assertArrayHasKey(
+				$key,
+				$options,
+				"Export must include registered option '{$key}'."
+			);
+		}
+	}
+
+	/**
+	 * Mandatory hostile-input regression (TC-1): an imported value carrying
+	 * script-context break-out characters is re-sanitized through its schema
+	 * Field before being stored - the file is never trusted. The break-out
+	 * chars are written as \xNN escapes (TC-2) and the assertion is
+	 * both-directions (TS-2): the safe, allow-listed form is present AND the
+	 * raw break-out characters are absent. The blacklist field allow-lists its
+	 * entries, so a bypass (storing the file's raw array) would leave the
+	 * payload in the stored value and fail the test.
+	 */
+	public function test_import_re_sanitizes_hostile_payload(): void {
+		$controller = $this->make_controller();
+
+		// `</script>"&` smuggled in among two valid entity ids.
+		$hostile = "\x3C/script\x3E\x22\x26";
+
+		$payload = wp_json_encode(
+			array(
+				'type'    => RestController::EXPORT_TYPE,
+				'options' => array(
+					GTM4WP_OPTION_BLACKLIST_STATUS => array( 'html', $hostile, 'gaawe' ),
+				),
+			)
+		);
+
+		$response = $controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => $payload ) )
+		);
+
+		$this->assertTrue( $response->get_data()['imported'] );
+
+		$stored = $this->saved[ GTM4WP_OPTION_BLACKLIST_STATUS ];
+
+		// Present: only the valid, allow-listed entities, as a comma string.
+		$this->assertSame( 'html,gaawe', $stored );
+
+		// Absent: the raw break-out characters from the uploaded file.
+		$this->assertStringNotContainsString( '</script>', $stored );
+		$this->assertStringNotContainsString( '"', $stored );
+		$this->assertStringNotContainsString( '&', $stored );
+	}
+
+	public function test_import_rejects_hostile_container_id_and_does_not_store_it(): void {
+		$controller = $this->make_controller();
+
+		$payload = wp_json_encode(
+			array(
+				'type'    => RestController::EXPORT_TYPE,
+				'options' => array(
+					GTM4WP_OPTION_GTM_CONTAINERS => array(
+						array( 'id' => "GTM-\x3Cscript\x3Ealert(1)\x3C/script\x3E" ),
+					),
+				),
+			)
+		);
+
+		$response = $controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => $payload ) )
+		);
+
+		$data = $response->get_data();
+
+		$this->assertFalse( $data['imported'], 'A rejected value makes the import report an error.' );
+		$this->assertArrayHasKey( GTM4WP_OPTION_GTM_CONTAINERS, (array) $data['errors'] );
+
+		// The hostile id never reaches the stored row: the field kept its default.
+		$this->assertStringNotContainsString(
+			'<script>',
+			(string) wp_json_encode( $this->saved[ GTM4WP_OPTION_GTM_CONTAINERS ] )
+		);
+	}
+
+	public function test_import_ignores_unknown_keys(): void {
+		$controller = $this->make_controller();
+
+		$payload = wp_json_encode(
+			array(
+				'type'    => RestController::EXPORT_TYPE,
+				'options' => array(
+					'evil-injected-key'            => 'value',
+					GTM4WP_OPTION_INCLUDE_LOGGEDIN => true,
+				),
+			)
+		);
+
+		$controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => $payload ) )
+		);
+
+		$this->assertArrayNotHasKey( 'evil-injected-key', $this->saved );
+		$this->assertTrue( $this->saved[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] );
+	}
+
+	public function test_import_replaces_missing_options_with_defaults(): void {
+		// Start with a stored row that has a custom value; the import file does
+		// NOT mention it, so after import it must fall back to its default.
+		$controller = $this->make_controller(
+			array( GTM4WP_OPTION_INCLUDE_LOGGEDIN => true )
+		);
+
+		$payload = wp_json_encode(
+			array(
+				'type'    => RestController::EXPORT_TYPE,
+				'options' => array(
+					GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION => 250,
+				),
+			)
+		);
+
+		$controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => $payload ) )
+		);
+
+		$this->assertSame( 250, $this->saved[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ] );
+		$this->assertFalse(
+			$this->saved[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ],
+			'An option absent from the file is reset to its default, not carried over from the target install.'
+		);
+	}
+
+	public function test_import_rejects_empty_payload(): void {
+		$controller = $this->make_controller();
+
+		$result = $controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => '' ) )
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertNull( $this->saved, 'A rejected import never writes the option row.' );
+	}
+
+	public function test_import_rejects_malformed_json(): void {
+		$controller = $this->make_controller();
+
+		$result = $controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => '{ this is not json ' ) )
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertNull( $this->saved );
+	}
+
+	public function test_import_rejects_file_that_is_not_a_gtm4wp_export(): void {
+		$controller = $this->make_controller();
+
+		$result = $controller->import_settings(
+			new \WP_REST_Request(
+				array(
+					'payload' => wp_json_encode(
+						array(
+							'type'    => 'some-other-plugin-export',
+							'options' => array( GTM4WP_OPTION_INCLUDE_LOGGEDIN => true ),
+						)
+					),
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertNull( $this->saved );
+	}
+
+	public function test_import_rejects_oversized_payload(): void {
+		$controller = $this->make_controller();
+
+		$result = $controller->import_settings(
+			new \WP_REST_Request( array( 'payload' => str_repeat( 'a', 600 * 1024 ) ) )
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertNull( $this->saved );
+	}
+
+	/**
+	 * Pre-flight control (import half) + round trip: a clean export imports
+	 * back without errors and every registered option is routed through the
+	 * import sanitizer. Together with the export control above this guarantees
+	 * a newly added Field is carried by both directions automatically - no
+	 * option can silently bypass import.
+	 */
+	public function test_export_round_trips_and_import_processes_every_option(): void {
+		$exporter = $this->make_controller(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS   => array(
+					array(
+						'id'          => 'GTM-ROUND1',
+						'gtm_auth'    => '',
+						'gtm_preview' => '',
+						'domain'      => '',
+						'path'        => '',
+					),
+				),
+				GTM4WP_OPTION_INCLUDE_LOGGEDIN => true,
+			)
+		);
+
+		// Capture the export payload before switching the get_option() stub.
+		$payload = wp_json_encode( $exporter->export_data() );
+
+		$importer = $this->make_controller();
+
+		$response = $importer->import_settings(
+			new \WP_REST_Request( array( 'payload' => $payload ) )
+		);
+
+		$this->assertTrue(
+			$response->get_data()['imported'],
+			'A file produced by export must import back without any field being rejected.'
+		);
+
+		foreach ( $this->registered_field_keys() as $key ) {
+			$this->assertArrayHasKey(
+				$key,
+				$this->saved,
+				"Import must process registered option '{$key}'."
+			);
+		}
+
+		$this->assertTrue( $this->saved[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ], 'Round-tripped custom values survive.' );
 	}
 }

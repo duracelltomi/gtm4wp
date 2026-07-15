@@ -171,5 +171,15 @@ final class SettingsPageTest extends TestCase {
 			RestController::REST_NAMESPACE . RestController::REST_ROUTE,
 			$data['restPath']
 		);
+		$this->assertSame(
+			RestController::REST_NAMESPACE . RestController::REST_ROUTE_EXPORT,
+			$data['exportPath'],
+			'The React app is told where to fetch the settings export.'
+		);
+		$this->assertSame(
+			RestController::REST_NAMESPACE . RestController::REST_ROUTE_IMPORT,
+			$data['importPath'],
+			'The React app is told where to POST a settings import.'
+		);
 	}
 }

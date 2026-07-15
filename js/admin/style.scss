@@ -72,6 +72,27 @@
 		}
 	}
 
+	&__actions {
+		align-items: center;
+		display: flex;
+		gap: var(--gtm4wp-s3);
+	}
+
+	&__io {
+		align-items: center;
+		display: flex;
+		gap: var(--gtm4wp-s2, 8px);
+	}
+
+	// The file input is triggered from the Import button; keep it out of the
+	// layout without removing it from the accessibility tree.
+	&__file-input {
+		height: 1px;
+		overflow: hidden;
+		position: absolute;
+		width: 1px;
+	}
+
 	&__body {
 		display: grid;
 		gap: var(--gtm4wp-s5);

@@ -163,8 +163,10 @@ final class SettingsPage {
 		}
 
 		return array(
-			'modules'  => $modules,
-			'restPath' => RestController::REST_NAMESPACE . RestController::REST_ROUTE,
+			'modules'    => $modules,
+			'restPath'   => RestController::REST_NAMESPACE . RestController::REST_ROUTE,
+			'exportPath' => RestController::REST_NAMESPACE . RestController::REST_ROUTE_EXPORT,
+			'importPath' => RestController::REST_NAMESPACE . RestController::REST_ROUTE_IMPORT,
 		);
 	}
 }

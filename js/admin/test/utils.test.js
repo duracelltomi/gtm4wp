@@ -4,8 +4,10 @@
 
 import {
 	axeptioVersionOptions,
+	buildValueMap,
 	changedValues,
 	coerceValue,
+	exportFilename,
 	moduleMatchesSearch,
 	stripTags,
 } from '../utils';
@@ -92,6 +94,46 @@ describe( 'changedValues', () => {
 		const state = { a: true, b: [ 'x' ] };
 
 		expect( changedValues( state, { ...state } ) ).toEqual( {} );
+	} );
+} );
+
+describe( 'buildValueMap', () => {
+	const modules = [
+		{
+			fields: [
+				{ key: 'flag', type: 'checkbox', value: true },
+				{ key: 'count', type: 'integer', value: 5 },
+			],
+		},
+		{
+			fields: [ { key: 'name', type: 'text', value: 'default' } ],
+		},
+	];
+
+	it( 'coerces each field value using its own value by default', () => {
+		expect( buildValueMap( modules ) ).toEqual( {
+			flag: true,
+			count: 5,
+			name: 'default',
+		} );
+	} );
+
+	it( 'lets server overrides replace a field value (import path)', () => {
+		expect(
+			buildValueMap( modules, { name: 'imported', flag: '' } )
+		).toEqual( {
+			flag: false,
+			count: 5,
+			name: 'imported',
+		} );
+	} );
+} );
+
+describe( 'exportFilename', () => {
+	it( 'stamps the given date into the file name', () => {
+		expect( exportFilename( new Date( '2026-07-15T10:20:30Z' ) ) ).toBe(
+			'gtm4wp-settings-2026-07-15.json'
+		);
 	} );
 } );
 
