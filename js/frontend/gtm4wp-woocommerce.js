@@ -130,6 +130,36 @@ function gtm4wp_woocommerce_handle_shipping_method_change() {
 }
 
 /**
+ * Reads the step identifier from a CheckoutWC cfw_step_changed event (#385).
+ *
+ * CheckoutWC's event payload shape is not verified against a live install, so
+ * this looks in the likely places (a plain string detail, or a detail object
+ * keyed by step / current / to / name) and returns a lowercase string, or an
+ * empty string when nothing recognizable is present.
+ *
+ * @param {Event} e The cfw_step_changed event.
+ * @return {string} The lowercased step identifier, or '' if unknown.
+ */
+function gtm4wp_woocommerce_checkoutwc_step( e ) {
+	let step = '';
+
+	if ( e && e.detail ) {
+		if ( typeof e.detail === 'string' ) {
+			step = e.detail;
+		} else {
+			step =
+				e.detail.step ||
+				e.detail.current ||
+				e.detail.to ||
+				e.detail.name ||
+				'';
+		}
+	}
+
+	return ( '' + step ).toLowerCase();
+}
+
+/**
  * Fires the GA4 add_to_cart event for a product added from its product detail
  * page - the variable, grouped and simple cases. Exposed on window so a theme
  * that handles add to cart with its own AJAX (and calls e.preventDefault() on the
@@ -1008,6 +1038,49 @@ function gtm4wp_woocommerce_process_pages() {
 				gtm4wp_woocommerce_handle_payment_method_change();
 			}
 		} );
+	}
+
+	// CheckoutWC compatibility (#385): CheckoutWC replaces the checkout with its
+	// own multi-step template, so the classic shipping/payment change events and
+	// the jQuery checkout_place_order event above are not reliably dispatched and
+	// add_shipping_info / add_payment_info are missed. Bind those steps to
+	// CheckoutWC's own cfw_step_changed event instead. cfw_step_changed only fires
+	// on CheckoutWC's checkout, so this block is inert on every other page (and
+	// gtm4wp_is_checkout may be false there, hence a separate branch). The step
+	// handlers are idempotent (gtm4wp_checkout_step_fired dedup) and read the
+	// selected method straight from the DOM, which CheckoutWC keeps on
+	// WooCommerce's standard field names.
+	if ( window.gtm4wp_checkoutwc ) {
+		window.gtm4wp_checkout_value = window.gtm4wp_checkout_value || 0;
+		window.gtm4wp_checkout_products = window.gtm4wp_checkout_products || [];
+		window.gtm4wp_checkout_products_ga4 =
+			window.gtm4wp_checkout_products_ga4 || [];
+
+		document.addEventListener( 'cfw_step_changed', function ( e ) {
+			const checkoutwc_step = gtm4wp_woocommerce_checkoutwc_step( e );
+
+			// Reaching the payment (or final review) step means the shipping
+			// selection is behind the visitor, so report both.
+			if (
+				checkoutwc_step.indexOf( 'payment' ) > -1 ||
+				checkoutwc_step.indexOf( 'review' ) > -1
+			) {
+				gtm4wp_woocommerce_handle_shipping_method_change();
+				gtm4wp_woocommerce_handle_payment_method_change();
+			} else if ( checkoutwc_step.indexOf( 'shipping' ) > -1 ) {
+				gtm4wp_woocommerce_handle_shipping_method_change();
+			}
+		} );
+
+		// Fallback: report any step not yet fired when the order is submitted, so
+		// a pre-selected/skipped step (or an unrecognized step name) is not lost.
+		jQuery( document.body ).on(
+			'cfw_before_submit checkout_place_order',
+			function () {
+				gtm4wp_woocommerce_handle_shipping_method_change();
+				gtm4wp_woocommerce_handle_payment_method_change();
+			}
+		);
 	}
 }
 

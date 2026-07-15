@@ -336,6 +336,23 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'When a user clicks on a product in a list, the select_item event uses a callback function with Google Tag Manager (GTM). This ensures that GTM can fire all related tags before the browser navigates to the product detail page. You can customize a timeout period (in milliseconds). This timeout only comes into play if a tag fails to fire within the specified time for some reason. Set this to 0 to open the product immediately without waiting for GTM: the select_item event is still pushed to the data layer, but the click is no longer held back. Use 0 (or a lower value than 2000) if product links feel slow to open - for example when a consent tool blocks GTM so the callback never returns.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced'
 			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'CheckoutWC compatibility', 'duracelltomi-google-tag-manager' ),
+				description: sprintf(
+					/* translators: 1: opening anchor tag linking to the CheckoutWC website. 2: closing anchor tag. */
+					esc_html__(
+						'Enable this if your store uses %1$sCheckoutWC%2$s, which replaces the standard WooCommerce checkout with its own multi-step template. The classic checkout markers the tracker relies on are not reliably present there, so the add_shipping_info and add_payment_info events are missed. With this on, the tracker also binds those events to CheckoutWC\'s own cfw_step_changed event.',
+						'duracelltomi-google-tag-manager'
+					),
+					'<a href="https://www.checkoutwc.com/" target="_blank" rel="noopener">',
+					'</a>'
+				),
+				group: 'advanced',
+				phase: Field::PHASE_EXPERIMENTAL
+			),
 		);
 	}
 

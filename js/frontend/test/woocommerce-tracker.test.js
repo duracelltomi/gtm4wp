@@ -646,3 +646,148 @@ describe( 'gtm4wp-woocommerce list attribution cookie (#405)', () => {
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
 	} );
 } );
+
+describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
+	// CheckoutWC replaces the checkout template (no body.woocommerce-checkout),
+	// so the tracker must bind add_shipping_info / add_payment_info to
+	// CheckoutWC's own cfw_step_changed event when the option is on.
+	const setGlobals = () => {
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		// Checkout products/value the step handlers read (server-populated on the
+		// real checkout page).
+		window.gtm4wp_checkout_products = [ { item_id: 1, price: 25 } ];
+		window.gtm4wp_checkout_value = 50;
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	};
+
+	// A CheckoutWC checkout page: no body.woocommerce-checkout, but the standard
+	// WooCommerce shipping/payment method inputs (which CheckoutWC keeps).
+	const CHECKOUT_DOM =
+		'<input type="radio" name="shipping_method[0]" value="flat_rate:1" checked />' +
+		'<div class="payment_methods">' +
+		'<input type="radio" name="payment_method" value="cod" checked />' +
+		'</div>';
+
+	// jsdom's document is shared across the tests in this file and isolateModules
+	// does not detach listeners, so capture the cfw_step_changed listener this
+	// test binds and remove it in afterEach - otherwise a prior test's listener
+	// would fire in the option-off test (TS-7 leak) and make it order-dependent.
+	let boundStepListeners = [];
+
+	const boot = () => {
+		boundStepListeners = [];
+		const originalAdd = document.addEventListener;
+		document.addEventListener = function ( type, fn, opts ) {
+			if ( 'cfw_step_changed' === type ) {
+				boundStepListeners.push( fn );
+			}
+			return originalAdd.call( this, type, fn, opts );
+		};
+
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers(); // binds the cfw_step_changed listener in process_pages()
+
+		document.addEventListener = originalAdd;
+	};
+
+	const dispatchStep = ( step ) =>
+		document.dispatchEvent(
+			new window.CustomEvent( 'cfw_step_changed', { detail: { step } } )
+		);
+
+	const calls = ( event ) =>
+		global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === event
+		);
+
+	afterEach( () => {
+		boundStepListeners.forEach( ( fn ) =>
+			document.removeEventListener( 'cfw_step_changed', fn )
+		);
+		boundStepListeners = [];
+
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+		delete window.gtm4wp_checkoutwc;
+		delete window.gtm4wp_checkout_products;
+		delete window.gtm4wp_checkout_value;
+	} );
+
+	it( 'fires add_shipping_info and add_payment_info on the payment step', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1; // opt-in ON
+
+		boot();
+		dispatchStep( 'payment' );
+
+		const shipping = calls( 'add_shipping_info' );
+		const payment = calls( 'add_payment_info' );
+		expect( shipping ).toHaveLength( 1 );
+		expect( payment ).toHaveLength( 1 );
+		// The selected method reaches the event (assert the effect, not just the call).
+		expect( shipping[ 0 ][ 2 ] ).toEqual(
+			expect.objectContaining( {
+				shipping_tier: 'flat_rate:1',
+				value: 50,
+			} )
+		);
+		expect( payment[ 0 ][ 2 ] ).toEqual(
+			expect.objectContaining( { payment_type: 'cod', value: 50 } )
+		);
+	} );
+
+	it( 'does not fire the same step twice across repeated step changes', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+
+		boot();
+		dispatchStep( 'shipping' ); // add_shipping_info
+		dispatchStep( 'payment' ); // add_payment_info (shipping already fired)
+		dispatchStep( 'payment' ); // nothing new
+
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 1 );
+	} );
+
+	it( 'does not bind the CheckoutWC listener when the option is off', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 0; // opt-in OFF
+
+		boot();
+		dispatchStep( 'payment' );
+
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 0 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 0 );
+	} );
+} );

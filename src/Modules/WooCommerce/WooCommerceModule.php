@@ -69,6 +69,7 @@ final class WooCommerceModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE   => false,
 			GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '',
 			GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION     => false,
+			GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC         => false,
 		);
 	}
 
@@ -203,6 +204,12 @@ final class WooCommerceModule extends AbstractModule {
 		// cookie (#405). Off by default (opt-in); when off the tracker never writes or
 		// reads the cookie, so stores already doing this in GTM are untouched.
 		$return_vars['gtm4wp_list_attribution'] = (int) ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION ) );
+
+		// Whether to also bind the checkout-step events (add_shipping_info /
+		// add_payment_info) to CheckoutWC's own cfw_step_changed event (#385).
+		// CheckoutWC replaces the checkout template, so the classic markers the
+		// tracker gates on are not reliably present. Off by default (opt-in).
+		$return_vars['gtm4wp_checkoutwc'] = (int) ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC ) );
 
 		return $return_vars;
 	}
