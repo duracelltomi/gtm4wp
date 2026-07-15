@@ -121,7 +121,7 @@ final class OptionsTest extends TestCase {
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_valid_hardcoded_gtm_id_overrides_stored_value(): void {
-		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-HARD1' );
+		$this->define_hardcoded_gtm_id( 'GTM-HARD1' );
 
 		Functions\when( 'get_option' )->justReturn(
 			array(
@@ -137,7 +137,7 @@ final class OptionsTest extends TestCase {
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_invalid_hardcoded_gtm_id_is_ignored(): void {
-		define( 'GTM4WP_HARDCODED_GTM_ID', 'not-a-gtm-id' );
+		$this->define_hardcoded_gtm_id( 'not-a-gtm-id' );
 
 		Functions\when( 'get_option' )->justReturn(
 			array(
@@ -220,7 +220,7 @@ final class OptionsTest extends TestCase {
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_hardcoded_gtm_id_keeps_settings_of_matching_row(): void {
-		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-BBB222' );
+		$this->define_hardcoded_gtm_id( 'GTM-BBB222' );
 
 		Functions\when( 'get_option' )->justReturn(
 			array(
@@ -253,5 +253,18 @@ final class OptionsTest extends TestCase {
 
 		$this->assertNull( $options->get( 'unknown-key' ) );
 		$this->assertSame( 'x', $options->get( 'unknown-key', 'x' ) );
+	}
+
+	/**
+	 * Defines the GTM4WP_HARDCODED_GTM_ID wp-config override for the current test.
+	 *
+	 * Routed through a single helper so the constant is declared in exactly one
+	 * place; each caller runs in its own process (RunInSeparateProcess), so the
+	 * define happens at most once per process at runtime.
+	 *
+	 * @param string $value The container ID to hard code.
+	 */
+	private function define_hardcoded_gtm_id( string $value ): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', $value );
 	}
 }
