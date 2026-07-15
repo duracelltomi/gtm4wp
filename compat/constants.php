@@ -153,6 +153,8 @@ define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR', 'integrate-webtoffee-gdpr' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_COOKIEYES', 'integrate-cookieyes' );
+
 define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO', 'integrate-axeptio' );
 define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID', 'integrate-axeptio-projectid' );
 define( 'GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION', 'integrate-axeptio-cookies-version' );

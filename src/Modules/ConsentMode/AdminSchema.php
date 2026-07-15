@@ -48,6 +48,7 @@ final class AdminSchema implements AdminSchemaInterface {
 			'consent-mode' => __( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
 			'cookiebot'    => __( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
 			'webtoffee'    => __( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
+			'cookieyes'    => __( 'CookieYes', 'duracelltomi-google-tag-manager' ),
 			'axeptio'      => __( 'Axeptio', 'duracelltomi-google-tag-manager' ),
 		);
 	}
@@ -158,6 +159,23 @@ final class AdminSchema implements AdminSchemaInterface {
 				),
 				group: 'webtoffee',
 				phase: Field::PHASE_DEPRECATED
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_COOKIEYES,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'CookieYes consent bridge', 'duracelltomi-google-tag-manager' ),
+				description: sprintf(
+					/* translators: 1: opening anchor tag linking to CookieYes' consent banner action API documentation. 2: Closing anchor tag. */
+					esc_html__(
+						'Enable this to push a GTM data layer event (cookie_consent_update) whenever CookieYes reports a consent choice. It listens for the %1$sCookieYes consent banner action API%2$s events (cookieyes_consent_update and cookieyes_banner_load) and forwards the accepted/rejected categories to the data layer, giving your container a defined consent signal to sequence tags on. It does not defer any events - rely on Google Consent Mode v2 to gate tags regardless of push order.',
+						'duracelltomi-google-tag-manager'
+					),
+					'<a href="https://www.cookieyes.com/documentation/consent-banner-action-api/" target="_blank" rel="noopener">',
+					'</a>'
+				),
+				group: 'cookieyes',
+				phase: Field::PHASE_EXPERIMENTAL
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO,

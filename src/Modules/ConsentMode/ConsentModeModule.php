@@ -53,6 +53,7 @@ final class ConsentModeModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY  => false,
 			GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false,
 			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR        => false,
+			GTM4WP_OPTION_INTEGRATE_COOKIEYES             => false,
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO               => false,
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID     => '',
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION => '',
@@ -68,6 +69,10 @@ final class ConsentModeModule extends AbstractModule {
 	protected function register_frontend_hooks(): void {
 		if ( $this->opt( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR ) ) {
 			add_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $this, 'add_webtoffee_header_js' ), 20, 2 );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INTEGRATE_COOKIEYES ) ) {
+			add_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $this, 'add_cookieyes_header_js' ), 20, 2 );
 		}
 
 		// Axeptio is a consent management tool owned by this module; its own
@@ -120,5 +125,52 @@ final class ConsentModeModule extends AbstractModule {
 			}
 		}
 	})();';
+	}
+
+	/**
+	 * Bridges CookieYes' documented consent events to a data layer
+	 * cookie_consent_update push, so the GTM container gets a defined consent
+	 * signal to sequence tags on (the same event name the WebToffee and
+	 * Cookiebot paths emit).
+	 *
+	 * Based on CookieYes' public Consent Banner Action API, not the WebToffee
+	 * global-callback override: CookieYes dispatches DOM events on document —
+	 * cookieyes_consent_update (detail: { accepted:[…], rejected:[…] }) when the
+	 * visitor sets or changes consent, and cookieyes_banner_load (detail:
+	 * { categories, isUserActionCompleted, … }) on every load. This mirrors the
+	 * Axeptio cookies:complete bridge rather than add_webtoffee_header_js().
+	 *
+	 * Only the data layer variable name is interpolated from PHP (escaped with
+	 * esc_js exactly like the sibling consent bridges); the consent payload is
+	 * read from the browser event, never from PHP, so there is no server-side
+	 * script sink here.
+	 *
+	 * @param string $inline_js      Inline JS collected so far.
+	 * @param string $datalayer_name Name of the data layer JS variable.
+	 * @return string
+	 */
+	public function add_cookieyes_header_js( $inline_js, $datalayer_name ) {
+		$datalayer_name = esc_js( $datalayer_name );
+
+		return $inline_js . '
+	document.addEventListener("cookieyes_consent_update", function(e) {
+		window.' . $datalayer_name . ' = window.' . $datalayer_name . ' || [];
+		window.' . $datalayer_name . '.push({
+			"event": "cookie_consent_update",
+			"consent_data": (e && e.detail) || {}
+		});
+	});
+
+	document.addEventListener("cookieyes_banner_load", function(e) {
+		if ( !e || !e.detail || !e.detail.isUserActionCompleted ) {
+			return;
+		}
+
+		window.' . $datalayer_name . ' = window.' . $datalayer_name . ' || [];
+		window.' . $datalayer_name . '.push({
+			"event": "cookie_consent_update",
+			"consent_data": e.detail
+		});
+	});';
 	}
 }
