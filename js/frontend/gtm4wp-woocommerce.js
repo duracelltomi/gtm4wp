@@ -715,7 +715,15 @@ function gtm4wp_woocommerce_process_pages() {
 
 			current_product_detail_data.item_group_id =
 				current_product_detail_data.id;
-			current_product_detail_data.id = product_variation.variation_id;
+			// Re-apply the dynamic-remarketing product-id prefix to the selected
+			// variation's id: the server prefixes the parent id, but here we swap in
+			// the variation id, so the prefix would otherwise be lost (#383). item_id
+			// stays unprefixed (server contract), and the prefix is only prepended
+			// when set, so an unprefixed id keeps its original type.
+			current_product_detail_data.id = gtm4wp_remarketing_prod_id_prefix
+				? gtm4wp_remarketing_prod_id_prefix +
+				  product_variation.variation_id
+				: product_variation.variation_id;
 			current_product_detail_data.item_id =
 				product_variation.variation_id;
 			current_product_detail_data.sku = product_variation.sku;
@@ -724,7 +732,11 @@ function gtm4wp_woocommerce_process_pages() {
 				product_variation.sku &&
 				'' !== product_variation.sku
 			) {
-				current_product_detail_data.id = product_variation.sku;
+				current_product_detail_data.id =
+					gtm4wp_remarketing_prod_id_prefix
+						? gtm4wp_remarketing_prod_id_prefix +
+						  product_variation.sku
+						: product_variation.sku;
 				current_product_detail_data.item_id = product_variation.sku;
 			}
 			current_product_detail_data.price = gtm4wp_make_sure_is_float(

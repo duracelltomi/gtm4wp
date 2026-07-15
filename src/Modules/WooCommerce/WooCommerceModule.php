@@ -194,6 +194,10 @@ final class WooCommerceModule extends AbstractModule {
 		// the admin has left console output enabled.
 		$return_vars['gtm4wp_console_log'] = ! (bool) $this->opt( GTM4WP_OPTION_NOCONSOLELOG );
 
+		// The dynamic-remarketing product-id prefix, so the found_variation handler can
+		// re-apply it to a selected variation's id (it is otherwise dropped, #383).
+		$return_vars['gtm4wp_remarketing_prod_id_prefix'] = (string) $this->opt( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX );
+
 		return $return_vars;
 	}
 

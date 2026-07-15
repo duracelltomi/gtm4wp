@@ -268,3 +268,99 @@ describe( 'gtm4wp-woocommerce shortcode add_to_cart button (#110)', () => {
 		expect( call[ 1 ][ 0 ] ).toHaveProperty( 'quantity', 1 );
 	} );
 } );
+
+describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
+	// Parent product data as the server emits it: the gads id field is already
+	// prefixed; item_id stays unprefixed.
+	const PARENT_DATA = {
+		item_id: 10,
+		id: 'woocommerce_gpf_10',
+		item_name: 'Parent',
+		price: 5,
+		internal_id: 10,
+	};
+
+	let handlers;
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	// Fires WooCommerce's found_variation handler with the given prefix and returns
+	// the pushed view_item item. found_variation is bound through jQuery, so a
+	// capturing jQuery stub records the handler and we invoke it directly.
+	const fireFoundVariation = ( prefix ) => {
+		document.body.className = '';
+		document.body.innerHTML =
+			'<form class="cart variations_form">' +
+			'<input type="hidden" name="gtm4wp_product_data" />' +
+			'</form>';
+		document.querySelector( '[name=gtm4wp_product_data]' ).value =
+			JSON.stringify( PARENT_DATA );
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		global.gtm4wp_remarketing_prod_id_prefix = prefix;
+		global.gtm4wp_make_sure_is_float = ( v ) => parseFloat( v ) || 0;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+
+		handlers = {};
+		const jq = {
+			on: ( ...args ) => {
+				const evt = args[ 0 ];
+				const fn = args[ args.length - 1 ];
+				if ( typeof fn === 'function' ) {
+					handlers[ evt ] = fn;
+				}
+				return jq;
+			},
+			trigger: () => jq,
+			ajaxSuccess: () => jq,
+		};
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers(); // binds the found_variation handler via the jQuery stub
+
+		handlers.found_variation(
+			{ target: document.querySelector( 'form' ) },
+			{
+				variation_id: 456,
+				sku: 'VAR-SKU',
+				display_price: 9.99,
+				attributes: { attribute_pa_color: 'blue' },
+			}
+		);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'view_item'
+		);
+		return call && call[ 1 ][ 0 ];
+	};
+
+	it( 're-applies the id prefix to the selected variation', () => {
+		const item = fireFoundVariation( 'woocommerce_gpf_' );
+		expect( item ).toBeDefined();
+		expect( item.id ).toBe( 'woocommerce_gpf_456' );
+		expect( item.item_id ).toBe( 456 );
+		expect( item.item_group_id ).toBe( 'woocommerce_gpf_10' );
+	} );
+
+	it( 'leaves the id unprefixed and numeric when no prefix is set', () => {
+		const item = fireFoundVariation( '' );
+		expect( item ).toBeDefined();
+		expect( item.id ).toBe( 456 );
+		expect( item.item_id ).toBe( 456 );
+	} );
+} );

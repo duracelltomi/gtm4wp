@@ -47,6 +47,28 @@ final class WooCommerceModuleTest extends TestCase {
 		return $module;
 	}
 
+	public function test_add_global_vars_exposes_the_remarketing_id_prefix(): void {
+		Functions\when( 'get_woocommerce_currency' )->justReturn( 'EUR' );
+
+		$module = $this->make_module(
+			array( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX => 'woocommerce_gpf_' )
+		);
+
+		$vars = $module->add_global_vars( array() );
+
+		// The prefix must be localized so the found_variation handler can re-apply it
+		// to a selected variation's id (#383).
+		$this->assertSame( 'woocommerce_gpf_', $vars['gtm4wp_remarketing_prod_id_prefix'] );
+	}
+
+	public function test_add_global_vars_remarketing_prefix_defaults_to_empty(): void {
+		Functions\when( 'get_woocommerce_currency' )->justReturn( 'EUR' );
+
+		$vars = $this->make_module()->add_global_vars( array() );
+
+		$this->assertSame( '', $vars['gtm4wp_remarketing_prod_id_prefix'] );
+	}
+
 	public function test_keeps_true_when_woocommerce_already_says_order_received(): void {
 		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) );
 
