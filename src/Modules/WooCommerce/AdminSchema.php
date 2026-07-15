@@ -324,7 +324,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_INTEGER,
 				default_value: 2000,
 				label: __( 'Set maximum timeout for select_item event', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'When a user clicks on a product in a list, the select_item event uses a callback function with Google Tag Manager (GTM). This ensures that GTM can fire all related tags before the browser navigates to the product detail page. You can customize a timeout period (in milliseconds). This timeout only comes into play if a tag fails to fire within the specified time for some reason.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'When a user clicks on a product in a list, the select_item event uses a callback function with Google Tag Manager (GTM). This ensures that GTM can fire all related tags before the browser navigates to the product detail page. You can customize a timeout period (in milliseconds). This timeout only comes into play if a tag fails to fire within the specified time for some reason. Set this to 0 to open the product immediately without waiting for GTM: the select_item event is still pushed to the data layer, but the click is no longer held back. Use 0 (or a lower value than 2000) if product links feel slow to open - for example when a consent tool blocks GTM so the callback never returns.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced'
 			),
 		);

@@ -4,6 +4,7 @@
 
 Major rewrite of the plugin - please read the announcement post on gtm4wp.com before upgrading.
 
+* Changed: clarified the "Set maximum timeout for select_item event" option (WooCommerce → Advanced) so it explains that a value of 0 opens product links immediately without waiting for GTM - the select_item event is still sent, but the click is no longer delayed. Useful when product-list links feel slow to open (e.g. a consent tool blocks GTM so the callback never returns).
 * Fixed: the dynamic-remarketing "Product ID prefix" is now kept on variations. When a variation was selected on a variable product page, the browser swapped in the variation id and dropped the configured prefix from the `id` field used for Google/Meta catalog matching; the prefix is now re-applied to the variation's `id` (the unprefixed `item_id` is unchanged).
 * Fixed: the `[add_to_cart]` shortcode button now fires an `add_to_cart` event. A standalone shortcode button is rendered outside a product loop, so it never received the hidden product-data markup that product-list items get; the GA4 item data is now attached to the button itself so a click can be tracked. Product lists are unaffected — they already carry the data.
 * Fixed: the product-page `add_to_cart` event is no longer fired when the browser blocks the add-to-cart form submit because a required field is empty (e.g. a required Product Add-ons field). The click now respects the form's HTML5 validity, so a rejected add no longer produces a false `add_to_cart`.
