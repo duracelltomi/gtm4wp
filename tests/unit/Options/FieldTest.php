@@ -205,4 +205,15 @@ final class FieldTest extends TestCase {
 		$this->assertSame( 'general', $ui['group'] );
 		$this->assertSame( 'GTM-CURRENT', $ui['value'], 'The current value is threaded into the UI array.' );
 	}
+
+	public function test_to_ui_array_carries_the_field_phase(): void {
+		// A non-stable phase must reach the UI array so the admin renders its maturity badge.
+		$field = $this->make_field(
+			Field::TYPE_CHECKBOX,
+			false,
+			array( 'phase' => Field::PHASE_EXPERIMENTAL )
+		);
+
+		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->to_ui_array( false )['phase'] );
+	}
 }

@@ -766,6 +766,110 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'A & B', $raw['customer']['shipping']['city'] );
 	}
 
+	public function test_item_category_passes_special_characters_raw(): void {
+		// TS-11: the category name is handed raw to the shared wp_json_encode() hex-flag
+		// sink, so & and " must survive verbatim. A re-added esc_js()/esc_attr()
+		// pre-escape (RI-4 data corruption) would turn "Foo & ..." into "Foo &amp; ..."
+		// before the sink can escape it once and correctly; with a benign category
+		// ('Shoes') that regression stays invisible and coverage green.
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => "Foo \x26 \x22Bar\x22", 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertStringContainsString( "\x26", $item['item_category'], 'A raw & must survive for the JSON sink to hex-encode.' );
+		$this->assertStringContainsString( "\x22", $item['item_category'], 'A raw " must survive for the JSON sink to hex-encode.' );
+		$this->assertStringNotContainsString( '&amp;', $item['item_category'], 'The category must not be entity-encoded upstream of the sink.' );
+		$this->assertStringNotContainsString( '&quot;', $item['item_category'] );
+	}
+
+	public function test_item_variant_and_brand_pass_special_characters_raw(): void {
+		// TS-11: item_variant (imploded variation attributes) and item_brand (brand
+		// taxonomy term) are also handed raw to the wp_json_encode() sink. A value
+		// carrying & / " must arrive verbatim so the sink escapes it once - a
+		// re-introduced esc_* pre-escape would corrupt the data unnoticed with benign
+		// input.
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static function ( $product_id, $taxonomy ) {
+				if ( 'product_brand' === $taxonomy ) {
+					return array( (object) array( 'name' => "AT\x26T \x22Store\x22" ) );
+				}
+				return array();
+			}
+		);
+
+		$product = new \WC_Product_Variation(
+			array(
+				'id'                   => 456,
+				'type'                 => 'variation',
+				'parent_id'            => 99,
+				'variation_attributes' => array( 'attribute_pa_color' => "Red \x26 \x22Blue\x22" ),
+			)
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY => 'product_brand' )
+		)->process_product( $product, array(), 'productdetail' );
+
+		$this->assertSame( "Red \x26 \x22Blue\x22", $item['item_variant'], 'The variant must reach the JSON sink raw.' );
+		$this->assertStringNotContainsString( '&amp;', $item['item_variant'] );
+		$this->assertStringNotContainsString( '&quot;', $item['item_variant'] );
+
+		$this->assertSame( "AT\x26T \x22Store\x22", $item['item_brand'], 'The brand must reach the JSON sink raw.' );
+		$this->assertStringNotContainsString( '&amp;', $item['item_brand'] );
+		$this->assertStringNotContainsString( '&quot;', $item['item_brand'] );
+	}
+
+	public function test_purchase_coupon_passes_special_characters_raw(): void {
+		// TS-11: the purchase coupon string is imploded and handed raw to the
+		// wp_json_encode() sink (ProductData.php:489). A coupon code carrying & must
+		// survive verbatim (not A&amp;B) so the sink escapes it once and correctly.
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'total'        => 10.0,
+				'currency'     => 'EUR',
+				'coupon_codes' => array( "A\x26B" ),
+			)
+		);
+
+		$dl = $this->make_product_data()->get_purchase_datalayer( $order, array() );
+
+		$this->assertSame( "A\x26B", $dl['ecommerce']['coupon'], 'The coupon must reach the JSON sink raw.' );
+		$this->assertStringNotContainsString( '&amp;', $dl['ecommerce']['coupon'], 'The coupon must not be entity-encoded upstream of the sink.' );
+	}
+
+	public function test_order_not_older_than_max_age_uses_paid_date_reference(): void {
+		// TS-10: is_order_older_than_max_age() measures the age from get_date_paid()
+		// for a paid order, not get_date_created() (ProductData.php:598-599). An order
+		// created decades ago but paid moments ago must NOT be treated as stale - if
+		// the reference were the created date it would fail the 30-minute gate. The
+		// TRUE branch (via the created date) is covered by
+		// PurchaseTrackingTest::test_skips_order_older_than_max_age.
+		//
+		// The method reads "now" internally (new \DateTime('now')), which is not
+		// injectable, so the recent-paid fixture is time()-relative; a 60-second paid
+		// age against a 30-minute gate leaves a 29-minute non-flake margin (TS-8),
+		// while the created date is a fixed absolute value.
+		$order = new \WC_Order(
+			array(
+				'is_paid'      => true,
+				'date_paid'    => gmdate( 'c', time() - 60 ),
+				'date_created' => '2000-01-01T00:00:00+00:00',
+			)
+		);
+
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE => 30 )
+		);
+
+		$this->assertFalse(
+			$product_data->is_order_older_than_max_age( $order ),
+			'A recently paid order must not be stale even when created long ago - the reference is the paid date.'
+		);
+	}
+
 	public function test_helpers_email_normalization(): void {
 		$this->assertSame(
 			hash( 'sha256', 'johndoe@gmail.com' ),

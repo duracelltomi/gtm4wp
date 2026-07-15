@@ -55,6 +55,20 @@ final class ListTrackingTest extends TestCase {
 		Functions\when( 'get_query_var' )->justReturn( 0 );
 	}
 
+	protected function tearDown(): void {
+		// Reset the cross-request/loop globals the list callbacks read and write
+		// (TS-7 isolation).
+		unset(
+			$GLOBALS['product'],
+			$GLOBALS['gtm4wp_cart_item_proddata'],
+			$GLOBALS['gtm4wp_grouped_product_ix'],
+			$GLOBALS['gtm4wp_last_widget_title'],
+			$GLOBALS['gtm4wp_product_counter']
+		);
+
+		parent::tearDown();
+	}
+
 	/**
 	 * Builds a ListTracking instance backed by real Options + ProductData.
 	 *
@@ -329,5 +343,175 @@ final class ListTrackingTest extends TestCase {
 		);
 
 		$this->assertSame( $link, $result );
+	}
+
+	/**
+	 * Sets up the WP functions quick_view_before_single_product() reads.
+	 *
+	 * @param \WC_Product $product The product wc_get_product() returns.
+	 * @return void
+	 */
+	private function stub_quick_view_env( \WC_Product $product ): void {
+		Functions\when( 'get_the_ID' )->justReturn( 123 );
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		Functions\when( 'get_woocommerce_currency' )->justReturn( 'EUR' );
+	}
+
+	public function test_quick_view_outputs_event_only_when_tracking_disabled(): void {
+		// Gate off: only the bare view_item event, no product/ecommerce data.
+		$this->stub_quick_view_env( $this->make_product() );
+
+		ob_start();
+		$this->make_list_tracking()->quick_view_before_single_product();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString( 'id="gtm4wp_quickview_data"', $out );
+		$this->assertStringNotContainsString( 'ecommerce', $out );
+		$this->assertStringNotContainsString( 'productType', $out );
+	}
+
+	public function test_quick_view_simple_product_adds_ecommerce_block(): void {
+		$this->stub_quick_view_env( $this->make_product() );
+
+		ob_start();
+		$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->quick_view_before_single_product();
+		$out = ob_get_clean();
+
+		// The default (simple) branch carries the ecommerce item and is not variable.
+		$this->assertStringContainsString( 'ecommerce', $out );
+		$this->assertStringContainsString( 'productIsVariable', $out );
+		$this->assertStringContainsString( 'view_item', $out );
+	}
+
+	public function test_quick_view_variable_product_sets_flag_without_ecommerce(): void {
+		$this->stub_quick_view_env( $this->make_product( array( 'type' => 'variable' ) ) );
+
+		ob_start();
+		$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->quick_view_before_single_product();
+		$out = ob_get_clean();
+
+		// The variable branch reports productIsVariable but builds no ecommerce block.
+		$this->assertStringContainsString( 'productIsVariable', $out );
+		$this->assertStringNotContainsString( 'ecommerce', $out );
+	}
+
+	public function test_cart_item_product_filter_stores_proddata_global_and_returns_product(): void {
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
+
+		$product = $this->make_product();
+		$result  = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->cart_item_product_filter(
+				$product,
+				array(
+					'line_subtotal' => 10.0,
+					'line_total'    => 10.0,
+					'quantity'      => 1,
+				)
+			);
+
+		$this->assertSame( $product, $result, 'The filter must return the product unchanged.' );
+		$this->assertIsArray( $GLOBALS['gtm4wp_cart_item_proddata'] );
+		$this->assertSame( 'Test Product', $GLOBALS['gtm4wp_cart_item_proddata']['item_name'] );
+	}
+
+	public function test_cart_item_remove_link_filter_injects_data_and_resets_global(): void {
+		// The constructor resets the per-item global, so stage it AFTER building.
+		$list_tracking                        = $this->make_list_tracking();
+		$GLOBALS['gtm4wp_cart_item_proddata'] = array( 'item_name' => 'Test Product' );
+
+		$out = $list_tracking->cart_item_remove_link_filter( '<a href="?remove_item=abc">x</a>' );
+
+		$this->assertStringContainsString( 'data-gtm4wp_product_data="', $out, 'The remove link must carry the product data.' );
+		// The JSON is written into an HTML attribute (esc_attr), so its quotes are
+		// encoded, never raw " that would break out of the attribute (TS-2).
+		$this->assertStringContainsString( '&quot;item_name&quot;', $out );
+		$this->assertStringNotContainsString( '"item_name"', $out );
+		$this->assertSame( '', $GLOBALS['gtm4wp_cart_item_proddata'], 'The per-item global must be reset after use.' );
+	}
+
+	public function test_cart_item_remove_link_filter_returns_link_unchanged_without_global(): void {
+		// No product data staged (non-array/unset global) -> the link is untouched.
+		unset( $GLOBALS['gtm4wp_cart_item_proddata'] );
+		$link = '<a href="?remove_item=abc">x</a>';
+
+		$this->assertSame( $link, $this->make_list_tracking()->cart_item_remove_link_filter( $link ) );
+	}
+
+	public function test_single_add_to_cart_tracking_outputs_hidden_input_when_enabled(): void {
+		$GLOBALS['product'] = $this->make_product();
+
+		ob_start();
+		$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->single_add_to_cart_tracking();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString( 'name="gtm4wp_product_data"', $out );
+		$this->assertStringContainsString( '&quot;item_name&quot;', $out );
+	}
+
+	public function test_single_add_to_cart_tracking_outputs_nothing_when_disabled(): void {
+		$GLOBALS['product'] = $this->make_product();
+
+		ob_start();
+		$this->make_list_tracking()->single_add_to_cart_tracking();
+		$out = ob_get_clean();
+
+		$this->assertSame( '', $out, 'The hidden input must not be printed when e-commerce tracking is off.' );
+	}
+
+	public function test_grouped_product_list_column_label_appends_hidden_span(): void {
+		// The constructor seeds the grouped index (to 1); reset it AFTER building.
+		$list_tracking                        = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$GLOBALS['gtm4wp_grouped_product_ix'] = 0;
+
+		$out = $list_tracking->grouped_product_list_column_label( 'Qty', $this->make_product() );
+
+		$this->assertStringContainsString( 'Qty', $out, 'The original label must be preserved.' );
+		$this->assertStringContainsString( 'class="gtm4wp_productdata"', $out );
+		$this->assertStringContainsString( '&quot;item_name&quot;', $out );
+		$this->assertSame( 1, $GLOBALS['gtm4wp_grouped_product_ix'], 'The grouped index must advance.' );
+	}
+
+	public function test_grouped_product_list_column_label_returns_label_without_product(): void {
+		$this->assertSame(
+			'Qty',
+			$this->make_list_tracking()->grouped_product_list_column_label( 'Qty', null ),
+			'A missing product must leave the label untouched.'
+		);
+	}
+
+	public function test_after_template_part_injects_product_data_into_widget_product(): void {
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
+
+		// gtm4wp_product_counter (0) and gtm4wp_last_widget_title are seeded by the
+		// constructor; stage the current product AFTER building.
+		$list_tracking      = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$GLOBALS['product'] = $this->make_product();
+
+		// after_template_part() consumes the current output buffer (the rendered
+		// template item) and re-echoes it with the data attribute injected; capture
+		// that echo in an outer buffer.
+		ob_start();                                       // Outer: capture the echo.
+		ob_start();                                       // Inner: the "template" output.
+		echo '<a href="https://example.com/p/">Item</a>';
+		$list_tracking->after_template_part( 'content-widget-product.php' );
+		$out = (string) ob_get_clean();                   // Outer buffer.
+
+		$this->assertStringContainsString( 'data-gtm4wp_product_data="', $out );
+		$this->assertSame( 1, $GLOBALS['gtm4wp_product_counter'], 'The widget product counter must advance.' );
+	}
+
+	public function test_after_template_part_passes_non_widget_template_unchanged(): void {
+		$GLOBALS['product'] = $this->make_product();
+
+		ob_start();
+		ob_start();
+		echo '<a href="https://example.com/p/">Item</a>';
+		$this->make_list_tracking()->after_template_part( 'content-product.php' );
+		$out = (string) ob_get_clean();
+
+		$this->assertSame( '<a href="https://example.com/p/">Item</a>', $out, 'A non-widget template must pass through unmodified.' );
 	}
 }

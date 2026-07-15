@@ -641,4 +641,131 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( 3, $result['customerTotalOrders'] );
 		$this->assertSame( 'Marks & Spencer', $result['customerBillingCompany'], 'Customer data must reach the data layer raw.' );
 	}
+
+	public function test_cart_page_fires_view_cart_event(): void {
+		// TS-5: the is_cart() branch (add_cart_view) fires the GA4 view_cart event for a
+		// non-empty cart when e-commerce tracking is on.
+		Functions\when( 'is_cart' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"view_cart"', $this->inline_js, 'The cart page must fire the GA4 view_cart event.' );
+		$this->assertStringContainsString( '"item_name":"Mug"', $this->inline_js, 'The cart item must be carried on the view_cart event.' );
+	}
+
+	public function test_cart_content_added_when_include_cart_option_enabled(): void {
+		// TS-5: the add_cart_content branch (WCEINCLUDECARTINDL) attaches the current
+		// cart's totals and visible items to the returned data layer on every page view.
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ) ); // phpcs:ignore
+
+		$result = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'cartContent', $result, 'The cart content must be added when WCEINCLUDECARTINDL is on.' );
+		$this->assertArrayHasKey( 'totals', $result['cartContent'] );
+		$this->assertSame( 'Mug', $result['cartContent']['items'][0]['item_name'], 'The visible cart item must appear in cartContent.' );
+	}
+
+	public function test_readded_to_cart_fires_add_to_cart_event(): void {
+		// TS-5: the maybe_add_readded_to_cart branch. The cart-page "Undo" link re-adds a
+		// removed item; cart_item_restored() flags its hash in the WC session, and the
+		// next page load fires an add_to_cart for it and clears the marker.
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+
+		$cart = new class( array( 'hash-1' => array( 'data' => $product, 'quantity' => 1 ) ) ) { // phpcs:ignore
+			public function __construct( private array $items ) {}
+			public function get_cart() {
+				return $this->items;
+			}
+			public function get_cart_item( $key ) {
+				return $this->items[ $key ] ?? null;
+			}
+			public function get_applied_coupons() {
+				return array();
+			}
+			public function get_discount_total() {
+				return 0;
+			}
+			public function get_subtotal() {
+				return 0;
+			}
+			public function get_cart_contents_total() {
+				return 0;
+			}
+		};
+
+		$session = new class() {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function get( $key ) {
+				return 'gtm4wp_product_readded_to_cart' === $key ? 'hash-1' : null;
+			}
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		$store           = new \stdClass();
+		$store->cart     = $cart;
+		$store->session  = $session;
+		$store->customer = null;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"add_to_cart"', $this->inline_js, 'A re-added cart item must fire the add_to_cart event.' );
+		$this->assertArrayHasKey( 'gtm4wp_product_readded_to_cart', $session->sets, 'The re-add marker must be consumed.' );
+		$this->assertNull( $session->sets['gtm4wp_product_readded_to_cart'], 'The re-add marker must be cleared after firing.' );
+	}
+
+	public function test_variable_product_fires_view_item_on_parent_when_enabled(): void {
+		// TS-5: the productType === 'variable' branch of add_product_view. With
+		// WCVIEWITEMONPARENT on, a view_item fires on the variable parent (and the
+		// productIsVariable flag is set to 1).
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'type' => 'variable', 'title' => 'Tee', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 1, $result['productIsVariable'], 'A variable product is flagged productIsVariable=1.' );
+		$this->assertStringContainsString( '"event":"view_item"', $this->inline_js, 'view_item fires on the variable parent when WCVIEWITEMONPARENT is on.' );
+	}
+
+	public function test_grouped_product_view_sets_flag_without_firing_view_item(): void {
+		// TS-5: the productType === 'grouped' branch of add_product_view. A grouped
+		// product sets productIsVariable=0 and, unlike simple / variable-on-parent, must
+		// NOT fire a single view_item event (the item has no own price to report).
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'type' => 'grouped', 'title' => 'Bundle', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$result = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( 0, $result['productIsVariable'], 'A grouped product is flagged productIsVariable=0.' );
+		$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_js, 'A grouped product must not fire a single view_item event.' );
+	}
 }
