@@ -67,6 +67,52 @@ final class ListTracking {
 	}
 
 	/**
+	 * Executed during woocommerce_loop_add_to_cart_link.
+	 * Attaches GA4 product data to a standalone add-to-cart button - the
+	 * [add_to_cart] shortcode and similar buttons rendered outside a product loop,
+	 * which get no .gtm4wp_productdata list markup - so the frontend click handler
+	 * can still fire add_to_cart for them (#110). Buttons inside a product loop
+	 * already carry that markup (added on woocommerce_after_shop_loop_item), so they
+	 * are skipped here to avoid duplicating the data.
+	 *
+	 * @param string $link    The add-to-cart link/button HTML.
+	 * @param mixed  $product The WooCommerce product this button belongs to.
+	 * @return string The link HTML, with product data added for standalone buttons.
+	 */
+	public function add_to_cart_link_filter( $link, $product = null ) {
+		// Inside a product loop the list markup already carries the product data.
+		if ( doing_action( 'woocommerce_after_shop_loop_item' ) ) {
+			return $link;
+		}
+
+		if ( ! ( $product instanceof \WC_Product ) ) {
+			return $link;
+		}
+
+		// Only a simple product gets an inline add-to-cart button; variable/grouped
+		// buttons are "Select options" links that navigate to the product page.
+		if ( 'simple' !== $product->get_type() ) {
+			return $link;
+		}
+
+		$eec_product_array = $this->product_data->process_product(
+			$product,
+			array(),
+			'shortcodeaddtocart'
+		);
+
+		if ( ! is_array( $eec_product_array ) ) {
+			return $link;
+		}
+
+		return Helpers::str_replace_first(
+			'<a ',
+			'<a data-gtm4wp_product_data="' . esc_attr( wp_json_encode( $eec_product_array ) ) . '" ',
+			$link
+		);
+	}
+
+	/**
 	 * Executed during woocommerce_cart_item_product for each product in the cart.
 	 * Stores the ecommerce product data into a global variable to be processed
 	 * when the cart item is rendered.

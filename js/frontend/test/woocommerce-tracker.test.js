@@ -190,3 +190,81 @@ describe( 'gtm4wp-woocommerce PDP add_to_cart validation guard (#274)', () => {
 		);
 	} );
 } );
+
+describe( 'gtm4wp-woocommerce shortcode add_to_cart button (#110)', () => {
+	const SHORTCODE_DATA = {
+		item_id: 42,
+		item_name: 'Shortcode Product',
+		price: 7,
+	};
+
+	beforeEach( () => {
+		document.body.className = '';
+		// [add_to_cart] shortcode: a .product wrapper with an add-to-cart button but
+		// no .gtm4wp_productdata span; the data lives on the button (href="#" so
+		// jsdom does not attempt a navigation).
+		document.body.innerHTML =
+			'<p class="product woocommerce add_to_cart_inline">' +
+			'<a href="#" class="button add_to_cart_button ajax_add_to_cart product_type_simple">Add to cart</a>' +
+			'</p>';
+		document
+			.querySelector( '.add_to_cart_button' )
+			.setAttribute(
+				'data-gtm4wp_product_data',
+				JSON.stringify( SHORTCODE_DATA )
+			);
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	} );
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	it( 'fires add_to_cart from the button data when there is no list span', () => {
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 42 } )
+		);
+		expect( call[ 1 ][ 0 ] ).toHaveProperty( 'quantity', 1 );
+	} );
+} );

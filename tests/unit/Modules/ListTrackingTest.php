@@ -290,4 +290,44 @@ final class ListTrackingTest extends TestCase {
 		$this->assertStringContainsString( 'Deal $1 special', $result );
 		$this->assertStringContainsString( 'ITEM', $result );
 	}
+
+	public function test_add_to_cart_link_filter_adds_data_for_a_standalone_button(): void {
+		// The [add_to_cart] shortcode renders a button outside a product loop, so it
+		// gets no .gtm4wp_productdata list markup; the data is attached to the button
+		// itself so the frontend click handler can still fire add_to_cart (#110).
+		Functions\when( 'doing_action' )->justReturn( false );
+
+		$result = $this->make_list_tracking()->add_to_cart_link_filter(
+			'<a href="?add-to-cart=123" class="button add_to_cart_button ajax_add_to_cart">Add to cart</a>',
+			$this->make_product()
+		);
+
+		$this->assertStringContainsString( 'data-gtm4wp_product_data=', $result, 'A standalone add-to-cart button must carry its product data.' );
+		$this->assertStringContainsString( 'Test Product', $result, 'The encoded data must include the actual product.' );
+	}
+
+	public function test_add_to_cart_link_filter_skips_buttons_inside_a_product_loop(): void {
+		// Inside a loop the .gtm4wp_productdata span already carries the data, so the
+		// button must be left untouched to avoid duplicating it.
+		Functions\when( 'doing_action' )->justReturn( true );
+
+		$link   = '<a href="?add-to-cart=123" class="button add_to_cart_button">Add to cart</a>';
+		$result = $this->make_list_tracking()->add_to_cart_link_filter( $link, $this->make_product() );
+
+		$this->assertSame( $link, $result, 'A loop add-to-cart button must not be modified.' );
+	}
+
+	public function test_add_to_cart_link_filter_skips_non_simple_products(): void {
+		// Variable/grouped buttons are "Select options" links to the product page,
+		// so there is no inline add to track at this point.
+		Functions\when( 'doing_action' )->justReturn( false );
+
+		$link   = '<a href="?add-to-cart=123" class="button add_to_cart_button">Select options</a>';
+		$result = $this->make_list_tracking()->add_to_cart_link_filter(
+			$link,
+			$this->make_product( array( 'type' => 'variable' ) )
+		);
+
+		$this->assertSame( $link, $result );
+	}
 }

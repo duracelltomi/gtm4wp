@@ -266,14 +266,27 @@ function gtm4wp_woocommerce_process_pages() {
 				const productdata_el =
 					product_el &&
 					product_el.querySelector( '.gtm4wp_productdata' );
-				if ( ! productdata_el ) {
-					return true;
-				}
 
-				const productdata = gtm4wp_read_json_from_node(
-					productdata_el,
-					'gtm4wp_product_data'
-				);
+				let productdata;
+				if ( productdata_el ) {
+					productdata = gtm4wp_read_json_from_node(
+						productdata_el,
+						'gtm4wp_product_data'
+					);
+				} else {
+					// Standalone [add_to_cart] shortcode button: it has no list
+					// markup, so the product data is attached to the button itself
+					// (#110).
+					const shortcode_button = event_target_element.closest(
+						'.add_to_cart_button'
+					);
+					productdata =
+						shortcode_button &&
+						gtm4wp_read_json_from_node(
+							shortcode_button,
+							'gtm4wp_product_data'
+						);
+				}
 				if ( ! productdata ) {
 					return true;
 				}
