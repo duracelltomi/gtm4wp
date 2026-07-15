@@ -83,7 +83,7 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 ## 1.21.1
 
 * Fix: undefined product_qty variable prevents add_to_cart in some cases. Thanks [diegoarda](https://github.com/diegoarda)
-* Fix: clarified that WebToffee integartion is only needed with the legacy 2.x product line
+* Fix: clarified that WebToffee integration is only needed with the legacy 2.x product line
 * Fix: Reflected Cross-Site Scripting (XSS) with site search tracking. Thanks [godzeo](https://github.com/godzeo)!
 
 ## 1.21
@@ -150,7 +150,7 @@ please update the plugin on a test version of your website before updating your 
 
 ## 1.19.1
 
-* Fixed: run additional checks when determing product category to prevent PHP errors in certain cases
+* Fixed: run additional checks when determining product category to prevent PHP errors in certain cases
 * Fixed: corrected Consent Mode flag names in admin page description texts
 
 ## 1.19
@@ -252,7 +252,7 @@ Full scan of the plugin is also in works to fix any other possible XSS issue.
 * Dev: removed PHP constant GTM4WP_WPFILTER_COMPILE_REMARKTING (related to removed Google Ads remarketing feature)
 * Dev: removed gtm4wp_compile_remarkering WordPress filter (related to removed Google Ads remarketing feature)
 
-Note to plugin users: I sincerely appologize for the vulnerabilities. To make sure, such cases do not happen again,
+Note to plugin users: I sincerely apologize for the vulnerabilities. To make sure, such cases do not happen again,
 the next version will be fully dedicacted to go through every peace of code and make sure proper data processing is happening in GTM4WP.
 
 ## 1.15
@@ -322,7 +322,7 @@ The goal is to keep this setup in the upcoming versions.
 * Added: Google Business Vertical option to populate Google Ads dynamic remarketing
 * Added: Make automatic cookie blocking mode of Cookiebot to work with your Google Tag Manager container (new option in the Integration tab)
 * Added: support for [server side containers with custom domains](https://developers.google.com/tag-manager/serverside/send-data#update_the_gtmjs_source_domain)
-* Added: improved duplacate WooCommerce order tracking prevention by also checking the age of the order. You can adjust the value in minutes on the plugin options page - by [Code-Craze](https://github.com/Code-Craze)
+* Added: improved duplicate WooCommerce order tracking prevention by also checking the age of the order. You can adjust the value in minutes on the plugin options page - by [Code-Craze](https://github.com/Code-Craze)
 * Fixed: prices rounded to 2 decimals in the data layer (WooCommerce integration)
 * Fixed: select_item event fired multiple times (at least twice)
 * Fixed: frontend protection to preveent double tracking transactions had a bug
@@ -391,7 +391,7 @@ If you are using the blacklist/whitelist feature of the plugin, review these opt
 * Fixed: use var_export instead of var_dump in some debug code,
 * Fixed: apply WooCommerce option for tax inclusion on the order received page as well
 * Fixed: JavaScript errors in Vimeo player
-* Updated: do not add type attribute to script elements if theme suppors HTML5
+* Updated: do not add type attribute to script elements if theme supports HTML5
 * Updated: tested version numbers for WordPress and WooCommerce
 
 ## 1.11.2
@@ -420,7 +420,7 @@ Please read the changelog very carefully as there are many important changes and
   * GTM4WP_HARDCODED_GTM_ENV_AUTH
   * GTM4WP_HARDCODED_GTM_ENV_PREVIEW
 * Added support for WooCommerce Grouped Products
-* Added new WooCommerce option to add all order data into the data layer on the order reveived page
+* Added new WooCommerce option to add all order data into the data layer on the order received page
   * This includes personal data of the customer -> you need to ensure this is used in a privacy friendly and compliant way!
   * This order data will be always present on the order received page, even if the page is reloaded or later revisited!
 * Removed several unofficial data layer variables on the WooCommerce order received page as they can be read using the new order data option
@@ -478,7 +478,7 @@ Please read the changelog very carefully as there are many important changes and
 * Fixed: checkout step events for payment mode and shipping type not always fired
 * Fixed: the CMD on Mac will be treated just like the Ctrl key on Windows while processing the product click event in the WooCommerce integration (thy for luzinis)
 * Fixed: add currencyCode to every ecommerce action in WooCommerce integration
-* Fixed: better WooCommere Quick View integration
+* Fixed: better WooCommerce Quick View integration
 * Fixed: possible cross site scripting vulnerability if site search tracking was enabled due to not properly escaped referrer url tracking
 * Changed: code cleanup in WooCommerce integration
 
@@ -570,7 +570,7 @@ Please read the changelog very carefully as there are many important changes and
 
 * Updated: even better WooCommerce 3.0 compatibility (WooCommerce 2.6 still supported but this support ends with the next plugin version)
 * Fixed: properly escaping product category name on variable product detail pages
-* Fixed: proper data layer stucture in the gtm4wp.changeDetailViewEEC event
+* Fixed: proper data layer structure in the gtm4wp.changeDetailViewEEC event
 * Added: Google Optimize page hiding snippet under Integrations tab
 * Added: add to cart data for WooCommerce enhanced ecommerce tracking if user undos a cart item removal (no need to update GTM tags)
 * Added: you can now enter a product ID prefix so that IDs can match with IDs in some product feeds generated by other plugins
@@ -677,7 +677,7 @@ Major changes to the Enhanced Ecommerce implementation of the WooCommerce integr
 * Added: new checkbox - use product SKU for Google Ads Dynamic Remarketing variables instead of product ID (experimental)
 * Added: place your container code after the opening body tag without modifying your theme files (thx Yaniv Friedensohn)
 * Added: automatic codeless container code injection for Genesis framework users
-* Fixed: Possible PHP error with custom payment gateway (QuickPay) on the checkout page (thx Damiel for findig this)
+* Fixed: Possible PHP error with custom payment gateway (QuickPay) on the checkout page (thx Damiel for finding this)
 
 ## 1.0
 

@@ -506,7 +506,7 @@ function gtm4wp_woocommerce_process_pages() {
 			const event_target_element = e.target;
 
 			if ( ! event_target_element ) {
-				// for some reason event target is not specificed
+				// for some reason event target is not specified
 				return true;
 			}
 
@@ -776,7 +776,7 @@ function gtm4wp_woocommerce_process_pages() {
 
 	// track variable products on their detail pages
 	// currently, we need to use jQuery here since WooCommerce is firing this event using jQuery
-	// that can not be catched using vanilla JS
+	// that can not be caught using vanilla JS
 	jQuery( document ).on(
 		'found_variation',
 		function ( event, product_variation ) {
@@ -896,9 +896,9 @@ function gtm4wp_woocommerce_process_pages() {
 	);
 	jQuery( '.variations select' ).trigger( 'change' );
 
-	// initiate codes in WooCommere Quick View
+	// initiate codes in WooCommerce Quick View
 	// currently, we need to use jQuery here since WooCommerce Quick View is showing the popup using
-	// jQuery AJAX calls that can not be catched using vanilla JS
+	// jQuery AJAX calls that can not be caught using vanilla JS
 	jQuery( document ).ajaxSuccess( function ( event, xhr, settings ) {
 		if ( typeof settings !== 'undefined' ) {
 			if ( settings.url.indexOf( 'wc-api=WC_Quick_View' ) > -1 ) {
@@ -948,7 +948,7 @@ function gtm4wp_woocommerce_process_pages() {
 			const event_target_element = e.target;
 
 			if ( ! event_target_element ) {
-				// for some reason event target is not specificed
+				// for some reason event target is not specified
 				return true;
 			}
 
@@ -963,7 +963,7 @@ function gtm4wp_woocommerce_process_pages() {
 			const event_target_element = e.target;
 
 			if ( ! event_target_element ) {
-				// for some reason event target is not specificed
+				// for some reason event target is not specified
 				return true;
 			}
 
@@ -990,7 +990,7 @@ function gtm4wp_woocommerce_process_pages() {
 			const event_target_element = e.target;
 
 			if ( ! event_target_element ) {
-				// for some reason event target is not specificed
+				// for some reason event target is not specified
 				return true;
 			}
 
@@ -1007,7 +1007,7 @@ function gtm4wp_woocommerce_process_pages() {
 			const event_target_element = e.target;
 
 			if ( ! event_target_element ) {
-				// for some reason event target is not specificed
+				// for some reason event target is not specified
 				return true;
 			}
 
