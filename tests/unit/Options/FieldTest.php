@@ -154,6 +154,64 @@ final class FieldTest extends TestCase {
 		$this->assertSame( 'line', $field->sanitize( '  line  ' ) );
 	}
 
+	/**
+	 * A crafted settings-import file can hand an array to a scalar field: the
+	 * import path reaches sanitize() without the REST-layer per-field type
+	 * coercion the normal save gets. The scalar branches must not raise a PHP
+	 * "Array to string conversion" warning, and the array must not leak in as
+	 * the literal string "Array" - it collapses to a safe empty string.
+	 */
+	public function test_scalar_sanitizers_handle_non_scalar_input_without_warning(): void {
+		$raised = array();
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test asserts no PHP warning is raised.
+		set_error_handler(
+			static function ( $errno, $errstr ) use ( &$raised ) {
+				$raised[] = $errstr;
+				return true;
+			}
+		);
+
+		try {
+			foreach ( array( Field::TYPE_TEXT, Field::TYPE_TEXTAREA, Field::TYPE_SELECT ) as $type ) {
+				$result = $this->make_field( $type, '' )->sanitize( array( 'hostile', 'array' ) );
+
+				$this->assertIsString( $result, $type . ' always sanitizes to a string.' );
+				$this->assertStringNotContainsString( 'Array', $result, $type . ' does not leak the array in as the literal string "Array".' );
+			}
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertSame( array(), $raised, 'No PHP warning is raised when a scalar field receives an array.' );
+	}
+
+	public function test_multiselect_and_table_handle_nested_arrays_without_warning(): void {
+		$raised = array();
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test asserts no PHP warning is raised.
+		set_error_handler(
+			static function ( $errno, $errstr ) use ( &$raised ) {
+				$raised[] = $errstr;
+				return true;
+			}
+		);
+
+		try {
+			$multi_result = $this->make_field( Field::TYPE_MULTISELECT, array() )
+				->sanitize( array( 'ok', array( 'nested' ) ) );
+
+			$table_result = $this->make_field( Field::TYPE_TABLE, array() )
+				->sanitize( array( array( 'id' => array( 'nested' ) ) ) );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertSame( array(), $raised, 'A nested array in a multiselect/table value raises no conversion warning.' );
+		$this->assertContains( 'ok', $multi_result, 'The scalar multiselect entry survives.' );
+		$this->assertSame( '', $table_result[0]['id'], 'A nested-array table cell collapses to an empty string.' );
+	}
+
 	public function test_custom_sanitizer_takes_precedence(): void {
 		$field = $this->make_field(
 			Field::TYPE_TEXT,

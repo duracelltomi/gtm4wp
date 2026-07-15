@@ -142,15 +142,15 @@ final class Field {
 				return (int) $value;
 
 			case self::TYPE_SELECT:
-				$value = (string) sanitize_text_field( (string) $value );
+				$value = (string) sanitize_text_field( self::to_string( $value ) );
 				if ( array() !== $this->choices && ! array_key_exists( $value, $this->choices ) ) {
 					return $this->default_value;
 				}
 				return $value;
 
 			case self::TYPE_MULTISELECT:
-				$values = is_array( $value ) ? $value : explode( ',', (string) $value );
-				$values = array_map( 'sanitize_text_field', array_map( 'strval', $values ) );
+				$values = is_array( $value ) ? $value : explode( ',', self::to_string( $value ) );
+				$values = array_map( 'sanitize_text_field', array_map( static fn ( $one ) => self::to_string( $one ), $values ) );
 				if ( array() !== $this->choices ) {
 					$values = array_values(
 						array_filter(
@@ -168,19 +168,37 @@ final class Field {
 				return array_values(
 					array_map(
 						static fn ( $row ) => is_array( $row )
-							? array_map( static fn ( $cell ) => sanitize_text_field( (string) $cell ), $row )
+							? array_map( static fn ( $cell ) => sanitize_text_field( self::to_string( $cell ) ), $row )
 							: array(),
 						$value
 					)
 				);
 
 			case self::TYPE_TEXTAREA:
-				return sanitize_textarea_field( (string) $value );
+				return sanitize_textarea_field( self::to_string( $value ) );
 
 			case self::TYPE_TEXT:
 			default:
-				return sanitize_text_field( (string) $value );
+				return sanitize_text_field( self::to_string( $value ) );
 		}
+	}
+
+	/**
+	 * Casts a submitted value to a string without emitting a PHP "Array to
+	 * string conversion" warning (or a fatal on an object without __toString).
+	 *
+	 * The settings save route type-normalizes each value at the REST layer
+	 * before it reaches sanitize(); the settings import route decodes the raw
+	 * file itself and reaches sanitize() without that coercion, so a crafted
+	 * file can hand an array to a scalar field. Non-scalar values collapse to
+	 * an empty string here, so every entry point into sanitize() behaves
+	 * identically (null already casts to '' - kept for parity).
+	 *
+	 * @param mixed $value Raw value of any type.
+	 * @return string
+	 */
+	private static function to_string( $value ): string {
+		return is_scalar( $value ) ? (string) $value : '';
 	}
 
 	/**
