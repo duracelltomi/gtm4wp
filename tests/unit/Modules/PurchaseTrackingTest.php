@@ -146,6 +146,60 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'A tracked order must be flagged with the _ga_tracked meta.' );
 	}
 
+	/**
+	 * TS-1 / TS-2 / stored-XSS regression. When the optional orderData block is on,
+	 * billing/shipping/coupon fields — user-controllable at checkout (finding #3) —
+	 * reach the inline-<script> purchase sink. This is the only test that drives the
+	 * WCORDERDATA branch; it proves the value is hex-encoded (each flag pinned) and
+	 * that no raw break-out or upstream entity-encoding survives. Break-out chars are
+	 * written with \xNN so no literal char appears in this file (TC-2).
+	 */
+	public function test_order_data_branch_hex_encodes_hostile_billing_and_coupon(): void {
+		// \x3C < , \x3E > , \x22 " , \x26 &
+		$order = $this->make_order(
+			array(
+				'billing_first_name' => "x\x3C/script\x3E",
+				'billing_company'    => "Marks \x26 Spencer",
+				'coupon_codes'       => array( "a\x22\x3E" ),
+			)
+		);
+
+		$output = $this->run_thankyou(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+			),
+			$order
+		);
+
+		$this->assertStringContainsString( '"orderData"', $output, 'The orderData block must be present when the option is on.' );
+
+		// Direction 2 (TS-2): the injected value's raw break-out must never survive.
+		// The 'x' prefix distinguishes the billing-name payload from the script
+		// block's own closing tag (the output legitimately ends with </script>).
+		$this->assertStringNotContainsString( 'x</script>', $output );
+		$this->assertStringNotContainsString( 'Marks & Spencer', $output );
+		$this->assertStringNotContainsString( '&amp;', $output, 'The value must not be entity-encoded upstream of the sink (RI-4).' );
+
+		// Direction 1 (TS-2): each break-out char is hex-encoded, pinning the flag
+		// set. Build the expected fragment with json_encode(... hex flags) exactly as
+		// the source does (TC-2: compute, never hand-type \uXXXX); trim() drops the
+		// quotes json_encode adds. The company (&) and coupon (" and >) carry no '/',
+		// so slash-escaping cannot affect the match — this pins JSON_HEX_AMP,
+		// JSON_HEX_QUOT and JSON_HEX_TAG.
+		$flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS;
+		$this->assertStringContainsString(
+			trim( (string) json_encode( "Marks \x26 Spencer", $flags ), '"' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			$output,
+			'The company & must be hex-encoded (JSON_HEX_AMP).'
+		);
+		$this->assertStringContainsString(
+			trim( (string) json_encode( "a\x22\x3E", $flags ), '"' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			$output,
+			'The coupon " and > must be hex-encoded (JSON_HEX_QUOT / JSON_HEX_TAG).'
+		);
+	}
+
 	public function test_does_not_flag_order_when_no_tracked_flag_option_set(): void {
 		$order = $this->make_order();
 

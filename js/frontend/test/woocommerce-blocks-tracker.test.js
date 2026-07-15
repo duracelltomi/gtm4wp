@@ -15,6 +15,8 @@ let mockSubscriber;
 let mockCartData;
 let mockActivePaymentMethod;
 let mockHasPaymentStore;
+let mockHasFinishedResolution;
+let mockSubscribeCount;
 
 // @wordpress/data is externalized to window.wp.data by the production build and
 // is not installed in node_modules, so the mock must be virtual.
@@ -25,7 +27,7 @@ jest.mock(
 			if ( name === 'wc/store/cart' ) {
 				return {
 					getCartData: () => mockCartData,
-					hasFinishedResolution: () => true,
+					hasFinishedResolution: () => mockHasFinishedResolution,
 				};
 			}
 			if ( name === 'wc/store/payment' && mockHasPaymentStore ) {
@@ -36,6 +38,7 @@ jest.mock(
 			return null;
 		},
 		subscribe: ( cb ) => {
+			mockSubscribeCount++;
 			mockSubscriber = cb;
 		},
 	} ),
@@ -70,6 +73,8 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		mockCartData = { items: [], totals: { currency_code: 'EUR' } };
 		mockActivePaymentMethod = '';
 		mockHasPaymentStore = false;
+		mockHasFinishedResolution = true;
+		mockSubscribeCount = 0;
 		window.gtm4wp_woocommerce_blocks_inited = false;
 		window.gtm4wp_blocks_context = undefined;
 		window.gtm4wp_push_ecommerce = jest.fn();
@@ -360,5 +365,55 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 				item_list_name: 'Cross-Sells',
 			} ),
 		] );
+	} );
+
+	it( 'does not read the cart until getCartData has finished resolving', () => {
+		const subscriber = loadTracker();
+		subscriber(); // baseline: empty cart, resolution finished
+
+		// The store is mid-resolution: the subscriber must bail before diffing.
+		mockHasFinishedResolution = false;
+		mockCartData = {
+			items: [ cartLine( 'A', 2, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+		};
+		subscriber();
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+		// Once resolution finishes, the very same change is reported - proving the
+		// early return suppressed the push, not the baseline.
+		mockHasFinishedResolution = true;
+		subscriber();
+		expect( window.gtm4wp_push_ecommerce ).toHaveBeenCalledWith(
+			'add_to_cart',
+			[ expect.objectContaining( { item_id: 7, quantity: 2 } ) ],
+			expect.objectContaining( { value: 20 } )
+		);
+	} );
+
+	it( 'falls back to the global currency when the cart totals omit it', () => {
+		global.gtm4wp_currency = 'USD';
+		mockCartData = { items: [], totals: {} }; // no currency_code
+		const subscriber = loadTracker();
+		subscriber(); // baseline
+
+		mockCartData = {
+			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
+			totals: {}, // still no currency_code
+		};
+		subscriber();
+
+		const call = window.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 2 ].currency ).toBe( 'USD' );
+	} );
+
+	it( 'subscribes only once when the bundle is initialized twice', () => {
+		loadTracker(); // first init subscribes
+		loadTracker(); // re-injected bundle: the guard blocks a second subscribe
+
+		expect( mockSubscribeCount ).toBe( 1 );
 	} );
 } );

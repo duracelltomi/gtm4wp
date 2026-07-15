@@ -15,6 +15,7 @@ use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
+require_once __DIR__ . '/store-api-stub.php';
 
 /**
  * Covers the data callbacks that expose the GA4 item array on the Store API
@@ -96,5 +97,89 @@ final class StoreApiDataTest extends TestCase {
 		$data = $this->make_store_api_data()->extend_cart_item_data( array() );
 
 		$this->assertSame( array( 'item' => '' ), $data );
+	}
+
+	/**
+	 * TS-11 raw-passthrough (RI-4). The block Store-API sink is the ONLY place the
+	 * `block`-context item passthrough is asserted, so a product-title `item_name`
+	 * that carries special characters must reach the endpoint object RAW: the Store
+	 * API / block tracker JSON-encodes it downstream, so the callback must never
+	 * pre-escape (esc_js/esc_html). Break-out chars are written with \xNN so no
+	 * literal char appears in this file (TC-2); stubEscapeFunctions() installs real
+	 * htmlspecialchars so a re-introduced pre-escape would change the value and fail.
+	 */
+	public function test_extend_product_data_passes_hostile_title_without_entity_escaping(): void {
+		Functions\stubEscapeFunctions();
+
+		// \x26 & , \x22 " , \x3C/script\x3E </script>  (no literal break-out char here).
+		$hostile = 'Ben ' . "\x26" . ' ' . "\x22" . 'Jerry' . "\x22" . ' ' . "\x3C/script\x3E";
+		$data    = $this->make_store_api_data()->extend_product_data(
+			new \WC_Product(
+				array(
+					'id'    => 7,
+					'title' => $hostile,
+					'sku'   => 'X-1',
+				)
+			)
+		);
+
+		$this->assertSame( $hostile, $data['item']['item_name'], 'The product title must reach the Store API sink verbatim.' );
+		$this->assertStringContainsString( "\x26", $data['item']['item_name'], 'A raw & must survive for the downstream encoder.' );
+		$this->assertStringContainsString( "\x22", $data['item']['item_name'], 'A raw " must survive for the downstream encoder.' );
+		$this->assertStringNotContainsString( '&amp;', $data['item']['item_name'], 'The value must not be entity-encoded upstream of the sink.' );
+		$this->assertStringNotContainsString( '&quot;', $data['item']['item_name'] );
+	}
+
+	/**
+	 * TS-11 raw-passthrough through the cart-item callback's own wp_json_encode():
+	 * the item is delivered as a JSON string that the block tracker JSON.parse()s
+	 * back, so a hostile item_name must round-trip verbatim.
+	 */
+	public function test_extend_cart_item_data_round_trips_a_hostile_title(): void {
+		Functions\stubEscapeFunctions();
+
+		$hostile = 'Ben ' . "\x26" . ' ' . "\x22" . 'Jerry' . "\x22" . ' ' . "\x3C/script\x3E";
+		$data    = $this->make_store_api_data()->extend_cart_item_data(
+			array(
+				'data'     => new \WC_Product(
+					array(
+						'id'    => 7,
+						'title' => $hostile,
+						'sku'   => 'X-1',
+					)
+				),
+				'quantity' => 2,
+			)
+		);
+
+		$decoded = json_decode( $data['item'], true );
+		$this->assertSame( $hostile, $decoded['item_name'], 'The item_name must round-trip the cart-item JSON string verbatim.' );
+	}
+
+	/**
+	 * Wiring: register() must register the product and cart-item endpoint data on
+	 * the Store API extend service with the right endpoint identifiers, the gtm4wp
+	 * namespace and an ARRAY_A schema type. (The defensive early returns for a
+	 * missing Store API / ExtendSchema class are not unit-tested — once the stub
+	 * classes are defined they exist process-wide; those guards are trivial.)
+	 */
+	public function test_register_registers_product_and_cart_item_endpoint_data(): void {
+		\Automattic\WooCommerce\StoreApi\StoreApi::$registered = array();
+
+		$this->make_store_api_data()->register();
+
+		$registered = \Automattic\WooCommerce\StoreApi\StoreApi::$registered;
+		$this->assertCount( 2, $registered, 'Both the product and cart-item endpoints are extended.' );
+
+		$endpoints = array_column( $registered, 'endpoint' );
+		$this->assertContains( 'product', $endpoints );
+		$this->assertContains( 'cart-item', $endpoints );
+
+		foreach ( $registered as $entry ) {
+			$this->assertSame( 'gtm4wp', $entry['namespace'] );
+			$this->assertSame( ARRAY_A, $entry['schema_type'] );
+			$this->assertIsCallable( $entry['data_callback'] );
+			$this->assertIsCallable( $entry['schema_callback'] );
+		}
 	}
 }

@@ -69,6 +69,30 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertSame( '', $vars['gtm4wp_remarketing_prod_id_prefix'] );
 	}
 
+	public function test_add_global_vars_list_attribution_flag_reflects_the_opt_in(): void {
+		Functions\when( 'get_woocommerce_currency' )->justReturn( 'EUR' );
+
+		// Opt-in ON: emit 1 so the tracker persists list attribution across the funnel (#405).
+		$on = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ) );
+		$this->assertSame( 1, $on->add_global_vars( array() )['gtm4wp_list_attribution'] );
+
+		// Default OFF: emit 0 so the tracker never writes or reads the attribution cookie.
+		$off = $this->make_module();
+		$this->assertSame( 0, $off->add_global_vars( array() )['gtm4wp_list_attribution'] );
+	}
+
+	public function test_add_global_vars_checkoutwc_flag_reflects_the_opt_in(): void {
+		Functions\when( 'get_woocommerce_currency' )->justReturn( 'EUR' );
+
+		// Opt-in ON: emit 1 so the checkout-step events also bind to CheckoutWC's cfw_step_changed (#385).
+		$on = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC => true ) );
+		$this->assertSame( 1, $on->add_global_vars( array() )['gtm4wp_checkoutwc'] );
+
+		// Default OFF: emit 0 so the CheckoutWC bridge stays inert.
+		$off = $this->make_module();
+		$this->assertSame( 0, $off->add_global_vars( array() )['gtm4wp_checkoutwc'] );
+	}
+
 	public function test_keeps_true_when_woocommerce_already_says_order_received(): void {
 		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) );
 

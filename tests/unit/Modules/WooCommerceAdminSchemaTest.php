@@ -160,4 +160,22 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 		$this->assertSame( '', $field->default_value );
 		$this->assertArrayHasKey( '', $field->choices, 'The empty choice keeps the standard WooCommerce order received page.' );
 	}
+
+	public function test_brand_taxonomy_sanitizer_trims_and_coerces_to_string(): void {
+		// The field is a TYPE_SELECT but carries a custom sanitizer, which Field::sanitize()
+		// applies before the choice validation; it must trim surrounding whitespace and
+		// coerce a non-string to a string.
+		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY );
+
+		$this->assertSame( 'x', $field->sanitize( '  x  ' ), 'Leading/trailing whitespace is trimmed from the stored taxonomy slug.' );
+		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
+	}
+
+	public function test_remarketing_id_prefix_sanitizer_trims_and_coerces_to_string(): void {
+		// The product-ID-prefix field defines the same trim((string)$value) sanitizer.
+		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX );
+
+		$this->assertSame( 'x', $field->sanitize( '  x  ' ), 'Leading/trailing whitespace is trimmed from the product ID prefix.' );
+		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
+	}
 }

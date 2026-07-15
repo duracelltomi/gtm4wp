@@ -98,6 +98,32 @@ final class DataLayerTest extends FrontendTestCase {
 		);
 	}
 
+	public function test_queue_push_lets_event_data_override_the_event_arg(): void {
+		// #348: array_merge keeps an `event` key already present in $event_data (e.g.
+		// the purchase data layer sets it first), so $event_data['event'] wins over
+		// the $event_name argument and its leading position is preserved.
+		$datalayer = new DataLayer( $this->make_options() );
+
+		$this->assertTrue(
+			$datalayer->queue_push(
+				'a',
+				array(
+					'event' => 'b',
+					'x'     => 1,
+				)
+			)
+		);
+
+		$this->assertSame(
+			array(
+				'event' => 'b',
+				'x'     => 1,
+			),
+			$GLOBALS['gtm4wp_additional_datalayer_pushes'][0]['datalayer_object'],
+			'The event key from $event_data overrides the $event_name argument, order preserved.'
+		);
+	}
+
 	public function test_flush_pushes_adds_inline_script_and_resets_queue(): void {
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
