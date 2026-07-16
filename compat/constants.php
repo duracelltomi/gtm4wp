@@ -94,6 +94,7 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTSTICKY', 'include-post-sticky' );
 define( 'GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY', 'include-primary-category' );
 define( 'GTM4WP_OPTION_INCLUDE_PAGELANGUAGE', 'include-page-language' );
 define( 'GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES', 'include-parent-categories' );
+define( 'GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE', 'include-master-language' );
 
 // New in 2.0: cache-safe data layer master switch. When on, visitor/session
 // specific values are not rendered into the (cacheable) page HTML; the browser

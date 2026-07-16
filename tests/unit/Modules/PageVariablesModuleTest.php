@@ -1546,6 +1546,278 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 'en_US', $data_layer['pageLanguage'] );
 	}
 
+	// ---------------------------------------------------------------------
+	// Master-language output (issue #145). resolve_default_language_*_id()
+	// swaps the current-language post/term for its default-language
+	// equivalent, so pageTitle / pageCategory / pageAttributes / pagePostTerms
+	// report the master values. The feature is opt-in and supports BOTH WPML
+	// and Polylang, guarded the same way as the pageLanguage detection.
+	//
+	// ORDERING NOTE: the Polylang case defines pll_* through Brain Monkey,
+	// which leaves function_exists() reporting them process-wide thereafter
+	// (see the PublishPress note at the bottom). It is therefore the LAST of
+	// this group, so the "neither active", WPML, off and filter cases (which
+	// require pll_* to be undefined, or exercise the WPML path that returns
+	// before the Polylang branch) all run first.
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Stubs a singular request whose language-dependent values the
+	 * master-language tests drive. Term ids 30/55/70 (current language) map to
+	 * 3/5/7 (default language) through whichever plugin the test activates;
+	 * get_term() returns the master term for those default ids.
+	 *
+	 * @return void
+	 */
+	private function stub_master_language_singular(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		Functions\when( 'wp_title' )->justReturn( 'CURRENT_TITLE' );
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+		Functions\when( 'get_the_title' )->alias(
+			static fn ( $id ): string => 8 === (int) $id ? 'Master title' : 'UNEXPECTED'
+		);
+		Functions\when( 'get_the_category' )->justReturn(
+			array(
+				new \WP_Term(
+					array(
+						'term_id' => 30,
+						'slug'    => 'cat-current',
+					)
+				),
+			)
+		);
+		Functions\when( 'get_the_tags' )->justReturn(
+			array(
+				new \WP_Term(
+					array(
+						'term_id' => 55,
+						'slug'    => 'tag-current',
+					)
+				),
+			)
+		);
+		Functions\when( 'get_term' )->alias(
+			static function ( $id ) {
+				$master = array(
+					3 => array(
+						'slug' => 'cat-master',
+						'name' => 'Cat master',
+					),
+					5 => array(
+						'slug' => 'tag-master',
+						'name' => 'Tag master',
+					),
+					7 => array(
+						'slug' => 'genre-master',
+						'name' => 'Genre master',
+					),
+				);
+				if ( isset( $master[ (int) $id ] ) ) {
+					return new \WP_Term(
+						array(
+							'term_id' => (int) $id,
+							'slug'    => $master[ (int) $id ]['slug'],
+							'name'    => $master[ (int) $id ]['name'],
+						)
+					);
+				}
+				return null;
+			}
+		);
+	}
+
+	/**
+	 * Stored options that enable the language-dependent sinks (title, category,
+	 * tags) so a test can assert the master vs. current value for each.
+	 *
+	 * @param bool $master_on Whether the master-language option is enabled.
+	 * @return array<string, mixed>
+	 */
+	private function master_language_options( bool $master_on ): array {
+		return array(
+			GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE => $master_on,
+			GTM4WP_OPTION_INCLUDE_POSTTITLE      => true,
+			GTM4WP_OPTION_INCLUDE_POSTTYPE       => false,
+			GTM4WP_OPTION_INCLUDE_CATEGORIES     => true,
+			GTM4WP_OPTION_INCLUDE_TAGS           => true,
+			GTM4WP_OPTION_INCLUDE_AUTHOR         => false,
+			GTM4WP_OPTION_INCLUDE_AUTHORID       => false,
+		);
+	}
+
+	/**
+	 * With the option OFF but WPML active, nothing is resolved: the current
+	 * (translated) title / category / tag values pass through unchanged. The
+	 * WPML filters are mocked to return DIFFERENT (master) ids, so if the
+	 * opt-in gate were broken the master values would appear and this test
+	 * would fail. Proves the feature is opt-in.
+	 */
+	public function test_master_language_off_leaves_translated_values_unchanged(): void {
+		$this->stub_master_language_singular();
+
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static function ( $id ) {
+				$map = array(
+					42 => 8,
+					30 => 3,
+					55 => 5,
+				);
+				return $map[ (int) $id ] ?? $id;
+			}
+		);
+
+		$module     = $this->make_module( $this->master_language_options( false ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'CURRENT_TITLE', $data_layer['pageTitle'] );
+		$this->assertSame( array( 'cat-current' ), $data_layer['pageCategory'] );
+		$this->assertSame( array( 'tag-current' ), $data_layer['pageAttributes'] );
+	}
+
+	/**
+	 * With the option ON but no multilingual plugin active, resolution yields
+	 * the same id, so every value falls back to the current behavior
+	 * unchanged (the "neither plugin active" branch of the feature).
+	 */
+	public function test_master_language_on_without_plugin_falls_back_unchanged(): void {
+		$this->stub_master_language_singular();
+
+		$module     = $this->make_module( $this->master_language_options( true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'CURRENT_TITLE', $data_layer['pageTitle'] );
+		$this->assertSame( array( 'cat-current' ), $data_layer['pageCategory'] );
+		$this->assertSame( array( 'tag-current' ), $data_layer['pageAttributes'] );
+	}
+
+	/**
+	 * WPML active + option ON: the post title, category slug and tag slug are
+	 * resolved to the site's default language through wpml_default_language +
+	 * wpml_object_id (the fourth `true` arg returns the original when there is
+	 * no translation). Element type is the post type for the post and the
+	 * taxonomy for the terms, per the WPML coding API.
+	 */
+	public function test_master_language_outputs_wpml_default_language_values(): void {
+		$this->stub_master_language_singular();
+
+		// WPML is detected exactly like the pageLanguage option: the presence
+		// of the wpml_current_language filter.
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static function ( $id ) {
+				// Current-language id => default-language id.
+				$map = array(
+					42 => 8,
+					30 => 3,
+					55 => 5,
+				);
+				return $map[ (int) $id ] ?? $id;
+			}
+		);
+
+		$module     = $this->make_module( $this->master_language_options( true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Master title', $data_layer['pageTitle'] );
+		$this->assertSame( array( 'cat-master' ), $data_layer['pageCategory'] );
+		$this->assertSame( array( 'tag-master' ), $data_layer['pageAttributes'] );
+	}
+
+	/**
+	 * The resolved id is filterable so integrators can support other
+	 * multilingual plugins. With no plugin active, a third party using the
+	 * gtm4wp_master_language_term_id filter alone drives the category to its
+	 * master term. Proves "keep it filterable".
+	 */
+	public function test_master_language_term_id_filter_drives_resolution(): void {
+		$this->stub_master_language_singular();
+
+		Filters\expectApplied( 'gtm4wp_master_language_term_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $resolved, $id ) => 30 === (int) $id ? 3 : $resolved
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE => true,
+				GTM4WP_OPTION_INCLUDE_POSTTITLE      => false,
+				GTM4WP_OPTION_INCLUDE_POSTTYPE       => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES     => true,
+				GTM4WP_OPTION_INCLUDE_TAGS           => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHORID       => false,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'cat-master' ), $data_layer['pageCategory'] );
+	}
+
+	/**
+	 * Polylang active + option ON: the post (pll_get_post), category and tag
+	 * (pll_get_term) and a CUSTOM taxonomy term are resolved to the default
+	 * language returned by pll_default_language(). Kept LAST because defining
+	 * pll_* leaks function_exists() into later tests (see the group note).
+	 */
+	public function test_master_language_outputs_polylang_default_language_values(): void {
+		$this->stub_master_language_singular();
+
+		// Polylang is detected exactly like the pageLanguage option: its
+		// pll_* functions existing (and the wpml_current_language filter absent).
+		Functions\when( 'pll_default_language' )->justReturn( 'en' );
+		Functions\when( 'pll_get_post' )->alias(
+			static fn ( $id ): int => 42 === (int) $id ? 8 : 0
+		);
+		Functions\when( 'pll_get_term' )->alias(
+			static function ( $id ): int {
+				$map = array(
+					30 => 3,
+					55 => 5,
+					70 => 7,
+				);
+				return $map[ (int) $id ] ?? 0;
+			}
+		);
+
+		// Custom-taxonomy term for the pagePostTerms sink.
+		Functions\when( 'get_object_taxonomies' )->justReturn( array( 'genre' ) );
+		Functions\when( 'get_the_terms' )->alias(
+			static fn ( $post_id, $taxonomy ) => 'genre' === $taxonomy
+				? array(
+					new \WP_Term(
+						array(
+							'term_id' => 70,
+							'name'    => 'Genre current',
+						)
+					),
+				)
+				: false
+		);
+		Functions\when( 'get_post_meta' )->justReturn( array() );
+
+		$GLOBALS['post'] = (object) array(
+			'ID'          => 42,
+			'post_author' => 7,
+		);
+
+		$options                                       = $this->master_language_options( true );
+		$options[ GTM4WP_OPTION_INCLUDE_POSTTERMLIST ] = true;
+
+		$module     = $this->make_module( $options );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Master title', $data_layer['pageTitle'] );
+		$this->assertSame( array( 'cat-master' ), $data_layer['pageCategory'] );
+		$this->assertSame( array( 'tag-master' ), $data_layer['pageAttributes'] );
+		// Custom taxonomy term names are resolved to the default language too.
+		$this->assertSame( array( 'Genre master' ), $data_layer['pagePostTerms']['genre'] );
+	}
+
 	public function test_404_page_type(): void {
 		Functions\when( 'is_404' )->justReturn( true );
 
