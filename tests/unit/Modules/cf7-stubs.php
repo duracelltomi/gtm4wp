@@ -19,10 +19,14 @@ if ( ! class_exists( 'WPCF7_ContactForm' ) ) {
 		 */
 		public static $current = null;
 
-		public function __construct( private string $stub_title = '' ) {}
+		public function __construct( private string $stub_title = '', private int $stub_id = 0 ) {}
 
 		public static function get_current() {
 			return self::$current;
+		}
+
+		public function id() {
+			return $this->stub_id;
 		}
 
 		public function title() {

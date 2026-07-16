@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
 use GTM4WP\Options\Options;
@@ -173,5 +174,53 @@ final class ContactForm7ModuleTest extends TestCase {
 
 		$this->assertSame( array( 'class' => 'wpcf7-form' ), $atts );
 		$this->assertArrayNotHasKey( 'data-gtm4wp-form-name', $atts );
+	}
+
+	/**
+	 * Master-language form name (issue #145): with the option on, the form is
+	 * resolved to its default-language equivalent (WPML here) and that form's
+	 * title is reported instead of the translated one.
+	 */
+	public function test_add_form_name_attribute_uses_master_language_title_when_enabled(): void {
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $id ) => 12 === (int) $id ? 5 : $id
+		);
+		Functions\when( 'get_the_title' )->alias( static fn ( $id ) => 5 === (int) $id ? 'Quote request' : 'WRONG' );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WPCF7 => true,
+				GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE => true,
+			)
+		);
+
+		// A German (translated) form, id 12, whose master (en) form id is 5.
+		\WPCF7_ContactForm::$current = new \WPCF7_ContactForm( 'Devis', 12 );
+
+		$atts = $module->add_form_name_attribute( array() );
+
+		$this->assertSame( 'Quote request', $atts['data-gtm4wp-form-name'] );
+	}
+
+	/**
+	 * Opt-in gate: with the option off (default), even with WPML active and a
+	 * master form available, the current-language form title is reported.
+	 */
+	public function test_add_form_name_attribute_keeps_translated_title_when_master_language_off(): void {
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $id ) => 12 === (int) $id ? 5 : $id
+		);
+		Functions\when( 'get_the_title' )->justReturn( 'Quote request' );
+
+		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
+
+		\WPCF7_ContactForm::$current = new \WPCF7_ContactForm( 'Devis', 12 );
+
+		$atts = $module->add_form_name_attribute( array() );
+
+		$this->assertSame( 'Devis', $atts['data-gtm4wp-form-name'], 'With the option off the translated form title is kept.' );
 	}
 }

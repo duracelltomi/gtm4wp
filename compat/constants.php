@@ -123,6 +123,7 @@ define( 'GTM4WP_OPTION_BLACKLIST_STATUS', 'blacklist-status' );
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7', 'integrate-wpcf7' );
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7_INPUTS', 'integrate-wpcf7-inputs' );
 define( 'GTM4WP_OPTION_INTEGRATE_WPCF7_GA4EVENTS', 'integrate-wpcf7-ga4events' );
+define( 'GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE', 'integrate-wpcf7-master-language' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE', 'integrate-woocommerce-track-enhanced-ecommerce' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION', 'integrate-woocommerce-product-per-impression' );
@@ -146,6 +147,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE', 'integrate-woocommerce-pu
 define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE', 'integrate-woocommerce-custom-order-received-page' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION', 'integrate-woocommerce-persist-list-attribution' );
 define( 'GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC', 'integrate-woocommerce-checkoutwc' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE', 'integrate-woocommerce-master-language' );
 
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );

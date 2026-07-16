@@ -268,7 +268,7 @@ final class ProductDataTest extends TestCase {
 		// and correctly (RI-4 / TS-11). The </script> break-out itself is proven at the
 		// sink by DataLayerTest::test_flush_pushes_hex_encodes_script_breakout_characters
 		// and by PageDataLayerTest.
-		$hostile = 'Deals ' . "\x3C/script\x3E" . ' ' . "\x26" . ' ' . "\x22" . 'x' . "\x22";
+		$hostile                                     = 'Deals ' . "\x3C/script\x3E" . ' ' . "\x26" . ' ' . "\x22" . 'x' . "\x22";
 		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			array( 123 => array( 'item_list_name' => $hostile ) ) // phpcs:ignore
 		);
@@ -884,5 +884,199 @@ final class ProductDataTest extends TestCase {
 		);
 
 		$this->assertSame( '', Helpers::normalize_and_hash( 'sha256', '   ', true ) );
+	}
+
+	// ---------------------------------------------------------------------
+	// Master-language product consolidation (issue #145). With the option on,
+	// the GA4 item identity/text (item_id, item_name, sku, item_category*,
+	// item_brand, item_variant) is built from the product's default-language
+	// equivalent so a product sold in several languages reports as one GA4
+	// item. Off by default, WPML AND Polylang. The Polylang case is LAST
+	// because defining pll_* leaks function_exists() process-wide.
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Activates WPML for a test: registers the wpml_current_language filter
+	 * (DefaultLanguage::is_active() detection) and maps wpml_object_id /
+	 * wpml_default_language.
+	 *
+	 * @param array<int, int> $map Current-language id => default-language id.
+	 * @return void
+	 */
+	private function activate_wpml( array $map ): void {
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static function ( $id ) use ( $map ) {
+				return $map[ (int) $id ] ?? $id;
+			}
+		);
+	}
+
+	public function test_master_language_off_keeps_the_current_product_values(): void {
+		// Opt-in gate: with the option OFF, even with WPML active and a master
+		// translation available, the current (translated) product is reported.
+		$this->activate_wpml( array( 123 => 100 ) );
+		Functions\when( 'wc_get_product' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? new \WC_Product(
+					array(
+						'id'    => 100,
+						'title' => 'Master Product',
+						'sku'   => 'SKU-MASTER',
+					)
+				)
+				: null
+		);
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Current Cat', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 123, $item['item_id'], 'With the option off the current product id is kept.' );
+		$this->assertSame( 'Test Product', $item['item_name'] );
+		$this->assertSame( 'Current Cat', $item['item_category'] );
+	}
+
+	public function test_master_language_resolves_full_item_via_wpml(): void {
+		// Product 123 -> master 100; item identity/text and categories/brand are
+		// read from the master product.
+		$this->activate_wpml( array( 123 => 100 ) );
+
+		Functions\when( 'wc_get_product' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? new \WC_Product(
+					array(
+						'id'    => 100,
+						'title' => 'Master Product',
+						'sku'   => 'SKU-MASTER',
+					)
+				)
+				: null
+		);
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static function ( $product_id, $taxonomy ) {
+				if ( 100 !== (int) $product_id ) {
+					return array();
+				}
+				if ( 'product_brand' === $taxonomy ) {
+					return array( (object) array( 'name' => 'Master Brand' ) ); // phpcs:ignore
+				}
+				return array( (object) array( 'name' => 'Master Cat', 'term_id' => 5 ) ); // phpcs:ignore
+			}
+		);
+
+		$product_data = $this->make_product_data(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY => 'product_brand',
+			)
+		);
+		$item         = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 123, $item['internal_id'], 'internal_id stays the current product id for client-side list matching.' );
+		$this->assertSame( 100, $item['item_id'], 'item_id is the master product id so GA4 merges the translations.' );
+		$this->assertSame( 'Master Product', $item['item_name'] );
+		$this->assertSame( 'SKU-MASTER', $item['sku'] );
+		$this->assertSame( 'Master Cat', $item['item_category'] );
+		$this->assertSame( 'Master Brand', $item['item_brand'] );
+	}
+
+	public function test_master_language_variation_resolves_parent_and_variant_via_wpml(): void {
+		// Variation 456 (parent 99) -> master variation 400 (parent 300).
+		$this->activate_wpml(
+			array(
+				456 => 400,
+				99  => 300,
+			)
+		);
+
+		Functions\when( 'wc_get_product' )->alias(
+			static fn ( $id ) => 400 === (int) $id
+				? new \WC_Product_Variation(
+					array(
+						'id'                   => 400,
+						'type'                 => 'variation',
+						'parent_id'            => 300,
+						'title'                => 'Master Variation',
+						'variation_attributes' => array( 'attribute_pa_color' => 'red' ),
+					)
+				)
+				: null
+		);
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static fn ( $product_id ) => 300 === (int) $product_id
+				? array( (object) array( 'name' => 'Master Cat', 'term_id' => 5 ) ) // phpcs:ignore
+				: array()
+		);
+
+		$variation = new \WC_Product_Variation(
+			array(
+				'id'                   => 456,
+				'type'                 => 'variation',
+				'parent_id'            => 99,
+				'title'                => 'Current Variation',
+				'variation_attributes' => array( 'attribute_pa_color' => 'rouge' ),
+			)
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
+		)->process_product( $variation, array(), 'productdetail' );
+
+		$this->assertSame( 400, $item['item_id'] );
+		$this->assertSame( 'Master Variation', $item['item_name'] );
+		$this->assertSame( 300, $item['item_group_id'], 'The variation parent resolves to the master parent id.' );
+		$this->assertSame( 'red', $item['item_variant'], 'The variant attributes come from the master variation.' );
+		$this->assertSame( 'Master Cat', $item['item_category'], 'Category comes from the master parent product.' );
+	}
+
+	public function test_master_language_falls_back_when_product_is_untranslated(): void {
+		// WPML active but no translation: wpml_object_id returns the same id, so
+		// the current product is used unchanged (no wc_get_product swap).
+		$this->activate_wpml( array() );
+		Functions\when( 'wc_get_product' )->justReturn( null );
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Current Cat', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
+		)->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 123, $item['item_id'] );
+		$this->assertSame( 'Test Product', $item['item_name'] );
+		$this->assertSame( 'Current Cat', $item['item_category'] );
+	}
+
+	public function test_master_language_resolves_full_item_via_polylang(): void {
+		Functions\when( 'pll_default_language' )->justReturn( 'en' );
+		Functions\when( 'pll_get_post' )->alias( static fn ( $id ): int => 123 === (int) $id ? 100 : 0 );
+
+		Functions\when( 'wc_get_product' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? new \WC_Product(
+					array(
+						'id'    => 100,
+						'title' => 'Master Product',
+						'sku'   => 'SKU-MASTER',
+					)
+				)
+				: null
+		);
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static fn ( $product_id ) => 100 === (int) $product_id
+				? array( (object) array( 'name' => 'Master Cat', 'term_id' => 5 ) ) // phpcs:ignore
+				: array()
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
+		)->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 100, $item['item_id'] );
+		$this->assertSame( 'Master Product', $item['item_name'] );
+		$this->assertSame( 'Master Cat', $item['item_category'] );
 	}
 }

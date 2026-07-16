@@ -698,6 +698,11 @@ final class PageVariablesModuleTest extends TestCase {
 	public function test_master_language_on_without_plugin_falls_back_unchanged(): void {
 		$this->stub_master_language_singular();
 
+		// No WPML filter is registered; make Polylang report no default language
+		// so its branch is a clean no-op (pll_* may be defined process-wide by a
+		// prior test's Brain Monkey stub - see the ORDERING NOTE above).
+		Functions\when( 'pll_default_language' )->justReturn( false );
+
 		$module     = $this->make_module( $this->master_language_options( true ) );
 		$data_layer = $module->add_datalayer_data( array() );
 
@@ -741,6 +746,58 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * The primary category (Yoast/Rank Math or first assigned) is resolved to
+	 * the default language too when the master-language option is on (issue #145
+	 * broadening). WPML here maps the current primary term 30 to master term 3.
+	 */
+	public function test_master_language_resolves_primary_category(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_meta' )->alias(
+			static fn ( $id, $key ) => '_yoast_wpseo_primary_category' === $key ? '30' : ''
+		);
+
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $id ) => 30 === (int) $id ? 3 : $id
+		);
+		Functions\when( 'get_term' )->alias(
+			static fn ( $id ) => 3 === (int) $id
+				? new \WP_Term(
+					array(
+						'term_id' => 3,
+						'slug'    => 'news-master',
+						'name'    => 'News master',
+					)
+				)
+				: new \WP_Term(
+					array(
+						'term_id' => (int) $id,
+						'slug'    => 'news-current',
+						'name'    => 'News current',
+					)
+				)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE  => true,
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'news-master', $data_layer['pagePrimaryCategory'] );
+		$this->assertSame( 'News master', $data_layer['pagePrimaryCategoryName'] );
+	}
+
+	/**
 	 * The resolved id is filterable so integrators can support other
 	 * multilingual plugins. With no plugin active, a third party using the
 	 * gtm4wp_master_language_term_id filter alone drives the category to its
@@ -748,6 +805,9 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	public function test_master_language_term_id_filter_drives_resolution(): void {
 		$this->stub_master_language_singular();
+
+		// No WPML/Polylang resolution here - only the filter changes the id.
+		Functions\when( 'pll_default_language' )->justReturn( false );
 
 		Filters\expectApplied( 'gtm4wp_master_language_term_id' )->zeroOrMoreTimes()->andReturnUsing(
 			static fn ( $resolved, $id ) => 30 === (int) $id ? 3 : $resolved
