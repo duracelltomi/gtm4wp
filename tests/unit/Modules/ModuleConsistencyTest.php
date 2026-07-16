@@ -91,6 +91,43 @@ final class ModuleConsistencyTest extends TestCase {
 		}
 	}
 
+	public function test_every_field_dependency_references_a_known_option(): void {
+		$found_dependency = false;
+
+		foreach ( $this->builtin_modules() as $module_id => $module ) {
+			$schema_class = $module->admin_schema();
+			$schema       = new $schema_class();
+			$field_keys   = array_map( static fn ( $field ) => $field->key, $schema->fields() );
+
+			foreach ( $schema->fields() as $field ) {
+				if ( '' === $field->depends_on ) {
+					continue;
+				}
+
+				$found_dependency = true;
+
+				// A field can only depend on a real option so the React app can
+				// resolve the current value it must gate the control on; a
+				// dependency on itself would never resolve.
+				$this->assertContains(
+					$field->depends_on,
+					$field_keys,
+					"Module '{$module_id}': field '{$field->key}' depends on unknown option '{$field->depends_on}'."
+				);
+				$this->assertNotSame(
+					$field->key,
+					$field->depends_on,
+					"Module '{$module_id}': field '{$field->key}' must not depend on itself."
+				);
+			}
+		}
+
+		$this->assertTrue(
+			$found_dependency,
+			'At least one built-in field is expected to declare a depends_on (e.g. parent categories on the category list).'
+		);
+	}
+
 	public function test_module_ids_are_unique_and_stable(): void {
 		$modules = $this->builtin_modules();
 

@@ -81,6 +81,26 @@ export function buildValueMap( modules, overrides = {} ) {
 }
 
 /**
+ * Whether a field's control should be disabled because the field it depends on
+ * (`field.depends_on`, an option key) is currently off/empty. Fields without a
+ * dependency are never disabled by this. Mirrors the per-column `depends_on`
+ * handling in TableControl at the whole-field level.
+ *
+ * @param {Object} field  Field description from the bootstrap data.
+ * @param {Object} values Option key => current UI value map.
+ * @return {boolean} True when the control must be disabled.
+ */
+export function isFieldDisabled( field, values ) {
+	const dependency = field && field.depends_on;
+
+	if ( ! dependency ) {
+		return false;
+	}
+
+	return ! ( values && values[ dependency ] );
+}
+
+/**
  * Builds the file name a settings export is downloaded as. The date is
  * injected so the value is deterministic and testable.
  *

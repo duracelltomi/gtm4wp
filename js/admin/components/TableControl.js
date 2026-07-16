@@ -27,6 +27,7 @@ export default function TableControl( {
 	value,
 	label,
 	help,
+	disabled = false,
 	onChange,
 } ) {
 	const columns = Array.isArray( field.columns ) ? field.columns : [];
@@ -117,7 +118,9 @@ export default function TableControl( {
 												<CheckboxControl
 													__nextHasNoMarginBottom
 													aria-label={ cellLabel }
-													disabled={ ! enabled }
+													disabled={
+														disabled || ! enabled
+													}
 													checked={
 														enabled &&
 														isChecked(
@@ -143,6 +146,7 @@ export default function TableControl( {
 												__nextHasNoMarginBottom
 												hideLabelFromVision
 												label={ cellLabel }
+												disabled={ disabled }
 												placeholder={
 													column.placeholder
 												}
@@ -164,6 +168,7 @@ export default function TableControl( {
 									<Button
 										icon="trash"
 										isDestructive
+										disabled={ disabled }
 										label={ sprintf(
 											/* translators: %d: row number. */
 											__(
@@ -180,7 +185,12 @@ export default function TableControl( {
 					</tbody>
 				</table>
 			</div>
-			<Button icon="plus" variant="secondary" onClick={ addRow }>
+			<Button
+				icon="plus"
+				variant="secondary"
+				disabled={ disabled }
+				onClick={ addRow }
+			>
 				{ __( 'Add row', 'duracelltomi-google-tag-manager' ) }
 			</Button>
 		</fieldset>

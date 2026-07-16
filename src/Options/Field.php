@@ -89,6 +89,12 @@ final class Field {
 	 * @param callable|null $derive        Optional fn( mixed $sanitized ): array returning additional
 	 *                                     option key => value pairs stored alongside this field
 	 *                                     (used to keep 1.x mirror options in sync).
+	 * @param string        $depends_on    Optional option key of another field this one depends on:
+	 *                                     the admin UI disables this field's control while that field
+	 *                                     is empty/off. Purely an admin-UX affordance — the frontend
+	 *                                     module is still responsible for ignoring the value when the
+	 *                                     dependency is not met. Mirrors the per-column 'depends_on'
+	 *                                     used inside TYPE_TABLE checkbox columns.
 	 */
 	public function __construct(
 		public string $key,
@@ -101,7 +107,8 @@ final class Field {
 		public array $choices = array(),
 		public $sanitizer = null,
 		public array $columns = array(),
-		public $derive = null
+		public $derive = null,
+		public string $depends_on = ''
 	) {
 	}
 
@@ -240,6 +247,7 @@ final class Field {
 			'phase'       => $this->phase,
 			'choices'     => $this->choices,
 			'columns'     => $this->columns,
+			'depends_on'  => $this->depends_on,
 			'value'       => $current_value,
 		);
 	}

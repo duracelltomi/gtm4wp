@@ -8,6 +8,7 @@ import {
 	changedValues,
 	coerceValue,
 	exportFilename,
+	isFieldDisabled,
 	moduleMatchesSearch,
 	stripTags,
 } from '../utils';
@@ -126,6 +127,52 @@ describe( 'buildValueMap', () => {
 			count: 5,
 			name: 'imported',
 		} );
+	} );
+} );
+
+describe( 'isFieldDisabled', () => {
+	const dependent = {
+		key: 'gtm4wp-options-include-parentcategories',
+		depends_on: 'gtm4wp-options-include-categories',
+	};
+
+	it( 'disables a dependent field while its dependency is off', () => {
+		expect(
+			isFieldDisabled( dependent, {
+				'gtm4wp-options-include-categories': false,
+			} )
+		).toBe( true );
+	} );
+
+	it( 'enables a dependent field once its dependency is on', () => {
+		expect(
+			isFieldDisabled( dependent, {
+				'gtm4wp-options-include-categories': true,
+			} )
+		).toBe( false );
+	} );
+
+	it( 'treats a missing/empty dependency value as off', () => {
+		expect( isFieldDisabled( dependent, {} ) ).toBe( true );
+		expect(
+			isFieldDisabled(
+				{ key: 'child', depends_on: 'parent-path' },
+				{ 'parent-path': '' }
+			)
+		).toBe( true );
+		expect(
+			isFieldDisabled(
+				{ key: 'child', depends_on: 'parent-path' },
+				{ 'parent-path': 'gtm.js' }
+			)
+		).toBe( false );
+	} );
+
+	it( 'never disables a field without a dependency', () => {
+		expect( isFieldDisabled( { key: 'lonely' }, {} ) ).toBe( false );
+		expect( isFieldDisabled( { key: 'lonely', depends_on: '' }, {} ) ).toBe(
+			false
+		);
 	} );
 } );
 

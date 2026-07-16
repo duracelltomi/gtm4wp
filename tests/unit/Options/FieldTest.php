@@ -41,7 +41,8 @@ final class FieldTest extends TestCase {
 			$overrides['choices'] ?? array(),
 			$overrides['sanitizer'] ?? null,
 			$overrides['columns'] ?? array(),
-			$overrides['derive'] ?? null
+			$overrides['derive'] ?? null,
+			$overrides['depends_on'] ?? ''
 		);
 	}
 
@@ -273,5 +274,27 @@ final class FieldTest extends TestCase {
 		);
 
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->to_ui_array( false )['phase'] );
+	}
+
+	public function test_depends_on_defaults_to_empty_and_reaches_the_ui_array(): void {
+		// Without a dependency the key is present but empty, so the React app
+		// never disables the control.
+		$standalone = $this->make_field( Field::TYPE_CHECKBOX, false );
+		$this->assertSame( '', $standalone->depends_on );
+		$this->assertSame( '', $standalone->to_ui_array( false )['depends_on'] );
+
+		// A declared dependency must reach the UI array under the same key the
+		// admin app reads (field.depends_on) so it can grey out the control
+		// while the field it points at is off.
+		$dependent = $this->make_field(
+			Field::TYPE_CHECKBOX,
+			false,
+			array( 'depends_on' => 'gtm4wp-options-include-categories' )
+		);
+		$this->assertSame( 'gtm4wp-options-include-categories', $dependent->depends_on );
+		$this->assertSame(
+			'gtm4wp-options-include-categories',
+			$dependent->to_ui_array( false )['depends_on']
+		);
 	}
 }

@@ -14,6 +14,7 @@ import { __ } from '@wordpress/i18n';
 
 import AxeptioVersionControl from './AxeptioVersionControl';
 import TableControl from './TableControl';
+import { isFieldDisabled } from '../utils';
 
 const PHASE_LABELS = {
 	beta: __( 'Beta', 'duracelltomi-google-tag-manager' ),
@@ -57,6 +58,13 @@ export default function FieldControl( {
 	const help = <FieldHelp field={ field } error={ error } />;
 	const label = <FieldLabel field={ field } />;
 
+	// When a field declares `depends_on`, its control is disabled while the
+	// field it points at is off/empty (e.g. "Include parent categories"
+	// depends on "Category list"). The stored value is shown as-is (greyed),
+	// never forced off, so the display never disagrees with what would be
+	// saved. The frontend module still guards the value independently.
+	const disabled = isFieldDisabled( field, values );
+
 	switch ( field.type ) {
 		case 'axeptio-version':
 			return (
@@ -65,6 +73,7 @@ export default function FieldControl( {
 					allValues={ values }
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					onChange={ ( next ) => onChange( next ) }
 				/>
 			);
@@ -74,6 +83,7 @@ export default function FieldControl( {
 				<ToggleControl
 					__nextHasNoMarginBottom
 					checked={ Boolean( value ) }
+					disabled={ disabled }
 					label={ label }
 					help={ help }
 					onChange={ ( next ) => onChange( next ) }
@@ -88,6 +98,7 @@ export default function FieldControl( {
 					type="number"
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					value={ String( value ?? '' ) }
 					onChange={ ( next ) => onChange( Number( next ) ) }
 				/>
@@ -100,6 +111,7 @@ export default function FieldControl( {
 					__nextHasNoMarginBottom
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					value={ String( value ?? '' ) }
 					options={ Object.entries( field.choices ).map(
 						( [ choiceValue, choiceLabel ] ) => ( {
@@ -131,6 +143,7 @@ export default function FieldControl( {
 									__nextHasNoMarginBottom
 									key={ choiceValue }
 									label={ choiceLabel }
+									disabled={ disabled }
 									checked={ selected.includes( choiceValue ) }
 									onChange={ ( checked ) =>
 										toggle( choiceValue, checked )
@@ -150,6 +163,7 @@ export default function FieldControl( {
 					value={ value }
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					onChange={ onChange }
 				/>
 			);
@@ -160,6 +174,7 @@ export default function FieldControl( {
 					__nextHasNoMarginBottom
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					value={ String( value ?? '' ) }
 					onChange={ ( next ) => onChange( next ) }
 				/>
@@ -172,6 +187,7 @@ export default function FieldControl( {
 					__nextHasNoMarginBottom
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					value={ String( value ?? '' ) }
 					onChange={ ( next ) => onChange( next ) }
 				/>

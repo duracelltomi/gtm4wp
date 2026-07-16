@@ -84,7 +84,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Include parent categories in the category list', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to also add the parent (ancestor) categories to the pageCategory data layer variable. When off, only the categories directly assigned to the current post or archive are listed. Requires the "Category list of current post/archive" option above to be enabled.', 'duracelltomi-google-tag-manager' ),
 				group: 'post',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				depends_on: GTM4WP_OPTION_INCLUDE_CATEGORIES
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_TAGS,

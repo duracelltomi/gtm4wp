@@ -25,6 +25,7 @@ export default function AxeptioVersionControl( {
 	allValues,
 	label,
 	help,
+	disabled = false,
 	onChange,
 } ) {
 	const projectId = String( allValues?.[ PROJECT_ID_KEY ] ?? '' ).trim();
@@ -117,6 +118,7 @@ export default function AxeptioVersionControl( {
 					__nextHasNoMarginBottom
 					label={ label }
 					help={ help }
+					disabled={ disabled }
 					value={ String( value ?? '' ) }
 					onChange={ ( next ) => onChange( next ) }
 				/>
@@ -143,7 +145,7 @@ export default function AxeptioVersionControl( {
 			help={ help }
 			value={ String( value ?? '' ) }
 			options={ options }
-			disabled={ '' === projectId }
+			disabled={ disabled || '' === projectId }
 			onChange={ ( next ) => onChange( next ) }
 		/>
 	);
