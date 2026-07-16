@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\WooCommerce;
 
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -847,5 +848,183 @@ final class PageDataLayer {
 		$fragments['div.gtm4wp-wc-visitor-data'] = '<div class="gtm4wp-wc-visitor-data" style="display:none" data-gtm4wp-visitor-cart="' . esc_attr( (string) $json ) . '"></div>';
 
 		return $fragments;
+	}
+
+	/**
+	 * Declares the two WooCommerce one-shot EVENTS the cache-safe data layer
+	 * delivers client-side in Phase 3 (issue #398): the add_to_cart fired after a
+	 * product is re-added to the cart (the cart "Undo"), and the reliable-purchase
+	 * fallback for a missed order-received page. Both are omitted from the cacheable
+	 * HTML (see add_datalayer_data) and delivered via the session endpoint instead.
+	 *
+	 * Each is a Tier 3 one-shot field gated by the shared event cookie
+	 * (Helpers::ONESHOT_EVENT_COOKIE): PHP sets that cookie when the event is queued
+	 * in the session, and the client fetches, fires once + de-dupes, then clears it.
+	 * They are declared whenever the cache-safe mode is on (the fallback additionally
+	 * requires the "purchase on any page" option) and independent of the current
+	 * marker/cookie state, because the delivering fetch happens on a LATER page than
+	 * the one that queued the event — so the client config must always advertise the
+	 * event cookie to watch. When nothing is pending the resolvers return null and
+	 * the event is simply not delivered.
+	 *
+	 * Hooked to GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS.
+	 *
+	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
+	 * @return array<int, VisitorField>
+	 */
+	public function declare_visitor_scoped_fields( array $fields ): array {
+		if ( ! (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) ) {
+			return $fields;
+		}
+
+		$event_cookie = Helpers::ONESHOT_EVENT_COOKIE;
+
+		$fields[] = new VisitorField(
+			'readdedToCart',
+			VisitorField::TIER_ACTION,
+			'',
+			array( $this, 'resolve_readded_to_cart' ),
+			$event_cookie,
+			true
+		);
+
+		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+			$fields[] = new VisitorField(
+				'pendingPurchase',
+				VisitorField::TIER_ACTION,
+				'',
+				array( $this, 'resolve_pending_purchase' ),
+				$event_cookie,
+				true
+			);
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * Session-endpoint resolver for the re-added-to-cart one-shot (Phase 3). Mirrors
+	 * maybe_add_readded_to_cart() but RETURNS the add_to_cart payload for the client
+	 * to push (under the same event name the server path used) instead of rendering
+	 * it into cacheable HTML, and carries the session cart-item key as the per-event
+	 * de-dupe token so a page reload does not re-fire it. Derives everything from the
+	 * current request's WC session/cart — no id parameter, so a caller only ever gets
+	 * its own re-add. Consumes the session marker so a lingering event cookie never
+	 * re-resolves the same re-add. Returns null when nothing is pending.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function resolve_readded_to_cart(): ?array {
+		$woo = function_exists( 'WC' ) ? WC() : null;
+		if ( ! $woo || empty( $woo->session ) || empty( $woo->cart ) ) {
+			return null;
+		}
+
+		$cart_readded_hash = $woo->session->get( 'gtm4wp_product_readded_to_cart' );
+		if ( ! isset( $cart_readded_hash ) ) {
+			return null;
+		}
+
+		// Consume the one-shot marker (own session) so it is resolved at most once.
+		$woo->session->set( 'gtm4wp_product_readded_to_cart', null );
+
+		$cart_item = $woo->cart->get_cart_item( $cart_readded_hash );
+		if ( empty( $cart_item ) ) {
+			return null;
+		}
+
+		$product = $cart_item['data'];
+
+		$eec_product_array = $this->product_data->process_product(
+			$product,
+			$this->cart_line_attributes( $cart_item ),
+			'readdedtocart',
+			$cart_item
+		);
+
+		unset( $eec_product_array['internal_id'] );
+
+		$gtm4wp_currency = get_woocommerce_currency();
+
+		return array(
+			'push'  => array(
+				'event'     => 'add_to_cart',
+				'ecommerce' => array(
+					'currency' => $gtm4wp_currency,
+					'value'    => $eec_product_array['price'] * $eec_product_array['quantity'],
+					'items'    => array( $eec_product_array ),
+				),
+			),
+			// The de-dupe token: the WC session re-add key. Recorded in localStorage
+			// after the push so a reload with the same token does not re-fire.
+			'token' => (string) $cart_readded_hash,
+		);
+	}
+
+	/**
+	 * Session-endpoint resolver for the reliable-purchase fallback one-shot (Phase 3).
+	 * Mirrors maybe_add_pending_purchase()/add_purchase_for_order() but RETURNS the GA4
+	 * purchase event payload for the client to push (under the same event name the
+	 * server path used) instead of rendering it into cacheable HTML, and carries the
+	 * order NUMBER so the client de-dupes against the SAME gtm4wp_orderid_tracked guard
+	 * the order-received page's inline block writes — so a fallback fire on one page and
+	 * a real order-received purchase for the same order can never both count.
+	 *
+	 * The order is resolved from the CURRENT request's WC session (no id parameter, no
+	 * IDOR), runs the same age / already-tracked / trackable-status gauntlet as the page
+	 * path, and the pending marker is consumed so a lingering event cookie never
+	 * re-resolves it. The endpoint deliberately does NOT write the _ga_tracked order
+	 * meta — it is a public GET, so the server-side write stays on the authenticated
+	 * order-received page; the fallback relies on the shared client-side
+	 * gtm4wp_orderid_tracked guard, plus that same page flagging _ga_tracked when it
+	 * fires (which this resolver's is_purchase_already_tracked() check then honours).
+	 * Returns null when nothing is eligible.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function resolve_pending_purchase(): ?array {
+		if ( true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+			return null;
+		}
+
+		$order_id = $this->pending_session_order_id();
+		if ( $order_id <= 0 ) {
+			return null;
+		}
+
+		$order = wc_get_order( $order_id );
+
+		// Consume the pending marker (own session) so it is resolved at most once,
+		// regardless of the outcome below - matching the page fallback.
+		$this->clear_pending_session_order();
+
+		if ( ! ( $order instanceof \WC_Order ) ) {
+			return null;
+		}
+
+		if ( $this->product_data->is_order_older_than_max_age( $order ) ) {
+			return null;
+		}
+
+		if ( $this->product_data->is_purchase_already_tracked( $order, $order_id ) ) {
+			return null;
+		}
+
+		if ( ! $this->product_data->is_order_status_trackable( $order ) ) {
+			return null;
+		}
+
+		$purchase_data_layer                 = $this->product_data->get_purchase_datalayer( $order );
+		$purchase_data_layer['new_customer'] = $this->product_data->is_new_customer( $order );
+
+		return array(
+			'push'        => $purchase_data_layer,
+			'orderNumber' => (string) $order->get_order_number(),
+			// Whether the client should consult/record the gtm4wp_orderid_tracked
+			// browser guard. When "Do not flag orders as being tracked" is on the
+			// plugin writes no order-tracked state anywhere - server meta OR browser -
+			// so the client pushes without the guard, matching the page path (#369).
+			'flag'        => ! (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ),
+		);
 	}
 }

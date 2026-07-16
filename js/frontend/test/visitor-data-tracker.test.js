@@ -558,3 +558,246 @@ describe( 'gtm4wp-visitor-data — single merged push', () => {
 		} );
 	} );
 } );
+
+/**
+ * Phase 3: the two WooCommerce one-shot events (an add_to_cart after the cart
+ * "Undo" and the reliable-purchase fallback) delivered over the same endpoint but
+ * cookie-gated, fired ONCE each with a per-event de-dupe guard, and never merged
+ * into the gtm4wp.visitorData push nor cached/replayed. The purchase reuses the
+ * SAME gtm4wp_orderid_tracked guard the order-received page's inline block writes,
+ * so a fallback fire and a real order-received purchase for one order never both
+ * count.
+ */
+describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
+	const ENDPOINT = 'https://site.example/wp-json/gtm4wp/v2/visitor-data';
+	const EVENT_COOKIE = 'gtm4wp_woo_event';
+
+	beforeEach( () => {
+		resetBrowserState();
+		global.fetch = jest.fn();
+		document.body.innerHTML = '';
+	} );
+
+	/**
+	 * A config that watches the shared one-shot event cookie for the given keys.
+	 *
+	 * @param {string[]} keys One-shot field keys (readdedToCart / pendingPurchase).
+	 * @return {Object} The client config.
+	 */
+	function actionConfig( keys ) {
+		return {
+			event: 'gtm4wp.visitorData',
+			fields: {},
+			endpoint: ENDPOINT,
+			nonce: 'n1',
+			sessionKey: 'gtm4wp_visitor_session',
+			actions: [ { cookie: EVENT_COOKIE, keys } ],
+		};
+	}
+
+	const eventsNamed = ( name ) =>
+		window.dataLayer.filter( ( entry ) => entry.event === name );
+
+	const purchasePayload = ( orderNumber, flag ) => ( {
+		pendingPurchase: {
+			push: {
+				event: 'purchase',
+				ecommerce: {
+					currency: 'EUR',
+					transaction_id: orderNumber,
+					value: 100,
+					items: [ { item_name: 'Mug' } ],
+				},
+			},
+			orderNumber,
+			flag,
+		},
+	} );
+
+	const readdedPayload = ( token ) => ( {
+		readdedToCart: {
+			push: {
+				event: 'add_to_cart',
+				ecommerce: {
+					currency: 'EUR',
+					value: 20,
+					items: [ { item_name: 'Mug' } ],
+				},
+			},
+			token,
+		},
+	} );
+
+	it( 'does NOT fetch and pushes nothing when the event cookie is absent', async () => {
+		window.gtm4wp_visitordata_config = actionConfig( [
+			'readdedToCart',
+			'pendingPurchase',
+		] );
+		// No event cookie set: an anonymous cached-page visitor never fetches.
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).not.toHaveBeenCalled();
+		expect( eventsNamed( 'add_to_cart' ) ).toHaveLength( 0 );
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'fires the re-added-to-cart add_to_cart once and clears the event cookie', async () => {
+		window.gtm4wp_visitordata_config = actionConfig( [ 'readdedToCart' ] );
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( readdedPayload( 'hash-1' ) );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( eventsNamed( 'add_to_cart' ) ).toHaveLength( 1 );
+		// The one-shot must NOT bleed into the merged visitorData push.
+		expect(
+			visitorEvents().find( ( e ) => 'readdedToCart' in e )
+		).toBeFalsy();
+		// The token is recorded and the event cookie consumed.
+		expect(
+			JSON.parse(
+				window.localStorage.getItem( 'gtm4wp_readded_to_cart' )
+			)
+		).toContain( 'hash-1' );
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	it( 'does not re-push a re-add whose token is already in localStorage (reload)', async () => {
+		// The token was already fired in this browser (e.g. a page reload).
+		window.localStorage.setItem(
+			'gtm4wp_readded_to_cart',
+			JSON.stringify( [ 'hash-1' ] )
+		);
+		window.gtm4wp_visitordata_config = actionConfig( [ 'readdedToCart' ] );
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( readdedPayload( 'hash-1' ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'add_to_cart' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'fires the reliable-purchase fallback once and writes the shared guard', async () => {
+		window.gtm4wp_visitordata_config = actionConfig( [
+			'pendingPurchase',
+		] );
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( purchasePayload( '1001', true ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+		expect( eventsNamed( 'purchase' )[ 0 ].ecommerce.transaction_id ).toBe(
+			'1001'
+		);
+		// Scenario (a): the fallback records gtm4wp_orderid_tracked keyed on the
+		// order number, so a LATER order-received purchase for the same order is
+		// suppressed by that page's inline guard (shared key).
+		expect( window.localStorage.getItem( 'gtm4wp_orderid_tracked' ) ).toBe(
+			'1001'
+		);
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	it( 'suppresses the fallback when the order is already tracked (scenario b)', async () => {
+		// Scenario (b): the order-received purchase fired first and wrote the shared
+		// gtm4wp_orderid_tracked guard; the fallback for the SAME order must not fire.
+		window.localStorage.setItem( 'gtm4wp_orderid_tracked', '1001' );
+		window.gtm4wp_visitordata_config = actionConfig( [
+			'pendingPurchase',
+		] );
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( purchasePayload( '1001', true ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		// The stale event cookie is still consumed so no further fetch happens.
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	it( 'with flag=false, pushes the purchase but writes NO order-tracked state', async () => {
+		// "Do not flag orders as being tracked": no order-tracked state is read or
+		// written anywhere, matching the server path (#369).
+		window.gtm4wp_visitordata_config = actionConfig( [
+			'pendingPurchase',
+		] );
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( purchasePayload( '1001', false ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+		expect(
+			window.localStorage.getItem( 'gtm4wp_orderid_tracked' )
+		).toBeNull();
+	} );
+
+	it( 'keeps one-shot keys out of the merged push and out of the cache', async () => {
+		// A fetch carrying BOTH a Tier 2 session field and a one-shot: only the
+		// session field is merged/cached; the one-shot fires as its own event.
+		window.gtm4wp_visitordata_config = {
+			event: 'gtm4wp.visitorData',
+			fields: {},
+			endpoint: ENDPOINT,
+			nonce: 'n1',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+			actions: [ { cookie: EVENT_COOKIE, keys: [ 'pendingPurchase' ] } ],
+		};
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce(
+			Object.assign(
+				{ visitorIP: '8.8.8.8' },
+				purchasePayload( '1001', true )
+			)
+		);
+
+		loadTracker();
+		await flush();
+
+		const merged = visitorEvents().find( ( e ) => 'visitorIP' in e );
+		expect( merged ).toBeTruthy();
+		expect( merged ).not.toHaveProperty( 'pendingPurchase' );
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+
+		// A later page in the same session: the session field replays from cache
+		// (no fetch), and the purchase is NOT re-fired (the event cookie is gone and
+		// the one-shot was never cached).
+		window.dataLayer = [];
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect(
+			visitorEvents().find( ( e ) => e.visitorIP === '8.8.8.8' )
+		).toBeTruthy();
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'clears a stale event cookie even when nothing is pending server-side', async () => {
+		window.gtm4wp_visitordata_config = actionConfig( [
+			'readdedToCart',
+			'pendingPurchase',
+		] );
+		setCookie( EVENT_COOKIE, '1' );
+		// The server has nothing queued (marker already consumed): empty payload.
+		mockEndpointOnce( {} );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		expect( eventsNamed( 'add_to_cart' ) ).toHaveLength( 0 );
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+} );

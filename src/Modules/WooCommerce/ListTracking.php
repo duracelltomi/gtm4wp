@@ -200,6 +200,11 @@ final class ListTracking {
 
 		if ( $woo && $woo->session ) {
 			$woo->session->set( 'gtm4wp_product_readded_to_cart', $cart_item_key );
+
+			// Cache-safe data layer (issue #398, Phase 3): flag that a one-shot event
+			// (this add_to_cart) is pending so the client fetches it on the next page.
+			// No-op unless the cache-safe mode is on.
+			Helpers::flag_oneshot_event( (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) );
 		}
 	}
 

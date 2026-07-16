@@ -48,6 +48,17 @@ defined( 'ABSPATH' ) || exit;
  *   HttpOnly WordPress auth cookie (JS cannot read it) but a JS-visible companion
  *   cookie the VisitorData module maintains alongside it.
  *
+ * Phase 3 adds one further constructor argument for the WooCommerce one-shot
+ * events (an add_to_cart after the cart "Undo"; the reliable-purchase fallback):
+ *
+ * - $one_shot marks a Tier 3 field as a one-shot EVENT rather than a persistent
+ *   session value. Unlike a regular gate (which is cached and replayed on every
+ *   later page view), a one-shot must fire EXACTLY once: the client fetches it
+ *   only while its event cookie is present, pushes it as its own data layer event
+ *   with a per-event de-dupe guard, then clears the event cookie — it is never
+ *   cached or replayed. The VisitorData module routes one-shot fields into the
+ *   config `actions` list instead of `gates`.
+ *
  * (WooCommerce customer & cart data are session-scoped and delivered on the
  * existing cart-fragments AJAX instead — see WooCommerce\PageDataLayer — so they
  * are not declared as VisitorField resolvers here.)
@@ -84,13 +95,18 @@ final class VisitorField {
 	 * @param string $cookie_gate   Tier 3 only: the JS-readable cookie whose change makes
 	 *                              the client re-fetch this field (empty = Tier 2, once per
 	 *                              session).
+	 * @param bool   $one_shot      Tier 3 only: whether this field is a one-shot EVENT
+	 *                              (Phase 3) — fetched only while its event cookie is
+	 *                              present, pushed once with a de-dupe guard, then the
+	 *                              cookie is cleared; never cached/replayed.
 	 */
 	public function __construct(
 		public string $key,
 		public int $tier,
 		public string $client_source = '',
 		public mixed $resolver = null,
-		public string $cookie_gate = ''
+		public string $cookie_gate = '',
+		public bool $one_shot = false
 	) {
 	}
 }

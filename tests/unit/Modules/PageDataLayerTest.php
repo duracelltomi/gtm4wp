@@ -11,6 +11,7 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Modules\WooCommerce\Helpers;
+use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Modules\WooCommerce\PageDataLayer;
 use GTM4WP\Modules\WooCommerce\ProductData;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
@@ -957,5 +958,243 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertSame( 0, $result['productIsVariable'], 'A grouped product is flagged productIsVariable=0.' );
 		$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_js, 'A grouped product must not fire a single view_item event.' );
+	}
+
+	// ---- Phase 3 (issue #398): the two one-shot events delivered client-side ----
+
+	/**
+	 * Stubs WC() with a cart holding a re-added item under $hash and a session that
+	 * reports that hash as the pending re-add marker and records its set() calls, so
+	 * the re-added-to-cart resolver (and its omission from server HTML) can be tested.
+	 *
+	 * @param string      $hash    The re-add cart item key.
+	 * @param \WC_Product $product The product in that cart line.
+	 * @return object The session object (inspect its ->sets array).
+	 */
+	private function stub_wc_readded( string $hash, \WC_Product $product ): object {
+		$cart = new class( array( $hash => array( 'data' => $product, 'quantity' => 1 ) ) ) { // phpcs:ignore
+			public function __construct( private array $items ) {}
+			public function get_cart() {
+				return $this->items;
+			}
+			public function get_cart_item( $key ) {
+				return $this->items[ $key ] ?? null;
+			}
+			public function get_applied_coupons() {
+				return array();
+			}
+			public function get_discount_total() {
+				return 0;
+			}
+			public function get_subtotal() {
+				return 0;
+			}
+			public function get_cart_contents_total() {
+				return 0;
+			}
+		};
+
+		$session = new class( $hash ) {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function __construct( private string $hash ) {}
+
+			public function get( $key ) {
+				return 'gtm4wp_product_readded_to_cart' === $key ? $this->hash : null;
+			}
+
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		$store           = new \stdClass();
+		$store->cart     = $cart;
+		$store->session  = $session;
+		$store->customer = null;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		return $session;
+	}
+
+	public function test_declare_visitor_scoped_fields_declares_both_oneshots_when_enabled(): void {
+		$fields = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER          => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->declare_visitor_scoped_fields( array() );
+
+		$this->assertCount( 2, $fields );
+		$keys = array_map( static fn ( $field ) => $field->key, $fields );
+		$this->assertContains( 'readdedToCart', $keys );
+		$this->assertContains( 'pendingPurchase', $keys );
+
+		foreach ( $fields as $field ) {
+			$this->assertSame( VisitorField::TIER_ACTION, $field->tier );
+			$this->assertTrue( $field->one_shot, 'Both must be flagged as one-shot events (never cached/replayed).' );
+			$this->assertSame( \GTM4WP\Modules\WooCommerce\Helpers::ONESHOT_EVENT_COOKIE, $field->cookie_gate, 'Both share the one-shot event cookie gate.' );
+		}
+	}
+
+	public function test_declare_visitor_scoped_fields_skips_pending_purchase_without_its_option(): void {
+		$fields = $this->make_page_datalayer( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
+			->declare_visitor_scoped_fields( array() );
+
+		$keys = array_map( static fn ( $field ) => $field->key, $fields );
+		$this->assertSame( array( 'readdedToCart' ), $keys, 'The fallback needs the purchase-on-any-page option; the re-add is always declared.' );
+	}
+
+	public function test_declare_visitor_scoped_fields_declares_nothing_when_cache_safe_off(): void {
+		$fields = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true ) )
+			->declare_visitor_scoped_fields( array( 'sentinel' ) );
+
+		$this->assertSame( array( 'sentinel' ), $fields, 'No one-shot fields unless the cache-safe mode is on.' );
+	}
+
+	public function test_resolve_pending_purchase_returns_payload_and_consumes_marker(): void {
+		// Scenario (a) server half: the fallback resolver returns the purchase payload
+		// keyed on the SAME order number the order-received inline guard writes, and
+		// consumes the pending marker - but does NOT flag _ga_tracked (public GET).
+		$order   = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertIsArray( $payload );
+		$this->assertSame( 'purchase', $payload['push']['event'] );
+		$this->assertSame( '1001', $payload['push']['ecommerce']['transaction_id'] );
+		$this->assertSame( '1001', $payload['orderNumber'], 'The de-dupe key is the order number (shared with the order-received guard).' );
+		$this->assertTrue( $payload['flag'], 'By default the browser guard is written.' );
+
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ], 'The pending marker is consumed so it resolves at most once.' );
+
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The endpoint (a public GET) must not write the _ga_tracked order meta.' );
+	}
+
+	public function test_resolve_pending_purchase_flag_false_under_no_tracked_flag_option(): void {
+		// #369: with "Do not flag orders as being tracked" on, the client must write no
+		// browser guard either - the payload flag is false.
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE     => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE  => true,
+				GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertIsArray( $payload );
+		$this->assertFalse( $payload['flag'], 'No browser order-tracked state may be written when the tracked flag is disabled.' );
+	}
+
+	public function test_resolve_pending_purchase_null_when_option_disabled(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->resolve_pending_purchase();
+
+		$this->assertNull( $payload, 'The fallback is not resolved unless the reliable-tracking option is on.' );
+	}
+
+	public function test_resolve_pending_purchase_null_and_consumes_marker_for_already_tracked_order(): void {
+		// Scenario (b) server half: the order-received page already flagged _ga_tracked,
+		// so the fallback resolver yields nothing - no second purchase.
+		$order   = $this->make_recent_order( array( 'meta' => array( '_ga_tracked' => 1 ) ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertNull( $payload, 'An order already flagged tracked must not resolve a fallback purchase.' );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The stale marker is still consumed.' );
+	}
+
+	public function test_resolve_pending_purchase_hostile_order_number_round_trips_hex_encoded(): void {
+		// TS-11: the resolver returns the order number RAW; the endpoint hex-encodes the
+		// whole payload, so a hostile order number can never surface a raw break-out.
+		$order = $this->make_recent_order( array( 'order_number' => 'ORD</script>' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		// Raw at the module boundary (the sink escapes it once and correctly).
+		$this->assertSame( 'ORD</script>', $payload['orderNumber'] );
+		$this->assertSame( 'ORD</script>', $payload['push']['ecommerce']['transaction_id'] );
+
+		// Encoded the way the endpoint does (TC-2): safe form present, raw break-out gone.
+		$encoded = json_encode( $payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$this->assertStringContainsString( 'ORD\u003', $encoded, 'The < must be hex-encoded (JSON_HEX_TAG).' );
+		$this->assertStringNotContainsString( 'ORD</script>', $encoded, 'No raw </script> may survive in the endpoint payload.' );
+	}
+
+	public function test_resolve_readded_to_cart_returns_payload_and_consumes_marker(): void {
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$session = $this->stub_wc_readded( 'hash-1', $product );
+
+		$payload = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->resolve_readded_to_cart();
+
+		$this->assertIsArray( $payload );
+		$this->assertSame( 'add_to_cart', $payload['push']['event'] );
+		$this->assertSame( 'Mug', $payload['push']['ecommerce']['items'][0]['item_name'] );
+		$this->assertSame( 'hash-1', $payload['token'], 'The re-add cart key is the de-dupe token.' );
+
+		$this->assertArrayHasKey( 'gtm4wp_product_readded_to_cart', $session->sets );
+		$this->assertNull( $session->sets['gtm4wp_product_readded_to_cart'], 'The re-add marker is consumed so it resolves at most once.' );
+	}
+
+	public function test_resolve_readded_to_cart_null_when_no_marker(): void {
+		// The default stub_wc() session returns null for every key.
+		$this->stub_wc();
+
+		$payload = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->resolve_readded_to_cart();
+
+		$this->assertNull( $payload, 'Nothing is resolved when no re-add is pending.' );
+	}
+
+	public function test_cache_safe_omits_the_readded_to_cart_one_shot_event(): void {
+		// Issue #398: the re-add add_to_cart is a session one-shot; in cache-safe mode it
+		// is withheld from cacheable HTML and delivered client-side via the endpoint. The
+		// page path must not even touch the marker (the endpoint resolver consumes it).
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$session = $this->stub_wc_readded( 'hash-1', $product );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"add_to_cart"', $this->inline_js, 'The re-add one-shot must not render into cacheable HTML in cache-safe mode.' );
+		$this->assertArrayNotHasKey( 'gtm4wp_product_readded_to_cart', $session->sets, 'The page path must not consume the marker in cache-safe mode (the endpoint does).' );
 	}
 }

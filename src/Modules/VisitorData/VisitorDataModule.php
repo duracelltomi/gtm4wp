@@ -175,6 +175,7 @@ final class VisitorDataModule extends AbstractModule {
 		$client_fields = array();
 		$session_keys  = array();
 		$gates         = array();
+		$actions       = array();
 
 		if ( is_array( $fields ) ) {
 			foreach ( $fields as $field ) {
@@ -187,12 +188,21 @@ final class VisitorDataModule extends AbstractModule {
 				} elseif ( VisitorField::TIER_SESSION === $field->tier ) {
 					$session_keys[] = $field->key;
 				} elseif ( VisitorField::TIER_ACTION === $field->tier && '' !== $field->cookie_gate ) {
-					$gates[ $field->cookie_gate ][] = $field->key;
+					// One-shot events (Phase 3) are delivered differently from a
+					// persistent gate: fetched only while the event cookie is present,
+					// pushed once with a de-dupe guard, then the cookie is cleared and
+					// the value is never cached. Route them to the `actions` list so the
+					// client runtime handles them separately from the replayed gates.
+					if ( $field->one_shot ) {
+						$actions[ $field->cookie_gate ][] = $field->key;
+					} else {
+						$gates[ $field->cookie_gate ][] = $field->key;
+					}
 				}
 			}
 		}
 
-		$has_endpoint_fields = array() !== $session_keys || array() !== $gates;
+		$has_endpoint_fields = array() !== $session_keys || array() !== $gates || array() !== $actions;
 
 		if ( array() === $client_fields && ! $has_endpoint_fields ) {
 			return null;
@@ -216,6 +226,16 @@ final class VisitorDataModule extends AbstractModule {
 				$config['gates'] = array();
 				foreach ( $gates as $cookie => $keys ) {
 					$config['gates'][] = array(
+						'cookie' => $cookie,
+						'keys'   => array_values( array_unique( $keys ) ),
+					);
+				}
+			}
+
+			if ( array() !== $actions ) {
+				$config['actions'] = array();
+				foreach ( $actions as $cookie => $keys ) {
+					$config['actions'][] = array(
 						'cookie' => $cookie,
 						'keys'   => array_values( array_unique( $keys ) ),
 					);

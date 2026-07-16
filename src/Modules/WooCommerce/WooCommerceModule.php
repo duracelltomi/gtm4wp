@@ -122,6 +122,13 @@ final class WooCommerceModule extends AbstractModule {
 			add_filter( 'woocommerce_add_to_cart_fragments', array( $page_datalayer, 'add_visitor_cart_fragment' ) );
 		}
 
+		// Cache-safe data layer (issue #398, Phase 3): declare the two WooCommerce
+		// one-shot EVENTS (re-added-to-cart and the reliable-purchase fallback) so the
+		// session endpoint resolves them for the current request and the client
+		// runtime fires them once, cookie-gated. The declare method no-ops unless the
+		// cache-safe mode is on, so this is safe to register unconditionally.
+		add_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array( $page_datalayer, 'declare_visitor_scoped_fields' ) );
+
 		add_filter( 'loop_end', array( $list_tracking, 'reset_loop' ) );
 		add_action( 'woocommerce_after_shop_loop_item', array( $list_tracking, 'after_shop_loop_item' ) );
 		add_action( 'woocommerce_after_add_to_cart_button', array( $list_tracking, 'single_add_to_cart_tracking' ) );

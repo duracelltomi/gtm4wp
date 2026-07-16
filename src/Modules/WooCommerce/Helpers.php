@@ -63,6 +63,60 @@ final class Helpers {
 	public const LIST_ATTRIBUTION_COOKIE_MAX_BYTES = 4096;
 
 	/**
+	 * Name of the short-lived, JS-readable event cookie the cache-safe data layer
+	 * (issue #398, Phase 3) sets when a WooCommerce one-shot event is queued in the
+	 * session — a product re-added to the cart ("Undo") or a placed order awaiting
+	 * its reliable-purchase fallback. Its mere presence tells the client runtime to
+	 * fetch the session endpoint on the next page; the client fires the event once,
+	 * de-dupes it and then clears this cookie. An anonymous visitor on a cached page,
+	 * who never has it, never fetches. Must match the literal the client clears in
+	 * js/frontend/gtm4wp-visitor-data.js and the cookie_gate declared in
+	 * PageDataLayer::declare_visitor_scoped_fields().
+	 */
+	public const ONESHOT_EVENT_COOKIE = 'gtm4wp_woo_event';
+
+	/**
+	 * Flags that a WooCommerce one-shot event is pending for this session by
+	 * setting the short-lived event cookie (self::ONESHOT_EVENT_COOKIE) — but only
+	 * when the cache-safe data layer is on, since that is the only mode in which the
+	 * one-shots are delivered client-side (otherwise they render server-side as
+	 * before and no cookie is needed). Called from the same hooks that seed the
+	 * session markers (ListTracking::cart_item_restored,
+	 * PurchaseTracking::remember_order). Skipped silently once headers are sent
+	 * (a cookie cannot be set then) and never lands on a cacheable response, because
+	 * those hooks run only on non-cached cart/checkout requests.
+	 *
+	 * The cookie is deliberately NOT HttpOnly (the client must read it) and carries
+	 * no visitor value — only the fact that a fetch is due. The client clears it
+	 * after delivery; the 2-day expiry only bounds the case where delivery never
+	 * happened, and comfortably covers a WooCommerce session.
+	 *
+	 * @param bool $cache_safe_enabled Whether GTM4WP_OPTION_CACHE_SAFE_DATALAYER is on.
+	 * @return void
+	 */
+	public static function flag_oneshot_event( bool $cache_safe_enabled ): void {
+		if ( ! $cache_safe_enabled || headers_sent() ) {
+			return;
+		}
+
+		setcookie(
+			self::ONESHOT_EVENT_COOKIE,
+			'1',
+			array(
+				'expires'  => time() + ( 2 * DAY_IN_SECONDS ),
+				'path'     => '/',
+				'domain'   => defined( 'COOKIE_DOMAIN' ) ? COOKIE_DOMAIN : '',
+				'secure'   => is_ssl(),
+				'httponly' => false,
+				'samesite' => 'Lax',
+			)
+		);
+
+		// Reflect it into $_COOKIE so any later same-request read sees it set.
+		$_COOKIE[ self::ONESHOT_EVENT_COOKIE ] = '1';
+	}
+
+	/**
 	 * Replace only the first occurrence of the search string with the replacement string.
 	 *
 	 * @param string $search The value being searched for, otherwise known as the needle.

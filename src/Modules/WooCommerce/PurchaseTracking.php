@@ -148,5 +148,10 @@ final class PurchaseTracking {
 		}
 
 		$woo->session->set( ProductData::PENDING_PURCHASE_SESSION_KEY, $order_id );
+
+		// Cache-safe data layer (issue #398, Phase 3): flag that a one-shot event
+		// (the reliable-purchase fallback) is pending so the client fetches it on the
+		// next page it can. No-op unless the cache-safe mode is on.
+		Helpers::flag_oneshot_event( (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) );
 	}
 }

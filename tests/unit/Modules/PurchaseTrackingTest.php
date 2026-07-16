@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Frontend\ScriptTag;
+use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Modules\WooCommerce\ProductData;
 use GTM4WP\Modules\WooCommerce\PurchaseTracking;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
@@ -51,7 +52,8 @@ final class PurchaseTrackingTest extends TestCase {
 	protected function tearDown(): void {
 		unset(
 			$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'],
-			$_COOKIE['gtm4wp_orderid_tracked']
+			$_COOKIE['gtm4wp_orderid_tracked'],
+			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ]
 		);
 		parent::tearDown();
 	}
@@ -318,6 +320,51 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->make_tracking()->remember_order( 1001 );
 
 		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets );
+	}
+
+	public function test_remember_order_flags_the_oneshot_event_cookie_in_cache_safe_mode(): void {
+		// Phase 3 (issue #398): seeding the pending-purchase marker also sets the
+		// short-lived event cookie so the client fetches the fallback on the next page.
+		$this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_order() );
+
+		Functions\when( 'headers_sent' )->justReturn( false );
+		Functions\when( 'is_ssl' )->justReturn( false );
+		$cookie_names = array();
+		Functions\when( 'setcookie' )->alias(
+			static function ( $name ) use ( &$cookie_names ) {
+				$cookie_names[] = $name;
+				return true;
+			}
+		);
+
+		$this->make_tracking(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+			)
+		)->remember_order( 1001 );
+
+		$this->assertContains( Helpers::ONESHOT_EVENT_COOKIE, $cookie_names, 'The one-shot event cookie must be set alongside the session marker in cache-safe mode.' );
+	}
+
+	public function test_remember_order_does_not_flag_the_event_cookie_when_cache_safe_off(): void {
+		$this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_order() );
+
+		Functions\when( 'headers_sent' )->justReturn( false );
+		$cookie_names = array();
+		Functions\when( 'setcookie' )->alias(
+			static function ( $name ) use ( &$cookie_names ) {
+				$cookie_names[] = $name;
+				return true;
+			}
+		);
+
+		$this->make_tracking( array( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true ) )
+			->remember_order( 1001 );
+
+		$this->assertSame( array(), $cookie_names, 'No event cookie may be set unless the cache-safe mode is on (behavior unchanged).' );
 	}
 
 	public function test_remember_order_does_nothing_without_a_session(): void {

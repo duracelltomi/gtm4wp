@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
+use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Modules\WooCommerce\ListTracking;
 use GTM4WP\Modules\WooCommerce\ProductData;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
@@ -63,10 +64,83 @@ final class ListTrackingTest extends TestCase {
 			$GLOBALS['gtm4wp_cart_item_proddata'],
 			$GLOBALS['gtm4wp_grouped_product_ix'],
 			$GLOBALS['gtm4wp_last_widget_title'],
-			$GLOBALS['gtm4wp_product_counter']
+			$GLOBALS['gtm4wp_product_counter'],
+			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ]
 		);
 
 		parent::tearDown();
+	}
+
+	/**
+	 * A WC()->session double that records set() calls; used by the cart-restore
+	 * one-shot tests.
+	 *
+	 * @return object The session object (inspect its ->sets array).
+	 */
+	private function stub_wc_session(): object {
+		$session = new class() {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function get( $key ) {
+				return null;
+			}
+
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		$store          = new \stdClass();
+		$store->session = $session;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		return $session;
+	}
+
+	public function test_cart_item_restored_seeds_marker_and_flags_event_cookie_in_cache_safe_mode(): void {
+		// Phase 3 (issue #398): restoring a removed cart item seeds the re-add marker
+		// and, in cache-safe mode, sets the one-shot event cookie so the client fetches
+		// the add_to_cart on the next page.
+		$session = $this->stub_wc_session();
+
+		Functions\when( 'headers_sent' )->justReturn( false );
+		Functions\when( 'is_ssl' )->justReturn( false );
+		$cookie_names = array();
+		Functions\when( 'setcookie' )->alias(
+			static function ( $name ) use ( &$cookie_names ) {
+				$cookie_names[] = $name;
+				return true;
+			}
+		);
+
+		$this->make_list_tracking( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
+			->cart_item_restored( 'hash-1' );
+
+		$this->assertSame( 'hash-1', $session->sets['gtm4wp_product_readded_to_cart'] ?? null, 'The re-add marker must be seeded in the WC session.' );
+		$this->assertContains( Helpers::ONESHOT_EVENT_COOKIE, $cookie_names, 'The one-shot event cookie must be set alongside the marker in cache-safe mode.' );
+	}
+
+	public function test_cart_item_restored_does_not_flag_event_cookie_when_cache_safe_off(): void {
+		$session = $this->stub_wc_session();
+
+		Functions\when( 'headers_sent' )->justReturn( false );
+		$cookie_names = array();
+		Functions\when( 'setcookie' )->alias(
+			static function ( $name ) use ( &$cookie_names ) {
+				$cookie_names[] = $name;
+				return true;
+			}
+		);
+
+		$this->make_list_tracking()->cart_item_restored( 'hash-1' );
+
+		$this->assertSame( 'hash-1', $session->sets['gtm4wp_product_readded_to_cart'] ?? null );
+		$this->assertSame( array(), $cookie_names, 'No event cookie may be set unless the cache-safe mode is on.' );
 	}
 
 	/**

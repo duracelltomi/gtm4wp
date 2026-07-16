@@ -15,6 +15,13 @@
  *   changed, so an anonymous visitor never fetches user data.
  * - WooCommerce customer & cart: read from the cart-fragments payload WooCommerce
  *   already refreshes on every cart change (no request of our own).
+ * - WooCommerce one-shot events (Phase 3): the add_to_cart after a cart "Undo" and
+ *   the reliable-purchase fallback. These ride the same endpoint but are delivered
+ *   only while a short-lived event cookie is present, fired ONCE each (with a
+ *   per-event de-dupe guard — the purchase reuses the same gtm4wp_orderid_tracked
+ *   guard as the order-received page), and are their own data layer events rather
+ *   than part of the merged gtm4wp.visitorData push; the event cookie is cleared
+ *   after delivery so a later page makes no request.
  *
  * All of these load-time sources are gathered into a SINGLE gtm4wp.visitorData
  * push, so a GTM setup sees them arrive together. On a cached page view the
@@ -190,6 +197,189 @@
 	}
 
 	/**
+	 * Clears a cookie by name (site-wide path). Used to consume the one-shot event
+	 * cookie after its events have been delivered, so a later page view — with the
+	 * cookie gone — makes no request.
+	 *
+	 * @param {string} name The cookie name.
+	 * @return {void}
+	 */
+	function clearCookie( name ) {
+		document.cookie =
+			name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+	}
+
+	// The de-dupe storage keys. gtm4wp_orderid_tracked is shared verbatim with the
+	// order-received page's inline purchase guard (PageDataLayer::purchase_dedupe_guard)
+	// so a fallback fire and a real order-received purchase for the same order can
+	// never both count; the read/write protocol below (localStorage else a one-year
+	// cookie, keyed on the order NUMBER) mirrors that block exactly.
+	const ORDER_TRACKED_KEY = 'gtm4wp_orderid_tracked';
+	const READDED_TOKENS_KEY = 'gtm4wp_readded_to_cart';
+	const READDED_TOKENS_MAX = 20;
+
+	/**
+	 * Reads the order number recorded as already tracked in this browser, from
+	 * localStorage or (when Web Storage is unavailable) the cookie — the read half of
+	 * the shared gtm4wp_orderid_tracked de-dupe guard.
+	 *
+	 * @return {string} The tracked order number, or ''.
+	 */
+	function readOrderTracked() {
+		if ( ! window.localStorage ) {
+			return readCookie( ORDER_TRACKED_KEY );
+		}
+		try {
+			return window.localStorage.getItem( ORDER_TRACKED_KEY ) || '';
+		} catch ( e ) {
+			return readCookie( ORDER_TRACKED_KEY );
+		}
+	}
+
+	/**
+	 * Records an order number as tracked in this browser (localStorage, else a
+	 * one-year cookie) — the write half of the shared gtm4wp_orderid_tracked guard.
+	 *
+	 * @param {string} orderNumber The order number to record.
+	 * @return {void}
+	 */
+	function writeOrderTracked( orderNumber ) {
+		if ( window.localStorage ) {
+			try {
+				window.localStorage.setItem( ORDER_TRACKED_KEY, orderNumber );
+				return;
+			} catch ( e ) {}
+		}
+		const expire = new Date();
+		expire.setTime( expire.getTime() + 365 * 24 * 60 * 60 * 1000 );
+		document.cookie =
+			ORDER_TRACKED_KEY +
+			'=' +
+			orderNumber +
+			';expires=' +
+			expire.toUTCString() +
+			';path=/';
+	}
+
+	/**
+	 * The list of re-add tokens already fired in this browser (localStorage), so a
+	 * page reload does not re-fire the same restored cart item.
+	 *
+	 * @return {Array} The stored token list (possibly empty).
+	 */
+	function readReaddedTokens() {
+		if ( ! window.localStorage ) {
+			return [];
+		}
+		try {
+			const parsed = JSON.parse(
+				window.localStorage.getItem( READDED_TOKENS_KEY ) || '[]'
+			);
+			return Array.isArray( parsed ) ? parsed : [];
+		} catch ( e ) {
+			return [];
+		}
+	}
+
+	/**
+	 * Records a re-add token as fired, capping the stored list so a long-lived
+	 * browser cannot grow it without bound.
+	 *
+	 * @param {string} token The re-add token.
+	 * @return {void}
+	 */
+	function recordReaddedToken( token ) {
+		if ( ! window.localStorage ) {
+			return;
+		}
+		const tokens = readReaddedTokens();
+		if ( -1 !== tokens.indexOf( token ) ) {
+			return;
+		}
+		tokens.push( token );
+		while ( tokens.length > READDED_TOKENS_MAX ) {
+			tokens.shift();
+		}
+		try {
+			window.localStorage.setItem(
+				READDED_TOKENS_KEY,
+				JSON.stringify( tokens )
+			);
+		} catch ( e ) {}
+	}
+
+	/**
+	 * Fires the reliable-purchase fallback exactly once. De-dupes against the shared
+	 * gtm4wp_orderid_tracked guard keyed on the order number (so it can never double
+	 * with the order-received purchase), UNLESS the payload flag is false — the "Do
+	 * not flag orders as being tracked" case, where no order-tracked state is read or
+	 * written anywhere, matching the server path.
+	 *
+	 * @param {Object} payload The resolver payload ({ push, orderNumber, flag }).
+	 * @return {void}
+	 */
+	function handlePendingPurchase( payload ) {
+		if ( ! payload || 'object' !== typeof payload || ! payload.push ) {
+			return;
+		}
+
+		const orderNumber =
+			undefined === payload.orderNumber || null === payload.orderNumber
+				? ''
+				: String( payload.orderNumber );
+		const useGuard = false !== payload.flag;
+
+		if ( useGuard && orderNumber && readOrderTracked() === orderNumber ) {
+			return;
+		}
+
+		dataLayer().push( payload.push );
+
+		if ( useGuard && orderNumber ) {
+			writeOrderTracked( orderNumber );
+		}
+	}
+
+	/**
+	 * Fires the re-added-to-cart add_to_cart exactly once, de-duped on the per-event
+	 * token so a page reload does not re-push it.
+	 *
+	 * @param {Object} payload The resolver payload ({ push, token }).
+	 * @return {void}
+	 */
+	function handleReaddedToCart( payload ) {
+		if ( ! payload || 'object' !== typeof payload || ! payload.push ) {
+			return;
+		}
+
+		const token =
+			undefined === payload.token || null === payload.token
+				? ''
+				: String( payload.token );
+
+		if ( token && -1 !== readReaddedTokens().indexOf( token ) ) {
+			return;
+		}
+
+		dataLayer().push( payload.push );
+
+		if ( token ) {
+			recordReaddedToken( token );
+		}
+	}
+
+	/**
+	 * One-shot event handlers (Phase 3), keyed by the field name the server resolver
+	 * returns. Each fires its own data layer event under the SAME event name the
+	 * server path used, with a de-dupe guard so it can never double-count; unlike the
+	 * Tier 2/3 fields these values are never cached or replayed.
+	 */
+	const actionHandlers = {
+		pendingPurchase: handlePendingPurchase,
+		readdedToCart: handleReaddedToCart,
+	};
+
+	/**
 	 * Tier 2/3: gather the server-only fields from the session endpoint into the
 	 * pending push, fetching only when needed, then call done(). Tier 2 is fetched
 	 * once per session (then replayed from the sessionStorage cache); each Tier 3
@@ -213,6 +403,16 @@
 			? config.session
 			: [];
 		const gates = Array.isArray( config.gates ) ? config.gates : [];
+		const actions = Array.isArray( config.actions ) ? config.actions : [];
+
+		// The set of one-shot field names, so the fetched values can be routed to
+		// their handlers and kept out of the merged visitorData push / the cache.
+		const actionKeys = {};
+		actions.forEach( function ( action ) {
+			( action.keys || [] ).forEach( function ( key ) {
+				actionKeys[ key ] = true;
+			} );
+		} );
 
 		let store;
 		try {
@@ -266,6 +466,20 @@
 				// cached identity data so it is never replayed, and do not fetch.
 				delete store.gates[ gate.cookie ];
 				dirty = true;
+			}
+		} );
+
+		// One-shot events (Phase 3): fetched whenever their event cookie is present.
+		// Unlike a gate they are never cached or replayed — the client fires each once,
+		// de-dupes it, then clears the event cookie below, so a later page with no
+		// cookie makes no request. An anonymous visitor never has the cookie.
+		const activeActionCookies = [];
+		actions.forEach( function ( action ) {
+			if ( readCookie( action.cookie ) ) {
+				if ( -1 === activeActionCookies.indexOf( action.cookie ) ) {
+					activeActionCookies.push( action.cookie );
+				}
+				needFetch = true;
 			}
 		} );
 
@@ -347,6 +561,21 @@
 						JSON.stringify( next )
 					);
 				} catch ( e ) {}
+
+				// One-shot events: hand each to its de-dupe+push handler and keep it
+				// OUT of the merged visitorData push (they are their own events and are
+				// never cached). Then clear the event cookie(s) so a later page — with
+				// the cookie gone — makes no request.
+				Object.keys( actionKeys ).forEach( function ( key ) {
+					if ( key in data ) {
+						const handler = actionHandlers[ key ];
+						if ( 'function' === typeof handler ) {
+							handler( data[ key ] );
+						}
+						delete data[ key ];
+					}
+				} );
+				activeActionCookies.forEach( clearCookie );
 
 				collect( data );
 			} )

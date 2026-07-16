@@ -19,9 +19,81 @@ use GTM4WP\Tests\unit\TestCase;
 final class HelpersTest extends TestCase {
 
 	protected function tearDown(): void {
-		unset( $_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] );
+		unset(
+			$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ],
+			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ]
+		);
 
 		parent::tearDown();
+	}
+
+	/**
+	 * Captured setcookie() calls from flag_oneshot_event(): each entry is
+	 * array( name, value, options ).
+	 *
+	 * @var array<int, array{0:string,1:string,2:array}>
+	 */
+	private array $cookie_writes = array();
+
+	/**
+	 * Captures the setcookie() calls flag_oneshot_event() makes (setcookie /
+	 * headers_sent are made redefinable via patchwork.json).
+	 *
+	 * @return void
+	 */
+	private function capture_event_cookie(): void {
+		$this->cookie_writes = array();
+
+		Functions\when( 'is_ssl' )->justReturn( false );
+		Functions\when( 'setcookie' )->alias(
+			function ( $name, $value = '', $options = array() ) {
+				$this->cookie_writes[] = array( $name, (string) $value, (array) $options );
+				return true;
+			}
+		);
+	}
+
+	public function test_flag_oneshot_event_sets_the_event_cookie_when_cache_safe_on(): void {
+		// Phase 3 (issue #398): flagging a pending one-shot writes the short-lived,
+		// JS-readable event cookie so the client fetches on the next page.
+		Functions\when( 'headers_sent' )->justReturn( false );
+		$this->capture_event_cookie();
+
+		Helpers::flag_oneshot_event( true );
+
+		$this->assertCount( 1, $this->cookie_writes );
+		$this->assertSame( Helpers::ONESHOT_EVENT_COOKIE, $this->cookie_writes[0][0] );
+		$this->assertSame( '1', $this->cookie_writes[0][1], 'The cookie carries only presence, no visitor value.' );
+		$this->assertFalse( $this->cookie_writes[0][2]['httponly'], 'The event cookie must be JS-readable.' );
+		$this->assertSame( '/', $this->cookie_writes[0][2]['path'], 'Site-wide path so the next page (anywhere) sees it and the client can clear it.' );
+		$this->assertGreaterThan( time(), $this->cookie_writes[0][2]['expires'] );
+		// Reflected into $_COOKIE so a later same-request read sees it.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- test assertion reading the value the code under test just set.
+		$this->assertSame( '1', $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] );
+	}
+
+	public function test_flag_oneshot_event_is_a_noop_when_cache_safe_off(): void {
+		// With the cache-safe mode off the one-shots render server-side as before, so
+		// no cookie is set - behavior is unchanged.
+		Functions\when( 'headers_sent' )->justReturn( false );
+		$this->capture_event_cookie();
+
+		Helpers::flag_oneshot_event( false );
+
+		$this->assertSame( array(), $this->cookie_writes, 'No cookie may be set when the cache-safe mode is off.' );
+		$this->assertArrayNotHasKey( Helpers::ONESHOT_EVENT_COOKIE, $_COOKIE );
+	}
+
+	public function test_flag_oneshot_event_is_a_noop_after_headers_sent(): void {
+		// A cookie cannot be set once output started; skip silently (the next
+		// non-cached request re-flags it).
+		Functions\when( 'headers_sent' )->justReturn( true );
+		$this->capture_event_cookie();
+
+		Helpers::flag_oneshot_event( true );
+
+		$this->assertSame( array(), $this->cookie_writes );
+		$this->assertArrayNotHasKey( Helpers::ONESHOT_EVENT_COOKIE, $_COOKIE );
 	}
 
 	/**

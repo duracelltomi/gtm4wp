@@ -115,15 +115,63 @@ customer field safe), and the JS suite (once-per-session, **cookie gate suppress
 the fetch when unchanged**, anonymous never fetches user data, logout drops cached
 identity, cart-fragment push).
 
-### Deferred to a Phase 2 follow-up: the WooCommerce one-shot events
+## Phase 3 — shipped (2.0 beta1): the WooCommerce one-shot events
 
 The two WooCommerce one-shot events — `maybe_add_readded_to_cart` (an `add_to_cart`
 after the cart "Undo") and `maybe_add_pending_purchase` (the reliable-tracking
-`purchase` fallback) — remain **omitted** under the cache-safe mode (unchanged from
-Phase 1). Unlike the customer/cart block, a one-shot must fire **exactly once**, so
-it cannot ride the re-applied (cached) cart-fragment without a per-event client-side
-dedupe, and the `purchase` fallback carries revenue where a double-count is costly.
-Delivering them safely (endpoint resolver that consumes the session marker + a
-client dedupe keyed on the order number, reusing the existing
-`gtm4wp_orderid_tracked` guard) is scoped as a follow-up; the endpoint/`VisitorField`
-framework already supports the additional resolvers.
+`purchase` fallback) — are now **delivered client-side** too, so with the mode on
+**no** visitor/session value is rendered into cacheable HTML at all. The epic is
+complete.
+
+Unlike the customer/cart block, a one-shot must fire **exactly once**, and the
+`purchase` fallback carries revenue where a double-count is costly. So they are
+delivered as **Tier 3 one-shot events** (`VisitorField::$one_shot`), distinct from a
+persistent gate: fetched only while an **event cookie** is present, fired once with a
+per-event dedupe guard, then the cookie is cleared — never cached or replayed.
+
+1. **Declaration.** `WooCommerce\PageDataLayer::declare_visitor_scoped_fields()`
+   registers `readdedToCart` and (only when "purchase on any page" is on)
+   `pendingPurchase` through `GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS`, both Tier 3,
+   `one_shot = true`, gated by the shared event cookie
+   `Helpers::ONESHOT_EVENT_COOKIE` (`gtm4wp_woo_event`). They are declared whenever
+   the mode is on, independent of marker state, because the delivering fetch happens
+   on a *later* page than the one that queued the event.
+2. **Event cookie.** `Helpers::flag_oneshot_event()` sets the short-lived, JS-readable
+   event cookie on the **same hooks that seed the session markers**
+   (`ListTracking::cart_item_restored`, `PurchaseTracking::remember_order`), only when
+   the mode is on and headers are not yet sent — so it never lands on a cacheable
+   response. `VisitorDataModule::build_config()` routes one-shot fields into a
+   `config.actions` list (separate from `gates`), so the client knows which cookie to
+   watch. An anonymous cached-page visitor without the cookie never fetches.
+3. **Resolvers.** On the session endpoint the resolvers resolve the order/re-add from
+   the **current WC session** (no id parameter → no IDOR), run the same eligibility
+   gauntlet as the page path, **consume** the session marker (so a lingering cookie
+   can't re-resolve), and return the event payload plus its dedupe key — the order
+   *number* for the purchase, the re-add token for the cart. `resolve_pending_purchase()`
+   deliberately does **not** write `_ga_tracked` (it is a public GET); that server-side
+   write stays on the authenticated order-received page.
+4. **Client dedupe (the point of the phase).** In `gtm4wp-visitor-data.js` the one-shot
+   handlers push each event under the same event name the server used, guarded so it
+   fires once:
+   - **Purchase fallback** reuses the **existing** de-dupe — the same
+     `gtm4wp_orderid_tracked` localStorage/cookie guard (keyed on the order number)
+     the order-received page's inline block writes (`purchase_dedupe_guard`), read/written
+     through one shared protocol. So a fallback fire on page N and a real
+     order-received purchase for the same order can **never both count** — whichever
+     runs first records the guard; the other is suppressed (client guard) or omitted
+     (server `_ga_tracked` gauntlet + marker clear). When "Do not flag orders as being
+     tracked" is on, the resolver sets `flag = false` and the client writes/reads **no**
+     order-tracked state anywhere, matching the server path.
+   - **Re-added-to-cart** de-dupes on the per-event token (the WC session re-add key),
+     recorded in `localStorage` after the push so a page reload does not re-fire it.
+   After delivering, the client clears the event cookie, so a later page makes no request.
+
+Regression tests: `PageDataLayerTest` (resolver payloads, marker consumption, no
+`_ga_tracked` write on the endpoint, the two exactly-once orderings, `flag=false`,
+hostile order number round-trips hex-encoded, one-shots absent from server HTML),
+`HelpersTest` / `PurchaseTrackingTest` / `ListTrackingTest` (event cookie set only in
+cache-safe mode + headers-sent guard), `VisitorDataModuleTest` (`config.actions`
+routing), and the JS suite (cookie gate → no fetch; fires once; reload with the token
+in localStorage does not re-fire; the shared guard suppresses the second purchase in
+both orderings; one-shots stay out of the merged push and the cache; stale cookie
+cleared).

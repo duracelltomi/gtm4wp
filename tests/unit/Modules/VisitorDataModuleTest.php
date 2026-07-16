@@ -193,6 +193,28 @@ final class VisitorDataModuleTest extends TestCase {
 		$this->assertStringNotContainsString( 'x@example.com', $code, 'The Tier 3 value must not be in the cacheable config.' );
 	}
 
+	public function test_one_shot_action_field_produces_the_actions_config_not_a_gate(): void {
+		// Phase 3: a one-shot Tier 3 field (the $one_shot flag on VisitorField) is
+		// routed into the config `actions` list — gated by its event cookie but never
+		// cached/replayed like a regular gate — so the client fires it once and clears
+		// the cookie. A regular gate alongside it stays under `gates`.
+		$this->scoped_fields = array(
+			new VisitorField( 'visitorEmail', VisitorField::TIER_ACTION, '', static fn () => 'x@example.com', 'gtm4wp_login' ),
+			new VisitorField( 'pendingPurchase', VisitorField::TIER_ACTION, '', static fn () => array(), 'gtm4wp_woo_event', true ),
+			new VisitorField( 'readdedToCart', VisitorField::TIER_ACTION, '', static fn () => array(), 'gtm4wp_woo_event', true ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$code = $this->inline_for( 'gtm4wp-visitor-data' );
+
+		// The persistent user gate stays under gates; the one-shots share their event
+		// cookie under actions (order of keys follows declaration).
+		$this->assertStringContainsString( '"gates":[{"cookie":"gtm4wp_login","keys":["visitorEmail"]}]', $code );
+		$this->assertStringContainsString( '"actions":[{"cookie":"gtm4wp_woo_event","keys":["pendingPurchase","readdedToCart"]}]', $code );
+	}
+
 	public function test_action_field_without_a_gate_is_omitted_from_the_config(): void {
 		// A Tier 3 field with no cookie gate cannot be delivered safely (nothing tells
 		// the client when to fetch it), so it contributes no gate and — being the only
