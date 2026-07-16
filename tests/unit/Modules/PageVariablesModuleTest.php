@@ -160,6 +160,181 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 42, $data_layer['postID'] );
 	}
 
+	/**
+	 * Issue #220: with the "include parent categories" option ON, each of the
+	 * post's category slugs is followed by its ancestor slugs (get_ancestors()
+	 * order: immediate parent first, up to the top-level category).
+	 */
+	public function test_parent_categories_included_on_single_post_when_enabled(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_category' )->justReturn(
+			array(
+				(object) array(
+					'slug'    => 'child',
+					'term_id' => 30,
+				),
+			)
+		);
+		// Ancestry chain: child (term 30), parent (term 20), grandparent (term 10).
+		Functions\when( 'get_ancestors' )->alias(
+			static fn ( int $term_id, string $taxonomy ): array =>
+				( 30 === $term_id && 'category' === $taxonomy ) ? array( 20, 10 ) : array()
+		);
+		Functions\when( 'get_term' )->alias(
+			static function ( int $term_id ) {
+				$slugs = array(
+					20 => 'parent',
+					10 => 'grandparent',
+				);
+				return new \WP_Term(
+					array(
+						'term_id' => $term_id,
+						'slug'    => $slugs[ $term_id ] ?? 'unknown',
+					)
+				);
+			}
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => true,
+				GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'child', 'parent', 'grandparent' ), $data_layer['pageCategory'] );
+	}
+
+	/**
+	 * Issue #220 negative case: with the option OFF (the default) the ancestor
+	 * slugs must NOT appear - the output stays exactly the immediate category
+	 * slugs, as in 1.x. get_ancestors() is stubbed to return parents anyway to
+	 * prove the code path is not even consulted when the option is off.
+	 */
+	public function test_parent_categories_excluded_on_single_post_when_disabled(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_category' )->justReturn(
+			array(
+				(object) array(
+					'slug'    => 'child',
+					'term_id' => 30,
+				),
+			)
+		);
+		Functions\when( 'get_ancestors' )->justReturn( array( 20 ) );
+		Functions\when( 'get_term' )->justReturn(
+			new \WP_Term(
+				array(
+					'term_id' => 20,
+					'slug'    => 'parent',
+				)
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => true,
+				GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES => false,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'child' ), $data_layer['pageCategory'] );
+		$this->assertNotContains( 'parent', $data_layer['pageCategory'] );
+	}
+
+	/**
+	 * Issue #220: two categories that share the same ancestor must not repeat
+	 * the shared parent slug - the list is de-duplicated while keeping order.
+	 */
+	public function test_parent_categories_deduped_when_categories_share_ancestor(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_the_category' )->justReturn(
+			array(
+				(object) array(
+					'slug'    => 'news',
+					'term_id' => 30,
+				),
+				(object) array(
+					'slug'    => 'tech',
+					'term_id' => 31,
+				),
+			)
+		);
+		// Both categories share the top-level "blog" (term 10) parent.
+		Functions\when( 'get_ancestors' )->justReturn( array( 10 ) );
+		Functions\when( 'get_term' )->justReturn(
+			new \WP_Term(
+				array(
+					'term_id' => 10,
+					'slug'    => 'blog',
+				)
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => true,
+				GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		// "blog" appears once even though both news and tech report it.
+		$this->assertSame( array( 'news', 'blog', 'tech' ), $data_layer['pageCategory'] );
+	}
+
+	/**
+	 * Issue #220: the parent-category inclusion also applies to the second
+	 * pageCategory build site - the category / taxonomy archive path.
+	 */
+	public function test_parent_categories_included_on_category_archive_when_enabled(): void {
+		Functions\when( 'is_archive' )->justReturn( true );
+		Functions\when( 'is_category' )->justReturn( true );
+		Functions\when( 'get_the_category' )->justReturn(
+			array(
+				(object) array(
+					'slug'    => 'child',
+					'term_id' => 30,
+				),
+			)
+		);
+		Functions\when( 'get_ancestors' )->justReturn( array( 20 ) );
+		Functions\when( 'get_term' )->justReturn(
+			new \WP_Term(
+				array(
+					'term_id' => 20,
+					'slug'    => 'parent',
+				)
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => true,
+				GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'child', 'parent' ), $data_layer['pageCategory'] );
+	}
+
 	public function test_content_word_count_and_reading_time(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );

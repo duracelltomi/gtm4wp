@@ -42,6 +42,7 @@ final class PageVariablesModule extends AbstractModule {
 		return array(
 			GTM4WP_OPTION_INCLUDE_POSTTYPE          => true,
 			GTM4WP_OPTION_INCLUDE_CATEGORIES        => true,
+			GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES  => false,
 			GTM4WP_OPTION_INCLUDE_TAGS              => true,
 			GTM4WP_OPTION_INCLUDE_AUTHOR            => true,
 			GTM4WP_OPTION_INCLUDE_AUTHORID          => false,
@@ -203,10 +204,7 @@ final class PageVariablesModule extends AbstractModule {
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CATEGORIES ) ) {
 				$_post_cats = get_the_category();
 				if ( $_post_cats ) {
-					$data_layer['pageCategory'] = array();
-					foreach ( $_post_cats as $_one_cat ) {
-						$data_layer['pageCategory'][] = $_one_cat->slug;
-					}
+					$data_layer['pageCategory'] = $this->build_category_slugs( $_post_cats );
 				}
 			}
 
@@ -525,11 +523,7 @@ final class PageVariablesModule extends AbstractModule {
 			}
 
 			if ( ( is_tax() || is_category() ) && $this->opt( GTM4WP_OPTION_INCLUDE_CATEGORIES ) ) {
-				$_post_cats                 = get_the_category();
-				$data_layer['pageCategory'] = array();
-				foreach ( $_post_cats as $_one_cat ) {
-					$data_layer['pageCategory'][] = $_one_cat->slug;
-				}
+				$data_layer['pageCategory'] = $this->build_category_slugs( get_the_category() );
 			}
 
 			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) && ( is_author() ) ) {
@@ -593,5 +587,38 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		return $data_layer;
+	}
+
+	/**
+	 * Builds the pageCategory slug list for a set of category terms.
+	 *
+	 * With the "include parent categories" option off (the default) this returns
+	 * just the immediate category slugs, keeping the 1.x output unchanged. With
+	 * it on, each category's ancestor slugs (from get_ancestors(): immediate
+	 * parent first, up to the top-level category) are appended after the
+	 * category's own slug and the final list is de-duplicated while preserving
+	 * order.
+	 *
+	 * @param array<int, \WP_Term> $categories Category term objects, as returned by get_the_category().
+	 * @return array<int, string> List of category slugs.
+	 */
+	private function build_category_slugs( array $categories ): array {
+		$include_parents = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES );
+
+		$slugs = array();
+		foreach ( $categories as $one_cat ) {
+			$slugs[] = $one_cat->slug;
+
+			if ( $include_parents ) {
+				foreach ( get_ancestors( $one_cat->term_id, 'category' ) as $ancestor_id ) {
+					$ancestor_term = get_term( (int) $ancestor_id, 'category' );
+					if ( $ancestor_term instanceof \WP_Term ) {
+						$slugs[] = $ancestor_term->slug;
+					}
+				}
+			}
+		}
+
+		return array_values( array_unique( $slugs ) );
 	}
 }
