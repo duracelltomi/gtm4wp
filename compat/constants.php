@@ -250,6 +250,20 @@ define( 'GTM4WP_WPFILTER_AXEPTIO_CONSENT_MODE_DEFAULT', 'gtm4wp_axeptio_consent_
  * 3rd party plugins to alter e-commerce related data layer content.
  */
 define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
+
+/**
+ * Source-aware successor of GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY (since 2.0).
+ *
+ * Behaves like the deprecated gtm4wp_eec_product_array filter but receives a
+ * third argument: the raw source object the GA4 item was built from - the
+ * WooCommerce cart item array on the cart/checkout paths, or the WC_Order_Item
+ * on the purchase path (null when there is no per-line source, e.g. a product
+ * detail page or product list). This lets extensions read custom cart/order
+ * item meta - which never lives on the WC_Product/variation - and attach only
+ * the fields they need, instead of bloating every GA4 event with the whole
+ * source array. The source object itself is never merged into the item array.
+ */
+define( 'GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE', 'gtm4wp_eec_item_with_source' );
 define( 'GTM4WP_WPFILTER_EEC_CART_ITEM', 'gtm4wp_eec_cart_item' );
 define( 'GTM4WP_WPFILTER_EEC_ORDER_ITEM', 'gtm4wp_eec_order_item' );
 define( 'GTM4WP_WPFILTER_EEC_ORDER_DATA', 'gtm4wp_eec_order_data' );

@@ -550,6 +550,162 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'added', $item['custom_dimension'] );
 	}
 
+	public function test_item_with_source_filter_receives_null_when_there_is_no_source(): void {
+		// #324: with no per-line source (product detail page), the new
+		// gtm4wp_eec_item_with_source filter's third argument is null.
+		$captured = 'unset';
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->once()
+			->andReturnUsing(
+				static function ( $item, $context, $source ) use ( &$captured ) {
+					$captured = $source;
+					return $item;
+				}
+			);
+
+		$this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertNull( $captured, 'With no per-line source the new filter must receive null.' );
+	}
+
+	public function test_item_with_source_filter_receives_the_order_item_on_the_purchase_path(): void {
+		// #324 (a): the new filter receives the raw WC_Order_Item when building an
+		// order line, so extensions can read custom order-item meta.
+		$order_item = new class( $this->make_product() ) {
+			public function __construct( private $product ) {}
+			public function get_product() {
+				return $this->product;
+			}
+			public function get_quantity() {
+				return 1;
+			}
+			public function get_subtotal() {
+				return 0.0;
+			}
+			public function get_total() {
+				return 0.0;
+			}
+		};
+
+		$order = new \WC_Order(
+			array(
+				'items'           => array( $order_item ),
+				'item_total_incl' => 10.0,
+				'item_total_excl' => 10.0,
+			)
+		);
+
+		$captured = 'unset';
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->once()
+			->with( \Mockery::type( 'array' ), 'purchase', \Mockery::type( 'object' ) )
+			->andReturnUsing(
+				static function ( $item, $context, $source ) use ( &$captured ) {
+					$captured = $source;
+					return $item;
+				}
+			);
+
+		$this->make_product_data()->process_order_items( $order );
+
+		$this->assertSame( $order_item, $captured, 'The new filter must receive the exact WC_Order_Item as its source on the purchase path.' );
+	}
+
+	public function test_source_item_is_not_merged_into_the_item_array(): void {
+		// #324 (b): the whole point of the new approach - the raw source object must
+		// NOT leak into the GA4 item array (which would bloat every event). A callback
+		// has to copy fields explicitly; absent one, none of the source's keys/values
+		// appear on the item.
+		$source = array(
+			'data'           => $this->make_product(),
+			'quantity'       => 1,
+			'my_custom_meta' => 'secret-source-value',
+		);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'cart', $source );
+
+		$this->assertArrayNotHasKey( 'my_custom_meta', $item, 'Source meta must not be merged into the item array.' );
+		$this->assertArrayNotHasKey( 'data', $item, 'The source WC_Product entry must not be merged into the item array.' );
+		$this->assertStringNotContainsString(
+			'secret-source-value',
+			json_encode( $item ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			'No source value may leak anywhere into the item array unless a callback adds it.'
+		);
+	}
+
+	public function test_item_with_source_filter_callback_can_attach_data_from_the_source(): void {
+		// #324: a callback CAN read the source and copy just the fields it needs onto
+		// the item - the intended, opt-in way to surface custom cart/order item meta.
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->once()
+			->andReturnUsing(
+				static function ( $item, $context, $source ) {
+					if ( is_array( $source ) && isset( $source['my_custom_meta'] ) ) {
+						$item['dimension1'] = $source['my_custom_meta'];
+					}
+					return $item;
+				}
+			);
+
+		$item = $this->make_product_data()->process_product(
+			$this->make_product(),
+			array(),
+			'cart',
+			array( 'my_custom_meta' => 'attached-value' )
+		);
+
+		$this->assertSame( 'attached-value', $item['dimension1'], 'A callback may explicitly copy source meta onto the item.' );
+	}
+
+	public function test_deprecated_product_array_filter_still_fires_and_can_modify_the_array(): void {
+		// #324 (c): the deprecated gtm4wp_eec_product_array filter must keep firing
+		// with its original two arguments so existing consumers are not broken, and its
+		// mutation must survive into the final item.
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->once()
+			->with( \Mockery::type( 'array' ), 'cart' )
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['legacy_dimension'] = 'legacy';
+					return $item;
+				}
+			);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'cart', array( 'x' => 1 ) );
+
+		$this->assertSame( 'legacy', $item['legacy_dimension'], 'The deprecated filter must still fire and its changes must survive.' );
+	}
+
+	public function test_both_filters_run_in_order_and_each_can_modify_the_array(): void {
+		// #324: ordering contract - the deprecated filter runs first, the new
+		// source-aware filter runs after it, and BOTH can modify the array. The new
+		// filter must see the deprecated filter's mutation (proves the order).
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->once()
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['from_deprecated'] = 'old';
+					return $item;
+				}
+			);
+
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->once()
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['saw_deprecated'] = $item['from_deprecated'] ?? 'missing';
+					$item['from_new']       = 'new';
+					return $item;
+				}
+			);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'cart' );
+
+		$this->assertSame( 'old', $item['from_deprecated'], 'The deprecated filter can still modify the array.' );
+		$this->assertSame( 'new', $item['from_new'], 'The new filter can also modify the array.' );
+		$this->assertSame( 'old', $item['saw_deprecated'], 'The new filter runs after the deprecated one, so it sees its changes.' );
+	}
+
 	public function test_additional_attributes_override_generated_ones(): void {
 		$item = $this->make_product_data()->process_product(
 			$this->make_product(),

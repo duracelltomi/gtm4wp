@@ -141,7 +141,8 @@ final class ListTracking {
 		$eec_product_array = $this->product_data->process_product(
 			$product,
 			$attributes,
-			'cart'
+			'cart',
+			is_array( $cart_item ) ? $cart_item : null
 		);
 
 		$GLOBALS['gtm4wp_cart_item_proddata'] = $eec_product_array;

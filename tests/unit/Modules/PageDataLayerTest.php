@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Modules\WooCommerce\Helpers;
@@ -811,6 +812,39 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertStringContainsString( '"event":"view_cart"', $this->inline_js, 'The cart page must fire the GA4 view_cart event.' );
 		$this->assertStringContainsString( '"item_name":"Mug"', $this->inline_js, 'The cart item must be carried on the view_cart event.' );
+	}
+
+	public function test_item_with_source_filter_receives_the_cart_item_on_a_cart_line(): void {
+		// #324 (a): on a cart line, the new gtm4wp_eec_item_with_source filter receives
+		// the raw WooCommerce cart item (with its custom meta) as its source argument,
+		// so extensions can read cart-item meta that is absent from the WC_Product.
+		$product   = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$cart_item = array(
+			'data'           => $product,
+			'quantity'       => 2,
+			'my_custom_meta' => 'cart-source-value',
+		);
+		$this->stub_wc( array( 'item-1' => $cart_item ) );
+
+		$captured = 'unset';
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->andReturnUsing(
+				static function ( $item, $context, $source ) use ( &$captured ) {
+					if ( 'cart' === $context ) {
+						$captured = $source;
+					}
+					return $item;
+				}
+			);
+
+		$result = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertIsArray( $captured, 'The new filter must receive the cart item array as source on a cart line.' );
+		$this->assertSame( 'cart-source-value', $captured['my_custom_meta'] ?? null, 'The raw cart item (with its custom meta) must reach the new filter as source.' );
+
+		// #324 (b): the cart item source must not leak into the built GA4 item.
+		$this->assertArrayNotHasKey( 'my_custom_meta', $result['cartContent']['items'][0], 'The cart item source must not be merged into the GA4 item.' );
 	}
 
 	public function test_cart_content_added_when_include_cart_option_enabled(): void {

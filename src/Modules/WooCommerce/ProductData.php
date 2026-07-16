@@ -83,9 +83,10 @@ final class ProductData {
 	 * @param mixed  $product An instance of WC_Product that needs to be transformed into an ecommerce item object.
 	 * @param array  $additional_product_attributes Any key-value pair that needs to be added into the ecommerce item object.
 	 * @param string $attributes_used_for The placement ID of the product that is passed to the apply_filters hook so that 3rd party code can be notified where this product data is being used.
+	 * @param mixed  $source_item Optional. The raw source object the item is built from - the WooCommerce cart item array on the cart/checkout paths or the WC_Order_Item on the purchase path - passed only to the GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE filter so extensions can read custom cart/order item meta. NOT merged into the returned item array. Null when there is no per-line source (product detail, product lists). Default null.
 	 * @return array|false The ecommerce item object of the WooCommerce product, or false if the product does not exist.
 	 */
-	public function process_product( $product, array $additional_product_attributes, string $attributes_used_for ) {
+	public function process_product( $product, array $additional_product_attributes, string $attributes_used_for, $source_item = null ) {
 		if ( ! $product ) {
 			return false;
 		}
@@ -244,10 +245,47 @@ final class ProductData {
 		 * productlist: product shown in a product list (category page or special product list like 'New products')
 		 * groupedproductlist: product shown on a product detail page of a grouped product
 		 *
+		 * @deprecated 2.0 Use {@see 'gtm4wp_eec_item_with_source'} instead, which receives the same
+		 *                 arguments plus the raw source object (cart item / order item) the item was built from.
+		 *
 		 * @param array  $_temp_productdata   An associative array containing all GA4 product attributes as well as any custom attribute
 		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used
 		 */
-		return apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, $attributes_used_for );
+		$_temp_productdata = apply_filters_deprecated(
+			GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY,
+			array( $_temp_productdata, $attributes_used_for ),
+			'2.0',
+			GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE
+		);
+
+		/**
+		 * Filters the ecommerce item array before using it for tracking.
+		 *
+		 * Source-aware successor of the deprecated gtm4wp_eec_product_array filter: it
+		 * receives the same item array and placement context, plus the raw source object
+		 * the item was built from. That source is the WooCommerce cart item array on the
+		 * cart/checkout paths and the WC_Order_Item on the purchase path (null when there
+		 * is no per-line source, e.g. a product detail page or a product list). Use it to
+		 * read custom cart/order item meta - which is not present on the WC_Product or its
+		 * variation - and attach only the specific fields you need, so the GA4 item payload
+		 * is not bloated with the whole source array. The source object is never merged
+		 * into the item array; adding data from it is entirely up to the callback.
+		 *
+		 * Runs after the deprecated gtm4wp_eec_product_array filter, so both filters can
+		 * still modify the array and a callback here sees the deprecated filter's changes.
+		 *
+		 * The placement context values are the same as for gtm4wp_eec_product_array (see above).
+		 *
+		 * @param array  $_temp_productdata   An associative array containing all GA4 product attributes as well as any custom attribute.
+		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used.
+		 * @param mixed  $source_item         The raw source object the item was built from: a WooCommerce cart item array, a WC_Order_Item, or null when there is no per-line source.
+		 */
+		return apply_filters(
+			GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE,
+			$_temp_productdata,
+			$attributes_used_for,
+			$source_item
+		);
 	}
 
 	/**
@@ -332,7 +370,8 @@ final class ProductData {
 				$eec_product_array = $this->process_product(
 					$product,
 					$item_attributes,
-					'purchase'
+					'purchase',
+					$order_item
 				);
 
 				unset( $eec_product_array['internal_id'] );

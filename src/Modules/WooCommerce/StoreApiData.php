@@ -116,7 +116,8 @@ final class StoreApiData {
 		$item = $this->product_data->process_product(
 			$product,
 			array( 'quantity' => $quantity ),
-			'block'
+			'block',
+			is_array( $cart_item ) ? $cart_item : null
 		);
 
 		return array(

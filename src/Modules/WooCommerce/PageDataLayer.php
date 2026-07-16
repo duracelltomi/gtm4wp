@@ -234,7 +234,8 @@ final class PageDataLayer {
 			$eec_product_array = $this->product_data->process_product(
 				$product,
 				$this->cart_line_attributes( $cart_item_data ),
-				'cart'
+				'cart',
+				$cart_item_data
 			);
 
 			unset( $eec_product_array['internal_id'] );
@@ -357,7 +358,8 @@ final class PageDataLayer {
 			$eec_product_array = $this->product_data->process_product(
 				$product,
 				$this->cart_line_attributes( $cart_item_data ),
-				'cart'
+				'cart',
+				$cart_item_data
 			);
 
 			unset( $eec_product_array['internal_id'] );
@@ -408,7 +410,8 @@ final class PageDataLayer {
 			$eec_product_array = $this->product_data->process_product(
 				$product,
 				$this->cart_line_attributes( $cart_item ),
-				'readdedtocart'
+				'readdedtocart',
+				$cart_item
 			);
 
 			$gtm4wp_currency = get_woocommerce_currency();
@@ -461,7 +464,8 @@ final class PageDataLayer {
 			$eec_product_array = $this->product_data->process_product(
 				$product,
 				$this->cart_line_attributes( $cart_item_data ),
-				'checkout'
+				'checkout',
+				$cart_item_data
 			);
 
 			unset( $eec_product_array['internal_id'] );
