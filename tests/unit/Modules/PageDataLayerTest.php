@@ -545,7 +545,7 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->make_page_datalayer(
 			array(
-				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
 				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
 			)
 		)->add_datalayer_data( array() );
@@ -564,8 +564,8 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->make_page_datalayer(
 			array(
-				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE     => true,
-				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE  => true,
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
 				GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true,
 			)
 		)->add_datalayer_data( array() );
@@ -640,6 +640,78 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertSame( 3, $result['customerTotalOrders'] );
 		$this->assertSame( 'Marks & Spencer', $result['customerBillingCompany'], 'Customer data must reach the data layer raw.' );
+	}
+
+	public function test_cache_safe_omits_customer_data_and_cart_content(): void {
+		// Issue #398 (1b): with the cache-safe data layer on, the visitor's customer
+		// details and cart must not be baked into cacheable HTML. Both features are
+		// enabled here so the ONLY reason they are absent is the cache-safe gate.
+		\WC_Customer::$fixtures[42] = array(
+			'order_count'     => 3,
+			'billing_company' => 'Marks & Spencer',
+			'billing_email'   => 'a@b.com',
+		);
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ), new \WC_Customer( 42 ) ); // phpcs:ignore
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA     => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'customerTotalOrders', $result, 'Customer data must be withheld from cacheable HTML in cache-safe mode.' );
+		$this->assertArrayNotHasKey( 'customerBillingCompany', $result );
+		$this->assertArrayNotHasKey( 'cartContent', $result, 'Cart content must be withheld from cacheable HTML in cache-safe mode.' );
+
+		// And no customer value leaks anywhere in the compiled data layer.
+		$serialized = json_encode( $result ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$this->assertStringNotContainsString( 'Marks & Spencer', $serialized );
+		$this->assertStringNotContainsString( 'a@b.com', $serialized );
+	}
+
+	public function test_cache_safe_omits_the_pending_purchase_one_shot_event(): void {
+		// Issue #398 (1b): the reliable-tracking fallback is a session one-shot that
+		// fires on arbitrary (cacheable) pages, so it is withheld in cache-safe mode.
+		$order = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'The pending-purchase one-shot must not fire on a cacheable page in cache-safe mode.' );
+	}
+
+	public function test_cache_safe_off_keeps_customer_data_and_cart(): void {
+		// Negative case: with the mode explicitly off, today's behavior is unchanged.
+		\WC_Customer::$fixtures[42] = array(
+			'order_count'     => 3,
+			'billing_company' => 'Marks & Spencer',
+		);
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ), new \WC_Customer( 42 ) ); // phpcs:ignore
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA     => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => false,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 3, $result['customerTotalOrders'] );
+		$this->assertArrayHasKey( 'cartContent', $result );
+		$this->assertSame( 'Mug', $result['cartContent']['items'][0]['item_name'] );
 	}
 
 	public function test_cart_page_fires_view_cart_event(): void {

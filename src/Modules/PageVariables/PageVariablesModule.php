@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\PageVariables;
 
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AbstractModule;
+use GTM4WP\Modules\VisitorData\VisitorField;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -85,6 +86,7 @@ final class PageVariablesModule extends AbstractModule {
 	 */
 	protected function register_frontend_hooks(): void {
 		add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, array( $this, 'add_datalayer_data' ) );
+		add_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array( $this, 'declare_visitor_scoped_fields' ) );
 	}
 
 	/**
@@ -105,6 +107,13 @@ final class PageVariablesModule extends AbstractModule {
 	public function add_datalayer_data( $data_layer ) {
 		global $wp_query;
 
+		// When the cache-safe data layer is on (issue #398), visitor/session
+		// specific values must not be baked into the cacheable page HTML: they are
+		// omitted here and, where the browser can compute them itself, delivered
+		// client-side instead (see declare_visitor_scoped_fields() and the
+		// gtm4wp-visitor-data script). Content/URL/site data is unaffected.
+		$cache_safe = (bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
+
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_SITEID ) || $this->opt( GTM4WP_OPTION_INCLUDE_SITENAME ) ) {
 			$data_layer['siteID']   = 0;
 			$data_layer['siteName'] = '';
@@ -117,7 +126,7 @@ final class PageVariablesModule extends AbstractModule {
 			}
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_LOGGEDIN ) ) {
+		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_LOGGEDIN ) ) {
 			$data_layer['visitorLoginState'] = 'logged-out';
 
 			if ( is_user_logged_in() ) {
@@ -125,7 +134,7 @@ final class PageVariablesModule extends AbstractModule {
 			}
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERROLE ) || $this->opt( GTM4WP_OPTION_INCLUDE_USEREMAIL ) || $this->opt( GTM4WP_OPTION_INCLUDE_USERREGDATE ) || $this->opt( GTM4WP_OPTION_INCLUDE_USERNAME ) ) {
+		if ( ! $cache_safe && ( $this->opt( GTM4WP_OPTION_INCLUDE_USERROLE ) || $this->opt( GTM4WP_OPTION_INCLUDE_USEREMAIL ) || $this->opt( GTM4WP_OPTION_INCLUDE_USERREGDATE ) || $this->opt( GTM4WP_OPTION_INCLUDE_USERNAME ) ) ) {
 			$current_user = wp_get_current_user();
 
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERROLE ) ) {
@@ -146,14 +155,14 @@ final class PageVariablesModule extends AbstractModule {
 			}
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERID ) ) {
+		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_USERID ) ) {
 			$_gtm4wp_userid = get_current_user_id();
 			if ( $_gtm4wp_userid > 0 ) {
 				$data_layer['visitorId'] = $_gtm4wp_userid;
 			}
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
+		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
 			// Passed raw: the data layer output sink runs every value through
 			// wp_json_encode() with the full hex flag set, which is the correct
 			// escaper for the inline-script context. VisitorIp::get() already
@@ -540,14 +549,22 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['pagePostType'] = 'search-results';
 
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_SEARCHDATA ) ) {
-				$data_layer['siteSearchTerm'] = get_search_query();
-				$data_layer['siteSearchFrom'] = '';
-				if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
-					$referer_url_parts            = explode( '?', esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) );
-					$data_layer['siteSearchFrom'] = $referer_url_parts[0];
+				// siteSearchTerm (from the URL) and siteSearchFrom (from the
+				// referrer) are things the browser can compute itself, so under the
+				// cache-safe data layer they are delivered client-side (see
+				// declare_visitor_scoped_fields()) rather than rendered here — which
+				// also removes their server-side reflected-XSS surface.
+				// siteSearchResults stays server-side: only the server knows it.
+				if ( ! $cache_safe ) {
+					$data_layer['siteSearchTerm'] = get_search_query();
+					$data_layer['siteSearchFrom'] = '';
+					if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
+						$referer_url_parts            = explode( '?', esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) );
+						$data_layer['siteSearchFrom'] = $referer_url_parts[0];
 
-					if ( count( $referer_url_parts ) > 1 ) {
-						$data_layer['siteSearchFrom'] = $referer_url_parts[0] . '?' . rawurlencode( $referer_url_parts[1] );
+						if ( count( $referer_url_parts ) > 1 ) {
+							$data_layer['siteSearchFrom'] = $referer_url_parts[0] . '?' . rawurlencode( $referer_url_parts[1] );
+						}
 					}
 				}
 				$data_layer['siteSearchResults'] = $wp_query->post_count;
@@ -579,7 +596,7 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['postFormat'] = get_post_format() ? '' : 'standard';
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_MISCGEOCF ) && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
+		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_MISCGEOCF ) && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
 			// Sanitized but not esc_js'd: the data layer output sink hex-encodes
 			// every value via wp_json_encode(), so pre-escaping would only
 			// corrupt the country code for special-character inputs.
@@ -587,6 +604,31 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		return $data_layer;
+	}
+
+	/**
+	 * Declares the page-variables fields that must be delivered outside the
+	 * cacheable HTML when the cache-safe data layer is on (issue #398). The site
+	 * search term (from the URL) and the referring page (siteSearchFrom) are
+	 * Tier 1 — the browser already knows them — so they are handed to the client
+	 * runtime under their existing data layer names. No-op unless cache-safe mode
+	 * is on, the search-data option is enabled and this is a search results page
+	 * (the only place these two fields are output).
+	 *
+	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
+	 * @return array<int, VisitorField>
+	 */
+	public function declare_visitor_scoped_fields( array $fields ): array {
+		if ( ! $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) ) {
+			return $fields;
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_SEARCHDATA ) && is_search() ) {
+			$fields[] = new VisitorField( 'siteSearchTerm', VisitorField::TIER_CLIENT, 'searchTerm' );
+			$fields[] = new VisitorField( 'siteSearchFrom', VisitorField::TIER_CLIENT, 'searchReferrer' );
+		}
+
+		return $fields;
 	}
 
 	/**

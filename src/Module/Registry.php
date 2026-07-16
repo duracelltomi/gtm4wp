@@ -41,6 +41,7 @@ final class Registry {
 		\GTM4WP\Modules\Container\ContainerModule::class,
 		\GTM4WP\Modules\PageVariables\PageVariablesModule::class,
 		\GTM4WP\Modules\ClientDeviceData\ClientDeviceDataModule::class,
+		\GTM4WP\Modules\VisitorData\VisitorDataModule::class,
 		\GTM4WP\Modules\UserEvents\UserEventsModule::class,
 		\GTM4WP\Modules\MediaEvents\MediaEventsModule::class,
 		\GTM4WP\Modules\ConsentMode\ConsentModeModule::class,

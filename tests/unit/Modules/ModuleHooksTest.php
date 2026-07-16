@@ -19,6 +19,7 @@ use GTM4WP\Modules\ConsentMode\ConsentModeModule;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
 use GTM4WP\Modules\MediaEvents\MediaEventsModule;
 use GTM4WP\Modules\UserEvents\UserEventsModule;
+use GTM4WP\Modules\VisitorData\VisitorDataModule;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Plugin;
@@ -130,6 +131,18 @@ final class ModuleHooksTest extends TestCase {
 
 	public function test_client_device_data_inactive_when_all_signals_disabled(): void {
 		$disabled = $this->boot( new ClientDeviceDataModule() );
+		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $disabled, 'enqueue_scripts' ) ) );
+	}
+
+	public function test_visitor_data_enqueues_and_declares_fields_when_cache_safe_on(): void {
+		$enabled = $this->boot( new VisitorDataModule(), array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+
+		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $enabled, 'enqueue_scripts' ) ) );
+	}
+
+	public function test_visitor_data_inactive_when_cache_safe_off(): void {
+		$disabled = $this->boot( new VisitorDataModule() );
+
 		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $disabled, 'enqueue_scripts' ) ) );
 	}
 

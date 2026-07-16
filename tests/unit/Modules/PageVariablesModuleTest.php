@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\PageVariables\PageVariablesModule;
+use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -686,6 +687,196 @@ final class PageVariablesModuleTest extends TestCase {
 		);
 
 		$this->assertSame( array(), $module->add_datalayer_data( array() ) );
+	}
+
+	/**
+	 * Stored options that turn on every visitor/session field this test class
+	 * exercises for the cache-safe on/off pair, plus the given cache-safe flag.
+	 *
+	 * @param bool $cache_safe Whether the cache-safe data layer is enabled.
+	 * @return array<string, mixed>
+	 */
+	private function all_visitor_fields_on( bool $cache_safe ): array {
+		return array(
+			GTM4WP_OPTION_CACHE_SAFE_DATALAYER => $cache_safe,
+			GTM4WP_OPTION_INCLUDE_LOGGEDIN     => true,
+			GTM4WP_OPTION_INCLUDE_USERROLE     => true,
+			GTM4WP_OPTION_INCLUDE_USEREMAIL    => true,
+			GTM4WP_OPTION_INCLUDE_USERID       => true,
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP   => true,
+			GTM4WP_OPTION_INCLUDE_MISCGEOCF    => true,
+			GTM4WP_OPTION_INCLUDE_SEARCHDATA   => true,
+		);
+	}
+
+	/**
+	 * Puts the request into a state where every gated visitor field WOULD be
+	 * populated (search page, logged-in user, spoofable IP/referrer/CF headers),
+	 * so a cache-safe test proves the gate suppresses them rather than the data
+	 * merely being absent. The header values carry break-out characters so the
+	 * "nothing leaks" assertion is meaningful (TC-5 hostile input).
+	 *
+	 * @return void
+	 */
+	private function arrange_hostile_visitor_request(): void {
+		Functions\when( 'is_search' )->justReturn( true );
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'wp_unslash' )->returnArg();
+		Functions\when( 'esc_url_raw' )->returnArg();
+		Functions\when( 'sanitize_text_field' )->returnArg();
+		Functions\when( 'wp_json_encode' )->alias(
+			static function ( $data, $options = 0, $depth = 512 ) {
+				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			}
+		);
+		Functions\when( 'get_search_query' )->justReturn( 'SEARCH_MARKER"&<x' );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'              => 3,
+				'roles'           => array( 'administrator' ),
+				'user_email'      => 'editor@example.com',
+				'user_registered' => '2020-01-01 00:00:00',
+				'user_login'      => 'EDITOR_MARKER',
+			)
+		);
+		Functions\when( 'get_current_user_id' )->justReturn( 3 );
+
+		$_SERVER['REMOTE_ADDR']       = '8.8.8.8';
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'CF_MARKER"&<x';
+		$_SERVER['HTTP_REFERER']      = 'https://evil.example/?REF_MARKER="><script>';
+
+		$GLOBALS['wp_query']->post_count = 5;
+	}
+
+	/**
+	 * Issue #398 (1b): with the cache-safe data layer ON, none of the visitor /
+	 * session specific fields — logged-in user data, visitor IP, Cloudflare
+	 * country, and the server copies of the search term / referrer — may be
+	 * rendered into the (cacheable) HTML. The URL-scoped search-results count and
+	 * page type stay. A hostile IP/referrer/CF header proves nothing leaks.
+	 */
+	public function test_cache_safe_on_omits_all_visitor_and_pii_fields(): void {
+		$this->arrange_hostile_visitor_request();
+
+		$module     = $this->make_module( $this->all_visitor_fields_on( true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		// URL/content-scoped search data is still safe to cache.
+		$this->assertSame( 'search-results', $data_layer['pagePostType'] );
+		$this->assertSame( 5, $data_layer['siteSearchResults'] );
+
+		// Every visitor/session field is withheld from the cacheable HTML.
+		foreach (
+			array(
+				'visitorLoginState',
+				'visitorType',
+				'visitorEmail',
+				'visitorEmailHash',
+				'visitorRegistrationDate',
+				'visitorUsername',
+				'visitorId',
+				'visitorIP',
+				'geoCloudflareCountryCode',
+				'siteSearchTerm',
+				'siteSearchFrom',
+			) as $withheld
+		) {
+			$this->assertArrayNotHasKey( $withheld, $data_layer, "'{$withheld}' must not be rendered into cacheable HTML when cache-safe mode is on." );
+		}
+
+		// Nothing visitor-specific leaks anywhere in the compiled data layer, not
+		// even a spoofed header value hiding inside another field.
+		$serialized = wp_json_encode( $data_layer );
+		$this->assertStringNotContainsString( 'SEARCH_MARKER', $serialized );
+		$this->assertStringNotContainsString( 'EDITOR_MARKER', $serialized );
+		$this->assertStringNotContainsString( 'editor@example.com', $serialized );
+		$this->assertStringNotContainsString( 'CF_MARKER', $serialized );
+		$this->assertStringNotContainsString( 'REF_MARKER', $serialized );
+		$this->assertStringNotContainsString( '8.8.8.8', $serialized );
+	}
+
+	/**
+	 * Issue #398 negative case: with the cache-safe data layer OFF (the default),
+	 * every server-rendered visitor field is produced exactly as before, so
+	 * turning the mode off restores today's behavior with no change.
+	 */
+	public function test_cache_safe_off_keeps_rendering_visitor_fields(): void {
+		$this->arrange_hostile_visitor_request();
+
+		$module     = $this->make_module( $this->all_visitor_fields_on( false ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'logged-in', $data_layer['visitorLoginState'] );
+		$this->assertSame( 'administrator', $data_layer['visitorType'] );
+		$this->assertSame( 'editor@example.com', $data_layer['visitorEmail'] );
+		$this->assertSame( 3, $data_layer['visitorId'] );
+		$this->assertSame( '8.8.8.8', $data_layer['visitorIP'] );
+		// The header values still reach the data layer raw (the sink escapes them).
+		$this->assertSame( 'CF_MARKER"&<x', $data_layer['geoCloudflareCountryCode'] );
+		$this->assertSame( 'SEARCH_MARKER"&<x', $data_layer['siteSearchTerm'] );
+		$this->assertArrayHasKey( 'siteSearchFrom', $data_layer );
+	}
+
+	/**
+	 * The Tier 1 search fields are handed to the client runtime (under their
+	 * existing data layer names) on a search page when cache-safe mode is on.
+	 */
+	public function test_declare_visitor_scoped_fields_moves_search_fields_client_side(): void {
+		Functions\when( 'is_search' )->justReturn( true );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+				GTM4WP_OPTION_INCLUDE_SEARCHDATA   => true,
+			)
+		);
+
+		$fields = $module->declare_visitor_scoped_fields( array() );
+
+		$this->assertCount( 2, $fields );
+		$this->assertContainsOnlyInstancesOf( VisitorField::class, $fields );
+
+		$map = array();
+		foreach ( $fields as $field ) {
+			$this->assertSame( VisitorField::TIER_CLIENT, $field->tier );
+			$map[ $field->key ] = $field->client_source;
+		}
+
+		$this->assertSame(
+			array(
+				'siteSearchTerm' => 'searchTerm',
+				'siteSearchFrom' => 'searchReferrer',
+			),
+			$map
+		);
+	}
+
+	public function test_declare_visitor_scoped_fields_noop_when_cache_safe_off(): void {
+		Functions\when( 'is_search' )->justReturn( true );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER => false,
+				GTM4WP_OPTION_INCLUDE_SEARCHDATA   => true,
+			)
+		);
+
+		$this->assertSame( array(), $module->declare_visitor_scoped_fields( array() ) );
+	}
+
+	public function test_declare_visitor_scoped_fields_noop_off_a_search_page(): void {
+		// Cache-safe on and search data on, but not a search results page: the two
+		// search fields are only output on is_search(), so nothing is declared.
+		Functions\when( 'is_search' )->justReturn( false );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+				GTM4WP_OPTION_INCLUDE_SEARCHDATA   => true,
+			)
+		);
+
+		$this->assertSame( array(), $module->declare_visitor_scoped_fields( array() ) );
 	}
 
 	/**

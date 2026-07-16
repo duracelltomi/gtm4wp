@@ -53,8 +53,18 @@ final class PageDataLayer {
 
 		$woo = WC();
 
-		$data_layer = $this->add_customer_data( $data_layer, $woo );
-		$data_layer = $this->add_cart_content( $data_layer, $woo );
+		// Under the cache-safe data layer (issue #398) the customer details and the
+		// cart are visitor/session specific, so they must not be baked into
+		// cacheable page HTML. Phase 1 omits them; a later release delivers them
+		// client-side (once per session / cookie-gated). The content-driven events
+		// below (view_item / view_cart / begin_checkout / purchase) are URL-scoped
+		// or fire only on cache-excluded pages, so they stay server-side.
+		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
+
+		if ( ! $cache_safe ) {
+			$data_layer = $this->add_customer_data( $data_layer, $woo );
+			$data_layer = $this->add_cart_content( $data_layer, $woo );
+		}
 
 		// Product detail view data layer content.
 		if ( is_product() ) {
@@ -67,13 +77,17 @@ final class PageDataLayer {
 			$this->add_begin_checkout( $woo );
 		}
 
-		$this->maybe_add_readded_to_cart( $woo );
+		// The one-shot cookie/session events are visitor/session specific, so they
+		// are also withheld from cacheable HTML under the cache-safe data layer.
+		if ( ! $cache_safe ) {
+			$this->maybe_add_readded_to_cart( $woo );
 
-		// Reliable purchase tracking: if the order-received page was missed (custom
-		// thank-you page, order-pay landing, a gateway that never reached it), emit
-		// the purchase for the order remembered in this session on whatever page the
-		// customer views next. No-op unless the feature is enabled.
-		$data_layer = $this->maybe_add_pending_purchase( $data_layer );
+			// Reliable purchase tracking: if the order-received page was missed (custom
+			// thank-you page, order-pay landing, a gateway that never reached it), emit
+			// the purchase for the order remembered in this session on whatever page the
+			// customer views next. No-op unless the feature is enabled.
+			$data_layer = $this->maybe_add_pending_purchase( $data_layer );
+		}
 
 		$this->datalayer->flush_pushes();
 

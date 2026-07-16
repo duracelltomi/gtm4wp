@@ -80,6 +80,11 @@ define( 'GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY', 'include-primary-category' );
 define( 'GTM4WP_OPTION_INCLUDE_PAGELANGUAGE', 'include-page-language' );
 define( 'GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES', 'include-parent-categories' );
 
+// New in 2.0: cache-safe data layer master switch. When on, visitor/session
+// specific values are not rendered into the (cacheable) page HTML; the browser
+// pushes what it can itself (referrer, search) as a gtm4wp.visitorData event.
+define( 'GTM4WP_OPTION_CACHE_SAFE_DATALAYER', 'cache-safe-datalayer' );
+
 // Removed in 2.0: geo and weather data. Constants kept for third party compatibility.
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEO', 'include-miscgeo' );
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEOAPI', 'geo-apikey' );
@@ -211,6 +216,16 @@ define( 'GTM4WP_WPFILTER_OUTPUT_CONTAINER', 'gtm4wp_output_container' );
  * variable declarations above the first data layer push command.
  */
 define( 'GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY', 'gtm4wp_add_global_vars_array' );
+
+/**
+ * Constant used by the cache-safe data layer (issue #398) to collect the
+ * "visitor-scoped" fields a module wants delivered outside the cacheable page
+ * HTML. Filter callbacks receive an array and append GTM4WP\Modules\VisitorData\VisitorField
+ * objects (each carrying a delivery tier). Phase 1 consumes the Tier 1 (client
+ * knows it) fields to build the gtm4wp.visitorData client push; Phase 2 will
+ * consume Tier 2/3 fields for the session endpoint.
+ */
+define( 'GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS', 'gtm4wp_visitor_scoped_fields' );
 
 /**
  * Constant that can be used to add nonce value to script tags for

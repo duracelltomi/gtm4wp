@@ -99,6 +99,7 @@ final class ModuleConsistencyTest extends TestCase {
 				'container',
 				'page-variables',
 				'client-device-data',
+				'visitor-data',
 				'user-events',
 				'media-events',
 				'consent',
