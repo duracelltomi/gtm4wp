@@ -54,6 +54,25 @@ const visitorEvents = () =>
 		( entry ) => entry.event === 'gtm4wp.visitorData'
 	);
 
+// The runtime attaches a MutationObserver to the shared jsdom document.body for
+// the WooCommerce cart fragment; without cleanup it leaks across isolateModules
+// reloads and fires (throwing on a torn-down document) in later tests (TS-7).
+// Track every observer the tracker creates and disconnect it after each test.
+let trackedObservers = [];
+const RealMutationObserver = window.MutationObserver;
+beforeEach( () => {
+	trackedObservers = [];
+	window.MutationObserver = function ( callback ) {
+		const observer = new RealMutationObserver( callback );
+		trackedObservers.push( observer );
+		return observer;
+	};
+} );
+afterEach( () => {
+	trackedObservers.forEach( ( observer ) => observer.disconnect() );
+	window.MutationObserver = RealMutationObserver;
+} );
+
 describe( 'gtm4wp-visitor-data', () => {
 	beforeEach( () => {
 		window.dataLayer = [];
@@ -459,5 +478,83 @@ describe( 'gtm4wp-visitor-data — WooCommerce cart fragment', () => {
 
 		expect( () => loadTracker() ).not.toThrow();
 		expect( visitorEvents() ).toHaveLength( 0 );
+	} );
+} );
+
+describe( 'gtm4wp-visitor-data — single merged push', () => {
+	beforeEach( () => {
+		resetBrowserState();
+		global.fetch = jest.fn();
+		document.body.innerHTML = '';
+	} );
+
+	/**
+	 * Adds the WooCommerce cart-fragment placeholder with the given block.
+	 *
+	 * @param {Object} block The cart block JSON.
+	 * @return {void}
+	 */
+	function addCartElement( block ) {
+		const el = document.createElement( 'div' );
+		el.className = 'gtm4wp-wc-visitor-data';
+		el.setAttribute( 'data-gtm4wp-visitor-cart', JSON.stringify( block ) );
+		document.body.appendChild( el );
+	}
+
+	it( 'merges Tier 1, the endpoint and the cart into ONE push on the first view', async () => {
+		addCartElement( { cartContent: { items: [] } } );
+		window.history.replaceState( {}, '', '/?s=shoes' );
+
+		window.gtm4wp_visitordata_config = {
+			event: 'gtm4wp.visitorData',
+			fields: { siteSearchTerm: 'searchTerm' },
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'n1',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+		};
+		mockEndpointOnce( { visitorIP: '8.8.8.8' } );
+
+		loadTracker();
+		await flush();
+
+		// The endpoint data appears exactly once — not split from the rest — and
+		// that single push carries all three sources together.
+		const withVisitor = visitorEvents().filter( ( e ) => 'visitorIP' in e );
+		expect( withVisitor ).toHaveLength( 1 );
+		expect( withVisitor[ 0 ] ).toMatchObject( {
+			event: 'gtm4wp.visitorData',
+			siteSearchTerm: 'shoes',
+			visitorIP: '8.8.8.8',
+			cartContent: { items: [] },
+		} );
+	} );
+
+	it( 'replays as ONE synchronous push on a cached view, with no fetch', () => {
+		window.sessionStorage.setItem(
+			'gtm4wp_visitor_session',
+			JSON.stringify( { gates: {}, session: { visitorIP: '8.8.8.8' } } )
+		);
+		addCartElement( { cartContent: { items: [] } } );
+
+		window.gtm4wp_visitordata_config = {
+			event: 'gtm4wp.visitorData',
+			fields: {},
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'n1',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+		};
+
+		// No await: the replay + cart read are synchronous.
+		loadTracker();
+
+		expect( global.fetch ).not.toHaveBeenCalled();
+		const withVisitor = visitorEvents().filter( ( e ) => 'visitorIP' in e );
+		expect( withVisitor ).toHaveLength( 1 );
+		expect( withVisitor[ 0 ] ).toMatchObject( {
+			visitorIP: '8.8.8.8',
+			cartContent: { items: [] },
+		} );
 	} );
 } );

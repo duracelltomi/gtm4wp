@@ -95,9 +95,16 @@ same `gtm4wp.visitorData` runtime, with **no** new per-page request. The
    keeps a hostile customer field from breaking out of the attribute.
 3. **Client runtime** (`gtm4wp-visitor-data.js`) gained the endpoint fetch
    (once-per-session + cookie-gated, with the sessionStorage cache and logout
-   cleanup) and the cart-fragment reader, both pushing under the same field names as
-   before. When Web Storage is unavailable it does **not** fetch (safe default = no
-   extra data, never a per-page request).
+   cleanup) and the cart-fragment reader. All the load-time sources (Tier 1, the
+   endpoint fields, the initial cart) are gathered into **one** `gtm4wp.visitorData`
+   push so a GTM setup sees them arrive together: on a cached view the endpoint
+   replays synchronously and the single push is synchronous; on the first view of a
+   session the one push fires when the endpoint responds. Only a subsequent cart
+   change fires an additional `gtm4wp.visitorData` event (the cart genuinely
+   changed). Because these values are delivered on the event rather than baked into
+   the page-view data layer, GTM tags that read them should trigger on the
+   `gtm4wp.visitorData` Custom Event. When Web Storage is unavailable the runtime
+   does **not** fetch (safe default = no extra data, never a per-page request).
 
 Regression tests: `VisitorDataEndpointTest` (identity gate — logged-out receives no
 user data; hostile header round-trips hex-encoded; no-cache headers),

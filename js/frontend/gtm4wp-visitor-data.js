@@ -16,6 +16,12 @@
  * - WooCommerce customer & cart: read from the cart-fragments payload WooCommerce
  *   already refreshes on every cart change (no request of our own).
  *
+ * All of these load-time sources are gathered into a SINGLE gtm4wp.visitorData
+ * push, so a GTM setup sees them arrive together. On a cached page view the
+ * endpoint replays from the cache and the push is synchronous; on the first view
+ * of a session the one push fires when the endpoint responds. Only a later cart
+ * change fires an additional gtm4wp.visitorData event (the cart really changed).
+ *
  * The PHP side (VisitorDataModule) bakes a small, cache-safe config into the page
  * telling this runtime which keys to build and how (Tier 1 producers, the endpoint
  * URL + nonce, the session/gate metadata). The config carries NO visitor value.
@@ -39,13 +45,35 @@
 	}
 
 	/**
+	 * The single accumulated visitor-data push. Every load-time source merges its
+	 * keys here; it is flushed once, when the (possibly async) endpoint is ready.
+	 */
+	const collected = {};
+
+	/**
+	 * Merges a key => value map into the pending single push.
+	 *
+	 * @param {Object} map The keys to add.
+	 * @return {void}
+	 */
+	function collect( map ) {
+		if ( ! map || 'object' !== typeof map ) {
+			return;
+		}
+
+		Object.keys( map ).forEach( function ( key ) {
+			collected[ key ] = map[ key ];
+		} );
+	}
+
+	/**
 	 * Pushes a gtm4wp.visitorData event carrying the given key => value map, under
 	 * the same variable names the server used. No-op for an empty map.
 	 *
 	 * @param {Object} map The data layer keys to deliver.
 	 * @return {void}
 	 */
-	function pushData( map ) {
+	function pushEvent( map ) {
 		if ( ! map || 'object' !== typeof map ) {
 			return;
 		}
@@ -123,12 +151,11 @@
 	};
 
 	/**
-	 * Tier 1: push the values the browser computes itself, no network.
+	 * Tier 1: gather the values the browser computes itself, no network.
 	 *
 	 * @return {void}
 	 */
-	function deliverClientFields() {
-		const map = {};
+	function collectClientFields() {
 		Object.keys( fields ).forEach( function ( key ) {
 			const producer = producers[ fields[ key ] ];
 			if ( 'function' !== typeof producer ) {
@@ -137,11 +164,9 @@
 
 			const value = producer();
 			if ( '' !== value && undefined !== value && null !== value ) {
-				map[ key ] = value;
+				collected[ key ] = value;
 			}
 		} );
-
-		pushData( map );
 	}
 
 	/**
@@ -165,16 +190,21 @@
 	}
 
 	/**
-	 * Tier 2/3: deliver the server-only fields from the session endpoint, fetching
-	 * only when needed. Tier 2 is fetched once per session (then replayed from the
-	 * sessionStorage cache); each Tier 3 gate is fetched only when its cookie value
-	 * differs from the one we last fetched with — so an unchanged gate (and an
-	 * anonymous visitor, whose gate cookie is absent) triggers no request.
+	 * Tier 2/3: gather the server-only fields from the session endpoint into the
+	 * pending push, fetching only when needed, then call done(). Tier 2 is fetched
+	 * once per session (then replayed from the sessionStorage cache); each Tier 3
+	 * gate is fetched only when its cookie value differs from the one we last
+	 * fetched with — so an unchanged gate (and an anonymous visitor, whose gate
+	 * cookie is absent) triggers no request. done() runs synchronously when no
+	 * fetch is needed, so a cached page view yields one synchronous push.
 	 *
+	 * @param {Function} done Called (sync or async) once the endpoint data, if any,
+	 *                        has been merged into the pending push.
 	 * @return {void}
 	 */
-	function deliverEndpointFields() {
+	function collectEndpointFields( done ) {
 		if ( ! config.endpoint || ! storageAvailable() ) {
+			done();
 			return;
 		}
 
@@ -248,7 +278,8 @@
 					);
 				} catch ( e ) {}
 			}
-			pushData( replay );
+			collect( replay );
+			done();
 			return;
 		}
 
@@ -259,10 +290,7 @@
 			headers[ 'X-WP-Nonce' ] = config.nonce;
 		}
 
-		fetch( config.endpoint, {
-			credentials: 'same-origin',
-			headers,
-		} )
+		fetch( config.endpoint, { credentials: 'same-origin', headers } )
 			.then( function ( response ) {
 				return response && response.ok ? response.json() : null;
 			} )
@@ -281,9 +309,9 @@
 					return;
 				}
 
-				// Cache the Tier 2 subset and each active gate's subset (tagged with the
-				// cookie value it was fetched at) so later page views replay without a
-				// request until the session ends or a gate cookie changes.
+				// Cache the Tier 2 subset and each active gate's subset (tagged with
+				// the cookie value it was fetched at) so later page views replay
+				// without a request until the session ends or a gate cookie changes.
 				const next = { gates: {} };
 				if ( sessionFields.length ) {
 					next.session = {};
@@ -320,65 +348,88 @@
 					);
 				} catch ( e ) {}
 
-				pushData( data );
+				collect( data );
 			} )
 			.catch( function () {
 				// Network error: stay silent; the next page view retries.
-			} );
+			} )
+			.then( done );
 	}
 
 	/**
-	 * WooCommerce customer & cart: read the block WooCommerce carries on its
-	 * cart-fragments response (a data attribute of the placeholder element) and push
-	 * it. Reads once now and again whenever WooCommerce (re)applies the fragment,
-	 * observed via a MutationObserver so a same-page cart change is picked up. The
-	 * value is de-duplicated so an unchanged fragment is not pushed twice.
+	 * The raw customer/cart block currently on the cart-fragments placeholder, or
+	 * null when there is none.
 	 *
-	 * @return {void}
+	 * @return {?string} The raw data attribute value, or null.
 	 */
-	function deliverWooCartFragment() {
-		let lastRaw = null;
-
-		function read() {
-			const element = document.querySelector( '.gtm4wp-wc-visitor-data' );
-			if ( ! element ) {
-				return;
-			}
-
-			const raw = element.getAttribute( 'data-gtm4wp-visitor-cart' );
-			if ( ! raw || raw === lastRaw ) {
-				return;
-			}
-			lastRaw = raw;
-
-			let data;
-			try {
-				data = JSON.parse( raw );
-			} catch ( e ) {
-				return;
-			}
-
-			pushData( data );
+	function currentWooRaw() {
+		const element = document.querySelector( '.gtm4wp-wc-visitor-data' );
+		if ( ! element ) {
+			return null;
 		}
+		return element.getAttribute( 'data-gtm4wp-visitor-cart' ) || null;
+	}
 
-		read();
-
-		// Only watch for fragment refreshes when the placeholder is actually on the
-		// page (WooCommerce is delivering the block), so nothing is observed on the
-		// pages that loaded this runtime for the endpoint fields alone.
-		if (
-			window.MutationObserver &&
-			document.body &&
-			document.querySelector( '.gtm4wp-wc-visitor-data' )
-		) {
-			new window.MutationObserver( read ).observe( document.body, {
-				childList: true,
-				subtree: true,
-			} );
+	/**
+	 * Parses a cart-fragment JSON string, or null when it is empty/invalid.
+	 *
+	 * @param {?string} raw The raw JSON string.
+	 * @return {?Object} The parsed cart block, or null.
+	 */
+	function parseWoo( raw ) {
+		if ( ! raw ) {
+			return null;
+		}
+		try {
+			return JSON.parse( raw );
+		} catch ( e ) {
+			return null;
 		}
 	}
 
-	deliverClientFields();
-	deliverEndpointFields();
-	deliverWooCartFragment();
+	// The last cart block we pushed, so an unchanged fragment is not pushed twice.
+	let lastWooRaw = null;
+
+	/**
+	 * Watches for WooCommerce re-applying/refreshing the cart fragment after the
+	 * initial push (a same-page cart change), pushing the updated cart block as its
+	 * own gtm4wp.visitorData event. Only wired on pages that carry the placeholder.
+	 *
+	 * @return {void}
+	 */
+	function observeWooChanges() {
+		if (
+			! window.MutationObserver ||
+			! document.body ||
+			! document.querySelector( '.gtm4wp-wc-visitor-data' )
+		) {
+			return;
+		}
+
+		new window.MutationObserver( function () {
+			const raw = currentWooRaw();
+			if ( ! raw || raw === lastWooRaw ) {
+				return;
+			}
+			lastWooRaw = raw;
+			pushEvent( parseWoo( raw ) );
+		} ).observe( document.body, { childList: true, subtree: true } );
+	}
+
+	// Gather the synchronous Tier 1 fields, then let the endpoint (sync replay or a
+	// single gated fetch) complete the pending push. When it is ready, fold in the
+	// WooCommerce cart the fragment has applied by then and flush everything as one
+	// gtm4wp.visitorData event; from then on only real cart changes push again.
+	collectClientFields();
+
+	collectEndpointFields( function () {
+		const raw = currentWooRaw();
+		if ( raw ) {
+			lastWooRaw = raw;
+			collect( parseWoo( raw ) );
+		}
+
+		pushEvent( collected );
+		observeWooChanges();
+	} );
 } )();
