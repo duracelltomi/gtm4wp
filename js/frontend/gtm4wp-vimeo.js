@@ -3,29 +3,20 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_vimeo_percentage_tracking = 10;
 const gtm4wp_vimeo_percentage_tracking_marks = {};
 
 function gtm4wp_initVimeoTracking() {
-	// The Vimeo Player SDK (player.vimeo.com/api/player.js) is enqueued as a
-	// dependency of this tracker, but it can still be missing at runtime if a
-	// consent manager, an ad blocker or a network error stopped it from
-	// loading. Without it there is nothing to hook into, so bail out
-	// gracefully instead of throwing on `new Vimeo.Player()`.
-	if ( typeof Vimeo === 'undefined' || typeof Vimeo.Player === 'undefined' ) {
-		return;
-	}
-
-	const gtm4wp_vimeo_frames = document.querySelectorAll(
-		'iframe[src*="vimeo.com"]'
-	);
-	if ( ! gtm4wp_vimeo_frames || gtm4wp_vimeo_frames.length == 0 ) {
-		return;
-	}
-
-	gtm4wp_vimeo_frames.forEach( function ( vimeo_frame ) {
+	// Wire every Vimeo iframe already on the page and any inserted later
+	// (popup/lightbox, AJAX). The Vimeo Player SDK (player.vimeo.com/api/player.js)
+	// is enqueued as a dependency but can still be missing at runtime (consent
+	// manager, ad blocker, network error), so it is re-checked per element: a
+	// frame is only wired once the SDK is available, otherwise it is left for a
+	// later insertion to pick up.
+	const gtm4wp_wireVimeoFrame = function ( vimeo_frame ) {
 		const vimeoapi = new Vimeo.Player( vimeo_frame );
 		const videourl = vimeo_frame.getAttribute( 'src' ).split( '?' ).shift();
 		const videoid = videourl.split( '/' ).pop();
@@ -347,7 +338,18 @@ function gtm4wp_initVimeoTracking() {
 				}
 			);
 		};
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="vimeo.com"]',
+		gtm4wp_wireVimeoFrame,
+		function () {
+			return (
+				typeof Vimeo !== 'undefined' &&
+				typeof Vimeo.Player !== 'undefined'
+			);
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initVimeoTracking );

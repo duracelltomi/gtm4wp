@@ -3,6 +3,7 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_videopress_percentage_tracking = 10;
@@ -38,15 +39,9 @@ function gtm4wp_isVideoPressOrigin( origin ) {
 
 function gtm4wp_initVideoPressTracking() {
 	// No SDK is enqueued: VideoPress players emit their state to the parent
-	// window via postMessage. If there is no VideoPress embed on the page there
-	// is nothing to track, so the message listener is not attached at all.
-	const gtm4wp_videopress_frames = document.querySelectorAll(
-		'iframe[src*="videopress.com"],iframe[src*="video.wordpress.com"]'
-	);
-	if ( ! gtm4wp_videopress_frames || gtm4wp_videopress_frames.length == 0 ) {
-		return;
-	}
-
+	// window via postMessage, so a single window 'message' listener serves every
+	// embed. It is attached only once a VideoPress embed is present (see the
+	// gtm4wpObserveMedia call below), so pages without one pay nothing.
 	const gtm4wp_videoPressMediaData = function ( guid, duration ) {
 		return {
 			id: guid,
@@ -220,17 +215,25 @@ function gtm4wp_initVideoPressTracking() {
 		}
 	};
 
-	// Attaching once is important: the tracker can be enqueued more than once
-	// (e.g. re-injected by a tag manager), so a previously bound handler is
-	// removed before binding the current one.
-	if ( window.gtm4wp_videopress_handler ) {
-		window.removeEventListener(
-			'message',
-			window.gtm4wp_videopress_handler
-		);
-	}
-	window.gtm4wp_videopress_handler = gtm4wp_onVideoPressMessage;
-	window.addEventListener( 'message', gtm4wp_onVideoPressMessage );
+	// Attach the window 'message' listener as soon as a VideoPress embed is
+	// present — at init or inserted later (popup/AJAX). Attaching is idempotent:
+	// the tracker can be enqueued more than once (a tag manager re-injects it),
+	// so a previously bound handler is removed before binding the current one.
+	const gtm4wp_attachVideoPressListener = function () {
+		if ( window.gtm4wp_videopress_handler ) {
+			window.removeEventListener(
+				'message',
+				window.gtm4wp_videopress_handler
+			);
+		}
+		window.gtm4wp_videopress_handler = gtm4wp_onVideoPressMessage;
+		window.addEventListener( 'message', gtm4wp_onVideoPressMessage );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="videopress.com"],iframe[src*="video.wordpress.com"]',
+		gtm4wp_attachVideoPressListener
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initVideoPressTracking );

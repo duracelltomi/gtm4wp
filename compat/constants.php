@@ -104,6 +104,7 @@ define( 'GTM4WP_OPTION_EVENTS_JWPLAYER', 'event-jwplayer' );
 define( 'GTM4WP_OPTION_EVENTS_VIDEOPRESS', 'event-videopress' );
 define( 'GTM4WP_OPTION_EVENTS_SPOTIFY', 'event-spotify' );
 define( 'GTM4WP_OPTION_EVENTS_TWITCH', 'event-twitch' );
+define( 'GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC', 'event-media-dynamic' );
 
 // Scroll tracking was removed in 2.0 (GTM has built-in scroll depth
 // tracking); the option keys are kept here for third party compatibility and

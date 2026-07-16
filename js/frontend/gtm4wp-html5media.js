@@ -3,25 +3,18 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_html5media_percentage_tracking = 10;
 const gtm4wp_html5media_percentage_tracking_marks = {};
 
 function gtm4wp_initHTML5MediaTracking() {
-	// Native <video>/<audio> players. Provider embeds (YouTube, Vimeo,
-	// SoundCloud) are iframes, not media elements, so there is nothing to
-	// exclude here — they are tracked by their own dedicated trackers.
-	const gtm4wp_html5_media_elements =
-		document.querySelectorAll( 'video, audio' );
-	if (
-		! gtm4wp_html5_media_elements ||
-		gtm4wp_html5_media_elements.length == 0
-	) {
-		return;
-	}
-
-	gtm4wp_html5_media_elements.forEach( function ( media_element ) {
+	// Native <video>/<audio> players. Wire those already present and any inserted
+	// later (popup/lightbox, AJAX). Provider embeds (YouTube, Vimeo, SoundCloud)
+	// are iframes, not media elements, so there is nothing to exclude here — they
+	// are tracked by their own dedicated trackers.
+	const gtm4wp_wireHTML5MediaElement = function ( media_element ) {
 		// The filename is the only stable identifier a local media file
 		// exposes, so it stands in for both the id and the title. It is read
 		// from the live currentSrc on every push because a source can still be
@@ -266,7 +259,9 @@ function gtm4wp_initHTML5MediaTracking() {
 				}
 			);
 		} );
-	} ); // end each media element
+	}; // end wire media element
+
+	gtm4wpObserveMedia( 'video, audio', gtm4wp_wireHTML5MediaElement );
 }
 
 gtm4wpOnReady( gtm4wp_initHTML5MediaTracking );

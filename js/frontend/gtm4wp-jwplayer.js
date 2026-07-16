@@ -3,36 +3,23 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_jwplayer_percentage_tracking = 10;
 const gtm4wp_jwplayer_percentage_tracking_marks = {};
 
 function gtm4wp_initJWPlayerTracking() {
-	// No SDK is enqueued for JW Player: the site loads its own JW library, so
-	// this tracker only hooks the existing global `jwplayer`. If it is missing
-	// (no JW Player on the page, or the library was blocked) there is nothing to
-	// hook into, so bail out gracefully instead of throwing on `jwplayer()`.
-	if ( typeof jwplayer === 'undefined' ) {
-		return;
-	}
-
-	// JW Player upgrades its container element with the `jwplayer`/`jw-player`
-	// class during setup; each such element carries the id used to fetch the
-	// player instance.
-	const gtm4wp_jwplayer_containers = document.querySelectorAll(
-		'.jwplayer,.jw-player'
-	);
-	if (
-		! gtm4wp_jwplayer_containers ||
-		gtm4wp_jwplayer_containers.length == 0
-	) {
-		return;
-	}
-
+	// No SDK is enqueued for JW Player: the site loads its own JW library, so this
+	// tracker only hooks the existing global `jwplayer`, re-checked per element
+	// (see gtm4wpObserveMedia) so a container inserted later (popup/AJAX) is still
+	// wired once the library is present. JW Player upgrades its container element
+	// with the `jwplayer`/`jw-player` class during setup; each such element
+	// carries the id used to fetch the player instance. `seen` guards against two
+	// containers sharing one id (the data-attribute marker guards the element).
 	const gtm4wp_jwplayer_seen = {};
 
-	gtm4wp_jwplayer_containers.forEach( function ( container ) {
+	const gtm4wp_wireJWPlayerContainer = function ( container ) {
 		const id = container.getAttribute( 'id' );
 		if ( ! id || gtm4wp_jwplayer_seen[ id ] ) {
 			return;
@@ -184,7 +171,15 @@ function gtm4wp_initJWPlayerTracking() {
 		player.on( 'error', function ( e ) {
 			gtm4wp_onJWPlayerEvent( 'error', e && e.message );
 		} );
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'.jwplayer,.jw-player',
+		gtm4wp_wireJWPlayerContainer,
+		function () {
+			return typeof jwplayer !== 'undefined';
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initJWPlayerTracking );

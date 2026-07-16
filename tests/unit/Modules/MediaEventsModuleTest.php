@@ -31,6 +31,14 @@ final class MediaEventsModuleTest extends TestCase {
 	private array $enqueued = array();
 
 	/**
+	 * Inline scripts captured from wp_add_inline_script(): each entry is
+	 * array( handle, code, position ).
+	 *
+	 * @var array<int, array{0:string,1:string,2:string}>
+	 */
+	private array $inline_scripts = array();
+
+	/**
 	 * Snapshot of $GLOBALS['post'] so a test that sets it cannot leak (TS-7).
 	 *
 	 * @var mixed
@@ -40,13 +48,20 @@ final class MediaEventsModuleTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->enqueued    = array();
-		$this->post_backup = $GLOBALS['post'] ?? null;
+		$this->enqueued       = array();
+		$this->inline_scripts = array();
+		$this->post_backup    = $GLOBALS['post'] ?? null;
 
 		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path );
 		Functions\when( 'wp_enqueue_script' )->alias(
 			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) {
 				$this->enqueued[] = $handle;
+				return true;
+			}
+		);
+		Functions\when( 'wp_add_inline_script' )->alias(
+			function ( $handle, $code, $position = 'after' ) {
+				$this->inline_scripts[] = array( $handle, $code, $position );
 				return true;
 			}
 		);
@@ -184,6 +199,55 @@ final class MediaEventsModuleTest extends TestCase {
 		$module->enqueue_scripts();
 
 		$this->assertSame( array(), $this->enqueued );
+	}
+
+	/**
+	 * Filters the captured inline scripts down to the ones that publish the
+	 * runtime-observer opt-in flag.
+	 *
+	 * @return array<int, array{0:string,1:string,2:string}>
+	 */
+	private function flag_inline_scripts(): array {
+		return array_values(
+			array_filter(
+				$this->inline_scripts,
+				static fn ( $script ) => false !== strpos( $script[1], 'gtm4wp_media_observe_dynamic' )
+			)
+		);
+	}
+
+	public function test_dynamic_observer_flag_published_once_when_option_enabled(): void {
+		// Two trackers enabled plus the opt-in: the flag must be published exactly
+		// once (on the first tracker), not once per bundle.
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_VIMEO         => true,
+				GTM4WP_OPTION_EVENTS_HTML5MEDIA    => true,
+				GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC => true,
+			)
+		);
+		$module->enqueue_scripts();
+
+		$flag_scripts = $this->flag_inline_scripts();
+		$this->assertCount( 1, $flag_scripts );
+
+		[ $handle, $code, $position ] = $flag_scripts[0];
+		$this->assertSame( 'window.gtm4wp_media_observe_dynamic = true;', $code );
+		// Printed before the tracker bundle so the flag is set when it runs.
+		$this->assertSame( 'before', $position );
+		// Attached to a media tracker handle that was actually enqueued.
+		$this->assertContains( $handle, $this->enqueued );
+	}
+
+	public function test_dynamic_observer_flag_not_published_when_option_disabled(): void {
+		// A tracker is enabled but the opt-in is off: the tracker still loads, yet
+		// no observer flag is published, so the shared MutationObserver is never
+		// created on the page.
+		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_VIMEO => true ) );
+		$module->enqueue_scripts();
+
+		$this->assertContains( 'gtm4wp-vimeo', $this->enqueued );
+		$this->assertCount( 0, $this->flag_inline_scripts() );
 	}
 
 	public function test_enable_youtube_js_api_adds_jsapi_params_to_a_youtube_embed(): void {

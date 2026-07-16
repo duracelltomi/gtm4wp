@@ -55,6 +55,18 @@ describe( 'gtm4wp-vimeo', () => {
 			'<iframe src="https://player.vimeo.com/video/987654321?h=abc"></iframe>';
 	} );
 
+	afterEach( () => {
+		// The runtime-insertion tests below opt into the shared MutationObserver,
+		// which lives on the (jsdom) document across tests; disconnect and reset it
+		// so it never leaks into another test. A no-op for the default tests.
+		if ( window.gtm4wp_media_observer ) {
+			window.gtm4wp_media_observer.disconnect();
+		}
+		delete window.gtm4wp_media_observer;
+		delete window.gtm4wp_media_scanners;
+		delete window.gtm4wp_media_observe_dynamic;
+	} );
+
 	const lastPush = () => window.dataLayer[ window.dataLayer.length - 1 ];
 
 	/**
@@ -214,5 +226,63 @@ describe( 'gtm4wp-vimeo', () => {
 		} ).not.toThrow();
 
 		expect( window.dataLayer ).toHaveLength( 0 );
+	} );
+
+	it( 'wires a Vimeo iframe inserted after load when runtime tracking is enabled', async () => {
+		// Opt in to runtime tracking, then load the tracker with NO Vimeo iframe
+		// present so nothing is wired at init.
+		window.gtm4wp_media_observe_dynamic = true;
+		const constructed = [];
+		const PlayerConstructor = function ( frame ) {
+			constructed.push( frame );
+			return new FakeVimeoPlayer();
+		};
+		global.Vimeo = { Player: PlayerConstructor };
+		document.body.innerHTML = '';
+		jest.isolateModules( () => {
+			require( '../gtm4wp-vimeo' );
+		} );
+		await flushPromises();
+		expect( constructed ).toHaveLength( 0 );
+
+		// A popup/AJAX inserts a Vimeo embed after load: the shared observer must
+		// wire it exactly as if it had been present at init.
+		const wrapper = document.createElement( 'div' );
+		wrapper.innerHTML =
+			'<iframe src="https://player.vimeo.com/video/111?h=z"></iframe>';
+		document.body.appendChild( wrapper );
+		await flushPromises();
+
+		expect( constructed ).toHaveLength( 1 );
+		expect( lastPush() ).toMatchObject( {
+			event: 'gtm4wp.mediaPlayerReady',
+			mediaType: 'vimeo',
+			mediaData: { id: '111' },
+		} );
+	} );
+
+	it( 'does not wire a Vimeo iframe inserted after load when runtime tracking is off', async () => {
+		// Opt-in NOT set: the tracker wires only what is present at load, so a
+		// later insertion is ignored (the pre-issue-#3 behavior).
+		const constructed = [];
+		const PlayerConstructor = function ( frame ) {
+			constructed.push( frame );
+			return new FakeVimeoPlayer();
+		};
+		global.Vimeo = { Player: PlayerConstructor };
+		document.body.innerHTML = '';
+		jest.isolateModules( () => {
+			require( '../gtm4wp-vimeo' );
+		} );
+		await flushPromises();
+
+		const wrapper = document.createElement( 'div' );
+		wrapper.innerHTML =
+			'<iframe src="https://player.vimeo.com/video/222?h=z"></iframe>';
+		document.body.appendChild( wrapper );
+		await flushPromises();
+
+		expect( constructed ).toHaveLength( 0 );
+		expect( window.gtm4wp_media_observer ).toBeUndefined();
 	} );
 } );

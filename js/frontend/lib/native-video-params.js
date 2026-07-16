@@ -144,3 +144,103 @@ export function gtm4wpOnReady( callback ) {
 		callback();
 	}
 }
+
+/**
+ * Wires every element matching `selector` and, when the site has opted in to
+ * runtime tracking, keeps wiring ones inserted later (popup/lightbox, AJAX) so a
+ * media player added after page load is tracked exactly like one present at init.
+ *
+ * The players already in the DOM are always wired. Watching for later insertions
+ * is opt-in via `window.gtm4wp_media_observe_dynamic` (set by the media module
+ * from the "track dynamically inserted players" setting), because a body-wide
+ * MutationObserver has a per-mutation cost that only pays off on sites that
+ * inject players after load. When enabled, ALL providers share ONE observer:
+ * each tracker registers a (selector, wire) scanner, so enabling N providers
+ * does not create N observers on the document. The shared callback inspects only
+ * the nodes each mutation adds (never the whole document).
+ *
+ * Each wired element is marked with a data attribute so a re-report — or a node
+ * moved elsewhere in the DOM — never binds it twice. The marker doubles as the
+ * guard against a provider SDK that injects its own matching iframe into a
+ * container the tracker created (the Twitch embed): mark that container and its
+ * descendants are skipped.
+ *
+ * @param {string}   selector    CSS selector identifying the provider embed.
+ * @param {Function} wireElement Called once with each matching element to wire
+ *                               it (the same wiring the tracker runs at init).
+ * @param {Function} [isReady]   Optional predicate; when it returns a falsy value
+ *                               the element is left unwired AND unmarked (e.g.
+ *                               the player SDK has not loaded), so a later
+ *                               insertion can still wire it once the SDK exists.
+ * @return {MutationObserver|null} The shared observer, or null when runtime
+ *                                 tracking is not enabled.
+ */
+export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
+	const wireOnce = function ( element ) {
+		// Skip when this element — or an ancestor the tracker already marked
+		// (e.g. the Twitch container whose SDK-injected iframe also matches the
+		// selector) — has been wired.
+		if ( element.closest( '[data-gtm4wp-media-wired]' ) ) {
+			return;
+		}
+		// SDK not ready: leave the element unmarked so a later insertion (once
+		// the SDK has loaded) can still wire it.
+		if ( typeof isReady === 'function' && ! isReady() ) {
+			return;
+		}
+		element.setAttribute( 'data-gtm4wp-media-wired', '1' );
+		wireElement( element );
+	};
+
+	// Wire everything already present (this happens regardless of the opt-in).
+	document.querySelectorAll( selector ).forEach( wireOnce );
+
+	// Runtime tracking of later-inserted players is opt-in.
+	if ( ! window.gtm4wp_media_observe_dynamic ) {
+		return null;
+	}
+
+	// Register this provider's scanner on the single shared observer. A
+	// re-executed bundle (tag manager re-injection) replaces its own scanner
+	// rather than stacking a duplicate — the double-init guard, mirroring the
+	// VideoPress/Wistia/Spotify trackers.
+	window.gtm4wp_media_scanners = (
+		window.gtm4wp_media_scanners || []
+	).filter( function ( scanner ) {
+		return scanner.selector !== selector;
+	} );
+	window.gtm4wp_media_scanners.push( { selector, wireOnce } );
+
+	if ( ! window.gtm4wp_media_observer ) {
+		window.gtm4wp_media_observer = new MutationObserver( function (
+			mutations
+		) {
+			mutations.forEach( function ( mutation ) {
+				mutation.addedNodes.forEach( function ( node ) {
+					// Only element nodes can match or contain a selector.
+					if ( node.nodeType !== 1 ) {
+						return;
+					}
+					window.gtm4wp_media_scanners.forEach( function ( scanner ) {
+						if ( node.matches( scanner.selector ) ) {
+							scanner.wireOnce( node );
+						}
+						// The added node may be a wrapper (a lightbox/popup
+						// container) holding the embed; querySelectorAll scans
+						// only that added subtree, never the whole document.
+						node.querySelectorAll( scanner.selector ).forEach(
+							scanner.wireOnce
+						);
+					} );
+				} );
+			} );
+		} );
+
+		window.gtm4wp_media_observer.observe(
+			document.body || document.documentElement,
+			{ childList: true, subtree: true }
+		);
+	}
+
+	return window.gtm4wp_media_observer;
+}

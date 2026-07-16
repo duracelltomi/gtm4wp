@@ -3,32 +3,20 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_mixcloud_percentage_tracking = 10;
 const gtm4wp_mixcloud_percentage_tracking_marks = {};
 
 function gtm4wp_initMixcloudTracking() {
-	// The Mixcloud Widget API (widget.mixcloud.com/media/js/widgetApi.js) is
-	// enqueued as a dependency of this tracker, but it can still be missing at
-	// runtime if a consent manager, an ad blocker or a network error stopped it
-	// from loading. Without it there is nothing to hook into, so bail out
-	// gracefully instead of throwing on `Mixcloud.PlayerWidget()`.
-	if (
-		typeof Mixcloud === 'undefined' ||
-		typeof Mixcloud.PlayerWidget === 'undefined'
-	) {
-		return;
-	}
-
-	const gtm4wp_mixcloud_frames = document.querySelectorAll(
-		'iframe[src*="mixcloud.com"]'
-	);
-	if ( ! gtm4wp_mixcloud_frames || gtm4wp_mixcloud_frames.length == 0 ) {
-		return;
-	}
-
-	gtm4wp_mixcloud_frames.forEach( function ( mixcloud_frame ) {
+	// Wire every Mixcloud iframe already on the page and any inserted later
+	// (popup/lightbox, AJAX). The Mixcloud Widget API
+	// (widget.mixcloud.com/media/js/widgetApi.js) is enqueued as a dependency but
+	// can still be missing at runtime (consent manager, ad blocker, network
+	// error), so it is re-checked per element: a frame is only wired once the SDK
+	// is available.
+	const gtm4wp_wireMixcloudFrame = function ( mixcloud_frame ) {
 		const widget = Mixcloud.PlayerWidget( mixcloud_frame );
 
 		// The Mixcloud widget exposes no getCurrentSound-style metadata getter,
@@ -169,7 +157,18 @@ function gtm4wp_initMixcloudTracking() {
 				gtm4wp_onMixcloudPlayerEvent( 'error' );
 			} );
 		} );
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="mixcloud.com"]',
+		gtm4wp_wireMixcloudFrame,
+		function () {
+			return (
+				typeof Mixcloud !== 'undefined' &&
+				typeof Mixcloud.PlayerWidget !== 'undefined'
+			);
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initMixcloudTracking );

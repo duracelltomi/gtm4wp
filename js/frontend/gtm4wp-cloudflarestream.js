@@ -3,32 +3,20 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_cloudflarestream_percentage_tracking = 10;
 const gtm4wp_cloudflarestream_percentage_tracking_marks = {};
 
 function gtm4wp_initCloudflareStreamTracking() {
-	// The Cloudflare Stream Player SDK (embed.cloudflarestream.com/embed/sdk.latest.js)
-	// is enqueued as a dependency of this tracker, but it can still be missing at
-	// runtime if a consent manager, an ad blocker or a network error stopped it
-	// from loading. Without it there is nothing to hook into, so bail out
-	// gracefully instead of throwing on `Stream()`.
-	if ( typeof Stream === 'undefined' ) {
-		return;
-	}
-
-	const gtm4wp_cloudflarestream_frames = document.querySelectorAll(
-		'iframe[src*="cloudflarestream.com"],iframe[src*="videodelivery.net"]'
-	);
-	if (
-		! gtm4wp_cloudflarestream_frames ||
-		gtm4wp_cloudflarestream_frames.length == 0
-	) {
-		return;
-	}
-
-	gtm4wp_cloudflarestream_frames.forEach( function ( stream_frame ) {
+	// Wire every Cloudflare Stream iframe already on the page and any inserted
+	// later (popup/lightbox, AJAX). The Stream Player SDK
+	// (embed.cloudflarestream.com/embed/sdk.latest.js) is enqueued as a
+	// dependency but can still be missing at runtime (consent manager, ad
+	// blocker, network error), so it is re-checked per element: a frame is only
+	// wired once the SDK is available.
+	const gtm4wp_wireStreamFrame = function ( stream_frame ) {
 		const videourl = stream_frame
 			.getAttribute( 'src' )
 			.split( '?' )
@@ -175,7 +163,15 @@ function gtm4wp_initCloudflareStreamTracking() {
 		player.addEventListener( 'error', function () {
 			gtm4wp_onStreamPlayerEvent( 'error', player.error );
 		} );
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="cloudflarestream.com"],iframe[src*="videodelivery.net"]',
+		gtm4wp_wireStreamFrame,
+		function () {
+			return typeof Stream !== 'undefined';
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initCloudflareStreamTracking );

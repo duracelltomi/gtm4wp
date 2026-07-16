@@ -26,6 +26,16 @@ defined( 'ABSPATH' ) || exit;
 final class MediaEventsModule extends AbstractModule {
 
 	/**
+	 * Whether the runtime-observer opt-in flag has been published to the page.
+	 *
+	 * Published at most once per request (on the first media tracker enqueued),
+	 * so every tracker's shared helper reads a single boolean.
+	 *
+	 * @var bool
+	 */
+	private bool $dynamic_flag_published = false;
+
+	/**
 	 * Module id.
 	 *
 	 * @return string
@@ -53,6 +63,7 @@ final class MediaEventsModule extends AbstractModule {
 			GTM4WP_OPTION_EVENTS_VIDEOPRESS       => false,
 			GTM4WP_OPTION_EVENTS_SPOTIFY          => false,
 			GTM4WP_OPTION_EVENTS_TWITCH           => false,
+			GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC    => false,
 		);
 	}
 
@@ -100,6 +111,31 @@ final class MediaEventsModule extends AbstractModule {
 	}
 
 	/**
+	 * Enqueues a built media tracker script and, on the first call, publishes the
+	 * runtime-observer opt-in flag.
+	 *
+	 * The flag is a single boolean read by js/frontend/lib/native-video-params.js
+	 * (gtm4wpObserveMedia): when true, every enabled tracker also watches
+	 * document.body for players inserted after page load (popups/AJAX). It is off
+	 * unless the site enabled GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC, so the shared
+	 * MutationObserver is never created on sites that do not need it.
+	 *
+	 * @param string $handle    Script handle.
+	 * @param string $file      File name inside the build directory.
+	 * @param array  $deps      Script dependencies.
+	 * @param bool   $in_footer Whether to print the script in the footer.
+	 * @return void
+	 */
+	private function enqueue_media_tracker( string $handle, string $file, array $deps, bool $in_footer ): void {
+		$this->enqueue_script( $handle, $file, $deps, $in_footer );
+
+		if ( ! $this->dynamic_flag_published && $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
+			wp_add_inline_script( $handle, 'window.gtm4wp_media_observe_dynamic = true;', 'before' );
+			$this->dynamic_flag_published = true;
+		}
+	}
+
+	/**
 	 * Loads the media tracking scripts based on the enabled options.
 	 *
 	 * @return void
@@ -125,7 +161,7 @@ final class MediaEventsModule extends AbstractModule {
 				);
 
 				if ( $has_youtube_embed ) {
-					$this->enqueue_script( 'gtm4wp-youtube', 'gtm4wp-youtube.js', array(), $in_footer );
+					$this->enqueue_media_tracker( 'gtm4wp-youtube', 'gtm4wp-youtube.js', array(), $in_footer );
 				}
 			}
 		}
@@ -136,14 +172,14 @@ final class MediaEventsModule extends AbstractModule {
 			wp_enqueue_script( 'gtm4wp-vimeo-api', 'https://player.vimeo.com/api/player.js', array(), '1.0', $in_footer );
 			// Depend on the Vimeo Player SDK handle so WordPress always prints
 			// it before the tracker, guaranteeing the `Vimeo` global exists.
-			$this->enqueue_script( 'gtm4wp-vimeo', 'gtm4wp-vimeo.js', array( 'gtm4wp-vimeo-api' ), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-vimeo', 'gtm4wp-vimeo.js', array( 'gtm4wp-vimeo-api' ), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_SOUNDCLOUD ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_soundcloud', true );
 
 			wp_enqueue_script( 'gtm4wp-soundcloud-api', 'https://w.soundcloud.com/player/api.js', array(), '1.0', $in_footer );
-			$this->enqueue_script( 'gtm4wp-soundcloud', 'gtm4wp-soundcloud.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-soundcloud', 'gtm4wp-soundcloud.js', array(), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_HTML5MEDIA ) ) {
@@ -151,7 +187,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Vanilla tracker: it binds to <video>/<audio> elements with the
 			// native addEventListener API and needs no external dependency.
-			$this->enqueue_script( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_DAILYMOTION ) ) {
@@ -160,7 +196,7 @@ final class MediaEventsModule extends AbstractModule {
 			// Dailymotion JS SDK: exposes the `DM` global used to wrap each
 			// dailymotion.com/dai.ly iframe embedded via WordPress oEmbed.
 			wp_enqueue_script( 'gtm4wp-dailymotion-api', 'https://api.dmcdn.net/all.js', array(), '1.0', $in_footer );
-			$this->enqueue_script( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', array( 'gtm4wp-dailymotion-api' ), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', array( 'gtm4wp-dailymotion-api' ), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_MIXCLOUD ) ) {
@@ -169,7 +205,7 @@ final class MediaEventsModule extends AbstractModule {
 			// Mixcloud Widget API: exposes the `Mixcloud` global used to build a
 			// PlayerWidget for each mixcloud.com iframe (audio, like SoundCloud).
 			wp_enqueue_script( 'gtm4wp-mixcloud-api', 'https://widget.mixcloud.com/media/js/widgetApi.js', array(), '1.0', $in_footer );
-			$this->enqueue_script( 'gtm4wp-mixcloud', 'gtm4wp-mixcloud.js', array( 'gtm4wp-mixcloud-api' ), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-mixcloud', 'gtm4wp-mixcloud.js', array( 'gtm4wp-mixcloud-api' ), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM ) ) {
@@ -178,7 +214,7 @@ final class MediaEventsModule extends AbstractModule {
 			// Cloudflare Stream Player SDK: exposes the `Stream` global used to
 			// wrap each cloudflarestream.com/videodelivery.net iframe.
 			wp_enqueue_script( 'gtm4wp-cloudflarestream-api', 'https://embed.cloudflarestream.com/embed/sdk.latest.js', array(), '1.0', $in_footer );
-			$this->enqueue_script( 'gtm4wp-cloudflarestream', 'gtm4wp-cloudflarestream.js', array( 'gtm4wp-cloudflarestream-api' ), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-cloudflarestream', 'gtm4wp-cloudflarestream.js', array( 'gtm4wp-cloudflarestream-api' ), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_WISTIA ) ) {
@@ -187,7 +223,7 @@ final class MediaEventsModule extends AbstractModule {
 			// No SDK is enqueued: Wistia's embed loads its own player runtime and
 			// the tracker binds through the global `window._wq` ready queue, so it
 			// works whether the embed script is already present or loads later.
-			$this->enqueue_script( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_JWPLAYER ) ) {
@@ -195,7 +231,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// No SDK is enqueued: the site already loads its own JW Player
 			// library; the tracker only hooks the existing `jwplayer` global.
-			$this->enqueue_script( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', array(), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_VIDEOPRESS ) ) {
@@ -203,7 +239,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// No SDK is enqueued: VideoPress uses a postMessage API, so the
 			// tracker listens for messages from the player iframes directly.
-			$this->enqueue_script( 'gtm4wp-videopress', 'gtm4wp-videopress.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-videopress', 'gtm4wp-videopress.js', array(), $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_SPOTIFY ) ) {
@@ -214,7 +250,7 @@ final class MediaEventsModule extends AbstractModule {
 			// embed. The tracker defines that callback, so it must run before the
 			// SDK: the SDK depends on the tracker handle and is loaded with the
 			// same defer strategy so both execute in dependency order.
-			$this->enqueue_script( 'gtm4wp-spotify', 'gtm4wp-spotify.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-spotify', 'gtm4wp-spotify.js', array(), $in_footer );
 			wp_enqueue_script(
 				'gtm4wp-spotify-api',
 				'https://open.spotify.com/embed/iframe-api/v1',
@@ -234,7 +270,7 @@ final class MediaEventsModule extends AbstractModule {
 			// each Twitch embed container into a Twitch.Embed so it can subscribe
 			// to player events (a plain iframe cannot be wrapped after the fact).
 			wp_enqueue_script( 'gtm4wp-twitch-api', 'https://embed.twitch.tv/embed/v1.js', array(), '1.0', $in_footer );
-			$this->enqueue_script( 'gtm4wp-twitch', 'gtm4wp-twitch.js', array( 'gtm4wp-twitch-api' ), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-twitch', 'gtm4wp-twitch.js', array( 'gtm4wp-twitch-api' ), $in_footer );
 		}
 	}
 }

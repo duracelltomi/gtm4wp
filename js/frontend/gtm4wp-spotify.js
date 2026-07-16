@@ -2,6 +2,7 @@ import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_spotify_percentage_tracking = 10;
@@ -174,19 +175,24 @@ function gtm4wp_initSpotifyTracking() {
 			previous( IFrameAPI );
 		}
 
-		const gtm4wp_spotify_frames = document.querySelectorAll(
-			'iframe[src*="open.spotify.com/embed"]'
+		// Wire the Spotify embeds present now and any inserted later
+		// (popup/AJAX). The IFrameAPI handed to this callback is captured in the
+		// wiring closure so late-inserted embeds get their own controller.
+		gtm4wpObserveMedia(
+			'iframe[src*="open.spotify.com/embed"]',
+			function ( spotify_frame ) {
+				IFrameAPI.createController(
+					spotify_frame,
+					{ uri: gtm4wp_spotifyUriFromSrc( spotify_frame ) },
+					function ( controller ) {
+						gtm4wp_bindSpotifyController(
+							controller,
+							spotify_frame
+						);
+					}
+				);
+			}
 		);
-
-		gtm4wp_spotify_frames.forEach( function ( spotify_frame ) {
-			IFrameAPI.createController(
-				spotify_frame,
-				{ uri: gtm4wp_spotifyUriFromSrc( spotify_frame ) },
-				function ( controller ) {
-					gtm4wp_bindSpotifyController( controller, spotify_frame );
-				}
-			);
-		} );
 	};
 }
 

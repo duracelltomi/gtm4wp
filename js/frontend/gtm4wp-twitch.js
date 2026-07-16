@@ -3,10 +3,16 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_twitch_percentage_tracking = 10;
 const gtm4wp_twitch_percentage_tracking_marks = {};
+
+// Unique-container-id counter for the Twitch.Player replacements. Module-scoped
+// (not a forEach index) so ids stay unique across both the initial wiring and
+// any players wired later from dynamically inserted iframes.
+let gtm4wp_twitch_frame_index = 0;
 
 function gtm4wp_bindTwitchPlayer( player, channel, video, collection ) {
 	const mediaid = video || channel || collection || '';
@@ -166,31 +172,16 @@ function gtm4wp_bindTwitchPlayer( player, channel, video, collection ) {
 }
 
 function gtm4wp_initTwitchTracking() {
-	// The Twitch Embed API (embed.twitch.tv/embed/v1.js) is enqueued as a
-	// dependency of this tracker, but it can still be missing at runtime if a
-	// consent manager, an ad blocker or a network error stopped it from loading.
-	// Without it there is nothing to hook into, so bail out gracefully instead of
-	// throwing on `new Twitch.Player()`.
-	if (
-		typeof Twitch === 'undefined' ||
-		typeof Twitch.Player === 'undefined'
-	) {
-		return;
-	}
-
-	const gtm4wp_twitch_frames = document.querySelectorAll(
-		'iframe[src*="player.twitch.tv"]'
-	);
-	if ( ! gtm4wp_twitch_frames || gtm4wp_twitch_frames.length == 0 ) {
-		return;
-	}
-
 	// A plain Twitch player iframe cannot be wrapped after the fact: the events
-	// are only available on a player created through the Embed API. Each iframe
-	// is therefore replaced with a Twitch.Player pointing at the same
-	// channel/video, which re-creates the embed under our control so its events
-	// can be tracked.
-	gtm4wp_twitch_frames.forEach( function ( twitch_frame, index ) {
+	// are only available on a player created through the Embed API. Each iframe is
+	// therefore replaced with a Twitch.Player pointing at the same channel/video,
+	// which re-creates the embed under our control so its events can be tracked.
+	// The Twitch Embed API (embed.twitch.tv/embed/v1.js) is enqueued as a
+	// dependency but can still be missing at runtime (consent manager, ad blocker,
+	// network error), so it is re-checked per element: a frame is only wired once
+	// the SDK is available, and this also covers iframes inserted later
+	// (popup/AJAX).
+	const gtm4wp_wireTwitchFrame = function ( twitch_frame ) {
 		let params;
 		try {
 			params = new URL(
@@ -208,11 +199,16 @@ function gtm4wp_initTwitchTracking() {
 			return;
 		}
 
-		const container = document.createElement( 'div' );
-		container.id = 'gtm4wp-twitch-' + index;
 		if ( ! twitch_frame.parentNode ) {
 			return;
 		}
+
+		const container = document.createElement( 'div' );
+		container.id = 'gtm4wp-twitch-' + gtm4wp_twitch_frame_index++;
+		// Mark the container so the iframe the Twitch Embed SDK injects into it —
+		// which also matches iframe[src*="player.twitch.tv"] — is skipped by the
+		// shared MutationObserver instead of being replaced again in a loop.
+		container.setAttribute( 'data-gtm4wp-media-wired', '1' );
 		twitch_frame.parentNode.replaceChild( container, twitch_frame );
 
 		const options = {
@@ -231,7 +227,18 @@ function gtm4wp_initTwitchTracking() {
 
 		const player = new Twitch.Player( container.id, options );
 		gtm4wp_bindTwitchPlayer( player, channel, video, collection );
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="player.twitch.tv"]',
+		gtm4wp_wireTwitchFrame,
+		function () {
+			return (
+				typeof Twitch !== 'undefined' &&
+				typeof Twitch.Player !== 'undefined'
+			);
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initTwitchTracking );

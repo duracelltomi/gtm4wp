@@ -2,6 +2,7 @@ import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_youtube_percentage_tracking = 10;
@@ -15,14 +16,7 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 			mediaType: 'youtube',
 		} );
 
-		const gtm4wp_youtube_frames = document.querySelectorAll(
-			"iframe[src^='https://www.youtube.com/embed']"
-		);
-		if ( ! gtm4wp_youtube_frames || gtm4wp_youtube_frames.length == 0 ) {
-			return;
-		}
-
-		gtm4wp_youtube_frames.forEach( function ( youtube_frame ) {
+		const gtm4wp_wireYouTubeFrame = function ( youtube_frame ) {
 			let playerID = youtube_frame.getAttribute( 'id' );
 
 			if (
@@ -73,7 +67,21 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 					onApiChange: gtm4wp_onYouTubeApiChange,
 				},
 			} );
-		} );
+		};
+
+		// Wire the YouTube iframes present now and any inserted later
+		// (popup/AJAX). This callback fires only once the IFrame API has loaded,
+		// so YT.Player exists; it is re-checked per element for safety.
+		gtm4wpObserveMedia(
+			"iframe[src^='https://www.youtube.com/embed']",
+			gtm4wp_wireYouTubeFrame,
+			function () {
+				return (
+					typeof YT !== 'undefined' &&
+					typeof YT.Player !== 'undefined'
+				);
+			}
+		);
 	};
 
 	const tag = document.createElement( 'script' );

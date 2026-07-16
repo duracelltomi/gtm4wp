@@ -3,32 +3,19 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_dailymotion_percentage_tracking = 10;
 const gtm4wp_dailymotion_percentage_tracking_marks = {};
 
 function gtm4wp_initDailymotionTracking() {
-	// The Dailymotion JS SDK (api.dmcdn.net/all.js) is enqueued as a dependency
-	// of this tracker, but it can still be missing at runtime if a consent
-	// manager, an ad blocker or a network error stopped it from loading. Without
-	// it there is nothing to hook into, so bail out gracefully instead of
-	// throwing on `DM.player()`.
-	if ( typeof DM === 'undefined' || typeof DM.player === 'undefined' ) {
-		return;
-	}
-
-	const gtm4wp_dailymotion_frames = document.querySelectorAll(
-		'iframe[src*="dailymotion.com"],iframe[src*="dai.ly"]'
-	);
-	if (
-		! gtm4wp_dailymotion_frames ||
-		gtm4wp_dailymotion_frames.length == 0
-	) {
-		return;
-	}
-
-	gtm4wp_dailymotion_frames.forEach( function ( dailymotion_frame ) {
+	// Wire every Dailymotion iframe already on the page and any inserted later
+	// (popup/lightbox, AJAX). The Dailymotion JS SDK (api.dmcdn.net/all.js) is
+	// enqueued as a dependency but can still be missing at runtime (consent
+	// manager, ad blocker, network error), so it is re-checked per element: a
+	// frame is only wired once the SDK is available.
+	const gtm4wp_wireDailymotionFrame = function ( dailymotion_frame ) {
 		const src = dailymotion_frame.getAttribute( 'src' );
 		const videourl = src.split( '?' ).shift();
 
@@ -191,7 +178,17 @@ function gtm4wp_initDailymotionTracking() {
 		player.addEventListener( 'error', function () {
 			gtm4wp_onDailymotionPlayerEvent( 'error', player.error );
 		} );
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="dailymotion.com"],iframe[src*="dai.ly"]',
+		gtm4wp_wireDailymotionFrame,
+		function () {
+			return (
+				typeof DM !== 'undefined' && typeof DM.player !== 'undefined'
+			);
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initDailymotionTracking );

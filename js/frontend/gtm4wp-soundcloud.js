@@ -3,29 +3,19 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
 const gtm4wp_soundclound_percentage_tracking = 10;
 const gtm4wp_soundclound_percentage_tracking_marks = {};
 
 function gtm4wp_initSoundCloudTracking() {
-	// The SoundCloud Widget API (w.soundcloud.com/player/api.js) is enqueued as
-	// a dependency of this tracker, but it can still be missing at runtime if a
-	// consent manager, an ad blocker or a network error stopped it from
-	// loading. Without it there is nothing to hook into, so bail out gracefully
-	// instead of throwing on `SC.Widget()`.
-	if ( typeof SC === 'undefined' || typeof SC.Widget === 'undefined' ) {
-		return;
-	}
-
-	const gtm4wp_soundcloud_frames = document.querySelectorAll(
-		'iframe[src*="soundcloud.com"]'
-	);
-	if ( ! gtm4wp_soundcloud_frames || gtm4wp_soundcloud_frames.length == 0 ) {
-		return;
-	}
-
-	gtm4wp_soundcloud_frames.forEach( function ( soundcloud_frame ) {
+	// Wire every SoundCloud iframe already on the page and any inserted later
+	// (popup/lightbox, AJAX). The SoundCloud Widget API (w.soundcloud.com/player/api.js)
+	// is enqueued as a dependency but can still be missing at runtime (consent
+	// manager, ad blocker, network error), so it is re-checked per element: a
+	// frame is only wired once the SDK is available.
+	const gtm4wp_wireSoundCloudFrame = function ( soundcloud_frame ) {
 		const widget = SC.Widget( soundcloud_frame );
 		let sound = {};
 
@@ -215,7 +205,17 @@ function gtm4wp_initSoundCloudTracking() {
 				} );
 			} );
 		};
-	} );
+	};
+
+	gtm4wpObserveMedia(
+		'iframe[src*="soundcloud.com"]',
+		gtm4wp_wireSoundCloudFrame,
+		function () {
+			return (
+				typeof SC !== 'undefined' && typeof SC.Widget !== 'undefined'
+			);
+		}
+	);
 }
 
 gtm4wpOnReady( gtm4wp_initSoundCloudTracking );

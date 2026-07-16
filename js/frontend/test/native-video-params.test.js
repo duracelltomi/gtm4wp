@@ -10,6 +10,7 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
+	gtm4wpObserveMedia,
 } from '../lib/native-video-params';
 
 describe( 'gtm4wpNativeVideoStatus', () => {
@@ -228,5 +229,197 @@ describe( 'gtm4wpOnReady', () => {
 		// The helper listens on window, so dispatch there directly.
 		window.dispatchEvent( new window.Event( 'DOMContentLoaded' ) );
 		expect( cb ).toHaveBeenCalledTimes( 1 );
+	} );
+} );
+
+describe( 'gtm4wpObserveMedia', () => {
+	// MutationObserver records are delivered as microtasks (before macrotasks),
+	// so awaiting a macrotask guarantees the observer callback has already run.
+	const flush = () => new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
+
+	beforeEach( () => {
+		document.body.innerHTML = '';
+	} );
+
+	afterEach( () => {
+		// The shared observer lives on the (jsdom) document, which persists across
+		// tests; disconnect and reset it so nothing leaks into the next test.
+		if ( window.gtm4wp_media_observer ) {
+			window.gtm4wp_media_observer.disconnect();
+		}
+		delete window.gtm4wp_media_observer;
+		delete window.gtm4wp_media_scanners;
+		delete window.gtm4wp_media_observe_dynamic;
+		document.body.innerHTML = '';
+	} );
+
+	it( 'wires elements already in the DOM regardless of the opt-in', () => {
+		document.body.innerHTML = '<video></video><video></video>';
+		const wired = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+
+		expect( wired ).toHaveLength( 2 );
+		// Each wired element is marked so a rescan never binds it twice.
+		expect(
+			document.querySelectorAll( 'video[data-gtm4wp-media-wired]' )
+		).toHaveLength( 2 );
+	} );
+
+	it( 'does not wire the same element twice on a repeat call (marker guard)', () => {
+		document.body.innerHTML = '<video></video>';
+		const wired = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'leaves an element unwired and unmarked when isReady is false, then wires it once ready', () => {
+		document.body.innerHTML = '<video></video>';
+		let ready = false;
+		const wired = [];
+		const isReady = () => ready;
+
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ), isReady );
+
+		// SDK not ready: nothing wired, nothing marked (so a retry stays possible).
+		expect( wired ).toHaveLength( 0 );
+		expect(
+			document
+				.querySelector( 'video' )
+				.hasAttribute( 'data-gtm4wp-media-wired' )
+		).toBe( false );
+
+		ready = true;
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ), isReady );
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'does NOT watch for later insertions when the opt-in is off', async () => {
+		const wired = [];
+
+		// window.gtm4wp_media_observe_dynamic is unset (opt-in off).
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+		expect( window.gtm4wp_media_observer ).toBeUndefined();
+
+		document.body.appendChild( document.createElement( 'video' ) );
+		await flush();
+
+		expect( wired ).toHaveLength( 0 );
+	} );
+
+	it( 'wires a player inserted after init when the opt-in is on', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const wired = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+		expect( wired ).toHaveLength( 0 );
+
+		// Simulate a popup/AJAX insertion of a wrapper that contains the player.
+		const wrapper = document.createElement( 'div' );
+		wrapper.innerHTML = '<video></video>';
+		document.body.appendChild( wrapper );
+		await flush();
+
+		expect( wired ).toHaveLength( 1 );
+		expect(
+			wrapper
+				.querySelector( 'video' )
+				.hasAttribute( 'data-gtm4wp-media-wired' )
+		).toBe( true );
+	} );
+
+	it( 'wires an element inserted directly (the added node itself matches)', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const wired = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+
+		document.body.appendChild( document.createElement( 'video' ) );
+		await flush();
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'does not re-wire an already-wired player that is moved in the DOM', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		document.body.innerHTML =
+			'<div id="a"></div><div id="b"></div><video></video>';
+		const wired = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => wired.push( el ) );
+		expect( wired ).toHaveLength( 1 ); // wired at init
+
+		// Moving the (already-marked) player re-reports it as an added node; the
+		// marker must stop it being wired a second time.
+		document
+			.querySelector( '#b' )
+			.appendChild( document.querySelector( 'video' ) );
+		await flush();
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'skips a matching element injected inside a container already marked wired (SDK self-insertion guard)', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const wired = [];
+
+		gtm4wpObserveMedia( 'iframe[src*="player.twitch.tv"]', ( el ) =>
+			wired.push( el )
+		);
+
+		// Emulate the Twitch tracker: a container it created and marked, into which
+		// the SDK later injects an iframe that also matches the selector.
+		const container = document.createElement( 'div' );
+		container.setAttribute( 'data-gtm4wp-media-wired', '1' );
+		document.body.appendChild( container );
+		await flush();
+
+		const sdkFrame = document.createElement( 'iframe' );
+		sdkFrame.setAttribute( 'src', 'https://player.twitch.tv/?channel=x' );
+		container.appendChild( sdkFrame );
+		await flush();
+
+		expect( wired ).toHaveLength( 0 );
+	} );
+
+	it( 'shares one observer across providers and wires each provider’s late insertions', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const videos = [];
+		const audios = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => videos.push( el ) );
+		gtm4wpObserveMedia( 'audio', ( el ) => audios.push( el ) );
+
+		// One shared MutationObserver serves both providers, not one per provider.
+		expect( window.gtm4wp_media_scanners ).toHaveLength( 2 );
+
+		document.body.appendChild( document.createElement( 'video' ) );
+		document.body.appendChild( document.createElement( 'audio' ) );
+		await flush();
+
+		expect( videos ).toHaveLength( 1 );
+		expect( audios ).toHaveLength( 1 );
+	} );
+
+	it( 'replaces its own scanner on re-init instead of stacking a duplicate', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const first = [];
+		const second = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => first.push( el ) );
+		gtm4wpObserveMedia( 'video', ( el ) => second.push( el ) );
+
+		expect( window.gtm4wp_media_scanners ).toHaveLength( 1 );
+
+		document.body.appendChild( document.createElement( 'video' ) );
+		await flush();
+
+		// Only the latest registration wires the late insertion (no double push).
+		expect( first ).toHaveLength( 0 );
+		expect( second ).toHaveLength( 1 );
 	} );
 } );
