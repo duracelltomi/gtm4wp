@@ -35,6 +35,22 @@ defined( 'ABSPATH' ) || exit;
 final class VisitorDataModule extends AbstractModule {
 
 	/**
+	 * Name of the JS-readable companion cookie that mirrors the (HttpOnly, so
+	 * JS-invisible) WordPress logged-in state. The client runtime uses it as the
+	 * Tier 3 gate for the logged-in-user fields: it re-fetches only when this
+	 * cookie changed, so an anonymous visitor — who never has it — never fetches
+	 * user data. Set on login, cleared on logout by maintain_login_gate_cookie().
+	 */
+	public const LOGIN_GATE_COOKIE = 'gtm4wp_login';
+
+	/**
+	 * Storage key shared with the client runtime: the sessionStorage entry under
+	 * which the client caches the Tier 2 (once-per-session) values and the Tier 3
+	 * cookie-gate bookkeeping. Kept here only so PHP and the client agree on the name.
+	 */
+	public const SESSION_STORAGE_KEY = 'gtm4wp_visitor_session';
+
+	/**
 	 * Module id.
 	 *
 	 * @return string
@@ -79,6 +95,25 @@ final class VisitorDataModule extends AbstractModule {
 		}
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+
+		// The session endpoint that delivers the Tier 2/3 fields (registered on REST
+		// requests, which run this frontend code path — is_admin() is false there).
+		add_action( 'rest_api_init', array( $this, 'register_endpoint' ) );
+
+		// Maintain the JS-readable login gate cookie so the client can tell logged-in
+		// from anonymous without reading the HttpOnly WordPress auth cookie. init runs
+		// before output (cookies settable) and for logged-in users the page is not
+		// cached, so the Set-Cookie never lands on a cacheable response.
+		add_action( 'init', array( $this, 'maintain_login_gate_cookie' ) );
+	}
+
+	/**
+	 * Registers the first-party session endpoint. Hooked to rest_api_init.
+	 *
+	 * @return void
+	 */
+	public function register_endpoint(): void {
+		( new VisitorDataEndpoint() )->register_routes();
 	}
 
 	/**
@@ -92,26 +127,23 @@ final class VisitorDataModule extends AbstractModule {
 
 	/**
 	 * Loads the client-side visitor-data runtime with its per-request field
-	 * config, but only when at least one Tier 1 field is active on this request.
-	 * The config carries only cache-safe (content/URL-derived, not visitor)
-	 * information — which data layer keys to compute and from which browser
-	 * source — so it is safe to bake into cached HTML.
+	 * config, but only when at least one field is active on this request. The
+	 * config carries only cache-safe (content/URL-derived, not visitor) information
+	 * — which data layer keys the browser computes and from which source (Tier 1),
+	 * plus the session-endpoint URL, its nonce and the field/cookie-gate metadata
+	 * for Tier 2/3 — so it is safe to bake into cached HTML. No visitor value is in
+	 * the config; those come from the endpoint at runtime.
 	 *
 	 * @return void
 	 */
 	public function enqueue_scripts(): void {
-		$client_fields = $this->collect_client_fields();
+		$config = $this->build_config();
 
-		if ( array() === $client_fields ) {
+		if ( null === $config ) {
 			return;
 		}
 
 		$this->enqueue_script( 'gtm4wp-visitor-data', 'gtm4wp-visitor-data.js' );
-
-		$config = array(
-			'event'  => 'gtm4wp.visitorData',
-			'fields' => $client_fields,
-		);
 
 		wp_add_inline_script(
 			'gtm4wp-visitor-data',
@@ -121,13 +153,13 @@ final class VisitorDataModule extends AbstractModule {
 	}
 
 	/**
-	 * Builds the data-layer-key => client-source map for the Tier 1 fields that
-	 * every module declares (through GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS) as
-	 * active on the current request.
+	 * Builds the cache-safe client config from the visitor-scoped fields every
+	 * module declares (through GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS), or null when
+	 * there is nothing to deliver on this request (so the runtime is not loaded).
 	 *
-	 * @return array<string, string>
+	 * @return array<string, mixed>|null
 	 */
-	private function collect_client_fields(): array {
+	public function build_config(): ?array {
 		/**
 		 * Collects the visitor-scoped fields to deliver outside the cacheable
 		 * page HTML. Callbacks append VisitorField objects.
@@ -141,19 +173,130 @@ final class VisitorDataModule extends AbstractModule {
 		$fields = apply_filters( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array() );
 
 		$client_fields = array();
+		$session_keys  = array();
+		$gates         = array();
 
 		if ( is_array( $fields ) ) {
 			foreach ( $fields as $field ) {
-				if (
-					$field instanceof VisitorField
-					&& VisitorField::TIER_CLIENT === $field->tier
-					&& '' !== $field->client_source
-				) {
+				if ( ! $field instanceof VisitorField ) {
+					continue;
+				}
+
+				if ( VisitorField::TIER_CLIENT === $field->tier && '' !== $field->client_source ) {
 					$client_fields[ $field->key ] = $field->client_source;
+				} elseif ( VisitorField::TIER_SESSION === $field->tier ) {
+					$session_keys[] = $field->key;
+				} elseif ( VisitorField::TIER_ACTION === $field->tier && '' !== $field->cookie_gate ) {
+					$gates[ $field->cookie_gate ][] = $field->key;
 				}
 			}
 		}
 
-		return $client_fields;
+		$has_endpoint_fields = array() !== $session_keys || array() !== $gates;
+
+		if ( array() === $client_fields && ! $has_endpoint_fields ) {
+			return null;
+		}
+
+		$config = array(
+			'event'  => 'gtm4wp.visitorData',
+			'fields' => $client_fields,
+		);
+
+		if ( $has_endpoint_fields ) {
+			$config['endpoint']   = rest_url( VisitorDataEndpoint::REST_NAMESPACE . VisitorDataEndpoint::REST_ROUTE );
+			$config['nonce']      = wp_create_nonce( 'wp_rest' );
+			$config['sessionKey'] = self::SESSION_STORAGE_KEY;
+
+			if ( array() !== $session_keys ) {
+				$config['session'] = array_values( array_unique( $session_keys ) );
+			}
+
+			if ( array() !== $gates ) {
+				$config['gates'] = array();
+				foreach ( $gates as $cookie => $keys ) {
+					$config['gates'][] = array(
+						'cookie' => $cookie,
+						'keys'   => array_values( array_unique( $keys ) ),
+					);
+				}
+			}
+		}
+
+		return $config;
+	}
+
+	/**
+	 * Keeps the JS-readable login gate cookie (self::LOGIN_GATE_COOKIE) in sync with
+	 * the WordPress login state so the client runtime can gate the Tier 3 user-data
+	 * fetch on it: it is set (to an opaque per-session token) for a logged-in user
+	 * and cleared for a logged-out one. The client re-fetches only when the value
+	 * changed, so an anonymous visitor — who never has the cookie — never fetches
+	 * user data. Hooked to init; only runs when the cache-safe mode is on.
+	 *
+	 * @return void
+	 */
+	public function maintain_login_gate_cookie(): void {
+		// Cookies can only be set before output. If a plugin already sent headers by
+		// init, skip silently — the next (logged-in, non-cached) request corrects it.
+		if ( headers_sent() ) {
+			return;
+		}
+
+		$current = isset( $_COOKIE[ self::LOGIN_GATE_COOKIE ] )
+			? sanitize_text_field( wp_unslash( $_COOKIE[ self::LOGIN_GATE_COOKIE ] ) )
+			: '';
+
+		if ( is_user_logged_in() ) {
+			$desired = $this->login_gate_value();
+
+			if ( $current !== $desired ) {
+				$this->set_login_gate_cookie( $desired, time() + ( 14 * DAY_IN_SECONDS ) );
+				$_COOKIE[ self::LOGIN_GATE_COOKIE ] = $desired;
+			}
+		} elseif ( '' !== $current ) {
+			// Logged out: clear the cookie so the client stops treating the visitor as
+			// logged in and does not push stale user data.
+			$this->set_login_gate_cookie( '', time() - DAY_IN_SECONDS );
+			unset( $_COOKIE[ self::LOGIN_GATE_COOKIE ] );
+		}
+	}
+
+	/**
+	 * The opaque, stable-per-session value of the login gate cookie. Derived with
+	 * wp_hash() from the current user id and session token so it (a) differs between
+	 * users and login sessions — a re-login triggers a re-fetch — and (b) is not the
+	 * session token itself, so it cannot be used to authenticate.
+	 *
+	 * @return string
+	 */
+	private function login_gate_value(): string {
+		$token = function_exists( 'wp_get_session_token' ) ? (string) wp_get_session_token() : '';
+
+		return substr( wp_hash( get_current_user_id() . '|' . $token ), 0, 20 );
+	}
+
+	/**
+	 * Sets (or, with an empty value and past expiry, clears) the login gate cookie.
+	 * The cookie is deliberately NOT HttpOnly (the client must read it) and scoped
+	 * like the WordPress auth cookies.
+	 *
+	 * @param string $value   Cookie value.
+	 * @param int    $expires Expiry timestamp.
+	 * @return void
+	 */
+	private function set_login_gate_cookie( string $value, int $expires ): void {
+		setcookie(
+			self::LOGIN_GATE_COOKIE,
+			$value,
+			array(
+				'expires'  => $expires,
+				'path'     => defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/',
+				'domain'   => defined( 'COOKIE_DOMAIN' ) ? COOKIE_DOMAIN : '',
+				'secure'   => is_ssl(),
+				'httponly' => false,
+				'samesite' => 'Lax',
+			)
+		);
 	}
 }

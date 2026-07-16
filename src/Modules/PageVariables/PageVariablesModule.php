@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\PageVariables;
 
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AbstractModule;
+use GTM4WP\Modules\VisitorData\VisitorDataModule;
 use GTM4WP\Modules\VisitorData\VisitorField;
 
 defined( 'ABSPATH' ) || exit;
@@ -608,12 +609,18 @@ final class PageVariablesModule extends AbstractModule {
 
 	/**
 	 * Declares the page-variables fields that must be delivered outside the
-	 * cacheable HTML when the cache-safe data layer is on (issue #398). The site
-	 * search term (from the URL) and the referring page (siteSearchFrom) are
-	 * Tier 1 — the browser already knows them — so they are handed to the client
-	 * runtime under their existing data layer names. No-op unless cache-safe mode
-	 * is on, the search-data option is enabled and this is a search results page
-	 * (the only place these two fields are output).
+	 * cacheable HTML when the cache-safe data layer is on (issue #398).
+	 *
+	 * Tier 1 — the site search term (from the URL) and the referring page
+	 * (siteSearchFrom) — is only declared on a search results page (the only place
+	 * these two fields are output) because the browser computes it with no request.
+	 *
+	 * Tier 2/3 — the visitor IP, Cloudflare country and the logged-in-user fields —
+	 * is declared independent of the page type and gated only on its own option,
+	 * because the session endpoint resolves it for the current request, which has no
+	 * page context. Each carries a server resolver (run only on the endpoint) so the
+	 * value is delivered client-side, once per session (Tier 2) or when the logged-in
+	 * cookie changed (Tier 3), instead of baked into cacheable HTML.
 	 *
 	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
 	 * @return array<int, VisitorField>
@@ -628,7 +635,188 @@ final class PageVariablesModule extends AbstractModule {
 			$fields[] = new VisitorField( 'siteSearchFrom', VisitorField::TIER_CLIENT, 'searchReferrer' );
 		}
 
+		return $this->declare_server_visitor_fields( $fields );
+	}
+
+	/**
+	 * Declares the Tier 2 (session) and Tier 3 (logged-in user) fields the session
+	 * endpoint delivers client-side. Each field is added only when its own option
+	 * is on, and carries a resolver that runs for the current request on the
+	 * endpoint; the resolver is the field's identity gate (the user resolvers return
+	 * null for an anonymous request, so a logged-out caller never receives user data).
+	 *
+	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
+	 * @return array<int, VisitorField>
+	 */
+	private function declare_server_visitor_fields( array $fields ): array {
+		$login_gate = VisitorDataModule::LOGIN_GATE_COOKIE;
+
+		// Tier 2: server-only but constant per session; fetched once per session.
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
+			$fields[] = new VisitorField( 'visitorIP', VisitorField::TIER_SESSION, '', array( $this, 'resolve_visitor_ip' ) );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_MISCGEOCF ) ) {
+			$fields[] = new VisitorField( 'geoCloudflareCountryCode', VisitorField::TIER_SESSION, '', array( $this, 'resolve_cloudflare_country' ) );
+		}
+
+		// Tier 3: logged-in user data; fetched only when the login gate cookie changed.
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_LOGGEDIN ) ) {
+			$fields[] = new VisitorField( 'visitorLoginState', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_login_state' ), $login_gate );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERROLE ) ) {
+			$fields[] = new VisitorField( 'visitorType', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_type' ), $login_gate );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USEREMAIL ) ) {
+			$fields[] = new VisitorField( 'visitorEmail', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_email' ), $login_gate );
+			$fields[] = new VisitorField( 'visitorEmailHash', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_email_hash' ), $login_gate );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERREGDATE ) ) {
+			$fields[] = new VisitorField( 'visitorRegistrationDate', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_registration_date' ), $login_gate );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERNAME ) ) {
+			$fields[] = new VisitorField( 'visitorUsername', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_username' ), $login_gate );
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERID ) ) {
+			$fields[] = new VisitorField( 'visitorId', VisitorField::TIER_ACTION, '', array( $this, 'resolve_visitor_id' ), $login_gate );
+		}
+
 		return $fields;
+	}
+
+	/**
+	 * Tier 2 resolver: the validated visitor IP for the current request, or null
+	 * when it cannot be determined. VisitorIp::get() already wp_unslash+validates
+	 * the value with filter_var( FILTER_VALIDATE_IP ), so it is a plain IP string.
+	 *
+	 * @return string|null
+	 */
+	public function resolve_visitor_ip(): ?string {
+		$ip = VisitorIp::get( (string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) );
+
+		return '' === $ip ? null : $ip;
+	}
+
+	/**
+	 * Tier 2 resolver: the Cloudflare country code from the current request header,
+	 * or null when absent. The value is wp_unslash+sanitized on the way in; the
+	 * endpoint hex-encodes it on the way out, so it is passed raw (RI-4).
+	 *
+	 * @return string|null
+	 */
+	public function resolve_cloudflare_country(): ?string {
+		if ( ! isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
+			return null;
+		}
+
+		$country = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) );
+
+		return '' === $country ? null : $country;
+	}
+
+	/**
+	 * Tier 3 resolver: 'logged-in' for an authenticated request, null otherwise.
+	 * Returning null for an anonymous request is the identity gate — a logged-out
+	 * caller receives no login-state field at all.
+	 *
+	 * @return string|null
+	 */
+	public function resolve_visitor_login_state(): ?string {
+		return is_user_logged_in() ? 'logged-in' : null;
+	}
+
+	/**
+	 * Tier 3 resolver: the current user's roles as a comma separated list, or null
+	 * for an anonymous request.
+	 *
+	 * @return string|null
+	 */
+	public function resolve_visitor_type(): ?string {
+		if ( ! is_user_logged_in() ) {
+			return null;
+		}
+
+		return implode( ',', wp_get_current_user()->roles );
+	}
+
+	/**
+	 * Tier 3 resolver: the current user's email address, or null for an anonymous
+	 * request. Passed raw; the endpoint hex-encodes it on output.
+	 *
+	 * @return string|null
+	 */
+	public function resolve_visitor_email(): ?string {
+		if ( ! is_user_logged_in() ) {
+			return null;
+		}
+
+		$email = wp_get_current_user()->user_email;
+
+		return empty( $email ) ? '' : $email;
+	}
+
+	/**
+	 * Tier 3 resolver: the SHA-256 hash of the current user's email address, or
+	 * null for an anonymous request.
+	 *
+	 * @return string|null
+	 */
+	public function resolve_visitor_email_hash(): ?string {
+		if ( ! is_user_logged_in() ) {
+			return null;
+		}
+
+		$email = wp_get_current_user()->user_email;
+
+		return empty( $email ) ? '' : hash( 'sha256', $email );
+	}
+
+	/**
+	 * Tier 3 resolver: the Unix timestamp of the current user's registration date,
+	 * or null for an anonymous request.
+	 *
+	 * @return int|string|null
+	 */
+	public function resolve_visitor_registration_date() {
+		if ( ! is_user_logged_in() ) {
+			return null;
+		}
+
+		$registered = wp_get_current_user()->user_registered;
+
+		return empty( $registered ) ? '' : strtotime( $registered );
+	}
+
+	/**
+	 * Tier 3 resolver: the current user's login name, or null for an anonymous
+	 * request. Passed raw; the endpoint hex-encodes it on output.
+	 *
+	 * @return string|null
+	 */
+	public function resolve_visitor_username(): ?string {
+		if ( ! is_user_logged_in() ) {
+			return null;
+		}
+
+		$login = wp_get_current_user()->user_login;
+
+		return empty( $login ) ? '' : $login;
+	}
+
+	/**
+	 * Tier 3 resolver: the current user's id, or null for an anonymous request.
+	 *
+	 * @return int|null
+	 */
+	public function resolve_visitor_id(): ?int {
+		$user_id = get_current_user_id();
+
+		return $user_id > 0 ? $user_id : null;
 	}
 
 	/**

@@ -33,10 +33,24 @@ defined( 'ABSPATH' ) || exit;
  *   the cart, one-shot events). Phase 2 fetches it gated by an existing cookie
  *   (the WP logged-in cookie, a cart-version cookie, an event cookie).
  *
- * Phase 1 only implements Tier 1. The value object is intentionally minimal so
- * Phase 2 can add the Tier 2/3 delivery inputs (a server resolver callable and a
- * cookie gate) as further constructor arguments with defaults, without changing
- * any Phase 1 caller.
+ * Phase 1 implemented Tier 1. Phase 2 adds the Tier 2/3 delivery inputs — a
+ * server resolver callable and a cookie gate — as further constructor arguments
+ * with defaults, so every Phase 1 caller is unaffected:
+ *
+ * - $resolver runs on the first-party session endpoint (VisitorDataEndpoint) for
+ *   the CURRENT request and returns the field value, or null to omit it. It is
+ *   the field's own identity/capability gate: a logged-in-user field's resolver
+ *   returns null for an anonymous request, so a logged-out caller never receives
+ *   user data.
+ * - $cookie_gate names the JS-readable cookie whose change tells the client
+ *   runtime to re-fetch this field (Tier 3). An empty gate means Tier 2 delivery:
+ *   fetched once per session and cached in sessionStorage. The gate is never the
+ *   HttpOnly WordPress auth cookie (JS cannot read it) but a JS-visible companion
+ *   cookie the VisitorData module maintains alongside it.
+ *
+ * (WooCommerce customer & cart data are session-scoped and delivered on the
+ * existing cart-fragments AJAX instead — see WooCommerce\PageDataLayer — so they
+ * are not declared as VisitorField resolvers here.)
  */
 final class VisitorField {
 
@@ -63,11 +77,20 @@ final class VisitorField {
 	 * @param int    $tier          One of the TIER_* constants.
 	 * @param string $client_source Tier 1 only: the producer token the client runtime
 	 *                              uses to compute the value (empty for Tier 2/3).
+	 * @param mixed  $resolver      Tier 2/3 only: a callable resolving the field value for
+	 *                              the current request on the session endpoint, or null to
+	 *                              omit it. Untyped so both closures and [$obj,'method']
+	 *                              array callables are accepted (null for Tier 1).
+	 * @param string $cookie_gate   Tier 3 only: the JS-readable cookie whose change makes
+	 *                              the client re-fetch this field (empty = Tier 2, once per
+	 *                              session).
 	 */
 	public function __construct(
 		public string $key,
 		public int $tier,
-		public string $client_source = ''
+		public string $client_source = '',
+		public mixed $resolver = null,
+		public string $cookie_gate = ''
 	) {
 	}
 }

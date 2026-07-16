@@ -37,6 +37,8 @@ if ( ! class_exists( 'WP_Term' ) ) {
 
 if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
+		private array $headers = array();
+
 		public function __construct( private $data = null, private int $status = 200 ) {}
 
 		public function get_data() {
@@ -45,6 +47,14 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 
 		public function get_status(): int {
 			return $this->status;
+		}
+
+		public function header( $key, $value, $replace = true ) {
+			$this->headers[ $key ] = $value;
+		}
+
+		public function get_headers(): array {
+			return $this->headers;
 		}
 	}
 }

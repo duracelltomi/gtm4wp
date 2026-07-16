@@ -138,12 +138,17 @@ final class ModuleHooksTest extends TestCase {
 		$enabled = $this->boot( new VisitorDataModule(), array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
 
 		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $enabled, 'enqueue_scripts' ) ) );
+		// Phase 2: the session endpoint and the login gate cookie maintenance.
+		$this->assertNotFalse( has_action( 'rest_api_init', array( $enabled, 'register_endpoint' ) ), 'The session endpoint must be registered.' );
+		$this->assertNotFalse( has_action( 'init', array( $enabled, 'maintain_login_gate_cookie' ) ), 'The login gate cookie must be maintained.' );
 	}
 
 	public function test_visitor_data_inactive_when_cache_safe_off(): void {
 		$disabled = $this->boot( new VisitorDataModule() );
 
 		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $disabled, 'enqueue_scripts' ) ) );
+		$this->assertFalse( has_action( 'rest_api_init', array( $disabled, 'register_endpoint' ) ) );
+		$this->assertFalse( has_action( 'init', array( $disabled, 'maintain_login_gate_cookie' ) ) );
 	}
 
 	public function test_media_events_youtube_filter_active_when_enabled(): void {
@@ -243,5 +248,31 @@ final class ModuleHooksTest extends TestCase {
 		);
 
 		$this->assertNotFalse( has_action( 'woocommerce_payment_complete' ), 'Enabling reliable tracking must seed woocommerce_payment_complete.' );
+	}
+
+	public function test_woocommerce_wires_cart_fragment_delivery_under_cache_safe(): void {
+		// Issue #398 Phase 2: cache-safe on + a customer/cart feature carries the block
+		// on cart-fragments (the placeholder in wp_footer, the fragments filter).
+		$this->register_woocommerce_hooks(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA   => true,
+			)
+		);
+
+		$this->assertNotFalse( has_filter( 'woocommerce_add_to_cart_fragments' ), 'The customer/cart block must ride cart-fragments.' );
+		$this->assertNotFalse( has_action( 'wp_footer' ), 'The cart-fragments placeholder must be output.' );
+	}
+
+	public function test_woocommerce_does_not_wire_cart_fragments_when_cache_safe_off(): void {
+		$this->register_woocommerce_hooks(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA   => true,
+			)
+		);
+
+		$this->assertFalse( has_filter( 'woocommerce_add_to_cart_fragments' ), 'No cart-fragments delivery unless cache-safe is on.' );
 	}
 }

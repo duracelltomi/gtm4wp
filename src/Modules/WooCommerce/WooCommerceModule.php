@@ -113,6 +113,15 @@ final class WooCommerceModule extends AbstractModule {
 
 		add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, array( $page_datalayer, 'add_datalayer_data' ) );
 
+		// Cache-safe data layer (issue #398): when the mode is on, the customer/cart
+		// block is omitted from the cacheable HTML (in add_datalayer_data) and carried
+		// instead on the existing cart-fragments AJAX, so no new per-page request is
+		// added. The gtm4wp-visitor-data runtime (enqueued below) reads and pushes it.
+		if ( $page_datalayer->delivers_visitor_cart_client_side() ) {
+			add_action( 'wp_footer', array( $page_datalayer, 'output_visitor_cart_placeholder' ) );
+			add_filter( 'woocommerce_add_to_cart_fragments', array( $page_datalayer, 'add_visitor_cart_fragment' ) );
+		}
+
 		add_filter( 'loop_end', array( $list_tracking, 'reset_loop' ) );
 		add_action( 'woocommerce_after_shop_loop_item', array( $list_tracking, 'after_shop_loop_item' ) );
 		add_action( 'woocommerce_after_add_to_cart_button', array( $list_tracking, 'single_add_to_cart_tracking' ) );
@@ -251,6 +260,21 @@ final class WooCommerceModule extends AbstractModule {
 	 */
 	public function enqueue_scripts(): void {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE, true );
+
+		// Cache-safe data layer (issue #398): when the customer/cart block is being
+		// delivered client-side over cart-fragments, make sure the visitor-data
+		// runtime that reads the fragment payload is loaded — even on pages where the
+		// PageVariables module declared no visitor fields of its own. Enqueuing the
+		// same handle is idempotent (VisitorDataModule may also enqueue it).
+		if (
+			(bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
+			&& (
+				(bool) $this->opt( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA )
+				|| (bool) $this->opt( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL )
+			)
+		) {
+			$this->enqueue_script( 'gtm4wp-visitor-data', 'gtm4wp-visitor-data.js' );
+		}
 
 		$this->enqueue_script( 'gtm4wp-ecommerce-generic', 'gtm4wp-ecommerce-generic.js', array(), $in_footer );
 

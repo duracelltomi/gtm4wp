@@ -53,30 +53,70 @@ adds a plain `fetch()` on `DOMContentLoaded`, it is wrong.
     (`view_item` / `view_cart` / `begin_checkout` / order-received `purchase`),
     which are URL-scoped or fire only on cache-excluded WooCommerce pages.
 
-## Phase 2 — planned (not built yet)
+## Phase 2 — shipped (2.0 beta1)
 
-Deliver the Tier 2/3 fields client-side, behind the same option and the same
-`gtm4wp.visitorData` runtime, with **no** new per-page request:
+The Tier 2/3 fields are now delivered client-side, behind the same option and the
+same `gtm4wp.visitorData` runtime, with **no** new per-page request. The
+`VisitorField` value object grew a server `resolver` + `cookie_gate` input
+(constructor args with defaults) — Phase 1 Tier 1 callers are unaffected.
 
-1. **First-party session endpoint.** Add a first-party REST route (or reuse the
-   WooCommerce Store API, already used in 2.0 for block tracking via
-   `extensions.gtm4wp.item`, as the precedent for a first-party data channel). It
-   returns the Tier 2/3 fields for the *current* authenticated request.
-   - **Tier 2** (IP, Cloudflare country): fetched **once per session**, the result
-     cached in `sessionStorage`; subsequent page views read the cache, no request.
-   - **Tier 3** (logged-in user data; one-shot events): fetched only when the
-     relevant **cookie** changed — the WordPress logged-in cookie for user data, an
-     event cookie for one-shots — so anonymous cached visitors never fetch.
-2. **WooCommerce customer & cart:** reuse WooCommerce **cart-fragments** (the
-   existing AJAX the mini-cart already refreshes on every cart change) to carry the
-   customer/cart data layer block, so no *new* per-page request is added — the
-   fragment request already happens on cart mutation.
-3. **Client runtime:** add producers to `gtm4wp-visitor-data.js` that read the
-   session endpoint / fragment payload and push under the same field names. The
-   `VisitorField` value object grows a server resolver + cookie-gate input
-   (constructor args with defaults) — Phase 1 callers are unaffected.
+1. **First-party session endpoint** — `GET gtm4wp/v2/visitor-data`
+   (`VisitorData\VisitorDataEndpoint`). It resolves the Tier 2/3 fields declared
+   through `GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS` for the **current request only**
+   (everything from `wp_get_current_user()`, `WC()` and `$_SERVER` — it accepts no
+   user/session id, so there is no IDOR) and returns them as a hex-encoded JSON
+   string payload (`{ "payload": "…" }`, mirroring the Store API cart-item pattern
+   in `StoreApiData`) with `no-cache` headers so the per-visitor response is never
+   cached.
+   - **Identity gate.** Each field's resolver is its own gate: a logged-in-user
+     resolver returns `null` for an anonymous request, so the field is omitted — a
+     logged-out request receives **no** user data. The route's `permission_callback`
+     is public (read-only GET, self-owned request-scoped data); the REST nonce, sent
+     as `X-WP-Nonce`, is what lets WordPress authenticate a logged-in caller's cookie
+     so their fields resolve at all.
+   - **Tier 2** (`visitorIP`, `geoCloudflareCountryCode`): fetched **once per
+     session**, cached in `sessionStorage`; later page views replay the cache, no
+     request.
+   - **Tier 3** (logged-in user data — login state, roles, email + hash, reg date,
+     username, id): fetched only when the **login gate cookie changed**. Because JS
+     cannot read the HttpOnly WordPress auth cookie, `VisitorDataModule` maintains a
+     JS-readable companion cookie (`gtm4wp_login`, an opaque per-session token via
+     `wp_hash()`) — set on login, cleared on logout, refreshed opportunistically on
+     `init`. An anonymous visitor never has it, so it never fetches user data.
+2. **WooCommerce customer & cart** ride the existing **cart-fragments** response
+   (`woocommerce_add_to_cart_fragments`), so no *new* per-page request is added —
+   the fragment AJAX already fires on cart mutation and re-applies from its
+   `sessionStorage` cache on every page. `PageDataLayer::add_visitor_cart_fragment()`
+   JSON-encodes the same customer/cart block (built by the same `add_customer_data`
+   / `add_cart_content` server builders) into a data attribute of a cache-safe
+   placeholder (`.gtm4wp-wc-visitor-data`, output in `wp_footer`); the client reads
+   it (and re-reads it via a `MutationObserver` when the fragment refreshes) and
+   pushes it under the same 1.x key names. `esc_attr( wp_json_encode( …, hex flags ) )`
+   keeps a hostile customer field from breaking out of the attribute.
+3. **Client runtime** (`gtm4wp-visitor-data.js`) gained the endpoint fetch
+   (once-per-session + cookie-gated, with the sessionStorage cache and logout
+   cleanup) and the cart-fragment reader, both pushing under the same field names as
+   before. When Web Storage is unavailable it does **not** fetch (safe default = no
+   extra data, never a per-page request).
 
-The regression tests to add in Phase 2: the endpoint enforces the same capability
-gate as the value it returns (a logged-out request never receives user data); the
-cookie gate actually suppresses the fetch when the cookie is unchanged; hostile
-header/IP inputs round-trip through the endpoint's JSON without breaking out.
+Regression tests: `VisitorDataEndpointTest` (identity gate — logged-out receives no
+user data; hostile header round-trips hex-encoded; no-cache headers),
+`PageVariablesModuleTest` (Tier 2/3 field declaration + resolvers, anonymous → null,
+hostile CF country raw), `VisitorDataModuleTest` (endpoint config baking, login gate
+cookie set/clear/unchanged), `PageDataLayerTest` (cart-fragment carrier, hostile
+customer field safe), and the JS suite (once-per-session, **cookie gate suppresses
+the fetch when unchanged**, anonymous never fetches user data, logout drops cached
+identity, cart-fragment push).
+
+### Deferred to a Phase 2 follow-up: the WooCommerce one-shot events
+
+The two WooCommerce one-shot events — `maybe_add_readded_to_cart` (an `add_to_cart`
+after the cart "Undo") and `maybe_add_pending_purchase` (the reliable-tracking
+`purchase` fallback) — remain **omitted** under the cache-safe mode (unchanged from
+Phase 1). Unlike the customer/cart block, a one-shot must fire **exactly once**, so
+it cannot ride the re-applied (cached) cart-fragment without a per-event client-side
+dedupe, and the `purchase` fallback carries revenue where a double-count is costly.
+Delivering them safely (endpoint resolver that consumes the session marker + a
+client dedupe keyed on the order number, reusing the existing
+`gtm4wp_orderid_tracked` guard) is scoped as a follow-up; the endpoint/`VisitorField`
+framework already supports the additional resolvers.

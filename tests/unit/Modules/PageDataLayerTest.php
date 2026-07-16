@@ -714,6 +714,90 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( 'Mug', $result['cartContent']['items'][0]['item_name'] );
 	}
 
+	/**
+	 * Issue #398 Phase 2: the customer/cart block is delivered client-side over
+	 * cart-fragments only when the cache-safe mode is on AND at least one of the
+	 * customer-data / cart-content features is enabled.
+	 */
+	public function test_delivers_visitor_cart_client_side_gating(): void {
+		$this->assertTrue(
+			$this->make_page_datalayer(
+				array(
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)->delivers_visitor_cart_client_side()
+		);
+
+		$this->assertFalse(
+			$this->make_page_datalayer(
+				array(
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => false,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)->delivers_visitor_cart_client_side(),
+			'Off unless the cache-safe mode is on.'
+		);
+
+		$this->assertFalse(
+			$this->make_page_datalayer( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
+				->delivers_visitor_cart_client_side(),
+			'Off unless a customer/cart feature is enabled.'
+		);
+	}
+
+	/**
+	 * Issue #398 Phase 2: the cart-fragments carrier delivers the same customer +
+	 * cart block under the same key names, on the placeholder selector, next to any
+	 * pre-existing fragments — and a hostile customer field round-trips through the
+	 * data attribute hex-encoded (safe form present, raw break-out absent).
+	 */
+	public function test_visitor_cart_fragment_carries_customer_and_cart_safely(): void {
+		\WC_Customer::$fixtures[42] = array(
+			'order_count'     => 3,
+			'billing_company' => 'Evil</script>"&Co',
+		);
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ), new \WC_Customer( 42 ) ); // phpcs:ignore
+
+		$page_datalayer = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA     => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+			)
+		);
+
+		$fragments = $page_datalayer->add_visitor_cart_fragment( array( 'existing' => '<span></span>' ) );
+
+		$this->assertArrayHasKey( 'div.gtm4wp-wc-visitor-data', $fragments, 'The block rides the placeholder selector.' );
+		$this->assertArrayHasKey( 'existing', $fragments, 'Pre-existing fragments must survive.' );
+
+		$html = $fragments['div.gtm4wp-wc-visitor-data'];
+
+		// Customer + cart delivered under the same 1.x key names.
+		$this->assertStringContainsString( 'customerTotalOrders', $html );
+		$this->assertStringContainsString( 'cartContent', $html );
+		$this->assertStringContainsString( 'Mug', $html );
+
+		// The hostile customer field is present hex-encoded (TC-2) and no raw
+		// break-out survives in the fragment HTML (TS-2).
+		$safe = json_encode( 'Evil</script>"&Co', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$this->assertStringContainsString( trim( $safe, '"' ), $html );
+		$this->assertStringNotContainsString( '</script>', $html );
+	}
+
+	public function test_visitor_cart_placeholder_is_empty_and_cache_safe(): void {
+		ob_start();
+		$this->make_page_datalayer()->output_visitor_cart_placeholder();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'class="gtm4wp-wc-visitor-data"', $html );
+		// The placeholder itself carries no visitor value (safe to bake into cache).
+		$this->assertStringNotContainsString( 'data-gtm4wp-visitor-cart', $html );
+	}
+
 	public function test_cart_page_fires_view_cart_event(): void {
 		// TS-5: the is_cart() branch (add_cart_view) fires the GA4 view_cart event for a
 		// non-empty cart when e-commerce tracking is on.

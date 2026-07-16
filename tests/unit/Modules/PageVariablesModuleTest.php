@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\PageVariables\PageVariablesModule;
+use GTM4WP\Modules\VisitorData\VisitorDataModule;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
@@ -849,6 +850,143 @@ final class PageVariablesModuleTest extends TestCase {
 			),
 			$map
 		);
+	}
+
+	/**
+	 * Issue #398 Phase 2: with cache-safe on, the server-only visitor fields (IP,
+	 * Cloudflare country, logged-in user data) are declared independent of the page
+	 * type — the session endpoint resolves them for the current request — each with
+	 * the right tier, cookie gate and a callable resolver. Off a search page, so the
+	 * two Tier 1 search fields are NOT among them.
+	 */
+	public function test_declare_visitor_scoped_fields_registers_tier2_3_server_fields(): void {
+		Functions\when( 'is_search' )->justReturn( false );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP   => true,
+				GTM4WP_OPTION_INCLUDE_MISCGEOCF    => true,
+				GTM4WP_OPTION_INCLUDE_LOGGEDIN     => true,
+				GTM4WP_OPTION_INCLUDE_USERROLE     => true,
+				GTM4WP_OPTION_INCLUDE_USEREMAIL    => true,
+				GTM4WP_OPTION_INCLUDE_USERID       => true,
+			)
+		);
+
+		$fields = $module->declare_visitor_scoped_fields( array() );
+
+		$by_key = array();
+		foreach ( $fields as $field ) {
+			$this->assertInstanceOf( VisitorField::class, $field );
+			$by_key[ $field->key ] = $field;
+		}
+
+		// Tier 2: server-only, constant per session, no cookie gate (once/session).
+		$this->assertSame( VisitorField::TIER_SESSION, $by_key['visitorIP']->tier );
+		$this->assertSame( '', $by_key['visitorIP']->cookie_gate );
+		$this->assertTrue( is_callable( $by_key['visitorIP']->resolver ) );
+		$this->assertSame( VisitorField::TIER_SESSION, $by_key['geoCloudflareCountryCode']->tier );
+
+		// Tier 3: logged-in user data, gated on the login companion cookie.
+		foreach ( array( 'visitorLoginState', 'visitorType', 'visitorEmail', 'visitorEmailHash', 'visitorId' ) as $key ) {
+			$this->assertArrayHasKey( $key, $by_key, "'{$key}' must be declared." );
+			$this->assertSame( VisitorField::TIER_ACTION, $by_key[ $key ]->tier );
+			$this->assertSame( VisitorDataModule::LOGIN_GATE_COOKIE, $by_key[ $key ]->cookie_gate );
+			$this->assertTrue( is_callable( $by_key[ $key ]->resolver ) );
+		}
+
+		// Tier 1 search fields are only declared on a search page.
+		$this->assertArrayNotHasKey( 'siteSearchTerm', $by_key );
+	}
+
+	public function test_declare_visitor_scoped_fields_skips_server_fields_when_options_off(): void {
+		Functions\when( 'is_search' )->justReturn( false );
+
+		// Cache-safe on, but every visitor option off (defaults): no server field.
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+
+		$this->assertSame( array(), $module->declare_visitor_scoped_fields( array() ) );
+	}
+
+	public function test_visitor_ip_resolver_returns_validated_ip_or_null(): void {
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => true ) );
+
+		$_SERVER['REMOTE_ADDR'] = '8.8.8.8';
+		$this->assertSame( '8.8.8.8', $module->resolve_visitor_ip() );
+
+		unset( $_SERVER['REMOTE_ADDR'] );
+		$this->assertNull( $module->resolve_visitor_ip(), 'No IP available resolves to null (omitted).' );
+	}
+
+	/**
+	 * The Cloudflare-country resolver mirrors the server path (RI-4): the spoofable
+	 * header value arrives RAW so the endpoint's single output sink hex-encodes it.
+	 * A hostile country must not be entity-escaped by the resolver.
+	 */
+	public function test_cloudflare_country_resolver_returns_raw_value(): void {
+		Functions\when( 'sanitize_text_field' )->returnArg();
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => true ) );
+
+		$hostile                      = 'A&"<B';
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = $hostile;
+
+		$value = $module->resolve_cloudflare_country();
+
+		$this->assertSame( $hostile, $value );
+		$this->assertStringNotContainsString( '&amp;', (string) $value );
+		$this->assertStringNotContainsString( '&quot;', (string) $value );
+
+		unset( $_SERVER['HTTP_CF_IPCOUNTRY'] );
+		$this->assertNull( $module->resolve_cloudflare_country(), 'Absent header resolves to null (omitted).' );
+	}
+
+	/**
+	 * The identity gate: every logged-in-user resolver returns null for an
+	 * anonymous request, so the session endpoint omits it — a logged-out caller
+	 * receives no user data.
+	 */
+	public function test_user_resolvers_return_null_for_anonymous_request(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( false );
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+
+		$module = $this->make_module();
+
+		$this->assertNull( $module->resolve_visitor_login_state() );
+		$this->assertNull( $module->resolve_visitor_type() );
+		$this->assertNull( $module->resolve_visitor_email() );
+		$this->assertNull( $module->resolve_visitor_email_hash() );
+		$this->assertNull( $module->resolve_visitor_registration_date() );
+		$this->assertNull( $module->resolve_visitor_username() );
+		$this->assertNull( $module->resolve_visitor_id() );
+	}
+
+	public function test_user_resolvers_return_values_for_logged_in_request(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'get_current_user_id' )->justReturn( 3 );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'              => 3,
+				'roles'           => array( 'editor', 'shop_manager' ),
+				'user_email'      => 'user@example.com',
+				'user_registered' => '2020-01-01 00:00:00',
+				'user_login'      => 'editoruser',
+			)
+		);
+
+		$module = $this->make_module();
+
+		$this->assertSame( 'logged-in', $module->resolve_visitor_login_state() );
+		$this->assertSame( 'editor,shop_manager', $module->resolve_visitor_type() );
+		$this->assertSame( 'user@example.com', $module->resolve_visitor_email() );
+		$this->assertSame( hash( 'sha256', 'user@example.com' ), $module->resolve_visitor_email_hash() );
+		$this->assertSame( strtotime( '2020-01-01 00:00:00' ), $module->resolve_visitor_registration_date() );
+		$this->assertSame( 'editoruser', $module->resolve_visitor_username() );
+		$this->assertSame( 3, $module->resolve_visitor_id() );
 	}
 
 	public function test_declare_visitor_scoped_fields_noop_when_cache_safe_off(): void {

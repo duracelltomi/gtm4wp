@@ -766,4 +766,82 @@ final class PageDataLayer {
 			$woo->session->set( ProductData::PENDING_PURCHASE_SESSION_KEY, null );
 		}
 	}
+
+	/**
+	 * Whether the WooCommerce customer/cart data layer block is delivered
+	 * client-side over the cart-fragments AJAX (cache-safe data layer, issue #398):
+	 * the mode is on and at least one of the customer-data / cart-content features
+	 * is enabled. When on, add_datalayer_data() omits the same block from the
+	 * cacheable page HTML (Phase 1) and it rides the fragments response instead.
+	 *
+	 * @return bool
+	 */
+	public function delivers_visitor_cart_client_side(): bool {
+		return (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
+			&& (
+				(bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA )
+				|| (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL )
+			);
+	}
+
+	/**
+	 * Builds the flat customer + cart data layer block for the current session,
+	 * reusing the exact server-path builders so the client receives identical
+	 * values under identical key names. Empty when neither feature is enabled or
+	 * WooCommerce is unavailable. Derives everything from the current request's WC
+	 * session/customer — no id parameter — so a caller only ever gets its own data.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function visitor_cart_datalayer(): array {
+		$woo = function_exists( 'WC' ) ? WC() : null;
+		if ( ! $woo ) {
+			return array();
+		}
+
+		$data = $this->add_customer_data( array(), $woo );
+		$data = $this->add_cart_content( $data, $woo );
+
+		return $data;
+	}
+
+	/**
+	 * Outputs the empty, cache-safe placeholder element the cart-fragments AJAX
+	 * fills with the customer/cart block. It carries no visitor data itself, so it
+	 * is safe to bake into the cached HTML; WooCommerce replaces it with the filled
+	 * version (from the fragments response and its sessionStorage cache) on every
+	 * page. Hooked to wp_footer.
+	 *
+	 * @return void
+	 */
+	public function output_visitor_cart_placeholder(): void {
+		echo '<div class="gtm4wp-wc-visitor-data" style="display:none"></div>';
+	}
+
+	/**
+	 * Carries the customer/cart data layer block on the WooCommerce cart-fragments
+	 * response, so it is delivered — and refreshed on every cart change — without
+	 * any new per-page request (the fragments AJAX already fires on cart mutation).
+	 * The block is JSON encoded into a data attribute of the placeholder; esc_attr()
+	 * is the correct escaper for the attribute context (the client reads it back via
+	 * dataset and JSON.parse, and the JSON_HEX_* flags keep any hostile customer
+	 * field free of a raw break-out). Hooked to woocommerce_add_to_cart_fragments.
+	 *
+	 * @param mixed $fragments The cart fragments map (selector => HTML).
+	 * @return array<string, string>
+	 */
+	public function add_visitor_cart_fragment( $fragments ): array {
+		if ( ! is_array( $fragments ) ) {
+			$fragments = array();
+		}
+
+		$json = wp_json_encode(
+			$this->visitor_cart_datalayer(),
+			JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		$fragments['div.gtm4wp-wc-visitor-data'] = '<div class="gtm4wp-wc-visitor-data" style="display:none" data-gtm4wp-visitor-cart="' . esc_attr( (string) $json ) . '"></div>';
+
+		return $fragments;
+	}
 }
