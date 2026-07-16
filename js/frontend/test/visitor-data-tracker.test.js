@@ -570,6 +570,8 @@ describe( 'gtm4wp-visitor-data — single merged push', () => {
  */
 describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 	const ENDPOINT = 'https://site.example/wp-json/gtm4wp/v2/visitor-data';
+	const CONFIRM_URL =
+		'https://site.example/wp-json/gtm4wp/v2/confirm-purchase-tracked';
 	const EVENT_COOKIE = 'gtm4wp_woo_event';
 
 	beforeEach( () => {
@@ -594,6 +596,24 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 			actions: [ { cookie: EVENT_COOKIE, keys } ],
 		};
 	}
+
+	/**
+	 * As actionConfig(), but the action entry carries a per-key confirm-beacon URL
+	 * map (issue #398): the client fires that authenticated POST after delivering the
+	 * one-shot so the server can flag the order tracked, keeping the GET read-only.
+	 *
+	 * @param {string[]} keys       One-shot field keys.
+	 * @param {Object}   confirmMap key => confirm-beacon URL.
+	 * @return {Object} The client config.
+	 */
+	function actionConfigConfirm( keys, confirmMap ) {
+		const config = actionConfig( keys );
+		config.actions[ 0 ].confirm = confirmMap;
+		return config;
+	}
+
+	const confirmBeacon = () =>
+		global.fetch.mock.calls.find( ( call ) => call[ 0 ] === CONFIRM_URL );
 
 	const eventsNamed = ( name ) =>
 		window.dataLayer.filter( ( entry ) => entry.event === name );
@@ -799,5 +819,99 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
 		expect( eventsNamed( 'add_to_cart' ) ).toHaveLength( 0 );
 		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	// Cross-device dedupe (issue #398): after a fallback delivery the client fires ONE
+	// authenticated POST beacon (with the shared wp_rest nonce) to flag the order
+	// tracked server-side, so a later order-received render on another device is
+	// suppressed — but only when the browser guard is in use and a purchase actually
+	// fired, and never when the GET is read-only-only (flag false / already tracked).
+	it( 'fires the confirm-purchase POST beacon after a fallback delivery, with the nonce', async () => {
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( purchasePayload( '1001', true ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+
+		// A second fetch: POST to the confirm route, keepalive, credentials + the nonce.
+		const beacon = confirmBeacon();
+		expect( beacon ).toBeTruthy();
+		const options = beacon[ 1 ];
+		expect( options.method ).toBe( 'POST' );
+		expect( options.keepalive ).toBe( true );
+		expect( options.credentials ).toBe( 'same-origin' );
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'n1' );
+		// The beacon carries NO order id — the server resolves it from the session.
+		expect( options.body ).toBeUndefined();
+	} );
+
+	it( 'sends NO confirm beacon when flag is false (do-not-flag option)', async () => {
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( purchasePayload( '1001', false ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+		expect( confirmBeacon() ).toBeFalsy();
+	} );
+
+	it( 'sends NO confirm beacon when the purchase is suppressed as already tracked', async () => {
+		// The order-received purchase already wrote the shared guard, so the fallback
+		// is suppressed — and with no push there is nothing to confirm.
+		window.localStorage.setItem( 'gtm4wp_orderid_tracked', '1001' );
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( purchasePayload( '1001', true ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		expect( confirmBeacon() ).toBeFalsy();
+	} );
+
+	it( 'still delivers the purchase when the confirm beacon fails (graceful)', async () => {
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		// The endpoint resolves the fallback; the beacon POST then rejects.
+		global.fetch
+			.mockResolvedValueOnce( {
+				ok: true,
+				json: () =>
+					Promise.resolve( {
+						payload: JSON.stringify(
+							purchasePayload( '1001', true )
+						),
+					} ),
+			} )
+			.mockRejectedValueOnce( new Error( 'network down' ) );
+
+		loadTracker();
+		await flush();
+
+		// The fallback purchase and the same-browser guard are unaffected by the
+		// beacon's failure (degrades to today's behavior — no regression).
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+		expect( window.localStorage.getItem( 'gtm4wp_orderid_tracked' ) ).toBe(
+			'1001'
+		);
+		expect( confirmBeacon() ).toBeTruthy();
 	} );
 } );

@@ -172,10 +172,11 @@ final class VisitorDataModule extends AbstractModule {
 		 */
 		$fields = apply_filters( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array() );
 
-		$client_fields = array();
-		$session_keys  = array();
-		$gates         = array();
-		$actions       = array();
+		$client_fields  = array();
+		$session_keys   = array();
+		$gates          = array();
+		$actions        = array();
+		$action_confirm = array();
 
 		if ( is_array( $fields ) ) {
 			foreach ( $fields as $field ) {
@@ -195,6 +196,14 @@ final class VisitorDataModule extends AbstractModule {
 					// client runtime handles them separately from the replayed gates.
 					if ( $field->one_shot ) {
 						$actions[ $field->cookie_gate ][] = $field->key;
+
+						// A one-shot may carry an authenticated POST-beacon URL the client
+						// fires after delivery (e.g. the reliable-purchase fallback flagging
+						// its order tracked, issue #398). Surface it per key so the client
+						// keeps the GET read-only.
+						if ( '' !== $field->confirm_url ) {
+							$action_confirm[ $field->cookie_gate ][ $field->key ] = $field->confirm_url;
+						}
 					} else {
 						$gates[ $field->cookie_gate ][] = $field->key;
 					}
@@ -235,10 +244,19 @@ final class VisitorDataModule extends AbstractModule {
 			if ( array() !== $actions ) {
 				$config['actions'] = array();
 				foreach ( $actions as $cookie => $keys ) {
-					$config['actions'][] = array(
+					$entry = array(
 						'cookie' => $cookie,
 						'keys'   => array_values( array_unique( $keys ) ),
 					);
+
+					// The client fires each mapped key's beacon (key => URL) after
+					// delivering that one-shot event; absent when no one-shot on this
+					// cookie declared a confirm URL.
+					if ( ! empty( $action_confirm[ $cookie ] ) ) {
+						$entry['confirm'] = $action_confirm[ $cookie ];
+					}
+
+					$config['actions'][] = $entry;
 				}
 			}
 		}

@@ -134,6 +134,12 @@ if ( ! class_exists( 'WC_Order' ) ) {
 			return (bool) $this->value( 'is_paid', false );
 		}
 		public function get_meta( $key, $single = true ) {
+			// A meta written this request (update_meta_data) wins over the constructor
+			// fixture, so is_purchase_already_tracked() sees a just-flagged _ga_tracked
+			// (the cross-device confirm-beacon path, issue #398).
+			if ( array_key_exists( $key, $this->saved_meta ) ) {
+				return $this->saved_meta[ $key ];
+			}
 			$meta = $this->value( 'meta', array() );
 			return array_key_exists( $key, $meta ) ? $meta[ $key ] : '';
 		}

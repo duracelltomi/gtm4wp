@@ -61,10 +61,21 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 
 if ( ! class_exists( 'WP_REST_Request' ) ) {
 	class WP_REST_Request {
-		public function __construct( private array $params = array() ) {}
+		public function __construct( private array $params = array(), private array $headers = array() ) {}
 
 		public function get_param( string $key ) {
 			return $this->params[ $key ] ?? null;
+		}
+
+		public function get_header( string $key ) {
+			// WordPress normalizes header names (case-insensitive, '-'/'_' equivalent).
+			$normalized = strtolower( str_replace( '-', '_', $key ) );
+			foreach ( $this->headers as $name => $value ) {
+				if ( strtolower( str_replace( '-', '_', (string) $name ) ) === $normalized ) {
+					return $value;
+				}
+			}
+			return null;
 		}
 	}
 }

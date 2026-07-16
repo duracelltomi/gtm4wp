@@ -21,7 +21,10 @@
  *   per-event de-dupe guard — the purchase reuses the same gtm4wp_orderid_tracked
  *   guard as the order-received page), and are their own data layer events rather
  *   than part of the merged gtm4wp.visitorData push; the event cookie is cleared
- *   after delivery so a later page makes no request.
+ *   after delivery so a later page makes no request. After the fallback purchase the
+ *   client also fires a single authenticated POST beacon so the server flags the
+ *   order _ga_tracked, closing the cross-device double-count while the GET stays
+ *   read-only (issue #398).
  *
  * All of these load-time sources are gathered into a SINGLE gtm4wp.visitorData
  * push, so a GTM setup sees them arrive together. On a cached page view the
@@ -309,16 +312,75 @@
 	}
 
 	/**
+	 * Fires the authenticated POST beacon that asks the server to flag the delivered
+	 * reliable-purchase-fallback order as tracked (issue #398), closing the
+	 * cross-device double-count while the GET session endpoint stays read-only. Sends
+	 * the shared wp_rest nonce (config.nonce) — as the X-WP-Nonce header on the fetch
+	 * keepalive path, or as the _wpnonce query parameter for the sendBeacon fallback,
+	 * which cannot set headers. Best-effort and fire-and-forget: it survives page
+	 * navigation (keepalive / sendBeacon) and any failure is swallowed, so it degrades
+	 * to the same-browser guard. Carries NO order id — the server resolves that from
+	 * its own session marker.
+	 *
+	 * @param {string} url The confirm-purchase route URL baked into the config.
+	 * @return {void}
+	 */
+	function confirmPurchaseTracked( url ) {
+		if ( ! url ) {
+			return;
+		}
+
+		try {
+			if ( 'function' === typeof fetch ) {
+				const headers = {};
+				if ( config.nonce ) {
+					headers[ 'X-WP-Nonce' ] = config.nonce;
+				}
+
+				const request = fetch( url, {
+					method: 'POST',
+					credentials: 'same-origin',
+					keepalive: true,
+					headers,
+				} );
+				if ( request && 'function' === typeof request.catch ) {
+					request.catch( function () {} );
+				}
+				return;
+			}
+
+			if (
+				'undefined' !== typeof navigator &&
+				'function' === typeof navigator.sendBeacon
+			) {
+				const separator = -1 === url.indexOf( '?' ) ? '?' : '&';
+				navigator.sendBeacon(
+					config.nonce
+						? url +
+								separator +
+								'_wpnonce=' +
+								encodeURIComponent( config.nonce )
+						: url
+				);
+			}
+		} catch ( e ) {
+			// Swallow: the same-browser guard still holds.
+		}
+	}
+
+	/**
 	 * Fires the reliable-purchase fallback exactly once. De-dupes against the shared
 	 * gtm4wp_orderid_tracked guard keyed on the order number (so it can never double
 	 * with the order-received purchase), UNLESS the payload flag is false — the "Do
 	 * not flag orders as being tracked" case, where no order-tracked state is read or
 	 * written anywhere, matching the server path.
 	 *
-	 * @param {Object} payload The resolver payload ({ push, orderNumber, flag }).
+	 * @param {Object} payload    The resolver payload ({ push, orderNumber, flag }).
+	 * @param {string} confirmUrl Optional authenticated POST-beacon URL fired after a
+	 *                            fallback delivery to flag the order tracked server-side.
 	 * @return {void}
 	 */
-	function handlePendingPurchase( payload ) {
+	function handlePendingPurchase( payload, confirmUrl ) {
 		if ( ! payload || 'object' !== typeof payload || ! payload.push ) {
 			return;
 		}
@@ -337,6 +399,15 @@
 
 		if ( useGuard && orderNumber ) {
 			writeOrderTracked( orderNumber );
+		}
+
+		// Cross-device dedupe (issue #398): after the fallback push, tell the server to
+		// flag _ga_tracked on the order so a later order-received render on ANOTHER
+		// device is suppressed. Only when the browser guard is in use (flag !== false);
+		// the "Do not flag orders as being tracked" case writes no order-tracked state
+		// anywhere, so it also sends no beacon.
+		if ( useGuard && confirmUrl ) {
+			confirmPurchaseTracked( confirmUrl );
 		}
 	}
 
@@ -407,10 +478,18 @@
 
 		// The set of one-shot field names, so the fetched values can be routed to
 		// their handlers and kept out of the merged visitorData push / the cache.
+		// actionConfirm maps a one-shot key to the authenticated POST-beacon URL its
+		// handler fires after delivery (e.g. the reliable-purchase fallback flagging
+		// its order tracked, issue #398), so the GET response stays side-effect free.
 		const actionKeys = {};
+		const actionConfirm = {};
 		actions.forEach( function ( action ) {
+			const confirm = action.confirm || {};
 			( action.keys || [] ).forEach( function ( key ) {
 				actionKeys[ key ] = true;
+				if ( confirm[ key ] ) {
+					actionConfirm[ key ] = confirm[ key ];
+				}
 			} );
 		} );
 
@@ -570,7 +649,7 @@
 					if ( key in data ) {
 						const handler = actionHandlers[ key ];
 						if ( 'function' === typeof handler ) {
-							handler( data[ key ] );
+							handler( data[ key ], actionConfirm[ key ] );
 						}
 						delete data[ key ];
 					}

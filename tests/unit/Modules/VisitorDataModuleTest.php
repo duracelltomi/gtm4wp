@@ -215,6 +215,28 @@ final class VisitorDataModuleTest extends TestCase {
 		$this->assertStringContainsString( '"actions":[{"cookie":"gtm4wp_woo_event","keys":["pendingPurchase","readdedToCart"]}]', $code );
 	}
 
+	public function test_one_shot_confirm_url_is_surfaced_per_key_in_the_actions_config(): void {
+		// Issue #398: a one-shot that carries a confirm_url (the reliable-purchase
+		// fallback's authenticated POST beacon) must surface it per key in its action
+		// entry, so the client can flag the order tracked after delivery while the GET
+		// stays read-only. A sibling one-shot without a confirm_url must NOT appear in
+		// the confirm map.
+		$this->scoped_fields = array(
+			new VisitorField( 'readdedToCart', VisitorField::TIER_ACTION, '', static fn () => array(), 'gtm4wp_woo_event', true ),
+			new VisitorField( 'pendingPurchase', VisitorField::TIER_ACTION, '', static fn () => array(), 'gtm4wp_woo_event', true, 'https://example.com/wp-json/gtm4wp/v2/confirm-purchase-tracked' ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$code = $this->inline_for( 'gtm4wp-visitor-data' );
+
+		// The confirm map is keyed by the one-shot field name and carries only the
+		// field that declared a URL.
+		$this->assertStringContainsString( '"confirm":{"pendingPurchase":"https:\/\/example.com\/wp-json\/gtm4wp\/v2\/confirm-purchase-tracked"}', $code );
+		$this->assertStringNotContainsString( 'readdedToCart":"http', $code, 'A one-shot without a confirm_url must not appear in the confirm map.' );
+	}
+
 	public function test_action_field_without_a_gate_is_omitted_from_the_config(): void {
 		// A Tier 3 field with no cookie gate cannot be delivered safely (nothing tells
 		// the client when to fetch it), so it contributes no gate and — being the only

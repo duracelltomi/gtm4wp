@@ -48,7 +48,7 @@ defined( 'ABSPATH' ) || exit;
  *   HttpOnly WordPress auth cookie (JS cannot read it) but a JS-visible companion
  *   cookie the VisitorData module maintains alongside it.
  *
- * Phase 3 adds one further constructor argument for the WooCommerce one-shot
+ * Phase 3 adds two further constructor arguments for the WooCommerce one-shot
  * events (an add_to_cart after the cart "Undo"; the reliable-purchase fallback):
  *
  * - $one_shot marks a Tier 3 field as a one-shot EVENT rather than a persistent
@@ -58,6 +58,12 @@ defined( 'ABSPATH' ) || exit;
  *   with a per-event de-dupe guard, then clears the event cookie — it is never
  *   cached or replayed. The VisitorData module routes one-shot fields into the
  *   config `actions` list instead of `gates`.
+ * - $confirm_url is the optional URL of an authenticated POST beacon the client
+ *   fires AFTER delivering a one-shot event, so the read-only GET session endpoint
+ *   can stay side-effect-free while a state change (e.g. the reliable-purchase
+ *   fallback flagging its order _ga_tracked to close a cross-device double-count,
+ *   issue #398) still happens. Surfaced per one-shot key in the config `actions`
+ *   entry; empty means no beacon.
  *
  * (WooCommerce customer & cart data are session-scoped and delivered on the
  * existing cart-fragments AJAX instead — see WooCommerce\PageDataLayer — so they
@@ -99,6 +105,10 @@ final class VisitorField {
 	 *                              (Phase 3) — fetched only while its event cookie is
 	 *                              present, pushed once with a de-dupe guard, then the
 	 *                              cookie is cleared; never cached/replayed.
+	 * @param string $confirm_url   One-shot only: optional URL of an authenticated POST
+	 *                              beacon the client fires after delivering this event,
+	 *                              so a state change can happen without the read-only
+	 *                              GET endpoint mutating anything (empty = no beacon).
 	 */
 	public function __construct(
 		public string $key,
@@ -106,7 +116,8 @@ final class VisitorField {
 		public string $client_source = '',
 		public mixed $resolver = null,
 		public string $cookie_gate = '',
-		public bool $one_shot = false
+		public bool $one_shot = false,
+		public string $confirm_url = ''
 	) {
 	}
 }

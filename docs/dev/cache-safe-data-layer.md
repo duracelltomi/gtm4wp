@@ -145,33 +145,68 @@ per-event dedupe guard, then the cookie is cleared — never cached or replayed.
    watch. An anonymous cached-page visitor without the cookie never fetches.
 3. **Resolvers.** On the session endpoint the resolvers resolve the order/re-add from
    the **current WC session** (no id parameter → no IDOR), run the same eligibility
-   gauntlet as the page path, **consume** the session marker (so a lingering cookie
+   gauntlet as the page path, **consume** the delivery marker (so a lingering cookie
    can't re-resolve), and return the event payload plus its dedupe key — the order
    *number* for the purchase, the re-add token for the cart. `resolve_pending_purchase()`
-   deliberately does **not** write `_ga_tracked` (it is a public GET); that server-side
-   write stays on the authenticated order-received page.
+   deliberately does **not** write `_ga_tracked` (it is a public GET); instead — when
+   order-tracked flagging is on — it stashes the resolved order id in a *dedicated*
+   needs-flag session marker (`PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY`) that
+   the authenticated POST beacon (point 5) consumes to write `_ga_tracked`. The GET
+   still mutates no order state.
 4. **Client dedupe (the point of the phase).** In `gtm4wp-visitor-data.js` the one-shot
    handlers push each event under the same event name the server used, guarded so it
    fires once:
    - **Purchase fallback** reuses the **existing** de-dupe — the same
      `gtm4wp_orderid_tracked` localStorage/cookie guard (keyed on the order number)
      the order-received page's inline block writes (`purchase_dedupe_guard`), read/written
-     through one shared protocol. So a fallback fire on page N and a real
-     order-received purchase for the same order can **never both count** — whichever
+     through one shared protocol. Within one browser a fallback fire on page N and a
+     real order-received purchase for the same order can **never both count** — whichever
      runs first records the guard; the other is suppressed (client guard) or omitted
-     (server `_ga_tracked` gauntlet + marker clear). When "Do not flag orders as being
-     tracked" is on, the resolver sets `flag = false` and the client writes/reads **no**
-     order-tracked state anywhere, matching the server path.
+     (server `_ga_tracked` gauntlet + marker clear). *Across devices*, the shared client
+     guard is not enough (device B has neither the localStorage guard nor, historically,
+     the server flag), so the POST beacon in point 5 restores the `_ga_tracked` parity
+     the classic order-received page has. When "Do not flag orders as being tracked" is
+     on, the resolver sets `flag = false` and the client writes/reads **no** order-tracked
+     state anywhere and sends **no** beacon, matching the server path.
    - **Re-added-to-cart** de-dupes on the per-event token (the WC session re-add key),
      recorded in `localStorage` after the push so a page reload does not re-fire it.
    After delivering, the client clears the event cookie, so a later page makes no request.
+5. **Cross-device purchase parity — the confirm-purchase POST beacon.** The classic
+   order-received page flags `_ga_tracked` so a second render for the same order is
+   suppressed *everywhere*; the fallback GET must not do that (a GET changing order
+   state is the anti-pattern). So after a fallback purchase delivery the client fires
+   **one** authenticated `POST` to `gtm4wp/v2/confirm-purchase-tracked`
+   (`PageDataLayer::confirm_pending_purchase_tracked()`), which loads the order via
+   `wc_get_order()` and calls `ProductData::flag_order_tracked()` — the same
+   `_ga_tracked` write the order-received page performs (and which already no-ops under
+   "Do not flag orders as being tracked"). Its security model mirrors the GET endpoint's:
+   the order id comes **only** from the needs-flag session marker (never the request
+   body → no IDOR; the callback reads no request param at all), and it is a state
+   change so it verifies the `wp_rest` REST nonce (sent as `X-WP-Nonce`, or as the
+   `_wpnonce` parameter for the `navigator.sendBeacon` fallback that cannot set headers)
+   rather than a capability — guest checkout is common and the request only ever flags
+   the caller's own session order. The marker is consumed on the first POST, so it is
+   idempotent (a second POST no-ops). The beacon fires **only** on the rare fallback
+   delivery — never a new per-page request — uses `fetch` keepalive (or `sendBeacon`)
+   so it survives navigation, and is best-effort: a failed beacon degrades to the
+   same-browser guard (no cross-device flag that time, no regression). The confirm URL
+   rides the client config as a per-key `confirm` entry on the one-shot `actions` list
+   (`VisitorField::$confirm_url` → `VisitorDataModule::build_config()`), reusing the
+   config's existing `wp_rest` nonce. With the beacon in place the fallback is
+   **exactly-once** — not just per browser — with the cross-device double-count closed.
 
 Regression tests: `PageDataLayerTest` (resolver payloads, marker consumption, no
-`_ga_tracked` write on the endpoint, the two exactly-once orderings, `flag=false`,
-hostile order number round-trips hex-encoded, one-shots absent from server HTML),
+`_ga_tracked` write on the endpoint, the needs-flag marker stashed only when flagging
+is on, the confirm-purchase POST flags via the session marker only — no-IDOR, is
+idempotent + returns 204, honours "do not flag", the nonce/CSRF permission gate, the
+headline cross-device flow where the beacon then suppresses the order-received render,
+the two exactly-once orderings, `flag=false`, hostile order number round-trips
+hex-encoded, one-shots absent from server HTML),
 `HelpersTest` / `PurchaseTrackingTest` / `ListTrackingTest` (event cookie set only in
 cache-safe mode + headers-sent guard), `VisitorDataModuleTest` (`config.actions`
-routing), and the JS suite (cookie gate → no fetch; fires once; reload with the token
-in localStorage does not re-fire; the shared guard suppresses the second purchase in
-both orderings; one-shots stay out of the merged push and the cache; stale cookie
-cleared).
+routing + the per-key `confirm` map), and the JS suite (cookie gate → no fetch; fires
+once; reload with the token in localStorage does not re-fire; the shared guard
+suppresses the second purchase in both orderings; the confirm beacon fires with the
+nonce after a fallback delivery, and is skipped on `flag=false` / when suppressed as
+already tracked / degrades gracefully on failure; one-shots stay out of the merged
+push and the cache; stale cookie cleared).
