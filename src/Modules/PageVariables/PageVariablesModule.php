@@ -75,6 +75,7 @@ final class PageVariablesModule extends AbstractModule {
 			GTM4WP_OPTION_INCLUDE_POSTSTICKY        => false,
 			GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY   => false,
 			GTM4WP_OPTION_INCLUDE_PAGELANGUAGE      => false,
+			GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE    => false,
 		);
 	}
 
@@ -104,6 +105,14 @@ final class PageVariablesModule extends AbstractModule {
 	 */
 	public function add_datalayer_data( $data_layer ) {
 		global $wp_query;
+
+		// When on, post/term derived values (title, category, tags, taxonomy
+		// terms) are output in the site's default (master) language instead of
+		// the current translation, so GA reports combine across languages.
+		// Read once here; each call site short-circuits on it so the default
+		// (off) path stays byte-for-byte the current behavior. See
+		// resolve_default_language_object_id() for the WPML/Polylang branching.
+		$use_master_language = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE );
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_SITEID ) || $this->opt( GTM4WP_OPTION_INCLUDE_SITENAME ) ) {
 			$data_layer['siteID']   = 0;
@@ -162,7 +171,25 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTITLE ) ) {
-			$data_layer['pageTitle'] = wp_strip_all_tags( wp_title( '|', false, 'right' ) );
+			$page_title = wp_title( '|', false, 'right' );
+
+			// On a singular page with the master-language option on, report the
+			// post's title in the site's default language. Only overridden when
+			// an actual translation exists (a distinct master post id), so a
+			// monolingual site, an untranslated post, or no active multilingual
+			// plugin all keep the current wp_title() output unchanged.
+			if ( $use_master_language && is_singular() ) {
+				$_post_id        = (int) get_the_ID();
+				$_master_post_id = $this->resolve_default_language_post_id( $_post_id, (string) get_post_type() );
+				if ( $_master_post_id > 0 && $_master_post_id !== $_post_id ) {
+					$_master_title = (string) get_the_title( $_master_post_id );
+					if ( '' !== $_master_title ) {
+						$page_title = $_master_title;
+					}
+				}
+			}
+
+			$data_layer['pageTitle'] = wp_strip_all_tags( $page_title );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGELANGUAGE ) ) {
@@ -213,7 +240,9 @@ final class PageVariablesModule extends AbstractModule {
 				if ( $_post_tags ) {
 					$data_layer['pageAttributes'] = array();
 					foreach ( $_post_tags as $_one_tag ) {
-						$data_layer['pageAttributes'][] = $_one_tag->slug;
+						$data_layer['pageAttributes'][] = $use_master_language
+							? $this->localized_term_field( (int) $_one_tag->term_id, 'post_tag', 'slug', (string) $_one_tag->slug )
+							: $_one_tag->slug;
 					}
 				}
 			}
@@ -316,7 +345,9 @@ final class PageVariablesModule extends AbstractModule {
 					if ( is_array( $post_taxonomy_values ) ) {
 						$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
 						foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
-							$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = $one_taxonomy_value->name;
+							$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = $use_master_language
+								? $this->localized_term_field( (int) $one_taxonomy_value->term_id, $one_object_taxonomy, 'name', (string) $one_taxonomy_value->name )
+								: $one_taxonomy_value->name;
 						}
 					}
 				}
@@ -604,21 +635,145 @@ final class PageVariablesModule extends AbstractModule {
 	 */
 	private function build_category_slugs( array $categories ): array {
 		$include_parents = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES );
+		$use_master      = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE );
 
 		$slugs = array();
 		foreach ( $categories as $one_cat ) {
-			$slugs[] = $one_cat->slug;
+			$slugs[] = $use_master
+				? $this->localized_term_field( (int) $one_cat->term_id, 'category', 'slug', (string) $one_cat->slug )
+				: $one_cat->slug;
 
 			if ( $include_parents ) {
 				foreach ( get_ancestors( $one_cat->term_id, 'category' ) as $ancestor_id ) {
 					$ancestor_term = get_term( (int) $ancestor_id, 'category' );
 					if ( $ancestor_term instanceof \WP_Term ) {
-						$slugs[] = $ancestor_term->slug;
+						$slugs[] = $use_master
+							? $this->localized_term_field( (int) $ancestor_term->term_id, 'category', 'slug', (string) $ancestor_term->slug )
+							: $ancestor_term->slug;
 					}
 				}
 			}
 		}
 
 		return array_values( array_unique( $slugs ) );
+	}
+
+	/**
+	 * Returns a field (slug or name) of the default (master) language
+	 * equivalent of a taxonomy term.
+	 *
+	 * Used to output category/tag/taxonomy values in the site's default
+	 * language (issue #145). When the term has a distinct translation in the
+	 * default language, that term's slug/name is returned; otherwise (no active
+	 * multilingual plugin, an untranslated term, or the term already being the
+	 * master one) the supplied fallback - the term's own value in the current
+	 * language - is returned unchanged.
+	 *
+	 * @param int    $term_id  Term id in the current language.
+	 * @param string $taxonomy Taxonomy of the term ('category', 'post_tag' or a custom taxonomy).
+	 * @param string $field    Field to read from the resolved term: 'slug' or 'name'.
+	 * @param string $fallback Current-language value to return when no master term is resolved.
+	 * @return string
+	 */
+	private function localized_term_field( int $term_id, string $taxonomy, string $field, string $fallback ): string {
+		$master_term_id = $this->resolve_default_language_term_id( $term_id, $taxonomy );
+		if ( $master_term_id > 0 && $master_term_id !== $term_id ) {
+			$master_term = get_term( $master_term_id, $taxonomy );
+			if ( $master_term instanceof \WP_Term ) {
+				return (string) ( 'name' === $field ? $master_term->name : $master_term->slug );
+			}
+		}
+
+		return $fallback;
+	}
+
+	/**
+	 * Resolves the id of the default (master) language equivalent of a post.
+	 *
+	 * @param int    $post_id Post id in the current language.
+	 * @param string $type    Post type (WPML element type for posts, e.g. 'post', 'page', a custom post type).
+	 * @return int Master-language post id, or the given id when it cannot be resolved.
+	 */
+	private function resolve_default_language_post_id( int $post_id, string $type ): int {
+		return $this->resolve_default_language_object_id( $post_id, $type, false, 'gtm4wp_master_language_post_id' );
+	}
+
+	/**
+	 * Resolves the id of the default (master) language equivalent of a term.
+	 *
+	 * @param int    $term_id  Term id in the current language.
+	 * @param string $taxonomy Taxonomy of the term (also the WPML element type for terms).
+	 * @return int Master-language term id, or the given id when it cannot be resolved.
+	 */
+	private function resolve_default_language_term_id( int $term_id, string $taxonomy ): int {
+		return $this->resolve_default_language_object_id( $term_id, $taxonomy, true, 'gtm4wp_master_language_term_id' );
+	}
+
+	/**
+	 * Resolves the id of the default (master) language equivalent of a post or
+	 * term using whichever multilingual plugin is active.
+	 *
+	 * Mirrors the WPML/Polylang guarding used by the pageLanguage detection:
+	 * WPML is detected through its wpml_current_language filter and resolved
+	 * with wpml_object_id (the `true` argument returns the original id when no
+	 * translation exists); Polylang is detected through its pll_* functions and
+	 * resolved with pll_get_post()/pll_get_term() (both return 0 when there is
+	 * no translation). When neither plugin is active - or no default-language
+	 * object is found - the given id is returned unchanged so the caller keeps
+	 * the current behavior. The result is always filterable so integrators can
+	 * support other multilingual plugins.
+	 *
+	 * @param int    $id      Post or term id in the current language.
+	 * @param string $type    WPML element type: the post type for posts, the taxonomy for terms.
+	 * @param bool   $is_term Whether $id is a term id (true) or a post id (false).
+	 * @param string $filter  Filter hook applied to the resolved id.
+	 * @return int
+	 */
+	private function resolve_default_language_object_id( int $id, string $type, bool $is_term, string $filter ): int {
+		$resolved = $id;
+
+		if ( $id > 0 ) {
+			if ( has_filter( 'wpml_current_language' ) ) {
+				// WPML: wpml_default_language + wpml_object_id.
+				$default_lang = apply_filters( 'wpml_default_language', null );
+				if ( is_string( $default_lang ) && '' !== $default_lang ) {
+					$wpml_id = apply_filters( 'wpml_object_id', $id, $type, true, $default_lang );
+					if ( is_numeric( $wpml_id ) && (int) $wpml_id > 0 ) {
+						$resolved = (int) $wpml_id;
+					}
+				}
+			} else {
+				// Polylang: pll_default_language + pll_get_post/pll_get_term.
+				$pll_ready = $is_term ? function_exists( 'pll_get_term' ) : function_exists( 'pll_get_post' );
+
+				if ( $pll_ready && function_exists( 'pll_default_language' ) ) {
+					$default_lang = pll_default_language();
+					if ( is_string( $default_lang ) && '' !== $default_lang ) {
+						$pll_id = $is_term ? pll_get_term( $id, $default_lang ) : pll_get_post( $id, $default_lang );
+						if ( is_numeric( $pll_id ) && (int) $pll_id > 0 ) {
+							$resolved = (int) $pll_id;
+						}
+					}
+				}
+			}
+		}
+
+		/**
+		 * Filters the id resolved to the site's default (master) language.
+		 *
+		 * Lets integrators support other multilingual plugins, or override the
+		 * WPML/Polylang resolution, for the master-language data layer values.
+		 * Fires as gtm4wp_master_language_post_id for posts and
+		 * gtm4wp_master_language_term_id for terms.
+		 *
+		 * @since 2.0
+		 *
+		 * @param int    $resolved Resolved master-language id (the original id when nothing was resolved).
+		 * @param int    $id       Original post/term id in the current language.
+		 * @param string $type     Post type (posts) or taxonomy (terms).
+		 *
+		 * @return int Id to read the master-language value from.
+		 */
+		return (int) apply_filters( $filter, $resolved, $id, $type );
 	}
 }

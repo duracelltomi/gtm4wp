@@ -79,6 +79,7 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTSTICKY', 'include-post-sticky' );
 define( 'GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY', 'include-primary-category' );
 define( 'GTM4WP_OPTION_INCLUDE_PAGELANGUAGE', 'include-page-language' );
 define( 'GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES', 'include-parent-categories' );
+define( 'GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE', 'include-master-language' );
 
 // Removed in 2.0: geo and weather data. Constants kept for third party compatibility.
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEO', 'include-miscgeo' );
