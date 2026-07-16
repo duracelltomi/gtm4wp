@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\WooCommerce;
 
+use GTM4WP\Frontend\DefaultLanguage;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -143,10 +144,9 @@ final class ProductData {
 
 		$use_full_category_path = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH );
 
-		$product_id     = $product->get_id();
-		$product_type   = $product->get_type();
-		$remarketing_id = $product_id;
-		$product_sku    = $product->get_sku();
+		$product_id   = $product->get_id();
+		$product_type = $product->get_type();
+		$product_sku  = $product->get_sku();
 
 		// Detect variations structurally: WooCommerce Subscriptions (and similar
 		// extensions) report a type other than "variation" - e.g.
@@ -157,14 +157,54 @@ final class ProductData {
 
 		if ( $is_variation ) {
 			$parent_product_id = $product->get_parent_id();
-			$product_cat       = Helpers::get_product_category( $parent_product_id, $use_full_category_path );
+		}
+
+		// Master-language consolidation (#145): on a multilingual store with the
+		// option on, resolve this product (and, for a variation, its parent) to
+		// the store's default-language equivalent and build the GA4 item identity
+		// and text - item_id, item_name, sku, item_category*, item_brand and
+		// item_variant - from that product, so the same product sold in several
+		// languages reports as one item to GA4 (which groups items by item_id).
+		// Price, stock and the internal list-attribution id stay on the current
+		// product. Falls back to the current product when the option is off, no
+		// multilingual plugin is active, or the product has no default-language
+		// translation.
+		$data_product     = $product;
+		$data_product_id  = $product_id;
+		$data_product_sku = $product_sku;
+		if ( isset( $parent_product_id ) ) {
+			$data_parent_id = $parent_product_id;
+		}
+
+		if (
+			true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE )
+			&& DefaultLanguage::is_active()
+		) {
+			$master_id = DefaultLanguage::post_id( $product_id, $is_variation ? 'product_variation' : 'product' );
+			if ( $master_id !== $product_id ) {
+				$master_product = wc_get_product( $master_id );
+				if ( $master_product instanceof \WC_Product ) {
+					$data_product     = $master_product;
+					$data_product_id  = $master_id;
+					$data_product_sku = (string) $master_product->get_sku();
+				}
+			}
+
+			if ( $is_variation && isset( $parent_product_id ) && ( $parent_product_id > 0 ) ) {
+				$data_parent_id = DefaultLanguage::post_id( $parent_product_id, 'product' );
+			}
+		}
+
+		if ( $is_variation ) {
+			$product_cat = Helpers::get_product_category( $data_parent_id, $use_full_category_path );
 		} else {
-			$product_cat = Helpers::get_product_category( $product_id, $use_full_category_path );
+			$product_cat = Helpers::get_product_category( $data_product_id, $use_full_category_path );
 		}
 		$product_cat_parts = explode( '/', $product_cat );
 
-		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCUSESKU ) && ( '' !== $product_sku ) ) {
-			$remarketing_id = $product_sku;
+		$remarketing_id = $data_product_id;
+		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCUSESKU ) && ( '' !== $data_product_sku ) ) {
+			$remarketing_id = $data_product_sku;
 		}
 
 		// wc_get_price_to_display() is expensive in the cart/checkout context. Skip it
@@ -181,8 +221,8 @@ final class ProductData {
 		$_temp_productdata = array(
 			'internal_id'              => $product_id,
 			'item_id'                  => $remarketing_id,
-			'item_name'                => $product->get_title(),
-			'sku'                      => $product_sku ? $product_sku : $product_id,
+			'item_name'                => $data_product->get_title(),
+			'sku'                      => $data_product_sku ? $data_product_sku : $data_product_id,
 			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
 			'stocklevel'               => $product->get_stock_quantity(),
 			'stockstatus'              => $product->get_stock_status(),
@@ -190,7 +230,7 @@ final class ProductData {
 		);
 
 		if ( $is_variation ) {
-			$_temp_productdata['item_group_id'] = $parent_product_id;
+			$_temp_productdata['item_group_id'] = $data_parent_id;
 		}
 
 		if ( 1 === count( $product_cat_parts ) ) {
@@ -208,17 +248,17 @@ final class ProductData {
 
 		$brand_taxonomy = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY );
 		if ( '' !== $brand_taxonomy ) {
-			if ( isset( $parent_product_id ) && ( 0 !== $parent_product_id ) ) {
-				$product_id_to_query = $parent_product_id;
+			if ( isset( $data_parent_id ) && ( 0 !== $data_parent_id ) ) {
+				$product_id_to_query = $data_parent_id;
 			} else {
-				$product_id_to_query = $product_id;
+				$product_id_to_query = $data_product_id;
 			}
 
 			$_temp_productdata['item_brand'] = Helpers::get_product_term( $product_id_to_query, $brand_taxonomy );
 		}
 
 		if ( $is_variation ) {
-			$_temp_productdata['item_variant'] = implode( ',', $product->get_variation_attributes() );
+			$_temp_productdata['item_variant'] = implode( ',', $data_product->get_variation_attributes() );
 		}
 
 		$_temp_productdata = array_merge( $_temp_productdata, $additional_product_attributes );
