@@ -29,11 +29,11 @@ final class FieldTest extends TestCase {
 	 *
 	 * @param array<string, mixed> $overrides Constructor overrides keyed by param name.
 	 */
-	private function make_field( string $type, $default = '', array $overrides = array() ): Field {
+	private function make_field( string $type, $default_value = '', array $overrides = array() ): Field {
 		return new Field(
 			$overrides['key'] ?? 'test-key',
 			$type,
-			$default,
+			$default_value,
 			$overrides['label'] ?? 'Label',
 			$overrides['description'] ?? '',
 			$overrides['group'] ?? '',
