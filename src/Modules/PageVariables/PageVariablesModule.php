@@ -221,15 +221,77 @@ final class PageVariablesModule extends AbstractModule {
 			}
 
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) || $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
-				$postuser = get_userdata( $GLOBALS['post']->post_author );
+				// PublishPress Authors lets a post have several authors (co-authors,
+				// guest authors), which matters for E-E-A-T. When it is active and
+				// the current post has more than one author, emit them as arrays
+				// (pagePostAuthors / pagePostAuthorIDs) while keeping the single-value
+				// vars for back-compat, set to the primary (first) author. When
+				// PublishPress is not active, the behavior below is unchanged.
+				$multiple_authors = array();
+				if ( function_exists( 'get_multiple_authors' ) ) {
+					$ppress_authors = get_multiple_authors( $GLOBALS['post']->ID );
+					if ( is_array( $ppress_authors ) ) {
+						$multiple_authors = $ppress_authors;
+					}
+				}
 
-				if ( false !== $postuser ) {
+				if ( count( $multiple_authors ) > 1 ) {
+					$author_names = array();
+					$author_ids   = array();
+
+					// Author display names and IDs are passed RAW to the data layer:
+					// the single output sink (wp_json_encode with the full hex flag
+					// set) is the correct escaper for the inline-script context, so
+					// pre-escaping here would only corrupt the values (RI-2/RI-4).
+					foreach ( $multiple_authors as $one_author ) {
+						$author_names[] = isset( $one_author->display_name ) ? $one_author->display_name : '';
+						$author_ids[]   = isset( $one_author->ID ) ? $one_author->ID : 0;
+					}
+
 					if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
-						$data_layer['pagePostAuthorID'] = $postuser->ID;
+						$data_layer['pagePostAuthorID'] = $author_ids[0];
+
+						/**
+						 * Filters the list of post author IDs output into the data layer
+						 * on a post with multiple authors (PublishPress Authors).
+						 *
+						 * @since 2.0
+						 *
+						 * @param array $author_ids       List of author IDs (WordPress user IDs; guest authors use a negative term id).
+						 * @param array $multiple_authors The PublishPress Author objects the IDs were built from.
+						 *
+						 * @return array Author IDs to output into the data layer.
+						 */
+						$data_layer['pagePostAuthorIDs'] = apply_filters( 'gtm4wp_page_post_author_ids', $author_ids, $multiple_authors );
 					}
 
 					if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
-						$data_layer['pagePostAuthor'] = $postuser->display_name;
+						$data_layer['pagePostAuthor'] = $author_names[0];
+
+						/**
+						 * Filters the list of post author display names output into the
+						 * data layer on a post with multiple authors (PublishPress Authors).
+						 *
+						 * @since 2.0
+						 *
+						 * @param array $author_names     List of author display names.
+						 * @param array $multiple_authors The PublishPress Author objects the names were built from.
+						 *
+						 * @return array Author display names to output into the data layer.
+						 */
+						$data_layer['pagePostAuthors'] = apply_filters( 'gtm4wp_page_post_authors', $author_names, $multiple_authors );
+					}
+				} else {
+					$postuser = get_userdata( $GLOBALS['post']->post_author );
+
+					if ( false !== $postuser ) {
+						if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
+							$data_layer['pagePostAuthorID'] = $postuser->ID;
+						}
+
+						if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
+							$data_layer['pagePostAuthor'] = $postuser->display_name;
+						}
 					}
 				}
 			}

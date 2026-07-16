@@ -512,4 +512,109 @@ final class PageVariablesModuleTest extends TestCase {
 
 		$this->assertSame( array(), $module->add_datalayer_data( array() ) );
 	}
+
+	/**
+	 * PublishPress Authors (issue #258): a post with multiple authors emits
+	 * pagePostAuthors (names) and pagePostAuthorIDs (IDs) arrays, while the
+	 * back-compat single-value vars stay and point at the primary/first author.
+	 *
+	 * NOTE: stubbing get_multiple_authors() defines the function process-wide,
+	 * so function_exists() reports it thereafter — these two PublishPress tests
+	 * are the LAST in the class so no single-author test runs after them (the
+	 * only consumer of that gate is this module). See the single-author
+	 * fallback test below for the count() === 1 branch.
+	 */
+	public function test_multiple_authors_output_as_arrays_for_publishpress(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+
+		// PublishPress Author objects expose ->display_name and ->ID (a positive
+		// WordPress user id, or a negative term id for a guest author). Passed
+		// raw so the data layer sink escapes them once and correctly.
+		Functions\when( 'get_multiple_authors' )->justReturn(
+			array(
+				(object) array(
+					'ID'           => 7,
+					'display_name' => 'Jane Writer',
+				),
+				(object) array(
+					'ID'           => -12,
+					'display_name' => 'Guest & <b>Co</b>',
+				),
+			)
+		);
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		// Every author is present in the array variables, values raw (the sink
+		// hex-encodes them; a re-introduced esc_* pre-escape would corrupt them).
+		$this->assertSame( array( 'Jane Writer', 'Guest & <b>Co</b>' ), $data_layer['pagePostAuthors'] );
+		$this->assertSame( array( 7, -12 ), $data_layer['pagePostAuthorIDs'] );
+		$this->assertStringNotContainsString( '&amp;', $data_layer['pagePostAuthors'][1] );
+		$this->assertStringNotContainsString( '&lt;', $data_layer['pagePostAuthors'][1] );
+
+		// Back-compat single-value vars stay, set to the primary/first author.
+		$this->assertSame( 'Jane Writer', $data_layer['pagePostAuthor'] );
+		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
+	}
+
+	/**
+	 * Single-author fallback: when PublishPress reports one author (or is not
+	 * active), only the plain single-value vars are set from get_userdata() and
+	 * neither array variable appears.
+	 */
+	public function test_single_author_uses_plain_vars_when_publishpress_returns_one_author(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+
+		Functions\when( 'get_multiple_authors' )->justReturn(
+			array(
+				(object) array(
+					'ID'           => 7,
+					'display_name' => 'Only Author',
+				),
+			)
+		);
+		Functions\when( 'get_userdata' )->justReturn(
+			(object) array(
+				'ID'           => 7,
+				'display_name' => 'Only Author',
+			)
+		);
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Only Author', $data_layer['pagePostAuthor'] );
+		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
+		$this->assertArrayNotHasKey( 'pagePostAuthors', $data_layer );
+		$this->assertArrayNotHasKey( 'pagePostAuthorIDs', $data_layer );
+	}
 }
