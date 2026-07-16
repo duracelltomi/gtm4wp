@@ -139,7 +139,7 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
   * Compatibility with High Performance Order Storage (HPOS)
 * AMP: load your AMP container on the AMP version of your pages
 * Cookiebot: use automatic cookie blocking mode if needed
-* Google Consent Mode v2: fire the "default" command with specific consent flags to integrat with non-certified Consent Management Platforms (CMPs) and plugins.
+* Google Consent Mode v2: fire the "default" command with specific consent flags to integrate with non-certified Consent Management Platforms (CMPs) and plugins.
 
 = Server side containers =
 
@@ -263,14 +263,14 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Added: new WordPress filter GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG / gtm4wp_overwrite_consent_mode_flag to overwrite Consent Mode flags in the default command. Can be used by consent banner plugins to mitigate support issues.
 * Fixed: Unwanted content on frontend when container placement set to off and gtm4wp_the_gtm_tag() called manually. Thanks [Michael Bourne](https://wordpress.org/support/users/michaelbourne/)
 * Fixed: Add to cart tracking broken with Bricks template and WooCommerce
-* Updated: bundled WhichBrowser library updated to the latest version. This is a short term solution to solve PHP erros, on the long term, the plan is to switch to [Matomo Device Detector](https://github.com/matomo-org/device-detector)
+* Updated: bundled WhichBrowser library updated to the latest version. This is a short term solution to solve PHP errors, on the long term, the plan is to switch to [Matomo Device Detector](https://github.com/matomo-org/device-detector)
 * Updated: allow the / character in GTM container path to support same tag gateway
 * Updated / Fixed: I reverted back the purchase tracking with WooCommerce to the logic present in v1.20- as the new way caused more headache than it resolved. Sorry for everyone who was affected by this.
 
 = 1.21.1 =
 
 * Fix: undefined product_qty variable prevents add_to_cart in some cases. Thanks [diegoarda](https://github.com/diegoarda)
-* Fix: clarified that WebToffee integartion is only needed with the legacy 2.x product line
+* Fix: clarified that WebToffee integration is only needed with the legacy 2.x product line
 * Fix: Reflected Cross-Site Scripting (XSS) with site search tracking. Thanks [godzeo](https://github.com/godzeo)!
 
 = 1.21 =
@@ -337,7 +337,7 @@ please update the plugin on a test version of your website before updating your 
 
 = 1.19.1 =
 
-* Fixed: run additional checks when determing product category to prevent PHP errors in certain cases
+* Fixed: run additional checks when determining product category to prevent PHP errors in certain cases
 * Fixed: corrected Consent Mode flag names in admin page description texts
 
 = 1.19 =
