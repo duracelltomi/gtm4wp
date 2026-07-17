@@ -9,7 +9,9 @@
 Pay special attention to:
 
 - **⭐ Script/HTML output escaping (RI-2, RI-3, RI-4, PA-3, PA-4):** anything written into the dataLayer or an inline `<script>` goes through `wp_json_encode( …, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS )`. The break-out char is usually `"` or `&`, not `<`/`>`. Never add a blanket `htmlspecialchars_decode()` to script output. `esc_js()` is for HTML-attribute JS, not raw `<script>` bodies. A dataLayer value sourced from `?s=`/`get_search_query()`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, or a cookie is reflected/stored XSS surface — prefer passing the **raw** value to `wp_json_encode` over pre-escaping it.
-- **Nonce + capability (PA-1):** every admin form, `wp_ajax_*` handler, and REST mutation verifies BOTH a nonce and `current_user_can(...)`.
+- **Nonce + capability (PA-1):** every admin form, `wp_ajax_*` handler, and REST mutation verifies BOTH a nonce and `current_user_can(...)`. Guest-facing frontend mutations: FP-5's three conditions, not a capability gate.
+- **⭐ Record ownership (PA-10):** a route that loads a record takes its id from the **server-side session**, or checks ownership — never trust an id from the request. Writing a `__return_true` route means every field it returns must be request-scoped and each resolver must enforce its own identity gate *in code*.
+- **⭐ Exposure (RI-11):** before adding a dataLayer field, ask whether the client needs it AND whether the lowest actor who can read the page (usually an anonymous visitor) is entitled to it. Escaping never answers that question. Watch internal ids, emails/addresses, order totals, submitted form values. Rating guide: `.security/threat-model.md`.
 - **Input sanitization (RI-6):** every `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE`/`$_SERVER` read is `wp_unslash()`'d and sanitized/validated before use.
 - **SQL safety (RI-7):** `$wpdb` queries with input use `$wpdb->prepare()`.
 - **WooCommerce / HPOS (RI-8):** order data via the WC CRUD API, never `get_post_meta()` on orders.

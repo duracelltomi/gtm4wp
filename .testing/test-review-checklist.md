@@ -17,9 +17,18 @@ sibling of `.security/code-review-checklist.md`; the two share the same componen
 groups so the matrices line up.
 
 **How to use:** Before a review, read this file + `test-review-patterns.md`.
-Prioritize `[ ]` (unreviewed) cells and the Test Debt Sweeps. After the review,
-mark reviewed cells `[x]` with the date, update the sweeps, and append gaps to the
-Known Test-Gaps Log.
+**Reconcile the tree on disk against the matrix first** (pre-review step 1), then
+prioritize `[ ]` (unreviewed) cells and the Test Debt Sweeps. After the review,
+mark reviewed cells `[x]` with the date, record the reviewed sha, update the
+sweeps, and append gaps to the Known Test-Gaps Log.
+
+> ⚠️ **A component with no row is invisible, not unreviewed.** The matrix can only
+> signal a gap for a component it already lists — a new module is not `[ ]`, it is
+> *absent*, and prioritization walks straight past it. Not hypothetical: the
+> **VisitorData** module and `gtm4wp-visitor-data.js` landed 2026-07-16 with no row
+> in this file *or* `.security/code-review-checklist.md`, and were backfilled by
+> hand on 2026-07-17. Run the inventory step every time; a complete-looking matrix
+> is the failure mode.
 
 **Status markers:**
 - `[ ]` — not yet reviewed by the test-review system
@@ -28,7 +37,10 @@ Known Test-Gaps Log.
 - `[-]` — not applicable (e.g. no security sink → Sec-input is N/A; an intentionally-untested orchestrator — see patterns BE-3)
 
 **Staleness rule:** A cell becomes `[~]` if the component's source **or** its test
-changed after the review date. Check with `git log --since="YYYY-MM-DD" -- <src> <test>`.
+changed after the review. Check with `git log <sha>..HEAD -- <src> <test>`, using the
+**`Reviewed at:` sha** recorded on the last run. Use the sha, not
+`--since="YYYY-MM-DD"`: a date is imprecise in both directions when commits and the
+review land on the same day. (Mirrors the same rule in `.security/code-review-checklist.md`.)
 
 **Dimensions:**
 - *Exists* — a dedicated or documented-indirect test covers the component at all (the TS-6 sweep).
@@ -70,13 +82,27 @@ yet still carry `[ ]` cells — presence ≠ reviewed-and-complete.
 | **ContactForm7 Module** (`src/Modules/ContactForm7/` — incl. tracker JS) | `Modules/ContactForm7ModuleTest`, `ModuleHooksTest` (gate); JS: `contact-form-7-tracker` | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Blacklist Module** (`src/Modules/Blacklist/` — incl. `sandboxedScripts` group class) | `Modules/BlacklistModuleTest` | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`; JS tracker) | `Modules/ClientDeviceDataModuleTest`, `ModuleHooksTest` (gate); JS: `client-device-data-tracker` | [x] 2026-07-13 | [x] 2026-07-14 | [x] 2026-07-14 | [-] | [x] 2026-07-14 | [x] 2026-07-14 |
+| **VisitorData Module** (`src/Modules/VisitorData/` — `VisitorDataEndpoint` **public** session route, `VisitorField`, `AdminSchema`; JS: `gtm4wp-visitor-data.js`) | `Modules/VisitorDataEndpointTest`, `VisitorDataModuleTest`, `ModuleHooksTest`; JS: `visitor-data-tracker` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **AMP Module** (`src/Modules/Amp/` — amp-wp 2.x `amp_analytics_entries` sink) | `Modules/AmpModuleTest`, `ModuleHooksTest` (gate) | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | `Admin/NoticesTest` | [x] 2026-07-13 | [ ] | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 | [x] 2026-07-13 |
 | **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | `Admin/RestControllerTest`, `SettingsPageTest`, `PluginRowTest`, `AdminCapabilityFilterTest` | [x] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Module Admin Schemas** (`src/Modules/*/AdminSchema.php`) | `Modules/ModuleConsistencyTest`, `ContainerAdminSchemaTest` | [x] | [ ] | [ ] | [ ] | [-] | [ ] |
-| **Frontend JS** (`js/frontend/` — 18 trackers + `lib/native-video-params` + `lib/blocks-cart-diff`) | 20 `js/frontend/test/*.test.js` (all trackers + libs; `woocommerce`/`woocommerce-blocks`/`blocks-cart-diff` now covered — the previously-open `woocommerce` gap is closed) | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 |
+| **Frontend JS** (`js/frontend/` — **19** bundles + `lib/native-video-params` + `lib/blocks-cart-diff`) | 21 `js/frontend/test/*.test.js` (all trackers + libs; `woocommerce`/`woocommerce-blocks`/`blocks-cart-diff` covered — the previously-open `woocommerce` gap is closed) | [~] 2026-07-15 | [~] 2026-07-15 | [~] 2026-07-15 | [~] 2026-07-15 | [~] 2026-07-15 | [~] 2026-07-15 |
 | **Admin JS** (`js/admin/`) | `js/admin/test/utils.test.js` | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 
+> **Process note (2026-07-17, no review run):** system hardening only — no tests
+> were reviewed. Mirrored the `.security/` changes: the **inventory step** (pre-review
+> step 1) and **sha-based staleness**. Backfilled the **VisitorData** row (landed
+> 2026-07-16 with no row; PHP + JS tests *do* exist, so `Exists [x]` — but no cell has
+> been judged, hence `[ ]` across the board), and corrected **Frontend JS** to 19
+> bundles / 21 test files, marking its cells `[~]`: 17 files in that group changed
+> after its 2026-07-15 review (`ab7fa99..HEAD` — the visitor-data tracker, the
+> MutationObserver media work, `#398` Phase 3). Only the rows touched here were
+> reconciled — the **next `/test-review` owns the full step-4 staleness pass**, and
+> should start with the VisitorData row: `VisitorDataEndpointTest` guards a route
+> that is public (A0) and reads request headers, so it needs both a grant/deny
+> access-control case and hostile-input coverage (TS-12, TC-5).
+>
 > **Seed note (2026-07-13):** only **Frontend Core** has been through a full
 > test-review pass (the session that added `VisitorIpTest` + 31 Frontend tests).
 > Every other row is the mechanical inventory only — `Exists [x]` means *some*

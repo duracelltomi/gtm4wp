@@ -31,23 +31,43 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
 
 ### Pre-review steps
 
-1. **Load the checklist** — `.testing/test-review-checklist.md` (coverage matrix,
+1. **Inventory the suite — mechanical, and FIRST.** The Coverage Matrix can only
+   surface a gap for a component it already has a row for: a component with **no
+   row** is not `[ ]`, it is *invisible* to step 5's prioritization. Reconcile the
+   matrix against the tree on disk before anything else:
+   ```bash
+   ls -d src/*/ src/Modules/*/ && ls js/frontend/*.js js/admin/*.js
+   ```
+   Any directory or bundle with no row → **add the row now**, all cells `[ ]`,
+   before prioritizing. Reconcile drifted counts in row labels ("18 trackers", "12
+   opts") against reality — a stale count means the row was never revisited.
+   This failed once already: the **VisitorData** module (`src/Modules/VisitorData/`,
+   including a **public** REST route) and `js/frontend/gtm4wp-visitor-data.js` landed
+   2026-07-16 with no row in *either* checklist, and were backfilled by hand on
+   2026-07-17. A complete-looking matrix is the failure mode, not the reassurance.
+2. **Load the checklist** — `.testing/test-review-checklist.md` (coverage matrix,
    Test Debt Sweeps, Known Test-Gaps Log).
-2. **Load learned patterns** — `.testing/test-review-patterns.md`. Use the Test
+3. **Load learned patterns** — `.testing/test-review-patterns.md`. Use the Test
    Smells and Project-Specific Test Conventions as the review checklist. Respect
    the Blessed Exceptions — do not flag BE-1..BE-3.
-3. **Check staleness** — for `[x]` cells, run
-   `git log --since="YYYY-MM-DD" -- <src> <test>`; mark `[~]` if the source or its
-   test changed since the review date.
-4. **Prioritize** — `[ ]` cells and any sweep marked `open`/`never`/stale first,
+4. **Check staleness** — for `[x]` cells, run `git log <sha>..HEAD -- <src> <test>`
+   using the **`Reviewed at:` sha** recorded on the last run; mark `[~]` if the
+   source or its test changed since. Use the sha, not `--since="YYYY-MM-DD"`: a date
+   is imprecise in both directions when commits and the review land on the same day.
+   Record the sha you reviewed in this run's report and gaps-log entry.
+5. **Prioritize** — `[ ]` cells and any sweep marked `open`/`never`/stale first,
    then `[~]`, then `[x]` only if time permits. Within `[ ]`, take security-sink
-   components before pure-logic ones.
-5. **Cross-reference** the Known Test-Gaps Log — don't re-log a gap already
+   components before pure-logic ones — and within those, the ones reachable by the
+   lowest actor (`.security/threat-model.md`): an untested public (A0) route
+   outranks an untested admin-only (A4) screen.
+6. **Cross-reference** the Known Test-Gaps Log — don't re-log a gap already
    `addressed` unless it regressed; advance `open` gaps.
-6. **Cross-reference `.security/`** — its Known Findings Log is the source of
+7. **Cross-reference `.security/`** — its Known Findings Log is the source of
    truth for which sinks exist. Every PA-3/RI-2 sink there should map to a
-   Sec-input test here (the Regression-per-bug sweep).
-7. **Empty-diff escalation — DO NOT STOP when nothing is new.** If there are no
+   Sec-input test here (the Regression-per-bug sweep). Its **Public Surface
+   Inventory** is the source of truth for which authorization gates exist — every
+   row there needs a grant + deny test (the Access-control sweep, TS-12/TC-13).
+8. **Empty-diff escalation — DO NOT STOP when nothing is new.** If there are no
    new commits and no `[ ]`/`[~]` cells, this is the trigger to **go deep**, not to
    stop:
    - Run **every** Test Debt Sweep (missing-file, untested-method, security-input,

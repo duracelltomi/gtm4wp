@@ -11,7 +11,11 @@
 
 Persistent coverage tracker for systematic reviews of the GTM4WP WordPress plugin. Updated after each review run.
 
-**How to use:** Before running a review, read this file. Prioritize `[ ]` (unreviewed) cells. After the review, mark reviewed cells `[x]` with the date and append new findings to the Known Findings Log.
+**Companion files:** `.security/code-review-patterns.md` (what to look for) and `.security/threat-model.md` (**how to rate what you find** — the A0–A4 actor ladder and the lowest-actor severity rule). Read all three before a review.
+
+**How to use:** Before running a review, read this file. **Reconcile the tree on disk against the tables below first** (pre-review step 1), then prioritize `[ ]` (unreviewed) cells. After the review, mark reviewed cells `[x]` with the date, record the reviewed sha, and append new findings to the Known Findings Log.
+
+> ⚠️ **A component with no row is invisible, not unreviewed.** The Coverage Matrix can only signal a gap for a component it already lists — a new module is not `[ ]`, it is *absent*, and prioritization walks straight past it. This is not hypothetical: the **VisitorData** module and its **public** REST route landed 2026-07-16 with no row and were backfilled by hand on 2026-07-17. Always run the inventory step (`ls -d src/*/ src/Modules/*/`, plus the surface greps) and add missing rows **before** prioritizing. The same applies to the Public Surface Inventory below.
 
 **Status markers:**
 - `[ ]` — not yet reviewed
@@ -19,9 +23,26 @@ Persistent coverage tracker for systematic reviews of the GTM4WP WordPress plugi
 - `[~] YYYY-MM-DD` — reviewed but stale (files changed since)
 - `[-]` — not applicable to this component
 
-**Staleness rule:** A cell becomes `[~]` if any file in the component group was modified after the review date. Check with `git log --since="YYYY-MM-DD" -- <path>`.
+**Staleness rule:** A cell becomes `[~]` if any file in the component group was modified after the review. Check with `git log <sha>..HEAD -- <path>`, using the **`Reviewed at:` sha** recorded on the last report in the Known Findings Log. Use the sha, not `--since="YYYY-MM-DD"`: a date is imprecise in both directions when commits and the review land on the same day (Review 6 ran at 20:46 on a day with earlier commits, so `--since` reports those as changes-since and cannot distinguish a commit at 09:00 from one at 23:00).
 
 **Dimensions:** *Cap/Nonce* = capability + nonce/CSRF on state changes · *Input San.* = `wp_unslash` + sanitize on request input · *Output XSS* = escaping into HTML/`<script>` (the primary dimension for this plugin) · *SQL* = `$wpdb->prepare` · *Cplx* = complexity/dead code · *Perf* = performance · *Types* = type hints/return types.
+
+---
+
+## Public Surface Inventory
+
+Every externally-reachable entry point, the **lowest actor** who can reach it (threat model A0–A4), and the gate that stops the actor below. Maintained by the **New surface** sweep and pre-review step 1: a route not listed here has never been reconciled, which is the one gap the per-component matrix cannot express.
+
+| Surface | Route / hook | Reachable by | Gate | Reviewed |
+|---|---|---|---|---|
+| Settings read/write | `gtm4wp/v2/settings` GET+POST (`RestController.php:69`) | A4 admin | `can_manage` (filterable cap) + `wp_rest` nonce via `api-fetch` | [x] 2026-07-15 |
+| Settings export | `gtm4wp/v2/settings/export` GET (`RestController.php:100`) | A4 admin | `can_manage` + `wp_rest` nonce | [x] 2026-07-15 |
+| Settings import | `gtm4wp/v2/settings/import` POST (`RestController.php:112`) | A4 admin | `can_manage` + `wp_rest` nonce; 512 KB / depth-16 caps, envelope marker, schema re-sanitization | [x] 2026-07-15 |
+| Notice dismiss | `wp_ajax_gtm4wp_dismiss_notice` (`Notices.php:53`) | A4 admin (authenticated) | nonce + `current_user_can` (self-protecting since #18) | [x] 2026-07-10 |
+| Confirm purchase tracked | `gtm4wp/v2/confirm-purchase-tracked` POST (`PageDataLayer.php:1104`) | A0/A1 guest or customer | `wp_rest` nonce only — **blessed FP-5**: order id from `PENDING_PURCHASE_FLAG_SESSION_KEY`, request body ignored, marker consumed | [x] 2026-07-16 |
+| **Visitor data** | `gtm4wp/v2/visitor-data` GET (`VisitorDataEndpoint.php:60`) | **A0 unauthenticated** | **`__return_true`** — public by design; each field's resolver is its own identity gate (author-documented in the class doc block, **not yet review-verified**) | **[ ]** |
+
+> The visitor-data row is the open one: a public read-only route whose safety rests on per-field resolver identity gates. Per the New-surface playbook, a `__return_true` gate must be **demonstrated in the code path**, not accepted from a doc block — read the callback and every resolver it calls. Landed 2026-07-16 (`#398` Phase 2); unreviewed as of 2026-07-17.
 
 ---
 
@@ -44,6 +65,7 @@ Persistent coverage tracker for systematic reviews of the GTM4WP WordPress plugi
 | **ContactForm7 Module** (`src/Modules/ContactForm7/` — incl. tracker JS) | [-] | [x] 2026-07-14 | [x] 2026-07-14 | [-] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Blacklist Module** (`src/Modules/Blacklist/`) | [-] | [x] 2026-07-14 | [x] 2026-07-14 | [-] | [x] 2026-07-14 | [x] 2026-07-10 | [x] 2026-07-10 |
 | **ClientDeviceData Module** (`src/Modules/ClientDeviceData/`) | [-] | [-] | [x] 2026-07-10 | [-] | [x] 2026-07-10 | [x] 2026-07-10 | [x] 2026-07-10 |
+| **VisitorData Module** (`src/Modules/VisitorData/` — `VisitorDataEndpoint` public session route, `VisitorDataModule`, `VisitorField`, `AdminSchema`; JS: `gtm4wp-visitor-data.js`) | [ ] | [ ] | [ ] | [-] | [ ] | [ ] | [ ] |
 | **AMP Module** (`src/Modules/Amp/`) | [-] | [x] 2026-07-14 | [x] 2026-07-14 | [-] | [x] 2026-07-14 | [x] 2026-07-14 | [x] 2026-07-14 |
 | **Admin — Notices/AJAX** (`src/Admin/Notices.php`) | [x] 2026-07-10 | [x] 2026-07-10 | [x] 2026-07-10 | [-] | [x] 2026-07-10 | [x] 2026-07-10 | [x] 2026-07-10 |
 | **Admin — Settings UI** (`src/Admin/SettingsPage.php`, `Admin.php`, `RestController.php`, `PluginRow.php`) | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [-] | [x] 2026-07-15 | [x] 2026-07-10 | [x] 2026-07-15 |
@@ -52,7 +74,9 @@ Persistent coverage tracker for systematic reviews of the GTM4WP WordPress plugi
 | **Admin JS** (`js/admin/`) | [x] 2026-07-15 | [x] 2026-07-15 | [x] 2026-07-15 | [-] | [x] 2026-07-15 | [x] 2026-07-10 | [-] |
 | **Tests** (`tests/`) | [-] | [-] | [-] | [-] | [x] 2026-07-10 | [-] | [-] |
 
-> **Coverage note (Review 2, 2026-07-10):** every component group has now had a first full pass across all applicable dimensions. Cells marked `[-]` are not-applicable (e.g. frontend modules perform no state-changing admin mutation, so Cap/Nonce is N/A; no `$wpdb` usage exists anywhere in `src/`, so SQL is N/A except where a component was explicitly confirmed clean). The Admin — Notices Cap/Nonce cell is now `[x]`: dismiss handler has nonce + allow-listed input but **no capability check** — see finding #18 (self-scoped, negligible impact).
+> **Process note (2026-07-17, no review run):** system hardening only — no code was reviewed. Added the **Public Surface Inventory** + **New surface** sweep, the **VisitorData** matrix row (backfilled — the module landed 2026-07-16 with no row), `.security/threat-model.md` (A0–A4 actors + the lowest-actor severity rule, codifying the calls previously re-derived per review), **PA-10** (record ownership / IDOR) and **RI-11** (data exposure, promoted after recurring as #30 and #31), sha-based staleness, and diff-scoping rules. The next `/code-review` is the first to run under these; its highest priority is the unreviewed **A0-reachable** `gtm4wp/v2/visitor-data` route.
+>
+> **Coverage note (Review 2, 2026-07-10) — superseded, read with the inventory warning above:** every component group **that existed on 2026-07-10** had a first full pass across all applicable dimensions. This sentence is *not* a standing claim of completeness — it was true of the tree as of that date and says nothing about modules added since (VisitorData, 2026-07-16, is the proof). Treat the disk tree, not this note, as the source of truth for what exists. Cells marked `[-]` are not-applicable (e.g. frontend modules perform no state-changing admin mutation, so Cap/Nonce is N/A; no `$wpdb` usage exists anywhere in `src/`, so SQL is N/A except where a component was explicitly confirmed clean). The Admin — Notices Cap/Nonce cell is now `[x]`: dismiss handler has nonce + allow-listed input but **no capability check** — see finding #18 (self-scoped, negligible impact).
 >
 > **Coverage note (Review 6, 2026-07-15):** reviewed the two production features since Review 5 (`07117bc..HEAD`): **settings export/import (#87)** (new REST export/import routes on `RestController`, `ImportExport` React component + `buildValueMap`/`exportFilename` helpers) and the **container output kill switch (#413)** (`ContainerCode::should_output_container()` + `container_suppressed_warning()`, `GTM4WP_OPTION_PRODUCTIONONLY` field, `GTM4WP_WPFILTER_OUTPUT_CONTAINER` filter). **No Critical/High/Medium.** Import/export is the higher-risk change and is notably defensive: `json_decode`-only (no `unserialize`/`eval`), 512 KB / depth-16 caps, strict envelope (`type` marker) validation, and every imported value re-run through the *same* `sanitize_onto()` → `Field::sanitize()` path as a normal save onto a defaults-rebuilt row (unknown keys dropped, container rows re-validated via `GTM_ID_PATTERN`/`AUTH_PATTERN`/domain in the `TYPE_TABLE` sanitizer, plus PA-2 re-validation at the output sink). Both routes = capability (`can_manage`) + `wp_rest` nonce (via `api-fetch`), PA-1. No `dangerouslySetInnerHTML` in `js/admin` (0 hits) → sanitizer error messages that echo a hostile GTM ID render as React-escaped text. Kill switch = static-string console warnings, `PHASE_EXPERIMENTAL` checkbox, mirrors placement-OFF (data layer stays compiled; actions still fire). One **Low**: #32 (import path skips the REST-schema type layer the save path has; an array-valued scalar field in a crafted file → PHP `Array to string conversion` warning + `"Array"` value — admin-only log noise, not a vuln). Baseline: **PHP 437 / JS 234 tests green**, `phpcs` clean.
 >
@@ -66,10 +90,11 @@ Persistent coverage tracker for systematic reviews of the GTM4WP WordPress plugi
 
 ## Whole-Repo Sweeps
 
-Dead code and cross-file duplication are **whole-repo** concerns — they do not map onto the per-component Coverage Matrix. Log each sweep here with the date last run and a one-line result. Run via the playbook in `.claude/commands/code-review.md` § B (grep-for-references, not eyeball). Treat a sweep older than ~4 weeks, or predating a significant feature landing, as stale.
+New surface, dead code, and cross-file duplication are **whole-repo** concerns — they do not map onto the per-component Coverage Matrix. Log each sweep here with the date last run and a one-line result. Run via the playbooks in `.claude/commands/code-review.md` — § A for **New surface**, § B for the rest (grep-for-references, not eyeball). Treat a sweep older than ~4 weeks, or predating a significant feature landing, as stale.
 
 | Sweep | Last run | Result summary |
 |---|---|---|
+| **New surface / public endpoints** (`register_rest_route`, `permission_callback`, `__return_true`, `wp_ajax_`, `admin_post_` reconciled against the Public Surface Inventory) | 2026-07-17 (inventory only, no review) | Inventory seeded with all 6 surfaces. 5 previously reviewed. **1 open: `gtm4wp/v2/visitor-data` (`VisitorDataEndpoint.php:60`) — A0-reachable, `__return_true`, landed 2026-07-16, never reviewed.** Its sibling `gtm4wp/v2/confirm-purchase-tracked` is nonce-only under the blessed FP-5 exception (verified R-2026-07-16). No `wp_ajax_` beyond the admin notice dismiss; no `admin_post_`. This sweep exists because a new module has no matrix row and therefore no `[ ]` — surface must be grepped, never inferred from the matrix. |
 | **Dead functions/methods** (private/public across `src/`, `compat/`, root `*.php`, `tests/`) | 2026-07-15 (R6) | Clean (targeted, R6). New `RestController::export_data/export_settings/import_settings/sanitize_onto` wired to registered routes; `ContainerCode::should_output_container/container_suppressed_warning` each called in `header_begin`+`get_tag`; JS `ImportExport`/`buildValueMap`/`exportFilename` all imported. (R5 full sweep below.) New `StoreApiData` (wired on `woocommerce_blocks_loaded`), all new `Helpers`/`ProductData`/`PageDataLayer` methods and `WooCommerceModule` block-detection helpers reachable; all new `window.*` block globals consumed by their trackers. (2026-07-14: standalone `Modules/Axeptio/` removed cleanly, new Axeptio/CF7 helpers reachable; 2026-07-10: `Field::rest_type()` dead→fixed; `Plugin::registry()`/`options()`+`Registry::get()` kept as intentional public API.) |
 | **Dead hooks** (`add_action`/`add_filter` with no callback; `do_action`/`apply_filters` constants with no listener) | 2026-07-15 (R6) | Clean. New `gtm4wp_output_container` filter is a documented public extension point (applied in `ContainerCode::should_output_container()`, default `true`, no internal listener required). Prior: new `GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION` is a documented public extension point (applied in `ProductData::process_product()`, no internal listener required). All new WooCommerce hooks in `WooCommerceModule::register_frontend_hooks()` bind live callbacks. (2026-07-14: `FILTER_DEFAULT_ENABLED`/`AXEPTIO_CONSENT_MODE_DEFAULT` verified; prior custom filters remain documented extension points with live listeners.) |
 | **Dead option constants** (`GTM4WP_OPTION_*`/`GTM4WP_*` in `compat/constants.php`, never read) | 2026-07-15 (R6) | Clean. New `GTM4WP_OPTION_PRODUCTIONONLY` (read in `ContainerCode::should_output_container`, module default, admin schema) and `GTM4WP_WPFILTER_OUTPUT_CONTAINER` (applied in `should_output_container`, documented public extension point) both read. Prior: new WC (`WCPURCHASESTATUSES`/`WCPURCHASEONANYPAGE`/`WCCUSTOMORDERRECEIVEDPAGE`/`WCLISTATTRIBUTION`/`WC_CHECKOUTWC`) and `INTEGRATE_COOKIEYES` constants are all read (schema + module). (2026-07-14: CF7/Axeptio constants read; `BLACKLIST_SANDBOXED` kept for BC in `Migration::REMOVED_OPTION_KEYS`.) |
@@ -84,6 +109,8 @@ Dead code and cross-file duplication are **whole-repo** concerns — they do not
 Each finding is logged once. Status: `open` | `fixed` | `wontfix`.
 
 > **Reports are local-only.** The detailed report files referenced below are git-ignored (see `.security/.gitignore`) because this is a public repo and reports carry exploit PoCs / possibly-unfixed detail. This log keeps only terse summaries — never paste a working payload or the full detail of an `open` Critical/High finding here.
+>
+> **Every report records `Reviewed at: <sha>`** — the HEAD commit it actually covered. The next review reads it to scope its diff (`<sha>..HEAD`, pre-review step 4) and to check cell staleness (step 5). Reports 1–5 predate the convention and record no sha; Report 6's was reconstructed from its coverage note, so **the next review's base is `ab7fa99`** (Review 6 reviewed up to `3a5a2a0`; `ab7fa99` is its own fix commit). Everything after `ab7fa99` — 14 commits as of 2026-07-17, including the whole `#398` cache-safe data-layer rewrite and the new public VisitorData endpoint — is **unreviewed**.
 
 ### Report 1: `.security/code-review-report-2026-07-10-1501.md`
 
@@ -165,6 +192,8 @@ Re-review of the WooCommerce overhaul + new consent/checkout bridges since Revie
 **Verification (no findings):** main dataLayer sink retains the full hex flags (raw `orderData`/billing fields safe, RI-2/RI-4); inline pushes + begin_checkout + thank-you all hex-flagged via `wp_add_inline_script`/`print_script_block` (PA-8, FP-2); list-attribution cookie DoS-bounded + per-field-sanitized (#405); order-received `?order`/`?key` and `gtm4wp_orderid_tracked` cookie validated (RI-6); StoreApiData is a REST/delegated sink (FP-4 class, slash-escaping blocks `</script>`); new SELECT/MULTISELECT options allow-list-sanitized on save (PA-5); list markup `esc_attr(wp_json_encode())` + PA-7 replacement guards; CookieYes bridge = `esc_js`'d JS-identifier datalayer name only; block minicart double-count ruled out (store-default detection keeps `is_block_cart_or_checkout` and the minicart-load gate consistent); no new dead code. Baseline **381 PHP / 213 JS tests green**, `phpcs` clean.
 
 ### Report 6: `.security/code-review-report-2026-07-15-2046.md`
+
+**Reviewed at:** `3a5a2a0` · **Fixes landed:** `ab7fa99` · **Base for the next review:** `ab7fa99`
 
 Review of the two production features since Review 5 (`07117bc..HEAD`): **settings export/import (#87)** and the **container output kill switch (#413)**. **No Critical/High/Medium.** Import/export is a strict subset of the already-reviewed save path (schema-driven re-sanitization, `json_decode`-only, size/depth caps, envelope validation, defaults-rebuilt row, capability + `wp_rest` nonce); kill switch is static-string output + a `PHASE_EXPERIMENTAL` checkbox mirroring placement-OFF. One Low.
 

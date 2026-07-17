@@ -2,6 +2,8 @@
 
 Accumulated patterns from past reviews of the GTM4WP WordPress plugin. The code review command reads this file before each review and appends new generalizable patterns after. It is also pre-loaded before writing any code — see `.security/pre-flight-check.md`.
 
+> **Companion — `.security/threat-model.md`.** This file is **what to look for**; the threat model is **how to rate what you find**: the A0–A4 actor ladder and the rule that severity comes from the *lowest actor who can reach the sink*, not from the sink's power. Read both. The two structural risk classes it names map onto the entries here: **injection** (RI-2/RI-3/RI-4, PA-3/PA-4) and **exposure** (RI-11).
+
 > ⛔ **Disclosure rule (hard):** this is a public repo — committed == published. Patterns describe general *classes* of issue, never a specific finding's exploit payload, repro steps, or unfixed-vuln detail. Keep all such detail in the git-ignored `code-review-report-*.md`. Full rule at the top of `.security/code-review-checklist.md`.
 
 **Categories:**
@@ -21,9 +23,11 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-4** — a value that reaches a script sink already HTML-entity-encoded (`esc_attr`, `esc_js`, `get_search_query()`) is a trap: a downstream decode resurrects the entity into a raw quote/angle-bracket.
 - **PA-1** — every admin form / `wp_ajax_*` / REST mutation verifies BOTH a nonce and a capability (`current_user_can`).
 - **PA-3** — any new dataLayer field sourced from the URL/request/headers inherits the reflected-XSS class; it must go through the hex-flag JSON path.
+- **PA-10** — a record id must come from the server-side session, or the route must check ownership; an id taken from the request without an ownership check is IDOR. A `__return_true` route's identity gate must be demonstrated in the code path, not asserted in a doc block.
 
 **Recurring Issues (RI):**
 - **RI-1** — every PHP file starts with `defined( 'ABSPATH' ) || exit;` (except the main plugin file).
+- **RI-11** — every value added to the dataLayer is an *exposure* decision, not just an escaping one: does the client need it, and is the lowest actor who can read the page entitled to it? Escaping never answers "should this be here at all?"
 - **RI-5** — every user-facing string uses `__()`/`esc_html__()` with text domain `duracelltomi-google-tag-manager`.
 - **RI-6** — every `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE`/`$_SERVER` read is `wp_unslash()`'d and sanitized/validated before use.
 - **RI-7** — `$wpdb` queries with input use `$wpdb->prepare()`; no string-interpolated SQL.
@@ -96,6 +100,17 @@ Never use `get_post_meta()`/`update_post_meta()` for order data — use the WC C
 ### RI-10: Undeclared variable in a frontend JS file
 Every `js/frontend/**/*.js` file is an ES module (it `import`s helpers) and is bundled by `wp-scripts` into a `"use strict"` IIFE. A bare assignment to an undeclared identifier (e.g. `player = new YT.Player(...)` with no `var`/`let`/`const`) is a silent auto-global in sloppy mode but throws `ReferenceError` under strict mode — the exact context these bundles run in. Such a throw inside a `forEach`/loop aborts the remaining iterations. Confirmed 2026-07-13: `gtm4wp-youtube.js:58` (finding #19) breaks multi-video tracking. Flag any assignment whose left side is never declared. ESLint's `no-undef` catches this if the global isn't whitelisted — do not add tracker-local names to the `.eslintrc.js` `globals` list to silence it.
 
+### RI-11: Over-exposure — a value that is escaped correctly but does not belong in the dataLayer
+Escaping answers "can this value become code?" It never answers **"should this value be here at all?"** Those are two different bugs, and this plugin's entire job — copying server-side request/page/order state into a client-readable `<script>` on a public page — makes the second one structural, not incidental. Per the threat model, **injection** and **exposure** are the two permanent risk classes; RI-2/RI-3/RI-4 own the first, this owns the second.
+
+**The rule:** every new dataLayer key answers two questions before it ships — (1) does the client actually need it, and (2) is the **lowest actor who can read the page** (usually A0, an anonymous visitor) entitled to it? A field sourced from A3/A4 data (order internals, customer PII, admin settings) landing in an A0-readable dataLayer is a finding **even when it is perfectly `wp_json_encode`'d with the full hex flags**. Rate it on what leaks and to whom, not on the escaping.
+
+Recurring offenders: internal post/product ids, email addresses, billing/shipping names and addresses, order totals, and submitted form field values. Confirmed twice, which is what promoted this to an RI:
+- **#31** (2026-07-15, Low, fixed) — block cross-sell items leaked `internal_id` (the internal product post id) into GA4 because the cross-sell mapper omitted the `delete` its sibling cart-item mapper does. A public post id, so Low — but it is the same class, and the *sibling asymmetry* is the tell: when one mapper strips a field and its sibling doesn't, the omission is a bug, not a decision.
+- **#30** (2026-07-14, Low, wontfix) — CF7 `integrate-wpcf7-inputs` defaults to `full`, pushing submitted field values (potential PII) into the dataLayer. Closed `wontfix` as intended, documented, 1.x-compatible behavior with an opt-out. That is a legitimate outcome for this class: exposure is often a **product decision**, so surface it and let the maintainer decide — but surface it, with the actor and the data named.
+
+The `#398` cache-safe data-layer work (2026-07-16, `813e882` "omit server PII") is this rule applied deliberately at design time — server-rendered PII was removed from cached pages and moved behind a per-request endpoint. Check new fields against that direction of travel rather than against 1.x precedent.
+
 ---
 
 ## Project-Specific Anti-Patterns
@@ -133,6 +148,18 @@ The `js/frontend/gtm4wp-*.js` media trackers form a family with a shared contrac
 - **Provenance:** parse only the embed iframe's own `src` (`new URL(frame.getAttribute('src'), location.href)` — `location.href` is only the resolution base). Never read `location.search`/`hash`/`document.referrer`/`document.cookie`.
 - **Consistency:** guard `if ( ! duration ) return;` before any percentage division (avoids `NaN`, matches siblings); guard against double-init (remove-before-rebind, or a `window.gtm4wp_<provider>_inited` flag) so a re-injected bundle does not double-push.
 
+### PA-10: Record ownership — where does the id come from? ⭐
+The positive counterpart to **FP-5**. FP-5 tells you what *not* to flag on one blessed route; this tells you what to *check* on the next one. As of 2.0 the plugin registers REST routes that resolve real records (orders, sessions, users), so this is live surface, not theory.
+
+**The rule:** for any route/handler that loads a record, trace where the **id** comes from.
+- **Id from the server-side session** (`WC()->session`, `wp_get_current_user()`, a PHP session key) → safe by construction: a caller can only ever reach its own record. This is what makes `PageDataLayer::confirm_pending_purchase_tracked()` sound — the order id comes solely from `PENDING_PURCHASE_FLAG_SESSION_KEY`, the request body is deliberately **not** read, and the marker is consumed for at-most-once.
+- **Id from the request** (body, query, cookie, header) → **must** be ownership-checked before the record is read or written. No check = IDOR. Severity by the threat model: A1 → another A1's order data is High; A0 → any customer's PII is High/Critical.
+
+**Corollaries:**
+- **A `__return_true` gate is a claim that must be demonstrated, not accepted.** A public route is fine when every field it returns is derived from the current request context and each resolver enforces its own identity gate — but *read the callback and every resolver* to confirm it. A doc block asserting "there is no IDOR" is the author's hypothesis; the review's job is to test it. `VisitorDataEndpoint` is the live example of this shape.
+- **Ask the threat model's two questions and record the answers** in the Public Surface Inventory: who can reach it, and whose data does it return? A surface where (2) sits above (1) is the finding.
+- **A read-only GET changes no state, so it has no CSRF surface** — a nonce there is for *authenticating* the caller's cookie (so their own user fields resolve), not for authorizing them. Do not flag a public read-only GET for "missing" CSRF protection; do flag it if the data it returns is not strictly request-scoped.
+
 ## False Positive Suppressions
 
 ### FP-1: `echo` in `ScriptTag::print_script_block()`
@@ -154,6 +181,8 @@ A `current_user_can()` gate is wrong here — guests have no capabilities, so re
 
 Reference: `PageDataLayer::confirm_pending_purchase_tracked()` (#398) writes the `_ga_tracked` analytics dedupe flag for the caller's own reliable-purchase-fallback order, so a later order-received render on another device is suppressed. `check_confirm_purchase_permission()` verifies the `wp_rest` nonce only; the order id comes solely from `PENDING_PURCHASE_FLAG_SESSION_KEY`, the request body is deliberately not read, and the marker is consumed for at-most-once. Do **not** re-flag this as a PA-1 nonce-only miss. A route that fails any of the three conditions — touches another user's data, is sensitive, or takes an id from the request — is NOT covered and still needs the full PA-1 treatment.
 
+**This suppression is scoped to one route; it is not a template.** `PA-10` is its positive counterpart: use that to check the *next* session-scoped route rather than reasoning by analogy from this one. The public visitor-data GET is a sibling in shape but has **not** been review-verified (see the Public Surface Inventory) — do not extend FP-5 to it by resemblance.
+
 ---
 
 ## Changelog
@@ -170,3 +199,4 @@ Reference: `PageDataLayer::confirm_pending_purchase_tracked()` (#398) writes the
 | 2026-07-15 (Review 5) | Reviewed the WooCommerce overhaul + CookieYes/CheckoutWC bridges (`b15b034..HEAD`, 24 commits). **No new pattern needed** — every new sink matched an existing entry: Store API extension = REST/delegated sink (FP-4 class; PHP default slash-escaping already blocks `</script>` in the extension value, and WC re-encodes the hydration/response), block trackers are dataLayer-only with same-origin `wc/store/*` data and no `postMessage` (PA-9), the #405 list-attribution cookie reader is DoS-bounded + per-field-sanitized with raw values to the hex-flag sink (RI-4/RI-6), the two block product-list injectors use `addcslashes`/`preg_replace_callback` (PA-7), new SELECT/MULTISELECT options allow-list-sanitize on save (PA-5), CookieYes head bridge interpolates only the `esc_js`'d JS-identifier datalayer name (RI-2 head-block, sibling of Axeptio/WebToffee). One Low (#31, cross-sell `internal_id` leak — data-quality, not a security class, so Known-Findings-Log only). |
 | 2026-07-13 (Review 3) | Reviewed the MediaEvents expansion (11 media trackers incl. 8 new, `lib/native-video-params.js`, 12 `EVENTS_*` options). Added **RI-10** (undeclared variable → strict-mode `ReferenceError` in the ES-module bundle; from finding #19, `gtm4wp-youtube.js`) and **PA-9** (embedded-media tracker template conventions: origin-validate raw `postMessage`, dataLayer-only sink, parse own iframe `src` only, `if(!duration)return` guard, double-init guard). Clarified RI-9 that `build/` is git-ignored here. Trackers confirmed free of HTML/JS injection sinks; VideoPress origin-validation is the reference for message handlers. |
 | 2026-07-16 | Added **FP-5** (blessed PA-1 exception): a guest-facing frontend REST mutation may use nonce + strict session-ownership-scoping instead of a capability check, when it only affects the caller's own session-resolved record, is idempotent and non-sensitive. From the #398 reliable-purchase cross-device dedupe beacon (`PageDataLayer::confirm_pending_purchase_tracked` — nonce-only by design; order id from `PENDING_PURCHASE_FLAG_SESSION_KEY`, request body ignored, marker consumed → no IDOR, at-most-once). Cross-referenced from PA-1. |
+| 2026-07-17 (system hardening, no review) | Added **PA-10** (record ownership / IDOR — where does the id come from; a `__return_true` gate must be demonstrated in the code path, not accepted from a doc block) as the positive counterpart to FP-5, which until now taught only what *not* to flag on one route; scoped FP-5 explicitly to that route so it is not extended by resemblance to the new public visitor-data GET. Added **RI-11** (over-exposure: a value escaped correctly but not entitled to be in the dataLayer) — promoted to a Recurring Issue on its second occurrence per the promotion rule (#31 internal id, #30 CF7 PII default), covering the *exposure* risk class that had been re-derived per finding with no entry. Added the companion **`.security/threat-model.md`** (A0–A4 actor ladder; severity = lowest actor who can reach the sink; in/out-of-scope incl. bounded-DoS and the multisite `unfiltered_html` caveat), codifying calls previously made ad hoc (#30 wontfix, #32 Low, Review 5's "DoS-bounded"). No code reviewed; prompted by the VisitorData module landing 2026-07-16 with no Coverage Matrix row. |
