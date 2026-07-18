@@ -19,3 +19,16 @@ phpcs.xml export-ignore
 CONTRIBUTING.md export-ignore
 README.md export-ignore
 ISSUE_TEMPLATE.md export-ignore
+CHANGELOG.md export-ignore
+SECURITY.md export-ignore
+composer.json export-ignore
+composer.lock export-ignore
+package-lock.json export-ignore
+gulpfile.js export-ignore
+phpunit.phar export-ignore
+.phpunit.result.cache export-ignore
+tests export-ignore
+.claude export-ignore
+.security export-ignore
+.testing export-ignore
+.github export-ignore

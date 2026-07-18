@@ -1,5 +1,23 @@
 # Full changelog for GTM4WP
 
+## 1.22.4
+
+This is the final release of the 1.x line. The next release is GTM4WP 2.0, a
+complete rewrite of the plugin. Features marked deprecated below still work in
+this version and will be removed in 2.0.
+
+* Fixed: hardened how values are encoded into the data layer and into inline script blocks. Script blocks are no longer HTML entity decoded after sanitization, and every value written into a script context is now JSON encoded with the full set of hex escaping flags. Thanks [cyn](https://github.com/cyn8)
+* Fixed: nonce attribute should not be sanitized. Thanks [oxyc](https://github.com/oxyc)
+* Fixed: avoid warnings when saving settings. Thanks [mircobabini](https://github.com/mircobabini)
+* Fixed: only float number is returned in JavaScript processing. Thanks [gkipouros](https://github.com/gkipouros)
+* Updated: only load plugin files on frontend or on admin when the admin user has sufficient permissions.
+* Updated: WooCommerce 10.4+ compatibility - the checkout inline script no longer uses the deprecated `wc_enqueue_js()` function. The old function is still used as a fallback on setups where the tracker script is loaded in the page head.
+* Updated: WordPress and WooCommerce compatibility.
+* Deprecated: geo data (ipstack.com) and weather data (OpenWeatherMap) integrations. No direct replacement: collect this data in Google Tag Manager or with a dedicated service instead.
+* Deprecated: scroll tracking. Use the Scroll Depth trigger built into Google Tag Manager instead.
+* Deprecated: the "Custom tag/variable templates" blacklist option, plus the Universal Analytics and Mouseflow entries of the tag blacklist.
+* Added: a dismissable admin notice announcing the upcoming GTM4WP 2.0 release. If the site uses one of the deprecated features above, the notice names it.
+
 ## 1.21.1
 
 * Fix: undefined product_qty variable prevents add_to_cart in some cases. Thanks [diegoarda](https://github.com/diegoarda)

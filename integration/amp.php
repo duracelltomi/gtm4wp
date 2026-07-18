@@ -118,7 +118,7 @@ function gtm4wp_amp_gtmcode() {
 				// Examples: from https://www.simoahava.com/analytics/accelerated-mobile-pages-via-google-tag-manager/.
 				// Inject the AMP GTM code.
 				// TODO: Use AMP classes to enable cross-compatibility with other future plugins.
-				echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id=' . esc_url_raw( $gtm4wp_oneampid ) . '&gtm.url=SOURCE_URL" data-credentials="include"><script type="application/json">' . wp_json_encode( gtm4wp_amp_gtmvariables() ) . '</script></amp-analytics>';
+				echo '<!-- Google Tag Manager --><amp-analytics config="https://www.googletagmanager.com/amp.json?id=' . esc_url_raw( $gtm4wp_oneampid ) . '&gtm.url=SOURCE_URL" data-credentials="include"><script type="application/json">' . wp_json_encode( gtm4wp_amp_gtmvariables(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . '</script></amp-analytics>';
 
 				// Add to counter.
 				++$x;

@@ -123,8 +123,11 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 	),
 	GTM4WP_OPTION_INCLUDE_MISCGEO           => array(
 		'label'       => esc_html__( 'Geo data', 'duracelltomi-google-tag-manager' ),
-		'description' => esc_html__( 'Add geo data (latitude, longitude, country, city, etc) of the current visitor (provided by ipstack.com)', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		'description' => esc_html__( 'Add geo data (latitude, longitude, country, city, etc) of the current visitor (provided by ipstack.com)', 'duracelltomi-google-tag-manager' ) .
+			gtm4wp_get_deprecation_notice(
+				esc_html__( 'There is no direct replacement: collect geo data in Google Tag Manager or with your analytics provider instead.', 'duracelltomi-google-tag-manager' )
+			),
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INCLUDE_MISCGEOAPI        => array(
 		'label'       => esc_html__( 'IPStack.com API key', 'duracelltomi-google-tag-manager' ),
@@ -136,8 +139,8 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 			),
 			'<a href="https://ipstack.com/product?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress" target="_blank" rel="noopener">',
 			'</a>'
-		),
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		) . gtm4wp_get_deprecation_notice(),
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INCLUDE_MISCGEOCF         => array(
 		'label'       => esc_html__( 'Cloudflare country code', 'duracelltomi-google-tag-manager' ),
@@ -164,13 +167,16 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 			'</a>',
 			'<a href="http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress" target="_blank" rel="noopener">',
 			'</a>'
+		) . gtm4wp_get_deprecation_notice(
+			esc_html__( 'There is no direct replacement: collect weather data in Google Tag Manager or with a dedicated service instead.', 'duracelltomi-google-tag-manager' )
 		),
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHERUNITS      => array(
 		'label'       => esc_html__( 'Weather data units', 'duracelltomi-google-tag-manager' ),
-		'description' => esc_html__( 'Select which temperature units you would like to use.', 'duracelltomi-google-tag-manager' ),
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		'description' => esc_html__( 'Select which temperature units you would like to use.', 'duracelltomi-google-tag-manager' ) .
+			gtm4wp_get_deprecation_notice(),
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI     => array(
 		'label'       => esc_html__( 'OpenWeatherMap API key', 'duracelltomi-google-tag-manager' ),
@@ -182,8 +188,8 @@ $GLOBALS['gtm4wp_includefieldtexts'] = array(
 			),
 			'<a href="http://openweathermap.org/price?utm_source=gtm4wp&utm_medium=link&utm_campaign=gtm4wp-google-tag-manager-for-wordpress" target="_blank" rel="noopener">',
 			'</a>'
-		),
-		'phase'       => GTM4WP_PHASE_EXPERIMENTAL,
+		) . gtm4wp_get_deprecation_notice(),
+		'phase'       => GTM4WP_PHASE_DEPRECATED,
 	),
 	GTM4WP_OPTION_INCLUDE_SITEID            => array(
 		'label'       => esc_html__( 'Site ID', 'duracelltomi-google-tag-manager' ),

@@ -23,6 +23,8 @@ Thumbs.db
 coverage.xml
 clover.xml
 /wordpress/
+phpunit.phar
+.phpunit.result.cache
 
 # Composer
 /vendor/
@@ -30,6 +32,18 @@ composer.lock
 
 # NPM
 node_modules
+
+# Build output and packaged releases (2.0 tooling, never part of the 1.x tree)
+build/
+release/
+
+# Security and test review reports. These describe not-yet-fixed findings and
+# must never reach this public repo. On the 2.0 branch the same rules live in
+# .security/.gitignore and .testing/.gitignore; those files are not present on
+# this branch, so the rules are repeated here to keep the reports uncommittable
+# no matter which branch is checked out.
+.security/code-review-report-*.md
+.testing/test-review-report-*.md
 
 # LLM
 .claude/

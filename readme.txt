@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 3.4.0
 Requires PHP: 7.4
-Tested up to: 6.9.4
+Tested up to: 7.0.2
 Stable tag: 1.22.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
@@ -226,11 +226,17 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 = 1.22.4 =
 
-* Fixed: use proper JSON encoding for user input in dataLayer script context. Thanks [cyn](https://github.com/cyn8)
+* Fixed: hardened how values are encoded into the data layer and into inline script blocks. Script blocks are no longer HTML entity decoded after sanitization, and every value written into a script context is now JSON encoded with the full set of hex escaping flags. Thanks [cyn](https://github.com/cyn8)
 * Fixed: nonce attribute should not be sanitized. Thanks [oxyc](https://github.com/oxyc)
 * Fixed: avoid warnings when saving settings. Thanks [mircobabini](https://github.com/mircobabini)
 * Fixed: only float number is returned in JavaScript processing. Thanks [gkipouros](https://github.com/gkipouros)
 * Updated: only load plugin files on frontend or on admin when the admin user has sufficient permissions.
+* Updated: WooCommerce 10.4+ compatibility - the checkout inline script no longer uses the deprecated wc_enqueue_js() function. The old function is still used as a fallback on setups where the tracker script is loaded in the page head.
+* Updated: WordPress and WooCommerce compatibility.
+* Deprecated: geo data (ipstack.com) and weather data (OpenWeatherMap) integrations. They still work in this version but will be removed in GTM4WP 2.0. There is no direct replacement: collect this data in Google Tag Manager or with a dedicated service instead.
+* Deprecated: scroll tracking. It still works in this version but will be removed in GTM4WP 2.0. Use the Scroll Depth trigger built into Google Tag Manager instead.
+* Deprecated: the "Custom tag/variable templates" blacklist option, plus the Universal Analytics and Mouseflow entries of the tag blacklist. These will be removed in GTM4WP 2.0.
+* Added: a dismissable admin notice announcing the upcoming GTM4WP 2.0 release. If your site uses one of the deprecated features above, the notice names it.
 
 = 1.22.3 =
 
@@ -367,7 +373,7 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 
 = 1.22.4 =
 
-Bugfix release
+Security and deprecation release. Hardens data layer and inline script encoding, and marks the features that will be removed in the upcoming GTM4WP 2.0 rewrite (geo data, weather data and scroll tracking). Those features still work in this version.
 
 = 1.22.3 =
 

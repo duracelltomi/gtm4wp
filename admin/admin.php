@@ -32,13 +32,46 @@ define( 'GTM4WP_PHASE_BETA', 'gtm4wp-phase-beta' );
 define( 'GTM4WP_PHASE_EXPERIMENTAL', 'gtm4wp-phase-experimental' );
 define( 'GTM4WP_PHASE_DEPRECATED', 'gtm4wp-phase-deprecated' );
 
+/**
+ * Returns the standard notice appended to the description of an option that is
+ * deprecated in version 1.22.4 and removed in GTM4WP 2.0.
+ *
+ * The grey "deprecated" badge next to the option label is rendered from the
+ * GTM4WP_PHASE_DEPRECATED phase; this notice adds the detail below the field
+ * and, where one exists, names the replacement.
+ *
+ * The returned string contains basic HTML. Option descriptions are escaped with
+ * gtm4wp_safe_admin_html_with_links() when they are printed, so no further
+ * escaping is needed here.
+ *
+ * @param string $replacement Optional already-translated sentence naming what to use instead.
+ * @return string
+ */
+function gtm4wp_get_deprecation_notice( $replacement = '' ) {
+	$notice = '<br /><br /><strong>' . esc_html__( 'Deprecated:', 'duracelltomi-google-tag-manager' ) . '</strong> ' .
+		esc_html__( 'this feature still works in version 1.22.4 but is no longer developed and will be removed in GTM4WP 2.0.', 'duracelltomi-google-tag-manager' );
+
+	if ( '' !== $replacement ) {
+		$notice .= ' ' . $replacement;
+	}
+
+	return $notice;
+}
+
 $GLOBALS['gtm4wp_def_user_notices_dismisses'] = array(
 	'enter-gtm-code'            => false,
 	'wc-ga-plugin-warning'      => false,
 	'wc-gayoast-plugin-warning' => false,
 	'php72-warning'             => false,
 	'deprecated-warning'        => false,
+	'gtm4wp-20-beta-notice'     => false,
 );
+
+/**
+ * URL of the announcement post about the upcoming GTM4WP 2.0 release.
+ * Linked from the admin notice shown by gtm4wp_show_warning().
+ */
+define( 'GTM4WP_20_ANNOUNCEMENT_URL', 'https://gtm4wp.com/' );
 
 /**
  * Generic function to safely escape translated text that outputs on the admin page.
@@ -878,7 +911,7 @@ function gtm4wp_admin_init() {
 		GTM4WP_ADMIN_GROUP_BLACKLIST,
 		array(
 			'label_for'   => GTM4WP_OPTIONS . '[' . GTM4WP_OPTION_BLACKLIST_SANDBOXED . ']',
-			'description' => '',
+			'description' => gtm4wp_get_deprecation_notice(),
 			'entityid'    => GTM4WP_OPTION_BLACKLIST_SANDBOXED,
 		)
 	);
@@ -1247,6 +1280,52 @@ function gtm4wp_show_warning() {
 	}
 	$gtm4wp_user_notices_dismisses = array_merge( $gtm4wp_def_user_notices_dismisses, $gtm4wp_user_notices_dismisses );
 
+	if ( false === $gtm4wp_user_notices_dismisses['gtm4wp-20-beta-notice'] ) {
+		// Collect the deprecated features this site actually uses so the notice can name them.
+		$gtm4wp_deprecated_in_use = array();
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_MISCGEO ] ) {
+			$gtm4wp_deprecated_in_use[] = esc_html__( 'Geo data', 'duracelltomi-google-tag-manager' );
+		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_INCLUDE_WEATHER ] ) {
+			$gtm4wp_deprecated_in_use[] = esc_html__( 'Weather data', 'duracelltomi-google-tag-manager' );
+		}
+
+		if ( $gtm4wp_options[ GTM4WP_OPTION_SCROLLER_ENABLED ] ) {
+			$gtm4wp_deprecated_in_use[] = esc_html__( 'Scroll tracking', 'duracelltomi-google-tag-manager' );
+		}
+
+		echo '<div class="gtm4wp-notice notice notice-info is-dismissible" data-href="?gtm4wp-20-beta-notice"><p><strong>';
+		esc_html_e( 'GTM4WP 2.0 is on its way', 'duracelltomi-google-tag-manager' );
+		echo '</strong></p><p>';
+		printf(
+			// translators: 1: opening anchor element pointing to the announcement post. 2: closing anchor element.
+			esc_html__(
+				'Version 2.0 is a complete rewrite of the plugin. Some features are deprecated in this version and will be removed in 2.0. A public beta is available for testing - %1$sread the announcement%2$s to see what changes and how to try it.',
+				'duracelltomi-google-tag-manager'
+			),
+			'<a href="' . esc_url( GTM4WP_20_ANNOUNCEMENT_URL ) . '" target="_blank" rel="noopener">',
+			'</a>'
+		);
+		echo '</p>';
+
+		if ( count( $gtm4wp_deprecated_in_use ) > 0 ) {
+			echo '<p>';
+			printf(
+				// translators: 1: comma separated list of the deprecated features that are currently enabled on this site.
+				esc_html__(
+					'This site currently uses: %1$s. These keep working in version 1.22.4 but will not be available in 2.0.',
+					'duracelltomi-google-tag-manager'
+				),
+				'<strong>' . esc_html( implode( ', ', $gtm4wp_deprecated_in_use ) ) . '</strong>'
+			);
+			echo '</p>';
+		}
+
+		echo '</div>';
+	}
+
 	if ( ( '' === trim( $gtm4wp_options[ GTM4WP_OPTION_GTM_CODE ] ) ) && ( false === $gtm4wp_user_notices_dismisses['enter-gtm-code'] ) ) {
 		echo '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code"><p><strong>';
 		printf(
@@ -1372,7 +1451,7 @@ function gtm4wp_add_plugin_action_links( $links, $file ) {
  */
 function gtm4wp_show_upgrade_notification( $current_plugin_metadata, $new_plugin_metadata ) {
 	if ( isset( $new_plugin_metadata->upgrade_notice ) && strlen( trim( $new_plugin_metadata->upgrade_notice ) ) > 0 ) {
-		echo '<p style="background-color: #d54e21; padding: 10px; color: #f9f9f9; margin-top: 10px"><strong>Important Upgrade Notice:</strong> ';
+		echo '<p style="background-color: #d54e21; padding: 10px; color: #f9f9f9; margin-top: 10px"><strong>' . esc_html__( 'Important Upgrade Notice:', 'duracelltomi-google-tag-manager' ) . '</strong> ';
 		echo esc_html( $new_plugin_metadata->upgrade_notice ), '</p>';
 	}
 }
