@@ -46,6 +46,14 @@ describe( 'gtm4wp-spotify', () => {
 
 	afterEach( () => {
 		delete window.onSpotifyIframeApiReady;
+		// The shared media observer lives on the (jsdom) window, which persists
+		// across tests; disconnect and reset it so nothing leaks into the next.
+		if ( window.gtm4wp_media_observer ) {
+			window.gtm4wp_media_observer.disconnect();
+		}
+		delete window.gtm4wp_media_observer;
+		delete window.gtm4wp_media_scanners;
+		delete window.gtm4wp_media_observe_dynamic;
 	} );
 
 	const lastPush = () => window.dataLayer[ window.dataLayer.length - 1 ];
@@ -53,6 +61,52 @@ describe( 'gtm4wp-spotify', () => {
 		window.dataLayer.filter(
 			( entry ) => entry.event === 'gtm4wp.mediaPlayerStateChange'
 		);
+	// MutationObserver records are delivered as microtasks, so awaiting a
+	// macrotask guarantees the observer callback has already run.
+	const flush = () => new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
+
+	// Cap on the emulated SDK so an unbounded re-wire regression fails the
+	// assertion instead of hanging the run (the loop is a microtask loop, which
+	// would starve the macrotask flush() above).
+	const CREATE_CAP = 10;
+
+	/**
+	 * A stub IFrameAPI that models what the real Spotify SDK actually does: it
+	 * does NOT reuse the element it is handed — createController() runs
+	 * `parentElement.replaceChild( iframe, target )` and assigns the embed src
+	 * synchronously, then reports the controller.
+	 *
+	 * Modelling the replacement is the point: a fake that leaves the element in
+	 * place cannot see the unbounded re-wire loop it caused (the observer saw the
+	 * SDK's own unmarked iframe as a fresh match and wired it, forever).
+	 *
+	 * @param {Array} [calls] Collects each element createController was given.
+	 * @return {Object} The stub IFrameAPI.
+	 */
+	function fakeIFrameAPI( calls ) {
+		return {
+			createController( element, options, cb ) {
+				if ( calls ) {
+					calls.push( element );
+					if ( calls.length > CREATE_CAP ) {
+						cb( controller );
+						return;
+					}
+				}
+
+				const replacement = document.createElement( 'iframe' );
+				replacement.setAttribute(
+					'src',
+					element.getAttribute( 'src' )
+				);
+				if ( element.parentElement ) {
+					element.parentElement.replaceChild( replacement, element );
+				}
+
+				cb( controller );
+			},
+		};
+	}
 
 	/**
 	 * Loads the tracker (which defines onSpotifyIframeApiReady) and simulates the
@@ -64,13 +118,36 @@ describe( 'gtm4wp-spotify', () => {
 		jest.isolateModules( () => {
 			require( '../gtm4wp-spotify' );
 		} );
-		window.onSpotifyIframeApiReady( {
-			createController( element, options, cb ) {
-				cb( controller );
-			},
-		} );
+		window.onSpotifyIframeApiReady( fakeIFrameAPI() );
 		return controller;
 	}
+
+	it( 'creates exactly one controller for a later-inserted embed the SDK replaces', async () => {
+		// Runtime tracking on + an embed inserted after load (popup/AJAX) means the
+		// shared observer is live when the SDK's replaceChild lands. The wired
+		// marker leaves with the replaced node, so without the re-mark the
+		// replacement is wired again — replacing it again, unbounded.
+		window.gtm4wp_media_observe_dynamic = true;
+		document.body.innerHTML = '';
+		const calls = [];
+
+		jest.isolateModules( () => {
+			require( '../gtm4wp-spotify' );
+		} );
+		window.onSpotifyIframeApiReady( fakeIFrameAPI( calls ) );
+
+		const frame = document.createElement( 'iframe' );
+		frame.setAttribute(
+			'src',
+			'https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT'
+		);
+		document.body.appendChild( frame );
+
+		await flush();
+		await flush();
+
+		expect( calls ).toHaveLength( 1 );
+	} );
 
 	const update = ( overrides ) =>
 		controller.emit( 'playback_update', {

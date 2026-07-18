@@ -165,6 +165,13 @@ export function gtm4wpOnReady( callback ) {
  * container the tracker created (the Twitch embed): mark that container and its
  * descendants are skipped.
  *
+ * A marker on the element alone is not enough for an SDK that REPLACES the
+ * element it is handed (Spotify): the marker leaves with the replaced node, so
+ * the observer would see the SDK's own iframe as a fresh, unmarked match and
+ * wire it — replacing it again, forever. wireOnce therefore re-marks whatever
+ * takes the element's slot. Keep this invariant when adding a provider: never
+ * assume the element handed to wireElement survives the call.
+ *
  * @param {string}   selector    CSS selector identifying the provider embed.
  * @param {Function} wireElement Called once with each matching element to wire
  *                               it (the same wiring the tracker runs at init).
@@ -188,8 +195,40 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
 		if ( typeof isReady === 'function' && ! isReady() ) {
 			return;
 		}
+
+		// Remember the slot BEFORE wiring: some provider SDKs replace the element
+		// they are handed (see the re-mark below), which takes the marker with it.
+		const parent = element.parentNode;
+		const slot = parent
+			? Array.prototype.indexOf.call( parent.childNodes, element )
+			: -1;
+
 		element.setAttribute( 'data-gtm4wp-media-wired', '1' );
 		wireElement( element );
+
+		// Some SDKs REPLACE the element they are given with their own iframe
+		// rather than reusing it in place — Spotify's createController() does
+		// `parentElement.replaceChild( iframe, target )` plus a synchronous `src`
+		// assignment. The replacement matches the same selector, carries no
+		// marker and has no marked ancestor, so the observer would wire it, which
+		// replaces it again — an unbounded loop that hangs the tab. replaceChild
+		// keeps the slot, so re-mark whatever now occupies it. Only a node that
+		// would actually be re-wired by THIS scanner is marked (it matches the
+		// selector, or wraps something that does), so an unrelated node shifting
+		// into the slot after a plain removal is never marked — which would have
+		// hidden a real embed from tracking.
+		if ( parent && slot > -1 && element.parentNode !== parent ) {
+			const replacement = parent.childNodes[ slot ];
+
+			if (
+				replacement &&
+				1 === replacement.nodeType &&
+				( replacement.matches( selector ) ||
+					replacement.querySelector( selector ) )
+			) {
+				replacement.setAttribute( 'data-gtm4wp-media-wired', '1' );
+			}
+		}
 	};
 
 	// Wire everything already present (this happens regardless of the opt-in).

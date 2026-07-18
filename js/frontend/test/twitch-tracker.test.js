@@ -59,6 +59,10 @@ describe( 'gtm4wp-twitch', () => {
 
 	afterEach( () => {
 		delete global.Twitch;
+		// The container-id counter lives on window (so ids survive bundle
+		// re-execution); reset it so it does not leak into other tests.
+		delete window.gtm4wp_twitch_frame_index;
+		delete window.gtm4wp_media_scanners;
 	} );
 
 	const lastPush = () => window.dataLayer[ window.dataLayer.length - 1 ];
@@ -186,5 +190,28 @@ describe( 'gtm4wp-twitch', () => {
 		// The iframe is left untouched and nothing is pushed.
 		expect( document.querySelector( 'iframe' ) ).not.toBeNull();
 		expect( window.dataLayer ).toHaveLength( 0 );
+	} );
+
+	it( 'gives each replaced player a unique container id across bundle re-execution', () => {
+		// A tag-manager re-injection re-runs the bundle from fresh module scope. A
+		// module-scoped counter would restart at 0 and collide with the still-present
+		// first container (both `gtm4wp-twitch-0`), so `new Twitch.Player('gtm4wp-twitch-0')`
+		// would bind to the stale container. The window-scoped counter keeps ids unique.
+		delete window.gtm4wp_twitch_frame_index;
+
+		loadTracker();
+		const firstId = player.elementId;
+
+		// Re-injection: a fresh iframe plus a fresh bundle execution.
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<iframe src="https://player.twitch.tv/?video=987654321&parent=example.com"></iframe>'
+		);
+		loadTracker();
+		const secondId = player.elementId;
+
+		expect( firstId ).toBe( 'gtm4wp-twitch-0' );
+		expect( secondId ).toBe( 'gtm4wp-twitch-1' );
+		expect( secondId ).not.toBe( firstId );
 	} );
 } );

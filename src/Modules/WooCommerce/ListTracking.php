@@ -142,7 +142,7 @@ final class ListTracking {
 			$product,
 			$attributes,
 			'cart',
-			is_array( $cart_item ) ? $cart_item : null
+			! empty( $cart_item ) && is_array( $cart_item ) ? $cart_item : null
 		);
 
 		$GLOBALS['gtm4wp_cart_item_proddata'] = $eec_product_array;

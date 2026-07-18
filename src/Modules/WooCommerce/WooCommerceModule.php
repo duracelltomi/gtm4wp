@@ -129,17 +129,15 @@ final class WooCommerceModule extends AbstractModule {
 		// cache-safe mode is on, so this is safe to register unconditionally.
 		add_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array( $page_datalayer, 'declare_visitor_scoped_fields' ) );
 
-		// Cache-safe data layer (issue #398): the reliable-purchase fallback is
-		// delivered over a read-only GET, which must not write order state. Register
-		// the authenticated POST beacon route that flags the delivered order
-		// _ga_tracked (closing the cross-device double-count) when both the cache-safe
-		// mode and the reliable-purchase feature are on — the only case the client
-		// beacons. The order id comes solely from the session marker, so there is no
-		// IDOR, and the route verifies the wp_rest nonce.
-		if (
-			(bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
-			&& true === $this->opt( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE )
-		) {
+		// Cache-safe data layer (issue #398): the one-shot events are delivered over a
+		// public, unauthenticated GET, which must not change state. Register the
+		// authenticated POST beacon routes that perform every state change instead —
+		// consuming each delivered event's session marker, and flagging the fallback
+		// order _ga_tracked (closing the cross-device double-count). Each id comes
+		// solely from the session marker, so there is no IDOR, and both routes verify
+		// the wp_rest nonce. The purchase route gates itself on the reliable-purchase
+		// feature; the re-add route ships with the mode.
+		if ( (bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) ) {
 			add_action( 'rest_api_init', array( $page_datalayer, 'register_confirm_purchase_route' ) );
 		}
 

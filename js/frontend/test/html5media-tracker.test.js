@@ -215,6 +215,26 @@ describe( 'gtm4wp-html5media', () => {
 		} );
 	} );
 
+	it( 'fires no milestone when the duration is 0 (avoids an Infinity percentage)', () => {
+		// A zero duration with a positive currentTime makes currentTime / duration
+		// Infinity, and Math.floor( Infinity * 100 ) would cross EVERY milestone at once
+		// (e.g. a stream before metadata loads). The `! duration` guard blocks it, the
+		// same way the other trackers do (finding #20 family convention, #42).
+		const el = createMedia( 'video', {
+			readyState: 1,
+			duration: 0,
+			currentTime: 5,
+		} );
+
+		loadTracker();
+		el.dispatchEvent( new Event( 'timeupdate' ) );
+
+		const marks = window.dataLayer.filter(
+			( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
+		);
+		expect( marks ).toHaveLength( 0 );
+	} );
+
 	it( 'pushes an error as a mediaPlayerEvent with the html5media type and the error code', () => {
 		const el = createMedia( 'video', {
 			readyState: 1,

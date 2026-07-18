@@ -386,6 +386,107 @@ describe( 'gtm4wpObserveMedia', () => {
 		expect( wired ).toHaveLength( 0 );
 	} );
 
+	// A provider SDK that REPLACES the element it is handed (Spotify's
+	// createController does parentElement.replaceChild + a synchronous src) takes
+	// the wired-marker with the replaced node. Without the re-mark in wireOnce the
+	// observer sees the SDK's own iframe as a fresh match and wires it — replacing
+	// it again, forever. The SPOTIFY_CAP below turns that regression into a
+	// failing assertion rather than a hung test run (the loop is a microtask loop,
+	// which would starve the macrotask flush()).
+	const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com/embed"]';
+	const SPOTIFY_CAP = 10;
+
+	/**
+	 * Emulates Spotify's IFrameAPI.createController(): it replaces the target
+	 * element with its own iframe and sets the embed src synchronously, so the
+	 * replacement matches the selector before the observer's microtask runs.
+	 *
+	 * @param {Array} wired Collects each element handed to the wiring.
+	 * @return {Function} The wireElement callback.
+	 */
+	const spotifyReplacingWire = ( wired ) => ( element ) => {
+		wired.push( element );
+		if ( wired.length > SPOTIFY_CAP ) {
+			return;
+		}
+
+		const replacement = document.createElement( 'iframe' );
+		replacement.setAttribute(
+			'src',
+			'https://open.spotify.com/embed/track/x'
+		);
+		element.parentElement.replaceChild( replacement, element );
+	};
+
+	it( 'does not re-wire the SDK’s replacement when a sibling provider registered the observer first', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		document.body.innerHTML =
+			'<iframe src="https://open.spotify.com/embed/track/x"></iframe>';
+		const wired = [];
+
+		// The common case: every sibling tracker wires on gtm4wpOnReady, while
+		// Spotify wires from its async onSpotifyIframeApiReady callback — so the
+		// shared observer is already live when Spotify's replaceChild lands, and
+		// an embed merely PRESENT AT LOAD is enough to trigger the loop.
+		gtm4wpObserveMedia( 'video', () => {} );
+		gtm4wpObserveMedia( SPOTIFY_SELECTOR, spotifyReplacingWire( wired ) );
+
+		await flush();
+		await flush();
+
+		expect( wired ).toHaveLength( 1 );
+		// The SDK's replacement carries the marker, so nothing re-wires it.
+		expect(
+			document
+				.querySelector( SPOTIFY_SELECTOR )
+				.hasAttribute( 'data-gtm4wp-media-wired' )
+		).toBe( true );
+	} );
+
+	it( 'does not re-wire the SDK’s replacement for a later-inserted embed', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const wired = [];
+
+		gtm4wpObserveMedia( SPOTIFY_SELECTOR, spotifyReplacingWire( wired ) );
+
+		// The feature's own advertised scenario: a popup/AJAX insertion.
+		const frame = document.createElement( 'iframe' );
+		frame.setAttribute( 'src', 'https://open.spotify.com/embed/track/x' );
+		document.body.appendChild( frame );
+
+		await flush();
+		await flush();
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'still wires an unrelated element that shifts into the slot of a removed one', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		document.body.innerHTML = '<video id="first"></video>';
+		const wired = [];
+
+		// A wire that REMOVES its element without replacing it must not cause the
+		// node that shifts into the vacated slot to be marked — that would hide a
+		// real embed from tracking.
+		gtm4wpObserveMedia( 'video', ( element ) => {
+			wired.push( element );
+			const later = document.createElement( 'video' );
+			later.id = 'second';
+			element.parentElement.replaceChild( later, element );
+		} );
+
+		await flush();
+
+		// #second took #first's slot and is a genuine, unwired embed: it must be
+		// marked (it matches the selector) rather than silently skipped forever.
+		expect(
+			document
+				.querySelector( '#second' )
+				.hasAttribute( 'data-gtm4wp-media-wired' )
+		).toBe( true );
+		expect( wired ).toHaveLength( 1 );
+	} );
+
 	it( 'shares one observer across providers and wires each provider’s late insertions', async () => {
 		window.gtm4wp_media_observe_dynamic = true;
 		const videos = [];

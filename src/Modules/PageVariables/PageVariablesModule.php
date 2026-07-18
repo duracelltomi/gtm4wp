@@ -230,11 +230,13 @@ final class PageVariablesModule extends AbstractModule {
 
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) || $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
 				// PublishPress Authors lets a post have several authors (co-authors,
-				// guest authors), which matters for E-E-A-T. When it is active and
-				// the current post has more than one author, emit them as arrays
-				// (pagePostAuthors / pagePostAuthorIDs) while keeping the single-value
-				// vars for back-compat, set to the primary (first) author. When
-				// PublishPress is not active, the behavior below is unchanged.
+				// guest authors), which matters for E-E-A-T. When it is active, the
+				// single-value vars are sourced from its primary (first) author - this
+				// also covers a single GUEST author, whose name is not the WordPress
+				// user in $post->post_author that get_userdata() would return. Only when
+				// there is MORE than one author are the array vars (pagePostAuthors /
+				// pagePostAuthorIDs) added alongside them. When PublishPress is not
+				// active (or returns no author), the get_userdata() fallback is unchanged.
 				$multiple_authors = array();
 				if ( function_exists( 'get_multiple_authors' ) ) {
 					$ppress_authors = get_multiple_authors( $GLOBALS['post']->ID );
@@ -243,7 +245,7 @@ final class PageVariablesModule extends AbstractModule {
 					}
 				}
 
-				if ( count( $multiple_authors ) > 1 ) {
+				if ( count( $multiple_authors ) >= 1 ) {
 					$author_names = array();
 					$author_ids   = array();
 
@@ -252,42 +254,48 @@ final class PageVariablesModule extends AbstractModule {
 					// set) is the correct escaper for the inline-script context, so
 					// pre-escaping here would only corrupt the values (RI-2/RI-4).
 					foreach ( $multiple_authors as $one_author ) {
-						$author_names[] = isset( $one_author->display_name ) ? $one_author->display_name : '';
-						$author_ids[]   = isset( $one_author->ID ) ? $one_author->ID : 0;
+						$author_names[] = self::read_author_prop( $one_author, 'display_name', '' );
+						$author_ids[]   = self::read_author_prop( $one_author, 'ID', 0 );
 					}
+
+					$has_multiple = count( $multiple_authors ) > 1;
 
 					if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
 						$data_layer['pagePostAuthorID'] = $author_ids[0];
 
-						/**
-						 * Filters the list of post author IDs output into the data layer
-						 * on a post with multiple authors (PublishPress Authors).
-						 *
-						 * @since 2.0
-						 *
-						 * @param array $author_ids       List of author IDs (WordPress user IDs; guest authors use a negative term id).
-						 * @param array $multiple_authors The PublishPress Author objects the IDs were built from.
-						 *
-						 * @return array Author IDs to output into the data layer.
-						 */
-						$data_layer['pagePostAuthorIDs'] = apply_filters( 'gtm4wp_page_post_author_ids', $author_ids, $multiple_authors );
+						if ( $has_multiple ) {
+							/**
+							 * Filters the list of post author IDs output into the data layer
+							 * on a post with multiple authors (PublishPress Authors).
+							 *
+							 * @since 2.0
+							 *
+							 * @param array $author_ids       List of author IDs (WordPress user IDs; guest authors use a negative term id).
+							 * @param array $multiple_authors The PublishPress Author objects the IDs were built from.
+							 *
+							 * @return array Author IDs to output into the data layer.
+							 */
+							$data_layer['pagePostAuthorIDs'] = apply_filters( 'gtm4wp_page_post_author_ids', $author_ids, $multiple_authors );
+						}
 					}
 
 					if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
 						$data_layer['pagePostAuthor'] = $author_names[0];
 
-						/**
-						 * Filters the list of post author display names output into the
-						 * data layer on a post with multiple authors (PublishPress Authors).
-						 *
-						 * @since 2.0
-						 *
-						 * @param array $author_names     List of author display names.
-						 * @param array $multiple_authors The PublishPress Author objects the names were built from.
-						 *
-						 * @return array Author display names to output into the data layer.
-						 */
-						$data_layer['pagePostAuthors'] = apply_filters( 'gtm4wp_page_post_authors', $author_names, $multiple_authors );
+						if ( $has_multiple ) {
+							/**
+							 * Filters the list of post author display names output into the
+							 * data layer on a post with multiple authors (PublishPress Authors).
+							 *
+							 * @since 2.0
+							 *
+							 * @param array $author_names     List of author display names.
+							 * @param array $multiple_authors The PublishPress Author objects the names were built from.
+							 *
+							 * @return array Author display names to output into the data layer.
+							 */
+							$data_layer['pagePostAuthors'] = apply_filters( 'gtm4wp_page_post_authors', $author_names, $multiple_authors );
+						}
 					}
 				} else {
 					$postuser = get_userdata( $GLOBALS['post']->post_author );
@@ -605,6 +613,36 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		return $data_layer;
+	}
+
+	/**
+	 * Reads a property from a PublishPress author object without depending on the
+	 * magic __isset() method (finding #43).
+	 *
+	 * PublishPress's Author objects resolve display_name/ID through __get(). isset(),
+	 * ?? and empty() all consult __isset() first, which a class exposing __get() need
+	 * not implement — and if it does not, isset() reports false even though __get()
+	 * would return a real value, so every author name/ID would silently blank out.
+	 * Reading through __get() directly (guarded by property_exists() for a plain
+	 * object and method_exists('__get') for a magic one) avoids that trap without
+	 * risking an "undefined property" warning for an object exposing the value in
+	 * neither way. A null value falls back to the default, matching the old isset()
+	 * semantics.
+	 *
+	 * @param object $author   The author object (PublishPress Author or a plain object).
+	 * @param string $prop     The property name to read.
+	 * @param mixed  $fallback Returned when the object exposes the property in neither way, or it is null.
+	 * @return mixed
+	 */
+	private static function read_author_prop( object $author, string $prop, $fallback ) {
+		if ( property_exists( $author, $prop ) || method_exists( $author, '__get' ) ) {
+			$value = $author->$prop;
+			if ( null !== $value ) {
+				return $value;
+			}
+		}
+
+		return $fallback;
 	}
 
 	/**

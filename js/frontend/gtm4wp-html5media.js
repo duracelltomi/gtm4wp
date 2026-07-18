@@ -210,15 +210,17 @@ function gtm4wp_initHTML5MediaTracking() {
 		}
 
 		media_element.addEventListener( 'timeupdate', function () {
-			if (
-				isNaN( media_element.duration ) ||
-				isNaN( media_element.currentTime )
-			) {
+			const videoDuration = media_element.duration;
+			const videoCurrentTime = media_element.currentTime;
+
+			// Guard a missing/zero/NaN duration the same way the other trackers do
+			// (the `if ( ! duration ) return;` family convention, finding #20): with
+			// duration 0 and a positive currentTime, currentTime / 0 is Infinity and
+			// Math.floor(Infinity * 100) would fire EVERY milestone at once.
+			if ( ! videoDuration || isNaN( videoCurrentTime ) ) {
 				return;
 			}
 
-			const videoDuration = media_element.duration;
-			const videoCurrentTime = media_element.currentTime;
 			const videoPercentage = Math.floor(
 				( videoCurrentTime / videoDuration ) * 100
 			);

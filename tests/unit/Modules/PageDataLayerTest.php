@@ -115,6 +115,7 @@ final class PageDataLayerTest extends TestCase {
 			$_GET['key'],
 			$_COOKIE['gtm4wp_orderid_tracked'],
 			$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ],
+			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ],
 			$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'],
 			$GLOBALS['gtm4wp_additional_datalayer_pushes']
 		);
@@ -129,6 +130,7 @@ final class PageDataLayerTest extends TestCase {
 			$_GET['key'],
 			$_COOKIE['gtm4wp_orderid_tracked'],
 			$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ],
+			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ],
 			$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'],
 			$GLOBALS['gtm4wp_additional_datalayer_pushes']
 		);
@@ -402,6 +404,10 @@ final class PageDataLayerTest extends TestCase {
 	 * @return object The session object (inspect its ->sets array).
 	 */
 	private function stub_wc_pending( int $pending_order_id ): object {
+		// The one-shot resolvers only load the WC session when the event cookie is
+		// present (oneshot_wc()'s gate keeps an anonymous Tier-2 fetch cheap).
+		$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] = '1';
+
 		$session = new class( $pending_order_id ) {
 			/**
 			 * Recorded set() calls, keyed by session key.
@@ -973,6 +979,9 @@ final class PageDataLayerTest extends TestCase {
 	 * @return object The session object (inspect its ->sets array).
 	 */
 	private function stub_wc_readded( string $hash, \WC_Product $product ): object {
+		// oneshot_wc()'s gate: the resolver loads the session only with the cookie set.
+		$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] = '1';
+
 		$cart = new class( array( $hash => array( 'data' => $product, 'quantity' => 1 ) ) ) { // phpcs:ignore
 			public function __construct( private array $items ) {}
 			public function get_cart() {
@@ -1058,10 +1067,11 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( array( 'sentinel' ), $fields, 'No one-shot fields unless the cache-safe mode is on.' );
 	}
 
-	public function test_resolve_pending_purchase_returns_payload_and_consumes_marker(): void {
-		// Scenario (a) server half: the fallback resolver returns the purchase payload
-		// keyed on the SAME order number the order-received inline guard writes, and
-		// consumes the pending marker - but does NOT flag _ga_tracked (public GET).
+	public function test_resolve_pending_purchase_returns_payload_without_mutating_state(): void {
+		// The fallback resolver returns the purchase payload keyed on the SAME order
+		// number the order-received inline guard writes. Being a public, unauthenticated
+		// GET it is READ-ONLY (issue #398): it neither consumes the delivery marker nor
+		// writes _ga_tracked - every state change happens on the confirm POST beacon.
 		$order = $this->make_recent_order();
 		Functions\when( 'wc_get_order' )->justReturn( $order );
 		$session = $this->stub_wc_pending( 1001 );
@@ -1079,10 +1089,28 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( '1001', $payload['orderNumber'], 'The de-dupe key is the order number (shared with the order-received guard).' );
 		$this->assertTrue( $payload['flag'], 'By default the browser guard is written.' );
 
-		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets );
-		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ], 'The pending marker is consumed so it resolves at most once.' );
-
+		// Read-only: the GET writes NOTHING to the session and no order meta.
+		$this->assertSame( array(), $session->sets, 'The read-only GET must not write any session state.' );
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The endpoint (a public GET) must not write the _ga_tracked order meta.' );
+	}
+
+	public function test_resolve_pending_purchase_null_without_the_event_cookie(): void {
+		// oneshot_wc()'s gate: with no event cookie the resolver never loads the WC
+		// session (keeping an anonymous Tier-2 fetch free of WooCommerce session work),
+		// so nothing is resolved even when a marker would otherwise be pending.
+		$order = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+		unset( $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertNull( $payload, 'No one-shot is resolved when the event cookie is absent.' );
 	}
 
 	public function test_resolve_pending_purchase_flag_false_under_no_tracked_flag_option(): void {
@@ -1113,9 +1141,10 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertNull( $payload, 'The fallback is not resolved unless the reliable-tracking option is on.' );
 	}
 
-	public function test_resolve_pending_purchase_null_and_consumes_marker_for_already_tracked_order(): void {
+	public function test_resolve_pending_purchase_null_for_already_tracked_order_without_mutating_state(): void {
 		// Scenario (b) server half: the order-received page already flagged _ga_tracked,
-		// so the fallback resolver yields nothing - no second purchase.
+		// so the fallback resolver yields nothing - no second purchase. Still read-only:
+		// it does not consume the marker (the confirm POST beacon owns that).
 		$order = $this->make_recent_order( array( 'meta' => array( '_ga_tracked' => 1 ) ) );
 		Functions\when( 'wc_get_order' )->justReturn( $order );
 		$session = $this->stub_wc_pending( 1001 );
@@ -1128,7 +1157,7 @@ final class PageDataLayerTest extends TestCase {
 		)->resolve_pending_purchase();
 
 		$this->assertNull( $payload, 'An order already flagged tracked must not resolve a fallback purchase.' );
-		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The stale marker is still consumed.' );
+		$this->assertSame( array(), $session->sets, 'The read-only GET must not touch the session, even when it resolves nothing.' );
 	}
 
 	public function test_resolve_pending_purchase_hostile_order_number_round_trips_hex_encoded(): void {
@@ -1155,7 +1184,7 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'ORD</script>', $encoded, 'No raw </script> may survive in the endpoint payload.' );
 	}
 
-	public function test_resolve_readded_to_cart_returns_payload_and_consumes_marker(): void {
+	public function test_resolve_readded_to_cart_returns_payload_without_mutating_state(): void {
 		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
 		$session = $this->stub_wc_readded( 'hash-1', $product );
 
@@ -1167,18 +1196,35 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( 'Mug', $payload['push']['ecommerce']['items'][0]['item_name'] );
 		$this->assertSame( 'hash-1', $payload['token'], 'The re-add cart key is the de-dupe token.' );
 
-		$this->assertArrayHasKey( 'gtm4wp_product_readded_to_cart', $session->sets );
-		$this->assertNull( $session->sets['gtm4wp_product_readded_to_cart'], 'The re-add marker is consumed so it resolves at most once.' );
+		// Read-only GET (issue #398): the marker is consumed by the confirm-readd POST
+		// beacon, not here, so a cross-site navigation to the endpoint cannot destroy
+		// the pending event.
+		$this->assertSame( array(), $session->sets, 'The read-only GET must not consume the re-add marker.' );
 	}
 
 	public function test_resolve_readded_to_cart_null_when_no_marker(): void {
-		// The default stub_wc() session returns null for every key.
+		// The event cookie is present (so the session loads) but no re-add marker is
+		// set, so the resolver finds nothing pending. The default stub_wc() session
+		// returns null for every key.
 		$this->stub_wc();
+		$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] = '1';
 
 		$payload = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
 			->resolve_readded_to_cart();
 
 		$this->assertNull( $payload, 'Nothing is resolved when no re-add is pending.' );
+	}
+
+	public function test_resolve_readded_to_cart_null_without_the_event_cookie(): void {
+		// oneshot_wc()'s gate: no event cookie, no WC session load, nothing resolved.
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc_readded( 'hash-1', $product );
+		unset( $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] );
+
+		$payload = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->resolve_readded_to_cart();
+
+		$this->assertNull( $payload, 'No re-add is resolved when the event cookie is absent.' );
 	}
 
 	public function test_cache_safe_omits_the_readded_to_cart_one_shot_event(): void {
@@ -1211,6 +1257,9 @@ final class PageDataLayerTest extends TestCase {
 	 * @return object The session object (inspect ->store / ->sets).
 	 */
 	private function stub_wc_stateful( array $initial = array() ): object {
+		// oneshot_wc()'s gate: the resolver loads the session only with the cookie set.
+		$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] = '1';
+
 		$session = new class( $initial ) {
 			/**
 			 * Live session store (get reads this, set writes it).
@@ -1275,10 +1324,11 @@ final class PageDataLayerTest extends TestCase {
 		return $session;
 	}
 
-	public function test_resolve_pending_purchase_stashes_needs_flag_marker_without_writing_meta(): void {
-		// Issue #398: the read-only GET stashes the resolved order id in the dedicated
-		// needs-flag marker (so the POST beacon can flag it later) yet writes NO order
-		// meta itself, and still consumes the delivery marker as before.
+	public function test_resolve_pending_purchase_is_fully_read_only(): void {
+		// Issue #398: the read-only GET delivers the payload but changes NOTHING - it
+		// leaves the delivery marker in place (the confirm POST beacon consumes it) and
+		// writes no order meta. A GET that mutated state could be fired by a cross-site
+		// navigation carrying the visitor's Lax cookies.
 		$order = $this->make_recent_order();
 		Functions\when( 'wc_get_order' )->justReturn( $order );
 		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
@@ -1291,9 +1341,9 @@ final class PageDataLayerTest extends TestCase {
 		)->resolve_pending_purchase();
 
 		$this->assertTrue( $payload['flag'] );
-		$this->assertSame( 1001, $session->store[ PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY ] ?? null, 'The needs-flag marker is stashed for the POST beacon.' );
+		$this->assertSame( array(), $session->sets, 'The read-only GET must not write any session state.' );
+		$this->assertSame( 1001, $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The delivery marker is left for the confirm POST beacon.' );
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The GET (public) must never write order meta.' );
-		$this->assertNull( $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The delivery marker is still consumed.' );
 	}
 
 	public function test_cross_device_confirm_beacon_flags_order_and_suppresses_order_received(): void {
@@ -1312,16 +1362,19 @@ final class PageDataLayerTest extends TestCase {
 		);
 
 		// Session A, page N: the GET resolver delivers the one fallback purchase and,
-		// being read-only, only stashes the needs-flag marker (no _ga_tracked).
+		// being read-only, changes nothing (no marker consumption, no _ga_tracked).
 		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
 		$payload = $page->resolve_pending_purchase();
 
 		$this->assertSame( 'purchase', $payload['push']['event'] ?? null, 'The fallback resolves exactly one purchase on session A.' );
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The GET must not flag the order.' );
+		$this->assertSame( 1001, $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The GET leaves the marker for the beacon.' );
 
-		// Session A, the POST beacon: the ONLY writer of _ga_tracked for the fallback.
+		// Session A, the POST beacon: reads the delivery marker, consumes it, and is the
+		// ONLY writer of _ga_tracked for the fallback.
 		$page->confirm_pending_purchase_tracked();
 		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'The POST beacon flags the order tracked.' );
+		$this->assertNull( $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The beacon consumes the delivery marker.' );
 
 		// Device B renders the real order-received page for the SAME order: _ga_tracked
 		// is set now, so is_purchase_already_tracked() suppresses the second purchase.
@@ -1364,7 +1417,7 @@ final class PageDataLayerTest extends TestCase {
 
 		// The session queued order 1001; a hostile client would "ask" for 9999 in the
 		// body, which the callback never reads.
-		$this->stub_wc_stateful( array( PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY => 1001 ) );
+		$this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
 
 		$this->make_page_datalayer(
 			array(
@@ -1390,7 +1443,7 @@ final class PageDataLayerTest extends TestCase {
 			}
 		);
 
-		$session = $this->stub_wc_stateful( array( PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY => 1001 ) );
+		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
 
 		$page = $this->make_page_datalayer(
 			array(
@@ -1406,13 +1459,27 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertNull( $first->get_data() );
 		$this->assertSame( array( 1001 ), $requested, 'The marker is consumed on the first POST; the second loads nothing.' );
 		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'The order is flagged exactly once.' );
-		$this->assertArrayNotHasKey( PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY, $session->store, 'The needs-flag marker is consumed.' );
+		$this->assertNull( $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The delivery marker is consumed.' );
 	}
 
-	public function test_do_not_flag_option_stashes_no_marker_and_confirm_writes_no_meta(): void {
+	public function test_confirm_readded_to_cart_consumes_the_marker(): void {
+		// The re-add's state change (consuming its session marker) happens on the
+		// authenticated POST beacon, not the read-only GET (issue #398). Idempotent.
+		$session = $this->stub_wc_stateful( array( 'gtm4wp_product_readded_to_cart' => 'hash-1' ) );
+
+		$page = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		$response = $page->confirm_readded_to_cart_tracked();
+		$page->confirm_readded_to_cart_tracked();
+
+		$this->assertSame( 204, $response->get_status(), 'The beacon returns 204 No Content.' );
+		$this->assertNull( $session->store['gtm4wp_product_readded_to_cart'] ?? null, 'The re-add marker is consumed.' );
+	}
+
+	public function test_do_not_flag_option_confirm_writes_no_meta(): void {
 		// "Do not flag orders as being tracked" ON, end to end (#398 / #369): resolve
-		// stashes NO needs-flag marker and returns flag:false, and even a stray POST
-		// writes no _ga_tracked (flag_order_tracked() no-ops under the option).
+		// returns flag:false without touching the session, and even if the beacon fires
+		// it writes no _ga_tracked (flag_order_tracked() no-ops under the option).
 		$order = $this->make_recent_order();
 		Functions\when( 'wc_get_order' )->justReturn( $order );
 		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
@@ -1427,11 +1494,9 @@ final class PageDataLayerTest extends TestCase {
 
 		$payload = $page->resolve_pending_purchase();
 		$this->assertFalse( $payload['flag'], 'flag:false tells the client to send no beacon.' );
-		$this->assertArrayNotHasKey( PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY, $session->store, 'No needs-flag marker is stashed when flagging is off.' );
+		$this->assertSame( array(), $session->sets, 'The read-only GET writes no session state, flagging on or off.' );
 
-		// Even if a needs-flag marker somehow existed and the POST fired, the write
-		// still no-ops under the option.
-		$session->store[ PageDataLayer::PENDING_PURCHASE_FLAG_SESSION_KEY ] = 1001;
+		// If the beacon fires anyway, the write still no-ops under the option.
 		$page->confirm_pending_purchase_tracked();
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'flag_order_tracked() no-ops under the do-not-flag option.' );
 	}

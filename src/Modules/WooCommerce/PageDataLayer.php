@@ -29,28 +29,25 @@ final class PageDataLayer {
 
 	/**
 	 * REST route (relative to VisitorDataEndpoint::REST_NAMESPACE) of the
-	 * authenticated POST that flags a reliable-purchase-fallback order as tracked
-	 * (issue #398). The read-only GET session endpoint resolves and delivers the
-	 * fallback purchase but deliberately writes no order meta; this companion POST —
-	 * nonce protected, order id taken only from the session marker (never the request
-	 * body, so no IDOR) — performs the _ga_tracked write, closing the cross-device
-	 * double-count without letting a GET mutate order state. Must match the client
+	 * authenticated POST that confirms the reliable-purchase fallback was delivered
+	 * (issue #398): it consumes the session delivery marker and flags the order
+	 * _ga_tracked. The session endpoint is a public GET, so it must not mutate
+	 * anything — it only READS the marker and returns the payload; this companion
+	 * POST (nonce protected, order id taken only from the session marker, never the
+	 * request body, so no IDOR) performs every state change. Must match the client
 	 * beacon target baked into the visitor-data config (the pendingPurchase
 	 * VisitorField's confirm_url).
 	 */
 	public const REST_ROUTE_CONFIRM_PURCHASE = '/confirm-purchase-tracked';
 
 	/**
-	 * WooCommerce session key holding the id of a reliable-purchase-fallback order
-	 * that was delivered over the read-only GET session endpoint and is waiting for
-	 * the authenticated POST beacon to flag it _ga_tracked (issue #398). Written by
-	 * resolve_pending_purchase() only when order-tracked flagging is on, and consumed
-	 * once by confirm_pending_purchase_tracked(). Kept separate from
-	 * ProductData::PENDING_PURCHASE_SESSION_KEY (the delivery marker, already consumed
-	 * by the GET) so the POST only ever flags — it never re-resolves or re-delivers a
-	 * purchase, and it takes no order id from the request.
+	 * REST route (relative to VisitorDataEndpoint::REST_NAMESPACE) of the
+	 * authenticated POST that confirms the re-added-to-cart one-shot was delivered
+	 * (issue #398), consuming its session marker. The sibling of
+	 * REST_ROUTE_CONFIRM_PURCHASE, and for the same reason: the GET that delivers the
+	 * event stays read-only, so every state change happens here, behind a nonce.
 	 */
-	public const PENDING_PURCHASE_FLAG_SESSION_KEY = 'gtm4wp_pending_purchase_needs_flag';
+	public const REST_ROUTE_CONFIRM_READD = '/confirm-readd-tracked';
 
 	/**
 	 * Constructor.
@@ -799,19 +796,71 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Stashes the id of a reliable-purchase-fallback order the read-only GET endpoint
-	 * has just delivered, so the authenticated POST beacon can flag it _ga_tracked
-	 * (issue #398). Only the dedicated needs-flag marker is written; the GET still
-	 * writes no order meta.
+	 * Returns WooCommerce with its session and cart loaded for the CURRENT request,
+	 * or null when WooCommerce cannot provide them.
 	 *
-	 * @param int $order_id The resolved fallback order id.
-	 * @return void
+	 * WooCommerce does NOT initialize its session on a REST request: WooCommerce::init()
+	 * calls initialize_session() only when is_request( 'frontend' ) is true, and that
+	 * check ends in `&& ! $this->is_rest_api_request()`. So on the cache-safe session
+	 * endpoint WC()->session is null, every one-shot resolver takes its "no session"
+	 * guard and silently returns null — and because the cache-safe mode ALSO omits
+	 * these events from the page HTML, the purchase / add_to_cart would be lost
+	 * outright rather than merely delayed. wc_load_cart() is WooCommerce's own remedy
+	 * for exactly this context; its Store API calls it per request
+	 * (StoreApi AbstractCartRoute::load_cart_session()).
+	 *
+	 * @return object|null WooCommerce, or null when it is unavailable.
 	 */
-	private function set_pending_flag_session_order( int $order_id ): void {
-		$woo = function_exists( 'WC' ) ? WC() : null;
-		if ( $woo && ! empty( $woo->session ) ) {
-			$woo->session->set( self::PENDING_PURCHASE_FLAG_SESSION_KEY, $order_id );
+	private function load_wc(): ?object {
+		if ( ! function_exists( 'WC' ) ) {
+			return null;
 		}
+
+		$woo = WC();
+		if ( ! $woo ) {
+			return null;
+		}
+
+		if (
+			empty( $woo->session )
+			&& function_exists( 'wc_load_cart' )
+			&& did_action( 'before_woocommerce_init' )
+		) {
+			wc_load_cart();
+		}
+
+		return $woo;
+	}
+
+	/**
+	 * Same as load_wc(), but only when a WooCommerce one-shot event is actually
+	 * pending for this browser — used by the read-only GET resolvers.
+	 *
+	 * The gate matters for more than speed. Loading the session + cart on EVERY
+	 * session-endpoint request would make WooCommerce hand a fresh session cookie to
+	 * visitors who have none, and page caches routinely bypass the cache for any
+	 * visitor carrying one — which would defeat the very mode this code serves. The
+	 * client only fetches a one-shot while its event cookie is present, so honouring
+	 * the same gate server-side keeps the common path (an anonymous visitor fetching
+	 * Tier 2 once per session) free of any WooCommerce session work.
+	 *
+	 * Only the cookie's PRESENCE is read, never its value: PurchaseTracking and
+	 * ListTracking set it (to a constant '1') alongside the session marker, so
+	 * "marker pending" and "cookie present" are written together. The one exception is
+	 * pending_session_order_id()'s WooCommerce `order_awaiting_payment` fallback, which
+	 * WooCommerce sets without our cookie; under the cache-safe mode that fallback
+	 * therefore only resolves once a real one-shot has flagged the cookie — acceptable,
+	 * because remember_order()'s three hooks already cover every payment method.
+	 *
+	 * @return object|null WooCommerce with a live session, or null.
+	 */
+	private function oneshot_wc(): ?object {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only; the value is never read, and every id still comes from the server-side session.
+		if ( ! isset( $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] ) ) {
+			return null;
+		}
+
+		return $this->load_wc();
 	}
 
 	/**
@@ -927,7 +976,11 @@ final class PageDataLayer {
 			'',
 			array( $this, 'resolve_readded_to_cart' ),
 			$event_cookie,
-			true
+			true,
+			// The client fires this authenticated POST beacon after delivering the
+			// re-add, so the GET stays read-only while the session marker is still
+			// consumed server-side (issue #398).
+			rest_url( VisitorDataEndpoint::REST_NAMESPACE . self::REST_ROUTE_CONFIRM_READD )
 		);
 
 		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
@@ -955,13 +1008,19 @@ final class PageDataLayer {
 	 * it into cacheable HTML, and carries the session cart-item key as the per-event
 	 * de-dupe token so a page reload does not re-fire it. Derives everything from the
 	 * current request's WC session/cart — no id parameter, so a caller only ever gets
-	 * its own re-add. Consumes the session marker so a lingering event cookie never
-	 * re-resolves the same re-add. Returns null when nothing is pending.
+	 * its own re-add. Returns null when nothing is pending.
+	 *
+	 * READ-ONLY: this runs on a public, unauthenticated GET, so it must not change
+	 * state — otherwise any cross-site top-level navigation to the endpoint (which
+	 * carries the visitor's SameSite=Lax cookies) would consume a real visitor's
+	 * pending event and destroy it. The marker is consumed by the authenticated POST
+	 * beacon (confirm_readded_to_cart_tracked) once the client has actually delivered
+	 * the event; until then the client's own per-token guard stops a re-push.
 	 *
 	 * @return array<string, mixed>|null
 	 */
 	public function resolve_readded_to_cart(): ?array {
-		$woo = function_exists( 'WC' ) ? WC() : null;
+		$woo = $this->oneshot_wc();
 		if ( ! $woo || empty( $woo->session ) || empty( $woo->cart ) ) {
 			return null;
 		}
@@ -970,9 +1029,6 @@ final class PageDataLayer {
 		if ( ! isset( $cart_readded_hash ) ) {
 			return null;
 		}
-
-		// Consume the one-shot marker (own session) so it is resolved at most once.
-		$woo->session->set( 'gtm4wp_product_readded_to_cart', null );
 
 		$cart_item = $woo->cart->get_cart_item( $cart_readded_hash );
 		if ( empty( $cart_item ) ) {
@@ -1017,21 +1073,29 @@ final class PageDataLayer {
 	 * a real order-received purchase for the same order can never both count.
 	 *
 	 * The order is resolved from the CURRENT request's WC session (no id parameter, no
-	 * IDOR), runs the same age / already-tracked / trackable-status gauntlet as the page
-	 * path, and the pending (delivery) marker is consumed so a lingering event cookie
-	 * never re-resolves it. Being a public GET, it deliberately writes NO _ga_tracked
-	 * order meta itself; instead, when order-tracked flagging is on, it stashes the
-	 * resolved order id in a dedicated needs-flag session marker
-	 * (PENDING_PURCHASE_FLAG_SESSION_KEY) that the authenticated POST beacon
-	 * (confirm_pending_purchase_tracked) consumes to write _ga_tracked — restoring the
-	 * order-received page's cross-device parity without mutating state from a GET. The
-	 * shared client-side gtm4wp_orderid_tracked guard still covers same-browser dedupe.
-	 * Returns null when nothing is eligible.
+	 * IDOR) and runs the same age / already-tracked / trackable-status gauntlet as the
+	 * page path. Returns null when nothing is eligible.
+	 *
+	 * READ-ONLY: this runs on a public, unauthenticated GET, so it changes nothing —
+	 * no _ga_tracked order meta, and (since issue #398's review) no session write
+	 * either. A GET that consumed the delivery marker could be fired by any cross-site
+	 * top-level navigation, which carries the visitor's SameSite=Lax cookies, and would
+	 * silently destroy a real buyer's purchase event. Every state change happens in the
+	 * authenticated POST beacon (confirm_pending_purchase_tracked), which consumes the
+	 * marker and writes _ga_tracked once the client has actually delivered the event.
+	 * Until the beacon lands the marker stays put, so a repeat fetch simply re-resolves
+	 * the same order and the shared client-side gtm4wp_orderid_tracked guard (keyed on
+	 * the order number) stops it being pushed twice.
 	 *
 	 * @return array<string, mixed>|null
 	 */
 	public function resolve_pending_purchase(): ?array {
 		if ( true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+			return null;
+		}
+
+		$woo = $this->oneshot_wc();
+		if ( ! $woo ) {
 			return null;
 		}
 
@@ -1041,10 +1105,6 @@ final class PageDataLayer {
 		}
 
 		$order = wc_get_order( $order_id );
-
-		// Consume the pending marker (own session) so it is resolved at most once,
-		// regardless of the outcome below - matching the page fallback.
-		$this->clear_pending_session_order();
 
 		if ( ! ( $order instanceof \WC_Order ) ) {
 			return null;
@@ -1071,17 +1131,6 @@ final class PageDataLayer {
 		// without the guard, matching the page path (#369).
 		$flag = ! (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG );
 
-		// Cross-device dedupe (issue #398): the classic order-received page flags
-		// _ga_tracked so a second render for the same order is suppressed everywhere;
-		// the same-browser guard alone cannot do that across devices. This is a public
-		// GET, so it must not write order meta - instead it stashes the resolved order
-		// id in a dedicated session marker the authenticated POST beacon
-		// (confirm_pending_purchase_tracked) consumes to perform the _ga_tracked write.
-		// Skipped when flagging is off: no marker, no beacon, no meta write (#369).
-		if ( $flag ) {
-			$this->set_pending_flag_session_order( $order_id );
-		}
-
 		return array(
 			'push'        => $purchase_data_layer,
 			'orderNumber' => (string) $order->get_order_number(),
@@ -1090,26 +1139,39 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Registers the authenticated POST route that flags a delivered
-	 * reliable-purchase-fallback order as tracked (issue #398). It is a companion to
-	 * the read-only GET session endpoint: the GET delivers the fallback purchase but
-	 * writes no order meta, and this POST performs the _ga_tracked write so a later
+	 * Registers the authenticated POST routes that confirm a one-shot event was
+	 * delivered (issue #398) and perform every state change the read-only GET session
+	 * endpoint deliberately does not: consuming the session delivery marker and, for
+	 * the purchase fallback, writing the _ga_tracked order meta so a later
 	 * order-received render on ANOTHER device is suppressed. Registered by
-	 * WooCommerceModule on rest_api_init only when the cache-safe mode and the
-	 * reliable-purchase feature are both on. Hooked to rest_api_init.
+	 * WooCommerceModule on rest_api_init only when the cache-safe mode is on (the
+	 * purchase route additionally requires the reliable-purchase feature). Hooked to
+	 * rest_api_init.
 	 *
 	 * @return void
 	 */
 	public function register_confirm_purchase_route(): void {
+		// Unlike the read-only GET session endpoint, these routes change state, so they
+		// must reject a cross-origin request: the wp_rest REST nonce is verified (PA-1).
+		// They are POSTs, so the HTTP semantics are correct.
+		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+			register_rest_route(
+				VisitorDataEndpoint::REST_NAMESPACE,
+				self::REST_ROUTE_CONFIRM_PURCHASE,
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'confirm_pending_purchase_tracked' ),
+					'permission_callback' => array( $this, 'check_confirm_purchase_permission' ),
+				)
+			);
+		}
+
 		register_rest_route(
 			VisitorDataEndpoint::REST_NAMESPACE,
-			self::REST_ROUTE_CONFIRM_PURCHASE,
+			self::REST_ROUTE_CONFIRM_READD,
 			array(
 				'methods'             => 'POST',
-				'callback'            => array( $this, 'confirm_pending_purchase_tracked' ),
-				// Unlike the read-only GET session endpoint, this route changes state,
-				// so it must reject a cross-origin request: the wp_rest REST nonce is
-				// verified here (PA-1). It is a POST, so the HTTP semantics are correct.
+				'callback'            => array( $this, 'confirm_readded_to_cart_tracked' ),
 				'permission_callback' => array( $this, 'check_confirm_purchase_permission' ),
 			)
 		);
@@ -1136,27 +1198,31 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * POST callback: flags the reliable-purchase-fallback order that this browser's
-	 * session queued (issue #398) as tracked, so a later order-received render on
-	 * another device is suppressed by is_purchase_already_tracked(). The order id
-	 * comes ONLY from the dedicated session marker set by resolve_pending_purchase() —
-	 * never from the request body, so a forged order id flags nothing (no IDOR). The
-	 * marker is consumed unconditionally so the write happens at most once (a second
-	 * POST finds no marker and no-ops). flag_order_tracked() itself no-ops when "Do
-	 * not flag orders as being tracked" is on, so that option is honoured here too.
-	 * The request body is intentionally not read.
+	 * POST callback: confirms the client delivered the reliable-purchase fallback for
+	 * the order this browser's session queued (issue #398). It consumes the delivery
+	 * marker and flags the order tracked, so a later order-received render on another
+	 * device is suppressed by is_purchase_already_tracked().
+	 *
+	 * This is where the fallback's state changes happen, because the GET that delivers
+	 * it is public and unauthenticated (see resolve_pending_purchase). The order id
+	 * comes ONLY from the session marker — never from the request body, so a forged
+	 * order id flags nothing (no IDOR) — and the marker is consumed unconditionally so
+	 * the write happens at most once (a second POST finds no marker and no-ops).
+	 * flag_order_tracked() itself no-ops when "Do not flag orders as being tracked" is
+	 * on, so that option is honoured here too. The request body is intentionally not
+	 * read.
 	 *
 	 * @return \WP_REST_Response A 204 No Content response.
 	 */
 	public function confirm_pending_purchase_tracked(): \WP_REST_Response {
-		$woo = function_exists( 'WC' ) ? WC() : null;
+		$woo = $this->load_wc();
 
 		if ( $woo && ! empty( $woo->session ) ) {
-			$order_id = absint( $woo->session->get( self::PENDING_PURCHASE_FLAG_SESSION_KEY ) );
+			$order_id = absint( $woo->session->get( ProductData::PENDING_PURCHASE_SESSION_KEY ) );
 
 			// Consume the marker up front so the flag write happens at most once,
 			// regardless of whether the order can still be loaded below (idempotent).
-			$woo->session->set( self::PENDING_PURCHASE_FLAG_SESSION_KEY, null );
+			$this->clear_pending_session_order();
 
 			if ( $order_id > 0 ) {
 				$order = wc_get_order( $order_id );
@@ -1165,6 +1231,27 @@ final class PageDataLayer {
 					$this->product_data->flag_order_tracked( $order );
 				}
 			}
+		}
+
+		return new \WP_REST_Response( null, 204 );
+	}
+
+	/**
+	 * POST callback: confirms the client delivered the re-added-to-cart one-shot, so
+	 * its session marker can be consumed (issue #398). The sibling of
+	 * confirm_pending_purchase_tracked() and, for the same reason, the only place that
+	 * re-add's state change happens — the GET that delivers it is public and
+	 * unauthenticated. Takes nothing from the request body: the marker is this
+	 * browser's own session key, so a caller can only ever consume its own re-add.
+	 * Idempotent — a second POST finds no marker and no-ops.
+	 *
+	 * @return \WP_REST_Response A 204 No Content response.
+	 */
+	public function confirm_readded_to_cart_tracked(): \WP_REST_Response {
+		$woo = $this->load_wc();
+
+		if ( $woo && ! empty( $woo->session ) ) {
+			$woo->session->set( 'gtm4wp_product_readded_to_cart', null );
 		}
 
 		return new \WP_REST_Response( null, 204 );

@@ -293,8 +293,15 @@ final class VisitorDataModule extends AbstractModule {
 				$_COOKIE[ self::LOGIN_GATE_COOKIE ] = $desired;
 			}
 		} elseif ( '' !== $current ) {
-			// Logged out: clear the cookie so the client stops treating the visitor as
-			// logged in and does not push stale user data.
+			// Logged out (or an expired auth cookie): clear the cookie so the client
+			// stops treating the visitor as logged in and does not push stale user data.
+			// This branch runs for an ANONYMOUS request that still carries the gate
+			// cookie, so — unlike the logged-in set branch above, whose page is never
+			// full-page cached — its response could be. It carries a Set-Cookie that
+			// must never be replayed to other visitors from a cache, so mark it
+			// no-store (finding #44). nocache_headers() sends no-store; headers are not
+			// yet sent here (init runs before output).
+			nocache_headers();
 			$this->set_login_gate_cookie( '', time() - DAY_IN_SECONDS );
 			unset( $_COOKIE[ self::LOGIN_GATE_COOKIE ] );
 		}

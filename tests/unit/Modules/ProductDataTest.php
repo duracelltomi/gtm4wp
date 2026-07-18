@@ -676,6 +676,33 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'legacy', $item['legacy_dimension'], 'The deprecated filter must still fire and its changes must survive.' );
 	}
 
+	public function test_deprecated_filter_keeps_applying_to_every_product_after_the_first(): void {
+		// #38: the deprecation NOTICE is gated to fire once per request, but the
+		// deprecated filter must still APPLY to every product (the else branch calls
+		// apply_filters() directly). A listener's mutation must land on the second and
+		// third product too, not just the first - otherwise later products silently lose
+		// the legacy filter's changes.
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->times( 3 )
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['legacy_dimension'] = 'legacy';
+					return $item;
+				}
+			);
+
+		$product_data = $this->make_product_data();
+		$items        = array(
+			$product_data->process_product( $this->make_product(), array(), 'cart' ),
+			$product_data->process_product( $this->make_product(), array(), 'cart' ),
+			$product_data->process_product( $this->make_product(), array(), 'cart' ),
+		);
+
+		foreach ( $items as $i => $item ) {
+			$this->assertSame( 'legacy', $item['legacy_dimension'], "Product $i must still carry the deprecated filter's mutation." );
+		}
+	}
+
 	public function test_both_filters_run_in_order_and_each_can_modify_the_array(): void {
 		// #324: ordering contract - the deprecated filter runs first, the new
 		// source-aware filter runs after it, and BOTH can modify the array. The new

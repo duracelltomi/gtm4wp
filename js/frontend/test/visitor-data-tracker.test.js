@@ -207,15 +207,18 @@ function setCookie( name, value ) {
 
 /**
  * Mocks the session-endpoint fetch to resolve once with the given data map
- * (wrapped in the hex-encoded string payload the endpoint returns).
+ * (wrapped in the hex-encoded string payload the endpoint returns) plus the fresh
+ * per-request nonce the endpoint hands back for the confirm beacons (issue #398).
  *
- * @param {Object} data The visitor data map the endpoint should return.
+ * @param {Object} data  The visitor data map the endpoint should return.
+ * @param {string} nonce The fresh beacon nonce the endpoint returns.
  * @return {void}
  */
-function mockEndpointOnce( data ) {
+function mockEndpointOnce( data, nonce = 'fresh-nonce' ) {
 	global.fetch.mockResolvedValueOnce( {
 		ok: true,
-		json: () => Promise.resolve( { payload: JSON.stringify( data ) } ),
+		json: () =>
+			Promise.resolve( { payload: JSON.stringify( data ), nonce } ),
 	} );
 }
 
@@ -265,12 +268,39 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 		).toBeTruthy();
 	} );
 
-	it( 'sends the nonce as X-WP-Nonce for the logged-in cookie auth', async () => {
+	it( 'sends the nonce as X-WP-Nonce only when fetching identity-bound gated data', async () => {
+		// Issue #398: the baked config nonce is sent ONLY when a Tier 3 gate cookie is
+		// active — i.e. a logged-in visitor, whose page is never full-page cached, so
+		// the baked nonce is fresh. WordPress needs it to authenticate their auth cookie.
+		setCookie( 'gtm4wp_login', 'abc' );
 		window.gtm4wp_visitordata_config = {
 			event: 'gtm4wp.visitorData',
 			fields: {},
 			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
 			nonce: 'secret-nonce',
+			sessionKey: 'gtm4wp_visitor_session',
+			gates: [ { cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] } ],
+		};
+		mockEndpointOnce( { visitorEmail: 'user@example.com' } );
+
+		loadTracker();
+		await flush();
+
+		const [ , options ] = global.fetch.mock.calls[ 0 ];
+		expect( options.credentials ).toBe( 'same-origin' );
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'secret-nonce' );
+	} );
+
+	it( 'sends NO nonce on an anonymous Tier 2 fetch (a stale baked nonce must not 403 the read)', async () => {
+		// Issue #398 (#35): an anonymous visitor needs no nonce to read Tier 2. Sending
+		// the baked nonce from a long-lived cached page — where it has gone stale —
+		// would make WordPress 403 the request and silently drop the IP/country. So no
+		// nonce is sent on a Tier-2-only (no active gate) fetch.
+		window.gtm4wp_visitordata_config = {
+			event: 'gtm4wp.visitorData',
+			fields: {},
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'stale-baked-nonce',
 			sessionKey: 'gtm4wp_visitor_session',
 			session: [ 'visitorIP' ],
 		};
@@ -281,7 +311,7 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 
 		const [ , options ] = global.fetch.mock.calls[ 0 ];
 		expect( options.credentials ).toBe( 'same-origin' );
-		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'secret-nonce' );
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBeUndefined();
 	} );
 
 	it( 'does NOT fetch when the gate cookie is unchanged (cookie gate suppresses it)', async () => {
@@ -846,9 +876,36 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 		expect( options.method ).toBe( 'POST' );
 		expect( options.keepalive ).toBe( true );
 		expect( options.credentials ).toBe( 'same-origin' );
-		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'n1' );
+		// Issue #398 (#35): the beacon authenticates with the FRESH nonce the endpoint
+		// just returned, not the (possibly stale) baked config nonce 'n1'.
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'fresh-nonce' );
 		// The beacon carries NO order id — the server resolves it from the session.
 		expect( options.body ).toBeUndefined();
+	} );
+
+	it( 'fires the confirm-readd POST beacon after a re-add delivery', async () => {
+		// Issue #398: the re-add's session marker is consumed by an authenticated POST
+		// beacon too, so its delivering GET stays read-only.
+		const READD_URL =
+			'https://site.example/wp-json/gtm4wp/v2/confirm-readd-tracked';
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'readdedToCart' ],
+			{ readdedToCart: READD_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( readdedPayload( 'hash-1' ) );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'add_to_cart' ) ).toHaveLength( 1 );
+
+		const beacon = global.fetch.mock.calls.find(
+			( call ) => call[ 0 ] === READD_URL
+		);
+		expect( beacon ).toBeTruthy();
+		expect( beacon[ 1 ].method ).toBe( 'POST' );
+		expect( beacon[ 1 ].headers[ 'X-WP-Nonce' ] ).toBe( 'fresh-nonce' );
 	} );
 
 	it( 'sends NO confirm beacon when flag is false (do-not-flag option)', async () => {

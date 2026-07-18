@@ -29,10 +29,22 @@ defined( 'ABSPATH' ) || exit;
  *   resolver returns null for an anonymous request (is_user_logged_in() is false
  *   because no valid auth cookie + REST nonce authenticated it), so a logged-out
  *   request receives NO user data. The permission callback is therefore public:
- *   the response is request-scoped and self-owned, and this is a read-only GET
- *   (no state change, so no CSRF surface — the nonce, sent per WP REST
- *   conventions, is what lets WordPress authenticate a logged-in caller's cookie
- *   so their user fields resolve at all).
+ *   the response is request-scoped and self-owned.
+ * - READ-ONLY. This GET changes no state, so it has no CSRF surface and needs no
+ *   nonce to authorize the caller. It is genuinely side-effect-free: the one-shot
+ *   resolvers READ their session markers but never consume them — the delivered
+ *   event's state change (marker consumption, and the purchase's _ga_tracked write)
+ *   happens on a separate AUTHENTICATED POST beacon (PageDataLayer's
+ *   confirm_* routes). A GET that mutated session state could be fired by any
+ *   cross-site top-level navigation carrying the visitor's SameSite=Lax cookies,
+ *   which would silently destroy a real buyer's pending event.
+ * - For a logged-in caller the client DOES send the wp_rest nonce (per WP REST
+ *   conventions) so WordPress authenticates the auth cookie and the user fields
+ *   resolve; a logged-in page is never full-page cached, so that baked nonce is
+ *   fresh. An anonymous caller sends NO nonce (nothing to authenticate), so a
+ *   stale nonce baked into a long-lived cached page can never 403 the read.
+ * - The response carries a FRESH wp_rest nonce for the client's one-shot confirm
+ *   beacons, so a beacon fired from a cached page still authenticates.
  * - The response is serialized with the full JSON_HEX_* flag set and returned as
  *   a string payload (mirroring the Store API cart-item pattern in StoreApiData),
  *   so a hostile request header (a </script>"&'-laced X-Forwarded-For or CF
@@ -93,6 +105,15 @@ final class VisitorDataEndpoint {
 					(object) $data,
 					JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 				),
+				// A FRESH wp_rest nonce for the client's one-shot confirm beacons.
+				// The config nonce is baked into (potentially long-lived cached) page
+				// HTML and goes stale after a nonce tick (~24h), which would 403 the
+				// beacon and silently restore the cross-device double-count. This one
+				// is generated per request, so it is always valid when the client uses
+				// it moments later. The GET itself needs no nonce for an anonymous
+				// caller (a nonce is not sent on that path — see the client runtime),
+				// so a stale baked nonce never blocks the read.
+				'nonce'   => wp_create_nonce( 'wp_rest' ),
 			)
 		);
 

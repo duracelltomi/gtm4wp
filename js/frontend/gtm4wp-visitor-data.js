@@ -44,6 +44,13 @@
 	const eventName = config.event || 'gtm4wp.visitorData';
 	const fields = config.fields || {};
 
+	// The nonce the one-shot confirm beacons authenticate with. It starts as the
+	// config nonce (baked into the page) but is replaced with the fresh nonce the
+	// session endpoint returns on every response — the baked one goes stale after a
+	// nonce tick (~24h), which on a long-lived cached page would 403 the beacon and
+	// silently restore the cross-device purchase double-count (issue #398).
+	let beaconNonce = config.nonce || '';
+
 	/**
 	 * Returns the data layer array, creating it if needed.
 	 *
@@ -322,10 +329,10 @@
 	 * to the same-browser guard. Carries NO order id — the server resolves that from
 	 * its own session marker.
 	 *
-	 * @param {string} url The confirm-purchase route URL baked into the config.
+	 * @param {string} url The confirm route URL baked into the config.
 	 * @return {void}
 	 */
-	function confirmPurchaseTracked( url ) {
+	function fireConfirmBeacon( url ) {
 		if ( ! url ) {
 			return;
 		}
@@ -333,8 +340,8 @@
 		try {
 			if ( 'function' === typeof fetch ) {
 				const headers = {};
-				if ( config.nonce ) {
-					headers[ 'X-WP-Nonce' ] = config.nonce;
+				if ( beaconNonce ) {
+					headers[ 'X-WP-Nonce' ] = beaconNonce;
 				}
 
 				const request = fetch( url, {
@@ -355,11 +362,11 @@
 			) {
 				const separator = -1 === url.indexOf( '?' ) ? '?' : '&';
 				navigator.sendBeacon(
-					config.nonce
+					beaconNonce
 						? url +
 								separator +
 								'_wpnonce=' +
-								encodeURIComponent( config.nonce )
+								encodeURIComponent( beaconNonce )
 						: url
 				);
 			}
@@ -402,12 +409,15 @@
 		}
 
 		// Cross-device dedupe (issue #398): after the fallback push, tell the server to
-		// flag _ga_tracked on the order so a later order-received render on ANOTHER
-		// device is suppressed. Only when the browser guard is in use (flag !== false);
-		// the "Do not flag orders as being tracked" case writes no order-tracked state
-		// anywhere, so it also sends no beacon.
+		// flag _ga_tracked on the order (and consume the delivery marker) so a later
+		// order-received render on ANOTHER device is suppressed. The read-only GET made
+		// no state change, so this authenticated POST is what performs it. Only when the
+		// browser guard is in use (flag !== false); the "Do not flag orders as being
+		// tracked" case writes no order-tracked state anywhere, so it also sends no
+		// beacon — the server marker then lingers, but its only reader is this same
+		// resolver and the client's per-order guard already stops a re-push.
 		if ( useGuard && confirmUrl ) {
-			confirmPurchaseTracked( confirmUrl );
+			fireConfirmBeacon( confirmUrl );
 		}
 	}
 
@@ -415,10 +425,13 @@
 	 * Fires the re-added-to-cart add_to_cart exactly once, de-duped on the per-event
 	 * token so a page reload does not re-push it.
 	 *
-	 * @param {Object} payload The resolver payload ({ push, token }).
+	 * @param {Object} payload    The resolver payload ({ push, token }).
+	 * @param {string} confirmUrl Authenticated POST-beacon URL fired after delivery so
+	 *                            the server consumes the re-add's session marker (the
+	 *                            read-only GET does not, issue #398).
 	 * @return {void}
 	 */
-	function handleReaddedToCart( payload ) {
+	function handleReaddedToCart( payload, confirmUrl ) {
 		if ( ! payload || 'object' !== typeof payload || ! payload.push ) {
 			return;
 		}
@@ -436,6 +449,14 @@
 
 		if ( token ) {
 			recordReaddedToken( token );
+		}
+
+		// The GET that delivered this re-add made no state change; this authenticated
+		// POST tells the server to consume the session marker so a later page does not
+		// re-resolve it. The client's per-token guard above already stops a re-push in
+		// the meantime.
+		if ( confirmUrl ) {
+			fireConfirmBeacon( confirmUrl );
 		}
 	}
 
@@ -577,9 +598,14 @@
 		}
 
 		const headers = { Accept: 'application/json' };
-		if ( config.nonce ) {
-			// Sent per WP REST conventions so WordPress authenticates the caller's
-			// cookie; a logged-out request stays anonymous and receives no user data.
+		// Send the (baked) nonce ONLY when there is identity-bound data to fetch — an
+		// active Tier 3 gate cookie, i.e. a logged-in visitor. Their page is never
+		// full-page cached, so the baked nonce is fresh and WordPress can authenticate
+		// their auth cookie so the user fields resolve. An anonymous fetch (Tier 2, or
+		// a guest one-shot) sends NO nonce: it needs none, and sending a stale nonce
+		// baked into a long-lived cached page would 403 the read (issue #398). The
+		// fresh nonce for any confirm beacon comes from the response below, not here.
+		if ( config.nonce && activeGates.length ) {
 			headers[ 'X-WP-Nonce' ] = config.nonce;
 		}
 
@@ -590,6 +616,12 @@
 			.then( function ( body ) {
 				if ( ! body || 'string' !== typeof body.payload ) {
 					return;
+				}
+
+				// Adopt the fresh nonce for the one-shot confirm beacons before any
+				// action handler below fires one (issue #398).
+				if ( 'string' === typeof body.nonce && body.nonce ) {
+					beaconNonce = body.nonce;
 				}
 
 				let data;

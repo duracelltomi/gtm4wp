@@ -1077,25 +1077,29 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
-	 * Single-author fallback: when PublishPress reports one author (or is not
-	 * active), only the plain single-value vars are set from get_userdata() and
-	 * neither array variable appears.
+	 * Single-author sourcing (issue #258 / finding #37): when PublishPress reports
+	 * exactly ONE author, the single-value vars come from that author - crucially a
+	 * GUEST author, whose name is not the WordPress user in $post->post_author that
+	 * get_userdata() would return - and neither array variable appears. Before the fix
+	 * a single author fell through to get_userdata(), giving the wrong name for a guest.
 	 */
-	public function test_single_author_uses_plain_vars_when_publishpress_returns_one_author(): void {
+	public function test_single_publishpress_author_is_sourced_from_that_author_not_get_userdata(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
 
 		Functions\when( 'get_multiple_authors' )->justReturn(
 			array(
 				(object) array(
-					'ID'           => 7,
-					'display_name' => 'Only Author',
+					'ID'           => -5,
+					'display_name' => 'Guest Writer',
 				),
 			)
 		);
+		// The creating WordPress user is a different person; the pre-fix code emitted
+		// THIS name/id for a single author, which is wrong for a guest author.
 		Functions\when( 'get_userdata' )->justReturn(
 			(object) array(
 				'ID'           => 7,
-				'display_name' => 'Only Author',
+				'display_name' => 'Creating User',
 			)
 		);
 
@@ -1116,9 +1120,103 @@ final class PageVariablesModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( 'Only Author', $data_layer['pagePostAuthor'] );
+		$this->assertSame( 'Guest Writer', $data_layer['pagePostAuthor'], 'The single PublishPress author (a guest) is used, not the creating WP user.' );
+		$this->assertSame( -5, $data_layer['pagePostAuthorID'] );
+		$this->assertArrayNotHasKey( 'pagePostAuthors', $data_layer, 'No array vars appear for a single author.' );
+		$this->assertArrayNotHasKey( 'pagePostAuthorIDs', $data_layer );
+	}
+
+	/**
+	 * Fallback (finding #37): when PublishPress is active but reports NO authors
+	 * (count 0), the plain single-value vars come from get_userdata( post_author ) -
+	 * the unchanged behavior, still exercised via the else branch.
+	 */
+	public function test_no_publishpress_authors_falls_back_to_get_userdata(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_multiple_authors' )->justReturn( array() );
+		Functions\when( 'get_userdata' )->justReturn(
+			(object) array(
+				'ID'           => 7,
+				'display_name' => 'Creating User',
+			)
+		);
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Creating User', $data_layer['pagePostAuthor'] );
 		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
 		$this->assertArrayNotHasKey( 'pagePostAuthors', $data_layer );
 		$this->assertArrayNotHasKey( 'pagePostAuthorIDs', $data_layer );
+	}
+
+	/**
+	 * #43: a real PublishPress Author resolves display_name/ID through __get() and
+	 * may not implement __isset(). The old isset()-based read would report false and
+	 * blank every author; read_author_prop() must still read the value through
+	 * __get(). This stub mirrors that object shape (magic __get, NO __isset).
+	 */
+	public function test_publishpress_author_value_is_read_through_magic_get_without_isset(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+
+		$magic_author = new class() {
+			/**
+			 * Backing store the magic getter reads (not exposed as real properties).
+			 *
+			 * @var array<string, mixed>
+			 */
+			private array $data = array(
+				'display_name' => 'Magic Guest',
+				'ID'           => -9,
+			);
+
+			public function __get( $name ) {
+				return $this->data[ $name ] ?? null;
+			}
+			// Deliberately NO __isset(): isset( $author->display_name ) is false here,
+			// exactly the case the fix must survive.
+		};
+
+		Functions\when( 'get_multiple_authors' )->justReturn( array( $magic_author ) );
+		Functions\when( 'get_userdata' )->justReturn(
+			(object) array(
+				'ID'           => 7,
+				'display_name' => 'Creating User',
+			)
+		);
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Magic Guest', $data_layer['pagePostAuthor'], 'The __get value is read even though __isset() is absent.' );
+		$this->assertSame( -9, $data_layer['pagePostAuthorID'] );
 	}
 }

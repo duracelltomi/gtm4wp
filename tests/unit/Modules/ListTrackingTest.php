@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Modules\WooCommerce\ListTracking;
@@ -488,6 +489,29 @@ final class ListTrackingTest extends TestCase {
 		$this->assertSame( $product, $result, 'The filter must return the product unchanged.' );
 		$this->assertIsArray( $GLOBALS['gtm4wp_cart_item_proddata'] );
 		$this->assertSame( 'Test Product', $GLOBALS['gtm4wp_cart_item_proddata']['item_name'] );
+	}
+
+	public function test_cart_item_product_filter_passes_null_source_when_called_without_a_cart_item(): void {
+		// #39: the "null when there is no per-line source" contract. Called with only the
+		// product (its $cart_item default), the source handed to process_product - and so
+		// to the gtm4wp_eec_item_with_source filter's third argument - must be NULL, not
+		// the empty-array default.
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
+
+		$captured_source = 'unset';
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->once()
+			->andReturnUsing(
+				static function ( $item, $context, $source ) use ( &$captured_source ) {
+					$captured_source = $source;
+					return $item;
+				}
+			);
+
+		$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->cart_item_product_filter( $this->make_product() );
+
+		$this->assertNull( $captured_source, 'With no cart item, the downstream source is null (no per-line source), not an empty array.' );
 	}
 
 	public function test_cart_item_remove_link_filter_injects_data_and_resets_global(): void {

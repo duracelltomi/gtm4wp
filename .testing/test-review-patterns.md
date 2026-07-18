@@ -36,6 +36,7 @@ on every review before anything else.
 - **TC-5** — every request/header-sourced dataLayer field (a `.security` PA-3 sink: `?s=`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, cookies, `$_SERVER`) ships a hostile-input regression test. This is the intersection of the two review systems.
 - **TS-6** — a whole class with **zero** tests is the cheapest, highest-value find. Run the missing-test-file sweep first every review.
 - **TS-12** — an authorization gate (a `permission_callback`, a `current_user_can()` check, a filterable capability like `gtm4wp_admin_page_capability`) is a test surface in its own right: it needs a **grant + deny** test and, if filterable, a test that the filter changes the required capability while the default stays unchanged. The XSS/output-sink lens (TS-1/TS-2/TC-5) never prompts for it, so an untested gate hides inside a component the matrix already marks `[x]`.
+- **TS-13** — a test double must be **no more capable than the real collaborator**: if the mock does the safe thing the real dependency does *not* (returns a live object the real one returns null for; leaves an element the real SDK replaces; exposes a property the real object hides behind `__get`), the failure it would cause is invisible and the suite stays green over a real bug.
 
 **Test Smells (TS):**
 - **TS-11** — upstream raw-passthrough contract: a module that hands a value to a *shared downstream JSON sink* needs a **special-character** input proving it does NOT pre-escape (`esc_js`/`esc_attr`). With benign data (`'HU'`) an accidental pre-escape is invisible and coverage stays green (the module-boundary form of TS-1 / RI-4).
@@ -210,6 +211,36 @@ the miss. Closed by `tests/unit/Admin/AdminCapabilityFilterTest.php`. Recipe:
 TC-13. How the flow was hardened so a future run catches this class: the
 **Access-control coverage** Test Debt Sweep in the checklist.
 
+### TS-13: A test double more capable than the real collaborator hides the bug ⭐
+The dual of TS-1: TS-1 is about the *input* (benign vs hostile); this is about the
+*collaborator*. A mock that does the safe thing the real dependency does **not** makes
+the failure it would cause invisible, so the suite stays green over a real bug. This
+is not hypothetical — in the 2026-07-17 security review, **three of the four most
+serious findings were each masked by exactly this**, and each fix had to change the
+double, not just add an assertion:
+
+- **#33** (WC session on REST): tests stubbed `WC()` **wholesale**, always returning a
+  live `->session`. The real `WC()->session` is *null* on a REST route (PA-11), so the
+  one-shot resolvers silently returned nothing in production while every test passed.
+  The regression test must NOT stub `WC()` into existence for the endpoint path — it
+  must exercise the null-session path (or an integration test).
+- **#40** (Spotify observer loop): the SDK fake `createController` was a no-op that left
+  the element in place. The real SDK **replaces** the element (PA-9), which is what
+  causes the unbounded re-wire. The fix: the fake must perform the real `replaceChild`
+  + synchronous `src` assignment, and a `SPOTIFY_CAP` turns the loop into a failing
+  count assertion rather than a hung run.
+- **#43** (PublishPress `__isset`): author fixtures were plain `stdClass` with real
+  properties, where `isset()` always works. Real PublishPress `Author` objects resolve
+  via `__get()` and may lack `__isset()` (RI-12), so `isset()` reports false and blanks
+  the value. The regression test needs a `__get`-without-`__isset` stub.
+
+**Rule while writing a double:** ask *"what does the real thing do here that my fake
+doesn't?"* — for an external SDK, a WP/WC core object, or a third-party class, model
+the one behavior the bug depends on (a null return, an element replacement, a magic
+accessor), not just the happy shape. **Rule while reviewing:** when a security/correctness
+finding turns on a collaborator's real behavior, check whether the test double reproduces
+it; a green test over a stubbed-away contract is not coverage.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -368,6 +399,7 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-17 (security Review 7) | Added **TS-13** (a test double more capable than the real collaborator hides the bug — the dual of TS-1, about the *collaborator* not the *input*). Prompted by the security review where three of the four most serious findings were each masked by this: `WC()` stubbed wholesale hid the null REST session (#33 / PA-11), a no-op `createController` fake hid the SDK element-replacement loop (#40 / PA-9), and plain-`stdClass` author fixtures hid the `__isset` blanking (#43 / RI-12). Each fix changed the double, not just the assertion. Cross-referenced from security PA-9/PA-11/RI-12. |
 | 2026-07-15 (issue #143) | Added **TS-12** (authorization/access-control gates are their own test surface — grant+deny + the filter customizes the required cap; the XSS-first lens never prompted for it, so the untested `gtm4wp_admin_page_capability` gate hid in an `[x]` component) and **TC-13** (the Brain Monkey capability-gate recipe). Prompted by closing the #143 gap with `AdminCapabilityFilterTest`. Also added the **Access-control coverage** Test Debt Sweep to the checklist and an access-control bullet to the pre-flight + the `test-reviewer` agent + the `/test-review` command, so the lens is applied mechanically on future runs. |
 | 2026-07-15 (Run 4 — gaps closed) | Closed T21–T26 on the user's "fix all" go-ahead. **PHP 381→416, JS 214→231, all green; phpcs 0 errors; lint:js clean; tests-only (no CHANGELOG).** Two security-contract tests throwaway-probe-verified (T21 `StoreApiData` fails if `item_name` pre-escaped; T22 purchase orderData fails if JSON_HEX_AMP dropped). New process lessons reinforced: (a) the **ListTracking constructor seeds four cross-request globals** (`gtm4wp_product_counter/last_widget_title/grouped_product_ix/cart_item_proddata`) — stage per-item test state AFTER `make_list_tracking()`, not before, or the constructor clobbers it; (b) TS-11 raw-passthrough for a delegated REST sink (`StoreApiData`) is written by asserting the value round-trips the callback verbatim with `stubEscapeFunctions()` installed, so a re-added `esc_*` fails; (c) the TC-8 Plugin-singleton harness extends to `WooCommerceModule::register_frontend_hooks()` (protected → `ReflectionMethod::invoke`; needs `Frontend` with both `datalayer` and `script_tag` props). New test stub `store-api-stub.php` (fake `StoreApi`/`ExtendSchema`/schemas + `ARRAY_A`). |
 | 2026-07-15 (Run 4 — report only) | Audited the shipped tests for the WooCommerce overhaul + CookieYes/CheckoutWC bridges (`780875c..HEAD`). **Security/XSS well-guarded, no High gap, no latent bug** — the previously-open `woocommerce` JS tracker gap is closed (793-line suite), the block cart-diff lib is fully covered, and the one new untrusted request surface (list-attribution cookie #405) is hostile-input both-directions. Extended **TS-7** with the JS delegated-`document`-listener leak across `jest.isolateModules`. **No new numbered pattern.** Two process lessons (no numbered entry): (a) a `ProductData` eligibility-helper branch is often exercised through `PurchaseTracking::on_thankyou`, not `ProductDataTest` — read the sibling test file before logging a helper branch as untested (two Run-4 fan-out Mediums collapsed this way: the age-gate TRUE branch and the `$_COOKIE[...tracked]` dedupe branch); (b) a delegated REST/Store-API sink still earns a **raw-passthrough contract** test (TS-11), even though it's FP-4 for XSS — it's the only place the sink's item passthrough is asserted. Gaps T21–T26. No tests written. |

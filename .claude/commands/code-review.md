@@ -166,9 +166,18 @@ Save the full report to `.security/code-review-report-{YYYY-MM-DD}-{HHMM}.md`. *
 
 Security findings additionally state the **Actor** (threat model A0–A4: the lowest
 actor who can reach the sink — this is what sets severity) and a **Conf.**idence
-0.0–1.0. Below ~0.7, don't report it as a finding — raise it as an open question
-instead. Every security finding states its concrete input → sink path, in the
+0.0–1.0. Every security finding states its concrete input → sink path, in the
 Finding cell or a prose block beneath the table.
+
+**Nothing the review noticed is dropped or exiled to a lesser tier.** A low-confidence
+or unverifiable item (a security concern below ~0.7, an assumption about an external
+class's behavior, a runtime-context question, a smell not yet pinned to a concrete
+failure) is still a **findings-table row at its appropriate severity** — usually Low —
+marked **(open)** in its Category, carrying its real (low) `Conf.` value, with the
+Finding cell stating *why it is unverified* and *what would resolve it* (a live repro,
+reading an external source). The `Conf.` column carries the honesty; there is no
+separate below-the-bar section. The maintainer triages — a small item they dismiss in
+a second beats one they never see.
 
 ### Critical (fix immediately)
 | # | Category | Actor | Conf. | File | Line(s) | Finding | Recommendation |
@@ -185,7 +194,9 @@ Finding cell or a prose block beneath the table.
 
 {Actor/Conf. are `—` for non-security findings: complexity, dead code, and
 improvement findings are rated on their own merits and are NOT subject to the
-confidence gate — a Low dead-code or correctness finding is a valid result.}
+confidence gate — a Low dead-code or correctness finding is a valid result.
+Low-confidence / unverified items are **(open)**-marked rows in the tables above
+(see the Findings note), not a separate section.}
 
 ## Statistics
 - Files reviewed: X
@@ -205,5 +216,6 @@ confidence gate — a Low dead-code or correctness finding is a valid result.}
 - The `phpcs:ignore WordPress.Security.EscapeOutput` on `ScriptTag::print_script_block()` is intentional and reviewed — do not re-flag it (see FP in patterns file).
 - Prioritize real, reachable risks over theoretical ones. State the concrete input → sink path for every security finding.
 - **Rate by actor, not by sink power** — severity comes from the *lowest actor who can reach the sink* (`.security/threat-model.md`), not from what the sink could theoretically do. An admin-only path an admin can already achieve via GTM is not a vulnerability; say why rather than dropping it silently. Note the multisite `unfiltered_html` caveat before leaning on that argument.
+- **Never silently drop a finding for being small or low-confidence, and never exile one to a separate lesser tier.** Everything the review noticed is a Findings-table row at its appropriate severity (usually Low). Confidence is expressed in the `Conf.` column, not by hiding the item: a below-~0.7 or unverifiable finding is an **(open)**-marked row with its real (low) confidence and a note on what would resolve it. Complexity, dead-code, and improvement findings are not confidence-gated at all — a Low one is a valid result. The maintainer triages; a minor item they dismiss in a second beats one they never see. Report everything the review noticed.
 - Verify exploitability where feasible (a tiny PHP repro, or a failing PHPUnit test) before rating a finding Critical/High. Use a **throwaway** probe (scratchpad dir), not a committed test — adding regression tests is the post-fix step.
 - After saving the report, present a summary to the user and ask which findings they want to address.

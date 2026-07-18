@@ -37,6 +37,9 @@ final class VisitorDataEndpointTest extends TestCase {
 				'Cache-Control' => 'no-cache, must-revalidate, max-age=0, no-store',
 			)
 		);
+
+		// A fresh per-request nonce for the client's one-shot confirm beacons.
+		Functions\when( 'wp_create_nonce' )->justReturn( 'fresh-nonce' );
 	}
 
 	/**
@@ -196,5 +199,19 @@ final class VisitorDataEndpointTest extends TestCase {
 
 		$this->assertArrayHasKey( 'Cache-Control', $headers );
 		$this->assertStringContainsString( 'no-store', $headers['Cache-Control'] );
+	}
+
+	/**
+	 * The response carries a FRESH nonce (generated per request) for the client's
+	 * one-shot confirm beacons, so a beacon fired from a long-lived cached page — whose
+	 * baked config nonce has gone stale — still authenticates (issue #398).
+	 */
+	public function test_response_carries_a_fresh_beacon_nonce(): void {
+		$this->stub_declared_fields( array() );
+
+		$body = ( new VisitorDataEndpoint() )->get_visitor_data()->get_data();
+
+		$this->assertArrayHasKey( 'nonce', $body );
+		$this->assertSame( 'fresh-nonce', $body['nonce'] );
 	}
 }

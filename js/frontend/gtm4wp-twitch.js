@@ -9,11 +9,6 @@ import {
 const gtm4wp_twitch_percentage_tracking = 10;
 const gtm4wp_twitch_percentage_tracking_marks = {};
 
-// Unique-container-id counter for the Twitch.Player replacements. Module-scoped
-// (not a forEach index) so ids stay unique across both the initial wiring and
-// any players wired later from dynamically inserted iframes.
-let gtm4wp_twitch_frame_index = 0;
-
 function gtm4wp_bindTwitchPlayer( player, channel, video, collection ) {
 	const mediaid = video || channel || collection || '';
 	let mediaurl = '';
@@ -203,8 +198,15 @@ function gtm4wp_initTwitchTracking() {
 			return;
 		}
 
+		// Unique-container-id counter for the Twitch.Player replacements. Kept on
+		// window (not module scope) so ids stay unique even when the bundle is
+		// re-executed (a tag-manager re-injection restarts module scope at 0 while the
+		// earlier gtm4wp-twitch-0 container is still in the DOM, which would collide).
+		window.gtm4wp_twitch_frame_index =
+			window.gtm4wp_twitch_frame_index || 0;
+
 		const container = document.createElement( 'div' );
-		container.id = 'gtm4wp-twitch-' + gtm4wp_twitch_frame_index++;
+		container.id = 'gtm4wp-twitch-' + window.gtm4wp_twitch_frame_index++;
 		// Mark the container so the iframe the Twitch Embed SDK injects into it —
 		// which also matches iframe[src*="player.twitch.tv"] — is skipped by the
 		// shared MutationObserver instead of being replaced again in a loop.

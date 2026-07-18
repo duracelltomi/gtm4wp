@@ -52,6 +52,17 @@ final class ProductData {
 	private ?array $list_attribution_map = null;
 
 	/**
+	 * Whether the gtm4wp_eec_product_array deprecation notice has already been
+	 * emitted this request. apply_filters_deprecated() calls _deprecated_hook() on
+	 * every invocation, so on a page with many products it would otherwise emit one
+	 * notice per product; this builder is instantiated once per request, so a single
+	 * instance flag bounds the notice to once per request.
+	 *
+	 * @var bool
+	 */
+	private bool $deprecated_filter_notified = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -251,12 +262,25 @@ final class ProductData {
 		 * @param array  $_temp_productdata   An associative array containing all GA4 product attributes as well as any custom attribute
 		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used
 		 */
-		$_temp_productdata = apply_filters_deprecated(
-			GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY,
-			array( $_temp_productdata, $attributes_used_for ),
-			'2.0',
-			GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE
-		);
+		if ( ! $this->deprecated_filter_notified ) {
+			// First product this request: apply_filters_deprecated() emits the
+			// E_USER_DEPRECATED notice (only when a listener is attached, and only under
+			// WP_DEBUG) and applies the filter. Gate it so the notice fires at most once
+			// per request instead of once per product.
+			$_temp_productdata                = apply_filters_deprecated(
+				GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY,
+				array( $_temp_productdata, $attributes_used_for ),
+				'2.0',
+				GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE
+			);
+			$this->deprecated_filter_notified = true;
+		} else {
+			// Later products this request: apply the still-supported deprecated filter
+			// directly, so its listeners keep running on every product but the
+			// deprecation notice is not repeated.
+			/** This filter is documented above (deprecated in favor of gtm4wp_eec_item_with_source). */
+			$_temp_productdata = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, $attributes_used_for );
+		}
 
 		/**
 		 * Filters the ecommerce item array before using it for tracking.

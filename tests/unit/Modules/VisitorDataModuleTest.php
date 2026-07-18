@@ -282,6 +282,14 @@ final class VisitorDataModuleTest extends TestCase {
 	private array $cookie_writes = array();
 
 	/**
+	 * How many times the gate maintenance called nocache_headers() (finding #44:
+	 * the clear branch must mark its Set-Cookie response no-store).
+	 *
+	 * @var int
+	 */
+	private int $nocache_calls = 0;
+
+	/**
 	 * Stubs the WordPress functions the login-gate maintenance reads and captures
 	 * the internal setcookie() calls it makes (setcookie/headers_sent are made
 	 * redefinable via patchwork.json).
@@ -291,7 +299,13 @@ final class VisitorDataModuleTest extends TestCase {
 	 */
 	private function arrange_gate( bool $logged_in ): void {
 		$this->cookie_writes = array();
+		$this->nocache_calls = 0;
 
+		Functions\when( 'nocache_headers' )->alias(
+			function () {
+				++$this->nocache_calls;
+			}
+		);
 		Functions\when( 'headers_sent' )->justReturn( false );
 		Functions\when( 'is_user_logged_in' )->justReturn( $logged_in );
 		Functions\when( 'is_ssl' )->justReturn( false );
@@ -331,6 +345,9 @@ final class VisitorDataModuleTest extends TestCase {
 		$this->assertSame( $expected, $this->cookie_writes[0][1] );
 		$this->assertFalse( $this->cookie_writes[0][2]['httponly'], 'The gate cookie must be JS-readable.' );
 		$this->assertGreaterThan( time(), $this->cookie_writes[0][2]['expires'], 'A set uses a future expiry.' );
+		// #44: the set branch runs only for a logged-in visitor, whose page is never
+		// full-page cached, so it needs no no-store marking (that is the clear branch).
+		$this->assertSame( 0, $this->nocache_calls, 'The logged-in set branch does not mark no-store.' );
 		// Reflected into $_COOKIE so a same-request read sees the new value.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- test assertion reading the value the code under test just set.
 		$this->assertSame( $expected, $_COOKIE[ VisitorDataModule::LOGIN_GATE_COOKIE ] );
@@ -355,6 +372,9 @@ final class VisitorDataModuleTest extends TestCase {
 		$this->assertSame( '', $this->cookie_writes[0][1], 'Logout clears the cookie value.' );
 		$this->assertLessThan( time(), $this->cookie_writes[0][2]['expires'], 'A clear uses a past expiry.' );
 		$this->assertArrayNotHasKey( VisitorDataModule::LOGIN_GATE_COOKIE, $_COOKIE );
+		// #44: this is an anonymous request whose Set-Cookie must not be cached and
+		// replayed to other visitors, so the clear branch marks the response no-store.
+		$this->assertSame( 1, $this->nocache_calls, 'The clear branch marks its Set-Cookie response no-store.' );
 	}
 
 	public function test_login_gate_cookie_untouched_for_anonymous_visitor_without_it(): void {
