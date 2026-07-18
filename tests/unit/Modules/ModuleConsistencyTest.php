@@ -42,6 +42,10 @@ final class ModuleConsistencyTest extends TestCase {
 			}
 		);
 		Functions\when( 'translate_user_role' )->returnArg();
+
+		// The container module's production-only field description reads the
+		// environment type while building its schema.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
 	}
 
 	/**

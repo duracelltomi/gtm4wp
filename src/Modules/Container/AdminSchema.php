@@ -316,7 +316,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Only output the container on production environments', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'When turned on, the GTM container code is only output when WordPress reports the environment type as "production". On any other environment (local, development, staging) the container is suppressed while the data layer stays active - so a cloned or staging copy of your site does not send hits to your live Google Tag Manager container without deactivating the plugin. This relies on the WP_ENVIRONMENT_TYPE constant (or WP_ENVIRONMENT_TYPE environment variable) being set on non-production copies; it defaults to "production" when unset. For host-based control without an option, return false from the gtm4wp_output_container filter.', 'duracelltomi-google-tag-manager' ),
+				description: $this->production_only_description(),
 				group: 'advanced',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
@@ -338,6 +338,55 @@ final class AdminSchema implements AdminSchemaInterface {
 				}
 			),
 		);
+	}
+
+	/**
+	 * Description of the "only output on production environments" option.
+	 *
+	 * The effect of this option depends entirely on WP_ENVIRONMENT_TYPE, which
+	 * lives in wp-config.php / the server config and is invisible from the
+	 * admin - so the static explanation is followed by a live readout of what
+	 * THIS instance actually reports, and what turning the option on would do
+	 * here. The common trap is a staging copy with no WP_ENVIRONMENT_TYPE set:
+	 * WordPress then reports "production" and the container keeps loading.
+	 *
+	 * The readout is rendered through RawHTML in the settings app, so the
+	 * environment value is escaped even though wp_get_environment_type() can
+	 * only return one of the four values whitelisted by WordPress core.
+	 *
+	 * @return string
+	 */
+	private function production_only_description(): string {
+		$intro = esc_html__( 'When turned on, the GTM container code is only output when WordPress reports the environment type as "production". On any other environment (local, development, staging) the container is suppressed while the data layer stays active - so a cloned or staging copy of your site does not send hits to your live Google Tag Manager container without deactivating the plugin. This relies on the WP_ENVIRONMENT_TYPE constant (or WP_ENVIRONMENT_TYPE environment variable) being set on non-production copies; it defaults to "production" when unset. For host-based control without an option, return false from the gtm4wp_output_container filter.', 'duracelltomi-google-tag-manager' );
+
+		// Resolved exactly as ContainerCode::should_output_container() does, so
+		// the readout can never disagree with the gate it describes.
+		// wp_get_environment_type() ships with WordPress 5.5+; the guard mirrors
+		// that sibling and falls back to core's own default.
+		$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
+
+		// Whether the value was set at all, looked up the same way core does.
+		// An unset WP_ENVIRONMENT_TYPE silently resolves to "production", which
+		// is worth calling out separately from an explicit "production".
+		$is_configured = defined( 'WP_ENVIRONMENT_TYPE' ) || false !== getenv( 'WP_ENVIRONMENT_TYPE' );
+
+		if ( 'production' !== $environment ) {
+			$effect = sprintf(
+				/* translators: %s: the environment type reported by WordPress, e.g. "staging". */
+				esc_html__( 'On this site WordPress currently reports the environment type "%s", so with this option turned on the GTM container is NOT loaded here (the data layer stays active).', 'duracelltomi-google-tag-manager' ),
+				esc_html( $environment )
+			);
+		} elseif ( $is_configured ) {
+			$effect = sprintf(
+				/* translators: %s: the environment type reported by WordPress, always "production" here. */
+				esc_html__( 'On this site WordPress currently reports the environment type "%s", so with this option turned on the GTM container is still loaded here.', 'duracelltomi-google-tag-manager' ),
+				esc_html( $environment )
+			);
+		} else {
+			$effect = esc_html__( 'On this site WP_ENVIRONMENT_TYPE is not set, so WordPress falls back to the environment type "production" and the GTM container is still loaded here even with this option turned on. Set WP_ENVIRONMENT_TYPE to "staging", "development" or "local" on your non-production copies for this option to take effect there.', 'duracelltomi-google-tag-manager' );
+		}
+
+		return $intro . '<br /><strong>' . $effect . '</strong>';
 	}
 
 	/**
