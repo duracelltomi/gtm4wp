@@ -37,7 +37,7 @@ EOF
 # Satisfied: no production code changed, or the changelog was already touched.
 { [ "$code_touched" -eq 0 ] || [ "$changelog_touched" -eq 1 ]; } && exit 0
 
-MSG="Production code changed but CHANGELOG.md has no matching entry. Add a concise bullet ('* Added:' / '* Changed:' / '* Updated:' / '* Fixed:') under the top '## 2.0' heading in CHANGELOG.md describing this change."
+MSG="Production code changed but CHANGELOG.md has no matching entry. Describe this change under the top '## 2.0' heading, in its theme group (### Architecture / Settings screen / Container / Page variables / WooCommerce / Media events / Consent / Contact Form 7 / AMP / Removed). IMPORTANT - 2.0 is UNRELEASED: if this change fixes or extends a feature that was itself introduced in 2.0, EDIT that feature's existing bullet instead of adding a new '* Fixed:' bullet (a user upgrading from 1.x never ran the intermediate code); editing an existing bullet satisfies this hook. Add a new bullet ('* Added:' / '* Changed:' / '* Updated:' / '* Fixed:') only for a change that is genuinely new versus the last release. Pure internal refactors with no functional change need no entry - use [skip changelog] on the commit instead. Mirror user-visible changes into the '= 2.0.0 =' block in readme.txt."
 
 if [ "$MODE" = "commitmsg" ]; then
   { echo "BLOCKED: $MSG"
