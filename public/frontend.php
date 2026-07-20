@@ -645,6 +645,25 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
 }
 
 /**
+ * Stores the gtm4wp_last_weatherstatus diagnostic cookie.
+ *
+ * gtm4wp_wp_loaded() runs on the wp_loaded hook, which can fire after another plugin, the
+ * theme or a displayed PHP notice has already started the HTTP response. Calling setcookie()
+ * at that point raises a "Cannot modify header information - headers already sent" warning, so
+ * skip the write once headers are on their way out.
+ *
+ * @param string $message Human readable status describing the last geo/weather API call.
+ * @return void
+ */
+function gtm4wp_set_weatherstatus_cookie( $message ) {
+	if ( headers_sent() ) {
+		return;
+	}
+
+	setcookie( 'gtm4wp_last_weatherstatus', $message, 0, '/', '', false, true );
+}
+
+/**
  * Function executed during wp_loaded.
  * Loads geo and weather data to be processed later.
  *
@@ -654,6 +673,20 @@ function gtm4wp_add_basic_datalayer_data( $data_layer ) {
  */
 function gtm4wp_wp_loaded() {
 	global $gtm4wp_options;
+
+	/**
+	 * The geo/weather lookups below issue blocking external HTTP requests and set a cookie,
+	 * so they should only run for regular front-end page views. Admin, AJAX, cron and REST
+	 * requests neither render the data layer nor should pay for a remote call, and they are
+	 * also the contexts where headers are most likely already sent by the time wp_loaded fires.
+	 */
+	$rest_prefix     = trailingslashit( rest_get_url_prefix() );
+	$request_uri     = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+	$is_rest_request = ( '' !== $request_uri ) && ( false !== strpos( $request_uri, $rest_prefix ) );
+
+	if ( is_admin() || wp_doing_ajax() || wp_doing_cron() || $is_rest_request ) {
+		return;
+	}
 
 	/**
 	 * GeoIP functionality can be disabled per user by setting the block_gtm4wp_geoip cookie to either "true", "on", "yes" or "1".
@@ -706,22 +739,22 @@ function gtm4wp_wp_loaded() {
 
 							if ( is_object( $weatherdata ) ) {
 								set_transient( 'gtm4wp-weatherdata-' . esc_attr( $client_ip ), $weatherdata, 60 * 60 );
-								setcookie( 'gtm4wp_last_weatherstatus', 'Weather data loaded.', 0, '/', '', false, true );
+								gtm4wp_set_weatherstatus_cookie( 'Weather data loaded.' );
 							}
 						} else {
 							if ( is_wp_error( $weatherdata ) ) {
-								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org request error: ' . $weatherdata->get_error_message(), 0, '/', '', false, true );
+								gtm4wp_set_weatherstatus_cookie( 'Openweathermap.org request error: ' . $weatherdata->get_error_message() );
 							} else {
-								setcookie( 'gtm4wp_last_weatherstatus', 'Openweathermap.org returned status code: ' . $weatherdata['response']['code'], 0, '/', '', false, true );
+								gtm4wp_set_weatherstatus_cookie( 'Openweathermap.org returned status code: ' . $weatherdata['response']['code'] );
 							}
 						}
 					}
 				}
 			} else {
 				if ( is_wp_error( $gtm4wp_geodata ) ) {
-					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com request error: ' . $gtm4wp_geodata->get_error_message(), 0, '/', '', false, true );
+					gtm4wp_set_weatherstatus_cookie( 'ipstack.com request error: ' . $gtm4wp_geodata->get_error_message() );
 				} else {
-					setcookie( 'gtm4wp_last_weatherstatus', 'ipstack.com returned status code: ' . $gtm4wp_geodata['response']['code'], 0, '/', '', false, true );
+					gtm4wp_set_weatherstatus_cookie( 'ipstack.com returned status code: ' . $gtm4wp_geodata['response']['code'] );
 				}
 			}
 		}
