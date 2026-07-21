@@ -87,7 +87,7 @@ semantics under an `integrate-edd-*` key; phases follow the
 | exclude-tax | `integrate-edd-exclude-tax` | `false` | beta | EDD has taxes (`$order->tax`, per-item `tax`). |
 | transaction-id-prefix | `integrate-edd-transaction-id-prefix` | `''` | beta | Applied to `$order->get_number()` (respects EDD sequential order numbers automatically). |
 | do-not-use-order-tracked-flag | `integrate-edd-do-not-use-order-tracked-flag` | `false` | beta | |
-| purchase-track-statuses | `integrate-edd-purchase-track-statuses` | `['complete']` | beta | Choices from `edd_get_payment_statuses()`. Default only `complete`: EDD's `pending`/`processing` are explicitly *incomplete* states, and offsite gateways can land buyers on the success page while still pending (EDD even ships a `payment-processing.php` holding template). Users with early-landing gateways can opt statuses in. |
+| purchase-track-statuses | `integrate-edd-purchase-track-statuses` | `['pending', 'processing', 'complete']` | beta | Choices from `edd_get_payment_statuses()`. Lenient default (mirrors WooCommerce's processing/on-hold/completed): offsite gateways can land buyers on the success page while the order is still `pending` (EDD ships a `payment-processing.php` holding template for exactly this), and with a strict default those purchases would look "missing". The three dedupe layers (§5) ensure an order tracked at `pending` is not re-tracked after completion. Conservative sites can narrow this to `complete`. |
 | clear-ecommerce-datalayer | `integrate-edd-clear-ecommerce-datalayer` | `false` | beta | Feeds the shared `gtm4wp_clear_ecommerce` JS global. |
 | datalayer-max-timeout | `integrate-edd-datalayer-max-timeout` | `2000` | beta | `select_item` eventCallback timeout, shared JS. |
 
@@ -200,8 +200,9 @@ Flow on `edd_is_success_page()` (mirrors `add_order_received_data` /
    Optional `user_data` (Enhanced Conversions) from `$order->email` +
    `$order->address` via the shared hashing helpers when customer-data is on.
 5. **Raw `orderData`** (when order-data on): attributes (dates, `order_number`,
-   `payment_key` **excluded** — it is a credential, unlike WC's order key which
-   WC also exposes; decide in review), `gateway`, `mode` (live/test), `status`,
+   `payment_key` **excluded** — decided; it is the credential that authorizes
+   viewing the receipt, and the dataLayer is readable by every tag on the
+   page), `gateway`, `mode` (live/test), `status`,
    discounts; totals (`subtotal`, `discount`, `tax`, `total`, `currency`);
    customer block incl. SHA256 hashes; items.
 6. **new_customer flag:** from EDD customer purchase count
@@ -210,10 +211,12 @@ Flow on `edd_is_success_page()` (mirrors `add_order_received_data` /
 
 **Offsite/pending gateways:** EDD sends pending arrivals to a
 `payment-processing.php` holding page that redirects to the success page ~8s
-later; the status gate in step 2 handles both orders (still-pending ⇒ not
-tracked; the buyer who reloads/returns after completion ⇒ tracked once). The
-WC-style status-change session seeding ("reliable purchase tracking") is
-backlog, pending EDD status-transition hook research.
+later. With the lenient status default, such an order is tracked on that first
+success-page view while still `pending`, and the dedupe layers keep it from
+being tracked again after completion; narrowing the statuses option to
+`complete` defers tracking to a post-completion visit instead. The WC-style
+status-change session seeding ("reliable purchase tracking") is backlog,
+pending EDD status-transition hook research.
 
 **Free purchases** flow through checkout normally (EDD forces the `manual`
 gateway at `0.00` total) and produce real orders — purchase tracking works
@@ -325,6 +328,17 @@ seeding ("reliable purchase tracking"), checkout quantity-field cart diffing,
 archive/taxonomy list tracking beyond the `[downloads]` grid, and EDD
 extension ecosystems (Recurring Payments, Software Licensing, Free Downloads).
 
+## Decision log
+
+Confirmed with the maintainer (2026-07-21):
+
+1. **Naming:** module id `edd`, option prefix `integrate-edd-*`.
+2. **Purchase status default:** lenient — `['pending', 'processing', 'complete']`
+   (WC-style; dedupe layers prevent double-counting on completion).
+3. **`payment_key`:** excluded from the raw `orderData` block (credential).
+4. **Variable prices:** `item_id` stays the download ID (or SKU); the price
+   option is expressed via `item_variant`, not a composite `{id}_{price_id}`.
+
 ## Open verification items
 
 Re-confirm against EDD source while implementing (research was done through
@@ -340,6 +354,6 @@ per-file fetches; line-level details need a local checkout):
 5. `edd_get_customer_by()` / `purchase_count` for the new_customer flag.
 6. EDD checkout block internals (does it render the classic form server-side?).
 7. Order status at success-page arrival per major gateway (Stripe vs PayPal) —
-   informs whether the `['complete']` default needs gateway-specific guidance.
+   informs the wording of the purchase-track-statuses field description.
 8. Behavior with EDD's AJAX cart disabled (`edd_is_ajax_enabled()`), and the
    quantity-field setting's effect on the checkout cart markup.
