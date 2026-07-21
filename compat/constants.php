@@ -163,6 +163,25 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE', 'integrate-woocomme
 define( 'GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION', 'integrate-woocommerce-persist-list-attribution' );
 define( 'GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC', 'integrate-woocommerce-checkoutwc' );
 
+// Easy Digital Downloads integration (new in 2.0, EDD 3.0+).
+define( 'GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE', 'integrate-edd-track-ecommerce' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION', 'integrate-edd-product-per-impression' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL', 'integrate-edd-cart-content-in-datalayer' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDBRANDTAXONOMY', 'integrate-edd-brand-taxonomy' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL', 'integrate-edd-business-vertical' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDUSESKU', 'integrate-edd-use-sku' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH', 'integrate-edd-use-full-category-path' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDPRODIDPREFIX', 'integrate-edd-product-id-prefix' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA', 'integrate-edd-customer-data' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDORDERDATA', 'integrate-edd-order-data' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDORDERMAXAGE', 'integrate-edd-order-max-age' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX', 'integrate-edd-exclude-tax' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG', 'integrate-edd-do-not-use-order-tracked-flag' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL', 'integrate-edd-clear-ecommerce-datalayer' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT', 'integrate-edd-datalayer-max-timeout' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX', 'integrate-edd-transaction-id-prefix' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES', 'integrate-edd-purchase-track-statuses' );
+
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
@@ -281,3 +300,16 @@ define( 'GTM4WP_WPFILTER_EEC_ORDER_DATA', 'gtm4wp_eec_order_data' );
 define( 'GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION', 'gtm4wp_eec_item_affiliation' );
 define( 'GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER', 'gtm4wp_purchase_datalayer' );
 define( 'GTM4WP_WPFILTER_EEC_DATALAYER_PAGELOAD', 'gtm4wp_woocommerce_datalayer_on_pageload' );
+
+/**
+ * Constants used by the Easy Digital Downloads integration (since 2.0) as
+ * WordPress filters to allow 3rd party plugins to alter e-commerce related
+ * data layer content. The store-agnostic GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE
+ * and GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION filters above run on EDD items too;
+ * these are the EDD counterparts of the WooCommerce-object-specific filters.
+ */
+define( 'GTM4WP_WPFILTER_EEC_EDD_CART_ITEM', 'gtm4wp_eec_edd_cart_item' );
+define( 'GTM4WP_WPFILTER_EEC_EDD_ORDER_ITEM', 'gtm4wp_eec_edd_order_item' );
+define( 'GTM4WP_WPFILTER_EEC_EDD_ORDER_DATA', 'gtm4wp_eec_edd_order_data' );
+define( 'GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER', 'gtm4wp_edd_purchase_datalayer' );
+define( 'GTM4WP_WPFILTER_EDD_DATALAYER_PAGELOAD', 'gtm4wp_edd_datalayer_on_pageload' );
