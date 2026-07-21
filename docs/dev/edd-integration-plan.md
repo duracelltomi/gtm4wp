@@ -1,7 +1,14 @@
 # Easy Digital Downloads integration — development plan
 
-Status: **plan / not implemented**. Target: a new built-in module mirroring the
-WooCommerce integration's feature set for [Easy Digital Downloads](https://github.com/awesomemotive/easy-digital-downloads)
+Status: **implemented** (phases 0–5 landed on this branch; see
+`src/Modules/EasyDigitalDownloads/`, `js/frontend/gtm4wp-edd.js` and the
+`tests/unit/Modules/Edd*`/`DownloadDataTest` suites). The
+[backlog items](#9-delivery-phases) and
+[open verification items](#open-verification-items) below remain accurate for
+follow-up work; markup-level items 1, 3 and 5–6 of the open list were verified
+against the EDD source during implementation. Target was: a new built-in module
+mirroring the WooCommerce integration's feature set for
+[Easy Digital Downloads](https://github.com/awesome-motive/easy-digital-downloads)
 (EDD).
 
 All EDD facts below were verified against the official repository
