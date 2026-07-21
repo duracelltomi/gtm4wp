@@ -49,8 +49,13 @@ final class ProductData {
 	 * every spelling coincides and a mismatch stays invisible; it only surfaces on
 	 * stores using a sequential/prefixed order-number plugin, or an order number
 	 * containing a character an escaper would rewrite.
+	 *
+	 * Since the guard is shared by every store integration, the key is defined
+	 * once on GTM4WP\Ecommerce\Helpers (site 1 above lives there too); this
+	 * delegating constant only keeps the 2.0 name alive for existing consumers
+	 * of this class.
 	 */
-	public const ORDER_TRACKED_COOKIE = 'gtm4wp_orderid_tracked';
+	public const ORDER_TRACKED_COOKIE = \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_COOKIE;
 
 	/**
 	 * Contexts (process_product $attributes_used_for values) whose output is

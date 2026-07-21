@@ -10,10 +10,18 @@
 
 namespace GTM4WP\Modules\WooCommerce;
 
+use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Static helpers ported from integration/ecommerce-generic.php of 1.x.
+ *
+ * The store-agnostic pieces (business verticals, category/taxonomy readers,
+ * Enhanced Conversions hashing, product id prefixing) live in
+ * GTM4WP\Ecommerce\Helpers since 2.0 so other store integrations (Easy
+ * Digital Downloads) can share them; the constants and methods here delegate
+ * to keep this class' public API unchanged for existing consumers.
  */
 final class Helpers {
 
@@ -23,17 +31,7 @@ final class Helpers {
 	 *
 	 * @var string[]
 	 */
-	public const BUSINESS_VERTICALS = array(
-		'retail',
-		'education',
-		'flights',
-		'hotel_rental',
-		'jobs',
-		'local',
-		'real_estate',
-		'travel',
-		'custom',
-	);
+	public const BUSINESS_VERTICALS = EcommerceHelpers::BUSINESS_VERTICALS;
 
 	/**
 	 * Business verticals that use a different name for their "id" field in
@@ -41,10 +39,7 @@ final class Helpers {
 	 *
 	 * @var array<string, string>
 	 */
-	public const BUSINESS_VERTICALS_IDS = array(
-		'flights' => 'destination',
-		'travel'  => 'destination',
-	);
+	public const BUSINESS_VERTICALS_IDS = EcommerceHelpers::BUSINESS_VERTICALS_IDS;
 
 	/**
 	 * Name of the first-party cookie that carries GA4 list attribution
@@ -235,11 +230,7 @@ final class Helpers {
 	 * @return int|string The product ID with the prefix string.
 	 */
 	public static function prefix_productid( $product_id, string $prefix ) {
-		if ( '' !== $prefix ) {
-			return $prefix . $product_id;
-		}
-
-		return $product_id;
+		return EcommerceHelpers::prefix_productid( $product_id, $prefix );
 	}
 
 	/**
@@ -389,24 +380,7 @@ final class Helpers {
 	 * @return string The category path. An example output can be: Home/Clothing/Toddlers.
 	 */
 	public static function get_product_category_hierarchy( $category_id, string $category_taxonomy = 'product_cat' ): string {
-		$cat_hierarchy = '';
-
-		$category_parent_list = get_term_parents_list(
-			$category_id,
-			$category_taxonomy,
-			array(
-				'format'    => 'name',
-				'separator' => '/',
-				'link'      => false,
-				'inclusive' => true,
-			)
-		);
-
-		if ( is_string( $category_parent_list ) ) {
-			$cat_hierarchy = trim( $category_parent_list, '/' );
-		}
-
-		return $cat_hierarchy;
+		return EcommerceHelpers::get_product_category_hierarchy( $category_id, $category_taxonomy );
 	}
 
 	/**
@@ -419,48 +393,7 @@ final class Helpers {
 	 * @return string The first category name of the product. Includes parent category names if $fullpath is true.
 	 */
 	public static function get_product_category( $product_id, bool $fullpath = false, string $category_taxonomy = 'product_cat' ): string {
-		$product_category    = '';
-		$primary_category_id = false;
-		$category_data       = false;
-
-		if ( function_exists( 'yoast_get_primary_term_id' ) ) {
-			$primary_category_id = yoast_get_primary_term_id( $category_taxonomy, $product_id );
-		} elseif ( function_exists( 'rank_math' ) ) {
-			$rank_math_data = get_post_meta( $product_id, 'rank_math_primary_' . $category_taxonomy, true );
-			if ( ! empty( $rank_math_data ) && intval( $rank_math_data ) ) {
-				$primary_category_id = $rank_math_data;
-			}
-		}
-
-		if ( false === $primary_category_id ) {
-			$product_categories = wp_get_post_terms(
-				$product_id,
-				$category_taxonomy,
-				array(
-					'orderby' => 'parent',
-					'order'   => 'ASC',
-				)
-			);
-
-			if ( ( is_array( $product_categories ) ) && ( count( $product_categories ) > 0 ) ) {
-				$category_data = array_pop( $product_categories );
-			}
-		} else {
-			$category_data = get_term( $primary_category_id, $category_taxonomy );
-			if ( is_wp_error( $category_data ) || is_null( $category_data ) ) {
-				$category_data = false;
-			}
-		}
-
-		if ( false !== $category_data ) {
-			if ( $fullpath ) {
-				$product_category = self::get_product_category_hierarchy( $category_data->term_id, $category_taxonomy );
-			} elseif ( isset( $category_data->name ) ) {
-				$product_category = $category_data->name;
-			}
-		}
-
-		return $product_category;
+		return EcommerceHelpers::get_product_category( $product_id, $fullpath, $category_taxonomy );
 	}
 
 	/**
@@ -471,20 +404,7 @@ final class Helpers {
 	 * @return string Returns the first assigned taxonomy value of the given WooCommerce product ID.
 	 */
 	public static function get_product_term( $product_id, string $taxonomy ): string {
-		$gtm4wp_product_terms = wp_get_post_terms(
-			$product_id,
-			$taxonomy,
-			array(
-				'orderby' => 'parent',
-				'order'   => 'ASC',
-			)
-		);
-
-		if ( is_array( $gtm4wp_product_terms ) && ( count( $gtm4wp_product_terms ) > 0 ) ) {
-			return $gtm4wp_product_terms[0]->name;
-		}
-
-		return '';
+		return EcommerceHelpers::get_product_term( $product_id, $taxonomy );
 	}
 
 	/**
@@ -495,11 +415,7 @@ final class Helpers {
 	 * @return string The name of the "ID" field for tagging.
 	 */
 	public static function get_gads_product_id_variable_name( string $vertical_id ): string {
-		if ( array_key_exists( $vertical_id, self::BUSINESS_VERTICALS_IDS ) ) {
-			return self::BUSINESS_VERTICALS_IDS[ $vertical_id ];
-		}
-
-		return 'id';
+		return EcommerceHelpers::get_gads_product_id_variable_name( $vertical_id );
 	}
 
 	/**
@@ -513,79 +429,23 @@ final class Helpers {
 	 * @return string the normalized and hashed value.
 	 */
 	public static function normalize_and_hash( string $hash_algorithm, string $value, bool $trim_intermediate_spaces ): string {
-		// Normalizes by first converting all characters to lowercase, then trimming spaces.
-		$normalized = strtolower( $value );
-		if ( true === $trim_intermediate_spaces ) {
-			// Removes leading, trailing, and intermediate spaces.
-			$normalized = str_replace( ' ', '', $normalized );
-		} else {
-			// Removes only leading and trailing spaces.
-			$normalized = trim( $normalized );
-		}
-
-		if ( '' === $normalized ) {
-			return '';
-		}
-
-		return hash( $hash_algorithm, $normalized );
+		return EcommerceHelpers::normalize_and_hash( $hash_algorithm, $value, $trim_intermediate_spaces );
 	}
 
 	/**
 	 * Returns the result of normalizing and hashing an email address.
 	 *
-	 * For gmail.com and googlemail.com Google folds the local part the way those
-	 * mailboxes actually resolve, before hashing: all '.' characters removed, and
-	 * a '+' together with everything after it discarded. Both rules apply to
-	 * those two domains ONLY - everywhere else "jane.doe" and "janedoe" are
-	 * different mailboxes, and stripping either would hash the wrong person.
-	 *
-	 * Note which of Google's two artifacts this follows. Their prose documents
-	 * both rules; the PHP sample on the same page implements only the dot rule,
-	 * and this function was originally ported from that sample (#321), which is
-	 * how the plus rule went missing. Do not "restore" this to match the sample.
-	 *
-	 * The split below deviates from that sample a second time, deliberately:
-	 * everything after the FIRST '@' is the domain (explode limit 2), so a
-	 * string carrying more than one '@' is never treated as a foldable
-	 * mailbox - it is hashed exactly as typed. Ordinary addresses split
-	 * identically either way. Do not "restore" the sample's unlimited split;
-	 * the regression test pins both directions.
-	 *
-	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: the normalization rules, in prose.
+	 * The gmail/googlemail folding rules and the deliberate deviations from
+	 * Google's PHP sample (the plus rule, the first-'@' split) are documented on
+	 * the shared implementation in GTM4WP\Ecommerce\Helpers - read that docblock
+	 * before changing anything; the regression test pins both directions.
 	 *
 	 * @param string $hash_algorithm the hash algorithm to use.
 	 * @param string $email_address the email address to normalize and hash.
 	 * @return string the normalized and hashed email address, or '' if nothing is left to hash.
 	 */
 	public static function normalize_and_hash_email_address( string $hash_algorithm, string $email_address ): string {
-		$normalized_email = strtolower( $email_address );
-		$email_parts      = explode( '@', $normalized_email, 2 );
-		if (
-			count( $email_parts ) > 1
-			// Anchored at both ends on purpose: an unanchored match also accepts
-			// "gmail.com.example.com", and folding a third party's local part
-			// would silently hash a value that can never match. The \s* absorbs
-			// trailing whitespace, which normalize_and_hash() strips afterwards.
-			&& preg_match( '/^(gmail|googlemail)\.com\s*$/', $email_parts[1] )
-		) {
-			$email_parts[0] = str_replace( '.', '', $email_parts[0] );
-
-			$plus_position = strpos( $email_parts[0], '+' );
-			if ( false !== $plus_position ) {
-				$email_parts[0] = substr( $email_parts[0], 0, $plus_position );
-			}
-
-			// A local part that was nothing but a tag leaves no address behind,
-			// and hashing a bare "@gmail.com" would be a value no lookup can
-			// ever match - so there is nothing honest to return but ''.
-			if ( '' === $email_parts[0] ) {
-				return '';
-			}
-
-			$normalized_email = sprintf( '%s@%s', $email_parts[0], $email_parts[1] );
-		}
-
-		return self::normalize_and_hash( $hash_algorithm, $normalized_email, true );
+		return EcommerceHelpers::normalize_and_hash_email_address( $hash_algorithm, $email_address );
 	}
 
 	/**

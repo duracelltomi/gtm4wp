@@ -1106,83 +1106,17 @@ final class PageDataLayer {
 	 * it. Extracted so the order-received page and the session fallback share the
 	 * exact same guard.
 	 *
-	 * The cookie read/write idiom emitted below is the PHP-side copy of the
-	 * shared helpers in js/frontend/lib/gtm4wp-cookies.js (this inline script
-	 * cannot import a bundle module); the storage key and byte format must stay
-	 * compatible with that lib and with gtm4wp-visitor-data.js, which reuses the
-	 * same gtm4wp_orderid_tracked guard for the fallback purchase.
+	 * The implementation lives in GTM4WP\Ecommerce\Helpers so every store
+	 * integration consults the same browser guard; the escaping rationale
+	 * (json_literal, not esc_js) and the storage-key contract with
+	 * js/frontend/lib/gtm4wp-cookies.js and gtm4wp-visitor-data.js are
+	 * documented there and on Ecommerce\Helpers::ORDER_TRACKED_COOKIE.
 	 *
 	 * @param \WC_Order $order The order being tracked.
 	 * @return array{0:string,1:string} The before and after JavaScript fragments.
 	 */
 	private function purchase_dedupe_guard( \WC_Order $order ): array {
-		// Emitted as a JSON string literal (quotes included, so it is NOT wrapped
-		// in quotes below) with the full hex flag set - the RI-2 escaper for an
-		// inline-script context. It replaces an esc_js() call, which was wrong on
-		// two counts: esc_js() is for HTML-attribute JS, not a raw <script> body
-		// (PA-4), and it is an ENCODING - it rewrote &, " and < in the order
-		// number to &amp;/&quot;/&lt;, which this inline-script path never decodes.
-		// The value stored here therefore differed from the raw order number that
-		// gtm4wp-visitor-data.js writes to the very same key, so the two guards
-		// stopped recognising each other's entries. See the contract on
-		// ProductData::ORDER_TRACKED_COOKIE - all three sites store the order
-		// number verbatim.
-		// json_literal(), not a bare wp_json_encode(): the result is interpolated
-		// into three JavaScript EXPRESSION positions below, and the encoder returns
-		// false - which PHP renders as '' - for a value it cannot encode, leaving
-		// `( == gtm4wp_orderid_tracked )`. That is a SyntaxError taking the whole
-		// duplicate-purchase guard with it (RI-21/#141).
-		//
-		// The value is a (string) cast scalar, so today the encoder cannot actually
-		// fail on it. Routed through the shared helper anyway, because an
-		// undocumented exemption is indistinguishable from an oversight, and the
-		// next person to widen this line should not have to re-derive the argument.
-		$order_number = ScriptTag::json_literal(
-			(string) $order->get_order_number(),
-			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
-		);
-
-		$storage_key = ProductData::ORDER_TRACKED_COOKIE;
-
-		$before_purchase_dl_push = '
-			// Check whether this order has been already tracked in this browser.
-
-			// Read order number already tracked from cookies or local storage.
-			let gtm4wp_orderid_tracked = "";
-
-			if ( !window.localStorage ) {
-				let gtm4wp_cookie = "; " + document.cookie;
-				let gtm4wp_cookie_parts = gtm4wp_cookie.split( "; ' . $storage_key . '=" );
-				if ( gtm4wp_cookie_parts.length == 2 ) {
-					gtm4wp_orderid_tracked = gtm4wp_cookie_parts.pop().split(";").shift();
-				}
-			} else {
-				gtm4wp_orderid_tracked = window.localStorage.getItem( "' . $storage_key . '" );
-			}
-
-			// Check whether this order has been already tracked before in this browser.
-			let gtm4wp_order_already_tracked = false;
-			if ( gtm4wp_orderid_tracked && ( ' . $order_number . ' == gtm4wp_orderid_tracked ) ) {
-				gtm4wp_order_already_tracked = true;
-			}
-
-			// only push purchase action if not tracked already.
-			if ( !gtm4wp_order_already_tracked ) {';
-
-		$after_purchase_dl_push = '
-			}
-
-			// Store the order number to prevent tracking this purchase again.
-			if ( !window.localStorage ) {
-				var gtm4wp_orderid_cookie_expire = new Date();
-				gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
-				var gtm4wp_orderid_cookie_expires_part = "expires=" + gtm4wp_orderid_cookie_expire.toUTCString();
-				document.cookie = "' . $storage_key . '=" + ' . $order_number . ' + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
-			} else {
-				window.localStorage.setItem( "' . $storage_key . '", ' . $order_number . ' );
-			}';
-
-		return array( $before_purchase_dl_push, $after_purchase_dl_push );
+		return \GTM4WP\Ecommerce\Helpers::purchase_dedupe_guard( (string) $order->get_order_number() );
 	}
 
 	/**
