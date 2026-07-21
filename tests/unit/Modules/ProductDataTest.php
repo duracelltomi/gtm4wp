@@ -820,6 +820,53 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 70.0, $no_tax_no_shipping['ecommerce']['value'] );
 	}
 
+	public function test_transaction_id_prefix_is_empty_by_default(): void {
+		// The option ships empty so an upgrade does not change the transaction id
+		// any store already reports on.
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'items'        => array(),
+			)
+		);
+
+		$full = $this->make_product_data()->get_purchase_datalayer( $order );
+
+		$this->assertSame( '1001', $full['ecommerce']['transaction_id'] );
+	}
+
+	public function test_transaction_id_prefix_is_prepended_when_set(): void {
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'items'        => array(),
+			)
+		);
+
+		$full = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX => 'store-a-' )
+		)->get_purchase_datalayer( $order );
+
+		$this->assertSame( 'store-a-1001', $full['ecommerce']['transaction_id'] );
+	}
+
+	public function test_transaction_id_prefix_leaves_the_raw_order_number_untouched(): void {
+		// Only the purchase event carries the prefix: orderData keeps the real
+		// WooCommerce order number, which the duplicate-tracking guards key on.
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'order_key'    => 'wc_order_abc',
+			)
+		);
+
+		$raw = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX => 'store-a-' )
+		)->get_raw_order_datalayer( $order, array() );
+
+		$this->assertSame( '1001', $raw['attributes']['order_number'] );
+	}
+
 	/**
 	 * Builds an order carrying a single line item, with fixtures for the
 	 * tax-inclusive and tax-exclusive per-item totals.

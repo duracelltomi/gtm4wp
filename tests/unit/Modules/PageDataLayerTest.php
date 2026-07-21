@@ -1184,6 +1184,36 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'ORD</script>', $encoded, 'No raw </script> may survive in the endpoint payload.' );
 	}
 
+	public function test_resolve_pending_purchase_hostile_transaction_id_prefix_round_trips_hex_encoded(): void {
+		// TS-11: the transaction id now has a second, admin-controlled source (the
+		// "Transaction ID prefix" option). It reaches the same sink raw, so a hostile
+		// prefix must be hex-encoded there just like a hostile order number - and it
+		// must not leak into the orderNumber the browser de-dupes on.
+		$order = $this->make_recent_order( array( 'order_number' => '1001' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX => '</script>-',
+			)
+		)->resolve_pending_purchase();
+
+		// Raw at the module boundary, and only on the transaction id.
+		$this->assertSame( '</script>-1001', $payload['push']['ecommerce']['transaction_id'] );
+		$this->assertSame( '1001', $payload['orderNumber'], 'The de-dupe key keeps the unprefixed order number.' );
+
+		// Encoded the way the endpoint does (TC-2): safe form present, raw break-out gone.
+		$flags    = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS;
+		$encoded  = json_encode( $payload, $flags ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$expected = json_encode( '</script>-1001', $flags ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+
+		$this->assertStringContainsString( trim( $expected, '"' ), $encoded, 'The prefix angle brackets must be hex-encoded (JSON_HEX_TAG).' );
+		$this->assertStringNotContainsString( '</script>', $encoded, 'No raw </script> may survive in the endpoint payload.' );
+	}
+
 	public function test_resolve_readded_to_cart_returns_payload_without_mutating_state(): void {
 		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
 		$session = $this->stub_wc_readded( 'hash-1', $product );

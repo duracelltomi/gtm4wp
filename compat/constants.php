@@ -146,6 +146,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING', 'integrate-woocommerce-excl
 define( 'GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG', 'integrate-woocommerce-do-not-use-order-tracked-flag' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL', 'integrate-woocommerce-clear-ecommerce-datalayer' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT', 'integrate-woocommerce-datalayer-max-timeout' );
+define( 'GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX', 'integrate-woocommerce-transaction-id-prefix' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES', 'integrate-woocommerce-purchase-track-statuses' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE', 'integrate-woocommerce-purchase-track-on-any-page' );
 define( 'GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE', 'integrate-woocommerce-custom-order-received-page' );

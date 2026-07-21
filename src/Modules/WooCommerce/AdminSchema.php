@@ -276,6 +276,17 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'purchase'
 			),
 			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX,
+				type: Field::TYPE_TEXT,
+				default_value: '',
+				label: __( 'Transaction ID prefix', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Text to prepend to the transaction_id sent with the purchase event, for example to tell several stores apart in one GA4 property or to match the order id format of another system. Leave this empty to send the WooCommerce order number unchanged. Only the purchase event is affected: the order number in the orderData variable and the duplicate tracking guards of the plugin keep using the raw order number.', 'duracelltomi-google-tag-manager' ),
+				group: 'purchase',
+				sanitizer: static function ( $value ) {
+					return trim( (string) $value );
+				}
+			),
+			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,

@@ -171,6 +171,18 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
 	}
 
+	public function test_transaction_id_prefix_is_an_empty_text_field_with_a_trimming_sanitizer(): void {
+		// Empty by default so an upgrade keeps sending the plain WooCommerce order
+		// number as the transaction id.
+		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX );
+
+		$this->assertSame( Field::TYPE_TEXT, $field->type );
+		$this->assertSame( '', $field->default_value );
+		$this->assertSame( 'purchase', $field->group );
+		$this->assertSame( 'x-', $field->sanitize( '  x-  ' ), 'Leading/trailing whitespace is trimmed from the prefix.' );
+		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
+	}
+
 	public function test_remarketing_id_prefix_sanitizer_trims_and_coerces_to_string(): void {
 		// The product-ID-prefix field defines the same trim((string)$value) sanitizer.
 		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX );

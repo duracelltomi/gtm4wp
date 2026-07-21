@@ -541,10 +541,17 @@ final class ProductData {
 
 			$order_currency = $order->get_currency();
 
+			// Optional fixed prefix in front of the transaction id, e.g. to tell
+			// several stores apart in one GA4 property. Empty by default, in which
+			// case the plain WooCommerce order number is sent as before. Only this
+			// event is affected: orderData and the duplicate-tracking guards keep
+			// using the raw order number.
+			$transaction_id_prefix = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX );
+
 			$data_layer['event']     = 'purchase';
 			$data_layer['ecommerce'] = array(
 				'currency'       => $order_currency,
-				'transaction_id' => $order->get_order_number(),
+				'transaction_id' => $transaction_id_prefix . $order->get_order_number(),
 				'affiliation'    => '',
 				'value'          => $order_revenue,
 				'tax'            => (float) $order->get_total_tax(),
