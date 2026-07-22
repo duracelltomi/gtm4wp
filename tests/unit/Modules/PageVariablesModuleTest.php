@@ -63,6 +63,10 @@ final class PageVariablesModuleTest extends TestCase {
 			'post_count'  => 0,
 			'found_posts' => 0,
 		);
+
+		// The module resolves the singular post once via get_post(); mirror
+		// WordPress by returning the global post, or null when it is not set up.
+		Functions\when( 'get_post' )->alias( static fn () => $GLOBALS['post'] ?? null );
 	}
 
 	protected function tearDown(): void {
@@ -160,6 +164,61 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
 		$this->assertSame( 'Author Name', $data_layer['pagePostAuthor'] );
 		$this->assertSame( 42, $data_layer['postID'] );
+	}
+
+	/**
+	 * Regression reported on the wordpress.org support forum (shipped in 1.22.x): is_singular()
+	 * being true does not guarantee the global post object is set up — unusual
+	 * template routing or a plugin resetting the global can leave it null, and
+	 * the module then raised "Attempt to read property ... on null" warnings on
+	 * every affected page view. The post-sourced variables must be OMITTED (not
+	 * emitted as '', 0 or null — a GTM trigger may test for key presence) and no
+	 * PHP warning may be raised; the error handler promotes any warning to a
+	 * test failure, so this test fails against the pre-fix code.
+	 */
+	public function test_singular_request_without_global_post_omits_post_variables_without_warning(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		Functions\when( 'get_the_category' )->justReturn( array() );
+		Functions\when( 'get_the_tags' )->justReturn( false );
+		Functions\when( 'get_object_taxonomies' )->justReturn( array( 'category' ) );
+		// Must never be reached: without a post there is no post_author to look up.
+		Functions\when( 'get_userdata' )->justReturn( false );
+
+		// The reported production state: a singular request with a null post global.
+		$GLOBALS['post'] = null;
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID      => true,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => true,
+				GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY => true,
+			)
+		);
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the reported PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $module->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		foreach ( array( 'pagePostAuthor', 'pagePostAuthorID', 'pagePostTerms', 'pageParentID', 'pageDepth' ) as $post_sourced_key ) {
+			$this->assertArrayNotHasKey( $post_sourced_key, $data_layer, "'{$post_sourced_key}' must be omitted, not emitted with a placeholder value, when the global post is unavailable." );
+		}
+
+		// Variables that do not need the post object still emit as before.
+		$this->assertSame( 'post', $data_layer['pagePostType'] );
+		$this->assertSame( 'single-post', $data_layer['pagePostType2'] );
 	}
 
 	/**

@@ -206,6 +206,12 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( is_singular() ) {
+			// is_singular() does not guarantee the global post object is set up
+			// (unusual template routing, a plugin resetting the global), so every
+			// post-object read below is gated on this nullable local and the
+			// affected variables are simply omitted when it is null.
+			$post = get_post();
+
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTYPE ) ) {
 				$data_layer['pagePostType']  = get_post_type();
 				$data_layer['pagePostType2'] = 'single-' . get_post_type();
@@ -228,7 +234,7 @@ final class PageVariablesModule extends AbstractModule {
 				}
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) || $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
+			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) || $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) && null !== $post ) {
 				// PublishPress Authors lets a post have several authors (co-authors,
 				// guest authors), which matters for E-E-A-T. When it is active, the
 				// single-value vars are sourced from its primary (first) author - this
@@ -239,7 +245,7 @@ final class PageVariablesModule extends AbstractModule {
 				// active (or returns no author), the get_userdata() fallback is unchanged.
 				$multiple_authors = array();
 				if ( function_exists( 'get_multiple_authors' ) ) {
-					$ppress_authors = get_multiple_authors( $GLOBALS['post']->ID );
+					$ppress_authors = get_multiple_authors( $post->ID );
 					if ( is_array( $ppress_authors ) ) {
 						$multiple_authors = $ppress_authors;
 					}
@@ -298,7 +304,7 @@ final class PageVariablesModule extends AbstractModule {
 						}
 					}
 				} else {
-					$postuser = get_userdata( $GLOBALS['post']->post_author );
+					$postuser = get_userdata( $post->post_author );
 
 					if ( false !== $postuser ) {
 						if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
@@ -324,13 +330,13 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pagePostDateUnix']    = get_the_date( 'U' );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST ) && null !== $post ) {
 				$data_layer['pagePostTerms'] = array();
 
 				$object_taxonomies = get_object_taxonomies( get_post_type() );
 
 				foreach ( $object_taxonomies as $one_object_taxonomy ) {
-					$post_taxonomy_values = get_the_terms( $GLOBALS['post']->ID, $one_object_taxonomy );
+					$post_taxonomy_values = get_the_terms( $post->ID, $one_object_taxonomy );
 					if ( is_array( $post_taxonomy_values ) ) {
 						$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
 						foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
@@ -339,7 +345,7 @@ final class PageVariablesModule extends AbstractModule {
 					}
 				}
 
-				$post_meta = get_post_meta( $GLOBALS['post']->ID );
+				$post_meta = get_post_meta( $post->ID );
 				if ( is_array( $post_meta ) ) {
 					$data_layer['pagePostTerms']['meta'] = array();
 					foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
@@ -433,8 +439,8 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pageHasFeaturedImage'] = has_post_thumbnail( get_the_ID() );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY ) ) {
-				$data_layer['pageParentID'] = (int) $GLOBALS['post']->post_parent;
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY ) && null !== $post ) {
+				$data_layer['pageParentID'] = (int) $post->post_parent;
 				$data_layer['pageDepth']    = count( get_post_ancestors( get_the_ID() ) );
 			}
 
