@@ -139,8 +139,12 @@ final class PageDataLayer {
 
 		$woo_customer = new \WC_Customer( $woo->customer->get_id() );
 
-		$data_layer['customerTotalOrders']     = $woo_customer->get_order_count();
-		$data_layer['customerTotalOrderValue'] = $woo_customer->get_total_spent();
+		$data_layer['customerTotalOrders'] = $woo_customer->get_order_count();
+
+		// get_total_spent() returns a wc_format_decimal() STRING; typed here so it
+		// keeps reaching GTM as a JSON number now that the data layer encode no
+		// longer numeric-coerces (JSON_NUMERIC_CHECK removed).
+		$data_layer['customerTotalOrderValue'] = (float) $woo_customer->get_total_spent();
 
 		$data_layer['customerFirstName'] = $woo_customer->get_first_name();
 		$data_layer['customerLastName']  = $woo_customer->get_last_name();
@@ -223,12 +227,17 @@ final class PageDataLayer {
 
 		$current_cart = $woo->cart;
 
+		// The money totals are cast to float: the WC_Cart getters pass through
+		// woocommerce_cart_* filters that third-party code may answer with decimal
+		// strings, and the data layer encode no longer numeric-coerces
+		// (JSON_NUMERIC_CHECK removed), so the totals are typed here to stay real
+		// JSON numbers. Coupon codes are identifiers and stay strings.
 		$data_layer['cartContent'] = array(
 			'totals' => array(
 				'applied_coupons' => $current_cart->get_applied_coupons(),
-				'discount_total'  => $current_cart->get_discount_total(),
-				'subtotal'        => $current_cart->get_subtotal(),
-				'total'           => $current_cart->get_cart_contents_total(),
+				'discount_total'  => (float) $current_cart->get_discount_total(),
+				'subtotal'        => (float) $current_cart->get_subtotal(),
+				'total'           => (float) $current_cart->get_cart_contents_total(),
 			),
 			'items'  => array(),
 		);

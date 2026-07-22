@@ -159,13 +159,15 @@ final class PageDataLayerTest extends TestCase {
 	/**
 	 * Stubs WC() to return a store object with the given cart and customer.
 	 *
-	 * @param array<string, mixed> $cart_items Cart items keyed by cart id.
-	 * @param mixed                $customer   The WC()->customer object (or null).
+	 * @param array<string, mixed> $cart_items  Cart items keyed by cart id.
+	 * @param mixed                $customer    The WC()->customer object (or null).
+	 * @param array<string, mixed> $cart_totals Optional cart totals getter overrides
+	 *                                          (discount_total, subtotal, total).
 	 * @return void
 	 */
-	private function stub_wc( array $cart_items = array(), $customer = null ): void {
-		$cart = new class( $cart_items ) {
-			public function __construct( private array $items ) {}
+	private function stub_wc( array $cart_items = array(), $customer = null, array $cart_totals = array() ): void {
+		$cart = new class( $cart_items, $cart_totals ) {
+			public function __construct( private array $items, private array $totals ) {}
 			public function get_cart() {
 				return $this->items;
 			}
@@ -176,13 +178,13 @@ final class PageDataLayerTest extends TestCase {
 				return array();
 			}
 			public function get_discount_total() {
-				return 0;
+				return $this->totals['discount_total'] ?? 0;
 			}
 			public function get_subtotal() {
-				return 0;
+				return $this->totals['subtotal'] ?? 0;
 			}
 			public function get_cart_contents_total() {
-				return 0;
+				return $this->totals['total'] ?? 0;
 			}
 		};
 
@@ -649,6 +651,54 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertSame( 3, $result['customerTotalOrders'] );
 		$this->assertSame( 'Marks & Spencer', $result['customerBillingCompany'], 'Customer data must reach the data layer raw.' );
+	}
+
+	public function test_customer_and_cart_money_totals_typed_as_numbers(): void {
+		// WC_Customer::get_total_spent() and (via woocommerce_cart_* filters) the
+		// cart totals can arrive as decimal STRINGS. Since the data layer encode
+		// no longer numeric-coerces (JSON_NUMERIC_CHECK removed), the builders
+		// must type money values themselves - while identifier-like values (a
+		// leading-zero SKU) stay byte-exact strings. Fixtures feed the string
+		// form on purpose (TS-13).
+		\WC_Customer::$fixtures[42] = array(
+			'order_count' => 3,
+			'total_spent' => '123.45',
+		);
+
+		$product = new \WC_Product(
+			array(
+				'id'    => 7,
+				'title' => 'Mug',
+				'sku'   => '000035180',
+			)
+		);
+		$this->stub_wc(
+			array(
+				'item-1' => array(
+					'data'     => $product,
+					'quantity' => 2,
+				),
+			),
+			new \WC_Customer( 42 ),
+			array(
+				'discount_total' => '2.50',
+				'subtotal'       => '33.50',
+				'total'          => '35.90',
+			)
+		);
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA     => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 123.45, $result['customerTotalOrderValue'], 'The customer lifetime value must be typed as a float.' );
+		$this->assertSame( 2.5, $result['cartContent']['totals']['discount_total'] );
+		$this->assertSame( 33.5, $result['cartContent']['totals']['subtotal'] );
+		$this->assertSame( 35.9, $result['cartContent']['totals']['total'] );
+		$this->assertSame( '000035180', $result['cartContent']['items'][0]['sku'], 'A leading-zero SKU must stay a byte-exact string.' );
 	}
 
 	public function test_cache_safe_omits_customer_data_and_cart_content(): void {

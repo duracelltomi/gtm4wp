@@ -969,6 +969,46 @@ final class ProductDataTest extends TestCase {
 		$this->assertArrayNotHasKey( 'discount', $items[0] );
 	}
 
+	public function test_raw_order_datalayer_types_money_totals_as_floats(): void {
+		// Several WC_Order money getters return wc_format_decimal() decimal
+		// STRINGS ("35.90"). The data layer encode no longer numeric-coerces
+		// (JSON_NUMERIC_CHECK removed - it mangled leading-zero SKUs and order
+		// numbers), so the builder must type the totals itself for them to keep
+		// reaching GTM as JSON numbers. The fixture feeds the WC-realistic
+		// string form on purpose (TS-13).
+		$order = new \WC_Order(
+			array(
+				'order_number'   => '001001',
+				'order_key'      => 'wc_order_abc',
+				'total'          => '35.90',
+				'total_tax'      => '5.90',
+				'discount_total' => '2.50',
+				'discount_tax'   => '0.50',
+				'shipping_total' => '4.90',
+				'shipping_tax'   => '0.98',
+				'cart_tax'       => '4.92',
+				'total_discount' => '3.00',
+				'subtotal'       => '33.50',
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		$this->assertSame( 2.5, $raw['totals']['discount_total'] );
+		$this->assertSame( 0.5, $raw['totals']['discount_tax'] );
+		$this->assertSame( 4.9, $raw['totals']['shipping_total'] );
+		$this->assertSame( 0.98, $raw['totals']['shipping_tax'] );
+		$this->assertSame( 4.92, $raw['totals']['cart_tax'] );
+		$this->assertSame( 35.9, $raw['totals']['total'] );
+		$this->assertSame( 5.9, $raw['totals']['total_tax'] );
+		$this->assertSame( 3.0, $raw['totals']['total_discount'] );
+		$this->assertSame( 33.5, $raw['totals']['subtotal'] );
+
+		// The order number is an identifier, not money: it keeps its exact string
+		// form - leading zeros preserved - matching the purchase transaction_id.
+		$this->assertSame( '001001', $raw['attributes']['order_number'] );
+	}
+
 	public function test_raw_order_datalayer_passes_values_without_entity_escaping(): void {
 		$order = new \WC_Order(
 			array(

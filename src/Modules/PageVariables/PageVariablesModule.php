@@ -122,7 +122,10 @@ final class PageVariablesModule extends AbstractModule {
 			if ( function_exists( 'get_blog_details' ) ) {
 				$gtm4wp_blogdetails = get_blog_details();
 
-				$data_layer['siteID']   = $gtm4wp_blogdetails->blog_id;
+				// WP_Site exposes blog_id as a numeric STRING; typed here so it keeps
+				// reaching GTM as a JSON number now that the data layer encode no
+				// longer numeric-coerces (JSON_NUMERIC_CHECK removed).
+				$data_layer['siteID']   = (int) $gtm4wp_blogdetails->blog_id;
 				$data_layer['siteName'] = $gtm4wp_blogdetails->blogname;
 			}
 		}

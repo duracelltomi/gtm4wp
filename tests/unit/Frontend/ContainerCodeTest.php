@@ -271,6 +271,78 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( $safe_fragment, $output );
 	}
 
+	public function test_header_begin_preserves_numeric_looking_strings_in_datalayer(): void {
+		// Regression (wp.org forum report): the data layer encode carried
+		// JSON_NUMERIC_CHECK, which coerced every numeric-looking string into a
+		// JSON number - a SKU of "000035180" reached GTM as 35180 in cartContent
+		// while ecommerce.items (built on the flag-free additional-push path)
+		// kept the correct string, so the two blocks disagreed about the same
+		// product. Identifier-like values must survive as strings, byte-exact.
+		$compiled = array(
+			'cartContent' => array(
+				'items' => array(
+					array(
+						'item_id' => '000035180',
+						'sku'     => '000035180',
+					),
+				),
+			),
+			'orderNumber' => '0042',
+		);
+
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn( $compiled );
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		// Expected output built with the same wp_json_encode() + flags the source
+		// uses (TC-2), asserting the full encode including every value's type.
+		$expected_json = wp_json_encode( $compiled, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+		$this->assertStringContainsString( 'var dataLayer_content = ' . $expected_json . ';', $output );
+
+		// Both directions (TS-2): the string form is present AND the coerced
+		// number form is absent.
+		$this->assertStringContainsString( '"item_id":"000035180"', $output );
+		$this->assertStringNotContainsString( '"item_id":35180', $output, 'A leading-zero SKU must not be coerced into a JSON number.' );
+		$this->assertStringNotContainsString( '"orderNumber":42', $output, 'A zero-padded order number must not be coerced into a JSON number.' );
+	}
+
+	public function test_header_begin_keeps_typed_numbers_as_json_numbers(): void {
+		// The counter-direction of dropping JSON_NUMERIC_CHECK: values the
+		// builders type as PHP floats/ints (prices, totals, quantities) must
+		// still encode as JSON numbers - GA4 and Meta reject string prices
+		// (the bug class the 1.22.4 JS-side parseFloat fix closed).
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn(
+				array(
+					'cartContent' => array(
+						'totals' => array( 'total' => 71.8 ),
+						'items'  => array(
+							array(
+								'price'    => 35.9,
+								'quantity' => 2,
+							),
+						),
+					),
+				)
+			);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( '"price":35.9', $output );
+		$this->assertStringContainsString( '"quantity":2', $output );
+		$this->assertStringContainsString( '"total":71.8', $output );
+		$this->assertStringNotContainsString( '"price":"35.9"', $output, 'A float price must encode as a JSON number, not a string.' );
+	}
+
 	public function test_header_begin_omits_loader_when_placement_off(): void {
 		$container = $this->make_container(
 			array(

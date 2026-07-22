@@ -304,8 +304,15 @@ final class ContainerCode {
 			// ScriptTag::print_script_block(): even a value that arrives here already
 			// HTML-entity encoded (e.g. get_search_query() returns esc_attr'd output,
 			// so a " becomes &quot;) can never break out of the JS string literal.
+			// No JSON_NUMERIC_CHECK here: it coerced every numeric-looking string
+			// anywhere in the structure into a JSON number, silently corrupting
+			// identifier-like values (a SKU of "000035180" lost its leading zeros;
+			// order numbers, postcodes and phone numbers changed type). Values that
+			// really are numbers (prices, totals, counts) are typed at their source
+			// instead - the same contract the additional-push and cart-fragments
+			// sinks have always had, so all sinks now agree on types.
 			$script_tag .= '
-	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';';
+	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';';
 
 			$script_tag .= '
 	' . esc_js( $datalayer_name ) . '.push( dataLayer_content );';

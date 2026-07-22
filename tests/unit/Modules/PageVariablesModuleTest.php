@@ -123,6 +123,26 @@ final class PageVariablesModuleTest extends TestCase {
 		unset( $_SERVER['HTTP_REFERER'] );
 	}
 
+	public function test_site_id_typed_as_number(): void {
+		// WP_Site (get_blog_details) exposes blog_id as a numeric STRING. The
+		// data layer encode no longer numeric-coerces (JSON_NUMERIC_CHECK
+		// removed - it mangled leading-zero SKUs/order numbers), so the module
+		// must type siteID itself for it to keep reaching GTM as a JSON number.
+		// The fixture feeds the WP-realistic string form on purpose (TS-13).
+		Functions\when( 'get_blog_details' )->justReturn(
+			(object) array(
+				'blog_id'  => '3',
+				'blogname' => 'Site three',
+			)
+		);
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SITEID => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( 3, $data_layer['siteID'], 'siteID must be typed as an int.' );
+		$this->assertSame( 'Site three', $data_layer['siteName'] );
+	}
+
 	public function test_singular_post_data(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
 		Functions\when( 'get_post_type' )->justReturn( 'post' );

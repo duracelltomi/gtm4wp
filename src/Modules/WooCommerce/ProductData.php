@@ -455,17 +455,23 @@ final class ProductData {
 
 				'coupons'              => implode( ', ', $order->get_coupon_codes() ),
 			),
+			// The money totals are cast to float because several WC_Order getters
+			// return wc_format_decimal() STRINGS ("35.90"). The data layer encode
+			// no longer numeric-coerces (JSON_NUMERIC_CHECK mangled leading-zero
+			// SKUs/order numbers), so the totals must be typed here to keep
+			// reaching GTM as real JSON numbers. The order number stays a string
+			// on purpose - it is an identifier, like the purchase transaction_id.
 			'totals'     => array(
 				'currency'       => $order->get_currency(),
-				'discount_total' => $order->get_discount_total(),
-				'discount_tax'   => $order->get_discount_tax(),
-				'shipping_total' => $order->get_shipping_total(),
-				'shipping_tax'   => $order->get_shipping_tax(),
-				'cart_tax'       => $order->get_cart_tax(),
-				'total'          => $order->get_total(),
-				'total_tax'      => $order->get_total_tax(),
-				'total_discount' => $order->get_total_discount(),
-				'subtotal'       => $order->get_subtotal(),
+				'discount_total' => (float) $order->get_discount_total(),
+				'discount_tax'   => (float) $order->get_discount_tax(),
+				'shipping_total' => (float) $order->get_shipping_total(),
+				'shipping_tax'   => (float) $order->get_shipping_tax(),
+				'cart_tax'       => (float) $order->get_cart_tax(),
+				'total'          => (float) $order->get_total(),
+				'total_tax'      => (float) $order->get_total_tax(),
+				'total_discount' => (float) $order->get_total_discount(),
+				'subtotal'       => (float) $order->get_subtotal(),
 				'tax_totals'     => $order->get_tax_totals(),
 			),
 			'customer'   => array(

@@ -197,6 +197,51 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertSame( array(), $GLOBALS['gtm4wp_additional_datalayer_pushes'], 'The queue is reset after the flush.' );
 	}
 
+	public function test_flush_pushes_preserves_numeric_looking_strings_and_typed_numbers(): void {
+		// This sink never used JSON_NUMERIC_CHECK - which is why ecommerce.items
+		// carried a leading-zero SKU correctly while the main data layer encode
+		// (which had the flag until it was removed) mangled the same product in
+		// cartContent (wp.org forum report). Pin the contract on this side too, so
+		// the flag is never "helpfully" added here: identifier strings stay
+		// byte-exact strings, PHP floats/ints stay JSON numbers.
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->queue_push(
+			'purchase',
+			array(
+				'ecommerce' => array(
+					'transaction_id' => '000123',
+					'value'          => 35.9,
+					'items'          => array(
+						array(
+							'item_id'  => '000035180',
+							'price'    => 35.9,
+							'quantity' => 1,
+						),
+					),
+				),
+			)
+		);
+
+		$datalayer->flush_pushes();
+
+		$this->assertCount( 1, $captured );
+		$code = $captured[0];
+
+		$this->assertStringContainsString( '"transaction_id":"000123"', $code );
+		$this->assertStringContainsString( '"item_id":"000035180"', $code );
+		$this->assertStringContainsString( '"value":35.9', $code );
+		$this->assertStringContainsString( '"price":35.9', $code );
+		$this->assertStringNotContainsString( '"item_id":35180', $code, 'A leading-zero SKU must not be coerced into a JSON number.' );
+		$this->assertStringNotContainsString( '"value":"35.9"', $code, 'A float value must encode as a JSON number, not a string.' );
+	}
+
 	public function test_flush_pushes_hex_encodes_script_breakout_characters(): void {
 		// The additional-push path prints via wp_add_inline_script (no
 		// htmlspecialchars_decode), so JSON_HEX_TAG is the load-bearing guard
