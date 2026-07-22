@@ -43,4 +43,9 @@ yarn-error.log
 .claude/settings.json
 .claude/settings.local.json
 
+# wordpress.org support-forum triage (/wporg-forum-review). The framework lives
+# in .claude/ and is committed; the working data — triage ledger, canonical
+# answers, per-run reports and drafted replies — is local only.
+.support/
+
 .docs/
