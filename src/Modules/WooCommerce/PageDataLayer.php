@@ -727,27 +727,43 @@ final class PageDataLayer {
 	 * @return array{0:string,1:string} The before and after JavaScript fragments.
 	 */
 	private function purchase_dedupe_guard( \WC_Order $order ): array {
-		$order_number = esc_js( $order->get_order_number() );
+		// Emitted as a JSON string literal (quotes included, so it is NOT wrapped
+		// in quotes below) with the full hex flag set - the RI-2 escaper for an
+		// inline-script context. It replaces an esc_js() call, which was wrong on
+		// two counts: esc_js() is for HTML-attribute JS, not a raw <script> body
+		// (PA-4), and it is an ENCODING - it rewrote &, " and < in the order
+		// number to &amp;/&quot;/&lt;, which this inline-script path never decodes.
+		// The value stored here therefore differed from the raw order number that
+		// gtm4wp-visitor-data.js writes to the very same key, so the two guards
+		// stopped recognising each other's entries. See the contract on
+		// ProductData::ORDER_TRACKED_COOKIE - all three sites store the order
+		// number verbatim.
+		$order_number = wp_json_encode(
+			(string) $order->get_order_number(),
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		$storage_key = ProductData::ORDER_TRACKED_COOKIE;
 
 		$before_purchase_dl_push = '
 			// Check whether this order has been already tracked in this browser.
 
-			// Read order id already tracked from cookies or local storage.
+			// Read order number already tracked from cookies or local storage.
 			let gtm4wp_orderid_tracked = "";
 
 			if ( !window.localStorage ) {
 				let gtm4wp_cookie = "; " + document.cookie;
-				let gtm4wp_cookie_parts = gtm4wp_cookie.split( "; gtm4wp_orderid_tracked=" );
+				let gtm4wp_cookie_parts = gtm4wp_cookie.split( "; ' . $storage_key . '=" );
 				if ( gtm4wp_cookie_parts.length == 2 ) {
 					gtm4wp_orderid_tracked = gtm4wp_cookie_parts.pop().split(";").shift();
 				}
 			} else {
-				gtm4wp_orderid_tracked = window.localStorage.getItem( "gtm4wp_orderid_tracked" );
+				gtm4wp_orderid_tracked = window.localStorage.getItem( "' . $storage_key . '" );
 			}
 
 			// Check whether this order has been already tracked before in this browser.
 			let gtm4wp_order_already_tracked = false;
-			if ( gtm4wp_orderid_tracked && ( "' . $order_number . '" == gtm4wp_orderid_tracked ) ) {
+			if ( gtm4wp_orderid_tracked && ( ' . $order_number . ' == gtm4wp_orderid_tracked ) ) {
 				gtm4wp_order_already_tracked = true;
 			}
 
@@ -757,14 +773,14 @@ final class PageDataLayer {
 		$after_purchase_dl_push = '
 			}
 
-			// Store order ID to prevent tracking this purchase again.
+			// Store the order number to prevent tracking this purchase again.
 			if ( !window.localStorage ) {
 				var gtm4wp_orderid_cookie_expire = new Date();
 				gtm4wp_orderid_cookie_expire.setTime( gtm4wp_orderid_cookie_expire.getTime() + (365*24*60*60*1000) );
 				var gtm4wp_orderid_cookie_expires_part = "expires=" + gtm4wp_orderid_cookie_expire.toUTCString();
-				document.cookie = "gtm4wp_orderid_tracked=" + "' . $order_number . '" + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
+				document.cookie = "' . $storage_key . '=" + ' . $order_number . ' + ";" + gtm4wp_orderid_cookie_expires_part + ";path=/";
 			} else {
-				window.localStorage.setItem( "gtm4wp_orderid_tracked", "' . $order_number . '" );
+				window.localStorage.setItem( "' . $storage_key . '", ' . $order_number . ' );
 			}';
 
 		return array( $before_purchase_dl_push, $after_purchase_dl_push );

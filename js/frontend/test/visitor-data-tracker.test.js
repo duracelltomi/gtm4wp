@@ -237,6 +237,34 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 		global.fetch = jest.fn();
 	} );
 
+	it( 'still flushes the Tier 1 push when fetch is unavailable', async () => {
+		// The endpoint call used to be unguarded while its sibling beacon
+		// feature-detected fetch, so on a browser without fetch the ReferenceError
+		// escaped collectEndpointFields() and done() never ran — losing not just
+		// the Tier 2/3 data but the already-collected Tier 1 values with it.
+		delete global.fetch;
+
+		setSearch( 's=shoes' );
+		window.gtm4wp_visitordata_config = {
+			event: 'gtm4wp.visitorData',
+			fields: { siteSearchTerm: 'searchTerm' },
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'n1',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+		};
+
+		expect( () => loadTracker() ).not.toThrow();
+		await flush();
+
+		const event = visitorEvents().find(
+			( e ) => e.siteSearchTerm === 'shoes'
+		);
+		expect( event ).toBeTruthy();
+		// The server-only field simply is not delivered — no placeholder.
+		expect( event.visitorIP ).toBeUndefined();
+	} );
+
 	it( 'fetches Tier 2 once per session, then replays from cache with no request', async () => {
 		window.gtm4wp_visitordata_config = {
 			event: 'gtm4wp.visitorData',

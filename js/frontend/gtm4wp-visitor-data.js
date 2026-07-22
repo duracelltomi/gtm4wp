@@ -568,6 +568,16 @@ import {
 			return;
 		}
 
+		// Feature-detect like fireConfirmBeacon() does: an unguarded call throws a
+		// ReferenceError where fetch is unavailable, and that throw escapes this
+		// function, so done() never runs and even the already-collected Tier 1
+		// values (search term, referrer) would be lost. Degrade to "no endpoint
+		// data" instead and let the caller flush what it has.
+		if ( 'function' !== typeof fetch ) {
+			done();
+			return;
+		}
+
 		const headers = { Accept: 'application/json' };
 		// Send the (baked) nonce ONLY when there is identity-bound data to fetch — an
 		// active Tier 3 gate cookie, i.e. a logged-in visitor. Their page is never

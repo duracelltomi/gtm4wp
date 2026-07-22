@@ -193,4 +193,77 @@ final class MigrationTest extends TestCase {
 		$this->assertSame( GTM4WP_VERSION, $this->option_store['gtm4wp-plugin-version'] );
 		$this->assertArrayNotHasKey( GTM4WP_OPTIONS, $this->option_store );
 	}
+
+	/**
+	 * The post meta option was split out of the combined "Post Terms" option in
+	 * 2.0. A site that had the combined option ON was already sending its custom
+	 * fields to Google Tag Manager, so the split must not silently drop that data:
+	 * the new option is seeded ON for them.
+	 */
+	public function test_seeds_post_meta_option_from_the_legacy_combined_option(): void {
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE             => 'GTM-AAA111',
+			GTM4WP_OPTION_INCLUDE_POSTTERMLIST => true,
+		);
+
+		Migration::maybe_run();
+
+		$this->assertTrue( $this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_INCLUDE_POSTMETA ] );
+		$this->assertTrue(
+			$this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_INCLUDE_POSTTERMLIST ],
+			'The legacy option keeps its own value - the taxonomy half is unaffected.'
+		);
+	}
+
+	/**
+	 * The mirror case: a site that had the combined option OFF was not sending
+	 * custom fields, so the new option must stay off.
+	 */
+	public function test_seeds_post_meta_option_off_when_the_legacy_option_was_off(): void {
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE             => 'GTM-AAA111',
+			GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+		);
+
+		Migration::maybe_run();
+
+		$this->assertFalse( $this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_INCLUDE_POSTMETA ] );
+	}
+
+	/**
+	 * The seeding is self-guarded: once the key exists it is the admin's own
+	 * choice and must never be overwritten, however often maybe_run() fires (it
+	 * runs on every admin request, not once per version).
+	 */
+	public function test_does_not_overwrite_an_existing_post_meta_choice(): void {
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE             => 'GTM-AAA111',
+			GTM4WP_OPTION_INCLUDE_POSTTERMLIST => true,
+			GTM4WP_OPTION_INCLUDE_POSTMETA     => false,
+		);
+
+		Migration::maybe_run();
+		Migration::maybe_run();
+
+		$this->assertFalse(
+			$this->option_store[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_INCLUDE_POSTMETA ],
+			'An admin who turned the meta option off must not have it re-enabled by the migration.'
+		);
+	}
+
+	/**
+	 * A site that never saved the legacy option has nothing to migrate: the key
+	 * stays absent so the module default (off) applies, exactly as on a fresh
+	 * install. Seeding it to false here would be harmless but would also make the
+	 * migration indistinguishable from an explicit admin choice.
+	 */
+	public function test_leaves_post_meta_option_absent_without_a_legacy_value(): void {
+		$this->option_store[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111',
+		);
+
+		Migration::maybe_run();
+
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_INCLUDE_POSTMETA, $this->option_store[ GTM4WP_OPTIONS ] );
+	}
 }

@@ -104,6 +104,58 @@ final class VisitorIpTest extends TestCase {
 		$this->assertSame( '8.8.8.8', VisitorIp::get( '!!!' ) );
 	}
 
+	/**
+	 * The header-name allow-list is anchored. The unanchored version it replaces
+	 * matched any string CONTAINING one allowed character, so every one of these
+	 * names passed validation and was turned into a $_SERVER lookup key. Nothing
+	 * could escape (the return is always FILTER_VALIDATE_IP gated), but the guard
+	 * validated nothing - so pin that it now rejects.
+	 *
+	 * @param string $header_name A header name that must be rejected.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'malformed_header_name_provider' )]
+	public function test_malformed_custom_header_names_are_rejected( string $header_name ): void {
+		$_SERVER['REMOTE_ADDR'] = '8.8.8.8';
+
+		// Seed the $_SERVER key the OLD (unanchored) code would have built, with a
+		// routable IP: if validation is skipped the lookup succeeds and this value
+		// is returned instead of REMOTE_ADDR, failing the assertion.
+		$_SERVER[ 'HTTP_' . strtoupper( str_replace( '-', '_', $header_name ) ) ] = '203.0.113.9';
+
+		$this->assertSame(
+			'8.8.8.8',
+			VisitorIp::get( $header_name ),
+			'A header name outside the [A-Z0-9_] allow-list must be rejected, falling back to REMOTE_ADDR.'
+		);
+	}
+
+	/**
+	 * Header names outside the [A-Z0-9_] allow-list that the unanchored pattern
+	 * used to accept.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function malformed_header_name_provider(): array {
+		return array(
+			'script tag'      => array( '"><script>alert(1)</script>' ),
+			'spaces'          => array( 'X Real IP' ),
+			'dot separator'   => array( 'X.Real.IP' ),
+			'colon'           => array( 'X-Real-IP:evil' ),
+			'trailing symbol' => array( 'X-Real-IP!' ),
+		);
+	}
+
+	/**
+	 * The positive half of the same gate: a well-formed name still works, so the
+	 * anchoring did not over-tighten (hyphens map to underscores as documented).
+	 */
+	public function test_wellformed_custom_header_names_are_still_accepted(): void {
+		$_SERVER['REMOTE_ADDR']         = '8.8.8.8';
+		$_SERVER['HTTP_TRUE_CLIENT_IP'] = '203.0.113.9';
+
+		$this->assertSame( '203.0.113.9', VisitorIp::get( 'True-Client-IP' ) );
+	}
+
 	public function test_xforwardedfor_returns_first_public_ip_and_skips_private(): void {
 		// The list is scanned left to right; private/reserved entries are
 		// skipped and the first public IP is returned.

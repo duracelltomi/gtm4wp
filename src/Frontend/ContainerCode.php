@@ -144,24 +144,19 @@ final class ContainerCode {
 		// Load in the global variables from the gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter.
 		$added_global_js_vars = (array) apply_filters( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array() );
 		foreach ( $added_global_js_vars as $js_var_name => $js_var_value ) {
-			if ( is_string( $js_var_value ) ) {
-				$js_var_value = "'" . esc_js( $js_var_value ) . "'";
-			}
-
-			if ( is_bool( $js_var_value ) || ( empty( $js_var_value ) && ( 0 !== $js_var_value ) ) ) {
-				$js_var_value = $js_var_value ? 'true' : 'false';
-			}
-
-			if ( is_array( $js_var_value ) ) {
-				$js_var_value = wp_json_encode( $js_var_value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
-			}
-
-			if ( is_null( $js_var_value ) ) {
-				$js_var_value = 'null';
+			// The name becomes a `const <name>` declaration, so anything that is not
+			// a valid JavaScript identifier is a syntax error that would kill this
+			// whole <script> block - including the data layer initialization above
+			// it. esc_js() does not validate identifiers (it would happily emit
+			// `const foo\' = ...`), so the name is allow-listed here instead and a
+			// non-conforming entry is skipped rather than allowed to break the page.
+			$js_var_name = (string) $js_var_name;
+			if ( ! preg_match( '/^[A-Za-z_$][A-Za-z0-9_$]*$/', $js_var_name ) ) {
+				continue;
 			}
 
 			$_gtm_top_content .= '
-	const ' . esc_js( $js_var_name ) . ' = ' . $js_var_value . ';';
+	const ' . $js_var_name . ' = ' . self::global_var_literal( $js_var_value ) . ';';
 		}
 
 		/**
@@ -194,6 +189,43 @@ final class ContainerCode {
 				return $_gtm_top_content;
 			}
 		}
+	}
+
+	/**
+	 * Renders one GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY value as a JavaScript literal.
+	 *
+	 * Dispatches on the ACTUAL type, in order. The previous chain of independent
+	 * `if`s tested `empty( $value ) && 0 !== $value` before the array and null
+	 * branches, which swallowed three types and rewrote them all to `false`:
+	 * null (should be `null`), an empty array (should be `[]`) and the float 0.0
+	 * (should be `0`, since `0 !== 0.0` is true under strict comparison). That
+	 * also made the trailing is_null() branch unreachable - it could never see a
+	 * null, because the empty() test had already turned it into the string
+	 * 'false'. Third-party integrators use this filter, so those were live bugs.
+	 *
+	 * @param mixed $value The filter-supplied value.
+	 * @return string A JavaScript literal, safe for an inline <script> body.
+	 */
+	private static function global_var_literal( $value ): string {
+		if ( is_null( $value ) ) {
+			return 'null';
+		}
+
+		if ( is_bool( $value ) ) {
+			return $value ? 'true' : 'false';
+		}
+
+		if ( is_array( $value ) ) {
+			return (string) wp_json_encode( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+		}
+
+		if ( is_int( $value ) || is_float( $value ) ) {
+			return (string) wp_json_encode( $value );
+		}
+
+		// Everything else is rendered as a quoted string, keeping the 1.x output
+		// shape ('single quotes', esc_js escaped) for the string case.
+		return "'" . esc_js( is_scalar( $value ) ? (string) $value : '' ) . "'";
 	}
 
 	/**
@@ -595,6 +627,19 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			return '';
 		}
 
+		// Re-validate at the output sink (PA-2), not just on save: these values
+		// also reach the row from a 1.x migration and from the
+		// GTM4WP_HARDCODED_GTM_ENV_* wp-config constants, neither of which went
+		// through the admin schema sanitizer. A stray & would otherwise inject
+		// extra query parameters into the container loader URL and the noscript
+		// iframe src. Malformed values are dropped whole (both parameters are
+		// meaningless alone) - Notices warns the admin so this is never silent.
+		if ( ! preg_match( ContainerRows::AUTH_PATTERN, $gtm_auth )
+			|| ! preg_match( ContainerRows::PREVIEW_PATTERN, $gtm_preview )
+		) {
+			return '';
+		}
+
 		return '&gtm_auth=' . esc_attr( $gtm_auth ) . '&gtm_preview=' . esc_attr( $gtm_preview ) . '&gtm_cookies_win=x';
 	}
 
@@ -648,7 +693,9 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 		$custom_path      = (string) ( $container[ ContainerRows::COLUMN_PATH ] ?? '' );
 		$_gtm_domain_path = ( '' === $custom_path ) ? 'gtm.js' : $custom_path;
 
-		if ( ! preg_match( '/^[a-zA-Z0-9\.\-\_\/]+$/', $_gtm_domain_path ) ) {
+		// Use the shared constant rather than a retyped copy: this allow-list is
+		// security relevant, and the inline duplicate had already drifted from it.
+		if ( ! preg_match( ContainerRows::PATH_PATTERN, $_gtm_domain_path ) ) {
 			return 'gtm.js';
 		}
 

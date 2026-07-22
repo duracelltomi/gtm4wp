@@ -115,6 +115,30 @@ final class Notices {
 			}
 		}
 
+		// A malformed GTM4WP_HARDCODED_* constant in wp-config.php is ignored while
+		// the options are built, which is invisible from the outside: the operator
+		// sees a container that quietly disregards their wp-config and has nothing
+		// to search for. Name the offending constant instead. Not dismissible - it
+		// stays until wp-config is fixed, exactly like the incomplete-environment
+		// notice above.
+		$hardcoded_errors = $this->options->hardcoded_errors();
+		if ( array() !== $hardcoded_errors ) {
+			echo '<div class="gtm4wp-notice notice notice-error" data-href="?invalid-hardcoded-constant"><p><strong>';
+			printf(
+				esc_html(
+					/* translators: %s: comma separated list of wp-config.php constant names that hold an invalid value. */
+					_n(
+						'The value of %s in your wp-config.php file is invalid and has been ignored. Please correct it, otherwise your Google Tag Manager container will not use the setting you configured there.',
+						'The values of %s in your wp-config.php file are invalid and have been ignored. Please correct them, otherwise your Google Tag Manager container will not use the settings you configured there.',
+						count( $hardcoded_errors ),
+						'duracelltomi-google-tag-manager'
+					)
+				),
+				esc_html( implode( ', ', $hardcoded_errors ) )
+			);
+			echo '</strong></p></div>';
+		}
+
 		if ( function_exists( 'is_plugin_active' ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {
 			if ( ( false === $dismisses['wc-ga-plugin-warning'] ) && is_plugin_active( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
 				echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';

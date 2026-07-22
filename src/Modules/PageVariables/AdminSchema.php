@@ -156,7 +156,15 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Post Terms', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include taxonomy values associated with a given post.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include taxonomy values associated with a given post, in the pagePostTerms data layer variable. Custom fields are a separate option below.', 'duracelltomi-google-tag-manager' ),
+				group: 'post'
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_POSTMETA,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Post custom fields (meta)', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the custom fields (post meta) of the current post in the pagePostTerms.meta data layer variable. Read this before enabling it: this publishes EVERY custom field whose name does not start with an underscore, together with its value, into the data layer of the public page, where any visitor can read it. That includes fields created by other plugins and themes - Advanced Custom Fields stores its values this way - so it may expose internal notes, ids, prices or contact details you did not intend to make public. Review your custom fields first, and use the gtm4wp_post_meta_in_datalayer filter to exclude individual keys. Until 2.0 this data was sent as part of the "Post Terms" option above; if you had that enabled, this option was turned on for you during the upgrade so your Google Tag Manager setup keeps working.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(

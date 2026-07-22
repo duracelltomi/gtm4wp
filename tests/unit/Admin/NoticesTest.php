@@ -44,6 +44,11 @@ final class NoticesTest extends TestCase {
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'esc_url_raw' )->returnArg();
 		Functions\when( 'get_current_user_id' )->justReturn( 1 );
+		// Brain Monkey's stubTranslationFunctions() does not cover _n(); the
+		// malformed-constant notice uses it for its singular/plural forms.
+		Functions\when( '_n' )->alias(
+			static fn ( $single, $plural, $number ) => ( 1 === (int) $number ? $single : $plural )
+		);
 		// Empty stored meta -> user_dismisses() returns the defaults.
 		Functions\when( 'get_user_meta' )->justReturn( '' );
 		Functions\when( 'wp_json_encode' )->alias(
@@ -205,6 +210,41 @@ final class NoticesTest extends TestCase {
 		$output = (string) ob_get_clean();
 
 		$this->assertStringNotContainsString( 'enter-gtm-code', $output, 'A dismissed notice must not render.' );
+	}
+
+	/**
+	 * A malformed GTM4WP_HARDCODED_* constant is ignored while the options are
+	 * built, which is invisible from the outside - the operator sees a container
+	 * that disregards their wp-config and has nothing to search for. The notice
+	 * must name the offending constant so the cause is findable.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_show_notices_warns_about_malformed_hardcoded_constants(): void {
+		// The real integration: a typo'd wp-config constant, rejected by Options,
+		// surfaced by the notice. 'oops preview' matches neither PREVIEW_PATTERN
+		// nor anything else the settings screen would accept.
+		define( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', 'oops preview' );
+
+		$notices = $this->make_notices_with_options( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'invalid-hardcoded-constant', $output );
+		$this->assertStringContainsString( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', $output, 'The offending constant is named.' );
+		$this->assertStringContainsString( 'wp-config.php', $output, 'The operator is told where to fix it.' );
+	}
+
+	public function test_show_notices_silent_when_hardcoded_constants_are_valid(): void {
+		$notices = $this->make_notices_with_options( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'invalid-hardcoded-constant', $output );
 	}
 
 	public function test_show_notices_warns_on_incomplete_container_env_config(): void {

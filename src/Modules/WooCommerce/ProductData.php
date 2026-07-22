@@ -32,6 +32,27 @@ final class ProductData {
 	public const PENDING_PURCHASE_SESSION_KEY = 'gtm4wp_pending_purchase';
 
 	/**
+	 * Name of the browser-side duplicate-purchase guard, stored in localStorage
+	 * (falling back to a cookie) and read back here.
+	 *
+	 * THE VALUE IS THE ORDER NUMBER, VERBATIM - not the order id, and not escaped.
+	 * Three places touch this key and they must agree byte for byte, or the guard
+	 * silently stops matching and a purchase is counted twice:
+	 *
+	 * 1. PageDataLayer::purchase_dedupe_guard() - the inline JS on the
+	 *    order-received page (writes it with wp_json_encode, so the value is raw).
+	 * 2. js/frontend/gtm4wp-visitor-data.js (ORDER_TRACKED_KEY) - the cache-safe
+	 *    reliable-purchase fallback (writes String(payload.orderNumber), raw).
+	 * 3. is_purchase_already_tracked() below - the server-side read.
+	 *
+	 * On a default WooCommerce install the order number IS the numeric order id, so
+	 * every spelling coincides and a mismatch stays invisible; it only surfaces on
+	 * stores using a sequential/prefixed order-number plugin, or an order number
+	 * containing a character an escaper would rewrite.
+	 */
+	public const ORDER_TRACKED_COOKIE = 'gtm4wp_orderid_tracked';
+
+	/**
 	 * Contexts (process_product $attributes_used_for values) whose output is
 	 * built on pages/requests that are never full-page cached, so the list
 	 * attribution cookie may be merged server-side there without making cacheable
@@ -737,10 +758,19 @@ final class ProductData {
 			return true;
 		}
 
-		if ( isset( $_COOKIE['gtm4wp_orderid_tracked'] ) ) {
-			$tracked_order_id = filter_var( wp_unslash( $_COOKIE['gtm4wp_orderid_tracked'] ), FILTER_VALIDATE_INT );
+		if ( isset( $_COOKIE[ self::ORDER_TRACKED_COOKIE ] ) ) {
+			// The browser writes the order NUMBER here (see the constant's doc
+			// block), so compare against that. The previous FILTER_VALIDATE_INT
+			// read compared it to the order ID instead, which silently never
+			// matched on any store whose order numbers are not the plain id
+			// (sequential/prefixed order-number plugins). The order id is still
+			// accepted as a fallback so guards written by an older version - and
+			// the default install where number == id - keep working.
+			$tracked = sanitize_text_field( wp_unslash( $_COOKIE[ self::ORDER_TRACKED_COOKIE ] ) );
 
-			if ( $tracked_order_id && ( $tracked_order_id === $order_id ) ) {
+			if ( '' !== $tracked
+				&& ( (string) $order->get_order_number() === $tracked || (string) $order_id === $tracked )
+			) {
 				return true;
 			}
 		}

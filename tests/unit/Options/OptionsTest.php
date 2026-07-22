@@ -153,13 +153,15 @@ final class OptionsTest extends TestCase {
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_hardcoded_env_parameters_override_stored_values(): void {
+		// Values matching the same patterns the settings screen enforces
+		// (AUTH_PATTERN / PREVIEW_PATTERN); a real gtm_preview is 'env-<number>'.
 		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', 'hard-auth' );
-		define( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', 'hard-preview' );
+		define( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', 'env-42' );
 
 		Functions\when( 'get_option' )->justReturn(
 			array(
 				GTM4WP_OPTION_ENV_GTM_AUTH    => 'stored-auth',
-				GTM4WP_OPTION_ENV_GTM_PREVIEW => 'stored-preview',
+				GTM4WP_OPTION_ENV_GTM_PREVIEW => 'env-7',
 				GTM4WP_OPTION_GTM_CODE        => 'GTM-A,GTM-B',
 			)
 		);
@@ -167,8 +169,65 @@ final class OptionsTest extends TestCase {
 		$options = new Options( self::DEFAULTS );
 
 		$this->assertSame( 'hard-auth', $options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) );
-		$this->assertSame( 'hard-preview', $options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) );
+		$this->assertSame( 'env-42', $options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) );
 		$this->assertSame( 'GTM-A', $options->get( GTM4WP_OPTION_GTM_CODE ), 'Env parameters limit output to the first container.' );
+		$this->assertSame( array(), $options->hardcoded_errors(), 'Valid hard coded values produce no error.' );
+	}
+
+	/**
+	 * A malformed GTM4WP_HARDCODED_GTM_ENV_* constant must be ignored (it would
+	 * otherwise put an unvalidated value into every container's loader URL, unlike
+	 * its stored sibling which the admin schema validates) AND be reported, so the
+	 * operator is not left debugging a silently discarded wp-config setting.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_malformed_hardcoded_env_parameters_are_rejected_and_reported(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', 'bad auth&value' );
+		define( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', 'not-an-env-value' );
+
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				GTM4WP_OPTION_ENV_GTM_AUTH    => 'stored-auth',
+				GTM4WP_OPTION_ENV_GTM_PREVIEW => 'env-7',
+				GTM4WP_OPTION_GTM_CODE        => 'GTM-A',
+			)
+		);
+
+		$options = new Options( self::DEFAULTS );
+
+		// Rejected: the stored values survive untouched.
+		$this->assertSame( 'stored-auth', $options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) );
+		$this->assertSame( 'env-7', $options->get( GTM4WP_OPTION_ENV_GTM_PREVIEW ) );
+
+		// Reported: both offending constant names are named for the admin notice.
+		$this->assertSame(
+			array( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ),
+			$options->hardcoded_errors()
+		);
+	}
+
+	/**
+	 * An empty hard coded environment value is a deliberate "clear the
+	 * environment", not a typo, so it must be applied rather than reported.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_empty_hardcoded_env_parameter_clears_without_error(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', '' );
+
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				GTM4WP_OPTION_ENV_GTM_AUTH    => 'stored-auth',
+				GTM4WP_OPTION_ENV_GTM_PREVIEW => 'env-7',
+				GTM4WP_OPTION_GTM_CODE        => 'GTM-A',
+			)
+		);
+
+		$options = new Options( self::DEFAULTS );
+
+		$this->assertSame( '', $options->get( GTM4WP_OPTION_ENV_GTM_AUTH ) );
+		$this->assertSame( array(), $options->hardcoded_errors() );
 	}
 
 	public function test_stored_container_rows_expose_legacy_mirrors(): void {

@@ -40,6 +40,11 @@ final class PurchaseTrackingTest extends TestCase {
 		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => $content );
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
+		// Used by the order-tracked cookie read in is_purchase_already_tracked().
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => is_scalar( $value ) ? trim( wp_strip_all_tags( (string) $value ) ) : ''
+		);
+		Functions\when( 'wp_strip_all_tags' )->alias( static fn ( $value ) => strip_tags( (string) $value ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
 		Functions\when( 'current_theme_supports' )->justReturn( true );
 		Functions\when( 'is_order_received_page' )->justReturn( false );
 
@@ -253,6 +258,43 @@ final class PurchaseTrackingTest extends TestCase {
 
 		$this->assertStringNotContainsString( 'purchase', $output, 'An order id matching the browser cookie must be treated as already tracked.' );
 	}
+
+	/**
+	 * The gtm4wp_orderid_tracked cookie carries the order NUMBER - that is what
+	 * both the inline order-received guard and gtm4wp-visitor-data.js write into
+	 * it. The server-side read used to parse it with FILTER_VALIDATE_INT and
+	 * compare it to the order ID, so on any store whose order numbers are not the
+	 * plain id (a sequential/prefixed order-number plugin) the cookie leg of the
+	 * guard silently never matched and the purchase could be counted twice.
+	 */
+	public function test_skips_order_matching_tracked_cookie_with_a_prefixed_order_number(): void {
+		$_COOKIE['gtm4wp_orderid_tracked'] = 'WC-1001';
+
+		$output = $this->run_thankyou(
+			array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ),
+			$this->make_order( array( 'order_number' => 'WC-1001' ) ),
+			1001
+		);
+
+		$this->assertStringNotContainsString( 'purchase', $output, 'A non-numeric order number matching the browser cookie must be treated as already tracked.' );
+	}
+
+	/**
+	 * The negative half: a cookie holding a DIFFERENT order number must not
+	 * suppress this order's purchase.
+	 */
+	public function test_tracks_order_when_the_cookie_holds_another_order_number(): void {
+		$_COOKIE['gtm4wp_orderid_tracked'] = 'WC-2002';
+
+		$output = $this->run_thankyou(
+			array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ),
+			$this->make_order( array( 'order_number' => 'WC-1001' ) ),
+			1001
+		);
+
+		$this->assertStringContainsString( 'purchase', $output, 'A cookie for a different order must not suppress this purchase.' );
+	}
+
 
 	/**
 	 * Stubs WC() to return a store with a session that records set() calls.

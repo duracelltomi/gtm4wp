@@ -228,7 +228,10 @@ final class Helpers {
 	 * sanitized values are returned RAW (not entity-encoded) so the downstream
 	 * wp_json_encode() dataLayer sink can escape them once and correctly. A
 	 * malformed, non-JSON or oversized cookie yields an empty map, and no more
-	 * than LIST_ATTRIBUTION_MAX_ENTRIES entries are ever processed.
+	 * than LIST_ATTRIBUTION_MAX_ENTRIES entries are ever ACCEPTED. Note that the
+	 * loop still visits every decoded entry, so the bound on the work done is the
+	 * LIST_ATTRIBUTION_COOKIE_MAX_BYTES cap above (a few hundred entries at most),
+	 * not the entry cap - keep that byte cap if you ever relax the entry cap.
 	 *
 	 * @return array<int, array{item_list_name: string, item_list_id: string}>
 	 */

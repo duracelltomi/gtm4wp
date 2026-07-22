@@ -40,6 +40,18 @@ final class Options {
 	private array $values;
 
 	/**
+	 * Names of the GTM4WP_HARDCODED_* wp-config constants that were defined but
+	 * malformed, and were therefore ignored while building the container rows.
+	 *
+	 * A silently discarded constant is very hard to diagnose from the outside -
+	 * the site operator sees a container that ignores their wp-config - so the
+	 * admin notices read this list and tell them exactly which constant is wrong.
+	 *
+	 * @var string[]
+	 */
+	private array $hardcoded_errors = array();
+
+	/**
 	 * Constructor. Loads and normalizes all options with a single
 	 * get_option() call.
 	 *
@@ -76,15 +88,36 @@ final class Options {
 				$gtmid_haserror = $gtmid_haserror || ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id );
 			}
 
-			if ( ! $gtmid_haserror ) {
+			if ( $gtmid_haserror ) {
+				$this->hardcoded_errors[] = 'GTM4WP_HARDCODED_GTM_ID';
+			} else {
 				$rows = ContainerRows::for_hardcoded_ids( $gtmid_list, $rows );
 			}
 		}
 
 		// The hard coded environment parameters are site wide overrides:
 		// they replace the environment values of every row.
+		//
+		// Validated against the same patterns the settings screen enforces, so a
+		// typo in wp-config.php cannot put a malformed value into every container's
+		// loader URL - the container ID above has always been validated this way
+		// and these two were the inconsistent siblings. A rejected constant is
+		// recorded in $hardcoded_errors so Notices can tell the operator which one
+		// is wrong instead of leaving them to debug a silently ignored setting.
 		$hardcoded_auth    = defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ? (string) constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) : null;
 		$hardcoded_preview = defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ? (string) constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) : null;
+
+		// An empty string is a deliberate "clear the environment", not a typo, so
+		// only non-empty values are pattern checked.
+		if ( ( null !== $hardcoded_auth ) && ( '' !== $hardcoded_auth ) && ! preg_match( ContainerRows::AUTH_PATTERN, $hardcoded_auth ) ) {
+			$this->hardcoded_errors[] = 'GTM4WP_HARDCODED_GTM_ENV_AUTH';
+			$hardcoded_auth           = null;
+		}
+
+		if ( ( null !== $hardcoded_preview ) && ( '' !== $hardcoded_preview ) && ! preg_match( ContainerRows::PREVIEW_PATTERN, $hardcoded_preview ) ) {
+			$this->hardcoded_errors[] = 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW';
+			$hardcoded_preview        = null;
+		}
 
 		if ( ( null !== $hardcoded_auth ) || ( null !== $hardcoded_preview ) ) {
 			foreach ( $rows as &$one_row ) {
@@ -121,6 +154,17 @@ final class Options {
 	 */
 	public function get( string $key, $fallback = null ) {
 		return array_key_exists( $key, $this->values ) ? $this->values[ $key ] : $fallback;
+	}
+
+	/**
+	 * Returns the names of the GTM4WP_HARDCODED_* wp-config constants that were
+	 * defined but malformed, and were ignored as a result. Empty when everything
+	 * hard coded is valid (the common case).
+	 *
+	 * @return string[]
+	 */
+	public function hardcoded_errors(): array {
+		return $this->hardcoded_errors;
 	}
 
 	/**

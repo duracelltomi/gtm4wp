@@ -565,6 +565,69 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( 'gtm4wp_orderid_tracked', $this->inline_js, 'The browser dedupe guard is emitted by default.' );
 	}
 
+	/**
+	 * The guard writes the order number VERBATIM, so it stays byte compatible with
+	 * the copy gtm4wp-visitor-data.js writes to the SAME localStorage/cookie key.
+	 * It used to be esc_js()'d - an encoding (PA-4: esc_js is for HTML-attribute
+	 * JS, not a raw <script> body) that rewrote &, " and < into entities this
+	 * inline-script path never decodes, so the two guards stored different bytes
+	 * for the same order and stopped recognising each other's entries.
+	 */
+	public function test_purchase_dedupe_guard_stores_the_order_number_verbatim(): void {
+		$order = $this->make_recent_order( array( 'order_number' => 'A&B-1001' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		// Built with the same encoder the source uses, never hand-typed: the & is
+		// emitted as the JSON/JS escape &, which the JavaScript engine
+		// resolves while parsing the string literal - so the value actually stored
+		// is the raw "A&B-1001", byte-identical to what gtm4wp-visitor-data.js
+		// writes to this key. The old esc_js() form produced "A&amp;B-1001", an
+		// HTML entity that stays literal inside a <script> and was therefore
+		// stored, and compared, as itself.
+		$expected = wp_json_encode( 'A&B-1001', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		$this->assertStringContainsString(
+			'window.localStorage.setItem( "gtm4wp_orderid_tracked", ' . $expected . ' )',
+			$this->inline_js,
+			'The order number must be stored as a JSON string literal that resolves to the raw value.'
+		);
+		$this->assertStringContainsString(
+			'( ' . $expected . ' == gtm4wp_orderid_tracked )',
+			$this->inline_js,
+			'The comparison operand must use the same encoding as the stored value.'
+		);
+		$this->assertStringNotContainsString( 'A&amp;B-1001', $this->inline_js, 'The esc_js entity form must not come back.' );
+	}
+
+	/**
+	 * The same value is also the comparison operand, and it is JSON-encoded with
+	 * the full hex flag set (RI-2), so an order number carrying a break-out
+	 * sequence cannot escape the inline script.
+	 */
+	public function test_purchase_dedupe_guard_hex_encodes_a_hostile_order_number(): void {
+		$order = $this->make_recent_order( array( 'order_number' => 'ORD</script>' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( 'ORD\u003', $this->inline_js, 'The < must be hex-encoded (JSON_HEX_TAG) in the dedupe guard.' );
+		$this->assertStringNotContainsString( 'ORD</script>', $this->inline_js, 'The raw </script> must never appear in the dedupe guard.' );
+	}
+
 	public function test_purchase_dedupe_guard_skipped_when_do_not_flag_option_is_on(): void {
 		// #369: with "Do not flag orders as being tracked" on, the plugin must not
 		// remember the order anywhere - so the browser-side gtm4wp_orderid_tracked

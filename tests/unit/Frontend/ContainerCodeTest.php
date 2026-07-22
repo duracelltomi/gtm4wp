@@ -765,9 +765,11 @@ final class ContainerCodeTest extends FrontendTestCase {
 				array(
 					'stringVar' => 'text',
 					'boolVar'   => true,
+					'falseVar'  => false,
 					'arrayVar'  => array( 1, 2 ),
 					'nullVar'   => null,
 					'zeroVar'   => 0,
+					'floatVar'  => 1.5,
 				)
 			);
 
@@ -779,11 +781,86 @@ final class ContainerCodeTest extends FrontendTestCase {
 
 		$this->assertStringContainsString( "const stringVar = 'text';", $output );
 		$this->assertStringContainsString( 'const boolVar = true;', $output );
+		$this->assertStringContainsString( 'const falseVar = false;', $output );
 		$this->assertStringContainsString( 'const arrayVar = [1,2];', $output );
-		// 1.x parity: null values hit the empty() branch before the is_null()
-		// branch, so they render as false, not null.
-		$this->assertStringContainsString( 'const nullVar = false;', $output );
+		$this->assertStringContainsString( 'const nullVar = null;', $output );
 		$this->assertStringContainsString( 'const zeroVar = 0;', $output );
+		$this->assertStringContainsString( 'const floatVar = 1.5;', $output );
+	}
+
+	/**
+	 * Regression: an earlier `empty( $v ) && 0 !== $v` test ran before the array
+	 * and null branches and swallowed three distinct types into the JS literal
+	 * `false` - which also made the trailing is_null() branch unreachable. Each
+	 * type must now render as itself; asserted in both directions so a relapse
+	 * into `false` fails rather than merely missing the right value.
+	 */
+	public function test_header_top_renders_falsy_global_vars_as_their_own_type(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY )
+			->once()
+			->andReturn(
+				array(
+					'nullVar'       => null,
+					'emptyArrayVar' => array(),
+					'floatZeroVar'  => 0.0,
+					'emptyStrVar'   => '',
+				)
+			);
+
+		$container = $this->make_container();
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'const nullVar = null;', $output );
+		$this->assertStringNotContainsString( 'const nullVar = false;', $output );
+
+		$this->assertStringContainsString( 'const emptyArrayVar = [];', $output );
+		$this->assertStringNotContainsString( 'const emptyArrayVar = false;', $output );
+
+		$this->assertStringContainsString( 'const floatZeroVar = 0;', $output );
+		$this->assertStringNotContainsString( 'const floatZeroVar = false;', $output );
+
+		$this->assertStringContainsString( "const emptyStrVar = '';", $output );
+		$this->assertStringNotContainsString( 'const emptyStrVar = false;', $output );
+	}
+
+	/**
+	 * A filter-supplied name that is not a valid JavaScript identifier would emit
+	 * a `const <junk> = ...` declaration and throw a SyntaxError that kills the
+	 * whole head block - including the data layer initialization. Such entries are
+	 * skipped; valid siblings in the same array must still be rendered.
+	 */
+	public function test_header_top_skips_global_vars_with_invalid_js_identifiers(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY )
+			->once()
+			->andReturn(
+				array(
+					"quo'te"     => 'bad',
+					'has space'  => 'bad',
+					'1leading'   => 'bad',
+					'</script>'  => 'bad',
+					'goodVar'    => 'kept',
+					'_under$var' => 'kept',
+				)
+			);
+
+		$container = $this->make_container();
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( "const goodVar = 'kept';", $output );
+		$this->assertStringContainsString( "const _under\$var = 'kept';", $output );
+
+		$this->assertStringNotContainsString( 'bad', $output );
+		$this->assertStringNotContainsString( 'has space', $output );
+		$this->assertStringNotContainsString( '1leading', $output );
+		// The data layer initialization the malformed declaration would have
+		// broken is still intact.
+		$this->assertStringContainsString( 'var dataLayer = dataLayer || [];', $output );
 	}
 
 	public function test_header_top_suppressed_on_amp_requests(): void {

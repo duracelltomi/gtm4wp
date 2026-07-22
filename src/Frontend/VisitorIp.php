@@ -37,7 +37,10 @@ final class VisitorIp {
 
 		if ( '' !== $use_custom_header ) {
 			$custom_header = strtoupper( str_replace( '-', '_', $use_custom_header ) );
-			if ( preg_match( '/[A-Z0-9_]+/', $custom_header ) ) {
+			// Anchored on purpose: the unanchored version this replaces matched any
+			// string CONTAINING one allowed character, so it accepted every input and
+			// validated nothing.
+			if ( preg_match( '/^[A-Z0-9_]+$/', $custom_header ) ) {
 				$custom_header = 'HTTP_' . $custom_header;
 			} else {
 				$custom_header = '';

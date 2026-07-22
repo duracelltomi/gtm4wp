@@ -108,20 +108,24 @@ final class Plugin {
 	}
 
 	/**
-	 * Returns the module registry.
+	 * Returns the module registry, or null before boot() has run.
 	 *
-	 * @return Registry
+	 * Nullable like frontend() below: both are built in boot(), so a caller that
+	 * runs earlier than plugins_loaded would otherwise get a TypeError from the
+	 * return type instead of a value it can test.
+	 *
+	 * @return Registry|null
 	 */
-	public function registry(): Registry {
+	public function registry(): ?Registry {
 		return $this->registry;
 	}
 
 	/**
-	 * Returns the options service.
+	 * Returns the options service, or null before boot() has run.
 	 *
-	 * @return Options
+	 * @return Options|null
 	 */
-	public function options(): Options {
+	public function options(): ?Options {
 		return $this->options;
 	}
 

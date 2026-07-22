@@ -54,6 +54,7 @@ final class PageVariablesModule extends AbstractModule {
 			GTM4WP_OPTION_INCLUDE_POSTID            => false,
 			GTM4WP_OPTION_INCLUDE_POSTFORMAT        => false,
 			GTM4WP_OPTION_INCLUDE_POSTTERMLIST      => false,
+			GTM4WP_OPTION_INCLUDE_POSTMETA          => false,
 			GTM4WP_OPTION_INCLUDE_SEARCHDATA        => false,
 			GTM4WP_OPTION_INCLUDE_LOGGEDIN          => false,
 			GTM4WP_OPTION_INCLUDE_USERROLE          => false,
@@ -344,48 +345,63 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pagePostDateUnix'] = (int) get_the_date( 'U' );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST ) && null !== $post ) {
+			// Taxonomy terms and post meta are two separate opt-ins since 2.0: the
+			// single "Post Terms" option used to emit both while its description
+			// named only the taxonomies, so enabling taxonomy tracking silently
+			// published every public custom field to the page. They still share the
+			// pagePostTerms container so existing GTM setups keep their variable
+			// paths (taxonomies at pagePostTerms.<taxonomy>, meta at
+			// pagePostTerms.meta); Migration seeds the meta option from the legacy
+			// one, so an upgrading site keeps sending exactly what it sent before.
+			$include_post_terms = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST );
+			$include_post_meta  = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA );
+
+			if ( ( $include_post_terms || $include_post_meta ) && null !== $post ) {
 				$data_layer['pagePostTerms'] = array();
 
-				$object_taxonomies = get_object_taxonomies( get_post_type() );
+				if ( $include_post_terms ) {
+					$object_taxonomies = get_object_taxonomies( get_post_type() );
 
-				foreach ( $object_taxonomies as $one_object_taxonomy ) {
-					$post_taxonomy_values = get_the_terms( $post->ID, $one_object_taxonomy );
-					if ( is_array( $post_taxonomy_values ) ) {
-						$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
-						foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
-							$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = $one_taxonomy_value->name;
+					foreach ( $object_taxonomies as $one_object_taxonomy ) {
+						$post_taxonomy_values = get_the_terms( $post->ID, $one_object_taxonomy );
+						if ( is_array( $post_taxonomy_values ) ) {
+							$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
+							foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
+								$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = $one_taxonomy_value->name;
+							}
 						}
 					}
 				}
 
-				$post_meta = get_post_meta( $post->ID );
-				if ( is_array( $post_meta ) ) {
-					$data_layer['pagePostTerms']['meta'] = array();
-					foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
-						if ( '_' !== substr( $post_meta_key, 0, 1 ) ) {
+				if ( $include_post_meta ) {
+					$post_meta = get_post_meta( $post->ID );
+					if ( is_array( $post_meta ) ) {
+						$data_layer['pagePostTerms']['meta'] = array();
+						foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
+							if ( '_' !== substr( $post_meta_key, 0, 1 ) ) {
 
-							/**
-							 * Applies a filter to determine if post meta should be included in the data layer.
-							 * This allows other plugins or themes to modify whether post meta should be included
-							 * in the data layer.
-							 *
-							 * @since 1.17
-							 *
-							 * @param bool $true_false_default The default value (true).
-							 * @param string $post_meta_key The name of the post meta key to be included in the data layer.
-							 *
-							 * @return bool Whether to include this post meta in the data layer.
-							 */
-							$include_post_meta_in_datalayer = (bool) apply_filters( 'gtm4wp_post_meta_in_datalayer', true, $post_meta_key );
+								/**
+								 * Applies a filter to determine if post meta should be included in the data layer.
+								 * This allows other plugins or themes to modify whether post meta should be included
+								 * in the data layer.
+								 *
+								 * @since 1.17
+								 *
+								 * @param bool $true_false_default The default value (true).
+								 * @param string $post_meta_key The name of the post meta key to be included in the data layer.
+								 *
+								 * @return bool Whether to include this post meta in the data layer.
+								 */
+								$include_post_meta_in_datalayer = (bool) apply_filters( 'gtm4wp_post_meta_in_datalayer', true, $post_meta_key );
 
-							if ( $include_post_meta_in_datalayer ) {
-								if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
-									$post_meta_dl_value = $post_meta_value[0];
-								} else {
-									$post_meta_dl_value = $post_meta_value;
+								if ( $include_post_meta_in_datalayer ) {
+									if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
+										$post_meta_dl_value = $post_meta_value[0];
+									} else {
+										$post_meta_dl_value = $post_meta_value;
+									}
+									$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
 								}
-								$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
 							}
 						}
 					}
@@ -394,7 +410,7 @@ final class PageVariablesModule extends AbstractModule {
 
 			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) || $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) && null !== $post ) {
 				$post_content = (string) get_post_field( 'post_content', get_the_ID() );
-				$word_count   = str_word_count( wp_strip_all_tags( strip_shortcodes( $post_content ) ) );
+				$word_count   = self::count_words( wp_strip_all_tags( strip_shortcodes( $post_content ) ) );
 
 				if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) ) {
 					$data_layer['pageContentWordCount'] = (int) $word_count;
@@ -565,13 +581,31 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pageCategory'] = $this->build_category_slugs( get_the_category() );
 			}
 
-			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) && ( is_author() ) ) {
+			// is_author() reports what the main query matched, not that $authordata
+			// was set up (RI-13) - so resolve it once here and OMIT both keys when
+			// it is unavailable, instead of emitting a 0 / '' placeholder a GTM
+			// trigger would read as a real author. This mirrors how the singular
+			// author block above handles a null $post.
+			if ( is_author() ) {
 				global $authordata;
-				$data_layer['pagePostAuthorID'] = isset( $authordata->ID ) ? $authordata->ID : 0;
-			}
 
-			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) && ( is_author() ) ) {
-				$data_layer['pagePostAuthor'] = get_the_author();
+				// Read through the RI-12-safe accessor rather than isset(): the
+				// object may expose ID through __get() without __isset(). Any object
+				// carrying an id is accepted, matching the previous behavior; only
+				// the "no author at all" case changes, and it now omits.
+				$author_id = is_object( $authordata )
+					? self::read_author_prop( $authordata, 'ID', null )
+					: null;
+
+				if ( null !== $author_id && $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
+					// Typed (int) for parity with the singular path: the data layer
+					// encode no longer numeric-coerces (JSON_NUMERIC_CHECK removed).
+					$data_layer['pagePostAuthorID'] = (int) $author_id;
+				}
+
+				if ( null !== $author_id && $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
+					$data_layer['pagePostAuthor'] = get_the_author();
+				}
 			}
 		}
 
@@ -597,7 +631,9 @@ final class PageVariablesModule extends AbstractModule {
 						}
 					}
 				}
-				$data_layer['siteSearchResults'] = $wp_query->post_count;
+				// Typed (int) like postCountOnPage/postCountTotal below: all counts
+				// agree on reaching GTM as a JSON number (RI-2, type at source).
+				$data_layer['siteSearchResults'] = (int) $wp_query->post_count;
 			}
 		}
 
@@ -643,6 +679,49 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		return $data_layer;
+	}
+
+	/**
+	 * Counts the words of a plain-text string in a UTF-8 aware way.
+	 *
+	 * PHP's str_word_count() only recognizes ASCII letters plus whatever the
+	 * current locale adds, so it returns 0 for Cyrillic, Greek, Hebrew, Arabic and
+	 * CJK content and MIS-counts Latin text with diacritics ("Größe Straße Übung"
+	 * counted 5 instead of 3, because each multi-byte character split a word).
+	 * That silently made pageContentWordCount 0 and collapsed pageReadingTime to a
+	 * constant 1 minute on every non-English site.
+	 *
+	 * Two scripts are counted differently because they delimit words differently:
+	 *
+	 * - Space-delimited scripts (Latin, Cyrillic, Greek, Arabic, ...) are split on
+	 *   Unicode whitespace.
+	 * - CJK (Han, Hiragana, Katakana, Hangul) does not put spaces between words, so
+	 *   a whitespace split would report a whole Japanese article as one word. Each
+	 *   CJK character is counted as one word instead - the same approximation
+	 *   word processors use - and those characters are removed before the
+	 *   whitespace split so mixed-script content is not counted twice.
+	 *
+	 * @param string $text Plain text (tags and shortcodes already stripped).
+	 * @return int Number of words, 0 for empty/whitespace-only input.
+	 */
+	private static function count_words( string $text ): int {
+		$cjk_pattern = '/[\x{1100}-\x{11FF}\x{3040}-\x{30FF}\x{3400}-\x{4DBF}\x{4E00}-\x{9FFF}\x{A960}-\x{A97F}\x{AC00}-\x{D7FF}\x{F900}-\x{FAFF}\x{20000}-\x{2FA1F}]/u';
+
+		$cjk_count = preg_match_all( $cjk_pattern, $text );
+		if ( false === $cjk_count ) {
+			// The PCRE unicode pass failed (no UTF-8 support / invalid sequence):
+			// fall back to the historical behavior rather than reporting nothing.
+			return str_word_count( $text );
+		}
+
+		$remainder = (string) preg_replace( $cjk_pattern, ' ', $text );
+
+		$words = preg_split( '/[\p{Z}\s]+/u', trim( $remainder ), -1, PREG_SPLIT_NO_EMPTY );
+		if ( false === $words ) {
+			return $cjk_count + str_word_count( $remainder );
+		}
+
+		return $cjk_count + count( $words );
 	}
 
 	/**

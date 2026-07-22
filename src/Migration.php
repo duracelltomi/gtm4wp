@@ -72,6 +72,7 @@ final class Migration {
 	 */
 	public static function maybe_run(): void {
 		self::seed_container_rows();
+		self::seed_post_meta_option();
 
 		if ( GTM4WP_VERSION === get_option( self::VERSION_OPTION, '' ) ) {
 			return;
@@ -80,6 +81,48 @@ final class Migration {
 		self::cleanup_removed_options();
 
 		update_option( self::VERSION_OPTION, GTM4WP_VERSION, false );
+	}
+
+	/**
+	 * Seeds the post-meta option (new in 2.0) from the legacy "Post Terms"
+	 * option it was split out of.
+	 *
+	 * Until 2.0 a single option emitted BOTH the taxonomy terms and every
+	 * non-underscore-prefixed post meta value, while its description named only
+	 * the taxonomies. Splitting them gives the admin an informed choice, but the
+	 * split must not silently drop data an existing site is already sending to
+	 * Google Tag Manager - so a site that had the combined option ON gets the new
+	 * meta option turned ON as well, preserving the exact data layer it had. A
+	 * site that had it OFF gets the new option OFF.
+	 *
+	 * Runs on every admin request rather than once per version (like
+	 * seed_container_rows()) because it is self-guarded and cheap: it acts only
+	 * while the new key is absent from the stored row, so it can neither run
+	 * twice nor override the admin's own later choice. Sites that never saved
+	 * settings at all have nothing to migrate and fall through to the defaults.
+	 *
+	 * @return void
+	 */
+	private static function seed_post_meta_option(): void {
+		$stored = get_option( GTM4WP_OPTIONS, array() );
+		if ( ! is_array( $stored ) || array() === $stored ) {
+			return;
+		}
+
+		// Already migrated (or explicitly saved by the admin): never touch it again.
+		if ( array_key_exists( GTM4WP_OPTION_INCLUDE_POSTMETA, $stored ) ) {
+			return;
+		}
+
+		// No legacy value to migrate from - leave the key absent so the module
+		// default (off) applies, exactly as for a fresh install.
+		if ( ! array_key_exists( GTM4WP_OPTION_INCLUDE_POSTTERMLIST, $stored ) ) {
+			return;
+		}
+
+		$stored[ GTM4WP_OPTION_INCLUDE_POSTMETA ] = (bool) $stored[ GTM4WP_OPTION_INCLUDE_POSTTERMLIST ];
+
+		update_option( GTM4WP_OPTIONS, $stored );
 	}
 
 	/**

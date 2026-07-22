@@ -59,6 +59,13 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTCOUNT', 'include-postcount' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTID', 'include-postid' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTFORMAT', 'include-postformat' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTTERMLIST', 'include-postterms' );
+/**
+ * Split out of GTM4WP_OPTION_INCLUDE_POSTTERMLIST in 2.0: that single option used to
+ * emit BOTH the taxonomy terms and every non-underscore-prefixed post meta value, while
+ * describing only the former. The meta half now has its own opt-in; Migration seeds it
+ * from the legacy option so an upgrading site keeps the data it was already sending.
+ */
+define( 'GTM4WP_OPTION_INCLUDE_POSTMETA', 'include-postmeta' );
 define( 'GTM4WP_OPTION_INCLUDE_SEARCHDATA', 'include-searchdata' );
 define( 'GTM4WP_OPTION_INCLUDE_BROWSERDATA', 'include-browserdata' );
 define( 'GTM4WP_OPTION_INCLUDE_OSDATA', 'include-osdata' );

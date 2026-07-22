@@ -223,6 +223,7 @@ final class PageVariablesModuleTest extends TestCase {
 				GTM4WP_OPTION_INCLUDE_POSTDATE         => true,
 				GTM4WP_OPTION_INCLUDE_MODIFIEDDATE     => true,
 				GTM4WP_OPTION_INCLUDE_POSTTERMLIST     => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA         => true,
 				GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT => true,
 				GTM4WP_OPTION_INCLUDE_READINGTIME      => true,
 				GTM4WP_OPTION_INCLUDE_CONTENTAGE       => true,
@@ -606,6 +607,281 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 450, $data_layer['pageContentWordCount'] );
 		// 450 words / 200 wpm rounds up to 3 minutes.
 		$this->assertSame( 3, $data_layer['pageReadingTime'] );
+	}
+
+	/**
+	 * Regression: str_word_count() only recognizes ASCII letters, so it returned 0
+	 * for Cyrillic/CJK content (making pageContentWordCount 0 and collapsing
+	 * pageReadingTime to a constant 1 minute on every non-English site) and
+	 * over-counted Latin text with diacritics, where each multi-byte character
+	 * split a word.
+	 *
+	 * @param string $content  Post content.
+	 * @param int    $expected Expected word count.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'non_ascii_content_provider' )]
+	public function test_content_word_count_is_utf8_aware( string $content, int $expected ): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'strip_shortcodes' )->returnArg();
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+		Functions\when( 'get_post_field' )->justReturn( $content );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( $expected, $data_layer['pageContentWordCount'] );
+		// The old implementation's failure mode was a flat zero; assert it is gone
+		// explicitly so a relapse cannot pass by coincidence.
+		$this->assertNotSame( 0, $data_layer['pageContentWordCount'] );
+	}
+
+	/**
+	 * Post content in scripts PHP's str_word_count() does not handle, with the
+	 * word count a reader would give.
+	 *
+	 * @return array<string, array{0: string, 1: int}>
+	 */
+	public static function non_ascii_content_provider(): array {
+		return array(
+			'latin ascii'           => array( 'Hello world this is a test', 6 ),
+			'latin with diacritics' => array( 'Größe Straße Übung', 3 ),
+			'cyrillic'              => array( 'Привет мир это тестовая статья', 5 ),
+			'greek'                 => array( 'Καλημέρα κόσμε φίλε', 3 ),
+			'japanese'              => array( 'これはテストの記事です', 11 ),
+			'mixed latin and cjk'   => array( 'WordPress の記事', 4 ),
+		);
+	}
+
+	/**
+	 * Regression: pageReadingTime collapsed to 1 minute for every post on a
+	 * non-Latin-script site, because the word count underlying it was always 0.
+	 */
+	public function test_reading_time_is_computed_from_the_utf8_word_count(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'strip_shortcodes' )->returnArg();
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+		Functions\when( 'get_post_field' )->justReturn( implode( ' ', array_fill( 0, 450, 'слово' ) ) );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT => true,
+				GTM4WP_OPTION_INCLUDE_READINGTIME      => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 450, $data_layer['pageContentWordCount'] );
+		$this->assertSame( 3, $data_layer['pageReadingTime'], '450 Cyrillic words / 200 wpm rounds up to 3 minutes, not the 1 the ASCII-only count produced.' );
+	}
+
+	/**
+	 * The taxonomy terms and the post meta are separate opt-ins since 2.0: the
+	 * combined option published every public custom field while describing only
+	 * the taxonomies. Terms-only must emit no `meta` key at all.
+	 */
+	public function test_post_terms_option_alone_does_not_publish_post_meta(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => false,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'Fiction' ), $data_layer['pagePostTerms']['genre'] );
+		$this->assertArrayNotHasKey( 'meta', $data_layer['pagePostTerms'], 'Enabling taxonomy terms must not publish custom fields.' );
+		// The value itself must be nowhere in the payload, not merely off the key.
+		$this->assertStringNotContainsString( 'secret-internal-note', wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * The meta option alone still fills pagePostTerms.meta, so a site that had the
+	 * combined option on keeps the exact data layer shape after the migration.
+	 */
+	public function test_post_meta_option_alone_publishes_meta_without_taxonomies(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+		$this->assertArrayNotHasKey( 'genre', $data_layer['pagePostTerms'] );
+		// Protected (underscore-prefixed) meta stays out, as it always has.
+		$this->assertArrayNotHasKey( '_hidden', $data_layer['pagePostTerms']['meta'] );
+	}
+
+	/**
+	 * Both on = the pre-split payload, so an upgraded site (whose meta option the
+	 * migration seeds from the legacy one) sees an unchanged data layer.
+	 */
+	public function test_both_post_term_options_reproduce_the_combined_payload(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'Fiction' ), $data_layer['pagePostTerms']['genre'] );
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+	}
+
+	/**
+	 * With both off the container key itself is absent - no empty pagePostTerms.
+	 */
+	public function test_pagepostterms_absent_when_both_options_disabled(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => false,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'pagePostTerms', $data_layer );
+	}
+
+	/**
+	 * Shared fixture for the taxonomy/meta split tests: a singular post carrying
+	 * one taxonomy term, one public custom field and one protected one.
+	 *
+	 * @return void
+	 */
+	private function arrange_singular_terms_and_meta(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		Functions\when( 'get_object_taxonomies' )->justReturn( array( 'genre' ) );
+		Functions\when( 'get_the_terms' )->justReturn( array( (object) array( 'name' => 'Fiction' ) ) );
+		Functions\when( 'get_post_meta' )->justReturn(
+			array(
+				'internal_note' => array( 'secret-internal-note' ),
+				'_hidden'       => array( 'protected' ),
+			)
+		);
+	}
+
+	/**
+	 * TC-14 on the author archive: is_author() reports what the query matched, not
+	 * that $authordata was set up. The keys must be OMITTED when it is missing -
+	 * the previous code emitted 0 / '' placeholders a GTM trigger reads as a real
+	 * author (the same class already fixed for the singular post variables).
+	 */
+	public function test_author_archive_without_authordata_omits_author_variables(): void {
+		Functions\when( 'is_archive' )->justReturn( true );
+		Functions\when( 'is_author' )->justReturn( true );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		unset( $GLOBALS['authordata'] );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the reported PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $module->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertArrayNotHasKey( 'pagePostAuthorID', $data_layer );
+		$this->assertArrayNotHasKey( 'pagePostAuthor', $data_layer );
+	}
+
+	/**
+	 * The positive half: with $authordata present both keys are emitted, and the
+	 * id is an int like the singular path (JSON number, not a numeric string).
+	 */
+	public function test_author_archive_with_authordata_emits_typed_author_variables(): void {
+		Functions\when( 'is_archive' )->justReturn( true );
+		Functions\when( 'is_author' )->justReturn( true );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		Functions\when( 'get_the_author' )->justReturn( 'Jane Doe' );
+
+		// A numeric-string ID, as WP_User exposes it, so the (int) cast is proven.
+		$GLOBALS['authordata'] = (object) array( 'ID' => '7' );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		unset( $GLOBALS['authordata'] );
+
+		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
+		$this->assertSame( 'Jane Doe', $data_layer['pagePostAuthor'] );
 	}
 
 	public function test_modified_date_family(): void {
