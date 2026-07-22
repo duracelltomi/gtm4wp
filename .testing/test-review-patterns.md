@@ -61,6 +61,7 @@ on every review before anything else.
 - **TC-3** — extend the right base: `FrontendTestCase` for services that read `Options` (it provides the Options factory + global reset); the plain `TestCase` for pure/static helpers with no Options dependency (`VisitorIp`).
 - **TC-4** — assert hook registration via `has_action`/`has_filter` (they return the priority integer), and prove **both** the enabled and the disabled state (the `ModuleHooksTest` gate pattern).
 - **TC-13** — the Brain Monkey recipe for a TS-12 capability gate: simulate the filter with `Filters\expectApplied( 'gtm4wp_admin_page_capability' )->andReturn( 'custom_cap' )` (omit it for the default-unchanged case — `apply_filters` passes the default through), assert `current_user_can` is called `->with()` that cap for grant/deny, and capture the `add_options_page()` 3rd arg for the menu/render gate (`AdminCapabilityFilterTest`).
+- **TC-14** — code gated on a WordPress conditional tag that then reads the companion global (`is_singular()` → `$GLOBALS['post']`) ships a tag-true/global-null case: promote warnings to failures via a throwing error handler, assert the affected keys are **absent** (omission, not placeholders) and the global-independent keys still emit.
 
 **Blessed Exceptions (BE) — do NOT flag:**
 - **BE-4** — snapshotting `$_POST`/`$_GET` in a test `setUp` (for TS-7 isolation) trips `WordPress.Security.NonceVerification.Missing` (a phpcs *error*, not warning). Suppress with a scoped `// phpcs:ignore WordPress.Security.NonceVerification.Missing -- test isolation snapshot; the handler's own nonce check is asserted`.
@@ -368,6 +369,36 @@ The Brain Monkey recipe for a TS-12 gate (canonical example
   `new Registry()` (empty) keeps the test focused and skips the schema-building
   stub set the other Admin tests need.
 
+### TC-14: Conditional-tag-gated code ships a tag-true/global-null case
+Code gated on a WordPress conditional tag (`is_singular()`, `is_author()`, …)
+that then reads the companion global (`$GLOBALS['post']`, `$authordata`) gets a
+test where **the tag is true but the global is null** — the state a conflicting
+plugin or unusual template routing produces in production (security **RI-13**).
+This is the fixture-side dual of TS-13: a well-formed `$GLOBALS['post']` stdClass
+in every fixture is a double more capable than the real request state, so the
+suite stays green over a warning-raising path (the PageVariables bug shipped in
+1.22.x and survived a fully-`[x]` review matrix this way).
+
+Recipe (canonical:
+`PageVariablesModuleTest::test_singular_request_without_global_post_omits_post_variables_without_warning`):
+
+1. Stub the conditional tag true; set `$GLOBALS['post'] = null` (tearDown unsets).
+   If the source resolves via `get_post()`, alias it to `$GLOBALS['post'] ?? null`
+   in `setUp` so all fixtures keep working.
+2. Wrap the call in a `set_error_handler` that **throws** on `E_WARNING | E_NOTICE`,
+   restored in `finally`. The handler is the load-bearing part: it is what makes
+   the test fail against unguarded code — `assertArrayNotHasKey` alone can pass
+   straight over a warning-raising read (warnings are not failures by default).
+3. Assert the affected keys are **absent** — omission, never `''`/`0`/`null`
+   placeholders (a GTM trigger may test key presence) — AND that the
+   global-independent keys still emit (proves the gate is scoped, not a bail-out
+   of the whole block).
+
+Scoped `phpcs:ignore`s are accepted for the handler
+(`WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler`,
+`WordPress.Security.EscapeOutput.ExceptionNotEscaped`) with a test-only
+justification, in the BE-4 spirit.
+
 ---
 
 ## Blessed Exceptions
@@ -399,6 +430,7 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-22 (forum-reported bug) | Added **TC-14** (conditional-tag-gated code ships a tag-true/global-null case, with the throwing-error-handler recipe) after the PageVariables `$GLOBALS['post']`-on-null warning shipped in 1.22.x and survived every review and a green suite: all fixtures set a well-formed post global (the TS-13 fixture-side dual), and nothing demanded the null case. Canonical test: `PageVariablesModuleTest::test_singular_request_without_global_post_omits_post_variables_without_warning` (verified to fail pre-fix). Companion security entry: RI-13 + the Unguarded WP-global reads sweep. |
 | 2026-07-17 (security Review 7) | Added **TS-13** (a test double more capable than the real collaborator hides the bug — the dual of TS-1, about the *collaborator* not the *input*). Prompted by the security review where three of the four most serious findings were each masked by this: `WC()` stubbed wholesale hid the null REST session (#33 / PA-11), a no-op `createController` fake hid the SDK element-replacement loop (#40 / PA-9), and plain-`stdClass` author fixtures hid the `__isset` blanking (#43 / RI-12). Each fix changed the double, not just the assertion. Cross-referenced from security PA-9/PA-11/RI-12. |
 | 2026-07-15 (issue #143) | Added **TS-12** (authorization/access-control gates are their own test surface — grant+deny + the filter customizes the required cap; the XSS-first lens never prompted for it, so the untested `gtm4wp_admin_page_capability` gate hid in an `[x]` component) and **TC-13** (the Brain Monkey capability-gate recipe). Prompted by closing the #143 gap with `AdminCapabilityFilterTest`. Also added the **Access-control coverage** Test Debt Sweep to the checklist and an access-control bullet to the pre-flight + the `test-reviewer` agent + the `/test-review` command, so the lens is applied mechanically on future runs. |
 | 2026-07-15 (Run 4 — gaps closed) | Closed T21–T26 on the user's "fix all" go-ahead. **PHP 381→416, JS 214→231, all green; phpcs 0 errors; lint:js clean; tests-only (no CHANGELOG).** Two security-contract tests throwaway-probe-verified (T21 `StoreApiData` fails if `item_name` pre-escaped; T22 purchase orderData fails if JSON_HEX_AMP dropped). New process lessons reinforced: (a) the **ListTracking constructor seeds four cross-request globals** (`gtm4wp_product_counter/last_widget_title/grouped_product_ix/cart_item_proddata`) — stage per-item test state AFTER `make_list_tracking()`, not before, or the constructor clobbers it; (b) TS-11 raw-passthrough for a delegated REST sink (`StoreApiData`) is written by asserting the value round-trips the callback verbatim with `stubEscapeFunctions()` installed, so a re-added `esc_*` fails; (c) the TC-8 Plugin-singleton harness extends to `WooCommerceModule::register_frontend_hooks()` (protected → `ReflectionMethod::invoke`; needs `Frontend` with both `datalayer` and `script_tag` props). New test stub `store-api-stub.php` (fake `StoreApi`/`ExtendSchema`/schemas + `ARRAY_A`). |

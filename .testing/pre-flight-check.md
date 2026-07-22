@@ -41,6 +41,10 @@ Pay special attention to (⭐ = highest impact):
   test, this one should too.
 - **Isolate (TS-7/TS-8):** snapshot and reset `$_SERVER`/`$GLOBALS`/statics in
   `setUp`/`tearDown`; inject fixed time/IDs; never depend on test order.
+- **Tag-true/global-null case (TC-14):** code gated on a conditional tag that
+  reads the companion global (`is_singular()` → `$GLOBALS['post']`) ships a case
+  with the tag true and the global null — warnings promoted to failures via a
+  throwing error handler, affected keys asserted **absent** (not placeholders).
 - **Right harness (TC-2/TC-3/TC-4):** build expected encoded output with the same
   `wp_json_encode(... hex flags)` the source uses (never hand-type `\uXXXX`);
   extend `FrontendTestCase` for Options-backed services, the base `TestCase` for
