@@ -33,6 +33,9 @@ node_modules
 npm-debug.log*
 yarn-error.log
 
+# Python (skill helper scripts)
+__pycache__/
+
 # Build output
 /build/
 /release/
