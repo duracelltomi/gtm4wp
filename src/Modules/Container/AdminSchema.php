@@ -283,7 +283,10 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'In some cases you need to rename the dataLayer variable. You can enter your name here. Leave blank for default name: dataLayer', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
 				sanitizer: static function ( $value ) {
-					$value = trim( (string) $value );
+					// Field::to_string() keeps the cast warning-free on non-scalar
+					// import values (a custom sanitizer replaces the type-defensive
+					// default in Field::sanitize(), it does not run in front of it).
+					$value = trim( Field::to_string( $value ) );
 
 					if ( ( '' !== $value ) && ( ! preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]*$/', $value ) ) ) {
 						return new \WP_Error(
@@ -330,11 +333,13 @@ final class AdminSchema implements AdminSchemaInterface {
 				choices: $role_choices,
 				sanitizer: static function ( $value ) {
 					// The admin UI submits an array of role ids; stored as comma separated string as in 1.x.
+					// Field::to_string() per element: a crafted import can nest arrays
+					// inside the list, and sanitize_key() warns on a non-string.
 					if ( is_array( $value ) ) {
-						return implode( ',', array_map( 'sanitize_key', $value ) );
+						return implode( ',', array_map( static fn ( $one ) => sanitize_key( Field::to_string( $one ) ), $value ) );
 					}
 
-					return implode( ',', array_filter( array_map( 'sanitize_key', explode( ',', (string) $value ) ) ) );
+					return implode( ',', array_filter( array_map( 'sanitize_key', explode( ',', Field::to_string( $value ) ) ) ) );
 				}
 			),
 		);

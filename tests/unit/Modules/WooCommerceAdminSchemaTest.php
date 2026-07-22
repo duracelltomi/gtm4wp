@@ -36,6 +36,10 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
 		Functions\when( 'wc_get_order_statuses' )->justReturn( array() );
 		Functions\when( 'get_pages' )->justReturn( array() );
+
+		// The sanitizer tests below exercise Field::sanitize(); mirror core's
+		// trimming behavior the same way FieldTest does.
+		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) $value ) );
 	}
 
 	/**
@@ -162,32 +166,45 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 	}
 
 	public function test_brand_taxonomy_sanitizer_trims_and_coerces_to_string(): void {
-		// The field is a TYPE_SELECT but carries a custom sanitizer, which Field::sanitize()
-		// applies before the choice validation; it must trim surrounding whitespace and
-		// coerce a non-string to a string.
+		// The field is a TYPE_SELECT with a custom sanitizer, which REPLACES the
+		// default SELECT branch entirely (Field::sanitize() returns its result
+		// before the type-based branches run) - deliberately, so the choice
+		// allow-list built from the taxonomies registered on THIS request can
+		// never silently reset a stored brand taxonomy while its plugin happens
+		// to be inactive. That also means the sanitizer must be type-defensive
+		// itself: a non-scalar import value must collapse to '' with no warning.
 		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY );
 
 		$this->assertSame( 'x', $field->sanitize( '  x  ' ), 'Leading/trailing whitespace is trimmed from the stored taxonomy slug.' );
 		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
+		$this->assertSame( '', $field->sanitize( array( 'x' ) ), 'A non-scalar import value must collapse to "" (Field::to_string()), never "Array" plus a PHP warning.' );
 	}
 
-	public function test_transaction_id_prefix_is_an_empty_text_field_with_a_trimming_sanitizer(): void {
+	public function test_transaction_id_prefix_is_an_empty_text_field_using_the_default_sanitizer(): void {
 		// Empty by default so an upgrade keeps sending the plain WooCommerce order
-		// number as the transaction id.
+		// number as the transaction id. No custom sanitizer on purpose: the
+		// TYPE_TEXT default (sanitize_text_field over Field::to_string()) already
+		// trims and is type-defensive, while a custom one would REPLACE that
+		// guard (it does not run in front of it).
 		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX );
 
 		$this->assertSame( Field::TYPE_TEXT, $field->type );
 		$this->assertSame( '', $field->default_value );
 		$this->assertSame( 'purchase', $field->group );
+		$this->assertNull( $field->sanitizer, 'The TYPE_TEXT default must apply - a custom sanitizer would bypass the type-defensive Field::to_string().' );
 		$this->assertSame( 'x-', $field->sanitize( '  x-  ' ), 'Leading/trailing whitespace is trimmed from the prefix.' );
 		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
+		$this->assertSame( '', $field->sanitize( array( 'x' ) ), 'A non-scalar import value must collapse to "", never "Array" plus a PHP warning.' );
 	}
 
-	public function test_remarketing_id_prefix_sanitizer_trims_and_coerces_to_string(): void {
-		// The product-ID-prefix field defines the same trim((string)$value) sanitizer.
+	public function test_remarketing_id_prefix_is_a_text_field_using_the_default_sanitizer(): void {
+		// Same contract as the transaction-id prefix: the TYPE_TEXT default
+		// sanitizer already provides the trimming the old custom one did.
 		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX );
 
+		$this->assertNull( $field->sanitizer, 'The TYPE_TEXT default must apply - a custom sanitizer would bypass the type-defensive Field::to_string().' );
 		$this->assertSame( 'x', $field->sanitize( '  x  ' ), 'Leading/trailing whitespace is trimmed from the product ID prefix.' );
 		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
+		$this->assertSame( '', $field->sanitize( array( 'x' ) ), 'A non-scalar import value must collapse to "", never "Array" plus a PHP warning.' );
 	}
 }

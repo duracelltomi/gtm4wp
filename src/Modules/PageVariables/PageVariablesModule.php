@@ -208,26 +208,28 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['pageLanguage'] = (string) apply_filters( 'gtm4wp_page_language', $page_language );
 		}
 
-		if ( is_singular() ) {
-			// is_singular() does not guarantee the global post object is set up
-			// (unusual template routing, a plugin resetting the global), so every
-			// post-object read below is gated on this nullable local and the
-			// affected variables are simply omitted when it is null.
-			$post = get_post();
+		// is_singular() does not guarantee the global post object is set up
+		// (unusual template routing, a plugin resetting the global), so the
+		// singular blocks below resolve it once into this nullable local, gate
+		// every post-derived variable on it and simply OMIT those variables
+		// when it is null - never ''/0/false placeholders, because a GTM
+		// trigger may test for key presence.
+		$post = get_post();
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTYPE ) ) {
+		if ( is_singular() ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTYPE ) && null !== $post ) {
 				$data_layer['pagePostType']  = get_post_type();
 				$data_layer['pagePostType2'] = 'single-' . get_post_type();
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CATEGORIES ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CATEGORIES ) && null !== $post ) {
 				$_post_cats = get_the_category();
 				if ( $_post_cats ) {
 					$data_layer['pageCategory'] = $this->build_category_slugs( $_post_cats );
 				}
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_TAGS ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_TAGS ) && null !== $post ) {
 				$_post_tags = get_the_tags();
 				if ( $_post_tags ) {
 					$data_layer['pageAttributes'] = array();
@@ -262,9 +264,13 @@ final class PageVariablesModule extends AbstractModule {
 					// the single output sink (wp_json_encode with the full hex flag
 					// set) is the correct escaper for the inline-script context, so
 					// pre-escaping here would only corrupt the values (RI-2/RI-4).
+					// The IDs are typed (int) - PublishPress may expose them as
+					// numeric strings, and the data layer encode no longer
+					// numeric-coerces (JSON_NUMERIC_CHECK removed), so without the
+					// cast the array would mix strings with the int fallback 0.
 					foreach ( $multiple_authors as $one_author ) {
 						$author_names[] = self::read_author_prop( $one_author, 'display_name', '' );
-						$author_ids[]   = self::read_author_prop( $one_author, 'ID', 0 );
+						$author_ids[]   = (int) self::read_author_prop( $one_author, 'ID', 0 );
 					}
 
 					$has_multiple = count( $multiple_authors ) > 1;
@@ -311,7 +317,7 @@ final class PageVariablesModule extends AbstractModule {
 
 					if ( false !== $postuser ) {
 						if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
-							$data_layer['pagePostAuthorID'] = $postuser->ID;
+							$data_layer['pagePostAuthorID'] = (int) $postuser->ID;
 						}
 
 						if ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) {
@@ -321,7 +327,7 @@ final class PageVariablesModule extends AbstractModule {
 				}
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTDATE ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTDATE ) && null !== $post ) {
 				$data_layer['pagePostDate']        = get_the_date();
 				$data_layer['pagePostDateYear']    = get_the_date( 'Y' );
 				$data_layer['pagePostDateMonth']   = get_the_date( 'm' );
@@ -330,7 +336,12 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pagePostDateHour']    = get_the_date( 'H' );
 				$data_layer['pagePostDateMinute']  = get_the_date( 'i' );
 				$data_layer['pagePostDateIso']     = get_the_date( 'c' );
-				$data_layer['pagePostDateUnix']    = get_the_date( 'U' );
+				// Typed (int): a pure numeric timestamp has no leading-zero risk and
+				// consumers do arithmetic on it, so it keeps reaching GTM as a JSON
+				// number now that the data layer encode no longer numeric-coerces
+				// (JSON_NUMERIC_CHECK removed). The zero-padded date parts above
+				// stay strings on purpose ("07" must not become 7).
+				$data_layer['pagePostDateUnix'] = (int) get_the_date( 'U' );
 			}
 
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST ) && null !== $post ) {
@@ -381,7 +392,7 @@ final class PageVariablesModule extends AbstractModule {
 				}
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) || $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) {
+			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) || $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) && null !== $post ) {
 				$post_content = (string) get_post_field( 'post_content', get_the_ID() );
 				$word_count   = str_word_count( wp_strip_all_tags( strip_shortcodes( $post_content ) ) );
 
@@ -409,7 +420,7 @@ final class PageVariablesModule extends AbstractModule {
 				}
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_MODIFIEDDATE ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_MODIFIEDDATE ) && null !== $post ) {
 				$data_layer['pageModifiedDate']        = get_the_modified_date();
 				$data_layer['pageModifiedDateYear']    = get_the_modified_date( 'Y' );
 				$data_layer['pageModifiedDateMonth']   = get_the_modified_date( 'm' );
@@ -418,27 +429,28 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pageModifiedDateHour']    = get_the_modified_date( 'H' );
 				$data_layer['pageModifiedDateMinute']  = get_the_modified_date( 'i' );
 				$data_layer['pageModifiedDateIso']     = get_the_modified_date( 'c' );
-				$data_layer['pageModifiedDateUnix']    = get_the_modified_date( 'U' );
+				// Typed (int) for the same reason as pagePostDateUnix above.
+				$data_layer['pageModifiedDateUnix'] = (int) get_the_modified_date( 'U' );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTAGE ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTAGE ) && null !== $post ) {
 				$post_published_gmt = get_post_time( 'U', true );
 				if ( false !== $post_published_gmt ) {
 					$data_layer['pageContentAgeDays'] = (int) max( 0, floor( ( time() - $post_published_gmt ) / DAY_IN_SECONDS ) );
 				}
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_COMMENTCOUNT ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_COMMENTCOUNT ) && null !== $post ) {
 				$data_layer['pageCommentCount']  = (int) get_comments_number( get_the_ID() );
 				$data_layer['pageCommentStatus'] = comments_open( get_the_ID() ) ? 'open' : 'closed';
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGETEMPLATE ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PAGETEMPLATE ) && null !== $post ) {
 				$page_template_slug         = (string) get_page_template_slug( get_the_ID() );
 				$data_layer['pageTemplate'] = ( '' === $page_template_slug ? 'default' : $page_template_slug );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE ) && null !== $post ) {
 				$data_layer['pageHasFeaturedImage'] = has_post_thumbnail( get_the_ID() );
 			}
 
@@ -447,11 +459,11 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pageDepth']    = count( get_post_ancestors( get_the_ID() ) );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTSTICKY ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTSTICKY ) && null !== $post ) {
 				$data_layer['pagePostSticky'] = is_sticky( get_the_ID() );
 			}
 
-			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY ) ) {
+			if ( $this->opt( GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY ) && null !== $post ) {
 				$primary_category_id = 0;
 
 				// Yoast SEO stores the chosen primary category id in post meta.
@@ -601,17 +613,26 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['pagePostType'] = '404-error';
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTCOUNT ) ) {
+		// The main query global is not guaranteed either (a plugin resetting it,
+		// the compile fired before the main query exists), so the counts are
+		// gated the same way as the post-derived variables above: omitted, not
+		// emitted as placeholders, when the global cannot answer.
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTCOUNT ) && isset( $wp_query->post_count, $wp_query->found_posts ) ) {
 			$data_layer['postCountOnPage'] = (int) $wp_query->post_count;
 			$data_layer['postCountTotal']  = (int) $wp_query->found_posts;
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTID ) && is_singular() === true ) {
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTID ) && is_singular() === true && null !== $post ) {
 			$data_layer['postID'] = (int) get_the_ID();
 		}
 
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTFORMAT ) && is_singular() === true ) {
-			$data_layer['postFormat'] = get_post_format() ? '' : 'standard';
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTFORMAT ) && is_singular() === true && null !== $post ) {
+			// get_post_format() returns the format slug, or false for a standard
+			// post. Emit the slug itself ('aside', 'gallery', ...), falling back
+			// to 'standard' - the inherited short-ternary variant emitted '' for
+			// every post that HAD a format, making the variable unusable.
+			$post_format              = get_post_format();
+			$data_layer['postFormat'] = $post_format ? $post_format : 'standard';
 		}
 
 		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_MISCGEOCF ) && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {

@@ -208,12 +208,32 @@ final class PageVariablesModuleTest extends TestCase {
 		// The reported production state: a singular request with a null post global.
 		$GLOBALS['post'] = null;
 
+		// Every singular option is ON so this test pins the omission contract for
+		// EVERY post-derived block: with the post global unavailable no block may
+		// emit a placeholder ('single-', false, 'closed', 'default', 0), and none
+		// of the WP accessors behind the gates may run at all (most are not even
+		// stubbed here - reaching one would fatal the test).
 		$module = $this->make_module(
 			array(
-				GTM4WP_OPTION_INCLUDE_AUTHOR        => true,
-				GTM4WP_OPTION_INCLUDE_AUTHORID      => true,
-				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => true,
-				GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY => true,
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => true,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => true,
+				GTM4WP_OPTION_INCLUDE_TAGS             => true,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID         => true,
+				GTM4WP_OPTION_INCLUDE_POSTDATE         => true,
+				GTM4WP_OPTION_INCLUDE_MODIFIEDDATE     => true,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST     => true,
+				GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT => true,
+				GTM4WP_OPTION_INCLUDE_READINGTIME      => true,
+				GTM4WP_OPTION_INCLUDE_CONTENTAGE       => true,
+				GTM4WP_OPTION_INCLUDE_COMMENTCOUNT     => true,
+				GTM4WP_OPTION_INCLUDE_PAGETEMPLATE     => true,
+				GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE    => true,
+				GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY    => true,
+				GTM4WP_OPTION_INCLUDE_POSTSTICKY       => true,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY  => true,
+				GTM4WP_OPTION_INCLUDE_POSTID           => true,
+				GTM4WP_OPTION_INCLUDE_POSTFORMAT       => true,
 			)
 		);
 
@@ -232,13 +252,156 @@ final class PageVariablesModuleTest extends TestCase {
 			restore_error_handler();
 		}
 
-		foreach ( array( 'pagePostAuthor', 'pagePostAuthorID', 'pagePostTerms', 'pageParentID', 'pageDepth' ) as $post_sourced_key ) {
+		$post_sourced_keys = array(
+			'pagePostType',
+			'pagePostType2',
+			'pageCategory',
+			'pageAttributes',
+			'pagePostAuthor',
+			'pagePostAuthorID',
+			'pagePostDate',
+			'pagePostDateUnix',
+			'pageModifiedDate',
+			'pageModifiedDateUnix',
+			'pagePostTerms',
+			'pageContentWordCount',
+			'pageReadingTime',
+			'pageContentAgeDays',
+			'pageCommentCount',
+			'pageCommentStatus',
+			'pageTemplate',
+			'pageHasFeaturedImage',
+			'pageParentID',
+			'pageDepth',
+			'pagePostSticky',
+			'pagePrimaryCategory',
+			'pagePrimaryCategoryName',
+			'postID',
+			'postFormat',
+		);
+		foreach ( $post_sourced_keys as $post_sourced_key ) {
 			$this->assertArrayNotHasKey( $post_sourced_key, $data_layer, "'{$post_sourced_key}' must be omitted, not emitted with a placeholder value, when the global post is unavailable." );
 		}
+	}
 
-		// Variables that do not need the post object still emit as before.
-		$this->assertSame( 'post', $data_layer['pagePostType'] );
-		$this->assertSame( 'single-post', $data_layer['pagePostType2'] );
+	/**
+	 * The RI-13 sibling of the null-post case: the main query global is not
+	 * guaranteed either (a plugin resetting it, the compile fired before the
+	 * main query exists). The two count variables must be omitted - never
+	 * emitted as 0 placeholders - and no PHP warning may be raised; with the
+	 * global back, they emit as ints (also when a filter hands back strings).
+	 */
+	public function test_post_count_omitted_without_warning_when_the_main_query_global_is_unavailable(): void {
+		$GLOBALS['wp_query'] = null;
+
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_POSTCOUNT => true ) );
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $module->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertArrayNotHasKey( 'postCountOnPage', $data_layer, 'The on-page count must be omitted, not 0, when the main query global is unavailable.' );
+		$this->assertArrayNotHasKey( 'postCountTotal', $data_layer, 'The total count must be omitted, not 0, when the main query global is unavailable.' );
+
+		// With the main query available the counts emit as ints as before - the
+		// found_posts fixture is a numeric string on purpose (TS-13; the data
+		// layer encode no longer numeric-coerces).
+		$GLOBALS['wp_query'] = (object) array(
+			'post_count'  => 7,
+			'found_posts' => '40',
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 7, $data_layer['postCountOnPage'] );
+		$this->assertSame( 40, $data_layer['postCountTotal'] );
+	}
+
+	/**
+	 * The postFormat variable must name the actual format. The short-ternary variant
+	 * inherited from 1.x emitted '' for every post that HAD a format and
+	 * 'standard' otherwise, so the variable could never distinguish formats.
+	 */
+	public function test_post_format_reports_the_actual_format_falling_back_to_standard(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => false,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => false,
+				GTM4WP_OPTION_INCLUDE_POSTFORMAT => true,
+			)
+		);
+
+		Functions\when( 'get_post_format' )->justReturn( 'gallery' );
+		$this->assertSame( 'gallery', $module->add_datalayer_data( array() )['postFormat'], 'A post with a format must report the format slug, not "".' );
+
+		Functions\when( 'get_post_format' )->justReturn( false );
+		$this->assertSame( 'standard', $module->add_datalayer_data( array() )['postFormat'], 'A standard post (get_post_format() false) reports "standard".' );
+	}
+
+	/**
+	 * The two Unix-timestamp keys are typed as ints at source (arithmetic
+	 * consumers; parity with siteID) while the zero-padded date parts stay
+	 * byte-exact strings - the JSON_NUMERIC_CHECK regression class. The
+	 * fixtures feed the WP-realistic string forms on purpose (TS-13:
+	 * get_the_date() returns strings for every format, including 'U').
+	 */
+	public function test_post_date_unix_typed_as_int_while_padded_parts_stay_strings(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		Functions\when( 'get_the_date' )->alias(
+			static function ( $format = '' ) {
+				if ( 'U' === $format ) {
+					return '1753142400';
+				}
+				return 'm' === $format ? '07' : '2026-07-22';
+			}
+		);
+		Functions\when( 'get_the_modified_date' )->alias(
+			static function ( $format = '' ) {
+				return 'U' === $format ? '1753228800' : '2026-07-23';
+			}
+		);
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHORID     => false,
+				GTM4WP_OPTION_INCLUDE_POSTDATE     => true,
+				GTM4WP_OPTION_INCLUDE_MODIFIEDDATE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 1753142400, $data_layer['pagePostDateUnix'], 'pagePostDateUnix must be typed int at source.' );
+		$this->assertSame( '07', $data_layer['pagePostDateMonth'], 'Zero-padded date parts must stay strings ("07" must not become 7).' );
+		$this->assertSame( 1753228800, $data_layer['pageModifiedDateUnix'], 'pageModifiedDateUnix must be typed int at source.' );
+		$this->assertSame( '2026-07-23', $data_layer['pageModifiedDate'] );
 	}
 
 	/**
@@ -248,6 +411,7 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	public function test_parent_categories_included_on_single_post_when_enabled(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_category' )->justReturn(
 			array(
 				(object) array(
@@ -299,6 +463,7 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	public function test_parent_categories_excluded_on_single_post_when_disabled(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_category' )->justReturn(
 			array(
 				(object) array(
@@ -339,6 +504,7 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	public function test_parent_categories_deduped_when_categories_share_ancestor(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_category' )->justReturn(
 			array(
 				(object) array(
@@ -418,6 +584,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 	public function test_content_word_count_and_reading_time(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'strip_shortcodes' )->returnArg();
 		Functions\when( 'wp_strip_all_tags' )->returnArg();
@@ -443,8 +610,12 @@ final class PageVariablesModuleTest extends TestCase {
 
 	public function test_modified_date_family(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_modified_date' )->alias(
-			static fn ( string $format = '' ): string => 'MOD:' . $format
+			// 'U' returns a WP-realistic numeric string; the module types it (int).
+			static function ( string $format = '' ): string {
+				return 'U' === $format ? '1753228800' : 'MOD:' . $format;
+			}
 		);
 
 		$module = $this->make_module(
@@ -462,11 +633,12 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 'MOD:', $data_layer['pageModifiedDate'] );
 		$this->assertSame( 'MOD:Y', $data_layer['pageModifiedDateYear'] );
 		$this->assertSame( 'MOD:c', $data_layer['pageModifiedDateIso'] );
-		$this->assertSame( 'MOD:U', $data_layer['pageModifiedDateUnix'] );
+		$this->assertSame( 1753228800, $data_layer['pageModifiedDateUnix'], 'The Unix timestamp is typed int at source.' );
 	}
 
 	public function test_content_age_in_days(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_post_time' )->justReturn( time() - ( 5 * DAY_IN_SECONDS ) );
 
 		$module = $this->make_module(
@@ -486,6 +658,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 	public function test_comment_count_and_status(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'get_comments_number' )->justReturn( '5' );
 		Functions\when( 'comments_open' )->justReturn( true );
@@ -543,6 +716,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 	public function test_page_template_defaults_when_empty(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'get_page_template_slug' )->justReturn( '' );
 
@@ -563,6 +737,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 	public function test_primary_category_from_yoast_meta(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'get_post_meta' )->alias(
 			static function ( int $id, string $key ) {
@@ -597,6 +772,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 	public function test_primary_category_falls_back_to_first_category(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'get_post_meta' )->justReturn( '' );
 		Functions\when( 'get_the_category' )->justReturn(
@@ -1112,11 +1288,14 @@ final class PageVariablesModuleTest extends TestCase {
 
 		// PublishPress Author objects expose ->display_name and ->ID (a positive
 		// WordPress user id, or a negative term id for a guest author). Passed
-		// raw so the data layer sink escapes them once and correctly.
+		// raw so the data layer sink escapes them once and correctly. The first
+		// ID is a numeric STRING on purpose (TS-13): PublishPress may expose it
+		// that way, and the module must type it (int) at source now that the
+		// data layer encode no longer numeric-coerces.
 		Functions\when( 'get_multiple_authors' )->justReturn(
 			array(
 				(object) array(
-					'ID'           => 7,
+					'ID'           => '7',
 					'display_name' => 'Jane Writer',
 				),
 				(object) array(

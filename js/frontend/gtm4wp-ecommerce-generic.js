@@ -1,6 +1,9 @@
 /**
  * GTM4WP e-commerce generic helper functions.
- *
+ */
+import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
+
+/**
  * Casts a price-like value into a float with two decimals.
  *
  * @param {number|string} probably_float The raw value (price) to normalize.
@@ -151,14 +154,7 @@ const GTM4WP_LIST_ATTR_TTL_DAYS = 3;
  */
 function gtm4wp_read_item_list_cookie() {
 	try {
-		const parts = ( '; ' + document.cookie ).split(
-			'; ' + GTM4WP_LIST_ATTR_COOKIE + '='
-		);
-		if ( parts.length !== 2 ) {
-			return {};
-		}
-
-		const raw = parts.pop().split( ';' ).shift();
+		const raw = gtm4wp_read_cookie( GTM4WP_LIST_ATTR_COOKIE );
 		if ( ! raw ) {
 			return {};
 		}
@@ -203,18 +199,12 @@ function gtm4wp_store_item_list_attribution(
 		map[ product_id ].item_list_id = item_list_id;
 	}
 
-	const expires = new Date();
-	expires.setTime(
-		expires.getTime() + GTM4WP_LIST_ATTR_TTL_DAYS * 24 * 60 * 60 * 1000
+	gtm4wp_write_cookie(
+		GTM4WP_LIST_ATTR_COOKIE,
+		encodeURIComponent( JSON.stringify( map ) ),
+		GTM4WP_LIST_ATTR_TTL_DAYS,
+		true
 	);
-
-	document.cookie =
-		GTM4WP_LIST_ATTR_COOKIE +
-		'=' +
-		encodeURIComponent( JSON.stringify( map ) ) +
-		';expires=' +
-		expires.toUTCString() +
-		';path=/;SameSite=Lax';
 }
 
 /**

@@ -749,6 +749,26 @@ final class ProductData {
 	}
 
 	/**
+	 * The full purchase-eligibility gauntlet in its canonical order: not too
+	 * old, not already tracked, status trackable. This is THE definition of
+	 * "this order gets a purchase event" - the order-received page, the
+	 * reliable-purchase session fallback and the thank-you hook all call it, so
+	 * the sequence and its short-circuits cannot drift apart per call site.
+	 * (A caller may still run is_order_older_than_max_age() separately first
+	 * when it must position other output, e.g. orderData, between the age check
+	 * and the rest; the re-check here is a pure date comparison.)
+	 *
+	 * @param \WC_Order $order    The order to check.
+	 * @param int       $order_id The order id of the current request (cookie dedupe).
+	 * @return bool
+	 */
+	public function is_order_trackable( \WC_Order $order, int $order_id ): bool {
+		return ! $this->is_order_older_than_max_age( $order )
+			&& ! $this->is_purchase_already_tracked( $order, $order_id )
+			&& $this->is_order_status_trackable( $order );
+	}
+
+	/**
 	 * Flags the order as tracked (via the _ga_tracked meta) so the purchase is
 	 * not counted twice. No-op when the "do not use the order tracked flag"
 	 * option is on.

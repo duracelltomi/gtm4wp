@@ -153,6 +153,52 @@ final class ModuleConsistencyTest extends TestCase {
 		);
 	}
 
+	/**
+	 * The settings-import route hands every field its RAW decoded value, so a
+	 * crafted file can supply an array (or deeper nesting) where a scalar is
+	 * expected. The type-based default sanitizers are type-defensive via
+	 * Field::to_string(); a CUSTOM sanitizer REPLACES them entirely
+	 * (Field::sanitize() returns its result before the type branches run), so
+	 * it must be type-defensive itself. This sweep feeds every field of every
+	 * built-in module a nested array and promotes any PHP warning ("Array to
+	 * string conversion" and friends) to a failure, pinning the class shut for
+	 * future fields too.
+	 */
+	public function test_every_field_sanitizer_handles_non_scalar_input_without_warning(): void {
+		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) $value ) );
+		Functions\when( 'sanitize_textarea_field' )->alias( static fn ( $value ) => trim( (string) $value ) );
+		Functions\when( 'sanitize_key' )->alias(
+			static fn ( $value ) => preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $value ) )
+		);
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			foreach ( $this->builtin_modules() as $module_id => $module ) {
+				$schema_class = $module->admin_schema();
+				$schema       = new $schema_class();
+
+				foreach ( $schema->fields() as $field ) {
+					$sanitized = $field->sanitize( array( array( 'hostile' ) ) );
+
+					$this->assertTrue(
+						is_scalar( $sanitized ) || is_array( $sanitized ) || null === $sanitized || $sanitized instanceof \WP_Error,
+						"Module '{$module_id}': field '{$field->key}' must reduce a non-scalar submission to a scalar/array/WP_Error."
+					);
+				}
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
 	public function test_option_keys_are_owned_by_exactly_one_module(): void {
 		$seen = array();
 

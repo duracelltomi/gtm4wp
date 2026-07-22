@@ -36,6 +36,12 @@
  * telling this runtime which keys to build and how (Tier 1 producers, the endpoint
  * URL + nonce, the session/gate metadata). The config carries NO visitor value.
  */
+import {
+	gtm4wp_read_cookie,
+	gtm4wp_write_cookie,
+	gtm4wp_clear_cookie,
+} from './lib/gtm4wp-cookies';
+
 ( function () {
 	'use strict';
 
@@ -106,20 +112,6 @@
 		} );
 
 		dataLayer().push( push );
-	}
-
-	/**
-	 * Reads a cookie value by name from document.cookie, or '' when absent.
-	 *
-	 * @param {string} name The cookie name.
-	 * @return {string} The cookie value, or ''.
-	 */
-	function readCookie( name ) {
-		const parts = ( '; ' + document.cookie ).split( '; ' + name + '=' );
-		if ( 2 === parts.length ) {
-			return parts.pop().split( ';' ).shift();
-		}
-		return '';
 	}
 
 	/**
@@ -206,19 +198,6 @@
 		}
 	}
 
-	/**
-	 * Clears a cookie by name (site-wide path). Used to consume the one-shot event
-	 * cookie after its events have been delivered, so a later page view — with the
-	 * cookie gone — makes no request.
-	 *
-	 * @param {string} name The cookie name.
-	 * @return {void}
-	 */
-	function clearCookie( name ) {
-		document.cookie =
-			name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-	}
-
 	// The de-dupe storage keys. gtm4wp_orderid_tracked is shared verbatim with the
 	// order-received page's inline purchase guard (PageDataLayer::purchase_dedupe_guard)
 	// so a fallback fire and a real order-received purchase for the same order can
@@ -237,12 +216,12 @@
 	 */
 	function readOrderTracked() {
 		if ( ! window.localStorage ) {
-			return readCookie( ORDER_TRACKED_KEY );
+			return gtm4wp_read_cookie( ORDER_TRACKED_KEY );
 		}
 		try {
 			return window.localStorage.getItem( ORDER_TRACKED_KEY ) || '';
 		} catch ( e ) {
-			return readCookie( ORDER_TRACKED_KEY );
+			return gtm4wp_read_cookie( ORDER_TRACKED_KEY );
 		}
 	}
 
@@ -260,15 +239,7 @@
 				return;
 			} catch ( e ) {}
 		}
-		const expire = new Date();
-		expire.setTime( expire.getTime() + 365 * 24 * 60 * 60 * 1000 );
-		document.cookie =
-			ORDER_TRACKED_KEY +
-			'=' +
-			orderNumber +
-			';expires=' +
-			expire.toUTCString() +
-			';path=/';
+		gtm4wp_write_cookie( ORDER_TRACKED_KEY, orderNumber, 365 );
 	}
 
 	/**
@@ -545,7 +516,7 @@
 
 		// Tier 3: fetched only when a gate cookie changed since the last fetch.
 		gates.forEach( function ( gate ) {
-			const current = readCookie( gate.cookie );
+			const current = gtm4wp_read_cookie( gate.cookie );
 
 			if ( current ) {
 				activeGates.push( { cookie: gate.cookie, value: current } );
@@ -575,7 +546,7 @@
 		// cookie makes no request. An anonymous visitor never has the cookie.
 		const activeActionCookies = [];
 		actions.forEach( function ( action ) {
-			if ( readCookie( action.cookie ) ) {
+			if ( gtm4wp_read_cookie( action.cookie ) ) {
 				if ( -1 === activeActionCookies.indexOf( action.cookie ) ) {
 					activeActionCookies.push( action.cookie );
 				}
@@ -686,7 +657,7 @@
 						delete data[ key ];
 					}
 				} );
-				activeActionCookies.forEach( clearCookie );
+				activeActionCookies.forEach( gtm4wp_clear_cookie );
 
 				collect( data );
 			} )

@@ -169,8 +169,15 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'Select which custom taxonomy is being used to add the brand of products', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				choices: $taxonomy_choices,
+				// Replaces the SELECT default on purpose: the choice list is built
+				// from the taxonomies registered on THIS request, so the default's
+				// allow-list reset would silently blank a stored brand taxonomy
+				// whenever its plugin is momentarily inactive during a save/import.
+				// Field::to_string() keeps the cast warning-free on non-scalar
+				// import values (Field::sanitize() runs a custom sanitizer INSTEAD
+				// of the type-defensive default, never before it).
 				sanitizer: static function ( $value ) {
-					return trim( (string) $value );
+					return sanitize_text_field( Field::to_string( $value ) );
 				}
 			),
 			new Field(
@@ -204,10 +211,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: '',
 				label: __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( "Some product feed generator plugins prefix product IDs with a fixed text like 'woocommerce_gpf'. You can enter this prefix here so that tags in your website include this prefix as well.", 'duracelltomi-google-tag-manager' ),
-				group: 'products',
-				sanitizer: static function ( $value ) {
-					return trim( (string) $value );
-				}
+				group: 'products'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT,
@@ -281,10 +285,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: '',
 				label: __( 'Transaction ID prefix', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Text to prepend to the transaction_id sent with the purchase event, for example to tell several stores apart in one GA4 property or to match the order id format of another system. Leave this empty to send the WooCommerce order number unchanged. Only the purchase event is affected: the order number in the orderData variable and the duplicate tracking guards of the plugin keep using the raw order number.', 'duracelltomi-google-tag-manager' ),
-				group: 'purchase',
-				sanitizer: static function ( $value ) {
-					return trim( (string) $value );
-				}
+				group: 'purchase'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG,

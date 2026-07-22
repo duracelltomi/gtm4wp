@@ -257,12 +257,12 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'tags',
 				choices: $all_labels,
 				sanitizer: static function ( $value ) {
-					$values = is_array( $value ) ? $value : explode( ',', (string) $value );
+					$values = is_array( $value ) ? $value : explode( ',', Field::to_string( $value ) );
 					$valid  = BlacklistModule::valid_restrictions();
 
 					$values = array_values(
 						array_filter(
-							array_map( 'sanitize_text_field', array_map( 'strval', $values ) ),
+							array_map( 'sanitize_text_field', array_map( static fn ( $one ) => Field::to_string( $one ), $values ) ),
 							static fn ( $one_value ) => in_array( $one_value, $valid, true )
 						)
 					);

@@ -81,13 +81,10 @@ final class PurchaseTracking {
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 		}
 
-		if ( isset( $order ) && $this->product_data->is_purchase_already_tracked( $order, (int) $order_id ) ) {
-			unset( $order );
-		}
-
-		if ( isset( $order ) && ! $this->product_data->is_order_status_trackable( $order ) ) {
-			// Only track orders whose status is configured as a purchase (default:
-			// processing, on-hold, completed); skips failed and still-pending orders.
+		// The canonical eligibility gauntlet (age / already-tracked / status).
+		// The separate age check above only exists so orderData is skipped for
+		// too-old orders as well; the composite re-runs it for free.
+		if ( isset( $order ) && ! $this->product_data->is_order_trackable( $order, (int) $order_id ) ) {
 			unset( $order );
 		}
 

@@ -120,6 +120,53 @@ final class ProductDataTest extends TestCase {
 		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'processing' ) ) ), 'A status not in the configured list must not be trackable.' );
 	}
 
+	/**
+	 * The is_order_trackable() composite is THE canonical eligibility gauntlet - the
+	 * order-received page, the reliable-purchase session fallback and the
+	 * thank-you hook all call this one composite - so each leg (age,
+	 * already-tracked, status) must be able to veto on its own.
+	 */
+	public function test_is_order_trackable_requires_every_gauntlet_leg(): void {
+		$product_data = $this->make_product_data();
+
+		$this->assertTrue(
+			$product_data->is_order_trackable( new \WC_Order( array( 'status' => 'processing' ) ), 11 ),
+			'A fresh, untracked order in a placement status is trackable.'
+		);
+
+		$this->assertFalse(
+			$product_data->is_order_trackable( new \WC_Order( array( 'status' => 'failed' ) ), 11 ),
+			'The status leg must veto: a failed order never fires the purchase.'
+		);
+
+		$this->assertFalse(
+			$product_data->is_order_trackable(
+				new \WC_Order(
+					array(
+						'status' => 'processing',
+						'meta'   => array( '_ga_tracked' => 1 ),
+					)
+				),
+				11
+			),
+			'The already-tracked leg must veto: the _ga_tracked meta suppresses a second purchase.'
+		);
+
+		$aged = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE => 60 ) );
+		$this->assertFalse(
+			$aged->is_order_trackable(
+				new \WC_Order(
+					array(
+						'status'       => 'processing',
+						'date_created' => '-2 hours',
+					)
+				),
+				11
+			),
+			'The age leg must veto: an order older than the configured maximum is skipped.'
+		);
+	}
+
 	public function test_order_status_trackable_empty_list_falls_back_to_anything_but_failed(): void {
 		// A misconfigured empty list must never silently disable all purchase
 		// tracking; it falls back to the pre-2.0 "anything but failed" rule.
@@ -268,7 +315,7 @@ final class ProductDataTest extends TestCase {
 		// and correctly (RI-4 / TS-11). The </script> break-out itself is proven at the
 		// sink by DataLayerTest::test_flush_pushes_hex_encodes_script_breakout_characters
 		// and by PageDataLayerTest.
-		$hostile = 'Deals ' . "\x3C/script\x3E" . ' ' . "\x26" . ' ' . "\x22" . 'x' . "\x22";
+		$hostile                                     = 'Deals ' . "\x3C/script\x3E" . ' ' . "\x26" . ' ' . "\x22" . 'x' . "\x22";
 		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			array( 123 => array( 'item_list_name' => $hostile ) ) // phpcs:ignore
 		);

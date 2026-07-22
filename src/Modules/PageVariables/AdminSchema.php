@@ -319,7 +319,10 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'By default, the plugin will check the so called REMOTE_ADDR system variable for IP addresses. In some cases, this might not include the correct address. You may specify a custom header to read the IP address from.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				sanitizer: static function ( $value ) {
-					$value = (string) $value;
+					// Field::to_string() keeps the cast warning-free on non-scalar
+					// import values (a custom sanitizer replaces the type-defensive
+					// default in Field::sanitize(), it does not run in front of it).
+					$value = Field::to_string( $value );
 
 					if ( '' === $value ) {
 						return '';

@@ -32,6 +32,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from html import unescape
@@ -303,6 +304,12 @@ def _post_body(markdown: str, start: int, end: int) -> str:
 
 def fetch_topic(reference: str) -> dict:
 	if reference.startswith("http"):
+		# Permalinks come from `list` output, which only ever carries
+		# wordpress.org URLs — refuse anything else so a poisoned or mistyped
+		# reference can never point this fetcher at an arbitrary host.
+		host = urllib.parse.urlsplit(reference).hostname or ""
+		if host != "wordpress.org" and host != "www.wordpress.org":
+			raise ValueError(f"refusing non-wordpress.org URL: {reference}")
 		url = reference.split("#", 1)[0].rstrip("/") + "/"
 	else:
 		url = f"{BASE}/topic/{reference.strip('/')}/"
@@ -400,6 +407,9 @@ def main(argv: list[str]) -> int:
 			file=sys.stderr,
 		)
 		return 1
+	except ValueError as error:
+		print(f"refused: {error}", file=sys.stderr)
+		return 2
 
 	json.dump(payload, sys.stdout, indent=2, ensure_ascii=False)
 	sys.stdout.write("\n")

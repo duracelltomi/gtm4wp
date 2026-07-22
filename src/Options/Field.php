@@ -201,10 +201,15 @@ final class Field {
 	 * an empty string here, so every entry point into sanitize() behaves
 	 * identically (null already casts to '' - kept for parity).
 	 *
+	 * Public because a CUSTOM field sanitizer sits in front of the type-based
+	 * branches (sanitize() returns its result immediately), so the guard here
+	 * never protects it: every custom sanitizer that needs a string must run
+	 * its own cast through this helper instead of a bare (string) cast.
+	 *
 	 * @param mixed $value Raw value of any type.
 	 * @return string
 	 */
-	private static function to_string( $value ): string {
+	public static function to_string( $value ): string {
 		return is_scalar( $value ) ? (string) $value : '';
 	}
 

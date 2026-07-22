@@ -673,13 +673,10 @@ final class PageDataLayer {
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 		}
 
-		if ( $this->product_data->is_purchase_already_tracked( $order, $order_id ) ) {
-			return $data_layer;
-		}
-
-		if ( ! $this->product_data->is_order_status_trackable( $order ) ) {
-			// Only track orders whose status is configured as a purchase (default:
-			// processing, on-hold, completed); skips failed and still-pending orders.
+		// The canonical eligibility gauntlet (age / already-tracked / status).
+		// The separate age check above only exists so orderData is skipped for
+		// too-old orders as well; the composite re-runs it for free.
+		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
 			return $data_layer;
 		}
 
@@ -719,6 +716,12 @@ final class PageDataLayer {
 	 * recorded in the cookie / local storage, and an "after" fragment that records
 	 * it. Extracted so the order-received page and the session fallback share the
 	 * exact same guard.
+	 *
+	 * The cookie read/write idiom emitted below is the PHP-side copy of the
+	 * shared helpers in js/frontend/lib/gtm4wp-cookies.js (this inline script
+	 * cannot import a bundle module); the storage key and byte format must stay
+	 * compatible with that lib and with gtm4wp-visitor-data.js, which reuses the
+	 * same gtm4wp_orderid_tracked guard for the fallback purchase.
 	 *
 	 * @param \WC_Order $order The order being tracked.
 	 * @return array{0:string,1:string} The before and after JavaScript fragments.
@@ -1119,15 +1122,7 @@ final class PageDataLayer {
 			return null;
 		}
 
-		if ( $this->product_data->is_order_older_than_max_age( $order ) ) {
-			return null;
-		}
-
-		if ( $this->product_data->is_purchase_already_tracked( $order, $order_id ) ) {
-			return null;
-		}
-
-		if ( ! $this->product_data->is_order_status_trackable( $order ) ) {
+		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
 			return null;
 		}
 
