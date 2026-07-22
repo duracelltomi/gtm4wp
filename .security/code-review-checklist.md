@@ -233,7 +233,7 @@ First review of the **VisitorData module + its A0-reachable `__return_true` `gtm
 
 ### Report 8: `.security/code-review-report-2026-07-22-1256.md`
 
-**Reviewed at:** `54d12e5` · **Base:** `b7a7d33` (range `b7a7d33..54d12e5`, 7 commits) — **the base for the next review is `54d12e5`** plus any fix commit this review produces.
+**Reviewed at:** `54d12e5` · **Base:** `b7a7d33` (range `b7a7d33..54d12e5`, 7 commits) · **Fixes landed:** `a2b18c7` — **the base for the next review is `a2b18c7`**.
 
 Review of the JSON_NUMERIC_CHECK removal, the transaction-ID-prefix option, the environment-type readout, and the PageVariables null-global fix, plus a full re-run of all whole-repo sweeps. **No Critical/High/Medium.** 8 Low findings; per the disclosure rule, one-line summaries only here (all are Low and none is exploitable by an actor below A4 — detail in the git-ignored report).
 
