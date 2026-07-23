@@ -86,7 +86,11 @@ Two things to respect:
 - **Never guess a slug from a title.** Take the permalink from `list` output. Guessed
   slugs 404, and the script will tell you so.
 - **Check `closed` first.** A closed topic cannot be answered; there is no point drafting
-  for it. Report it and move on.
+  for it. Report it and move on. Note that `closed` is derived only from the topic page
+  and is independent of `age_days`: a topic can be **inside** the reply window by age and
+  still be closed. Trust the field, not the arithmetic. (Before 2026-07-23 this field was
+  wrong whenever the notice was line-wrapped; if you are checking the page text yourself,
+  collapse whitespace first.)
 
 Note `opened_age_days`: if the topic is older than **14 days** and no maintainer has
 replied, the draft opens with a brief apology.
@@ -132,8 +136,23 @@ git show 2.0-dev:CHANGELOG.md | sed -n '/^## 2.0/,/^## 1.21.1/p'
 |---|---|
 | Fixed in the published version | "This is fixed in **1.22.4** — please update." Name the symptom, not the file. |
 | Fixed on `master`, unreleased | "Fixed, and it ships in the next 1.x release." No date. |
-| Fixed only in 2.0 | "Fixed in the upcoming 2.0 rewrite." Say it is a major rewrite; **never promise a date.** |
+| Fixed only in 2.0 | "Fixed in the upcoming 2.0 rewrite." Say it is a major rewrite. See the date rule below. |
 | Not fixed anywhere | A genuine open report — continue to classification. |
+
+**⚠️ Dates: check what has already been announced publicly.** The old rule here was a flat
+"never promise a date". That is wrong when the maintainer has already published one: saying
+"I cannot give you a date" while gtm4wp.com states a target reads as evasive or out of
+touch. Before writing any "no date" sentence, check the announcements on gtm4wp.com. If a
+target is public, quote it **with the hedge it was published with** (e.g. "planned for
+1 September 2026, assuming nothing major turns up during the beta") rather than hardening it
+into a promise. If nothing is public, then say no date. Never invent one, and never firm up
+a hedge the maintainer has not firmed up himself.
+
+The 2.0 announcement is worth linking where 2.0 is central to the answer, but **not in every
+reply**: the identical URL pasted into many threads is exactly the form-letter pattern the
+forum guidelines target. Link it where the reporter's fix lands in 2.0, or where the
+subtext is "is this plugin still maintained?". Skip it for GTM-config answers and repro
+requests, where it is noise.
 
 ### 3. GitHub cross-link (read-only)
 
@@ -165,10 +184,27 @@ plus the reply intent:
 | Low-star review | `review` | Measured, non-defensive; fix the problem if there is one |
 | Suspected vulnerability | `security` | Private-disclosure redirect only |
 
+**⚠️ "It goes away when I disable the plugin" does not mean the plugin is at fault**, and it
+turns up in a large share of reports. Disabling GTM4WP also removes the container, and with
+it every custom tag and script inside the reporter's *own* GTM container, so that evidence
+fits "the bug is in my container" just as well. Do not let it push a topic into `bug`.
+The isolation test to ask for, plus the exact wording and its caveats, is
+`disabling-the-plugin-proves-nothing` in `.support/forum-answers.md`.
+
+Likewise, before assigning `needs-repro` to anything purchase-related, check
+`cannot-reproduce-paid-checkouts` there: on a card-only shop these cannot be reproduced
+without spending real money, so the useful first ask is a COD or bank-transfer path on
+staging, not the generic repro block.
+
 ### 5. Draft
 
-Write it in the plugin's voice: warm, specific, no jargon the reporter has not used
-themselves. Forum-specific constraints:
+First read `.support/forum-answers.md` (the FAQ of canonical answers) and reuse the
+relevant entry rather than re-deriving it. Then apply the `humanizer` skill to every draft
+before presenting it — see [Voice](#voice-how-a-reply-should-read) below, which is not
+optional here: the forum guidelines ban unvetted AI-generated replies, so a draft that
+reads as machine-written is a guidelines problem, not just a style one.
+
+Forum-specific constraints:
 
 - **No internal file paths, no line numbers, no class names.** GitHub readers want those;
   forum readers do not, and they date badly.
@@ -179,6 +215,63 @@ themselves. Forum-specific constraints:
 - Reference the reporter's own symptom in your words so it reads as a human reply.
 - If the topic is in the **closing window** (`age_days > 150`), say nothing about the
   deadline — just answer it, and answer it now.
+
+#### ⚠️ Verify every concrete claim before writing it
+
+The most common defect in a drafted reply is not bad prose, it is a **plausible invention**
+stated with unearned confidence. Real examples caught only because the maintainer read the
+draft first: a settings toggle that does not exist, an account-recovery route that does not
+work, and a confirmation of a *reporter's* false premise about the plugin's history.
+
+So, before a claim goes into a draft:
+
+- **Naming a setting?** Confirm the exact label exists in the branch the reporter runs
+  (usually released 1.x, i.e. `master`, not the checked-out branch). Never describe a
+  toggle from memory or by analogy.
+- **Naming where a setting lives?** The settings screen was reorganised in 2.0, so the
+  *location* differs even when the label does not. A 1.x reporter has an **Integration**
+  tab with a WooCommerce section; "WooCommerce → Advanced" is 2.0 wording and means nothing
+  to them. Give 1.x navigation unless the reporter is on 2.0.
+- **Naming a filter, hook or meta key?** Confirm the string in the source.
+- **Describing what the plugin does?** Read the code path. Changelog wording is a summary
+  and regularly hides the detail that matters, e.g. that a hook is a *fallback* rather than
+  the primary path.
+- **Accepting the reporter's framing?** Their premise can be wrong too. Confirming it puts
+  a false statement about the plugin on the public record under the maintainer's name.
+
+Reading the code repeatedly produced a *better* answer than the changelog-derived one, not
+merely a safer one. Budget for it.
+
+#### Voice: how a reply should read
+
+Replies are posted by the maintainer under his own name, so match his voice, not a generic
+support-desk one. Observed from his own forum posts:
+
+- Opens `Hi @name,` on its own line; closes with `Please let me know...` or
+  `I am happy to help`.
+- **Few contractions.** `it is`, `does not`, `I would`, `cannot`.
+- `so that` as the habitual connector. Plain statements, no rhetorical build-up.
+- Plain and slightly formal. No Americanisms, no `Good news:` openers, no colon-led
+  dramatic reveals, no one-word sentences for emphasis.
+
+Hard rules for the final text:
+
+- **No em or en dashes.** Use a period, comma, colon or parentheses. This is the single most
+  reliable AI tell and the maintainer does not use them.
+- **Grammatically correct standard English throughout.** English is the maintainer's second
+  language and he has asked that drafts be correct. Match his *register* (plain, formal,
+  sparse contractions) but never reproduce non-standard constructions found in older posts,
+  such as `can not` for `cannot`. Correct grammar is the requirement; the quirks are not.
+- **US spelling**, consistently, matching the codebase (`normalized`, `optimization`,
+  `fulfillment`).
+- No boldface, no bullet-with-bold-header lists, no emoji, straight quotes only.
+
+Mechanical check before handing a draft over:
+
+```bash
+cd .support/drafts/<date> && cat *.md | grep -o "—\|–" | wc -l   # must be 0
+grep -n "can not" *.md                                            # must be empty
+```
 
 ### 6. Hand off for posting
 
@@ -271,3 +364,6 @@ Trim to what is actually missing:
 - Apology threshold: 14 days with no maintainer reply
 - Security channel: `security@gtm4wp.com` / GitHub private advisories (`SECURITY.md`)
 - Local state (git-ignored): `.support/forum-ledger.json`, `.support/forum-answers.md`
+- **Read `.support/forum-answers.md` before drafting** — the FAQ of canonical answers, with
+  the traps a previous run already fell into. Reuse an entry or add one, every run.
+- **Run the `humanizer` skill on every draft**, then check the voice rules in step 5

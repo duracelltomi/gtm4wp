@@ -365,19 +365,26 @@ def fetch_topic(reference: str) -> dict:
 
 	opening_age = posts[0]["age_days"] if posts else None
 
+	# The "is closed to new replies" notice is hard-wrapped by the md renderer, so it can
+	# arrive split across lines ("...closed to new\nreplies."). A raw substring test misses
+	# those and reports a closed topic as open, which wastes a drafting pass on a topic that
+	# cannot be answered. Collapse whitespace before testing.
+	flat_markdown = re.sub(r"\s+", " ", markdown)
+	is_closed = "is closed to new replies" in flat_markdown
+
 	return {
 		"url": url,
 		"slug": _slug_of(url),
 		"title": title.group(1).strip() if title else None,
 		"status": status.group(1).strip() if status else None,
-		"closed": "is closed to new replies" in markdown,
+		"closed": is_closed,
 		"replies": int(replies.group(1)) if replies else None,
 		"participants": int(participants.group(1)) if participants else None,
 		"last_reply_from": last_reply_from.group(1).strip() if last_reply_from else None,
 		"last_activity_relative": last_activity.group(1).strip() if last_activity else None,
 		"last_post_id": int(last_post_id.group(1)) if last_post_id else None,
 		"opened_age_days": opening_age,
-		"in_reply_window": not ("is closed to new replies" in markdown),
+		"in_reply_window": not is_closed,
 		"posts": posts,
 		"raw_md": markdown,
 	}

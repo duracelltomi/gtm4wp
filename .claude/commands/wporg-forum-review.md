@@ -116,6 +116,17 @@ Read `.support/forum-ledger.json` if it exists. A topic needs re-triage only whe
 makes re-running the sweep idempotent — it is the role the hidden
 `<!-- gtm4wp-issue-review:stale-nudge -->` marker plays on GitHub.
 
+**Also read `.support/forum-answers.md` in full, before triaging anything.** It is this
+system's FAQ: the accumulated canonical answers, each recording what was verified, what
+turned out to be wrong, and which claims are known traps. Loading it first is what stops
+the sweep re-deriving (and re-getting-wrong) an answer that a previous run already
+established. Every drafted reply must either reuse an entry from it or add a new one.
+
+Treat its ⚠️ blocks as hard constraints, not background reading: they are corrections
+earned from real mistakes, several of which were caught only because the maintainer spotted
+them before posting. If an entry says a setting does not exist or a premise is false, that
+is settled — do not restate the error because it sounds plausible.
+
 ### 2. Resolve fix status before classifying
 
 Run the skill's [fix-status resolver](../skills/wporg-forum-triage/SKILL.md) **once per
@@ -175,6 +186,22 @@ action`. Add per-lane counts, the cluster summary, and an "aged out this run" se
 Drafts: the exact text to be posted, nothing else — no headings, no notes to self, no
 metadata. The file is what lands on the clipboard.
 
+**Every draft goes through the `humanizer` skill before it is presented**, and must satisfy
+the voice rules in the `wporg-forum-triage` skill (no em or en dashes, few contractions,
+correct standard English, US spelling, `Hi @name,` opener). This is a guidelines
+requirement, not a preference: wordpress.org prohibits unvetted AI-generated replies, so a
+draft that reads as machine-written is a problem even when its content is perfect.
+
+Verify concrete claims against the source before writing them — settings labels against
+`master` (what reporters actually run), filter and meta-key names against the code, and
+plugin behavior against the code path rather than the changelog. See the ⚠️ section in the
+skill's step 5. Past runs shipped drafts naming settings that do not exist; each was caught
+only because a human read it first, which is not a control to rely on.
+
+When presenting a draft, say explicitly which of its claims are **verified** and which are
+**inferred**, so the reviewer knows where to look. Record inferences in the ledger `notes`
+so a later run does not promote a guess to a fact.
+
 ### 6. Present the batch
 
 Show the user a numbered list: for each draft, the topic title, the lane, the fix status,
@@ -189,6 +216,22 @@ Start-Process "https://wordpress.org/support/topic/<slug>/#new-post"
 
 Wait for them to say "posted" or "skip" before moving to the next. On "posted", record
 `replied_at` (the current UTC timestamp) and `last_seen_post_id` in the ledger.
+
+`last_seen_post_id` is only knowable **after** the reply exists, so re-read the topic to
+pick it up. This also confirms the post actually landed:
+
+```bash
+python $S topic <url> | python -c "import sys,json; d=json.load(sys.stdin); print(d['last_post_id'], d['last_reply_from'])"
+```
+
+Recording the maintainer's own post id is what makes the next `new` run quiet: the sweep
+compares `last_post_id` against it, so a thread nobody has answered back on is skipped. Omit
+it and every thread replied to this run looks like it has fresh activity next time.
+
+Also worth showing per draft, alongside the text: which claims are **verified** against the
+source and which are **inferred**. A reviewer cannot check what they cannot see, and the
+inferred ones are where the errors live. Copy that distinction into the ledger `notes` so a
+later run does not read an old guess as an established fact.
 
 ### 7. Update the ledger
 
