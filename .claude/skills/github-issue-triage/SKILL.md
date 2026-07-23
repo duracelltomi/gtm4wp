@@ -132,9 +132,15 @@ another user to verify a fix or a repro.
 
 ### 4a. Draft the reply
 
-Write a short, warm comment (see [templates](#reply-templates)). Keep it specific
-to *this* issue — reference the reporter's symptom in your own words so it reads
-as a human reply, not a form letter. Never paste internal file paths or
+**First read `.support/forum-answers.md`** (git-ignored) — the FAQ of canonical
+answers shared with the wordpress.org forum system. The same questions arrive on
+both channels, so an issue is often already answered there, complete with what a
+previous run got *wrong* and which claims are known traps. Reuse the relevant
+entry instead of re-deriving it; if you answer something new, add an entry.
+
+Then write a short, warm comment (see [templates](#reply-templates)). Keep it
+specific to *this* issue — reference the reporter's symptom in your own words so it
+reads as a human reply, not a form letter. Never paste internal file paths or
 vulnerability detail. Use the plugin's voice: helpful, concise, no over-promising.
 
 ### 4b. (Confirmed bugs) locate the code — then stop
@@ -234,6 +240,10 @@ comment asks for.
 ## Quick reference
 
 - Repo: `duracelltomi/gtm4wp` · default branch `master` · active dev `2.0-dev`
+- **Read `.support/forum-answers.md` before drafting** — the FAQ of canonical answers,
+  shared with the wordpress.org forum system, carrying the traps a previous run already
+  fell into. Reuse an entry or add one, every run. Git-ignored, so it is a safe place
+  for detail that must not be published.
 - Labels in use: `bug`, `enhancement`, `question`, `duplicate`, `invalid`,
   `wontfix`, `help wanted`, `needs testing`, `waiting for reply`
 - Security channel: `security@gtm4wp.com` / GitHub private advisories (see `SECURITY.md`)
