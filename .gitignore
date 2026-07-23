@@ -51,4 +51,9 @@ __pycache__/
 # answers, per-run reports and drafted replies — is local only.
 .support/
 
+# Shared voice definition for drafted support replies (both /wporg-forum-review
+# and /issue-review). Local only: it quotes the maintainer's own writing and
+# describes how to match it, which is not something to publish.
+.claude/MAINTAINER-VOICE.md
+
 .docs/

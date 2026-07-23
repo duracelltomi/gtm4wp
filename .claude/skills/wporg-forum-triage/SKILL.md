@@ -200,9 +200,13 @@ staging, not the generic repro block.
 
 First read `.support/forum-answers.md` (the FAQ of canonical answers) and reuse the
 relevant entry rather than re-deriving it. Then apply the `humanizer` skill to every draft
-before presenting it — see [Voice](#voice-how-a-reply-should-read) below, which is not
-optional here: the forum guidelines ban unvetted AI-generated replies, so a draft that
-reads as machine-written is a guidelines problem, not just a style one.
+before presenting it, and check the result against `.claude/MAINTAINER-VOICE.md` — see
+[Voice](#voice-how-a-reply-should-read) below. Neither is optional here: the forum
+guidelines ban unvetted AI-generated replies, so a draft that reads as machine-written is a
+guidelines problem, not just a style one.
+
+⚠️ **Re-run both on every revision, not just the first draft.** A revised draft is a new
+draft. The rule and the reason live in `.claude/MAINTAINER-VOICE.md`.
 
 Forum-specific constraints:
 
@@ -244,27 +248,23 @@ merely a safer one. Budget for it.
 
 #### Voice: how a reply should read
 
-Replies are posted by the maintainer under his own name, so match his voice, not a generic
-support-desk one. Observed from his own forum posts:
+**The voice is defined once, in `.claude/MAINTAINER-VOICE.md` (local, git-ignored). Read
+that file before drafting.** It carries a writing sample to calibrate against, the habits
+derived from it, the hard rules (no em or en dashes, correct standard English, US spelling,
+few contractions, no exclamation marks) and the rule that a revised draft goes back through
+`humanizer`.
 
-- Opens `Hi @name,` on its own line; closes with `Please let me know...` or
-  `I am happy to help`.
-- **Few contractions.** `it is`, `does not`, `I would`, `cannot`.
-- `so that` as the habitual connector. Plain statements, no rhetorical build-up.
-- Plain and slightly formal. No Americanisms, no `Good news:` openers, no colon-led
-  dramatic reveals, no one-word sentences for emphasis.
+The same voice is used on the GitHub issue tracker, so that file is shared with the
+`github-issue-triage` skill. Do not restate its contents here, in any committed file, or in
+a commit message: it is deliberately kept out of the public repository, and it would drift.
+If the file is missing (a fresh clone will not have it), say so and ask for it rather than
+reconstructing it from memory.
 
-Hard rules for the final text:
-
-- **No em or en dashes.** Use a period, comma, colon or parentheses. This is the single most
-  reliable AI tell and the maintainer does not use them.
-- **Grammatically correct standard English throughout.** English is the maintainer's second
-  language and he has asked that drafts be correct. Match his *register* (plain, formal,
-  sparse contractions) but never reproduce non-standard constructions found in older posts,
-  such as `can not` for `cannot`. Correct grammar is the requirement; the quirks are not.
-- **US spelling**, consistently, matching the codebase (`normalized`, `optimization`,
-  `fulfillment`).
-- No boldface, no bullet-with-bold-header lists, no emoji, straight quotes only.
+The forum-specific constraints that sit on top of it (bbPress formatting, no file paths or
+class names, the 1.x audience, keep it short) are listed in step 5 above. Note that here it
+is a **guidelines** matter and not only a style one: wordpress.org prohibits unvetted
+AI-generated responses, so a draft that reads as machine-written is a compliance problem
+even when its content is perfect.
 
 Mechanical check before handing a draft over:
 
@@ -298,60 +298,78 @@ the ledger so the sweep does not re-draft it.
 Scaffolds, not fixed text — rewrite every time. `{…}` are fill-ins.
 
 **Apology opener (older than 14 days, no maintainer reply yet):**
-> Hi @{reporter}, thanks for the report, and sorry for the slow reply here — this thread
-> sat longer than it should have.
+> Hi @{reporter},
+>
+> Thank you for the report, and sorry for the slow reply. This thread sat here longer than
+> it should have.
 
 **Already fixed in the published version:**
-> Good news: this is fixed in GTM4WP {version}, which is out now. {One line naming the
-> symptom in their words.} Updating the plugin should clear it — if it doesn't, let me
-> know and we'll dig in.
+> Hi @{reporter},
+>
+> This is fixed in GTM4WP {version}, which is already released. {One line naming the
+> symptom in their words.} Updating the plugin should solve it. If it does not, please let
+> me know and I will look into it.
 
 **Fixed only in 2.0:**
-> This one is fixed in the upcoming GTM4WP 2.0, which is a full rewrite of the plugin.
-> I can't give you a firm date yet, but it's coming. {If a workaround exists, give it
-> here — that's the part they actually need today.}
+> Hi @{reporter},
+>
+> This is fixed in the upcoming GTM4WP 2.0, which is a full rewrite of the plugin. {Date:
+> quote a publicly announced target with the hedge it was published with, otherwise say
+> there is no date yet. See the date rule in step 2.} {If a workaround exists, give it
+> here, since that is the part they need today.}
 
 **Confirmed bug:**
-> Thanks for the clear report — I can reproduce this. {One-line restatement.} It's on the
-> list to fix and I'll follow up here when it lands.
+> Hi @{reporter},
+>
+> Thank you for the clear report, I can reproduce this. {One-line restatement.} It is on
+> the list to fix and I will follow up here when it lands.
 
-**Can't reproduce — request info:**
-> Thanks for flagging this. I haven't been able to reproduce it yet — could you share a
-> bit more so I can dig in? {repro-intake block}
+**Cannot reproduce, request info:**
+> Hi @{reporter},
+>
+> Thank you for reporting this. I could not reproduce it yet, so could you please share
+> some more details so that I can look into it? {repro-intake block}
 
 **Not our bug (kindly):**
-> Thanks for reaching out. This looks like it's coming from {the GTM container setup / the
-> theme / another plugin} rather than GTM4WP itself — {brief why, and where to look}.
-> Happy to point you in the right direction if you can share {…}.
+> Hi @{reporter},
+>
+> Thank you for reaching out. This looks like it comes from {the GTM container setup / the
+> theme / another plugin} rather than from GTM4WP itself, {brief why, and where to look}.
+> If you share {…} then I am happy to point you in the right direction.
 
 **Duplicate / cluster:**
-> Thanks — this is the same underlying issue as {other topic title}, so the answer is the
-> same: {canonical answer}.
+> Hi @{reporter},
+>
+> This is the same underlying issue as {other topic title}, so the answer is the same:
+> {canonical answer}.
 
 **Low-star review:**
-> Thanks for the honest feedback, and sorry the plugin cost you time. {Address the
-> specific complaint — if it's fixed, say in which version; if it's a real gap, say so
-> plainly.} {If applicable: an invitation to open a support topic so it can actually be
-> solved.}
+> Hi @{reporter},
+>
+> Thank you for the honest feedback, and I am sorry that the plugin cost you time.
+> {Address the specific complaint. If it is fixed, say in which version. If it is a real
+> gap, say so plainly.} {If applicable: an invitation to open a support topic so that it
+> can actually be solved.}
 
 Never argue with a review and never ask anyone to change their rating.
 
 **Security redirect (public, detail-free):**
-> Thanks for the report. So we can handle this responsibly, could you please resend it
-> through our private security channel rather than a public forum topic? Either
-> security@gtm4wp.com, or GitHub's private advisory form linked from the plugin's
-> SECURITY.md. That lets us assess and patch before any details are public. Much
-> appreciated.
+> Hi @{reporter},
+>
+> Thank you for the report. So that we can handle this responsibly, could you please
+> resend it through our private security channel instead of a public forum topic? Either
+> security@gtm4wp.com, or the GitHub private advisory form linked from the plugin's
+> SECURITY.md. That lets us assess and patch the problem before any details become public.
 
 ## Repro-intake block
 
 Trim to what is actually missing:
 
-> To reproduce this I'll need:
-> - GTM4WP version, WordPress version, and WooCommerce version if it's shop-related
-> - Your active theme and any caching/optimization plugins (WP Rocket, LiteSpeed, Autoptimize, FlyingPress…)
-> - The dataLayer output for the affected event — GTM Preview mode, or `console.log(window.dataLayer)` in the browser console
-> - Steps to reproduce, and what you expected versus what happened
+> To reproduce this I will need:
+> - GTM4WP version, WordPress version, and WooCommerce version if it is shop related
+> - Your active theme and any caching or optimization plugins (WP Rocket, LiteSpeed, Autoptimize, FlyingPress)
+> - The dataLayer output for the affected event, either from GTM Preview mode or from `console.log(window.dataLayer)` in the browser console
+> - Steps to reproduce, and what you expected compared to what happened
 > - Any errors in the browser console
 
 ## Quick reference
@@ -366,4 +384,6 @@ Trim to what is actually missing:
 - Local state (git-ignored): `.support/forum-ledger.json`, `.support/forum-answers.md`
 - **Read `.support/forum-answers.md` before drafting** — the FAQ of canonical answers, with
   the traps a previous run already fell into. Reuse an entry or add one, every run.
-- **Run the `humanizer` skill on every draft**, then check the voice rules in step 5
+- **Run the `humanizer` skill on every draft *and on every revision of one***, then check it
+  against `.claude/MAINTAINER-VOICE.md` (local, git-ignored), starting with the writing
+  sample there, which outranks the rule list

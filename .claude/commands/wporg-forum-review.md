@@ -187,10 +187,18 @@ Drafts: the exact text to be posted, nothing else — no headings, no notes to s
 metadata. The file is what lands on the clipboard.
 
 **Every draft goes through the `humanizer` skill before it is presented**, and must satisfy
-the voice rules in the `wporg-forum-triage` skill (no em or en dashes, few contractions,
-correct standard English, US spelling, `Hi @name,` opener). This is a guidelines
+the voice rules in `.claude/MAINTAINER-VOICE.md` (local, git-ignored; the `wporg-forum-triage`
+skill points at it): no em or en dashes, few contractions, correct standard English, US
+spelling, `Hi @name,` opener. Calibrate against the writing sample in that file, which
+outranks the rule list, because a draft can satisfy every rule and still read as
+machine-written. Never restate its contents in a committed file. This is a guidelines
 requirement, not a preference: wordpress.org prohibits unvetted AI-generated replies, so a
 draft that reads as machine-written is a problem even when its content is perfect.
+
+⚠️ **A revised draft is a new draft.** When feedback during the run changes a reply, the
+edited text goes back through `humanizer` and the voice sample before being presented again.
+Text written straight into an already-humanized draft is where the AI register returns,
+because the rest of the file having passed once makes it look finished.
 
 Verify concrete claims against the source before writing them — settings labels against
 `master` (what reporters actually run), filter and meta-key names against the code, and
@@ -256,9 +264,11 @@ fast lane work and stops the next sweep re-drafting what you already answered.
 
 ## Nudge template (drafted, never auto-posted)
 
-> Hi @{reporter}, just following up on this — I still need {the specific missing detail}
-> to reproduce it on my side. If you're still seeing the problem, could you share that
-> when you get a chance? Otherwise I'll assume it's sorted. Thanks!
+> Hi @{reporter},
+>
+> I am following up on this one. I still need {the specific missing detail} so that I can
+> reproduce it on my side. If you are still seeing the problem, could you please share
+> that when you have a moment? Otherwise I will assume that it is solved. Thank you.
 
 Do not threaten to close: on wordpress.org you cannot close a topic, and the 6-month
 window closes it for you.

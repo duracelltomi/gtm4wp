@@ -138,10 +138,36 @@ both channels, so an issue is often already answered there, complete with what a
 previous run got *wrong* and which claims are known traps. Reuse the relevant
 entry instead of re-deriving it; if you answer something new, add an entry.
 
-Then write a short, warm comment (see [templates](#reply-templates)). Keep it
-specific to *this* issue — reference the reporter's symptom in your own words so it
-reads as a human reply, not a form letter. Never paste internal file paths or
-vulnerability detail. Use the plugin's voice: helpful, concise, no over-promising.
+Then write a short comment (see [templates](#reply-templates)). Keep it specific to
+*this* issue — reference the reporter's symptom in your own words so it reads as a
+human reply, not a form letter. Never paste internal file paths or vulnerability
+detail, and do not over-promise.
+
+#### Voice
+
+**The voice is defined once, in `.claude/MAINTAINER-VOICE.md` (local, git-ignored). Read
+that file before drafting.** It carries a writing sample to calibrate against, the habits
+derived from it, and the hard rules: no em or en dashes, few contractions, correct
+standard English, US spelling, no exclamation marks, straight quotes.
+
+**This is the same voice used on the wordpress.org forum**, which is why that file is
+shared with the `wporg-forum-triage` skill rather than restated in either one. The
+maintainer's name is on a GitHub comment exactly as it is on a forum post. What differs
+between the two channels is format and audience only, and that table is in the shared
+file: on GitHub you have full markdown, and a technical reporter can be given version
+numbers, hook and filter names, commit or PR references and `#N` cross-links.
+
+Do not restate that file's contents in any committed file or commit message; it is
+deliberately kept out of the public repository. If it is missing (a fresh clone will not
+have it), say so and ask for it rather than reconstructing it from memory.
+
+Apply the `humanizer` skill to every draft before presenting it, then check it against
+the shared file. ⚠️ **Re-run both on every revision**: a revised draft is a new draft,
+and text written straight into an already-humanized comment is where the AI register
+returns. The rule and the reason are in `.claude/MAINTAINER-VOICE.md`.
+
+The templates below predate this and are being kept in the same voice; if you find one
+that reads as machine-written, fix the template as well as the draft.
 
 ### 4b. (Confirmed bugs) locate the code — then stop
 
@@ -172,48 +198,62 @@ Adapt tone and wording every time — these are scaffolds, not fixed text. `{…
 fill-ins.
 
 **Apology opener (issue older than 14 days, no prior maintainer reply):**
-> Hi @{reporter}, thank you for reporting this — and apologies for the slow
-> response; this one sat longer than it should have.
+> Hi @{reporter},
+>
+> Thank you for reporting this, and sorry for the slow response. This issue sat here
+> longer than it should have.
 
 **Confirmed bug:**
-> Thanks for the clear report — I've reproduced this. {one-line restatement of the
-> symptom}. I've tagged it as a bug and it's on the list to fix. I'll follow up
-> here when a fix lands.
+> Hi @{reporter},
+>
+> Thank you for the clear report, I can reproduce this. {One-line restatement of the
+> symptom.} I marked it as a bug and it is on the list to fix. I will follow up here
+> when the fix lands.
 
-**Unconfirmed — request repro info:**
-> Thanks for flagging this. I haven't been able to reproduce it yet — could you
-> share a bit more so I can dig in? {repro-intake block}
+**Unconfirmed, request repro info:**
+> Hi @{reporter},
+>
+> Thank you for reporting this. I could not reproduce it yet, so could you please share
+> some more details so that I can look into it? {repro-intake block}
 
 **Enhancement:**
-> Thanks for the suggestion! {restate the idea}. This is a reasonable enhancement;
-> I've labelled it as such so it's tracked. I can't promise a timeline, but it's
-> noted.
+> Hi @{reporter},
+>
+> Thank you for the suggestion. {Restate the idea.} This is a reasonable enhancement and
+> I labeled it as such so that it is tracked. I cannot promise a timeline for it.
 
 **Support / not-our-bug (kindly):**
-> Thanks for reaching out. This looks like it's coming from {GTM container config /
-> the theme / another plugin} rather than GTM4WP itself — {brief why + where to
-> look}. Happy to point you in the right direction if you can share {…}.
+> Hi @{reporter},
+>
+> Thank you for reaching out. This looks like it comes from {the GTM container
+> configuration / the theme / another plugin} rather than from GTM4WP itself, {brief why
+> and where to look}. If you share {…} then I am happy to point you in the right
+> direction.
 
 **Duplicate:**
-> Thanks! This looks like the same underlying issue as #{X}, so I'll consolidate
-> the discussion there to keep it in one place. Please follow #{X} for updates.
+> Hi @{reporter},
+>
+> Thank you for the report. This is the same underlying issue as #{X}, so I am closing
+> this one to keep the discussion in one place. Please follow #{X} for updates.
 
 **Security redirect (public, detail-free):**
-> Thanks for the report. So that we can handle this responsibly, could you please
-> resend it through our private security channel rather than a public issue? See
-> SECURITY.md — either security@gtm4wp.com or GitHub's private advisory form. That
-> lets us assess and patch before any details are public. Much appreciated.
+> Hi @{reporter},
+>
+> Thank you for the report. So that we can handle this responsibly, could you please
+> resend it through our private security channel instead of a public issue? See
+> SECURITY.md, either security@gtm4wp.com or the GitHub private advisory form. That lets
+> us assess and patch the problem before any details become public.
 
 ## Repro-intake block
 
 Paste this (trim to what's missing) when asking for reproduction info:
 
-> To reproduce this I'll need:
-> - **GTM4WP version**, **WordPress version**, **WooCommerce version** (if relevant)
-> - Active **theme** and any **caching/optimization plugins** (WP Rocket, LiteSpeed, Autoptimize…)
-> - The **dataLayer output** for the affected event — GTM Preview mode, or `console.log(window.dataLayer)` in the browser console
-> - Steps to reproduce, and what you expected vs. what happened
-> - Any relevant browser-console errors
+> To reproduce this I will need:
+> - GTM4WP version, WordPress version, and WooCommerce version if it is shop related
+> - Your active theme and any caching or optimization plugins (WP Rocket, LiteSpeed, Autoptimize)
+> - The dataLayer output for the affected event, either from GTM Preview mode or from `console.log(window.dataLayer)` in the browser console
+> - Steps to reproduce, and what you expected compared to what happened
+> - Any errors in the browser console
 
 ## Applying on approval
 

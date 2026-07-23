@@ -130,8 +130,20 @@ lane label where they fit (e.g. a fix landed and needs reporter verification).
 ### 3. Draft, using the skill's templates
 
 For every ✋ item, write the comment with the `github-issue-triage` reply templates —
-warm, specific to the issue, apology opener when overdue, never form-lettery, never
-any file path or vuln detail in a public draft.
+specific to the issue, apology opener when overdue, never form-lettery, never any file
+path or vuln detail in a public draft.
+
+**Every draft goes through the `humanizer` skill and then `.claude/MAINTAINER-VOICE.md`**
+(local, git-ignored), the shared definition of the maintainer's voice: no em or en dashes,
+few contractions, correct standard English, US spelling, no exclamation marks, `Hi @name,`
+opener. Calibrate against the writing sample in that file, which outranks the rule list,
+because a draft can satisfy every rule and still read as machine-written. The same voice is
+used on the wordpress.org forum, so a reader who meets the maintainer on both channels meets
+one person. Never restate that file's contents in a committed file or a commit message.
+
+⚠️ **A revised draft is a new draft.** When feedback during the run changes a comment, the
+edited text goes back through `humanizer` and the voice file before being presented again.
+Text written straight into an already-humanized draft is where the AI register returns.
 
 Reuse the matching `.support/forum-answers.md` entry where one exists, and **add an
 entry whenever this sweep settles a question that will recur**. That file is the
@@ -169,18 +181,24 @@ double-nudging, and closed issues drop out of the open sweep.
 
 ## Stale-nudge template (auto-posted)
 
-Adapt the reporter's name/context; keep the marker on the last line.
+Adapt the reporter's name and context; keep the marker on the last line. This one is
+**auto-posted with no human review**, so it has to satisfy `.claude/MAINTAINER-VOICE.md`
+as written. Note it speaks as **I**, not "we": GTM4WP has one maintainer.
 
-> Hi @{reporter}, just following up — we're still missing the details above to move
-> this forward. If we don't hear back within about a week, we'll close this to keep
-> the tracker tidy, but you're welcome to reopen it (or open a fresh issue) any time
-> with the extra info. Thanks for your patience!
+> Hi @{reporter},
+>
+> I am following up on this one. I still need the details above so that I can move it
+> forward. If I do not hear back within about a week then I will close this issue to keep
+> the tracker tidy, but you are welcome to reopen it, or to open a new one, at any time
+> when you have that information. Thank you for your patience.
 >
 > `<!-- gtm4wp-issue-review:stale-nudge -->`
 
 ## Stale-close comment template (batch-approved)
 
-> Closing this out for now since we haven't been able to get the additional details
-> needed to reproduce it. This isn't a judgment on the report — please don't hesitate
-> to reopen or open a new issue if you can share the info above. Thanks again for
-> taking the time to report it!
+> Hi @{reporter},
+>
+> I am closing this one for now, since the additional details needed to reproduce it did
+> not arrive. This is not a judgment on the report itself. Please reopen this issue, or
+> open a new one, if you are able to share the information above. Thank you for taking
+> the time to report it.
