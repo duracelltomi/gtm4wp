@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec bash "$(git rev-parse --show-toplevel)/.claude/hooks/require-changelog.sh" commitmsg "$1"

@@ -1,0 +1,383 @@
+/**
+ * GTM4WP admin app: left pane navigation + tabbed settings panel.
+ *
+ * Every size comes from the token block below — a single 13px anchored type
+ * scale and a 4px spacing scale — so nothing is picked ad hoc. The accent
+ * follows the visitor's WordPress admin colour scheme, with static fallbacks.
+ */
+
+.gtm4wp-app {
+	// Typography — anchored to wp-admin's 13px base.
+	--gtm4wp-fs-page: 20px;
+	--gtm4wp-fs-panel: 16px;
+	--gtm4wp-fs-section: 14px;
+	--gtm4wp-fs-body: 13px;
+	--gtm4wp-fs-help: 12px;
+	--gtm4wp-fs-micro: 11px;
+
+	// Spacing — 4px base.
+	--gtm4wp-s1: 4px;
+	--gtm4wp-s2: 8px;
+	--gtm4wp-s3: 12px;
+	--gtm4wp-s4: 16px;
+	--gtm4wp-s5: 20px;
+	--gtm4wp-s6: 24px;
+	--gtm4wp-s8: 32px;
+
+	--gtm4wp-radius: 6px;
+	--gtm4wp-radius-sm: 4px;
+
+	// Surfaces, lines and text.
+	--gtm4wp-surface: #fff;
+	--gtm4wp-surface-2: #f6f7f7;
+	--gtm4wp-border: #dcdcde;
+	--gtm4wp-text: #1d2327;
+	--gtm4wp-text-2: #50575e;
+	--gtm4wp-text-3: #757575;
+	--gtm4wp-danger: #d63638;
+	--gtm4wp-danger-bg: #fcf0f0;
+	--gtm4wp-danger-bg: color-mix(in srgb, var(--gtm4wp-danger) 8%, #fff);
+
+	// Accent tracks the admin colour scheme; static fallbacks for older browsers.
+	--gtm4wp-accent: var(--wp-admin-theme-color, #2271b1);
+	--gtm4wp-accent-hover: var(--wp-admin-theme-color-darker-10, #135e96);
+	--gtm4wp-accent-bg: #f0f6fc;
+	--gtm4wp-accent-bg: color-mix(in srgb, var(--gtm4wp-accent) 10%, #fff);
+
+	--gtm4wp-shadow-card: 0 1px 2px rgba(0, 0, 0, .05);
+	--gtm4wp-shadow-sticky: 0 1px 3px rgba(0, 0, 0, .06);
+
+	margin-top: var(--gtm4wp-s4);
+
+	&__header {
+		align-items: center;
+		background: var(--gtm4wp-surface);
+		border: 1px solid var(--gtm4wp-border);
+		border-radius: var(--gtm4wp-radius);
+		box-shadow: var(--gtm4wp-shadow-sticky);
+		display: flex;
+		gap: var(--gtm4wp-s4);
+		justify-content: space-between;
+		padding: var(--gtm4wp-s3) var(--gtm4wp-s5);
+		position: sticky;
+		top: 42px;
+		z-index: 10;
+
+		h1 {
+			font-size: var(--gtm4wp-fs-page);
+			font-weight: 600;
+			letter-spacing: -.01em;
+			margin: 0;
+			padding: 0;
+		}
+	}
+
+	&__actions {
+		align-items: center;
+		display: flex;
+		gap: var(--gtm4wp-s3);
+	}
+
+	&__io {
+		align-items: center;
+		display: flex;
+		gap: var(--gtm4wp-s2, 8px);
+	}
+
+	// The file input is triggered from the Import button; keep it out of the
+	// layout without removing it from the accessibility tree.
+	&__file-input {
+		height: 1px;
+		overflow: hidden;
+		position: absolute;
+		width: 1px;
+	}
+
+	&__body {
+		display: grid;
+		gap: var(--gtm4wp-s5);
+		grid-template-columns: 240px minmax(0, 1fr);
+		margin-top: var(--gtm4wp-s5);
+
+		@media (max-width: 782px) {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	&__snackbar {
+		bottom: var(--gtm4wp-s6);
+		left: 50%;
+		position: fixed;
+		transform: translateX(-50%);
+		z-index: 100;
+	}
+}
+
+.gtm4wp-sidebar {
+	align-self: start;
+	background: var(--gtm4wp-surface);
+	border: 1px solid var(--gtm4wp-border);
+	border-radius: var(--gtm4wp-radius);
+	box-shadow: var(--gtm4wp-shadow-card);
+	padding: var(--gtm4wp-s3);
+
+	ul {
+		list-style: none;
+		margin: var(--gtm4wp-s3) 0 0;
+	}
+
+	li {
+		margin: 0;
+	}
+
+	&__item {
+		align-items: center;
+		background: none;
+		border: none;
+		border-left: 3px solid transparent;
+		border-radius: var(--gtm4wp-radius-sm);
+		color: var(--gtm4wp-text-2);
+		cursor: pointer;
+		display: flex;
+		font-size: var(--gtm4wp-fs-body);
+		gap: var(--gtm4wp-s2);
+		justify-content: space-between;
+		padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
+		text-align: left;
+		width: 100%;
+
+		&:hover {
+			background: var(--gtm4wp-surface-2);
+			color: var(--gtm4wp-text);
+		}
+
+		&.is-active {
+			background: var(--gtm4wp-accent-bg);
+			border-left-color: var(--gtm4wp-accent);
+			color: var(--gtm4wp-text);
+			font-weight: 600;
+		}
+
+		&.is-unavailable {
+			color: var(--gtm4wp-text-3);
+		}
+	}
+
+	&__dirty {
+		color: var(--gtm4wp-danger);
+	}
+
+	&__empty {
+		color: var(--gtm4wp-text-3);
+		font-size: var(--gtm4wp-fs-help);
+		margin: var(--gtm4wp-s3) 0 0;
+	}
+}
+
+.gtm4wp-panel {
+	background: var(--gtm4wp-surface);
+	border: 1px solid var(--gtm4wp-border);
+	border-radius: var(--gtm4wp-radius);
+	box-shadow: var(--gtm4wp-shadow-card);
+	overflow: hidden;
+
+	h2 {
+		font-size: var(--gtm4wp-fs-panel);
+		font-weight: 600;
+		letter-spacing: -.01em;
+		margin: 0;
+	}
+
+	&__head {
+		padding: var(--gtm4wp-s5) var(--gtm4wp-s6) var(--gtm4wp-s4);
+	}
+
+	&__body {
+		padding: var(--gtm4wp-s5) var(--gtm4wp-s6) var(--gtm4wp-s6);
+	}
+
+	&__intro {
+		color: var(--gtm4wp-text-2);
+		margin: var(--gtm4wp-s2) 0 0;
+		max-width: 66ch;
+	}
+}
+
+// Section tabs (mirrors @wordpress/components TabPanel, full-bleed underline).
+.gtm4wp-tabs {
+	.components-tab-panel__tabs {
+		border-bottom: 1px solid var(--gtm4wp-border);
+		padding: 0 var(--gtm4wp-s6);
+	}
+
+	.components-tab-panel__tabs-item {
+		font-size: var(--gtm4wp-fs-section);
+	}
+
+	// Red dot on tabs whose group holds a field the server rejected.
+	.gtm4wp-tab--has-error::after {
+		background: var(--gtm4wp-danger);
+		border-radius: 50%;
+		content: "";
+		display: inline-block;
+		height: 6px;
+		margin-inline-start: var(--gtm4wp-s1);
+		vertical-align: middle;
+		width: 6px;
+	}
+}
+
+.gtm4wp-field {
+	margin-bottom: var(--gtm4wp-s6);
+	max-width: 48em;
+
+	&:last-child {
+		margin-bottom: 0;
+	}
+}
+
+.gtm4wp-field-label {
+	color: var(--gtm4wp-text);
+	font-weight: 600;
+}
+
+.gtm4wp-field-help {
+	color: var(--gtm4wp-text-3);
+	display: block;
+	font-size: var(--gtm4wp-fs-help);
+	margin-top: var(--gtm4wp-s1);
+
+	code {
+		font-size: var(--gtm4wp-fs-micro);
+	}
+}
+
+.gtm4wp-field-error {
+	background: var(--gtm4wp-danger-bg);
+	border-inline-start: 3px solid var(--gtm4wp-danger);
+	border-radius: var(--gtm4wp-radius-sm);
+	color: var(--gtm4wp-danger);
+	display: block;
+	font-weight: 600;
+	margin-block: var(--gtm4wp-s2) var(--gtm4wp-s3);
+	padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
+}
+
+.gtm4wp-phase {
+	border-radius: 10px;
+	font-size: var(--gtm4wp-fs-micro);
+	font-weight: 600;
+	letter-spacing: .03em;
+	margin-left: var(--gtm4wp-s2);
+	padding: 2px 8px;
+	text-transform: uppercase;
+	vertical-align: middle;
+
+	&--beta {
+		background: var(--gtm4wp-accent-bg);
+		color: var(--gtm4wp-accent);
+	}
+
+	&--experimental {
+		background: #fcf9e8;
+		color: #996800;
+	}
+
+	&--deprecated {
+		background: #fcf0f1;
+		color: var(--gtm4wp-danger);
+	}
+}
+
+.gtm4wp-field--table {
+	max-width: none;
+
+	.gtm4wp-field-help {
+		max-width: 48em;
+	}
+}
+
+.gtm4wp-table {
+	border: none;
+	margin: 0;
+	// Fieldsets default to min-inline-size: min-content, which would let the
+	// table push the whole panel beyond the viewport.
+	min-inline-size: 0;
+	padding: 0;
+
+	&__scroll {
+		margin: var(--gtm4wp-s3) 0;
+		// Safety net only: the fluid table below fits its container, so this
+		// no longer shows a scrollbar at normal panel widths.
+		overflow-x: auto;
+	}
+
+	&__table {
+		background: var(--gtm4wp-surface);
+		border: 1px solid var(--gtm4wp-border);
+		border-collapse: collapse;
+		border-radius: var(--gtm4wp-radius);
+		// Columns share the panel width evenly and shrink to fit instead of
+		// forcing a horizontal scrollbar.
+		table-layout: fixed;
+		width: 100%;
+
+		th {
+			background: var(--gtm4wp-surface-2);
+			border-bottom: 1px solid var(--gtm4wp-border);
+			color: var(--gtm4wp-text-2);
+			font-size: var(--gtm4wp-fs-micro);
+			font-weight: 600;
+			letter-spacing: .04em;
+			padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
+			text-align: left;
+			text-transform: uppercase;
+			vertical-align: bottom;
+		}
+
+		th:last-child {
+			width: 48px;
+		}
+
+		td {
+			border-bottom: 1px solid var(--gtm4wp-border);
+			padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
+			vertical-align: middle;
+		}
+
+		tbody tr:last-child td {
+			border-bottom: none;
+		}
+
+		// Let the inputs shrink with their column rather than forcing overflow.
+		td .components-base-control,
+		td .components-base-control__field,
+		td input {
+			min-width: 0;
+		}
+	}
+
+	&__empty {
+		color: var(--gtm4wp-text-3);
+		text-align: center;
+	}
+
+	&__actions {
+		text-align: center;
+	}
+}
+
+.gtm4wp-multiselect {
+	border: none;
+	margin: 0;
+	padding: 0;
+
+	&__choices {
+		display: grid;
+		gap: var(--gtm4wp-s1);
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		margin-top: var(--gtm4wp-s3);
+		max-height: 420px;
+		overflow-y: auto;
+	}
+}

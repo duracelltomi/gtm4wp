@@ -1,8 +1,14 @@
 <?xml version="1.0"?>
-<ruleset name="WordPress Coding Standards for Plugins">
-	<description>Generally-applicable sniffs for WordPress plugins and theme development</description>
+<ruleset name="WordPress Coding Standards for GTM4WP">
+	<description>WordPress coding standards for the GTM4WP plugin (2.x, OOP)</description>
 
-  <!-- Default Rules -->
+	<file>duracelltomi-google-tag-manager-for-wordpress.php</file>
+	<file>uninstall.php</file>
+	<file>compat</file>
+	<file>src</file>
+	<file>tests</file>
+
+	<!-- Default Rules -->
 	<rule ref="WordPress" />
 	<rule ref="WordPress-Core" />
 	<rule ref="WordPress-Extra" />
@@ -12,14 +18,49 @@
 	<exclude-pattern>*/wptest/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
 	<exclude-pattern>*/vendor/*</exclude-pattern>
-	<exclude-pattern>*/integration/whichbrowser/*</exclude-pattern>
-  <exclude-pattern>*/PHPCompatibility/Tests/Keywords/ForbiddenNames/*\.php</exclude-pattern>
-  <exclude-pattern>*/vendor/*</exclude-pattern>
-  <exclude-pattern>*/spec/*</exclude-pattern>
-  <exclude-pattern>*/wpcs/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
 
-  <!-- Check up to 8 files simultanously. -->
-  <arg name="parallel" value="8"/>
+	<!-- PSR-4 class files: file and class naming follows PSR-4, not WPCS file naming. -->
+	<rule ref="WordPress.Files.FileName">
+		<exclude-pattern>*/src/*</exclude-pattern>
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="PEAR.NamingConventions.ValidClassName">
+		<exclude-pattern>*/src/*</exclude-pattern>
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
 
-  <config name="testVersion" value="7.0-"/>
+	<!-- Tests: allow PHPUnit conventions (snake_case-free method names, no per-test doc blocks). -->
+	<rule ref="WordPress.NamingConventions.ValidFunctionName">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="Squiz.Commenting.FunctionComment">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="Squiz.Commenting.FileComment">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="Squiz.Commenting.ClassComment">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="Squiz.Commenting.VariableComment">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+
+	<rule ref="WordPress.WP.GlobalVariablesOverride">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+
+	<!-- Legacy 1.x test files, absorbed into tests/unit in later phases. -->
+	<exclude-pattern>*/tests/test-*.php</exclude-pattern>
+
+	<!-- Check up to 8 files simultaneously. -->
+	<arg name="parallel" value="8"/>
+	<arg name="extensions" value="php"/>
+
+	<config name="testVersion" value="8.0-"/>
+	<config name="minimum_wp_version" value="6.3"/>
+
+	<!-- Warnings are reported but do not fail the build (errors still do). -->
+	<config name="ignore_warnings_on_exit" value="1"/>
 </ruleset>

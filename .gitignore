@@ -23,8 +23,6 @@ Thumbs.db
 coverage.xml
 clover.xml
 /wordpress/
-phpunit.phar
-.phpunit.result.cache
 
 # Composer
 /vendor/
@@ -32,18 +30,30 @@ composer.lock
 
 # NPM
 node_modules
+npm-debug.log*
+yarn-error.log
 
-# Build output and packaged releases (2.0 tooling, never part of the 1.x tree)
-build/
-release/
+# Python (skill helper scripts)
+__pycache__/
 
-# Security and test review reports. These describe not-yet-fixed findings and
-# must never reach this public repo. On the 2.0 branch the same rules live in
-# .security/.gitignore and .testing/.gitignore; those files are not present on
-# this branch, so the rules are repeated here to keep the reports uncommittable
-# no matter which branch is checked out.
-.security/code-review-report-*.md
-.testing/test-review-report-*.md
+# Build output
+/build/
+/release/
+.phpunit.result.cache
 
-# LLM
-.claude/
+# LLM: project instructions and skills are committed,
+# personal permission settings are not.
+.claude/settings.json
+.claude/settings.local.json
+
+# wordpress.org support-forum triage (/wporg-forum-review). The framework lives
+# in .claude/ and is committed; the working data — triage ledger, canonical
+# answers, per-run reports and drafted replies — is local only.
+.support/
+
+# Shared voice definition for drafted support replies (both /wporg-forum-review
+# and /issue-review). Local only: it quotes the maintainer's own writing and
+# describes how to match it, which is not something to publish.
+.claude/MAINTAINER-VOICE.md
+
+.docs/
