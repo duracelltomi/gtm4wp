@@ -131,12 +131,13 @@ is settled — do not restate the error because it sounds plausible.
 
 Run the skill's [fix-status resolver](../skills/wporg-forum-triage/SKILL.md) **once per
 sweep**, not once per topic: pull the published version from the wordpress.org API, read
-`git show master:CHANGELOG.md` for the released 1.x fixes, and `git show
-2.0-dev:CHANGELOG.md` for the `## 2.0` section. Hold both lists in mind while classifying.
+`git show 1.x:CHANGELOG.md` for the released 1.x fixes, and `git show
+master:CHANGELOG.md` for the `## 2.0` section. Hold both lists in mind while classifying.
 
-The trap worth repeating: `CHANGELOG.md` on the checked-out `2.0-dev` branch has **no
-1.22.x section**. Reading fix status off the current branch will tell a reporter to wait
-for 2.0 when the fix is already downloadable.
+The trap worth repeating: `CHANGELOG.md` on the checked-out `master` branch (the 2.0 line)
+has **no 1.22.x section** — it jumps from `## 2.0` straight to `## 1.21.1`. The released 1.x
+fixes live on the `1.x` branch. Reading fix status off the current branch will tell a
+reporter to wait for 2.0 when the fix is already downloadable.
 
 ### 3. Assign a lane
 

@@ -95,7 +95,7 @@ gh issue list --state all --search "<key terms>" --limit 20 \
 ```
 
 - Search `CHANGELOG.md` and recent commits for the symptom — on the 2.0 rewrite,
-  many open 1.x bugs are already fixed on `2.0-dev`. Use `git log --oneline
+  many open 1.x bugs are already fixed on `master`. Use `git log --oneline
   --all --grep=<term>` and `Grep` over `CHANGELOG.md`.
 - If it duplicates another issue → outcome **duplicate** (link the canonical one).
 - If it's fixed but unreleased → draft a comment naming the fixing commit/PR and
@@ -279,7 +279,7 @@ comment asks for.
 
 ## Quick reference
 
-- Repo: `duracelltomi/gtm4wp` · default branch `master` · active dev `2.0-dev`
+- Repo: `duracelltomi/gtm4wp` · default branch `master` (the active 2.0 line) · released 1.x maintenance on `1.x`
 - **Read `.support/forum-answers.md` before drafting** — the FAQ of canonical answers,
   shared with the wordpress.org forum system, carrying the traps a previous run already
   fell into. Reuse an entry or add one, every run. Git-ignored, so it is a safe place
