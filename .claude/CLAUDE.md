@@ -31,8 +31,8 @@ test-quality sibling of the security system above (same shape, so the two align)
 
 ## Architecture
 
-Version 2.0 is a full OOP rewrite (see the 2.0-dev branch). The public 1.x
-integration surface — hooks, template functions, wp-config constants and the
+Version 2.0 is a full OOP rewrite (this `master` branch; the released 1.x line
+lives on the `1.x` branch). The public 1.x integration surface — hooks, template functions, wp-config constants and the
 `gtm4wp-options` key — is kept backward compatible through the `compat/` layer.
 
 - **Namespaced OOP PHP** — PSR-4 `GTM4WP\` → `src/`, one class per file, autoloaded via `src/Autoloader.php` (Composer autoloader used for tests). No global procedural code except the `compat/` shims.

@@ -24,7 +24,7 @@ for one topic or an ad-hoc handful.
 | Write access | `gh issue comment/close/edit` | **None.** No API; replying requires a logged-in session |
 | Labels / state | real labels | **none** — state lives in the local `.support/` ledger |
 | Reply window | forever | **~6 months of inactivity, then the topic is closed to replies** |
-| Who the reporter is | usually a developer | usually a site owner on the **released 1.x**, not on `2.0-dev` |
+| Who the reporter is | usually a developer | usually a site owner on the **released 1.x**, not on the `master` 2.0 rewrite |
 | Automated replies | fine | **prohibited** — the forum guidelines ban "unvetted AI-generated responses" |
 
 The hard rules:
@@ -58,7 +58,7 @@ The hard rules:
    plugin on the right side of the guidelines — a human vets every word.
 
 3. **Answer for the version the reporter is actually running.** Almost every forum
-   reporter is on the released 1.x line. "Fixed on `2.0-dev`" is not an answer to
+   reporter is on the released 1.x line. "Fixed on `master` (2.0)" is not an answer to
    someone whose site is broken today. Always run the
    [fix-status resolver](#2-fix-status-resolver) before drafting.
 
@@ -108,9 +108,9 @@ The highest-value reply on this forum is "that's already fixed — update." Gett
 right needs both branches, because **the branch you are checked out on does not have the
 whole story**:
 
-- `master` — the released 1.x line (final release **1.22.4**). Its `CHANGELOG.md` holds
+- `1.x` — the released 1.x line (final release **1.22.4**). Its `CHANGELOG.md` holds
   the `## 1.22.4` and earlier sections.
-- `2.0-dev` — the rewrite. Its `CHANGELOG.md` has a `## 2.0` section and then jumps
+- `master` — the 2.0 rewrite. Its `CHANGELOG.md` has a `## 2.0` section and then jumps
   straight to `## 1.21.1`; **there is no 1.22.x section on this branch at all.** Fixes
   backported to 1.22.4 are invisible from here.
 
@@ -121,15 +121,15 @@ Resolve in order and stop at the first hit:
 curl -s "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request\[slug\]=duracelltomi-google-tag-manager" \
   | python -c "import sys,json; d=json.load(sys.stdin); print(d['version'], d['last_updated'])"
 
-# 2. Fixed in a released 1.x version?  (authoritative — read master, not the current branch)
-git show master:CHANGELOG.md | sed -n '/^## 1.22.4/,/^## 1.21.1/p'
-git show master:readme.txt | grep -i "stable tag"
+# 2. Fixed in a released 1.x version?  (authoritative — read the 1.x branch, not the current branch)
+git show 1.x:CHANGELOG.md | sed -n '/^## 1.22.4/,/^## 1.21.1/p'
+git show 1.x:readme.txt | grep -i "stable tag"
 
-# 3. Fixed on master but not yet released?
-git log master --oneline --grep=<term>
+# 3. Fixed on the 1.x branch but not yet released?
+git log 1.x --oneline --grep=<term>
 
 # 4. Fixed only in the rewrite?
-git show 2.0-dev:CHANGELOG.md | sed -n '/^## 2.0/,/^## 1.21.1/p'
+git show master:CHANGELOG.md | sed -n '/^## 2.0/,/^## 1.21.1/p'
 ```
 
 | Outcome | What the reply says |
@@ -377,7 +377,7 @@ Trim to what is actually missing:
 - Plugin slug: `duracelltomi-google-tag-manager` · forum: `https://wordpress.org/support/plugin/duracelltomi-google-tag-manager/`
 - Maintainer login: `duracelltomi` (the only contributor listed on wordpress.org). Anyone
   else in a thread is a reporter or a bystander.
-- Branches: `master` = released 1.x (1.22.4, final 1.x) · `2.0-dev` = the rewrite
+- Branches: `1.x` = released 1.x line (1.22.4, final 1.x) · `master` = the 2.0 rewrite (default branch)
 - Reply window: ~6 months of inactivity, then closed. `age_days > 150` = answer it now.
 - Apology threshold: 14 days with no maintainer reply
 - Security channel: `security@gtm4wp.com` / GitHub private advisories (`SECURITY.md`)
