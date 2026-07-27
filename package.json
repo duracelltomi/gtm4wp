@@ -26,7 +26,7 @@
   "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
   "devDependencies": {
     "@wordpress/scripts": "^30.0.0",
-    "adm-zip": "^0.5.18",
+    "adm-zip": "^0.6.0",
     "typescript": "~5.3.3"
   },
   "overrides": {
