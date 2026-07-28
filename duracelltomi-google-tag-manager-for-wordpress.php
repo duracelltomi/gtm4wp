@@ -19,8 +19,7 @@
  * License: GPLv3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: duracelltomi-google-tag-manager
- * Domain Path: /languages
-
+ *
  * WC requires at least: 5.0
  * WC tested up to: 11.0.0
  */

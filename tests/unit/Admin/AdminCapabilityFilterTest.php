@@ -112,7 +112,7 @@ final class AdminCapabilityFilterTest extends TestCase {
 
 		$captured = null;
 		Functions\when( 'add_options_page' )->alias(
-			function ( $page_title, $menu_title, $capability, $menu_slug, $callback ) use ( &$captured ) {
+			function ( $page_title, $menu_title, $capability, $menu_slug, $callback ) use ( &$captured ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real add_options_page() signature
 				$captured = $capability;
 				return 'settings_page_' . GTM4WP_ADMINSLUG;
 			}

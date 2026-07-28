@@ -1216,7 +1216,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		// via FILTER_HEADER_TOP_JS survives. A raw wp_kses() echo without the
 		// restore would leave &amp;&amp; / x=1&amp;y=2 and break the script.
 		Functions\when( 'wp_kses' )->alias(
-			static function ( $content, $allowed_html ) {
+			static function ( $content, $allowed_html ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_kses() signature
 				return str_replace( '&', '&amp;', (string) $content );
 			}
 		);

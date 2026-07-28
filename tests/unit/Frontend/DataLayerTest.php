@@ -469,7 +469,7 @@ final class DataLayerTest extends FrontendTestCase {
 	public function test_flush_pushes_adds_inline_script_and_resets_queue(): void {
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
-			static function ( $handle, $code, $position ) use ( &$captured ) {
+			static function ( $handle, $code, $position ) use ( &$captured ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
 				$captured[] = array( $handle, $code, $position );
 			}
 		);
@@ -496,7 +496,7 @@ final class DataLayerTest extends FrontendTestCase {
 	public function test_flush_pushes_reads_third_party_entries_from_global(): void {
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
-			static function ( $handle, $code, $position ) use ( &$captured ) {
+			static function ( $handle, $code, $position ) use ( &$captured ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
 				$captured[] = $code;
 			}
 		);
@@ -523,7 +523,7 @@ final class DataLayerTest extends FrontendTestCase {
 
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
-			static function ( $handle, $code, $position ) use ( &$captured ) {
+			static function ( $handle, $code, $position ) use ( &$captured ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
 				$captured[] = $code;
 			}
 		);
@@ -548,7 +548,7 @@ final class DataLayerTest extends FrontendTestCase {
 		// byte-exact strings, PHP floats/ints stay JSON numbers.
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
-			static function ( $handle, $code, $position ) use ( &$captured ) {
+			static function ( $handle, $code, $position ) use ( &$captured ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
 				$captured[] = $code;
 			}
 		);
@@ -591,7 +591,7 @@ final class DataLayerTest extends FrontendTestCase {
 		// uniformity (see .security patterns FP-2 / RI-2).
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
-			static function ( $handle, $code, $position ) use ( &$captured ) {
+			static function ( $handle, $code, $position ) use ( &$captured ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
 				$captured[] = $code;
 			}
 		);

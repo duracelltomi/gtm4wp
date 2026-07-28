@@ -33,7 +33,7 @@ final class MigrationTest extends TestCase {
 			}
 		);
 		Functions\when( 'update_option' )->alias(
-			function ( $key, $value, $autoload = null ) {
+			function ( $key, $value, $autoload = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real update_option() signature
 				$this->option_store[ $key ] = $value;
 				return true;
 			}

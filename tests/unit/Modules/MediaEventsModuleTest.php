@@ -142,9 +142,9 @@ final class MediaEventsModuleTest extends TestCase {
 		$this->inline_scripts = array();
 		$this->post_backup    = $GLOBALS['post'] ?? null;
 
-		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path );
+		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path ); // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real plugins_url() signature
 		Functions\when( 'wp_enqueue_script' )->alias(
-			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) {
+			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_enqueue_script() signature
 				$this->enqueued[]              = $handle;
 				$this->enqueued_src[ $handle ] = (string) $src;
 				return true;
