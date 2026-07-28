@@ -180,8 +180,7 @@ final class UserEventsModule extends AbstractModule {
 			return;
 		}
 
-		$script_tag     = $frontend->script_tag();
-		$datalayer_name = $frontend->datalayer()->name();
+		$script_tag = $frontend->script_tag();
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_USERLOGIN ) ) {
 			$user_logged_in = array_key_exists( 'gtm4wp_user_logged_in', $_COOKIE ) ?
@@ -191,12 +190,8 @@ final class UserEventsModule extends AbstractModule {
 			if ( $user_logged_in ) {
 				$event_script = '
 ' . $script_tag->opening_tag() . '
-	if ( window.' . esc_js( $datalayer_name ) . ' ) {
-		window.' . esc_js( $datalayer_name ) . ".push({
-			'event': 'gtm4wp.userLoggedIn'
-		});
-	}
-</script>";
+	' . $frontend->datalayer()->push_snippet( array( 'event' => 'gtm4wp.userLoggedIn' ) ) . '
+</script>';
 
 				$script_tag->print_script_block( $event_script );
 
@@ -212,12 +207,8 @@ final class UserEventsModule extends AbstractModule {
 			if ( $user_registered ) {
 				$event_script = '
 ' . $script_tag->opening_tag() . '
-	if ( window.' . esc_js( $datalayer_name ) . ' ) {
-		window.' . esc_js( $datalayer_name ) . ".push({
-			'event': 'gtm4wp.userRegistered'
-		});
-	}
-</script>";
+	' . $frontend->datalayer()->push_snippet( array( 'event' => 'gtm4wp.userRegistered' ) ) . '
+</script>';
 
 				$script_tag->print_script_block( $event_script );
 

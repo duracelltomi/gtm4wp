@@ -6,6 +6,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_vimeo_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -46,7 +47,7 @@ function gtm4wp_initVimeoTracking() {
 							duration
 						);
 
-						window[ gtm4wp_datalayer_name ].push( {
+						gtm4wp_push_dl_event( {
 							event: 'gtm4wp.mediaPlayerReady',
 							mediaType: 'vimeo',
 							mediaData: {
@@ -78,7 +79,7 @@ function gtm4wp_initVimeoTracking() {
 						} );
 					} )
 					.catch( function ( error ) {
-						window[ gtm4wp_datalayer_name ].push( {
+						gtm4wp_push_dl_event( {
 							event: 'gtm4wp.mediaPlayerEvent',
 							mediaType: 'vimeo',
 							mediaData: {
@@ -108,7 +109,7 @@ function gtm4wp_initVimeoTracking() {
 					} ); // end of api call getDuration
 			} )
 			.catch( function ( error ) {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerEvent',
 					mediaType: 'vimeo',
 					mediaData: {
@@ -212,7 +213,7 @@ function gtm4wp_initVimeoTracking() {
 			vimeoapi
 				.getCurrentTime()
 				.then( function ( seconds ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlayerEvent',
 						mediaType: 'vimeo',
 						mediaData: {
@@ -246,7 +247,7 @@ function gtm4wp_initVimeoTracking() {
 					} );
 				} )
 				.catch( function ( error ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlayerEvent',
 						mediaType: 'vimeo',
 						mediaData: {
@@ -280,7 +281,7 @@ function gtm4wp_initVimeoTracking() {
 			player_state,
 			data
 		) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerStateChange',
 				mediaType: 'vimeo',
 				mediaData: {
@@ -315,7 +316,7 @@ function gtm4wp_initVimeoTracking() {
 						vimeo_frame.getAttribute( 'data-player_duration' )
 					);
 
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlayerStateChange',
 						mediaType: 'vimeo',
 						mediaData: {
@@ -343,7 +344,7 @@ function gtm4wp_initVimeoTracking() {
 					} );
 				} )
 				.catch( function ( error ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlayerEvent',
 						mediaType: 'vimeo',
 						mediaData: {
@@ -388,7 +389,7 @@ function gtm4wp_initVimeoTracking() {
 				videoPercentage,
 				gtm4wp_vimeo_percentage_tracking,
 				function ( i ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlaybackPercentage',
 						mediaType: 'vimeo',
 						mediaData: {

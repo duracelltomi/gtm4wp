@@ -188,6 +188,9 @@ define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO', 'integrate-consent-mode-per
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC', 'integrate-consent-mode-func' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY', 'integrate-consent-mode-security' );
 
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE', 'integrate-consent-queue' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE_CMP', 'integrate-consent-queue-cmp' );
+
 define( 'GTM4WP_PLACEMENT_FOOTER', 0 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN', 1 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN_AUTO', 2 );

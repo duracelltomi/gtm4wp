@@ -6,6 +6,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_cloudflarestream_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -70,7 +71,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 		};
 
 		const gtm4wp_onStreamPlayerStateChange = function ( playerState ) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerStateChange',
 				mediaType: 'cloudflarestream',
 				mediaData: gtm4wp_streamMediaData(),
@@ -89,7 +90,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 		};
 
 		const gtm4wp_onStreamPlayerEvent = function ( eventName, eventParam ) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'cloudflarestream',
 				mediaData: gtm4wp_streamMediaData(),
@@ -126,7 +127,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 				videoPercentage,
 				gtm4wp_cloudflarestream_percentage_tracking,
 				function ( i ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlaybackPercentage',
 						mediaType: 'cloudflarestream',
 						mediaData: gtm4wp_streamMediaData(),
@@ -148,7 +149,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 		};
 
 		player.addEventListener( 'loadedmetadata', function () {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerReady',
 				mediaType: 'cloudflarestream',
 				mediaData: gtm4wp_streamMediaData(),

@@ -5,6 +5,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_soundclound_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -64,7 +65,7 @@ function gtm4wp_initSoundCloudTracking() {
 
 		widget.bind( SC.Widget.Events.READY, function () {
 			gtm4wp_refreshSoundCloudCurrentSound( function () {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerReady',
 					mediaType: 'soundcloud',
 					mediaData: {
@@ -138,7 +139,7 @@ function gtm4wp_initSoundCloudTracking() {
 			eventData,
 			playerState
 		) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerStateChange',
 				mediaType: 'soundcloud',
 				mediaData: {
@@ -177,7 +178,7 @@ function gtm4wp_initSoundCloudTracking() {
 				mediaPercentage,
 				gtm4wp_soundclound_percentage_tracking,
 				function ( i ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlaybackPercentage',
 						mediaType: 'soundcloud',
 						mediaData: {
@@ -207,7 +208,7 @@ function gtm4wp_initSoundCloudTracking() {
 
 		const gtm4wp_onSoundCloudPlayerEvent = function ( eventName ) {
 			widget.getPosition( function ( currentPosition ) {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerEvent',
 					mediaType: 'soundcloud',
 					mediaData: {

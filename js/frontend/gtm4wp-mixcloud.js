@@ -5,6 +5,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_mixcloud_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -65,7 +66,7 @@ function gtm4wp_initMixcloudTracking() {
 		};
 
 		const gtm4wp_onMixcloudPlayerStateChange = function ( playerState ) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerStateChange',
 				mediaType: 'mixcloud',
 				mediaData: gtm4wp_mixcloudMediaData(),
@@ -84,7 +85,7 @@ function gtm4wp_initMixcloudTracking() {
 		};
 
 		const gtm4wp_onMixcloudPlayerEvent = function ( eventName ) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'mixcloud',
 				mediaData: gtm4wp_mixcloudMediaData(),
@@ -119,7 +120,7 @@ function gtm4wp_initMixcloudTracking() {
 				mediaPercentage,
 				gtm4wp_mixcloud_percentage_tracking,
 				function ( i ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlaybackPercentage',
 						mediaType: 'mixcloud',
 						mediaData: gtm4wp_mixcloudMediaData(),
@@ -141,7 +142,7 @@ function gtm4wp_initMixcloudTracking() {
 		};
 
 		widget.ready.then( function () {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerReady',
 				mediaType: 'mixcloud',
 				mediaData: gtm4wp_mixcloudMediaData(),

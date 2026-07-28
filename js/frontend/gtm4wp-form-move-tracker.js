@@ -1,3 +1,5 @@
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
+
 // Guard against double registration: a re-injected bundle (AJAX navigation, a page
 // builder duplicating the handle) would otherwise attach these document-level
 // listeners twice and double-push every form event. The media-tracker family and
@@ -84,7 +86,7 @@ if ( ! window.gtm4wp_form_move_inited ) {
 	 * @param {string}  eventname The data layer event name.
 	 */
 	function gtm4wp_form_move_push( elem, eventname ) {
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: eventname,
 
 			inputID: elem.getAttribute( 'id' ) || '(no input ID)',

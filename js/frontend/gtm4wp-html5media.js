@@ -6,6 +6,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_html5media_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -48,7 +49,7 @@ function gtm4wp_initHTML5MediaTracking() {
 				? 0
 				: media_element.duration;
 
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerReady',
 				mediaType: 'html5media',
 				mediaData: {
@@ -101,7 +102,7 @@ function gtm4wp_initHTML5MediaTracking() {
 				? 0
 				: media_element.currentTime;
 
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerStateChange',
 				mediaType: 'html5media',
 				mediaData: {
@@ -139,7 +140,7 @@ function gtm4wp_initHTML5MediaTracking() {
 				? 0
 				: media_element.currentTime;
 
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'html5media',
 				mediaData: {
@@ -272,7 +273,7 @@ function gtm4wp_initHTML5MediaTracking() {
 				videoPercentage,
 				gtm4wp_html5media_percentage_tracking,
 				function ( i ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlaybackPercentage',
 						mediaType: 'html5media',
 						mediaData: {

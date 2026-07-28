@@ -2,6 +2,7 @@
  * GTM4WP e-commerce generic helper functions.
  */
 import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 /**
  * Casts a price-like value into a float with two decimals.
@@ -35,8 +36,10 @@ function gtm4wp_push_ecommerce(
 	const ecom_obj = extra_params || {};
 	ecom_obj.items = items;
 
+	// The clear must travel the same (possibly queued) channel as the event
+	// push below, so their relative order survives a consent-queue replay.
 	if ( gtm4wp_clear_ecommerce ) {
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			ecommerce: null,
 		} );
 	}
@@ -65,7 +68,7 @@ function gtm4wp_push_ecommerce(
 		);
 	}
 
-	window[ gtm4wp_datalayer_name ].push( dl_obj );
+	gtm4wp_push_dl_event( dl_obj );
 }
 
 function gtm4wp_read_from_json(

@@ -1,3 +1,5 @@
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
+
 let gtm4wp_last_selected_product_variation;
 
 // #82: these three carry de-dupe state that the document-level listeners registered
@@ -1094,13 +1096,8 @@ function gtm4wp_woocommerce_process_pages() {
 							// and its own truthiness guard then swallowed the
 							// failure on any site using the rename - or pushed
 							// into whatever other tool owns that global there.
-							if (
-								dl_data_obj &&
-								window[ gtm4wp_datalayer_name ]
-							) {
-								window[ gtm4wp_datalayer_name ].push(
-									dl_data_obj
-								);
+							if ( dl_data_obj ) {
+								gtm4wp_push_dl_event( dl_data_obj );
 							}
 						} catch ( e ) {
 							console &&

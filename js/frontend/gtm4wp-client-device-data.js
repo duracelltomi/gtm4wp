@@ -6,6 +6,9 @@
  * minimal user agent fallback elsewhere. Pushes a gtm4wp.deviceData event
  * into the data layer with the same variable names as 1.x used.
  */
+
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
+
 ( function () {
 	'use strict';
 
@@ -24,7 +27,6 @@
 		os: true,
 		device: true,
 	};
-	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
 
 	function pushDeviceData( data ) {
 		const filtered = { event: 'gtm4wp.deviceData' };
@@ -40,8 +42,7 @@
 			}
 		} );
 
-		window[ datalayerName ] = window[ datalayerName ] || [];
-		window[ datalayerName ].push( filtered );
+		gtm4wp_push_dl_event( filtered );
 	}
 
 	function significantBrand( brands ) {

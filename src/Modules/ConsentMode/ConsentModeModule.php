@@ -58,6 +58,8 @@ final class ConsentModeModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID     => '',
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION => '',
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE   => false,
+			GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE         => false,
+			GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE_CMP     => '',
 		);
 	}
 
@@ -78,6 +80,10 @@ final class ConsentModeModule extends AbstractModule {
 		// Axeptio is a consent management tool owned by this module; its own
 		// enabling option and project ID gate the registration.
 		( new Axeptio( $this->options ) )->register_hooks();
+
+		// The consent-aware event queue is gated on its own enabling option
+		// and a supported consent tool selection.
+		( new ConsentQueue( $this->options ) )->register_hooks();
 	}
 
 	/**

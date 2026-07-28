@@ -4,6 +4,7 @@ import {
 	gtm4wpMediaMilestones,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_spotify_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -202,7 +203,7 @@ function gtm4wp_onSpotifyPercentageChange(
 		gtm4wp_spotify_percentage_tracking,
 		function ( i ) {
 			const info = gtm4wp_spotifyMediaData( uri, duration );
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlaybackPercentage',
 				mediaType: 'spotify',
 				mediaData: info,
@@ -239,7 +240,7 @@ function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 
 	controller.addListener( 'ready', function () {
 		const info = gtm4wp_spotifyMediaData( fallbackUri, 0 );
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: 'gtm4wp.mediaPlayerReady',
 			mediaType: 'spotify',
 			mediaData: info,
@@ -298,7 +299,7 @@ function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 		gtm4wp_spotify_last_state[ uri ] = playerState;
 
 		const info = gtm4wp_spotifyMediaData( uri, duration );
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: 'gtm4wp.mediaPlayerStateChange',
 			mediaType: 'spotify',
 			mediaData: info,

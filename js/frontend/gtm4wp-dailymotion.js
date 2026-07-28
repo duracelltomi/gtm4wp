@@ -5,6 +5,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_dailymotion_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -227,7 +228,7 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 	};
 
 	const gtm4wp_onDailymotionPlayerStateChange = function ( playerState ) {
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: 'gtm4wp.mediaPlayerStateChange',
 			mediaType: 'dailymotion',
 			mediaData: gtm4wp_dailymotionMediaData(),
@@ -246,7 +247,7 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 	};
 
 	const gtm4wp_onDailymotionPlayerEvent = function ( eventName, eventParam ) {
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: 'gtm4wp.mediaPlayerEvent',
 			mediaType: 'dailymotion',
 			mediaData: gtm4wp_dailymotionMediaData(),
@@ -283,7 +284,7 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 			videoPercentage,
 			gtm4wp_dailymotion_percentage_tracking,
 			function ( i ) {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlaybackPercentage',
 					mediaType: 'dailymotion',
 					mediaData: gtm4wp_dailymotionMediaData(),
@@ -319,7 +320,7 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 	gtm4wp_dailymotionOn(
 		dailymotion.events.PLAYER_CRITICALPATHREADY,
 		function () {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerReady',
 				mediaType: 'dailymotion',
 				mediaData: gtm4wp_dailymotionMediaData(),
@@ -501,7 +502,7 @@ function gtm4wp_initDailymotionTracking() {
 			// family (see the Vimeo tracker's .catch): a mediaPlayerEvent named
 			// 'error' carrying the reason, measured on whichever node is
 			// actually on screen now.
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'dailymotion',
 				mediaData: {

@@ -107,27 +107,25 @@ final class PurchaseTracking {
 				$this->product_data->get_purchase_datalayer( $order, $order_items )
 			);
 
-			$datalayer_name = $this->datalayer->name();
-
 			// An unencodable payload must not be reported as tracked (#141). Order
 			// data passes through the public GTM4WP_WPFILTER_EEC_ORDER_DATA /
 			// _ORDER_ITEM filters, so a third party can put a value in here that
 			// wp_json_encode() refuses (INF/NAN, a resource, over-deep nesting), and
-			// it then returns false - which PHP concatenates as '', emitting
-			// `.push()`: a call that pushes nothing at all. Emitting that AND
-			// flagging the order tracked would suppress this purchase permanently,
-			// on every later page view too. Bailing leaves the order un-flagged, so
-			// the next request tries again.
-			$encoded_data_layer = wp_json_encode( $data_layer, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
-
-			if ( false === $encoded_data_layer ) {
+			// it then returns false. push_snippet() below encodes this same payload
+			// internally but its inline snippet cannot report the failure, so probe
+			// it here first: emitting a broken push AND flagging the order tracked
+			// would suppress this purchase permanently, on every later page view
+			// too. Bailing leaves the order un-flagged, so the next request tries
+			// again.
+			if ( false === wp_json_encode( $data_layer, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) ) {
 				return;
 			}
 
+			// The consent-aware guarded push (DataLayer::push_snippet) carries
+			// the same hex-flag JSON encoding this block always used.
 			$script_tag = '
 ' . $this->script_tag->opening_tag() . '
-	window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];
-	window.' . esc_js( $datalayer_name ) . '.push(' . $encoded_data_layer . ');
+	' . $this->datalayer->push_snippet( $data_layer ) . '
 </script>';
 
 			$this->script_tag->print_script_block( $script_tag );

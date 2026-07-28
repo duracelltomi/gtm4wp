@@ -5,6 +5,7 @@ import {
 	gtm4wpMediaSrcUrl,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_youtube_percentage_tracking = 10;
 // Both keyed by the YouTube video id, so a null prototype: on a plain object a
@@ -98,7 +99,7 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 			src: '//www.youtube.com/iframe_api',
 			subscribe( rescan ) {
 				window.onYouTubeIframeAPIReady = function () {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaApiReady',
 						mediaType: 'youtube',
 					} );
@@ -131,7 +132,7 @@ function gtm4wp_youtubeIframe( target ) {
 function gtm4wp_onYouTubePlayerReady( event ) {
 	const videodata = event.target.getVideoData();
 
-	window[ gtm4wp_datalayer_name ].push( {
+	gtm4wp_push_dl_event( {
 		event: 'gtm4wp.mediaPlayerReady',
 		mediaType: 'youtube',
 		mediaData: {
@@ -197,7 +198,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 
 	const videodata = event.target.getVideoData();
 
-	window[ gtm4wp_datalayer_name ].push( {
+	gtm4wp_push_dl_event( {
 		event: 'gtm4wp.mediaPlayerStateChange',
 		mediaType: 'youtube',
 		mediaData: {
@@ -233,7 +234,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 function gtm4wp_pushYouTubePlayerEvent( event, eventName ) {
 	const videodata = event.target.getVideoData();
 
-	window[ gtm4wp_datalayer_name ].push( {
+	gtm4wp_push_dl_event( {
 		event: 'gtm4wp.mediaPlayerEvent',
 		mediaType: 'youtube',
 		mediaData: {
@@ -294,7 +295,7 @@ function gtm4wp_onYouTubePercentageChange( event ) {
 		videoPercentage,
 		gtm4wp_youtube_percentage_tracking,
 		function ( i ) {
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlaybackPercentage',
 				mediaType: 'youtube',
 				mediaData: {

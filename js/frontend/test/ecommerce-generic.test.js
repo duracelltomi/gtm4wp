@@ -16,8 +16,9 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 		window.dataLayer = [];
 		global.gtm4wp_console_log = false;
 		// Reset per test so the clear_ecommerce=false case below cannot leak into
-		// the following test (TS-7).
+		// the following test (TS-7). Same for the consent queue runtime hook.
 		global.gtm4wp_clear_ecommerce = true;
+		delete window.gtm4wp_datalayer_push;
 	} );
 
 	describe( 'gtm4wp_make_sure_is_float', () => {
@@ -556,6 +557,27 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			expect( spy ).not.toHaveBeenCalled();
 
 			spy.mockRestore();
+		} );
+
+		it( 'routes the clear and the event through the consent queue runtime when installed', () => {
+			// Both pushes must travel the same (possibly queued) channel so
+			// their relative order survives a consent-queue replay.
+			window.gtm4wp_datalayer_push = jest.fn();
+
+			window.gtm4wp_push_ecommerce( 'add_to_cart', [ { item_id: 1 } ], {
+				currency: 'EUR',
+			} );
+
+			expect( window.dataLayer ).toHaveLength( 0 );
+			expect( window.gtm4wp_datalayer_push ).toHaveBeenCalledTimes( 2 );
+			expect( window.gtm4wp_datalayer_push.mock.calls[ 0 ][ 0 ] ).toEqual(
+				{
+					ecommerce: null,
+				}
+			);
+			expect(
+				window.gtm4wp_datalayer_push.mock.calls[ 1 ][ 0 ].event
+			).toBe( 'add_to_cart' );
 		} );
 
 		it( 'does not prepend an ecommerce reset when clear_ecommerce is off', () => {

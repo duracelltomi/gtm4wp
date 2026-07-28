@@ -56,6 +56,7 @@ import {
 	gtm4wp_write_cookie,
 	gtm4wp_clear_cookie,
 } from './lib/gtm4wp-cookies';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 ( function () {
 	'use strict';
@@ -74,7 +75,6 @@ import {
 	window.gtm4wp_visitordata_inited = true;
 
 	const config = window.gtm4wp_visitordata_config || { fields: {} };
-	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
 	const fields = config.fields || {};
 
 	/**
@@ -128,16 +128,6 @@ import {
 	// nonce tick (~24h), which on a long-lived cached page would 403 the beacon and
 	// silently restore the cross-device purchase double-count (issue #398).
 	let beaconNonce = config.nonce || '';
-
-	/**
-	 * Returns the data layer array, creating it if needed.
-	 *
-	 * @return {Array} The data layer.
-	 */
-	function dataLayer() {
-		window[ datalayerName ] = window[ datalayerName ] || [];
-		return window[ datalayerName ];
-	}
 
 	/**
 	 * The single accumulated visitor push: the Tier 1 producers and the endpoint
@@ -201,7 +191,7 @@ import {
 		} );
 		push.event = name;
 
-		dataLayer().push( push );
+		gtm4wp_push_dl_event( push );
 	}
 
 	/**
@@ -463,7 +453,7 @@ import {
 			return;
 		}
 
-		dataLayer().push( payload.push );
+		gtm4wp_push_dl_event( payload.push );
 
 		if ( useGuard && orderNumber ) {
 			writeOrderTracked( orderNumber );
@@ -508,7 +498,7 @@ import {
 			return;
 		}
 
-		dataLayer().push( payload.push );
+		gtm4wp_push_dl_event( payload.push );
 
 		if ( token ) {
 			recordReaddedToken( token );

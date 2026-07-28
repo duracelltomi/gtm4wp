@@ -32,6 +32,13 @@ const DIST_FILES = [
 	{ source: 'compat', required: true },
 	{ source: 'src', required: true },
 	{ source: 'build', required: true },
+	// The consent queue runtime is not a webpack entry: PHP inlines this
+	// source file at runtime (ConsentQueue::add_head_js), so it must ship
+	// even though the rest of js/ stays out of the archive.
+	{
+		source: 'js/frontend/lib/gtm4wp-consent-queue-runtime.js',
+		required: true,
+	},
 ];
 
 /**

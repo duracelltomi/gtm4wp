@@ -150,7 +150,9 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->assertStringContainsString( '"event":"purchase"', $output );
 		$this->assertStringContainsString( '"transaction_id":"1001"', $output );
 		$this->assertStringContainsString( '"new_customer":true', $output );
-		$this->assertStringContainsString( 'dataLayer.push(', $output );
+		// The consent-aware guarded push caller (DataLayer::push_snippet):
+		// routes through the queue runtime when present, direct push otherwise.
+		$this->assertStringContainsString( '(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})(', $output );
 		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'A tracked order must be flagged with the _ga_tracked meta.' );
 	}
 

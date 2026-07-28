@@ -77,6 +77,30 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
 	}
 
+	public function test_consent_mode_wires_consent_queue_when_enabled_with_cmp(): void {
+		// The queue is owned by the consent module; enabling it together with
+		// a supported consent tool must register a head-block callback via
+		// the delegated ConsentQueue handler.
+		$this->boot(
+			new ConsentModeModule(),
+			array(
+				GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE     => true,
+				GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE_CMP => 'cookiebot',
+			)
+		);
+
+		$this->assertNotFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
+	}
+
+	public function test_consent_mode_does_not_wire_consent_queue_without_cmp_selection(): void {
+		$this->boot(
+			new ConsentModeModule(),
+			array( GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE => true )
+		);
+
+		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
+	}
+
 	public function test_webtoffee_header_js_uses_custom_datalayer_name(): void {
 		Functions\stubEscapeFunctions();
 

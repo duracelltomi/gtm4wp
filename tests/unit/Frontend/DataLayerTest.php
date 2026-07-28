@@ -222,14 +222,14 @@ final class DataLayerTest extends FrontendTestCase {
 
 		$this->assertCount( 1, $captured );
 		$this->assertStringContainsString(
-			'dataLayer.push((window.gtm4wp_enrich||function(d){return d;})({"event":"view_item","value":42},123,"list"));',
+			'(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})((window.gtm4wp_enrich||function(d){return d;})({"event":"view_item","value":42},123,"list"));',
 			$captured[0]
 		);
 	}
 
 	public function test_flush_pushes_emits_a_plain_push_without_a_wrapper(): void {
-		// The wrapper is opt-in: with no wrapper the emitted line must stay exactly
-		// what every release so far produced, byte for byte.
+		// The wrapper is opt-in: with no wrapper the object goes straight into the
+		// consent-aware guarded push, with no identity-fallback fragment emitted.
 		$captured = array();
 		Functions\when( 'wp_add_inline_script' )->alias(
 			static function ( $handle, $code, $position ) use ( &$captured ) {
@@ -242,7 +242,7 @@ final class DataLayerTest extends FrontendTestCase {
 
 		$datalayer->flush_pushes();
 
-		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $captured[0] );
+		$this->assertStringContainsString( '(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"view_item","value":42});', $captured[0] );
 		$this->assertStringNotContainsString( 'function(d){return d;}', $captured[0] );
 	}
 
@@ -271,7 +271,7 @@ final class DataLayerTest extends FrontendTestCase {
 
 		// Both directions: the safe form is what got emitted, and no fragment of the
 		// hostile value survived anywhere in the script.
-		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $captured[0] );
+		$this->assertStringContainsString( '(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"view_item","value":42});', $captured[0] );
 		$this->assertStringNotContainsString( 'alert', $captured[0] );
 		$this->assertStringNotContainsString( '</script', $captured[0] );
 		$this->assertStringNotContainsString( $hostile, $captured[0] );
@@ -379,7 +379,7 @@ final class DataLayerTest extends FrontendTestCase {
 
 		$datalayer->flush_pushes();
 
-		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $captured[0] );
+		$this->assertStringContainsString( '(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"view_item","value":42});', $captured[0] );
 		$this->assertStringNotContainsString( 'gtm4wp_enrich', $captured[0] );
 	}
 
@@ -433,7 +433,7 @@ final class DataLayerTest extends FrontendTestCase {
 
 		$all = implode( "\n", $captured );
 
-		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $all );
+		$this->assertStringContainsString( '(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"view_item","value":42});', $all );
 		$this->assertStringNotContainsString( 'broken_event', $all );
 		$this->assertStringNotContainsString( 'dataLayer.push();', $all );
 	}
@@ -459,7 +459,7 @@ final class DataLayerTest extends FrontendTestCase {
 		$datalayer = new DataLayer( $this->make_options() );
 		$datalayer->flush_pushes();
 
-		$this->assertStringContainsString( 'dataLayer.push({"event":"thirdparty.event"});', $captured[0] );
+		$this->assertStringContainsString( '(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"thirdparty.event"});', $captured[0] );
 	}
 
 	public function test_queue_push_lets_event_data_override_the_event_arg(): void {
@@ -505,7 +505,12 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertSame( 'gtm4wp-additional-datalayer-pushes', $captured[0][0] );
 		$this->assertSame( 'after', $captured[0][2] );
 		$this->assertStringContainsString( '// before', $captured[0][1] );
-		$this->assertStringContainsString( 'dataLayer.push({"event":"gtm4wp.test","value":42});', $captured[0][1] );
+		// The guarded snippet: routes through the consent queue runtime when
+		// present, plain direct push otherwise (see DataLayer::push_snippet()).
+		$this->assertStringContainsString(
+			'(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"gtm4wp.test","value":42});',
+			$captured[0][1]
+		);
 		$this->assertStringContainsString( '// after', $captured[0][1] );
 
 		$this->assertSame( array(), $GLOBALS['gtm4wp_additional_datalayer_pushes'] );
@@ -604,6 +609,60 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertStringContainsString( '"price":35.9', $code );
 		$this->assertStringNotContainsString( '"item_id":35180', $code, 'A leading-zero SKU must not be coerced into a JSON number.' );
 		$this->assertStringNotContainsString( '"value":"35.9"', $code, 'A float value must encode as a JSON number, not a string.' );
+	}
+
+	public function test_push_snippet_wraps_the_object_in_the_guarded_queue_caller(): void {
+		$datalayer = new DataLayer( $this->make_options() );
+
+		$this->assertSame(
+			'(window.gtm4wp_datalayer_push||function(o){window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);})({"event":"gtm4wp.userLoggedIn"});',
+			$datalayer->push_snippet( array( 'event' => 'gtm4wp.userLoggedIn' ) )
+		);
+	}
+
+	public function test_push_snippet_honors_the_configured_datalayer_name(): void {
+		$datalayer = new DataLayer(
+			$this->make_options( array( GTM4WP_OPTION_DATALAYER_NAME => 'myDataLayer' ) )
+		);
+
+		$snippet = $datalayer->push_snippet( array( 'event' => 'x' ) );
+
+		$this->assertStringContainsString( 'window.myDataLayer=window.myDataLayer||[];window.myDataLayer.push(o);', $snippet );
+		$this->assertStringNotContainsString( 'window.dataLayer', $snippet );
+	}
+
+	public function test_push_snippet_never_emits_a_non_identifier_datalayer_name(): void {
+		// name() routes through ContainerRows::datalayer_name() (PA-2), so a
+		// stored name that is not a plain JS identifier collapses to the
+		// 'dataLayer' fallback before it can reach this sink. Both directions:
+		// the fallback is what is emitted, and no fragment of the hostile
+		// value survives - raw or escaped.
+		$datalayer = new DataLayer(
+			$this->make_options( array( GTM4WP_OPTION_DATALAYER_NAME => 'dl"x' ) )
+		);
+
+		$snippet = $datalayer->push_snippet( array( 'event' => 'x' ) );
+
+		$this->assertStringContainsString( 'window.dataLayer=window.dataLayer||[];window.dataLayer.push(o);', $snippet );
+		$this->assertStringNotContainsString( 'dl"x', $snippet );
+		$this->assertStringNotContainsString( 'dl\\"x', $snippet );
+	}
+
+	public function test_push_snippet_hex_encodes_script_breakout_characters(): void {
+		$datalayer = new DataLayer( $this->make_options() );
+
+		$hostile = "\x3C/script\x3E\x3Csvg onload=alert(1)\x3E \x26 \x22quote\x22";
+		$snippet = $datalayer->push_snippet( array( 'evil' => $hostile ) );
+
+		$expected_json = wp_json_encode(
+			array( 'evil' => $hostile ),
+			JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		$this->assertStringContainsString( $expected_json, $snippet );
+		$this->assertStringNotContainsString( '</script>', $snippet, 'A </script> in the event object must never survive unencoded.' );
+		$this->assertStringNotContainsString( '<svg', $snippet, 'A raw < must be hex-encoded (JSON_HEX_TAG).' );
+		$this->assertStringNotContainsString( '"quote"', $snippet, 'A raw double quote must be hex-encoded (JSON_HEX_QUOT).' );
 	}
 
 	public function test_flush_pushes_hex_encodes_script_breakout_characters(): void {

@@ -72,11 +72,12 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function groups(): array {
 		return array(
-			'consent-mode' => __( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
-			'cookiebot'    => __( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
-			'webtoffee'    => __( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
-			'cookieyes'    => __( 'CookieYes', 'duracelltomi-google-tag-manager' ),
-			'axeptio'      => __( 'Axeptio', 'duracelltomi-google-tag-manager' ),
+			'consent-mode'  => __( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
+			'consent-queue' => __( 'Consent-aware event queue', 'duracelltomi-google-tag-manager' ),
+			'cookiebot'     => __( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
+			'webtoffee'     => __( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
+			'cookieyes'     => __( 'CookieYes', 'duracelltomi-google-tag-manager' ),
+			'axeptio'       => __( 'Axeptio', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -168,6 +169,42 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				doc: self::DOC_CONSENT
 			),
 			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Consent-aware event queue', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Enable this to hold data layer events emitted by GTM4WP (e-commerce, media, form, user and custom events) in a JavaScript queue until your consent management tool signals - via its browser event - that the visitor\'s consent choice is available (stored from an earlier visit or just made) and Google Consent Mode has been updated. Queued events are then replayed in their original order and later events pass straight through. The plugin never inspects the granted/denied state: tag firing remains controlled by Google Consent Mode and your tag settings inside Google Tag Manager. The page load data layer, the container loader and the consent default command are never held back. Events are held until the signal arrives - if your consent tool never fires it, queued events are not sent at all. Select your consent management tool below.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'consent-queue',
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_BASE
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE_CMP,
+				type: Field::TYPE_SELECT,
+				default_value: '',
+				label: __( 'Consent management tool', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Select the consent management tool whose browser event unlocks the queue. Prefer your tool\'s dedicated entry when it is listed - its native browser event guarantees that the Google Consent Mode update has already run. Choose "WP Consent API" for any consent plugin implementing the WordPress Consent API standard (WebToffee GDPR Cookie Consent, Moove GDPR Cookie Compliance, consentmanager.net and others). Note for CookieYes: its browser events fire only when the plugin is connected to the CookieYes web app - with a locally configured banner choose "WP Consent API" instead. With "Custom / other" the queue is unlocked by dispatching the gtm4wp_consent_ready browser event on document, or by calling window.gtm4wp_consent_unlock() from your own integration code.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'consent-queue',
+				phase: Field::PHASE_EXPERIMENTAL,
+				choices: array(
+					''               => __( '&mdash; select your consent tool &mdash;', 'duracelltomi-google-tag-manager' ),
+					'cookiebot'      => __( 'Cookiebot by Usercentrics', 'duracelltomi-google-tag-manager' ),
+					'cookieyes'      => __( 'CookieYes (connected to the CookieYes web app)', 'duracelltomi-google-tag-manager' ),
+					'complianz'      => __( 'Complianz', 'duracelltomi-google-tag-manager' ),
+					'borlabs'        => __( 'Borlabs Cookie', 'duracelltomi-google-tag-manager' ),
+					'wp-consent-api' => __( 'WP Consent API (any compatible consent plugin)', 'duracelltomi-google-tag-manager' ),
+					'custom'         => __( 'Custom / other (gtm4wp_consent_ready browser event)', 'duracelltomi-google-tag-manager' ),
+				),
+				depends_on: GTM4WP_OPTION_INTEGRATE_CONSENT_QUEUE,
+				doc: self::DOC_BASE
+			),
+			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_COOKIEBOT,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
@@ -205,7 +242,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				description: sprintf(
 					/* translators: 1: opening anchor tag linking to CookieYes' consent banner action API documentation. 2: Closing anchor tag. */
 					esc_html__(
-						'Enable this to push a GTM data layer event (cookie_consent_update) whenever CookieYes reports a consent choice. It listens for the %1$sCookieYes consent banner action API%2$s events (cookieyes_consent_update and cookieyes_banner_load) and forwards the accepted/rejected categories to the data layer, giving your container a defined consent signal to sequence tags on. It does not defer any events - rely on Google Consent Mode v2 to gate tags regardless of push order.',
+						'Enable this to push a GTM data layer event (cookie_consent_update) whenever CookieYes reports a consent choice. It listens for the %1$sCookieYes consent banner action API%2$s events (cookieyes_consent_update and cookieyes_banner_load) and forwards the accepted/rejected categories to the data layer, giving your container a defined consent signal to sequence tags on. It does not defer any events on its own - rely on Google Consent Mode v2 to gate tags regardless of push order, or enable the consent-aware event queue above to hold GTM4WP events until the consent choice is available.',
 						'duracelltomi-google-tag-manager'
 					),
 					'<a href="https://www.cookieyes.com/documentation/consent-banner-action-api/" target="_blank" rel="noopener">',

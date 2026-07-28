@@ -3,6 +3,7 @@ import {
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_wistia_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -70,7 +71,7 @@ function gtm4wp_initWistiaTracking() {
 			};
 
 			const gtm4wp_onWistiaPlayerStateChange = function ( playerState ) {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerStateChange',
 					mediaType: 'wistia',
 					mediaData: gtm4wp_wistiaMediaData(),
@@ -92,7 +93,7 @@ function gtm4wp_initWistiaTracking() {
 				eventName,
 				eventParam
 			) {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerEvent',
 					mediaType: 'wistia',
 					mediaData: gtm4wp_wistiaMediaData(),
@@ -121,7 +122,7 @@ function gtm4wp_initWistiaTracking() {
 					videoPercentage,
 					gtm4wp_wistia_percentage_tracking,
 					function ( i ) {
-						window[ gtm4wp_datalayer_name ].push( {
+						gtm4wp_push_dl_event( {
 							event: 'gtm4wp.mediaPlaybackPercentage',
 							mediaType: 'wistia',
 							mediaData: gtm4wp_wistiaMediaData(),
@@ -142,7 +143,7 @@ function gtm4wp_initWistiaTracking() {
 				);
 			};
 
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerReady',
 				mediaType: 'wistia',
 				mediaData: gtm4wp_wistiaMediaData(),

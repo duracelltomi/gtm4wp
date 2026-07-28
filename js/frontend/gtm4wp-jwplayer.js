@@ -5,6 +5,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_jwplayer_percentage_tracking = 10;
 // Keyed by the media id the provider reports, so a null prototype: on a plain
@@ -67,7 +68,7 @@ function gtm4wp_initJWPlayerTracking() {
 		const gtm4wp_onJWPlayerStateChange = function ( playerState ) {
 			const mediaData = gtm4wp_jwMediaData();
 
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerStateChange',
 				mediaType: 'jwplayer',
 				mediaData,
@@ -88,7 +89,7 @@ function gtm4wp_initJWPlayerTracking() {
 		const gtm4wp_onJWPlayerEvent = function ( eventName, eventParam ) {
 			const mediaData = gtm4wp_jwMediaData();
 
-			window[ gtm4wp_datalayer_name ].push( {
+			gtm4wp_push_dl_event( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'jwplayer',
 				mediaData,
@@ -127,7 +128,7 @@ function gtm4wp_initJWPlayerTracking() {
 				videoPercentage,
 				gtm4wp_jwplayer_percentage_tracking,
 				function ( i ) {
-					window[ gtm4wp_datalayer_name ].push( {
+					gtm4wp_push_dl_event( {
 						event: 'gtm4wp.mediaPlaybackPercentage',
 						mediaType: 'jwplayer',
 						mediaData,
@@ -153,7 +154,7 @@ function gtm4wp_initJWPlayerTracking() {
 		// (which may have fired before this tracker ran).
 		const gtm4wp_jwReadyMediaData = gtm4wp_jwMediaData();
 
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: 'gtm4wp.mediaPlayerReady',
 			mediaType: 'jwplayer',
 			mediaData: gtm4wp_jwReadyMediaData,

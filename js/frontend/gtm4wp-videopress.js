@@ -5,6 +5,7 @@ import {
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
 
 const gtm4wp_videopress_percentage_tracking = 10;
 
@@ -225,7 +226,7 @@ function gtm4wp_initVideoPressTracking() {
 			videoPercentage,
 			gtm4wp_videopress_percentage_tracking,
 			function ( i ) {
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlaybackPercentage',
 					mediaType: 'videopress',
 					mediaData: gtm4wp_videoPressMediaData( guid, duration ),
@@ -258,7 +259,7 @@ function gtm4wp_initVideoPressTracking() {
 		}
 		gtm4wp_videopress_last_state[ guid ] = playerState;
 
-		window[ gtm4wp_datalayer_name ].push( {
+		gtm4wp_push_dl_event( {
 			event: 'gtm4wp.mediaPlayerStateChange',
 			mediaType: 'videopress',
 			mediaData: gtm4wp_videoPressMediaData( guid, duration ),
@@ -343,7 +344,7 @@ function gtm4wp_initVideoPressTracking() {
 				}
 				gtm4wp_videopress_ready[ guid ] = true;
 
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerReady',
 					mediaType: 'videopress',
 					mediaData: gtm4wp_videoPressMediaData( guid, duration ),
@@ -436,7 +437,7 @@ function gtm4wp_initVideoPressTracking() {
 						data.qualityLevelInternalName;
 				}
 
-				window[ gtm4wp_datalayer_name ].push( {
+				gtm4wp_push_dl_event( {
 					event: 'gtm4wp.mediaPlayerEvent',
 					mediaType: 'videopress',
 					mediaData: gtm4wp_videoPressMediaData( guid, duration ),

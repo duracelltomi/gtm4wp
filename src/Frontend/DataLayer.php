@@ -241,6 +241,47 @@ final class DataLayer {
 	}
 
 	/**
+	 * Builds a self-contained JavaScript statement pushing one data layer
+	 * event object, consent-aware when the queue runtime is on the page.
+	 *
+	 * The snippet routes through window.gtm4wp_datalayer_push() — the queue
+	 * runtime installed into the head block by ConsentQueue::add_head_js()
+	 * (js/frontend/lib/gtm4wp-consent-queue-runtime.js) — so the event can be
+	 * held until the visitor's consent choice is available. When the runtime
+	 * is absent (feature off, AMP page, head block stripped by a cache
+	 * plugin) the inline fallback is a plain direct push. A guarded twin of
+	 * this caller lives in JS as gtm4wp_push_dl_event()
+	 * (js/frontend/lib/gtm4wp-datalayer.js) — keep the two in sync.
+	 *
+	 * The object is JSON encoded with the full hex flag set so no value can
+	 * break out of the inline script; the data layer name goes through
+	 * esc_js() (identifier interpolation, the established contract).
+	 *
+	 * @param array<string, mixed> $datalayer_object The data layer event object.
+	 * @return string
+	 */
+	public function push_snippet( array $datalayer_object ): string {
+		$json = wp_json_encode( $datalayer_object, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		return $this->guarded_push_call( (string) $json );
+	}
+
+	/**
+	 * Wraps an already-encoded JavaScript expression in the consent-aware
+	 * guarded push call (see push_snippet() for the contract). The expression
+	 * must be a self-contained JavaScript value: JSON from wp_json_encode(),
+	 * optionally wrapped in the wrapper_fragments() call pair.
+	 *
+	 * @param string $js_expression JavaScript expression evaluating to the object to push.
+	 * @return string
+	 */
+	private function guarded_push_call( string $js_expression ): string {
+		$name = esc_js( $this->name() );
+
+		return '(window.gtm4wp_datalayer_push||function(o){window.' . $name . '=window.' . $name . '||[];window.' . $name . '.push(o);})(' . $js_expression . ');';
+	}
+
+	/**
 	 * Outputs the necessary JavaScript codes to fire additional data layer
 	 * events just after the main GTM container code.
 	 * Port of gtm4wp_fire_additional_datalayer_pushes() from 1.x.
@@ -252,8 +293,6 @@ final class DataLayer {
 		if ( ! is_array( $queued ) ) {
 			$queued = array();
 		}
-
-		$datalayer_name = $this->name();
 
 		foreach ( $queued as $one_event ) {
 			$datalayer_push_code = '';
@@ -275,8 +314,12 @@ final class DataLayer {
 				if ( false !== $encoded_object ) {
 					list( $wrapper_open, $wrapper_close ) = $this->wrapper_fragments( $one_event );
 
+					// The wrapper runs at script-execution time (its job is adding
+					// visitor data the cached HTML cannot carry); only the resulting
+					// object is handed to the consent-aware guarded push, which may
+					// hold it until the consent signal arrives.
 					$datalayer_push_code .= '
-	' . esc_js( $datalayer_name ) . '.push(' . $wrapper_open . $encoded_object . $wrapper_close . ');';
+	' . $this->guarded_push_call( $wrapper_open . $encoded_object . $wrapper_close );
 				}
 			}
 

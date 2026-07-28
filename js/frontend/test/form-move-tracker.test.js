@@ -14,6 +14,7 @@ describe( 'gtm4wp-form-move-tracker', () => {
 	beforeEach( () => {
 		window.dataLayer = [];
 		document.body.innerHTML = '';
+		delete window.gtm4wp_datalayer_push;
 	} );
 
 	function dispatchFocus( el, type ) {
@@ -175,5 +176,21 @@ describe( 'gtm4wp-form-move-tracker', () => {
 		dispatchFocus( document.getElementById( 'dbl' ), 'focusin' );
 
 		expect( window.dataLayer ).toHaveLength( 1 );
+	} );
+
+	it( 'routes through the consent queue runtime when it is installed', () => {
+		// Representative for every tracker converted to gtm4wp_push_dl_event:
+		// with the queue runtime present the event goes to it, not straight
+		// into the data layer.
+		window.gtm4wp_datalayer_push = jest.fn();
+		document.body.innerHTML = '<input id="routed" />';
+
+		dispatchFocus( document.getElementById( 'routed' ), 'focusin' );
+
+		expect( window.dataLayer ).toHaveLength( 0 );
+		expect( window.gtm4wp_datalayer_push ).toHaveBeenCalledTimes( 1 );
+		expect( window.gtm4wp_datalayer_push.mock.calls[ 0 ][ 0 ].event ).toBe(
+			'gtm4wp.formElementEnter'
+		);
 	} );
 } );

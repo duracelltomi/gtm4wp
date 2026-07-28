@@ -21,6 +21,8 @@
  * @see https://contactform7.com/dom-events/
  */
 
+import { gtm4wp_push_dl_event } from './lib/gtm4wp-datalayer';
+
 /**
  * Tracker configuration, injected by the module as an inline script. Falls back
  * to the defaults (full inputs, no GA4 events) when that inline script did not run.
@@ -188,8 +190,7 @@ function gtm4wp_cf7_push_ga4( w, name, form, status ) {
 		fields.form_status = status;
 	}
 
-	w[ gtm4wp_datalayer_name ] = w[ gtm4wp_datalayer_name ] || [];
-	w[ gtm4wp_datalayer_name ].push( Object.assign( { event: name }, fields ) );
+	gtm4wp_push_dl_event( Object.assign( { event: name }, fields ) );
 }
 
 /**
@@ -216,8 +217,7 @@ function gtm4wp_cf7_push_ga4( w, name, form, status ) {
 		d.addEventListener( ctf7event, function ( event ) {
 			const cf7data = gtm4wp_prepare_cf7_data( event );
 
-			w[ gtm4wp_datalayer_name ] = w[ gtm4wp_datalayer_name ] || [];
-			w[ gtm4wp_datalayer_name ].push(
+			gtm4wp_push_dl_event(
 				Object.assign( { event: p[ event.type ] }, cf7data )
 			);
 
