@@ -4,30 +4,25 @@
 
 WordPress plugin that integrates Google Tag Manager into WordPress websites with comprehensive WooCommerce e-commerce tracking (GA4). The plugin manages GTM container code injection, data layer population, and event tracking for product impressions, cart actions, checkout steps, and purchases.
 
-## Security review system
+## Security & test review systems
 
-This repo has a cumulative security-review system under `.security/`:
+Two cumulative, self-updating review systems live under `.security/` and `.testing/`.
+Their pre-flight checklists are loaded into every session by the SessionStart hooks in
+`.claude/settings.json` (no need to `@`-import them here) — follow them **before**
+writing code (`.security/pre-flight-check.md`) or tests (`.testing/pre-flight-check.md`).
 
-- **Before writing or modifying any PHP/JS**, read `.security/pre-flight-check.md` and follow it — it points to `.security/code-review-patterns.md` (accumulated recurring issues, project anti-patterns, and false-positive suppressions) which you must actively avoid.
-- **`.security/threat-model.md`** is the companion that says *how to rate* a finding: the A0–A4 actor ladder (anonymous visitor → administrator) and the rule that severity comes from the **lowest actor who can reach the sink**, not from the sink's power. The patterns file is *what to look for*; this is *how bad it is*. It also fixes what is in and out of scope (bounded-DoS in; admin-attacks-themselves out, with a multisite caveat). Read it before rating anything, and note the two structural risk classes it names: **injection** (RI-2/3/4, PA-3/4) and **exposure** (RI-11).
-- **`/code-review`** (`.claude/commands/code-review.md`) runs a cumulative review that updates `.security/code-review-checklist.md` (coverage matrix + known findings) and the patterns file, and saves a report to `.security/code-review-report-{date}-{time}.md`. The `code-reviewer` subagent (`.claude/agents/code-reviewer.md`) encodes the same checklist.
-- The single most important rule (from the first review): **anything written into the dataLayer or an inline `<script>` must go through `wp_json_encode` with `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS`; never blanket-`htmlspecialchars_decode()` script output; `esc_js()` is not for raw `<script>` bodies.**
-- ⛔ **Disclosure rule (hard):** this is a public repo — committed == published. Never put a working exploit payload, reproduction steps, or the detail of an unfixed finding into any committed file (security docs, code comments, commit messages). That detail lives only in the git-ignored `.security/code-review-report-*.md`; the canonical rule is at the top of `.security/code-review-checklist.md`.
-
-@.security/pre-flight-check.md
-
-## Test review system
-
-This repo has a cumulative **test-review** system under `.testing/`, the
-test-quality sibling of the security system above (same shape, so the two align):
-
-- **Before writing or modifying any test**, read `.testing/pre-flight-check.md` and follow it — it points to `.testing/test-review-patterns.md` (accumulated test smells, project test conventions, and blessed exceptions) which you must actively avoid. A security-relevant code change ships its regression test in the same change.
-- **`/test-review`** (`.claude/commands/test-review.md`) reviews the *test suite* (not the code — that is `/code-review`) for coverage completeness and assertion quality, updates `.testing/test-review-checklist.md` (coverage matrix + Test Debt Sweeps + gaps log) and the patterns file, and saves a report to `.testing/test-review-report-{date}-{time}.md`. The `test-reviewer` subagent (`.claude/agents/test-reviewer.md`) encodes the same checklist.
-- The single most important rule: **a line that is covered is not a behavior that is asserted** — every value reaching a `<script>`/dataLayer sink needs a regression test with a *hostile* input, not just benign data. Coverage tooling can't see this; the review is what catches it.
-- Coverage (optional) is scoped to `src/` in `phpunit.xml`; `composer test:coverage` reports once a PCOV/Xdebug driver is installed. The system also runs without a driver, on mechanical missing-test sweeps + judgment.
-- ⛔ **Disclosure rule (hard):** same as the security system — a test gap on a security sink can point at an unfixed vuln, so keep committed `.testing/` notes terse and defer live-vuln detail to the git-ignored `.security/` report.
-
-@.testing/pre-flight-check.md
+- **Security** (`.security/`): `/code-review` runs the review and updates
+  `code-review-checklist.md` + `code-review-patterns.md` (*what* to look for) and
+  `threat-model.md` (*how bad* — the A0–A4 actor ladder, severity = lowest actor who
+  can reach the sink, scope). Encoded in the `code-reviewer` subagent.
+- **Testing** (`.testing/`): `/test-review` audits the *suite* (coverage + assertion
+  quality, not the code) and updates `test-review-checklist.md` +
+  `test-review-patterns.md`. Encoded in the `test-reviewer` subagent. A
+  security-relevant code change ships its regression test in the same change.
+- ⛔ **Disclosure rule (hard):** public repo — committed == published. Never commit an
+  exploit payload, repro steps, or unfixed-finding detail into any file (docs, code
+  comments, commit messages); live detail stays only in the git-ignored
+  `.security/code-review-report-*.md`. Canonical rule: top of `.security/code-review-checklist.md`.
 
 ## Architecture
 
@@ -142,48 +137,18 @@ it on purpose):
 
 ## Changelog policy
 
-Every change to **production code** ships a matching bullet under the top `## 2.0`
-heading in `CHANGELOG.md` (`* Added:` / `* Changed:` / `* Updated:` / `* Fixed:`).
-"Production code" = `src/**.php`, `compat/**.php`, `js/frontend/**.js`, `js/admin/**.js`,
-the main plugin file and `uninstall.php`; tests, docs and `.security/`/`.testing/`
-housekeeping are exempt.
+Every **production-code** change ships a matching bullet under the top `## 2.0`
+heading in `CHANGELOG.md` (and usually a mirrored `readme.txt` block). This is
+enforced by `.claude/hooks/require-changelog.sh` — a Claude Code `Stop` hook and a
+git `commit-msg` hook that will **block** you if production code changed without a
+`CHANGELOG.md` change (`[skip changelog]` in the commit message bypasses it).
 
-### Write for the upgrading user, not for the development history
-
-While a version is **unreleased**, a fix to a feature introduced *in that same
-version* must **edit that feature's existing bullet**, not add a new `* Fixed:`
-bullet. A user upgrading from the last release never ran the intermediate code,
-so for them the feature plus its development fixes is a single `* Added:`. Add a
-`* Fixed:` bullet only for a defect that shipped in a **released** version.
-
-Corollaries:
-
-- A change that only repairs a regression introduced earlier in the same
-  unreleased version gets **no bullet at all** — its net effect versus the last
-  release is zero. Touch `CHANGELOG.md` (e.g. refine the feature's wording) to
-  satisfy the hook.
-- An internal refactor with "no functional change" is not a changelog entry.
-  Use `[skip changelog]` in the commit message instead.
-- Editing an existing bullet **satisfies both hooks** — they check that
-  `CHANGELOG.md` changed, not that a bullet was added.
-- The 2.0 section is grouped under `###` theme headings (Architecture, Settings
-  screen, Container, Page variables, WooCommerce, Media events, Consent, Contact
-  Form 7, AMP, Removed). Put a new bullet in its theme group rather than at the
-  top of the section.
-- `readme.txt`'s `= 2.0.0 =` block **mirrors** the `## 2.0` section (flattened
-  for WordPress.org: no nested lists, `**bold**` lead-ins instead of `###`).
-  A user-visible change updates both files together.
-
-This is enforced automatically by one shared script, `.claude/hooks/require-changelog.sh`:
-
-- a Claude Code **`Stop` hook** (in `.claude/settings.json`) blocks wrapping up a turn
-  that left production code modified without a `CHANGELOG.md` change;
-- a git **`commit-msg` hook** (`.githooks/commit-msg`) rejects a commit that stages
-  production code without staging `CHANGELOG.md`. Escape hatch for non-user-facing
-  commits: put `[skip changelog]` in the commit message (or `git commit --no-verify`).
-
-**One-time setup after cloning** (the git hook lives in a tracked dir, so it must be
-activated once per clone): `git config core.hooksPath .githooks`.
+The non-obvious part: while a version is unreleased, a fix to a feature added in
+that *same* version **edits that feature's existing bullet** rather than adding a
+new `* Fixed:` — a `Fixed:` bullet is only for a defect that shipped in a released
+version. The full policy (theme grouping, `readme.txt` mirror, corollaries,
+one-time `git config core.hooksPath .githooks` setup) lives in the **`changelog`
+skill** — invoke it when editing `CHANGELOG.md`/`readme.txt` or when the hook blocks you.
 
 ## Testing
 
@@ -217,4 +182,4 @@ See `.claude/skills/woocommerce-extension-developer/SKILL.md` for WooCommerce co
 - Never use WordPress post functions (`get_post_meta`, etc.) for WooCommerce order data - use the WC CRUD API
 - All user-facing strings must use `__()`/`esc_html__()` with text domain `'duracelltomi-google-tag-manager'`
 - Every PHP file should have a `defined( 'ABSPATH' ) || exit;` guard (except the main plugin file)
-- Use `wp_json_encode()` with `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS` for any script-context output
+- Script-context output uses `wp_json_encode()` with the hex flags — see **Coding Standards** above and `.security/pre-flight-check.md` (loaded each session)
