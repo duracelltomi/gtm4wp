@@ -4,7 +4,7 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 6.3
 Requires PHP: 8.0
-Tested up to: 6.9.4
+Tested up to: 7.0.2
 Stable tag: 1.22.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html

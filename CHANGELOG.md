@@ -8,6 +8,7 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 
 * Changed: complete object-oriented rewrite. Every feature is now a module that third-party plugins can extend through the `gtm4wp_register_modules` action. All public template functions (`gtm4wp_the_gtm_tag()` etc.), filter/action names, wp-config constants and the `gtm4wp-options` storage key are unchanged, so existing integrations keep working.
 * Changed: minimum requirements raised to PHP 8.0 and WordPress 6.3.
+* Updated: verified compatible with WordPress 7.0.2 and WooCommerce 10.9.4.
 * Updated: frontend scripts now load with the `defer` strategy where possible.
 
 ### Settings screen
