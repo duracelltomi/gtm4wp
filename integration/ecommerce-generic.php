@@ -11,9 +11,12 @@
 /**
  * Replace only the first occurrence of the search string with the replacement string.
  *
- * @see https://stackoverflow.com/questions/1252693/using-str-replace-so-that-it-only-acts-on-the-first-match
- *
- * TODO: replace regexp usage.
+ * Both arguments are treated as literal strings. This deliberately does NOT use
+ * preg_replace(): its replacement argument expands $0/$1/${1}/\1 as backreferences,
+ * so a replacement carrying product data would have such a sequence substituted with
+ * the matched text. Where the matched text contains a quote, that expansion lands a
+ * raw quote inside an already-escaped attribute and terminates it - the escaping runs
+ * before the substitution, so it cannot defend against it.
  *
  * @param string $search The value being searched for, otherwise known as the needle. Must be a string.
  * @param string $replace The replacement value that replaces found search values. Must be a string.
@@ -21,9 +24,19 @@
  * @return string This function returns a string with the replaced values.
  */
 function gtm4wp_str_replace_first( $search, $replace, $subject ) {
-	$search = '/' . preg_quote( $search, '/' ) . '/';
+	// Guarded because this is a global function a third party may call: strpos()
+	// warns on an empty needle below PHP 8.0, and this branch requires PHP 7.4.
+	if ( '' === $search ) {
+		return $subject;
+	}
 
-	return preg_replace( $search, $replace, $subject, 1 );
+	$position = strpos( $subject, $search );
+
+	if ( false === $position ) {
+		return $subject;
+	}
+
+	return substr_replace( $subject, $replace, $position, strlen( $search ) );
 }
 
 /**

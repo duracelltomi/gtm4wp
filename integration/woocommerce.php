@@ -1507,7 +1507,12 @@ function gtm4wp_woocommerce_grouped_product_list_column_label( $labelvalue, $pro
 function gtm4wp_woocommerce_add_productdata_to_wc_block( $content, $data, $product ) {
 	$product_data_tag = gtm4wp_woocommerce_get_product_list_item_extra_tag( $product, '', 0, $data->permalink );
 
-	return preg_replace( '/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', '$0' . $product_data_tag, $content );
+	// The tag carries product data, and a preg_replace replacement expands $0/$n/\1
+	// into the matched text - which here contains quotes - so escape those sequences
+	// before they reach the replacement. The leading $0 re-emits the matched <li>.
+	$replacement = '$0' . addcslashes( (string) $product_data_tag, '\\$' );
+
+	return preg_replace( '/<li.+class=("|"[^"]+)wc-block-grid__product("|[^"]+")[^<]*>/i', $replacement, $content );
 }
 
 add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, 'gtm4wp_woocommerce_datalayer_filter_items' );
