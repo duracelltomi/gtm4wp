@@ -1,5 +1,14 @@
 # Full changelog for GTM4WP
 
+## 1.22.5
+
+A maintenance release for the 1.x line. 1.22.4 was intended to be the last one
+before GTM4WP 2.0; this release exists because the fixes below are worth shipping
+to 1.x users rather than holding for 2.0.
+
+* Fixed (security): hardened how the hidden product-data attribute is built for WooCommerce product lists and cart remove links, so that no product field value can affect the surrounding HTML. Certain values were not guaranteed to stay inside the attribute.
+* Fixed: when a custom `X-Forwarded-For` header is configured as the visitor IP source, all entries of the header are now evaluated. Only the first entry was ever considered, because the remaining ones were not trimmed of the space that follows each comma and therefore failed IP validation.
+
 ## 1.22.4
 
 This is the final release of the 1.x line. The next release is GTM4WP 2.0, a

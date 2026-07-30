@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 3.4.0
 Requires PHP: 7.4
 Tested up to: 7.0.2
-Stable tag: 1.22.4
+Stable tag: 1.22.5
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -224,6 +224,13 @@ to report micro conversions and/or to serve ads only to visitors who spend more 
 
 == Changelog ==
 
+= 1.22.5 =
+
+A maintenance release for the 1.x line. 1.22.4 was intended to be the last one before GTM4WP 2.0; this release exists because the fixes below are worth shipping to 1.x users rather than holding for 2.0.
+
+* Fixed (security): hardened how the hidden product-data attribute is built for WooCommerce product lists and cart remove links, so that no product field value can affect the surrounding HTML. Certain values were not guaranteed to stay inside the attribute.
+* Fixed: when a custom X-Forwarded-For header is configured as the visitor IP source, all entries of the header are now evaluated. Only the first entry was ever considered, because the remaining ones were not trimmed of the space that follows each comma and therefore failed IP validation.
+
 = 1.22.4 =
 
 * Fixed: hardened how values are encoded into the data layer and into inline script blocks. Script blocks are no longer HTML entity decoded after sanitization, and every value written into a script context is now JSON encoded with the full set of hex escaping flags. Thanks [cyn](https://github.com/cyn8)
@@ -370,6 +377,10 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 * Added: Create a cookie named block_gtm4wp_geoip after a specific user selected cookie preferences. Set the value to either "yes", "true", "on" or "1" and the GeoIP (and weather API) feature will be disabled for that particular user
 
 == Upgrade Notice ==
+
+= 1.22.5 =
+
+Security release. Hardens how product data is written into WooCommerce product list and cart markup. Recommended for every store, and especially where users other than the site administrator can edit products.
 
 = 1.22.4 =
 
