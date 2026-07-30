@@ -104,6 +104,12 @@ if ( ! function_exists( 'gtm4wp_amp_running' ) ) {
  * IP address for tracking purposes. Therefore function has been changed to only use the safe server variable and a user option to allow one
  * specific custom HTTP header.
  *
+ * Note that the custom header value is still NOT authenticated. Narrowing the choice to one operator-configured header removes the guesswork
+ * an attacker had with a header list, but the header itself remains client supplied - only REMOTE_ADDR is observed by the server. For
+ * X-Forwarded-For the list below is scanned left to right, and proxies that append (nginx proxy_add_x_forwarded_for, AWS ALB, Cloudflare)
+ * put the address they observed on the right, so the entry returned here is the one the client chose rather than the one the proxy vouched
+ * for. Treat the result as analytics data, never as an input to an access decision.
+ *
  * The function will translate the given custom header to a PHP server varibale, no need to directly input the PHP form of the header.
  * If custom the header is not found, the function will fall back to REMOTE_ADDR.
  *
@@ -115,7 +121,11 @@ function gtm4wp_get_user_ip( $use_custom_header = '' ) {
 
 	if ( '' !== $use_custom_header ) {
 		$custom_header = strtoupper( str_replace( '-', '_', $use_custom_header ) );
-		if ( preg_match( '/[A-Z0-9_]+/', $custom_header ) ) {
+		// Anchored on purpose: the unanchored version this replaces matched any string
+		// CONTAINING one allowed character, so it accepted every input and validated
+		// nothing. Any value that produced a working $_SERVER key consists only of
+		// allowed characters anyway, so working setups are unaffected.
+		if ( preg_match( '/^[A-Z0-9_]+$/', $custom_header ) ) {
 			$custom_header = 'HTTP_' . $custom_header;
 		} else {
 			$custom_header = '';
