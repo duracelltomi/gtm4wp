@@ -42,6 +42,19 @@ Ordered lowest → highest trust. "Reaches" is cumulative down the list.
 | **A3** | Shop manager | + all orders, products, customer PII, WC settings | Reads other customers' PII *by design* — not a finding on its own |
 | **A4** | Administrator (`manage_options`) | + plugin settings, container IDs, custom domains/paths | **Already trusted with script injection by WordPress itself** |
 
+### Development-time actors (D0–D1)
+
+A0–A4 rate risk to **a site running the plugin**. They cannot express the second target: **the maintainer's own machine**, reached through the repository's tooling rather than through the plugin. That path became real when the triage workflows began pulling third-party text (wp.org topics, GitHub issue bodies and comments) into an agent session that holds pre-approved tool permissions, and when `core.hooksPath` began executing scripts resolved from the checked-out worktree. Findings #76 and #77 (2026-07-29) are the first two of the class, and neither has a site actor at all — which is precisely why the A-ladder never prompted for them.
+
+| Actor | Who | Reaches | Notes |
+|---|---|---|---|
+| **D0** | Outside contributor / author of any third-party text | Issue bodies and comments, forum topics, PR branch contents (including hook scripts, workflows, build config) | Unauthenticated and unlimited — anyone can open an issue or a PR |
+| **D1** | Maintainer / reviewer at the keyboard | Their workstation: shell, SSH and `gh` credentials, signing keys, every repo they can push to | The sink. Trusted by definition, which is what makes reaching it valuable |
+
+**The rule is the same one:** severity is set by the lowest actor who can reach the sink. **D0 → D1 is the finding** — third-party text or branch content causing code to run, or a credential to be used, on the reviewer's machine. Rate on what the execution reaches (credentials and push access to other repositories put it above "just this repo"), and note whether the boundary is *enforced* (an allowlist, a fixed script path) or merely *described* (prose in a command file, a skill's documented write surface). Only the enforced one counts — PA-14 owns the specifics.
+
+D1 → D1 is not a finding, for the same reason A4 → A4 is not: a maintainer can already run anything locally.
+
 ---
 
 ## The severity rule
@@ -103,6 +116,11 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 - IDOR and authorization-logic gaps on any route (PA-10, PA-1).
 - Supply-chain of *this* plugin's own output (container ID/domain/path reaching a
   script `src` — PA-2).
+- **The repository's own toolchain, rated on the D-axis** (PA-14): pre-approved tool
+  permissions, hooks that execute a path resolved from the working tree, CI triggers,
+  and the skills/commands that ingest third-party text. In scope even though none of
+  it ships to a site, because D0 reaches D1 through it. Locally-scoped, git-ignored
+  config counts — it never appears in a diff, so it is reviewed deliberately or never.
 
 ## Out of scope
 
@@ -125,3 +143,4 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | Date | Action |
 |---|---|
 | 2026-07-17 | Seeded. Actor ladder A0–A4, the lowest-actor severity rule (+ multisite `unfiltered_html` caveat), the two new-surface questions, and the in/out-of-scope list. Codifies the calls previously re-derived ad hoc per review (#30 `wontfix`, #32 Low, #31 exposure, Review 5's "DoS-bounded"). |
+| 2026-07-29 | Added the **development-time actors D0/D1** and brought the repository's own toolchain into scope (PA-14). A0–A4 rate risk to a *site*; they have no way to express third-party text or branch content causing code to run on the *maintainer's machine*, so findings #76/#77 had no severity vocabulary and, before that, no lens that would prompt for them. Same lowest-actor rule: D0 → D1 is the finding, rated on what the execution reaches, with enforced boundaries distinguished from described ones. |
