@@ -349,6 +349,7 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Fixed: the dynamic-remarketing "Product ID prefix" is now kept on variations. When a variation was selected on a variable product page, the browser swapped in the variation id and dropped the configured prefix from the `id` field used for Google/Meta catalog matching; the prefix is now re-applied to the variation's `id` (the unprefixed `item_id` is unchanged).
 * Fixed: the `[add_to_cart]` shortcode button now fires an `add_to_cart` event. A standalone shortcode button is rendered outside a product loop, so it never received the hidden product-data markup that product-list items get; the GA4 item data is now attached to the button itself so a click can be tracked. Product lists are unaffected — they already carry the data.
 * Fixed: the product-page `add_to_cart` event is no longer fired when the browser blocks the add-to-cart form submit because a required field is empty (e.g. a required Product Add-ons field). The click now respects the form's HTML5 validity, so a rejected add no longer produces a false `add_to_cart`.
+* Fixed (security): hardened how the hidden product-data attribute is built for WooCommerce product markup, so that no product field value can affect the surrounding HTML. Certain values were not guaranteed to stay inside the attribute. Technical detail is deliberately withheld while the same fix is prepared for the 1.x line.
 
 **Media events**
 

@@ -170,6 +170,33 @@ final class HelpersTest extends TestCase {
 		);
 	}
 
+	/**
+	 * Both callers pass a data-bearing replacement (the esc_attr'd product JSON),
+	 * so a $0/${0}/\1 sequence arriving in product data must stay literal. The
+	 * helper used to run preg_replace, whose replacement argument expands those
+	 * into the MATCHED text - and the cart remove-link matches on `href="`, which
+	 * carries a quote, so the expansion terminated the attribute the caller had
+	 * already esc_attr'd. Escaping runs before the substitution and cannot defend
+	 * against it (PA-7 / RI-17). This test fails if the regex is reintroduced.
+	 */
+	public function test_str_replace_first_treats_backreference_sequences_in_the_replacement_literally(): void {
+		$out = Helpers::str_replace_first( 'href="', 'data="$0 ${0} \1" href="', 'href="x">' );
+
+		$this->assertSame( 'data="$0 ${0} \1" href="x">', $out, 'Backreference sequences stay literal.' );
+		// Both directions: the matched text was never substituted into the value.
+		$this->assertStringNotContainsString( 'data="href="', $out );
+	}
+
+	public function test_str_replace_first_treats_regex_metacharacters_in_the_needle_literally(): void {
+		// The needle was previously wrapped in a pattern via preg_quote; with the
+		// regex gone it is a plain literal, so this stays a non-match either way.
+		$this->assertSame(
+			'a.c',
+			Helpers::str_replace_first( 'a+c', 'X', 'a.c' ),
+			'The needle is matched literally, never as a pattern.'
+		);
+	}
+
 	public function test_prefix_productid_applies_prefix_only_when_set(): void {
 		$this->assertSame( 'feed_123', Helpers::prefix_productid( 123, 'feed_' ) );
 		$this->assertSame( 123, Helpers::prefix_productid( 123, '' ), 'An empty prefix leaves the id untouched.' );
