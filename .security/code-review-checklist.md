@@ -362,6 +362,15 @@ The value of this entry is not the findings, it is **why this system could not h
 | 78 | Medium | open | Authorization strength (FP-5 cond. 3): the guest `confirm-*-tracked` beacons verify a `wp_rest` nonce, which for logged-out callers is a site-wide constant per tick — and the plugin publishes it from its own public GET. The token binds no particular caller, so it filters malformed requests rather than authorizing. Effect is analytics integrity (a purchase event permanently suppressed, `_ga_tracked` written), not disclosure. FP-5 conditions 1 and 2 still hold. | `src/Modules/WooCommerce/PageDataLayer.php` |
 
 **System changes made the same day** (this is the durable half): PA-7 rewritten + promoted ⭐ with a *grep the wrappers* litmus and a re-derivable call-site ledger; new **RI-17** (an escape is only valid at the instant of output), **RI-18** (sanitized ≠ authentic), **PA-14** (the toolchain is attack surface); **D0/D1** development-time actors added to the threat model with the toolchain brought in scope; **FP re-derivation rule** added to the suppressions preamble and FP-5 condition 3 tightened to "a CSRF gate bound to the caller"; two Coverage Matrix rows and the **Toolchain trust** sweep added here; `/code-review` pre-review step 1 widened to inventory the toolchain, plus new steps for FP re-derivation and post-fix family enumeration.
+### 1.22.5 release testing: 2026-07-30 (no `/code-review` run)
+
+Found by hand while smoke-testing the 1.22.5 backport on a dev store, not by a review pass — the tell was two dataLayer events from the same plugin disagreeing about a value's *type*. Recorded here because it affects **both** lines and neither has it logged.
+
+| # | Sev | Status | Summary | File(s) |
+|---|-----|--------|---------|---------|
+| 79 | Low | open | Correctness (RI-16 family, sibling asymmetry): in the `remove_from_cart` handler the mini-cart branch resolves quantity with `parseInt( textContent )` while the cart-page branch takes `input.value` raw, which is always a string. Two consequences: (a) `remove_from_cart` reports `quantity: "1"` on the cart page and `quantity: 1` on the mini-cart, for the same product; (b) the `if ( 0 === qty ) return true;` guard uses strict equality, so a zero-quantity line on the cart page (`"0"`) does not match and an event fires with `quantity: "0"`, while the mini-cart correctly suppresses it — the two surfaces disagree on whether a zero-quantity removal is an event at all. `value` is unaffected (`price * "1"` coerces). Present verbatim in both lines. Fix: `parseInt` + `Number.isNaN` on both branches, per RI-16. | 2.0: `js/frontend/gtm4wp-woocommerce.js:569,576` · 1.x: `js/gtm4wp-woocommerce.js:362,369` |
+
+No new pattern needed — **RI-16** already owns this class, and its litmus ("when three branches do the same normalization and one spells it differently, read the odd one") is exactly what this is. #69 was the same file's `add_to_cart` sibling; this is the third occurrence, which is worth noting when RI-16 is next reviewed.
 
 ### Report 3: fix session note
 
