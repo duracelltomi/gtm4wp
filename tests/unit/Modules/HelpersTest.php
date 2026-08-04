@@ -143,9 +143,9 @@ final class HelpersTest extends TestCase {
 		$this->stub_cookie_sanitizers();
 		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			array(
-				0   => array( 'item_list_name' => 'Zero id dropped' ),
-				7   => array( 'item_list_id' => 'no-name-dropped' ),
-				9   => array( 'item_list_name' => 'Kept' ),
+				0 => array( 'item_list_name' => 'Zero id dropped' ),
+				7 => array( 'item_list_id' => 'no-name-dropped' ),
+				9 => array( 'item_list_name' => 'Kept' ),
 			)
 		);
 

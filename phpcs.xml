@@ -51,6 +51,16 @@
 		<exclude-pattern>*/tests/*</exclude-pattern>
 	</rule>
 
+	<!--
+	Tests: stubs and mock callbacks must match the arity of the WordPress function they
+	stand in for (wp_kses, wp_enqueue_script, update_option, add_submenu_page, ...), so a
+	trailing parameter the stub does not read is required, not dead code. Dropping it
+	would break the call it exists to intercept.
+	-->
+	<rule ref="Generic.CodeAnalysis.UnusedFunctionParameter">
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+
 	<!-- Legacy 1.x test files, absorbed into tests/unit in later phases. -->
 	<exclude-pattern>*/tests/test-*.php</exclude-pattern>
 
@@ -61,6 +71,11 @@
 	<config name="testVersion" value="8.0-"/>
 	<config name="minimum_wp_version" value="6.3"/>
 
-	<!-- Warnings are reported but do not fail the build (errors still do). -->
-	<config name="ignore_warnings_on_exit" value="1"/>
+	<!--
+	Warnings fail the build alongside errors. They were previously ignored on exit, which
+	meant CI printed WPCS warnings for years and exited 0 - a whole array's double-arrow
+	alignment silently drifted that way. Everything the WordPress standard raises here is
+	either auto-fixable by phpcbf or worth a deliberate exclude-pattern above, so there is
+	no standing warning backlog for this to trip over.
+	-->
 </ruleset>
