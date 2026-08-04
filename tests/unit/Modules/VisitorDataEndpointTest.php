@@ -214,4 +214,75 @@ final class VisitorDataEndpointTest extends TestCase {
 		$this->assertArrayHasKey( 'nonce', $body );
 		$this->assertSame( 'fresh-nonce', $body['nonce'] );
 	}
+
+	/**
+	 * WordPress registers rest_send_cors_headers() on rest_pre_serve_request by default,
+	 * and it REFLECTS the request Origin while sending
+	 * Access-Control-Allow-Credentials: true. On this public route that would let any
+	 * page on the internet read the response with the visitor's own cookies attached -
+	 * their WooCommerce-session-derived data, and any token the route hands out (#78).
+	 * The decision to strip those headers is split out from the header calls so it can
+	 * be asserted; the header() calls themselves have no observable effect in a unit
+	 * test, which is exactly why the logic does not live inside them.
+	 *
+	 * @param string $route    The REST route being served.
+	 * @param string $origin   The request Origin, empty when absent.
+	 * @param bool   $expected Whether the reflected CORS headers must be stripped.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_cors_cases' )]
+	public function test_should_restrict_cors( string $route, string $origin, bool $expected ): void {
+		Functions\when( 'home_url' )->justReturn( 'https://shop.example' );
+		Functions\when( 'wp_parse_url' )->alias(
+			static fn ( $url, $component = -1 ) => parse_url( $url, $component ) // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+		);
+
+		$this->assertSame( $expected, VisitorDataEndpoint::should_restrict_cors( $route, $origin ) );
+	}
+
+	/**
+	 * Supplies both directions: origins whose CORS grant must be revoked, and the
+	 * requests that must be left exactly as core served them.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function provide_cors_cases(): array {
+		return array(
+			'foreign origin on our route'      => array( '/gtm4wp/v2/visitor-data', 'https://evil.example', true ),
+			'foreign origin on our beacon'     => array( '/gtm4wp/v2/confirm-purchase-tracked', 'https://evil.example', true ),
+			'look-alike host'                  => array( '/gtm4wp/v2/visitor-data', 'https://shop.example.evil.example', true ),
+			'different port is a different origin' => array( '/gtm4wp/v2/visitor-data', 'https://shop.example:8443', true ),
+			'unparseable origin'               => array( '/gtm4wp/v2/visitor-data', 'not a url', true ),
+			// Origin: null is what a file:// or sandboxed-iframe document sends. It is
+			// not this site, so it is stripped like any other foreign origin.
+			'null origin'                      => array( '/gtm4wp/v2/visitor-data', 'null', true ),
+			'our own origin'                   => array( '/gtm4wp/v2/visitor-data', 'https://shop.example', false ),
+			// No Origin means the request was not cross-origin, so core sent no CORS
+			// headers to remove in the first place.
+			'no origin header'                 => array( '/gtm4wp/v2/visitor-data', '', false ),
+			// Strictly scoped: another plugin's routes keep WordPress' own behavior.
+			'another namespace'                => array( '/wc/store/v1/cart', 'https://evil.example', false ),
+			'core namespace'                   => array( '/wp/v2/posts', 'https://evil.example', false ),
+			// A namespace that merely starts with ours must not be caught by a prefix
+			// match - hence the trailing slash in the comparison.
+			'look-alike namespace'             => array( '/gtm4wp/v22/something', 'https://evil.example', false ),
+		);
+	}
+
+	public function test_restrict_cors_returns_the_served_value_unchanged(): void {
+		// The filter is a side-effect hook on rest_pre_serve_request: whatever it does
+		// with headers, it must hand back the $served value it was given or the REST
+		// server stops serving the response.
+		Functions\when( 'home_url' )->justReturn( 'https://shop.example' );
+		Functions\when( 'wp_parse_url' )->alias(
+			static fn ( $url, $component = -1 ) => parse_url( $url, $component ) // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+		);
+		Functions\when( 'get_http_origin' )->justReturn( 'https://evil.example' );
+
+		$endpoint = new VisitorDataEndpoint();
+		$request  = new \WP_REST_Request();
+		$request->set_route( '/gtm4wp/v2/visitor-data' );
+
+		$this->assertTrue( $endpoint->restrict_cors( true, null, $request ) );
+		$this->assertFalse( $endpoint->restrict_cors( false, null, $request ) );
+	}
 }

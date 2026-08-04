@@ -139,6 +139,30 @@ final class Notices {
 			echo '</strong></p></div>';
 		}
 
+		// A custom visitor-IP header with no trusted proxies declared is read exactly as
+		// it always was, and that reading cannot be authenticated: an HTTP header is
+		// sent by the client. The admin has no way to see this from the settings screen
+		// - both states look identical there - so name it, the same way a discarded
+		// wp-config constant is named above. Not dismissible: it describes a live
+		// configuration gap and goes away by itself once the list is filled in.
+		if (
+			$this->options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP )
+			&& ( '' !== trim( (string) $this->options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) ) )
+			&& ( '' === trim( (string) $this->options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES ) ) )
+		) {
+			echo '<div class="gtm4wp-notice notice notice-warning" data-href="?visitor-ip-untrusted-header"><p><strong>';
+			printf(
+				/* translators: 1: opening anchor element pointing to the GTM4WP options page. 2: closing anchor element. */
+				esc_html__(
+					'Google Tag Manager for WordPress is reading the visitor IP address from a custom HTTP header, but no trusted proxy addresses are configured. HTTP headers are sent by the visitor, so the reported IP address can be chosen by them. Please %1$sadd the addresses of your reverse proxy, load balancer or CDN%2$s, or turn the custom header off.',
+					'duracelltomi-google-tag-manager'
+				),
+				'<a href="' . esc_url( menu_page_url( GTM4WP_ADMINSLUG, false ) ) . '">',
+				'</a>'
+			);
+			echo '</strong></p></div>';
+		}
+
 		if ( function_exists( 'is_plugin_active' ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {
 			if ( ( false === $dismisses['wc-ga-plugin-warning'] ) && is_plugin_active( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
 				echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';

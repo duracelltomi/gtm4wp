@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\PageVariables;
 
+use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Options\Field;
 
@@ -92,7 +93,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: true,
 				label: __( 'Tags of current post', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the tags of the current post.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the tags of the current post in the pageAttributes data layer variable. Tags are listed by their slug (for example black-friday), not by their display name.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(
@@ -324,7 +325,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_TEXT,
 				default_value: '',
 				label: __( 'Visitor IP - Read from custom header.', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'By default, the plugin will check the so called REMOTE_ADDR system variable for IP addresses. In some cases, this might not include the correct address. You may specify a custom header to read the IP address from.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'By default, the plugin will check the so called REMOTE_ADDR system variable for IP addresses. In some cases, this might not include the correct address. You may specify a custom header to read the IP address from. Important: an HTTP header is sent by the visitor, so on its own it is a claim and not a fact - anyone can put any address in it. Fill in the trusted proxy addresses below to make this header trustworthy. Without them the plugin keeps reading the header the way it always has, but the value can be chosen by the visitor, so do not use it for anything but analytics.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				sanitizer: static function ( $value ) {
 					// Field::to_string() keeps the cast warning-free on non-scalar
@@ -337,11 +338,47 @@ final class AdminSchema implements AdminSchemaInterface {
 					}
 
 					$custom_header = strtoupper( str_replace( '-', '_', $value ) );
-					if ( preg_match( '/[A-Z0-9_]+/', $custom_header ) ) {
+					// Anchored, like the identical check in VisitorIp::get(). The
+					// unanchored form this replaces matched any string CONTAINING one
+					// allowed character, so it accepted every input - #62 fixed that at
+					// the READ end and left this, the WRITE end, behind (PA-2: cover
+					// every entry point). Nothing unsafe reached the sink, because the
+					// reader's anchored check rejected it again; the cost was that the
+					// admin saw a malformed header name accepted and then silently
+					// ignored, with nothing to tell them which of the two had happened.
+					if ( preg_match( '/^[A-Z0-9_]+$/', $custom_header ) ) {
 						return $custom_header;
 					}
 
 					return '';
+				}
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES,
+				type: Field::TYPE_TEXTAREA,
+				default_value: '',
+				label: __( 'Visitor IP - Trusted proxy addresses', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The IP addresses or CIDR ranges of the reverse proxies, load balancers and CDNs that sit in front of this site - one per line, or comma separated. This is what makes the custom header above trustworthy: with it set, an X-Forwarded-For list is read from the right (skipping your own hops) and a single-value header such as CF-Connecting-IP is only used when the request really did arrive through one of these addresses. Leave it empty if nothing sits in front of your site. Cloudflare publishes its ranges at cloudflare.com/ips; for a load balancer inside your own network the address is usually a private range such as 10.0.0.0/8.', 'duracelltomi-google-tag-manager' ),
+				group: 'visitor',
+				phase: Field::PHASE_BETA,
+				depends_on: GTM4WP_OPTION_INCLUDE_VISITOR_IP,
+				sanitizer: static function ( $value ) {
+					// Type-defensive: a custom sanitizer REPLACES Field::sanitize()'s
+					// type-based branches, so it never sits behind to_string() (RI-6).
+					$value = Field::to_string( $value );
+
+					$entries = preg_split( '/[\s,]+/', $value, -1, PREG_SPLIT_NO_EMPTY );
+					if ( ! is_array( $entries ) ) {
+						return '';
+					}
+
+					// Validated with the reader's own rule (VisitorIp::is_valid_range),
+					// so what is stored is exactly what will be honored. An entry the
+					// reader would quietly skip is worse than a rejected one: the admin
+					// believes that proxy is covered when it is not.
+					$valid = array_values( array_filter( $entries, array( VisitorIp::class, 'is_valid_range' ) ) );
+
+					return implode( "\n", $valid );
 				}
 			),
 			new Field(

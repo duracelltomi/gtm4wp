@@ -39,11 +39,27 @@ if ( ! function_exists( 'gtm4wp_get_user_ip' ) ) {
 	 * Returns the IP address of the user either from the REMOTE_ADDR server variable
 	 * or a custom HTTP header specified in the parameter of the function.
 	 *
+	 * The trusted proxy list configured on the settings screen is applied here too, so a
+	 * 1.x caller that passes only a header name still gets the authenticated reading
+	 * rather than the raw header. Pass the second argument to override it.
+	 *
 	 * @param string $use_custom_header A custom HTTP header to use instead of the default REMOTE_ADDR server variable.
+	 * @param string $trusted_proxies   IP addresses / CIDR ranges of the proxies in front of this site. Defaults to the configured list.
 	 * @return string IP address of the user if found, empty string otherwise.
 	 */
-	function gtm4wp_get_user_ip( $use_custom_header = '' ) {
-		return VisitorIp::get( (string) $use_custom_header );
+	function gtm4wp_get_user_ip( $use_custom_header = '', $trusted_proxies = null ) {
+		if ( null === $trusted_proxies ) {
+			// options() is nullable by design (#64): it is built in boot(), and this is
+			// a public function a theme could call earlier. Falling back to '' means an
+			// early caller gets the same reading it got before this parameter existed,
+			// never a fatal.
+			$options         = Plugin::instance()->options();
+			$trusted_proxies = ( null === $options )
+				? ''
+				: (string) $options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES, '' );
+		}
+
+		return VisitorIp::get( (string) $use_custom_header, (string) $trusted_proxies );
 	}
 }
 

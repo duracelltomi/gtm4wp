@@ -1,9 +1,26 @@
 let gtm4wp_last_selected_product_variation;
-window.gtm4wp_view_item_fired_during_pageload = false;
 
-window.gtm4wp_checkout_step_fired = []; // step 1 will be the billing section which is reported during pageload, no need to handle here
+// #82: these three carry de-dupe state that the document-level listeners registered
+// in gtm4wp_woocommerce_process_pages() read on every event, so they must survive a
+// re-injected bundle. The double-init guard added for #71 lives inside that function
+// and therefore protects nothing written above it: a second copy of this module ran
+// its initializers, the guard then stopped it registering listeners, and the FIRST
+// copy's listeners went on reading state the second copy had just wiped - so
+// add_payment_info / add_shipping_info could fire twice and the page-load view_item
+// suppression reset. Initialize only when absent. A plain `x = x || default` is wrong
+// for gtm4wp_first_container_id, whose legitimate value can be 0.
+if ( 'undefined' === typeof window.gtm4wp_view_item_fired_during_pageload ) {
+	window.gtm4wp_view_item_fired_during_pageload = false;
+}
 
-window.gtm4wp_first_container_id = '';
+// step 1 will be the billing section which is reported during pageload, no need to handle here
+if ( 'undefined' === typeof window.gtm4wp_checkout_step_fired ) {
+	window.gtm4wp_checkout_step_fired = [];
+}
+
+if ( 'undefined' === typeof window.gtm4wp_first_container_id ) {
+	window.gtm4wp_first_container_id = '';
+}
 
 /**
  * Read a quantity out of the DOM as a number, or null when there is nothing usable.

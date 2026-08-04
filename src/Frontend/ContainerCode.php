@@ -216,11 +216,11 @@ final class ContainerCode {
 		}
 
 		if ( is_array( $value ) ) {
-			return (string) wp_json_encode( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+			return self::json_literal( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 		}
 
 		if ( is_int( $value ) || is_float( $value ) ) {
-			return (string) wp_json_encode( $value );
+			return self::json_literal( $value, 0 );
 		}
 
 		// Everything else is rendered as a JSON string literal, with the SAME hex
@@ -231,10 +231,32 @@ final class ContainerCode {
 		// (RI-4/PA-4, #72). Verified inert, never a break-out: esc_js backslashed
 		// the quotes. This is a data-correctness fix, and it makes every branch of
 		// this function agree on one encoder.
-		return (string) wp_json_encode(
+		return self::json_literal(
 			is_scalar( $value ) ? (string) $value : '',
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);
+	}
+
+	/**
+	 * Encodes one value as a JavaScript literal, never returning an empty string.
+	 *
+	 * The encoder returns false when it cannot encode the value at all. Casting that
+	 * to a string yields '', which would emit `const someVar = ;` - a SyntaxError
+	 * that takes down the WHOLE head <script> block, including the data layer
+	 * initialization above the global vars (#85). The filter that supplies these
+	 * values is public, so the input is third-party. Falling back to the `null`
+	 * literal keeps the block parseable and the failure confined to one variable,
+	 * which is the same "skip rather than break the page" principle the JS-identifier
+	 * allow-list on the variable NAME already applies in header_top().
+	 *
+	 * @param mixed $value The value to encode.
+	 * @param int   $flags wp_json_encode() flags for this value's context.
+	 * @return string A JavaScript literal, never an empty string.
+	 */
+	private static function json_literal( $value, int $flags ): string {
+		$json = wp_json_encode( $value, $flags );
+
+		return false === $json ? 'null' : $json;
 	}
 
 	/**

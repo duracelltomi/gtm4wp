@@ -1198,11 +1198,28 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Permission callback for the confirm-purchase POST: verifies the wp_rest REST
-	 * nonce, sent as the X-WP-Nonce header (fetch keepalive) or, for the
-	 * navigator.sendBeacon fallback that cannot set headers, the _wpnonce parameter.
-	 * A guest checkout is common, so this is a nonce (CSRF) gate rather than a
-	 * capability gate — the request only ever flags the caller's own session order.
+	 * Permission callback for the confirm-purchase POST. A guest checkout is common, so
+	 * this cannot be a capability gate — the request only ever flags the caller's own
+	 * session order (FP-5). Two checks, and it matters which one is load bearing:
+	 *
+	 * 1. The wp_rest nonce (X-WP-Nonce header for fetch keepalive, or the _wpnonce
+	 *    parameter for the navigator.sendBeacon fallback, which cannot set headers).
+	 *    This is a malformed-request FILTER, not the gate: for a logged-out caller
+	 *    WordPress derives wp_rest from uid 0 with an empty session token, so the value
+	 *    is identical for every guest on the site for the whole nonce tick — and this
+	 *    plugin hands one out from its own public GET endpoint. It proves the caller
+	 *    obtained a site-wide constant. It authenticates nobody (#78, FP-5 cond. 3).
+	 * 2. The request Origin. THIS is the gate. A browser sets Origin on every POST and
+	 *    a page cannot forge it, so a cross-site request fails here.
+	 *
+	 * Binding the token to the WC session instead was considered and does NOT work:
+	 * WordPress registers rest_send_cors_headers() on rest_pre_serve_request by default,
+	 * which reflects the request Origin and sends Access-Control-Allow-Credentials: true
+	 * — so a third-party page can read any token this site hands out, with the visitor's
+	 * own cookies attached, and replay it here. A session-bound nonce would look like a
+	 * fix and would not be one. (VisitorDataEndpoint::restrict_cors() now stops that
+	 * reflection for this plugin's namespace, but the Origin check does not depend on
+	 * it.)
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return bool
@@ -1214,7 +1231,69 @@ final class PageDataLayer {
 			$nonce = (string) $request->get_param( '_wpnonce' );
 		}
 
-		return '' !== $nonce && false !== wp_verify_nonce( $nonce, 'wp_rest' );
+		if ( '' === $nonce || false === wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return false;
+		}
+
+		return self::is_same_origin_request();
+	}
+
+	/**
+	 * Whether this request demonstrably originated from a page on this site.
+	 *
+	 * Origin is the primary signal: browsers send it on every POST, including
+	 * same-origin ones, and script cannot set it. Referer is the fallback for the rare
+	 * client that omits Origin; it is weaker (a referrer policy can strip it) but it is
+	 * only ever consulted when Origin is absent. When neither is present the request is
+	 * refused — a state change on behalf of a visitor should come from a page, and
+	 * "no evidence" is not the same as "same origin".
+	 *
+	 * @return bool
+	 */
+	private static function is_same_origin_request(): bool {
+		$site = wp_parse_url( home_url() );
+
+		if ( ! is_array( $site ) || empty( $site['host'] ) ) {
+			return false;
+		}
+
+		$origin = get_http_origin();
+		if ( is_string( $origin ) && '' !== $origin ) {
+			return self::url_matches_site( $origin, $site );
+		}
+
+		$referer = wp_get_raw_referer();
+		if ( is_string( $referer ) && '' !== $referer ) {
+			return self::url_matches_site( $referer, $site );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether a URL's host and port are this site's.
+	 *
+	 * Scheme is deliberately not compared: TLS-terminating proxies and mixed
+	 * http/https home_url configurations make it an unreliable signal, while host and
+	 * port are what separate this site from an attacker's. A subdomain is a different
+	 * host and is therefore refused.
+	 *
+	 * @param string               $url  The Origin or Referer value.
+	 * @param array<string, mixed> $site Parsed home_url() parts.
+	 * @return bool
+	 */
+	private static function url_matches_site( string $url, array $site ): bool {
+		$parts = wp_parse_url( $url );
+
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+			return false;
+		}
+
+		if ( strtolower( (string) $parts['host'] ) !== strtolower( (string) $site['host'] ) ) {
+			return false;
+		}
+
+		return ( $parts['port'] ?? null ) === ( $site['port'] ?? null );
 	}
 
 	/**

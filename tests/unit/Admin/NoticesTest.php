@@ -177,6 +177,80 @@ final class NoticesTest extends TestCase {
 		return new Notices( new Options( $stored ) );
 	}
 
+	/**
+	 * Reading the visitor IP from a custom header with no trusted proxies declared is
+	 * the state #75 describes: an HTTP header is sent by the client, so the reported
+	 * address is theirs to choose. Both configurations look identical on the settings
+	 * screen, so the admin is told rather than left to discover it - the same reason
+	 * the discarded-wp-config-constant notice exists. Ships grant AND deny, because a
+	 * warning that never turns off is as useless as one that never appears.
+	 */
+	public function test_show_notices_warns_about_an_unauthenticated_visitor_ip_header(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP         => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER  => 'HTTP_X_FORWARDED_FOR',
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'visitor-ip-untrusted-header', $output );
+	}
+
+	public function test_show_notices_silent_once_trusted_proxies_are_configured(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP         => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER  => 'HTTP_X_FORWARDED_FOR',
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '10.0.0.0/8',
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'visitor-ip-untrusted-header', $output );
+	}
+
+	public function test_show_notices_silent_when_no_custom_visitor_ip_header_is_used(): void {
+		// REMOTE_ADDR only: nothing is being trusted, so there is nothing to warn about.
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP        => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER => '',
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'visitor-ip-untrusted-header', $output );
+	}
+
+	public function test_show_notices_silent_when_the_visitor_ip_variable_is_off(): void {
+		// A leftover header name on a site that no longer publishes visitorIP reaches
+		// no sink, so the warning would be noise.
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP         => false,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER  => 'HTTP_X_FORWARDED_FOR',
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'visitor-ip-untrusted-header', $output );
+	}
+
 	public function test_show_notices_prompts_for_gtm_id_when_code_empty(): void {
 		$notices = $this->make_notices_with_options( array( GTM4WP_OPTION_GTM_CODE => '' ) );
 

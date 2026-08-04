@@ -61,6 +61,12 @@ const visitorEvents = () =>
 let trackedObservers = [];
 const RealMutationObserver = window.MutationObserver;
 beforeEach( () => {
+	// The bundle guards its boot with window.gtm4wp_visitordata_inited so a
+	// re-injected copy cannot push, re-fetch and re-observe a second time (#83). That
+	// flag lives on window, which jsdom keeps for the whole file, so it has to be
+	// cleared before every module load - and at FILE level, not inside one describe,
+	// because all five describes here reload the module.
+	delete window.gtm4wp_visitordata_inited;
 	trackedObservers = [];
 	window.MutationObserver = function ( callback ) {
 		const observer = new RealMutationObserver( callback );
@@ -86,6 +92,25 @@ describe( 'gtm4wp-visitor-data', () => {
 		};
 		setSearch( '' );
 		setReferrer( '' );
+	} );
+
+	it( 'does not push or re-observe when the bundle is loaded twice (#83)', () => {
+		// This bundle attaches no document-level listeners - it pushes, fetches and
+		// observes from its module body - so PA-9's "module-scope addEventListener"
+		// litmus never selected it. A re-injected bundle pushed gtm4wp.visitorData a
+		// second time and, worse, left a SECOND MutationObserver on document.body
+		// with its own lastWooRaw, so every later cart change pushed twice for good.
+		setSearch( 's=' + encodeURIComponent( 'blue shoes' ) );
+
+		loadTracker();
+		expect( visitorEvents() ).toHaveLength( 1 );
+		const observersAfterFirstLoad = trackedObservers.length;
+
+		// Second copy of the bundle: the guard flag is left exactly as it would find it.
+		loadTracker();
+
+		expect( visitorEvents() ).toHaveLength( 1 );
+		expect( trackedObservers ).toHaveLength( observersAfterFirstLoad );
 	} );
 
 	it( 'pushes the moved search term and referrer under their existing names', () => {
@@ -286,6 +311,11 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 		).toBeTruthy();
 
 		// A later page view in the same session replays from sessionStorage — no fetch.
+		// A page view is a new window, so the #83 boot guard is not set there; jsdom
+		// keeps one window for the whole file, so clear it to model that faithfully.
+		// (Leaving it set would model a re-injection on the SAME page instead, which
+		// is the case the guard exists to block and is covered by its own test.)
+		delete window.gtm4wp_visitordata_inited;
 		window.dataLayer = [];
 		loadTracker();
 		await flush();
@@ -849,7 +879,9 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 
 		// A later page in the same session: the session field replays from cache
 		// (no fetch), and the purchase is NOT re-fired (the event cookie is gone and
-		// the one-shot was never cached).
+		// the one-shot was never cached). A page view is a new window, so clear the
+		// #83 boot guard - see the note on the Tier 2 replay test above.
+		delete window.gtm4wp_visitordata_inited;
 		window.dataLayer = [];
 		loadTracker();
 		await flush();

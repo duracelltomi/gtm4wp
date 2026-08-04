@@ -48,6 +48,7 @@ define( 'GTM4WP_OPTION_INCLUDE_USERREGDATE', 'include-userregdate' );
 define( 'GTM4WP_OPTION_INCLUDE_USERNAME', 'include-username' );
 define( 'GTM4WP_OPTION_INCLUDE_VISITOR_IP', 'include-visitor-ip' );
 define( 'GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER', 'include-visitor-ip-header' );
+define( 'GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES', 'include-visitor-ip-proxies' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTTYPE', 'include-posttype' );
 define( 'GTM4WP_OPTION_INCLUDE_CATEGORIES', 'include-categories' );
 define( 'GTM4WP_OPTION_INCLUDE_TAGS', 'include-tags' );

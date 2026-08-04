@@ -45,6 +45,18 @@ import {
 ( function () {
 	'use strict';
 
+	// Guard against double registration (#83). PA-9's rule was written as "a bundle
+	// attaching document-level listeners needs a guard", and this file attaches none -
+	// it pushes, fetches and observes from its module body instead, which is the same
+	// class: a re-injected bundle (AJAX navigation, a page builder duplicating the
+	// handle) would push gtm4wp.visitorData a second time, issue a second request to
+	// the session endpoint, and leave a SECOND MutationObserver on document.body with
+	// its own lastWooRaw - so every later cart change would push twice, permanently.
+	if ( window.gtm4wp_visitordata_inited ) {
+		return;
+	}
+	window.gtm4wp_visitordata_inited = true;
+
 	const config = window.gtm4wp_visitordata_config || { fields: {} };
 	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
 	const eventName = config.event || 'gtm4wp.visitorData';

@@ -57,6 +57,12 @@ const deviceEvents = () =>
 
 describe( 'gtm4wp-client-device-data', () => {
 	beforeEach( () => {
+		// The bundle guards its boot with window.gtm4wp_clientdevice_inited so a
+		// re-injected copy cannot push gtm4wp.deviceData twice (#83). That flag lives
+		// on window, which jsdom keeps for the whole file, so every test has to clear
+		// it before loading the module again - otherwise every test after the first
+		// silently gets an early return and no push at all.
+		delete window.gtm4wp_clientdevice_inited;
 		window.dataLayer = [];
 		window.gtm4wp_datalayer_name = 'dataLayer';
 		window.gtm4wp_clientdevice_config = {
@@ -199,5 +205,24 @@ describe( 'gtm4wp-client-device-data', () => {
 
 		expect( () => loadTracker() ).not.toThrow();
 		expect( deviceEvents() ).toHaveLength( 0 );
+	} );
+
+	it( 'does not push a second time when the bundle is loaded twice (#83)', () => {
+		// This bundle attaches no listeners - it detects and pushes straight from its
+		// module body - so PA-9's "module-scope addEventListener" litmus never
+		// selected it, and a re-injected bundle (AJAX navigation, a page builder
+		// duplicating the handle) pushed gtm4wp.deviceData twice.
+		setNavigator( {
+			userAgent:
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+			userAgentData: undefined,
+		} );
+
+		loadTracker();
+		expect( deviceEvents() ).toHaveLength( 1 );
+
+		// Second copy of the bundle: the guard flag is left exactly as it would find it.
+		loadTracker();
+		expect( deviceEvents() ).toHaveLength( 1 );
 	} );
 } );

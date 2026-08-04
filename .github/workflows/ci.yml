@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ master, 1.x ]
 
+# Least privilege by default rather than whatever the repository setting happens to
+# be. Nothing here writes to the repo or calls the API; both jobs only need the
+# checkout. Fork pull requests already get a read-only token, so this closes the
+# same-repo branch-push case.
+permissions:
+  contents: read
+
 jobs:
   php:
     name: PHP ${{ matrix.php }} — phpcs + phpunit
@@ -23,8 +30,13 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: none
 
+      # install, not update: composer.lock is committed, and `composer update` here
+      # ignored it - so CI resolved a fresh dependency set on every run and never
+      # actually tested the pinned one, while any newly published version of a dev
+      # dependency (or a transitive Composer plugin, which executes code) ran in CI
+      # on first publish. The JS job has always used `npm ci` for exactly this reason.
       - name: Install Composer dependencies
-        run: composer update --no-interaction --no-progress
+        run: composer install --no-interaction --no-progress
 
       - name: PHP_CodeSniffer (includes PHP 8.0 compatibility sniffs)
         run: vendor/bin/phpcs

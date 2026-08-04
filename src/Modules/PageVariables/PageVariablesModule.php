@@ -64,6 +64,7 @@ final class PageVariablesModule extends AbstractModule {
 			GTM4WP_OPTION_INCLUDE_USERREGDATE       => false,
 			GTM4WP_OPTION_INCLUDE_VISITOR_IP        => false,
 			GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER => '',
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
 			GTM4WP_OPTION_INCLUDE_MISCGEOCF         => false,
 			GTM4WP_OPTION_INCLUDE_SITEID            => false,
 			GTM4WP_OPTION_INCLUDE_SITENAME          => false,
@@ -172,7 +173,10 @@ final class PageVariablesModule extends AbstractModule {
 			// wp_json_encode() with the full hex flag set, which is the correct
 			// escaper for the inline-script context. VisitorIp::get() already
 			// validates the value with filter_var( FILTER_VALIDATE_IP ).
-			$data_layer['visitorIP'] = VisitorIp::get( (string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) );
+			$data_layer['visitorIP'] = VisitorIp::get(
+				(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ),
+				(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )
+			);
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTITLE ) ) {
@@ -844,7 +848,10 @@ final class PageVariablesModule extends AbstractModule {
 	 * @return string|null
 	 */
 	public function resolve_visitor_ip(): ?string {
-		$ip = VisitorIp::get( (string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) );
+		$ip = VisitorIp::get(
+			(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ),
+			(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )
+		);
 
 		return '' === $ip ? null : $ip;
 	}

@@ -918,6 +918,41 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( 'var dataLayer = dataLayer || [];', $output );
 	}
 
+	/**
+	 * The value half of the same hazard (#85). wp_json_encode() returns false when it
+	 * cannot encode a value at all - invalid UTF-8 is the reachable case, and the
+	 * filter supplying these values is public, so the input is third-party. Casting
+	 * that false to a string used to emit `const brokenVar = ;`, a SyntaxError that
+	 * takes down the whole head block including the data layer initialization - the
+	 * exact failure the identifier allow-list above exists to prevent, arriving
+	 * through the value instead of the name.
+	 */
+	public function test_header_top_falls_back_to_null_when_a_global_var_cannot_be_encoded(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY )
+			->once()
+			->andReturn(
+				array(
+					// A lone continuation byte: not valid UTF-8, so json_encode() fails.
+					'brokenVar' => "\xB1\x31",
+					'goodVar'   => 'kept',
+				)
+			);
+
+		$container = $this->make_container();
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'const brokenVar = null;', $output );
+		$this->assertStringNotContainsString( 'const brokenVar = ;', $output );
+
+		// The declaration after it, and the data layer initialization before it, both
+		// survive: the failure is confined to the one variable that could not encode.
+		$this->assertStringContainsString( 'const goodVar = "kept";', $output );
+		$this->assertStringContainsString( 'var dataLayer = dataLayer || [];', $output );
+	}
+
 	public function test_header_top_suppressed_on_amp_requests(): void {
 		Filters\expectApplied( ContainerCode::FILTER_AMP_RUNNING )
 			->once()

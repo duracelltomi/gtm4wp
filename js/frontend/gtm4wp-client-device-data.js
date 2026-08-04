@@ -9,6 +9,16 @@
 ( function () {
 	'use strict';
 
+	// Guard against double registration (#83). This bundle attaches no listeners - it
+	// detects and pushes straight from its module body - so PA-9's "module-scope
+	// addEventListener" litmus never selected it, but a re-injected bundle pushes
+	// gtm4wp.deviceData twice just the same. The trigger is "does anything run at
+	// import time", not "does it listen".
+	if ( window.gtm4wp_clientdevice_inited ) {
+		return;
+	}
+	window.gtm4wp_clientdevice_inited = true;
+
 	const config = window.gtm4wp_clientdevice_config || {
 		browser: true,
 		os: true,

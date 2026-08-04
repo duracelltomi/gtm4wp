@@ -44,7 +44,16 @@ defined( 'ABSPATH' ) || exit;
  *   fresh. An anonymous caller sends NO nonce (nothing to authenticate), so a
  *   stale nonce baked into a long-lived cached page can never 403 the read.
  * - The response carries a FRESH wp_rest nonce for the client's one-shot confirm
- *   beacons, so a beacon fired from a cached page still authenticates.
+ *   beacons, so a beacon fired from a cached page is not rejected as malformed. Note
+ *   what that nonce is NOT: for a logged-out caller WordPress derives wp_rest from
+ *   uid 0 with an empty session token, so it is the same value for every guest on the
+ *   site for the whole tick, and this endpoint publishes it. It filters junk; it
+ *   authenticates nobody. The beacons' actual CSRF gate is the Origin check in
+ *   PageDataLayer::check_confirm_purchase_permission() (#78).
+ * - CORS is restricted for this namespace (restrict_cors below). WordPress reflects
+ *   the request Origin with Access-Control-Allow-Credentials: true by default, which
+ *   on a public route lets any page read this response with the visitor's cookies
+ *   attached. That is undone here for third-party origins.
  * - The response is serialized with the full JSON_HEX_* flag set and returned as
  *   a string payload (mirroring the Store API cart-item pattern in StoreApiData),
  *   so a hostile request header (a </script>"&'-laced X-Forwarded-For or CF
@@ -69,6 +78,10 @@ final class VisitorDataEndpoint {
 	 * @return void
 	 */
 	public function register_routes(): void {
+		// Priority 11: core registers rest_send_cors_headers() on this filter at the
+		// default 10, so this runs after it and undoes what it did for this namespace.
+		add_filter( 'rest_pre_serve_request', array( $this, 'restrict_cors' ), 11, 3 );
+
 		register_rest_route(
 			self::REST_NAMESPACE,
 			self::REST_ROUTE,
@@ -83,6 +96,92 @@ final class VisitorDataEndpoint {
 				'permission_callback' => '__return_true',
 			)
 		);
+	}
+
+	/**
+	 * Stops WordPress handing this plugin's REST responses to third-party origins.
+	 *
+	 * WordPress registers rest_send_cors_headers() on rest_pre_serve_request by default,
+	 * and it REFLECTS the request Origin while sending
+	 * Access-Control-Allow-Credentials: true. On a public route that is a standing
+	 * invitation: any page on the internet can fetch these routes with the visitor's own
+	 * cookies attached and read the response. For this namespace that would mean a
+	 * visitor's WooCommerce-session-derived data (a pending order, cart contents)
+	 * readable by whatever site they happen to be on, and any token these routes issue
+	 * being harvestable and replayable (#78).
+	 *
+	 * Browser cookie defaults (SameSite=Lax) probably block most of that today, but a
+	 * browser default is not a control this plugin owns. Removing the headers makes the
+	 * browser refuse the cross-origin read outright. Same-origin requests are
+	 * unaffected: they either send no Origin or send this site's own.
+	 *
+	 * Scoped strictly to this plugin's namespace — other plugins' routes keep core's
+	 * behavior.
+	 *
+	 * @param bool             $served  Whether the request has already been served.
+	 * @param mixed            $result  The response data (unused).
+	 * @param \WP_REST_Request $request The request being served.
+	 * @return bool The unchanged $served value.
+	 */
+	public function restrict_cors( $served, $result, $request ) {
+		if ( ! ( $request instanceof \WP_REST_Request ) ) {
+			return $served;
+		}
+
+		$origin = get_http_origin();
+
+		if ( ! self::should_restrict_cors( (string) $request->get_route(), is_string( $origin ) ? $origin : '' ) ) {
+			return $served;
+		}
+
+		// header() replaces a previously sent header of the same name, but removing is
+		// what we want: with no Access-Control-Allow-Origin at all the browser blocks
+		// the read rather than being told which origin is permitted.
+		header_remove( 'Access-Control-Allow-Origin' );
+		header_remove( 'Access-Control-Allow-Credentials' );
+		header_remove( 'Access-Control-Allow-Methods' );
+
+		return $served;
+	}
+
+	/**
+	 * Whether the reflected CORS headers must be stripped for this route and origin.
+	 *
+	 * Split out from restrict_cors() so the decision is testable without sending
+	 * headers: the header calls have no return value and no observable effect in a
+	 * unit test, but this predicate is the whole of the logic.
+	 *
+	 * @param string $route  The REST route being served (e.g. /gtm4wp/v2/visitor-data).
+	 * @param string $origin The request Origin header, empty when absent.
+	 * @return bool
+	 */
+	public static function should_restrict_cors( string $route, string $origin ): bool {
+		// No Origin: not a cross-origin request, so core sent no CORS headers either.
+		if ( '' === $origin ) {
+			return false;
+		}
+
+		if ( 0 !== strpos( ltrim( $route, '/' ), self::REST_NAMESPACE . '/' ) ) {
+			return false;
+		}
+
+		$site = wp_parse_url( home_url() );
+		if ( ! is_array( $site ) || empty( $site['host'] ) ) {
+			// Cannot establish what this site's origin is, so cannot vouch for any
+			// third-party one either. Strip.
+			return true;
+		}
+
+		$parts = wp_parse_url( $origin );
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+			return true;
+		}
+
+		if ( strtolower( (string) $parts['host'] ) !== strtolower( (string) $site['host'] ) ) {
+			return true;
+		}
+
+		return ( $parts['port'] ?? null ) !== ( $site['port'] ?? null );
 	}
 
 	/**

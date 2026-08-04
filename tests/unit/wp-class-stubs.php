@@ -77,6 +77,23 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 			}
 			return null;
 		}
+
+		/**
+		 * The route this request was matched to, e.g. /gtm4wp/v2/visitor-data. Real
+		 * requests carry it; code that scopes a rest_pre_serve_request filter to its
+		 * own namespace reads it.
+		 *
+		 * @var string
+		 */
+		private string $route = '';
+
+		public function set_route( string $route ): void {
+			$this->route = $route;
+		}
+
+		public function get_route(): string {
+			return $this->route;
+		}
 	}
 }
 

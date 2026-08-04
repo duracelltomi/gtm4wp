@@ -1644,12 +1644,45 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'flag_order_tracked() no-ops under the do-not-flag option.' );
 	}
 
+	/**
+	 * Origin reported by get_http_origin() for the request under test.
+	 *
+	 * @var string
+	 */
+	private string $stub_origin = '';
+
+	/**
+	 * Referer reported by wp_get_raw_referer() for the request under test.
+	 *
+	 * @var string
+	 */
+	private string $stub_referer = '';
+
+	/**
+	 * Stubs the URL helpers the permission callback reads, driven by the two
+	 * properties above so a single test can vary them per assertion.
+	 *
+	 * @return void
+	 */
+	private function stub_origin_helpers(): void {
+		Functions\when( 'home_url' )->justReturn( 'https://shop.example' );
+		// wp_parse_url() is parse_url() plus a PHP 5.4 compat shim, so the plain
+		// function is a faithful stand-in on the supported PHP versions.
+		Functions\when( 'wp_parse_url' )->alias(
+			static fn ( $url, $component = -1 ) => parse_url( $url, $component ) // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+		);
+		Functions\when( 'get_http_origin' )->alias( fn () => $this->stub_origin );
+		Functions\when( 'wp_get_raw_referer' )->alias( fn () => $this->stub_referer );
+	}
+
 	public function test_confirm_purchase_permission_requires_a_valid_rest_nonce(): void {
-		// CSRF: the state-changing POST verifies the wp_rest nonce (header or the
-		// sendBeacon _wpnonce fallback); a missing or bad nonce is rejected.
+		// The nonce is a malformed-request filter, not the gate (#78) - but it is still
+		// verified, and a missing or bad one is rejected before anything else runs.
 		Functions\when( 'wp_verify_nonce' )->alias(
 			static fn ( $nonce, $action ) => ( 'wp_rest' === $action && 'good' === $nonce ) ? 1 : false
 		);
+		$this->stub_origin_helpers();
+		$this->stub_origin = 'https://shop.example';
 
 		$page = $this->make_page_datalayer();
 
@@ -1663,11 +1696,73 @@ final class PageDataLayerTest extends TestCase {
 		);
 		$this->assertFalse(
 			$page->check_confirm_purchase_permission( new \WP_REST_Request( array(), array( 'X-WP-Nonce' => 'bad' ) ) ),
-			'A bad nonce is rejected (CSRF).'
+			'A bad nonce is rejected.'
 		);
 		$this->assertFalse(
 			$page->check_confirm_purchase_permission( new \WP_REST_Request() ),
 			'A request with no nonce at all is rejected.'
 		);
+	}
+
+	/**
+	 * #78: a valid nonce used to be sufficient, and this test asserted exactly that.
+	 * It cannot be: for a logged-out caller WordPress derives wp_rest from uid 0 with an
+	 * empty session token, so every guest on the site shares one value for the whole
+	 * tick - and the plugin publishes one from its own public GET. The nonce proves the
+	 * caller obtained a site-wide constant. The Origin is what a cross-site page cannot
+	 * produce, so that is the gate; these cases all carry a VALID nonce so the only
+	 * thing under test is the origin.
+	 */
+	public function test_confirm_purchase_permission_rejects_a_cross_origin_request(): void {
+		Functions\when( 'wp_verify_nonce' )->justReturn( 1 );
+		$this->stub_origin_helpers();
+
+		$page    = $this->make_page_datalayer();
+		$request = static fn () => new \WP_REST_Request( array(), array( 'X-WP-Nonce' => 'good' ) );
+
+		$this->stub_origin = 'https://shop.example';
+		$this->assertTrue( $page->check_confirm_purchase_permission( $request() ), 'Own origin is accepted.' );
+
+		$this->stub_origin = 'https://evil.example';
+		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'A foreign origin is rejected despite a valid nonce.' );
+
+		// A subdomain is a different host, so it is a different origin.
+		$this->stub_origin = 'https://shop.example.evil.example';
+		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'A look-alike host is rejected.' );
+
+		// Same host, different port: still a different origin.
+		$this->stub_origin = 'https://shop.example:8443';
+		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'A different port is a different origin.' );
+
+		// Scheme is deliberately NOT compared: TLS-terminating proxies make it
+		// unreliable, and it is not what separates this site from an attacker.
+		$this->stub_origin = 'http://shop.example';
+		$this->assertTrue( $page->check_confirm_purchase_permission( $request() ), 'Scheme alone does not disqualify an origin.' );
+	}
+
+	public function test_confirm_purchase_permission_falls_back_to_the_referer_only_when_origin_is_absent(): void {
+		Functions\when( 'wp_verify_nonce' )->justReturn( 1 );
+		$this->stub_origin_helpers();
+
+		$page    = $this->make_page_datalayer();
+		$request = static fn () => new \WP_REST_Request( array(), array( 'X-WP-Nonce' => 'good' ) );
+
+		$this->stub_origin  = '';
+		$this->stub_referer = 'https://shop.example/checkout/order-received/42/';
+		$this->assertTrue( $page->check_confirm_purchase_permission( $request() ), 'Referer vouches for the request when Origin is absent.' );
+
+		$this->stub_referer = 'https://evil.example/attack.html';
+		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'A foreign referer is rejected.' );
+
+		// Neither signal: refuse. "No evidence" is not "same origin", and a state
+		// change on a visitor's behalf should come from a page.
+		$this->stub_referer = '';
+		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'With no Origin and no Referer the request is refused.' );
+
+		// Origin wins when both are present, so a stripped-then-forged referer cannot
+		// talk its way past a foreign origin.
+		$this->stub_origin  = 'https://evil.example';
+		$this->stub_referer = 'https://shop.example/';
+		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'Referer must not override a foreign Origin.' );
 	}
 }

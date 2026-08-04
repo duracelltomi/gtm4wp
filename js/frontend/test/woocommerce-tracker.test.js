@@ -678,6 +678,15 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 		window.gtm4wp_checkout_products = [ { item_id: 1, price: 25 } ];
 		window.gtm4wp_checkout_value = 50;
 
+		// Each test here simulates a fresh page load, and a fresh page load means a
+		// fresh window - so the "already reported" state the bundle now preserves
+		// across a re-injection (#82) starts empty. jsdom keeps one window for the
+		// whole file, so it has to be cleared explicitly; before #82 the module body
+		// wiped it on every load, which is precisely the bug.
+		delete window.gtm4wp_checkout_step_fired;
+		delete window.gtm4wp_view_item_fired_during_pageload;
+		delete window.gtm4wp_first_container_id;
+
 		global.gtm4wp_push_ecommerce = jest.fn();
 		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
 			const raw = el && el.dataset && el.dataset[ key ];
@@ -1098,6 +1107,40 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 		// of the bundle would find it.
 		bootWithCapture();
 		expect( capturedDocListeners ).toEqual( [] );
+	} );
+
+	it( 'keeps the de-dupe state a second copy of the bundle would have reset (#82)', () => {
+		// #71's guard lives INSIDE process_pages(), so it protects nothing written
+		// above it. The module body's state initializers used to run unconditionally
+		// on every re-injection, and the first copy's still-attached listeners then
+		// read a freshly emptied gtm4wp_checkout_step_fired - re-firing
+		// add_payment_info / add_shipping_info and resetting the page-load view_item
+		// suppression, which is the double-push #71 exists to prevent, by another
+		// route. Asserting the state directly rather than the pushes: the listener
+		// leak documented above makes push counts unreliable in this file.
+		document.body.innerHTML = '';
+		delete window.gtm4wp_checkout_step_fired;
+		delete window.gtm4wp_view_item_fired_during_pageload;
+		delete window.gtm4wp_first_container_id;
+
+		bootWithCapture();
+		expect( window.gtm4wp_checkout_step_fired ).toEqual( [] );
+
+		// State the first copy's listeners have accumulated by now.
+		window.gtm4wp_checkout_step_fired.push( 'payment_method' );
+		window.gtm4wp_view_item_fired_during_pageload = true;
+		window.gtm4wp_first_container_id = 0;
+
+		// The re-injected copy: its module body re-runs in full.
+		bootWithCapture();
+
+		expect( window.gtm4wp_checkout_step_fired ).toEqual( [
+			'payment_method',
+		] );
+		expect( window.gtm4wp_view_item_fired_during_pageload ).toBe( true );
+		// 0 is a legitimate container index (it is a loop counter), so a
+		// `x = x || ''` initializer would wrongly reset it - hence the typeof test.
+		expect( window.gtm4wp_first_container_id ).toBe( 0 );
 	} );
 } );
 
