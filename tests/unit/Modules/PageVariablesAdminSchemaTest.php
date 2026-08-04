@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
+use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Modules\PageVariables\AdminSchema;
 use GTM4WP\Options\Field;
 use GTM4WP\Tests\unit\TestCase;
@@ -109,6 +110,85 @@ final class PageVariablesAdminSchemaTest extends TestCase {
 		$this->assertSame(
 			GTM4WP_OPTION_INCLUDE_VISITOR_IP,
 			$this->field( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )->depends_on
+		);
+	}
+
+	/**
+	 * #96: the header field is inert unless the Visitor IP variable is on - and it is
+	 * the field that carries the risk the "no trusted proxies" notice warns about, so
+	 * it rendering enabled on a screen where that notice can never fire was the wrong
+	 * way round. Its sibling three lines below always declared the dependency.
+	 */
+	public function test_visitor_ip_header_field_depends_on_the_visitor_ip_option(): void {
+		$this->assertSame(
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP,
+			$this->field( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER )->depends_on
+		);
+	}
+
+	/**
+	 * #94: the sanitizer must validate with the READER's predicate, not a copy of it.
+	 * Asserting agreement rather than a hardcoded list is the point - a future
+	 * tightening of VisitorIp::normalize_header_name() then cannot leave this end
+	 * behind, which is exactly how the two ends drifted apart in the first place.
+	 */
+	public function test_visitor_ip_header_sanitizer_agrees_with_the_reader(): void {
+		$sanitize = $this->field( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER )->sanitizer;
+
+		foreach ( array( 'X-Real-IP', 'CF-Connecting-IP', 'x_forwarded_for', 'X-Real-IP: 1.2.3.4', 'has space', '!!!', '' ) as $input ) {
+			$this->assertSame(
+				VisitorIp::normalize_header_name( $input ),
+				( $sanitize )( $input ),
+				sprintf( 'The stored value for "%s" must be exactly what the reader honors.', $input )
+			);
+		}
+	}
+
+	/**
+	 * RI-15: an option's description is its consent contract, and the quiet two thirds
+	 * of it are the data layer VARIABLE NAME and the FORM the values take. #84 fixed
+	 * the tag option after its sibling had both corrected in the same commit; this
+	 * pins the rest of the group so the next one is not left behind again.
+	 *
+	 * @param string   $key      Option key.
+	 * @param string[] $expected Substrings the description must contain.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_description_contracts' )]
+	public function test_description_names_its_variable_and_value_form( string $key, array $expected ): void {
+		$description = $this->field( $key )->description;
+
+		foreach ( $expected as $needle ) {
+			$this->assertStringContainsString(
+				$needle,
+				$description,
+				sprintf( 'The description of "%s" must name %s.', $key, $needle )
+			);
+		}
+	}
+
+	/**
+	 * Supplies each option with the variable name and value-form terms it must name.
+	 *
+	 * @return array<string, array{0: string, 1: string[]}>
+	 */
+	public static function provide_description_contracts(): array {
+		return array(
+			// Emits the format SLUG into a variable that, alone in this group, has no
+			// "page" prefix - so neither half was guessable from the old wording.
+			'post format'      => array( GTM4WP_OPTION_INCLUDE_POSTFORMAT, array( 'postFormat', 'slug', 'standard' ) ),
+			// Emits TWO variables; the description named neither, nor the second one's
+			// existence.
+			'primary category' => array( GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY, array( 'pagePrimaryCategory', 'pagePrimaryCategoryName', 'slug' ) ),
+			// Singular description, plural payload on a multi-author post.
+			'author id'        => array( GTM4WP_OPTION_INCLUDE_AUTHORID, array( 'pagePostAuthorID', 'pagePostAuthorIDs' ) ),
+			'author name'      => array( GTM4WP_OPTION_INCLUDE_AUTHOR, array( 'pagePostAuthor', 'pagePostAuthors' ) ),
+			// Role slugs, comma joined, and a value emitted for logged-OUT visitors.
+			'user role'        => array( GTM4WP_OPTION_INCLUDE_USERROLE, array( 'visitorType', 'slug', 'visitor-logged-out' ) ),
+			'login state'      => array( GTM4WP_OPTION_INCLUDE_LOGGEDIN, array( 'visitorLoginState', 'logged-in', 'logged-out' ) ),
+			// Already correct - kept so a regression on the two that prompted the rule
+			// fails here too.
+			'categories'       => array( GTM4WP_OPTION_INCLUDE_CATEGORIES, array( 'pageCategory', 'slug' ) ),
+			'tags'             => array( GTM4WP_OPTION_INCLUDE_TAGS, array( 'pageAttributes', 'slug' ) ),
 		);
 	}
 }

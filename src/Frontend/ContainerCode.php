@@ -541,7 +541,14 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 * @return void
 	 */
 	public function the_tag(): void {
-		echo wp_kses(
+		// print_markup_block(), not a bare wp_kses(): this block mixes the noscript
+		// iframe (whose src must keep its &amp; entity form) with the console
+		// warning <script> blocks that get_tag() prepends for placement OFF, the
+		// kill switch and an excluded user role. wp_kses() encodes every bare
+		// ampersand, so a raw echo shipped `console.warn &amp;&amp; console.warn(…)`
+		// - a SyntaxError that took out the whole warning block. Only script bodies
+		// get the ampersand back; the attribute is left alone.
+		$this->script_tag->print_markup_block(
 			$this->get_tag(),
 			array_merge(
 				ScriptTag::sanitize_rules(),

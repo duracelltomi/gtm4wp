@@ -82,9 +82,17 @@ final class Plugin {
 		// The settings REST endpoint must be reachable on REST requests where
 		// is_admin() is false; the controller class only loads when a REST
 		// request actually initializes.
+		//
+		// RestCors is registered in the same place and with no condition on
+		// purpose: it withdraws core's reflected cross-origin grant for the WHOLE
+		// gtm4wp/v2 namespace, and the namespace exists on every install because
+		// of the settings routes right above. Registering it from a module (as it
+		// was) tied a namespace-wide control to that module's feature flag (#97).
 		add_action(
 			'rest_api_init',
 			function () {
+				RestCors::register();
+
 				( new Admin\RestController( $this->registry ) )->register_routes();
 			}
 		);

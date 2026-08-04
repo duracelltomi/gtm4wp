@@ -381,19 +381,59 @@ final class VisitorIpTest extends TestCase {
 	 */
 	public static function provide_range_validity(): array {
 		return array(
-			'plain ipv4'          => array( '10.0.0.5', true ),
-			'ipv4 cidr'           => array( '10.0.0.0/8', true ),
-			'ipv4 full prefix'    => array( '10.0.0.5/32', true ),
-			'plain ipv6'          => array( '2001:db8::1', true ),
-			'ipv6 cidr'           => array( '2001:db8::/32', true ),
-			'ipv6 full prefix'    => array( '2001:db8::1/128', true ),
-			'ipv4 prefix too big' => array( '10.0.0.0/33', false ),
-			'ipv6 prefix too big' => array( '2001:db8::/129', false ),
-			'not an ip'           => array( 'example.com', false ),
-			'octet out of range'  => array( '999.1.1.1', false ),
-			'empty prefix'        => array( '10.0.0.0/', false ),
-			'non numeric prefix'  => array( '10.0.0.0/eight', false ),
-			'empty string'        => array( '', false ),
+			'plain ipv4'                   => array( '10.0.0.5', true ),
+			'ipv4 cidr'                    => array( '10.0.0.0/8', true ),
+			'ipv4 full prefix'             => array( '10.0.0.5/32', true ),
+			'plain ipv6'                   => array( '2001:db8::1', true ),
+			'ipv6 cidr'                    => array( '2001:db8::/32', true ),
+			'ipv6 full prefix'             => array( '2001:db8::1/128', true ),
+			'ipv4 prefix too big'          => array( '10.0.0.0/33', false ),
+			'ipv6 prefix too big'          => array( '2001:db8::/129', false ),
+			'not an ip'                    => array( 'example.com', false ),
+			'octet out of range'           => array( '999.1.1.1', false ),
+			'empty prefix'                 => array( '10.0.0.0/', false ),
+			'non numeric prefix'           => array( '10.0.0.0/eight', false ),
+			'empty string'                 => array( '', false ),
+			// A /0 matches every address, so it would declare the whole internet a
+			// trusted proxy - restoring the verbatim header trust this option exists
+			// to remove, and silently, because the "no trusted proxies" admin notice
+			// keys on the list being non-empty.
+			'ipv4 catch-all'               => array( '0.0.0.0/0', false ),
+			'ipv6 catch-all'               => array( '::/0', false ),
+			'zero prefix on a real subnet' => array( '10.0.0.0/0', false ),
+		);
+	}
+
+	/**
+	 * The header-name allow-list is ONE rule shared by the reader and the option
+	 * sanitizer (#94). It used to be two literals three files apart: #62 anchored the
+	 * read end and #89 the save end, each with its own copy.
+	 *
+	 * @param string $input    The header name as an admin might type it.
+	 * @param string $expected The canonical form, or '' when it must be rejected.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_header_names' )]
+	public function test_normalize_header_name( string $input, string $expected ): void {
+		$this->assertSame( $expected, VisitorIp::normalize_header_name( $input ) );
+	}
+
+	/**
+	 * Supplies both directions for the header-name rule: accepted and rejected forms.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function provide_header_names(): array {
+		return array(
+			'dashed form'        => array( 'X-Forwarded-For', 'X_FORWARDED_FOR' ),
+			'already canonical'  => array( 'CF_CONNECTING_IP', 'CF_CONNECTING_IP' ),
+			'lower case'         => array( 'x-real-ip', 'X_REAL_IP' ),
+			'empty'              => array( '', '' ),
+			// The anchoring cases: the unanchored pattern these replaced accepted any
+			// string that merely CONTAINED one allowed character.
+			'embedded separator' => array( 'X-Forwarded-For; DROP', '' ),
+			'spaces'             => array( 'X Forwarded For', '' ),
+			'punctuation'        => array( 'X-Forwarded-For!', '' ),
+			'leading whitespace' => array( ' X-Forwarded-For', '' ),
 		);
 	}
 }

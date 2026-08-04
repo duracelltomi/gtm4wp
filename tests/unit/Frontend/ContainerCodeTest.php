@@ -1151,6 +1151,78 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertSame( '', $output, 'The footer hook stays silent when placement is Body open.' );
 	}
 
+	/**
+	 * Both halves of the mixed-content ampersand rule.
+	 *
+	 * This sink emits a block that MIXES markup with <script>, and the two contexts
+	 * want opposite things from wp_kses()'s ampersand encoding. Model the real
+	 * wp_kses() (every bare & becomes &amp;, which it does) and pin both halves:
+	 *
+	 * - the console warnings must come back with `&&` intact, or the block is a
+	 *   SyntaxError and no warning is ever shown. This was live for the placement
+	 *   OFF, kill-switch and excluded-user-role warnings; the sibling head sink has
+	 *   had the restore since #29 and only this one was left behind.
+	 * - the iframe src must KEEP `&amp;`, which is the correct spelling of a query
+	 *   separator in an HTML attribute and what both 2.0 and 1.x have always
+	 *   emitted. A blanket restore would have fixed the script by corrupting this.
+	 */
+	public function test_the_tag_restores_ampersands_in_scripts_but_not_in_the_iframe(): void {
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) {
+				return str_replace( '&', '&amp;', (string) $content );
+			}
+		);
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array( 'roles' => array( 'editor' ) )
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE         => 'GTM-ABC123',
+				GTM4WP_OPTION_NOGTMFORLOGGEDIN => 'editor',
+			)
+		);
+
+		ob_start();
+		$container->the_tag();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'console.warn && console.warn(',
+			$output,
+			'The JavaScript AND operator must survive wp_kses() or the whole warning block is a SyntaxError.'
+		);
+		$this->assertStringNotContainsString(
+			'&amp;&amp;',
+			$output,
+			'An entity-encoded && is the defect this guards against.'
+		);
+	}
+
+	public function test_the_tag_keeps_the_entity_form_in_the_iframe_attribute(): void {
+		// The other direction of the same rule: only <script> bodies get the
+		// ampersand back. An environment-parameter iframe URL must stay &amp;-joined.
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) {
+				return str_replace( '&', '&amp;', (string) $content );
+			}
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE        => 'GTM-ABC123',
+				GTM4WP_OPTION_ENV_GTM_AUTH    => 'authtoken',
+				GTM4WP_OPTION_ENV_GTM_PREVIEW => 'env-2',
+			)
+		);
+
+		ob_start();
+		$container->the_tag();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123&amp;gtm_auth=authtoken', $output );
+	}
+
 	public function test_the_tag_wraps_get_tag_through_kses_with_iframe_rules(): void {
 		$captured_rules = null;
 		Functions\when( 'wp_kses' )->alias(

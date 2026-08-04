@@ -101,7 +101,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Post author ID', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the ID of the author on the current post or author page.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the ID of the author on the current post or author page in the pagePostAuthorID data layer variable. On a post with several authors (PublishPress Authors) the full list is added as pagePostAuthorIDs as well.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(
@@ -109,7 +109,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: true,
 				label: __( 'Post author name', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the name of the author on the current post or author page.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the display name of the author on the current post or author page in the pagePostAuthor data layer variable. On a post with several authors (PublishPress Authors) the full list is added as pagePostAuthors as well.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(
@@ -149,7 +149,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Post Format', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the post format.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the format of the current post in the postFormat data layer variable. The format is reported by its slug (aside, gallery, video and so on), and posts with no format set report standard.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(
@@ -245,7 +245,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Primary category', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the primary category of the current post as chosen in Yoast SEO or Rank Math (falls back to the first assigned category). Useful as a single content grouping dimension.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the primary category of the current post as chosen in Yoast SEO or Rank Math (falls back to the first assigned category). This adds two data layer variables: pagePrimaryCategory holds the category slug and pagePrimaryCategoryName holds its display name. Useful as a single content grouping dimension.', 'duracelltomi-google-tag-manager' ),
 				group: 'content'
 			),
 			new Field(
@@ -269,7 +269,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Logged in status', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include whether there is a logged in user on your website.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include whether there is a logged in user on your website, in the visitorLoginState data layer variable. The value is either logged-in or logged-out.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor'
 			),
 			new Field(
@@ -277,7 +277,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Logged in user role', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the role of the logged in user.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the role of the logged in user in the visitorType data layer variable. Roles are reported by their slug, a user with several roles reports them comma separated, and a visitor who is not logged in reports visitor-logged-out.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor'
 			),
 			new Field(
@@ -327,30 +327,17 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Visitor IP - Read from custom header.', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'By default, the plugin will check the so called REMOTE_ADDR system variable for IP addresses. In some cases, this might not include the correct address. You may specify a custom header to read the IP address from. Important: an HTTP header is sent by the visitor, so on its own it is a claim and not a fact - anyone can put any address in it. Fill in the trusted proxy addresses below to make this header trustworthy. Without them the plugin keeps reading the header the way it always has, but the value can be chosen by the visitor, so do not use it for anything but analytics.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
+				depends_on: GTM4WP_OPTION_INCLUDE_VISITOR_IP,
 				sanitizer: static function ( $value ) {
 					// Field::to_string() keeps the cast warning-free on non-scalar
 					// import values (a custom sanitizer replaces the type-defensive
 					// default in Field::sanitize(), it does not run in front of it).
-					$value = Field::to_string( $value );
-
-					if ( '' === $value ) {
-						return '';
-					}
-
-					$custom_header = strtoupper( str_replace( '-', '_', $value ) );
-					// Anchored, like the identical check in VisitorIp::get(). The
-					// unanchored form this replaces matched any string CONTAINING one
-					// allowed character, so it accepted every input - #62 fixed that at
-					// the READ end and left this, the WRITE end, behind (PA-2: cover
-					// every entry point). Nothing unsafe reached the sink, because the
-					// reader's anchored check rejected it again; the cost was that the
-					// admin saw a malformed header name accepted and then silently
-					// ignored, with nothing to tell them which of the two had happened.
-					if ( preg_match( '/^[A-Z0-9_]+$/', $custom_header ) ) {
-						return $custom_header;
-					}
-
-					return '';
+					// The name is then validated with the READER's own predicate, so
+					// what is stored is exactly what VisitorIp::get() will honor -
+					// #62 anchored the read end and #89 the save end, each with its
+					// own copy of the pattern, and two copies of an allow-list is a
+					// divergence waiting for the next tightening (PA-2). One rule now.
+					return VisitorIp::normalize_header_name( Field::to_string( $value ) );
 				}
 			),
 			new Field(

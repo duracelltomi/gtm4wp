@@ -94,4 +94,68 @@ final class ScriptTag {
 
 		echo str_replace( '&amp;', '&', $sanitized ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses() sanitized above; only the ampersand entity is restored so inline JS operators and URLs stay valid.
 	}
+
+	/**
+	 * Safely outputs a block that MIXES HTML markup with inline <script> elements.
+	 *
+	 * Same sanitizer as print_script_block(), different ampersand rule, and the
+	 * difference is the whole reason this method exists. wp_kses() entity-encodes
+	 * every bare ampersand, which is
+	 *
+	 * - wrong inside a <script> body: `console.warn && console.warn(…)` becomes
+	 *   `console.warn &amp;&amp; console.warn(…)`, a SyntaxError that kills the
+	 *   entire block, because the browser never HTML-decodes inside <script>; but
+	 * - right inside an HTML attribute: `ns.html?id=X&amp;gtm_auth=Y` is the
+	 *   correct spelling of that URL and is what both 2.0 and 1.x have always
+	 *   emitted for the noscript iframe.
+	 *
+	 * So the ampersand is restored ONLY within script elements, leaving attributes
+	 * as wp_kses() left them. Blanket-restoring (print_script_block) would corrupt
+	 * the iframe URL; not restoring at all is the defect this fixes - the
+	 * container placement OFF, kill-switch and excluded-user-role console warnings
+	 * all reach the page through here.
+	 *
+	 * @param string     $block The markup block, possibly containing <script> elements.
+	 * @param array|null $rules Optional wp_kses() rule set override.
+	 * @return void
+	 */
+	public function print_markup_block( string $block, ?array $rules = null ): void {
+		$sanitized = wp_kses(
+			$block,
+			$rules ?? self::sanitize_rules()
+		);
+
+		echo self::restore_script_ampersands( $sanitized ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses() sanitized above; only the ampersand entity is restored, and only inside <script> bodies, so inline JS operators stay valid.
+	}
+
+	/**
+	 * Turns &amp; back into & inside every <script> element of an
+	 * already-sanitized block, leaving the rest of the markup untouched.
+	 *
+	 * Safe by the same argument as print_script_block()'s blanket restore: the only
+	 * way out of a <script> body is a literal `</script`, and this transform can
+	 * only ever produce an ampersand - never `<`, `>`, `"` or `'`. Every other
+	 * entity stays inert exactly as RI-3 requires.
+	 *
+	 * preg_replace_callback(), not preg_replace(): a callback RETURNS the
+	 * replacement, so a `$1`/`\1` sequence occurring in the script body is never
+	 * expanded as a backreference (PA-7). On a PCRE failure the callback returns
+	 * null, in which case the sanitized input is emitted unchanged rather than the
+	 * empty string - the same "degrade, never blank the output" rule as
+	 * ContainerCode::json_literal() (#85).
+	 *
+	 * @param string $markup wp_kses()-sanitized markup.
+	 * @return string
+	 */
+	private static function restore_script_ampersands( string $markup ): string {
+		$restored = preg_replace_callback(
+			'#(<script\b[^>]*>)(.*?)(</script>)#is',
+			static function ( array $matches ): string {
+				return $matches[1] . str_replace( '&amp;', '&', $matches[2] ) . $matches[3];
+			},
+			$markup
+		);
+
+		return null === $restored ? $markup : $restored;
+	}
 }

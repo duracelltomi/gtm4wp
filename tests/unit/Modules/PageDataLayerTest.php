@@ -1652,7 +1652,7 @@ final class PageDataLayerTest extends TestCase {
 	private string $stub_origin = '';
 
 	/**
-	 * Referer reported by wp_get_raw_referer() for the request under test.
+	 * Referer carried by the request under test, as $_SERVER['HTTP_REFERER'].
 	 *
 	 * @var string
 	 */
@@ -1672,7 +1672,28 @@ final class PageDataLayerTest extends TestCase {
 			static fn ( $url, $component = -1 ) => parse_url( $url, $component ) // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
 		);
 		Functions\when( 'get_http_origin' )->alias( fn () => $this->stub_origin );
-		Functions\when( 'wp_get_raw_referer' )->alias( fn () => $this->stub_referer );
+
+		// The Referer is read straight from $_SERVER, so the fixture sets $_SERVER
+		// rather than stubbing a helper (#91). wp_get_raw_referer() is deliberately
+		// NOT used by the code under test: it prefers $_REQUEST['_wp_http_referer'],
+		// which the caller supplies. Driven per assertion through $stub_referer.
+		Functions\when( 'wp_unslash' )->alias( static fn ( $value ) => $value );
+		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => (string) $value );
+	}
+
+	/**
+	 * Applies the current $stub_referer to the superglobal the code reads.
+	 *
+	 * @return void
+	 */
+	private function apply_stub_referer(): void {
+		if ( '' === $this->stub_referer ) {
+			unset( $_SERVER['HTTP_REFERER'] );
+
+			return;
+		}
+
+		$_SERVER['HTTP_REFERER'] = $this->stub_referer;
 	}
 
 	public function test_confirm_purchase_permission_requires_a_valid_rest_nonce(): void {
@@ -1749,20 +1770,67 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->stub_origin  = '';
 		$this->stub_referer = 'https://shop.example/checkout/order-received/42/';
+		$this->apply_stub_referer();
 		$this->assertTrue( $page->check_confirm_purchase_permission( $request() ), 'Referer vouches for the request when Origin is absent.' );
 
 		$this->stub_referer = 'https://evil.example/attack.html';
+		$this->apply_stub_referer();
 		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'A foreign referer is rejected.' );
 
 		// Neither signal: refuse. "No evidence" is not "same origin", and a state
 		// change on a visitor's behalf should come from a page.
 		$this->stub_referer = '';
+		$this->apply_stub_referer();
 		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'With no Origin and no Referer the request is refused.' );
 
 		// Origin wins when both are present, so a stripped-then-forged referer cannot
 		// talk its way past a foreign origin.
 		$this->stub_origin  = 'https://evil.example';
 		$this->stub_referer = 'https://shop.example/';
+		$this->apply_stub_referer();
 		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'Referer must not override a foreign Origin.' );
+	}
+
+	/**
+	 * #91: the Referer leg must come from the transport, never from the payload.
+	 *
+	 * WordPress' wp_get_raw_referer() - the obvious helper, and the one this callback
+	 * used to call - returns $_REQUEST['_wp_http_referer'] before the header. That
+	 * makes the fallback leg of a CSRF gate settable by the request it is deciding
+	 * about: a cross-site form POST need only append the parameter. The header is the
+	 * only version of this value a foreign page cannot choose.
+	 */
+	public function test_confirm_purchase_permission_ignores_a_request_supplied_referer_parameter(): void {
+		Functions\when( 'wp_verify_nonce' )->justReturn( 1 );
+		$this->stub_origin_helpers();
+
+		// Pin the mechanism, not only the outcome: the helper must not be consulted
+		// at all. Asserting the result alone would still pass if someone reinstated
+		// wp_get_raw_referer() and the fixture happened not to trip it.
+		Functions\expect( 'wp_get_raw_referer' )->never();
+
+		$page = $this->make_page_datalayer();
+
+		// No Origin (so the fallback leg is reached) and no Referer header, with the
+		// attacker's own _wp_http_referer naming this site in both the query and the
+		// body. Neither may vouch for anything.
+		$this->stub_origin  = '';
+		$this->stub_referer = '';
+		$this->apply_stub_referer();
+
+		$_REQUEST['_wp_http_referer'] = 'https://shop.example/';
+		$_GET['_wp_http_referer']     = 'https://shop.example/';
+
+		$this->assertFalse(
+			$page->check_confirm_purchase_permission(
+				new \WP_REST_Request(
+					array( '_wp_http_referer' => 'https://shop.example/' ),
+					array( 'X-WP-Nonce' => 'good' )
+				)
+			),
+			'A request-supplied _wp_http_referer must not satisfy the same-origin gate.'
+		);
+
+		unset( $_REQUEST['_wp_http_referer'], $_GET['_wp_http_referer'] );
 	}
 }

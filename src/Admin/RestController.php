@@ -14,6 +14,7 @@ use GTM4WP\Module\Registry;
 use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Modules\Container\HardcodedContainers;
 use GTM4WP\Options\Field;
+use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -28,7 +29,8 @@ defined( 'ABSPATH' ) || exit;
  */
 final class RestController {
 
-	public const REST_NAMESPACE    = 'gtm4wp/v2';
+	// Defined once in RestCors, which also owns the namespace's cross-origin policy.
+	public const REST_NAMESPACE    = RestCors::REST_NAMESPACE;
 	public const REST_ROUTE        = '/settings';
 	public const REST_ROUTE_EXPORT = '/settings/export';
 	public const REST_ROUTE_IMPORT = '/settings/import';

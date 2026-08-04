@@ -57,18 +57,10 @@ final class VisitorIp {
 	 * @return string IP address of the user if found, empty string otherwise.
 	 */
 	public static function get( string $use_custom_header = '', string $trusted_proxies = '' ): string {
-		$custom_header = '';
+		$custom_header = self::normalize_header_name( $use_custom_header );
 
-		if ( '' !== $use_custom_header ) {
-			$custom_header = strtoupper( str_replace( '-', '_', $use_custom_header ) );
-			// Anchored on purpose: the unanchored version this replaces matched any
-			// string CONTAINING one allowed character, so it accepted every input and
-			// validated nothing.
-			if ( preg_match( '/^[A-Z0-9_]+$/', $custom_header ) ) {
-				$custom_header = 'HTTP_' . $custom_header;
-			} else {
-				$custom_header = '';
-			}
+		if ( '' !== $custom_header ) {
+			$custom_header = 'HTTP_' . $custom_header;
 		}
 
 		if ( ( '' !== $custom_header ) && ( ! empty( $_SERVER[ $custom_header ] ) ) ) {
@@ -180,6 +172,35 @@ final class VisitorIp {
 	}
 
 	/**
+	 * Normalizes a configured HTTP header name to its canonical $_SERVER form
+	 * (without the HTTP_ prefix), or returns an empty string when it is not a
+	 * usable header name.
+	 *
+	 * Public for the same reason as is_valid_range() below: the option's sanitizer
+	 * must accept exactly what the reader will honor. Both ends used to carry their
+	 * own copy of this pattern - #62 anchored the read end and #89 the save end,
+	 * and the two literals then sat three files apart with a comment on one saying
+	 * the other was "identical", which is a divergence waiting for the next
+	 * tightening (PA-2).
+	 *
+	 * Anchored on purpose: the unanchored version this replaces matched any string
+	 * CONTAINING one allowed character, so it accepted every input and validated
+	 * nothing.
+	 *
+	 * @param string $header A header name as the admin typed it (X-Forwarded-For, x_forwarded_for, ...).
+	 * @return string The canonical name (X_FORWARDED_FOR), or '' when invalid.
+	 */
+	public static function normalize_header_name( string $header ): string {
+		if ( '' === $header ) {
+			return '';
+		}
+
+		$name = strtoupper( str_replace( '-', '_', $header ) );
+
+		return preg_match( '/^[A-Z0-9_]+$/', $name ) ? $name : '';
+	}
+
+	/**
 	 * Whether an entry is a valid single IP address or CIDR range.
 	 *
 	 * Public so the option's sanitizer validates with exactly the same rule that the
@@ -204,9 +225,21 @@ final class VisitorIp {
 			return false;
 		}
 
+		$prefix_length = (int) $prefix;
+
+		// A /0 matches every address, so accepting it would declare the entire
+		// internet a trusted proxy - which restores exactly the verbatim header
+		// trust this option exists to remove, and does it silently: the admin
+		// notice that warns about an unconfigured list keys on the list being
+		// non-empty, so filling it with 0.0.0.0/0 also switches off the one signal
+		// that would have told them.
+		if ( $prefix_length < 1 ) {
+			return false;
+		}
+
 		$max = ( false !== filter_var( $subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) ? 128 : 32;
 
-		return (int) $prefix <= $max;
+		return $prefix_length <= $max;
 	}
 
 	/**
@@ -264,7 +297,7 @@ final class VisitorIp {
 			return false;
 		}
 
-		$prefix     = (int) $prefix;
+		$prefix      = (int) $prefix;
 		$whole_bytes = intdiv( $prefix, 8 );
 		$rest_bits   = $prefix % 8;
 

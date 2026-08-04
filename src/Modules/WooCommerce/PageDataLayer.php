@@ -1248,6 +1248,12 @@ final class PageDataLayer {
 	 * refused — a state change on behalf of a visitor should come from a page, and
 	 * "no evidence" is not the same as "same origin".
 	 *
+	 * The Referer is read from $_SERVER, NOT through wp_get_raw_referer(): that helper
+	 * returns $_REQUEST['_wp_http_referer'] in preference to the header, and a request
+	 * parameter is supplied by the very request this function is deciding about. It is
+	 * the right helper for restoring a form's return URL and the wrong one for an
+	 * access decision — the value has to come from the transport, not the payload.
+	 *
 	 * @return bool
 	 */
 	private static function is_same_origin_request(): bool {
@@ -1262,8 +1268,11 @@ final class PageDataLayer {
 			return self::url_matches_site( $origin, $site );
 		}
 
-		$referer = wp_get_raw_referer();
-		if ( is_string( $referer ) && '' !== $referer ) {
+		$referer = isset( $_SERVER['HTTP_REFERER'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) )
+			: '';
+
+		if ( '' !== $referer ) {
 			return self::url_matches_site( $referer, $site );
 		}
 
