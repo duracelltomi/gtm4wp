@@ -362,6 +362,14 @@
 		text-align: center;
 	}
 
+	// A cell whose value is fixed in wp-config.php: still selectable so the
+	// container ID can be copied, but visibly not editable.
+	&__cell--locked input {
+		background: var(--gtm4wp-surface-2);
+		color: var(--gtm4wp-text-3);
+		cursor: not-allowed;
+	}
+
 	&__actions {
 		text-align: center;
 	}

@@ -6,6 +6,8 @@
 import { Button, CheckboxControl, TextControl } from '@wordpress/components';
 import { sprintf, __ } from '@wordpress/i18n';
 
+import { isCellLocked } from '../utils';
+
 // A stored checkbox cell is the canonical string '1' (on) or '' (off); older
 // or programmatic values may arrive as booleans, so normalize them all.
 function isChecked( value ) {
@@ -33,19 +35,40 @@ export default function TableControl( {
 	const columns = Array.isArray( field.columns ) ? field.columns : [];
 	const rows = Array.isArray( value ) ? value : [];
 
-	const updateCell = ( rowIndex, columnKey, next ) => {
+	// The row set is fixed outside this screen (a wp-config.php constant), so the
+	// list cannot be added to or thinned out here — the field description names
+	// the constant that decides it.
+	const rowsLocked = Boolean( field.rows_locked );
+
+	// A locked cell is rejected here as well, not only rendered read-only:
+	// `readOnly` reaches the input through the component library's prop
+	// pass-through, and this screen runs against every WordPress version the
+	// plugin supports — the lock must not depend on that.
+	const updateCell = ( rowIndex, column, next ) => {
+		if ( isCellLocked( field, column ) ) {
+			return;
+		}
+
 		onChange(
 			rows.map( ( row, index ) =>
-				index === rowIndex ? { ...row, [ columnKey ]: next } : row
+				index === rowIndex ? { ...row, [ column.key ]: next } : row
 			)
 		);
 	};
 
 	const addRow = () => {
+		if ( rowsLocked ) {
+			return;
+		}
+
 		onChange( [ ...rows, emptyRow( columns ) ] );
 	};
 
 	const removeRow = ( rowIndex ) => {
+		if ( rowsLocked ) {
+			return;
+		}
+
 		onChange( rows.filter( ( row, index ) => index !== rowIndex ) );
 	};
 
@@ -99,6 +122,11 @@ export default function TableControl( {
 										rowIndex + 1
 									);
 
+									const locked = isCellLocked(
+										field,
+										column
+									);
+
 									if ( 'checkbox' === column.type ) {
 										// A checkbox column can depend on another
 										// cell (e.g. omitting the container ID
@@ -119,7 +147,9 @@ export default function TableControl( {
 													__nextHasNoMarginBottom
 													aria-label={ cellLabel }
 													disabled={
-														disabled || ! enabled
+														disabled ||
+														locked ||
+														! enabled
 													}
 													checked={
 														enabled &&
@@ -130,7 +160,7 @@ export default function TableControl( {
 													onChange={ ( next ) =>
 														updateCell(
 															rowIndex,
-															column.key,
+															column,
 															next ? '1' : ''
 														)
 													}
@@ -146,7 +176,13 @@ export default function TableControl( {
 												__nextHasNoMarginBottom
 												hideLabelFromVision
 												label={ cellLabel }
+												className={
+													locked
+														? 'gtm4wp-table__cell--locked'
+														: undefined
+												}
 												disabled={ disabled }
+												readOnly={ locked }
 												placeholder={
 													column.placeholder
 												}
@@ -156,7 +192,7 @@ export default function TableControl( {
 												onChange={ ( next ) =>
 													updateCell(
 														rowIndex,
-														column.key,
+														column,
 														next
 													)
 												}
@@ -168,7 +204,7 @@ export default function TableControl( {
 									<Button
 										icon="trash"
 										isDestructive
-										disabled={ disabled }
+										disabled={ disabled || rowsLocked }
 										label={ sprintf(
 											/* translators: %d: row number. */
 											__(
@@ -188,7 +224,7 @@ export default function TableControl( {
 			<Button
 				icon="plus"
 				variant="secondary"
-				disabled={ disabled }
+				disabled={ disabled || rowsLocked }
 				onClick={ addRow }
 			>
 				{ __( 'Add row', 'duracelltomi-google-tag-manager' ) }

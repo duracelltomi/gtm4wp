@@ -118,6 +118,85 @@ final class ContainerAdminSchemaTest extends TestCase {
 		$this->assertSame( 'path', $columns['no_id']['depends_on'], 'The checkbox depends on the custom path column.' );
 	}
 
+	/**
+	 * Baseline for the read-only cases below: with no wp-config.php constant in
+	 * play every cell is editable and the field description says nothing about
+	 * one, so a lock can never be a leftover default.
+	 */
+	public function test_container_table_is_fully_editable_without_wpconfig_constants(): void {
+		$field   = $this->field( GTM4WP_OPTION_GTM_CONTAINERS );
+		$columns = array_column( $field->columns, null, 'key' );
+
+		foreach ( $columns as $key => $column ) {
+			$this->assertArrayNotHasKey( 'readonly', $column, "Column '{$key}' must stay editable." );
+		}
+
+		$this->assertFalse( $field->rows_locked, 'The container list is the admin\'s to manage.' );
+		$this->assertStringNotContainsString( 'wp-config.php', $field->description );
+	}
+
+	/**
+	 * The 1.x behavior this restores: a hard coded container ID rendered the
+	 * field read-only and said why. 2.0 fed the React screen the raw stored
+	 * value instead, so an admin could save a container ID that never loads
+	 * with nothing on screen explaining it.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_hardcoded_gtm_id_makes_the_container_table_read_only(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-HARD01' );
+
+		$field   = $this->field( GTM4WP_OPTION_GTM_CONTAINERS );
+		$columns = array_column( $field->columns, null, 'key' );
+
+		$this->assertTrue( $columns['id']['readonly'], 'The container ID column is fixed in wp-config.php.' );
+		$this->assertTrue( $field->rows_locked, 'The constant decides which containers load, so no row can be added or removed.' );
+
+		$this->assertStringContainsString( 'GTM4WP_HARDCODED_GTM_ID', $field->description, 'The admin must be told which constant to edit.' );
+		$this->assertStringContainsString( 'wp-config.php', $field->description );
+		$this->assertStringContainsString( 'read-only', $field->description );
+	}
+
+	/**
+	 * One environment parameter fixes its own column only: the container list
+	 * stays editable, so locking the whole table would take away a setting
+	 * wp-config.php does not control.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_hardcoded_env_auth_locks_only_its_own_column(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', 'hard-auth' );
+
+		$field   = $this->field( GTM4WP_OPTION_GTM_CONTAINERS );
+		$columns = array_column( $field->columns, null, 'key' );
+
+		$this->assertTrue( $columns['gtm_auth']['readonly'] );
+		$this->assertArrayNotHasKey( 'readonly', $columns['id'], 'The container ID is not hard coded, so it stays editable.' );
+		$this->assertArrayNotHasKey( 'readonly', $columns['gtm_preview'] );
+		$this->assertFalse( $field->rows_locked );
+
+		$this->assertStringContainsString( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', $field->description );
+		$this->assertStringNotContainsString( 'GTM4WP_HARDCODED_GTM_ID', $field->description, 'Only the constants actually in effect are named.' );
+	}
+
+	/**
+	 * A malformed constant overrides nothing at output time, so the field must
+	 * stay editable - otherwise the admin is locked out of the very setting they
+	 * need to fix, and the separate admin notice already names the constant.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_rejected_hardcoded_constant_leaves_the_table_editable(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', 'not-a-gtm-id' );
+
+		$field   = $this->field( GTM4WP_OPTION_GTM_CONTAINERS );
+		$columns = array_column( $field->columns, null, 'key' );
+
+		$this->assertArrayNotHasKey( 'readonly', $columns['id'] );
+		$this->assertFalse( $field->rows_locked );
+		$this->assertStringNotContainsString( 'wp-config.php', $field->description );
+	}
+
 	public function test_container_table_stores_omit_id_flag_only_with_custom_path(): void {
 		$field = $this->field( GTM4WP_OPTION_GTM_CONTAINERS );
 

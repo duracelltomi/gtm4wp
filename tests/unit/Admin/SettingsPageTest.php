@@ -160,6 +160,49 @@ final class SettingsPageTest extends TestCase {
 		$this->assertCount( 0, $this->inline_scripts, 'The app is loaded on the settings page only.' );
 	}
 
+	/**
+	 * End to end through the bootstrap sink: with a hard coded container ID the
+	 * React app must receive the container that is actually loaded AND the
+	 * read-only flags that stop the admin from editing it. Getting only one of
+	 * the two is what let an admin save a container ID that never loads.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_bootstrap_data_locks_the_container_table_fixed_in_wp_config(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-HARD01' );
+
+		$page = $this->make_settings_page(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-STORED1',
+						'gtm_auth'    => '',
+						'gtm_preview' => '',
+						'domain'      => '',
+						'path'        => '',
+						'no_id'       => '',
+					),
+				),
+			)
+		);
+
+		$field = null;
+		foreach ( $page->bootstrap_data()['modules'] as $module ) {
+			foreach ( $module['fields'] as $one_field ) {
+				if ( GTM4WP_OPTION_GTM_CONTAINERS === $one_field['key'] ) {
+					$field = $one_field;
+				}
+			}
+		}
+
+		$this->assertNotNull( $field, 'The container table reaches the React app.' );
+		$this->assertSame( 'GTM-HARD01', $field['value'][0]['id'], 'The screen is given the container the frontend loads.' );
+		$this->assertTrue( $field['rows_locked'], 'The row set is fixed in wp-config.php.' );
+
+		$columns = array_column( $field['columns'], null, 'key' );
+		$this->assertTrue( $columns['id']['readonly'] );
+	}
+
 	public function test_bootstrap_data_exposes_modules_and_rest_path(): void {
 		$page = $this->make_settings_page( array() );
 

@@ -76,58 +76,60 @@ final class AdminSchema implements AdminSchemaInterface {
 			}
 		}
 
+		// Every column a valid GTM4WP_HARDCODED_* constant takes over is rendered
+		// read-only, and the row set is frozen when the constants also decide
+		// which containers are loaded. Without this the screen would show - and
+		// happily save - a container setup the frontend silently overrides.
+		$locks   = HardcodedContainers::locks();
+		$columns = array(
+			array(
+				'key'         => ContainerRows::COLUMN_ID,
+				'label'       => __( 'Container ID', 'duracelltomi-google-tag-manager' ),
+				'placeholder' => 'GTM-XXXXXX',
+			),
+			array(
+				'key'         => ContainerRows::COLUMN_AUTH,
+				'label'       => __( 'Environment gtm_auth', 'duracelltomi-google-tag-manager' ),
+				'placeholder' => '',
+			),
+			array(
+				'key'         => ContainerRows::COLUMN_PREVIEW,
+				'label'       => __( 'Environment gtm_preview', 'duracelltomi-google-tag-manager' ),
+				'placeholder' => 'env-NN',
+			),
+			array(
+				'key'         => ContainerRows::COLUMN_DOMAIN,
+				'label'       => __( 'Custom domain', 'duracelltomi-google-tag-manager' ),
+				'placeholder' => 'www.googletagmanager.com',
+			),
+			array(
+				'key'         => ContainerRows::COLUMN_PATH,
+				'label'       => __( 'Custom path', 'duracelltomi-google-tag-manager' ),
+				'placeholder' => 'gtm.js',
+			),
+			array(
+				'key'        => ContainerRows::COLUMN_NO_ID,
+				'label'      => __( 'Omit container ID', 'duracelltomi-google-tag-manager' ),
+				'type'       => 'checkbox',
+				'depends_on' => ContainerRows::COLUMN_PATH,
+			),
+		);
+
+		foreach ( $columns as $index => $column ) {
+			if ( isset( $locks['columns'][ $column['key'] ] ) ) {
+				$columns[ $index ]['readonly'] = true;
+			}
+		}
+
 		return array(
 			new Field(
 				key: GTM4WP_OPTION_GTM_CONTAINERS,
 				type: Field::TYPE_TABLE,
 				default_value: array(),
 				label: __( 'Google Tag Manager containers', 'duracelltomi-google-tag-manager' ),
-				description: wp_kses(
-					__(
-						'Add one row for each Google Tag Manager container you want to load.<br />
-						The environment parameters (gtm_auth and gtm_preview) activate a specific container environment; both values are required to activate an environment, leave both empty to load the live version.<br />
-						Enter a custom domain name (without the https:// prefix) and a custom path if you are using a server side GTM container for tracking. Leave them empty to use www.googletagmanager.com and gtm.js.<br />
-						When a custom path is set you can also turn on "Omit container ID" so that the container ID is left out of the loader URL - use this when your server side GTM container is selected by its path and expects no id parameter.',
-						'duracelltomi-google-tag-manager'
-					),
-					array(
-						'br' => array(),
-					)
-				),
+				description: $this->containers_description( $locks ),
 				group: 'general',
-				columns: array(
-					array(
-						'key'         => ContainerRows::COLUMN_ID,
-						'label'       => __( 'Container ID', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => 'GTM-XXXXXX',
-					),
-					array(
-						'key'         => ContainerRows::COLUMN_AUTH,
-						'label'       => __( 'Environment gtm_auth', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => '',
-					),
-					array(
-						'key'         => ContainerRows::COLUMN_PREVIEW,
-						'label'       => __( 'Environment gtm_preview', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => 'env-NN',
-					),
-					array(
-						'key'         => ContainerRows::COLUMN_DOMAIN,
-						'label'       => __( 'Custom domain', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => 'www.googletagmanager.com',
-					),
-					array(
-						'key'         => ContainerRows::COLUMN_PATH,
-						'label'       => __( 'Custom path', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => 'gtm.js',
-					),
-					array(
-						'key'        => ContainerRows::COLUMN_NO_ID,
-						'label'      => __( 'Omit container ID', 'duracelltomi-google-tag-manager' ),
-						'type'       => 'checkbox',
-						'depends_on' => ContainerRows::COLUMN_PATH,
-					),
-				),
+				columns: $columns,
 				sanitizer: static function ( $value ) {
 					if ( ! is_array( $value ) ) {
 						$value = array();
@@ -238,7 +240,8 @@ final class AdminSchema implements AdminSchemaInterface {
 
 					return $rows;
 				},
-				derive: static fn ( $rows ) => ContainerRows::legacy_values( is_array( $rows ) ? $rows : array() )
+				derive: static fn ( $rows ) => ContainerRows::legacy_values( is_array( $rows ) ? $rows : array() ),
+				rows_locked: array() !== $locks['rows']
 			),
 			new Field(
 				key: GTM4WP_OPTION_GTM_PLACEMENT,
@@ -343,6 +346,62 @@ final class AdminSchema implements AdminSchemaInterface {
 				}
 			),
 		);
+	}
+
+	/**
+	 * Description of the container table.
+	 *
+	 * The static part is followed by a live readout whenever a GTM4WP_HARDCODED_*
+	 * constant is in effect: a wp-config.php file is invisible from the admin, so
+	 * a read-only control on its own would leave the admin wondering why the
+	 * table cannot be edited. The readout names every constant that is actually
+	 * being applied (a malformed one overrides nothing and is reported by the
+	 * admin notice instead), and promises what the save route enforces - the
+	 * stored container setup is kept and used again once the constants are gone.
+	 *
+	 * Rendered through RawHTML in the settings app; the constant names are
+	 * class constants of HardcodedContainers, never user input.
+	 *
+	 * @param array{columns: array<string, string>, rows: string[]} $locks Lock report of HardcodedContainers::locks().
+	 * @return string
+	 */
+	private function containers_description( array $locks ): string {
+		$intro = wp_kses(
+			__(
+				'Add one row for each Google Tag Manager container you want to load.<br />
+				The environment parameters (gtm_auth and gtm_preview) activate a specific container environment; both values are required to activate an environment, leave both empty to load the live version.<br />
+				Enter a custom domain name (without the https:// prefix) and a custom path if you are using a server side GTM container for tracking. Leave them empty to use www.googletagmanager.com and gtm.js.<br />
+				When a custom path is set you can also turn on "Omit container ID" so that the container ID is left out of the loader URL - use this when your server side GTM container is selected by its path and expects no id parameter.',
+				'duracelltomi-google-tag-manager'
+			),
+			array(
+				'br' => array(),
+			)
+		);
+
+		if ( array() === $locks['columns'] ) {
+			return $intro;
+		}
+
+		$constants = array_values( array_unique( array_merge( array_values( $locks['columns'] ), $locks['rows'] ) ) );
+
+		$readout = sprintf(
+			/* translators: %s: comma separated list of wp-config.php constant names, e.g. GTM4WP_HARDCODED_GTM_ID. */
+			esc_html__( 'Part of this setting is fixed in your wp-config.php file by %s and cannot be changed here.', 'duracelltomi-google-tag-manager' ),
+			esc_html( implode( ', ', $constants ) )
+		);
+
+		if ( array() !== $locks['rows'] ) {
+			$readout .= ' ' . esc_html__( 'Those constants also decide which containers are loaded, so the whole table is read-only and shows the containers that are actually running. The container list you saved here is kept untouched and is used again as soon as the constants are removed from wp-config.php.', 'duracelltomi-google-tag-manager' );
+		} else {
+			$readout .= ' ' . esc_html__( 'The affected columns are read-only and show the values that are actually used. The values you saved for them are kept untouched and are used again as soon as the constants are removed from wp-config.php.', 'duracelltomi-google-tag-manager' );
+		}
+
+		if ( in_array( HardcodedContainers::CONSTANT_AUTH, $locks['rows'], true ) ) {
+			$readout .= ' ' . esc_html__( 'Both environment parameters are hard coded, therefore only the first container is loaded.', 'duracelltomi-google-tag-manager' );
+		}
+
+		return $intro . '<br /><strong>' . $readout . '</strong>';
 	}
 
 	/**

@@ -127,7 +127,10 @@ final class SettingsPage {
 	 * @return array<string, mixed>
 	 */
 	public function bootstrap_data(): array {
-		$values  = $this->rest->current_values();
+		// ui_values(), not current_values(): where a wp-config.php constant
+		// overrides the container setup the screen shows what is actually
+		// loaded, alongside the read-only state the container schema declares.
+		$values  = $this->rest->ui_values();
 		$modules = array();
 
 		foreach ( $this->registry->all() as $module ) {

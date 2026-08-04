@@ -101,6 +101,24 @@ export function isFieldDisabled( field, values ) {
 }
 
 /**
+ * Whether a table cell is read-only because its value is controlled outside the
+ * settings screen — a `GTM4WP_HARDCODED_*` constant in wp-config.php fixing part
+ * of the container setup. A locked row set locks every cell of the table: with
+ * the row list itself decided by wp-config.php, an edit to any other cell has no
+ * row of the admin's own left to be saved into.
+ *
+ * @param {Object} field  Field description from the bootstrap data.
+ * @param {Object} column Column description of that field.
+ * @return {boolean} True when the cell must be rendered read-only.
+ */
+export function isCellLocked( field, column ) {
+	return (
+		Boolean( field && field.rows_locked ) ||
+		Boolean( column && column.readonly )
+	);
+}
+
+/**
  * Builds the file name a settings export is downloaded as. The date is
  * injected so the value is deterministic and testable.
  *

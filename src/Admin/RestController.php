@@ -12,6 +12,7 @@ namespace GTM4WP\Admin;
 
 use GTM4WP\Module\Registry;
 use GTM4WP\Modules\Container\ContainerRows;
+use GTM4WP\Modules\Container\HardcodedContainers;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -162,6 +163,37 @@ final class RestController {
 	}
 
 	/**
+	 * Returns the values the settings screen has to render: the current values
+	 * with the container rows replaced by the ones that are actually loaded
+	 * whenever a GTM4WP_HARDCODED_* wp-config.php constant overrides them.
+	 *
+	 * The screen must never show a container setup the frontend does not use -
+	 * that is what let an admin save a container ID that never loads. The rows
+	 * are recomputed here rather than read from the Options service because that
+	 * service is built before this request writes the option row, so a save or
+	 * import response would otherwise answer with the pre-save state.
+	 *
+	 * Deliberately separate from current_values(): an export must carry the
+	 * site's OWN stored configuration, not the constants of this install, so
+	 * that the file stays portable to a site without them.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function ui_values(): array {
+		$values = $this->current_values();
+
+		if ( HardcodedContainers::is_active() ) {
+			list( $rows ) = HardcodedContainers::apply(
+				ContainerRows::normalize( $values[ GTM4WP_OPTION_GTM_CONTAINERS ] ?? array() )
+			);
+
+			$values[ GTM4WP_OPTION_GTM_CONTAINERS ] = $rows;
+		}
+
+		return $values;
+	}
+
+	/**
 	 * GET handler.
 	 *
 	 * @return \WP_REST_Response
@@ -169,7 +201,7 @@ final class RestController {
 	public function get_settings(): \WP_REST_Response {
 		return new \WP_REST_Response(
 			array(
-				'values' => $this->current_values(),
+				'values' => $this->ui_values(),
 			)
 		);
 	}
@@ -183,7 +215,7 @@ final class RestController {
 	 * @return \WP_REST_Response
 	 */
 	public function save_settings( \WP_REST_Request $request ): \WP_REST_Response {
-		$submitted = (array) $request->get_param( 'values' );
+		$submitted = $this->keep_hardcoded_containers( (array) $request->get_param( 'values' ) );
 
 		$stored = get_option( GTM4WP_OPTIONS, array() );
 		if ( ! is_array( $stored ) ) {
@@ -198,9 +230,71 @@ final class RestController {
 			array(
 				'saved'  => array() === $errors,
 				'errors' => (object) $errors,
-				'values' => $this->current_values(),
+				'values' => $this->ui_values(),
 			)
 		);
+	}
+
+	/**
+	 * Keeps the container values that wp-config.php controls out of the stored
+	 * option row.
+	 *
+	 * The settings screen shows - and therefore submits - the container rows that
+	 * are actually loaded, so without this a save triggered by an unrelated field
+	 * would persist the constant's value over the admin's own container setup and
+	 * silently change which containers load once the constant is removed.
+	 *
+	 * - When the constants decide the row set, the table is read-only as a whole
+	 *   and nothing submitted for it can be intentional: the value is dropped and
+	 *   the stored rows stay exactly as they are.
+	 * - When only single columns are overridden, the rows still belong to the
+	 *   admin: every locked cell is restored from the stored row with the same
+	 *   container ID (a row that was just added has no stored value, so it stays
+	 *   empty). Matching by ID rather than by position survives rows being added,
+	 *   removed or reordered in the same save.
+	 *
+	 * A crafted request can still put anything into the option row; it stays
+	 * inert, because the constants win again at output time. This is about not
+	 * destroying the admin's stored setup behind their back.
+	 *
+	 * @param array<string, mixed> $submitted Raw option key => value map (untrusted).
+	 * @return array<string, mixed> The submitted map with the locked container values restored.
+	 */
+	private function keep_hardcoded_containers( array $submitted ): array {
+		if ( ! array_key_exists( GTM4WP_OPTION_GTM_CONTAINERS, $submitted ) || ! HardcodedContainers::is_active() ) {
+			return $submitted;
+		}
+
+		$locks = HardcodedContainers::locks();
+
+		if ( array() !== $locks['rows'] ) {
+			unset( $submitted[ GTM4WP_OPTION_GTM_CONTAINERS ] );
+
+			return $submitted;
+		}
+
+		$stored_rows  = ContainerRows::normalize( $this->current_values()[ GTM4WP_OPTION_GTM_CONTAINERS ] ?? array() );
+		$stored_by_id = array_column( $stored_rows, null, ContainerRows::COLUMN_ID );
+
+		$rows = is_array( $submitted[ GTM4WP_OPTION_GTM_CONTAINERS ] ) ? $submitted[ GTM4WP_OPTION_GTM_CONTAINERS ] : array();
+
+		foreach ( $rows as $index => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$row_id = isset( $row[ ContainerRows::COLUMN_ID ] ) && is_scalar( $row[ ContainerRows::COLUMN_ID ] )
+				? trim( (string) $row[ ContainerRows::COLUMN_ID ] )
+				: '';
+
+			foreach ( array_keys( $locks['columns'] ) as $column ) {
+				$rows[ $index ][ $column ] = $stored_by_id[ $row_id ][ $column ] ?? '';
+			}
+		}
+
+		$submitted[ GTM4WP_OPTION_GTM_CONTAINERS ] = $rows;
+
+		return $submitted;
 	}
 
 	/**
@@ -293,7 +387,7 @@ final class RestController {
 			array(
 				'imported' => array() === $errors,
 				'errors'   => (object) $errors,
-				'values'   => $this->current_values(),
+				'values'   => $this->ui_values(),
 			)
 		);
 	}

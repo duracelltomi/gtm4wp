@@ -580,4 +580,166 @@ final class RestControllerTest extends TestCase {
 
 		$this->assertTrue( $this->saved[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ], 'Round-tripped custom values survive.' );
 	}
+
+	/**
+	 * The settings screen must show the containers that are actually loaded: in
+	 * 1.x the hard coded ID was rendered into a read-only input, while 2.0 fed
+	 * the screen the raw stored value and let the admin save a container ID that
+	 * never loads. An export, in contrast, has to stay portable and carry the
+	 * site's own stored setup rather than this install's wp-config constants.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_ui_values_show_the_container_the_hardcoded_id_actually_loads(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-HARD01' );
+
+		$controller = $this->make_controller(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-STORED1',
+						'gtm_auth'    => '',
+						'gtm_preview' => '',
+						'domain'      => 'stored.example.com',
+						'path'        => '',
+						'no_id'       => '',
+					),
+				),
+			)
+		);
+
+		$ui_rows = $controller->ui_values()[ GTM4WP_OPTION_GTM_CONTAINERS ];
+
+		$this->assertCount( 1, $ui_rows );
+		$this->assertSame( 'GTM-HARD01', $ui_rows[0]['id'], 'The screen shows the container ID the frontend loads.' );
+		$this->assertSame( 'stored.example.com', $ui_rows[0]['domain'], 'The hard coded ID inherits the settings of the stored row.' );
+
+		$this->assertSame(
+			'GTM-STORED1',
+			$controller->current_values()[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'],
+			'The export path keeps the stored setup, so a settings file stays portable to a site without the constant.'
+		);
+	}
+
+	/**
+	 * With the row set fixed in wp-config.php the whole table is read-only, so
+	 * nothing submitted for it can be intentional. Saving an unrelated option
+	 * must not persist the constant's container ID over the admin's own stored
+	 * list - that would silently change which container loads the moment the
+	 * constant is removed.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_save_keeps_the_stored_containers_when_wpconfig_fixes_the_row_set(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-HARD01' );
+
+		$stored_rows = array(
+			array(
+				'id'          => 'GTM-STORED1',
+				'gtm_auth'    => '',
+				'gtm_preview' => '',
+				'domain'      => 'stored.example.com',
+				'path'        => '',
+				'no_id'       => '',
+			),
+		);
+
+		$controller = $this->make_controller(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => $stored_rows,
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-STORED1',
+			)
+		);
+
+		// Exactly what the screen submits: the effective rows it was given, plus
+		// the unrelated option the admin actually changed.
+		$controller->save_settings(
+			new \WP_REST_Request(
+				array(
+					'values' => array(
+						GTM4WP_OPTION_GTM_CONTAINERS   => array(
+							array(
+								'id'          => 'GTM-HARD01',
+								'gtm_auth'    => '',
+								'gtm_preview' => '',
+								'domain'      => 'stored.example.com',
+								'path'        => '',
+								'no_id'       => '',
+							),
+						),
+						GTM4WP_OPTION_INCLUDE_LOGGEDIN => 1,
+					),
+				)
+			)
+		);
+
+		$this->assertSame( $stored_rows, $this->saved[ GTM4WP_OPTION_GTM_CONTAINERS ], 'The stored container list survives the save untouched.' );
+		$this->assertSame( 'GTM-STORED1', $this->saved[ GTM4WP_OPTION_GTM_CODE ], 'The hard coded ID must not leak into the 1.x mirror either.' );
+		$this->assertTrue( $this->saved[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ], 'The option the admin did change is still saved.' );
+	}
+
+	/**
+	 * A single hard coded environment parameter fixes one column but leaves the
+	 * container list to the admin: an edit to any other cell must be saved,
+	 * while the locked cell falls back to the value stored for that container.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_save_restores_a_hardcoded_env_column_from_the_stored_row(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', 'hard-auth' );
+
+		$controller = $this->make_controller(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-AAA111',
+						'gtm_auth'    => 'stored-auth',
+						'gtm_preview' => 'env-7',
+						'domain'      => '',
+						'path'        => '',
+						'no_id'       => '',
+					),
+				),
+			)
+		);
+
+		$controller->save_settings(
+			new \WP_REST_Request(
+				array(
+					'values' => array(
+						GTM4WP_OPTION_GTM_CONTAINERS => array(
+							// The row as the screen renders it: the locked cell
+							// carries the constant's value, the domain was edited.
+							array(
+								'id'          => 'GTM-AAA111',
+								'gtm_auth'    => 'hard-auth',
+								'gtm_preview' => 'env-7',
+								'domain'      => 'new.example.com',
+								'path'        => '',
+								'no_id'       => '',
+							),
+							// A container added in the same save has no stored
+							// value for the locked column.
+							array(
+								'id'          => 'GTM-BBB222',
+								'gtm_auth'    => 'hard-auth',
+								'gtm_preview' => '',
+								'domain'      => '',
+								'path'        => '',
+								'no_id'       => '',
+							),
+						),
+					),
+				)
+			)
+		);
+
+		$rows = $this->saved[ GTM4WP_OPTION_GTM_CONTAINERS ];
+
+		$this->assertCount( 2, $rows, 'The admin can still manage the container list.' );
+		$this->assertSame( 'new.example.com', $rows[0]['domain'], 'The cell the admin edited is saved.' );
+		$this->assertSame( 'stored-auth', $rows[0]['gtm_auth'], 'The hard coded value never overwrites the stored one.' );
+		$this->assertSame( 'env-7', $rows[0]['gtm_preview'], 'A column no constant touches is saved as submitted.' );
+		$this->assertSame( '', $rows[1]['gtm_auth'], 'A newly added container has no stored value for the locked column.' );
+	}
 }

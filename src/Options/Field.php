@@ -95,6 +95,11 @@ final class Field {
 	 *                                     module is still responsible for ignoring the value when the
 	 *                                     dependency is not met. Mirrors the per-column 'depends_on'
 	 *                                     used inside TYPE_TABLE checkbox columns.
+	 * @param bool          $rows_locked   TYPE_TABLE only: the row set is decided outside the settings
+	 *                                     screen (a wp-config.php constant), so the admin UI renders the
+	 *                                     whole table read-only and offers no add/remove row action.
+	 *                                     A single column whose value is fixed that way is marked with
+	 *                                     a 'readonly' entry in $columns instead.
 	 */
 	public function __construct(
 		public string $key,
@@ -108,7 +113,8 @@ final class Field {
 		public $sanitizer = null,
 		public array $columns = array(),
 		public $derive = null,
-		public string $depends_on = ''
+		public string $depends_on = '',
+		public bool $rows_locked = false
 	) {
 	}
 
@@ -253,6 +259,7 @@ final class Field {
 			'choices'     => $this->choices,
 			'columns'     => $this->columns,
 			'depends_on'  => $this->depends_on,
+			'rows_locked' => $this->rows_locked,
 			'value'       => $current_value,
 		);
 	}

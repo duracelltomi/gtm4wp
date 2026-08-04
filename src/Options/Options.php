@@ -11,6 +11,7 @@
 namespace GTM4WP\Options;
 
 use GTM4WP\Modules\Container\ContainerRows;
+use GTM4WP\Modules\Container\HardcodedContainers;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -77,65 +78,11 @@ final class Options {
 			$rows = ContainerRows::from_legacy( $values );
 		}
 
-		if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
-			$hardcoded_gtm_id = constant( 'GTM4WP_HARDCODED_GTM_ID' );
-
-			// Validate the hard coded GTM ID before overriding the stored value.
-			$gtmid_list     = explode( ',', $hardcoded_gtm_id );
-			$gtmid_haserror = false;
-
-			foreach ( $gtmid_list as $one_gtm_id ) {
-				$gtmid_haserror = $gtmid_haserror || ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id );
-			}
-
-			if ( $gtmid_haserror ) {
-				$this->hardcoded_errors[] = 'GTM4WP_HARDCODED_GTM_ID';
-			} else {
-				$rows = ContainerRows::for_hardcoded_ids( $gtmid_list, $rows );
-			}
-		}
-
-		// The hard coded environment parameters are site wide overrides:
-		// they replace the environment values of every row.
-		//
-		// Validated against the same patterns the settings screen enforces, so a
-		// typo in wp-config.php cannot put a malformed value into every container's
-		// loader URL - the container ID above has always been validated this way
-		// and these two were the inconsistent siblings. A rejected constant is
-		// recorded in $hardcoded_errors so Notices can tell the operator which one
-		// is wrong instead of leaving them to debug a silently ignored setting.
-		$hardcoded_auth    = defined( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) ? (string) constant( 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ) : null;
-		$hardcoded_preview = defined( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) ? (string) constant( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ) : null;
-
-		// An empty string is a deliberate "clear the environment", not a typo, so
-		// only non-empty values are pattern checked.
-		if ( ( null !== $hardcoded_auth ) && ( '' !== $hardcoded_auth ) && ! preg_match( ContainerRows::AUTH_PATTERN, $hardcoded_auth ) ) {
-			$this->hardcoded_errors[] = 'GTM4WP_HARDCODED_GTM_ENV_AUTH';
-			$hardcoded_auth           = null;
-		}
-
-		if ( ( null !== $hardcoded_preview ) && ( '' !== $hardcoded_preview ) && ! preg_match( ContainerRows::PREVIEW_PATTERN, $hardcoded_preview ) ) {
-			$this->hardcoded_errors[] = 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW';
-			$hardcoded_preview        = null;
-		}
-
-		if ( ( null !== $hardcoded_auth ) || ( null !== $hardcoded_preview ) ) {
-			foreach ( $rows as &$one_row ) {
-				if ( null !== $hardcoded_auth ) {
-					$one_row[ ContainerRows::COLUMN_AUTH ] = $hardcoded_auth;
-				}
-				if ( null !== $hardcoded_preview ) {
-					$one_row[ ContainerRows::COLUMN_PREVIEW ] = $hardcoded_preview;
-				}
-			}
-			unset( $one_row );
-		}
-
-		// A complete site wide environment override belongs to exactly one
-		// container: keep the 1.x behavior and only load the first one.
-		if ( ( null !== $hardcoded_auth ) && ( '' !== $hardcoded_auth ) && ( null !== $hardcoded_preview ) && ( '' !== $hardcoded_preview ) ) {
-			$rows = array_slice( $rows, 0, 1 );
-		}
+		// The GTM4WP_HARDCODED_* wp-config.php constants override the stored
+		// container setup. Both the override itself and the read-only state of the
+		// settings screen are resolved by HardcodedContainers, so the screen can
+		// never disagree with what the frontend loads.
+		list( $rows, $this->hardcoded_errors ) = HardcodedContainers::apply( $rows );
 
 		$values[ GTM4WP_OPTION_GTM_CONTAINERS ] = $rows;
 

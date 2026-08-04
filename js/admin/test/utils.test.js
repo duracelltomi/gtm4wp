@@ -8,6 +8,7 @@ import {
 	changedValues,
 	coerceValue,
 	exportFilename,
+	isCellLocked,
 	isFieldDisabled,
 	moduleMatchesSearch,
 	stripTags,
@@ -173,6 +174,37 @@ describe( 'isFieldDisabled', () => {
 		expect( isFieldDisabled( { key: 'lonely', depends_on: '' }, {} ) ).toBe(
 			false
 		);
+	} );
+} );
+
+describe( 'isCellLocked', () => {
+	const idColumn = { key: 'id' };
+	const authColumn = { key: 'gtm_auth', readonly: true };
+
+	it( 'locks a column a wp-config.php constant fixes', () => {
+		expect( isCellLocked( { rows_locked: false }, authColumn ) ).toBe(
+			true
+		);
+	} );
+
+	it( 'leaves the other columns editable', () => {
+		expect( isCellLocked( { rows_locked: false }, idColumn ) ).toBe(
+			false
+		);
+	} );
+
+	it( 'locks every cell once the row set is fixed', () => {
+		// With the container list itself decided by wp-config.php there is no
+		// row of the admin's own left for an edit to be saved into.
+		expect( isCellLocked( { rows_locked: true }, idColumn ) ).toBe( true );
+		expect( isCellLocked( { rows_locked: true }, authColumn ) ).toBe(
+			true
+		);
+	} );
+
+	it( 'treats a field without lock information as editable', () => {
+		expect( isCellLocked( {}, {} ) ).toBe( false );
+		expect( isCellLocked( undefined, undefined ) ).toBe( false );
 	} );
 } );
 
