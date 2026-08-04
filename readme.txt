@@ -404,13 +404,27 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
 * Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead. The `GTM4WP_OPTION_SCROLLER_*` constants remain in place for backward compatibility.
 
+= 1.22.5 =
+
+A maintenance release for the 1.x line. 1.22.4 was intended to be the last one before GTM4WP 2.0; this release exists because the fixes below are worth shipping to 1.x users rather than holding for 2.0.
+
+* Fixed (security): hardened how the hidden product-data attribute is built for WooCommerce product lists and cart remove links, so that no product field value can affect the surrounding HTML. Certain values were not guaranteed to stay inside the attribute.
+* Fixed: when a custom X-Forwarded-For header is configured as the visitor IP source, all entries of the header are now evaluated. Only the first entry was ever considered, because the remaining ones were not trimmed of the space that follows each comma and therefore failed IP validation.
+* Fixed: the custom visitor IP header name is now validated in full. The check accepted any value that contained at least one valid character, so an invalid header name passed validation and was then simply never found. Setups with a working header name are unaffected.
+
 = 1.22.4 =
 
-* Fixed: use proper JSON encoding for user input in dataLayer script context. Thanks [cyn](https://github.com/cyn8)
+* Fixed: hardened how values are encoded into the data layer and into inline script blocks. Script blocks are no longer HTML entity decoded after sanitization, and every value written into a script context is now JSON encoded with the full set of hex escaping flags. Thanks [cyn](https://github.com/cyn8)
 * Fixed: nonce attribute should not be sanitized. Thanks [oxyc](https://github.com/oxyc)
 * Fixed: avoid warnings when saving settings. Thanks [mircobabini](https://github.com/mircobabini)
 * Fixed: only float number is returned in JavaScript processing. Thanks [gkipouros](https://github.com/gkipouros)
 * Updated: only load plugin files on frontend or on admin when the admin user has sufficient permissions.
+* Updated: WooCommerce 10.4+ compatibility - the checkout inline script no longer uses the deprecated wc_enqueue_js() function. The old function is still used as a fallback on setups where the tracker script is loaded in the page head.
+* Updated: WordPress and WooCommerce compatibility.
+* Deprecated: geo data (ipstack.com) and weather data (OpenWeatherMap) integrations. They still work in this version but will be removed in GTM4WP 2.0. There is no direct replacement: collect this data in Google Tag Manager or with a dedicated service instead.
+* Deprecated: scroll tracking. It still works in this version but will be removed in GTM4WP 2.0. Use the Scroll Depth trigger built into Google Tag Manager instead.
+* Deprecated: the "Custom tag/variable templates" blacklist option, plus the Universal Analytics and Mouseflow entries of the tag blacklist. These will be removed in GTM4WP 2.0.
+* Added: a dismissable admin notice announcing the upcoming GTM4WP 2.0 release. If your site uses one of the deprecated features above, the notice names it.
 
 = 1.22.3 =
 
@@ -549,9 +563,13 @@ If you are on GA360 and still collecting ecommerce data, you need to update your
 Major rewrite: requires PHP 8.0 and WordPress 6.3. Weather/geo data, scroll tracking and the bundled WhichBrowser library were removed. Public API (template functions, hooks, options) is unchanged.
 
 
+= 1.22.5 =
+
+Security release. Hardens how product data is written into WooCommerce product list and cart markup. Recommended for every store, and especially where users other than the site administrator can edit products.
+
 = 1.22.4 =
 
-Bugfix release
+Security and deprecation release. Hardens data layer and inline script encoding, and marks the features that will be removed in the upcoming GTM4WP 2.0 rewrite (geo data, weather data and scroll tracking). Those features still work in this version.
 
 = 1.22.3 =
 
