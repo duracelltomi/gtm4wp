@@ -529,6 +529,28 @@ final class ListTrackingTest extends TestCase {
 		$this->assertSame( '', $GLOBALS['gtm4wp_cart_item_proddata'], 'The per-item global must be reset after use.' );
 	}
 
+	/**
+	 * The sibling of test_add_productdata_to_wc_block_preserves_dollar_backreference_sequences:
+	 * this injector reaches preg_replace through Helpers::str_replace_first(), so the
+	 * addcslashes() guard on the block injector never covered it. Here the match is
+	 * `href="` - it contains a quote - so expanding a $0 from product data lands a raw
+	 * quote inside the esc_attr'd attribute and terminates it (PA-7 / RI-17).
+	 */
+	public function test_cart_item_remove_link_filter_keeps_backreference_sequences_out_of_the_attribute(): void {
+		$list_tracking                        = $this->make_list_tracking();
+		$GLOBALS['gtm4wp_cart_item_proddata'] = array( 'item_name' => 'Deal $0 special' );
+
+		$out = $list_tracking->cart_item_remove_link_filter( '<a href="?remove_item=abc">x</a>' );
+
+		// The literal `$0` survives verbatim in the product name...
+		$this->assertStringContainsString( 'Deal $0 special', $out );
+		// ...and the matched text was not substituted in its place.
+		$this->assertStringNotContainsString( 'Deal href=" special', $out );
+		// Both directions: exactly one href attribute, so nothing broke out of the
+		// data attribute to create a second one.
+		$this->assertSame( 1, substr_count( $out, 'href="' ), 'No injected duplicate href attribute.' );
+	}
+
 	public function test_cart_item_remove_link_filter_returns_link_unchanged_without_global(): void {
 		// No product data staged (non-array/unset global) -> the link is untouched.
 		unset( $GLOBALS['gtm4wp_cart_item_proddata'] );

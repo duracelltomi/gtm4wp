@@ -57,4 +57,20 @@ describe( 'gtm4wp-form-move-tracker', () => {
 
 		expect( window.dataLayer ).toHaveLength( 0 );
 	} );
+
+	it( 'does not re-register its listeners when the bundle loads twice (#71)', () => {
+		// The import at the top of this file already booted the tracker once, so
+		// executing the module again here is exactly what a re-injected bundle does
+		// (AJAX navigation, a page builder duplicating the handle). Without the
+		// window.gtm4wp_form_move_inited guard the second copy attaches its own
+		// focusin listener and every form interaction is pushed twice.
+		document.body.innerHTML =
+			'<form id="f"><input id="dbl" name="dbl" /></form>';
+
+		jest.isolateModules( () => require( '../gtm4wp-form-move-tracker' ) );
+
+		dispatchFocus( document.getElementById( 'dbl' ), 'focusin' );
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+	} );
 } );

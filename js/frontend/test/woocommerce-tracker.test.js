@@ -15,6 +15,15 @@
  * (jsdom cannot navigate).
  */
 
+// The bundle guards its boot with window.gtm4wp_woocommerce_inited so a re-injected
+// copy cannot attach its document listeners twice (#71). That flag lives on window,
+// which jsdom keeps for the whole file, so every test has to clear it before it
+// boots the module again - otherwise the second and later tests silently get an
+// early return and no listeners at all. Mirrors the blocks tracker's suite.
+beforeEach( () => {
+	delete window.gtm4wp_woocommerce_inited;
+} );
+
 const PRODUCT_DATA = {
 	item_id: 42,
 	item_name: 'PC Product',
@@ -450,7 +459,9 @@ describe( 'gtm4wp-woocommerce exposed add_to_cart trackers (#273)', () => {
 		expect( call[ 1 ][ 0 ] ).toEqual(
 			expect.objectContaining( { item_id: 77 } )
 		);
-		expect( call[ 1 ][ 0 ].quantity ).toBe( '2' );
+		// Number, not the string the input carries: every quantity site parses
+		// before reporting so the type is the same on every surface (#79).
+		expect( call[ 1 ][ 0 ].quantity ).toBe( 2 );
 	} );
 
 	it( 'gtm4wp_track_list_add_to_cart tracks a list button directly', () => {
@@ -1007,9 +1018,9 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 			( c ) => c[ 0 ] === 'remove_from_cart'
 		);
 		expect( call ).toBeDefined();
-		// qty from the input value (3); value = price (8) * 3.
+		// qty parsed from the input value (3, as a number - #79); value = price (8) * 3.
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55, quantity: '3' } )
+			expect.objectContaining( { item_id: 55, quantity: 3 } )
 		);
 		expect( call[ 2 ] ).toEqual(
 			expect.objectContaining( { currency: 'EUR', value: 24 } )
@@ -1048,6 +1059,45 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 		expect(
 			clickRemove().find( ( c ) => c[ 0 ] === 'remove_from_cart' )
 		).toBeUndefined();
+	} );
+
+	it( 'does not fire remove_from_cart when a cart-row qty input is zero', () => {
+		// The mini-cart case above always passed: parseInt gave a real 0 and the
+		// strict `0 === qty` guard matched. The cart page handed that guard the
+		// input's string '0', which never matched, so a zero-quantity line fired
+		// an event there while the mini-cart suppressed it - the two surfaces
+		// disagreed on whether this is an event at all (#79). The sibling test
+		// existed for the working surface only, which is why nothing caught it.
+		document.body.innerHTML =
+			'<table><tbody><tr class="cart_item">' +
+			'<td class="product-remove">' +
+			'<a href="#" class="remove" data-gtm4wp_product_data=\'' +
+			JSON.stringify( REMOVE_PRODUCT ) +
+			"'>x</a></td>" +
+			'<td class="product-quantity">' +
+			'<input type="number" class="qty" value="0" /></td>' +
+			'</tr></tbody></table>';
+
+		expect(
+			clickRemove().find( ( c ) => c[ 0 ] === 'remove_from_cart' )
+		).toBeUndefined();
+	} );
+
+	it( 'binds no further listeners when the bundle is loaded twice (#71)', () => {
+		// A re-injected bundle (AJAX navigation, a page builder duplicating the
+		// handle) used to attach every document listener a second time and
+		// double-push each ecommerce event. Asserting on listener registrations
+		// rather than pushes on purpose: prior describes in this file leak
+		// listeners onto the shared document, so push counts are not reliable here.
+		document.body.innerHTML = '';
+
+		bootWithCapture();
+		expect( capturedDocListeners.length ).toBeGreaterThan( 0 );
+
+		// Second load with the guard flag left in place, exactly as the second copy
+		// of the bundle would find it.
+		bootWithCapture();
+		expect( capturedDocListeners ).toEqual( [] );
 	} );
 } );
 
@@ -1110,6 +1160,38 @@ describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {
 		// internal_id is stripped from every grouped item before the push.
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
 		expect( call[ 1 ][ 1 ] ).not.toHaveProperty( 'internal_id' );
+	} );
+
+	it( 'falls back to quantity 1 when the product form has no quantity field', () => {
+		// #69: the guard was `isNaN( quantity )` applied AFTER a lookup that
+		// short-circuits to null when the field is absent - and isNaN( null ) is
+		// false, because Number( null ) is 0. So the fallback never ran and the
+		// event carried quantity: null with value: 0. Some themes and product
+		// add-on plugins render no quantity input at all.
+		document.body.innerHTML =
+			'<form class="cart" action="https://shop/p">' +
+			'<input type="hidden" name="gtm4wp_product_data" value=\'' +
+			JSON.stringify( { item_id: 9, price: 3 } ) +
+			"' />" +
+			'<button type="submit" class="single_add_to_cart_button">Add</button>' +
+			'</form>';
+
+		bootWithCapture();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		window.gtm4wp_track_single_add_to_cart(
+			document.querySelector( '.single_add_to_cart_button' ),
+			document.querySelector( 'form.cart' )
+		);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ].quantity ).toBe( 1 );
+		expect( call[ 1 ][ 0 ].quantity ).not.toBeNull();
+		// value must follow the quantity, not collapse to 0.
+		expect( call[ 2 ] ).toEqual( expect.objectContaining( { value: 3 } ) );
 	} );
 
 	it( 'does not fire add_to_cart on a disabled add-to-cart button', () => {
@@ -1201,7 +1283,7 @@ describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {
 		// The variation object (item_id = variation id) is added with the chosen
 		// quantity from the form.
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 456, quantity: '2' } )
+			expect.objectContaining( { item_id: 456, quantity: 2 } )
 		);
 		// value = variation price (9.99) * quantity (2), two decimals.
 		expect( call[ 2 ].value ).toBe( '19.98' );

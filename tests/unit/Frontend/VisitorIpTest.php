@@ -172,6 +172,37 @@ final class VisitorIpTest extends TestCase {
 		$this->assertSame( '8.8.8.8', VisitorIp::get( 'X-Forwarded-For' ) );
 	}
 
+	/**
+	 * RFC 7239 / de-facto X-Forwarded-For is comma+SPACE separated, which is what
+	 * every real proxy emits. Without trimming, every entry after the first carries
+	 * a leading space and fails filter_var(), so only entry 1 was ever usable and
+	 * the function silently fell back to REMOTE_ADDR (#67). The sibling cases above
+	 * use comma-without-space, which is why a green suite never showed this.
+	 */
+	public function test_xforwardedfor_trims_entries_separated_by_comma_and_space(): void {
+		$_SERVER['REMOTE_ADDR']          = '203.0.113.1';
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '10.0.0.1, 192.168.0.1, 8.8.8.8';
+
+		$this->assertSame(
+			'8.8.8.8',
+			VisitorIp::get( 'X-Forwarded-For' ),
+			'Entries after the first must be trimmed before validation.'
+		);
+		$this->assertNotSame(
+			'203.0.113.1',
+			VisitorIp::get( 'X-Forwarded-For' ),
+			'A trimmed public entry must win over the REMOTE_ADDR fallback.'
+		);
+	}
+
+	public function test_xforwardedfor_trims_a_single_padded_entry(): void {
+		// A one-entry header with incidental whitespace still resolves.
+		$_SERVER['REMOTE_ADDR']          = '203.0.113.1';
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '  8.8.8.8  ';
+
+		$this->assertSame( '8.8.8.8', VisitorIp::get( 'X-Forwarded-For' ) );
+	}
+
 	public function test_private_remote_addr_yields_empty_string(): void {
 		// On a private/local network REMOTE_ADDR itself is a private range, so
 		// the filtered result is empty - 1.x parity.

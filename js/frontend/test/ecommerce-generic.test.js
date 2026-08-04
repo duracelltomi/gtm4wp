@@ -134,7 +134,9 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			);
 
 			const map = window.gtm4wp_read_item_list_cookie();
-			expect( map[ 42 ] ).toEqual( {
+			// toMatchObject: entries also carry the recency sequence eviction sorts
+			// on (#68), which the PHP reader ignores.
+			expect( map[ 42 ] ).toMatchObject( {
 				item_list_name: 'Summer Sale',
 				item_list_id: 'summer-sale',
 			} );
@@ -198,13 +200,70 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			// The cap holds: the map never grows past GTM4WP_LIST_ATTR_MAX_ENTRIES.
 			expect( Object.keys( map ) ).toHaveLength( 20 );
 			// The oldest id (1) was evicted; the newest (21) is present.
+			// toMatchObject, not toEqual: each entry also carries the recency
+			// sequence the eviction sorts on (#68), which is bookkeeping the PHP
+			// reader ignores.
 			expect( map[ 1 ] ).toBeUndefined();
-			expect( map[ 21 ] ).toEqual( {
+			expect( map[ 21 ] ).toMatchObject( {
 				item_list_name: 'List 21',
 				item_list_id: 'list-21',
 			} );
 			// Only one entry was evicted: the second-oldest survives.
 			expect( map[ 2 ] ).toBeDefined();
+		} );
+
+		it( 'evicts the least recently stored entry, not the lowest product id', () => {
+			// #68: the sibling test above stores ids 1..21 ASCENDING, so insertion
+			// order and numeric key order coincide and the old shift()-based
+			// eviction looked correct. Product ids are integer-like keys, and the
+			// spec makes Object.keys() return those in ascending NUMERIC order
+			// whatever the insertion order - so the eviction actually dropped the
+			// lowest id. Storing DESCENDING makes the two orders disagree: id 21 is
+			// now the oldest entry and id 1 the newest, so the old code would have
+			// evicted 1 (the newest) and kept 21 (the oldest) - inverted.
+			for ( let id = 21; id >= 1; id-- ) {
+				window.gtm4wp_store_item_list_attribution(
+					id,
+					'List ' + id,
+					'list-' + id
+				);
+			}
+
+			const map = window.gtm4wp_read_item_list_cookie();
+
+			expect( Object.keys( map ) ).toHaveLength( 20 );
+			// Stored first => least recently stored => evicted.
+			expect( map[ 21 ] ).toBeUndefined();
+			// Stored last => must survive.
+			expect( map[ 1 ] ).toMatchObject( { item_list_name: 'List 1' } );
+			// And the one stored second is still there: exactly one was evicted.
+			expect( map[ 20 ] ).toBeDefined();
+		} );
+
+		it( 'treats an entry with no recency marker as the oldest', () => {
+			// Entries written by an earlier version carry no sequence, so they must
+			// drain out first rather than outliving freshly stored ones.
+			const legacy = {};
+			for ( let id = 100; id < 119; id++ ) {
+				legacy[ id ] = { item_list_name: 'Legacy ' + id };
+			}
+			document.cookie =
+				'gtm4wp_item_list_attr=' +
+				encodeURIComponent( JSON.stringify( legacy ) );
+
+			window.gtm4wp_store_item_list_attribution( 5, 'Fresh', 'fresh' );
+			window.gtm4wp_store_item_list_attribution(
+				6,
+				'Fresh 6',
+				'fresh-6'
+			);
+
+			const map = window.gtm4wp_read_item_list_cookie();
+
+			expect( Object.keys( map ) ).toHaveLength( 20 );
+			// Both fresh entries survive; a legacy one made way for the second.
+			expect( map[ 5 ] ).toMatchObject( { item_list_name: 'Fresh' } );
+			expect( map[ 6 ] ).toMatchObject( { item_list_name: 'Fresh 6' } );
 		} );
 	} );
 

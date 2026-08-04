@@ -119,15 +119,27 @@ final class Helpers {
 	/**
 	 * Replace only the first occurrence of the search string with the replacement string.
 	 *
+	 * Both arguments are treated as literal strings. This deliberately does NOT use
+	 * preg_replace(): its replacement argument expands $0/$1/${1}/\1 as backreferences,
+	 * so a replacement carrying product data would have such a sequence substituted with
+	 * the matched text. Where the matched text contains a quote (the cart remove-link
+	 * injects at `href="`), that expansion lands a raw quote inside an already-esc_attr'd
+	 * attribute and terminates it - the escaping runs before the substitution, so it
+	 * cannot defend against it. See PA-7 / RI-17 in .security/code-review-patterns.md.
+	 *
 	 * @param string $search The value being searched for, otherwise known as the needle.
 	 * @param string $replace The replacement value that replaces found search values.
 	 * @param string $subject The string being searched and replaced on, otherwise known as the haystack.
 	 * @return string This function returns a string with the replaced values.
 	 */
 	public static function str_replace_first( string $search, string $replace, string $subject ): string {
-		$search = '/' . preg_quote( $search, '/' ) . '/';
+		$position = strpos( $subject, $search );
 
-		return (string) preg_replace( $search, $replace, $subject, 1 );
+		if ( false === $position ) {
+			return $subject;
+		}
+
+		return substr_replace( $subject, $replace, $position, strlen( $search ) );
 	}
 
 	/**
