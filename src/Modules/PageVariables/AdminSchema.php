@@ -74,7 +74,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: true,
 				label: __( 'Category list of current post/archive', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the category names of the current post or archive page', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the categories of the current post or archive page in the pageCategory data layer variable. Categories are listed by their slug (for example news-and-events), not by their display name.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(
@@ -116,7 +116,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Post date', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the date of the current post. This will include 4 dataLayer variables: full date, post year, post month, post date.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the date of the current post. This will include 9 dataLayer variables: full date, year, month, day, day name, hour, minute, ISO 8601 date and Unix timestamp. On date based archive pages only the parts the archive covers are included.', 'duracelltomi-google-tag-manager' ),
 				group: 'post'
 			),
 			new Field(
