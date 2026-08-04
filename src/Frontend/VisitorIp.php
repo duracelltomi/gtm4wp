@@ -58,8 +58,12 @@ final class VisitorIp {
 
 		if ( ( '' !== $custom_header ) && ( ! empty( $_SERVER[ $custom_header ] ) ) ) {
 			if ( 'HTTP_X_FORWARDED_FOR' === $custom_header ) {
-				// X-Forwarded-For is a comma+space separated list of IPs.
+				// X-Forwarded-For is a comma+space separated list of IPs, so each entry
+				// has to be trimmed before it is validated: without that, every entry
+				// after the first carries a leading space and fails filter_var().
 				foreach ( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $custom_header ] ) ) ) as $ip ) {
+					$ip = trim( $ip );
+
 					if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) !== false ) {
 						return $ip;
 					}

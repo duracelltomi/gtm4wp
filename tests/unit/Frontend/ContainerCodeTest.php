@@ -779,13 +779,68 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_top();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "const stringVar = 'text';", $output );
+		// #72: every branch of global_var_literal() now uses the same hex-flag JSON
+		// encoder, so a string is a JSON literal ("double quotes") rather than the
+		// 1.x esc_js single-quoted shape. The array branch had already broken that
+		// parity, so there was no consistent shape left to preserve.
+		$this->assertStringContainsString( 'const stringVar = "text";', $output );
 		$this->assertStringContainsString( 'const boolVar = true;', $output );
 		$this->assertStringContainsString( 'const falseVar = false;', $output );
 		$this->assertStringContainsString( 'const arrayVar = [1,2];', $output );
 		$this->assertStringContainsString( 'const nullVar = null;', $output );
 		$this->assertStringContainsString( 'const zeroVar = 0;', $output );
 		$this->assertStringContainsString( 'const floatVar = 1.5;', $output );
+	}
+
+	/**
+	 * #72: the string branch used esc_js() - an HTML-attribute escaper - three lines
+	 * below an array branch already using hex-flag JSON. A filter-supplied string
+	 * therefore reached the integrator with `"`, `<` and `>` as &quot;/&lt;/&gt;
+	 * TEXT, because a browser never HTML-decodes inside a <script> body, while the
+	 * same value inside an array arrived as real characters. Never a break-out
+	 * (esc_js backslashed the quotes) - a data-corruption class.
+	 *
+	 * Both directions: the hex escapes must be present AND the entity forms absent,
+	 * so a relapse to esc_js fails rather than merely looking different.
+	 */
+	public function test_header_top_encodes_string_global_vars_like_the_array_branch(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY )
+			->andReturn(
+				array(
+					'strVar' => 'A & B "q" <b>',
+					'arrVar' => array( 'A & B "q" <b>' ),
+				)
+			);
+
+		$container = $this->make_container();
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		// Hex-escaped, exactly as the array branch encodes the same characters.
+		$this->assertStringContainsString( '"', $output );
+		$this->assertStringContainsString( '<', $output );
+		// ...and no HTML entity forms, which is what esc_js produced.
+		$this->assertStringNotContainsString( '&quot;', $output );
+		$this->assertStringNotContainsString( '&lt;', $output );
+
+		// The two branches now agree on the encoding of the identical value.
+		$this->assertSame(
+			1,
+			preg_match( '/const strVar = (".*?");/', $output, $str_match ),
+			'The string global var must be rendered.'
+		);
+		$this->assertSame(
+			1,
+			preg_match( '/const arrVar = \[(".*?")\];/', $output, $arr_match ),
+			'The array global var must be rendered.'
+		);
+		$this->assertSame(
+			$arr_match[1],
+			$str_match[1],
+			'A string must encode identically whether it arrives bare or inside an array.'
+		);
 	}
 
 	/**
@@ -822,7 +877,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( 'const floatZeroVar = 0;', $output );
 		$this->assertStringNotContainsString( 'const floatZeroVar = false;', $output );
 
-		$this->assertStringContainsString( "const emptyStrVar = '';", $output );
+		$this->assertStringContainsString( 'const emptyStrVar = "";', $output );
 		$this->assertStringNotContainsString( 'const emptyStrVar = false;', $output );
 	}
 
@@ -852,8 +907,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_top();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "const goodVar = 'kept';", $output );
-		$this->assertStringContainsString( "const _under\$var = 'kept';", $output );
+		$this->assertStringContainsString( 'const goodVar = "kept";', $output );
+		$this->assertStringContainsString( 'const _under$var = "kept";', $output );
 
 		$this->assertStringNotContainsString( 'bad', $output );
 		$this->assertStringNotContainsString( 'has space', $output );

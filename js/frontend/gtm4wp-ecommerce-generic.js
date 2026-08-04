@@ -186,15 +186,42 @@ function gtm4wp_store_item_list_attribution(
 
 	const map = gtm4wp_read_item_list_cookie();
 
-	// Drop any existing entry for this id, then evict oldest keys until there is
-	// room, so the cookie never grows past the cap.
+	// Drop any existing entry for this id, then evict the least recently stored
+	// entries until there is room, so the cookie never grows past the cap.
+	//
+	// #68: this used to take Object.keys( map ).shift(), and the keys are product
+	// ids - integer-like, so the spec makes Object.keys return them in ASCENDING
+	// NUMERIC order regardless of insertion order. That evicted the lowest product
+	// id, not the oldest entry, so on a store with a wide id range the same low-id
+	// products were dropped over and over while genuinely stale high-id entries
+	// survived. Each entry now carries the second it was stored and eviction sorts
+	// on that. An entry written by an older version has no stamp and sorts as
+	// oldest, so the cookie drains itself of legacy entries first.
 	delete map[ product_id ];
-	const keys = Object.keys( map );
-	while ( keys.length >= GTM4WP_LIST_ATTR_MAX_ENTRIES ) {
-		delete map[ keys.shift() ];
+
+	const stored_at = ( key ) =>
+		( map[ key ] && parseInt( map[ key ].t, 10 ) ) || 0;
+	const keys_by_age = Object.keys( map ).sort(
+		( a, b ) => stored_at( a ) - stored_at( b )
+	);
+	while ( keys_by_age.length >= GTM4WP_LIST_ATTR_MAX_ENTRIES ) {
+		delete map[ keys_by_age.shift() ];
 	}
 
-	map[ product_id ] = { item_list_name };
+	// A sequence number rather than a clock: several products can be stored inside
+	// the same millisecond (a list page wiring every tile at once), and tied stamps
+	// would fall back to Object.keys order - the very numeric ordering this fix
+	// exists to stop relying on. It also stays short, which matters because the
+	// cookie is byte-capped on the PHP side. The PHP reader takes only
+	// item_list_name and item_list_id from each entry, so this field is ignored
+	// there and needs no coordinated change.
+	const next_seq =
+		Object.keys( map ).reduce(
+			( max, key ) => Math.max( max, stored_at( key ) ),
+			0
+		) + 1;
+
+	map[ product_id ] = { item_list_name, t: next_seq };
 	if ( item_list_id ) {
 		map[ product_id ].item_list_id = item_list_id;
 	}

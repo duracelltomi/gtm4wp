@@ -223,9 +223,18 @@ final class ContainerCode {
 			return (string) wp_json_encode( $value );
 		}
 
-		// Everything else is rendered as a quoted string, keeping the 1.x output
-		// shape ('single quotes', esc_js escaped) for the string case.
-		return "'" . esc_js( is_scalar( $value ) ? (string) $value : '' ) . "'";
+		// Everything else is rendered as a JSON string literal, with the SAME hex
+		// flags as the array branch above. It used to use esc_js() in single quotes
+		// for 1.x output parity, three lines below a branch that had already broken
+		// that parity - and esc_js is an HTML-attribute escaper, so `"`, `<` and `>`
+		// reached the integrator as &quot;/&lt;/&gt; text instead of characters
+		// (RI-4/PA-4, #72). Verified inert, never a break-out: esc_js backslashed
+		// the quotes. This is a data-correctness fix, and it makes every branch of
+		// this function agree on one encoder.
+		return (string) wp_json_encode(
+			is_scalar( $value ) ? (string) $value : '',
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
 	}
 
 	/**

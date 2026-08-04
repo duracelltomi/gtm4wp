@@ -5,6 +5,27 @@ window.gtm4wp_checkout_step_fired = []; // step 1 will be the billing section wh
 
 window.gtm4wp_first_container_id = '';
 
+/**
+ * Read a quantity out of the DOM as a number, or null when there is nothing usable.
+ *
+ * Every quantity in this file comes from an element that may be absent - the
+ * lookup short-circuits to null - and that yields a *string* when it is present.
+ * Converting first and testing the number afterwards is the only order that
+ * handles both: isNaN( null ) is false, because Number( null ) is 0, so a guard
+ * written after the fact never fires; and `|| 1` lets the truthy string '0'
+ * through untouched. Callers decide what an absent or zero quantity means for
+ * their own event, since that differs per surface (RI-16, findings #69 / #79).
+ *
+ * @param {HTMLElement|null} el   Element carrying the quantity, may be null.
+ * @param {string}           prop Property to read - 'value' or 'textContent'.
+ * @return {number|null} The parsed quantity, or null when it cannot be read.
+ */
+function gtm4wp_read_quantity( el, prop ) {
+	const qty = parseInt( el && el[ prop ], 10 );
+
+	return Number.isNaN( qty ) ? null : qty;
+}
+
 function gtm4wp_woocommerce_handle_cart_qty_change() {
 	document
 		.querySelectorAll( '.product-quantity input.qty' )
@@ -37,7 +58,6 @@ function gtm4wp_woocommerce_handle_cart_qty_change() {
 				if ( original_value < current_value ) {
 					// yes => handle add to cart event
 					productdata.quantity = current_value - original_value;
-					productdata.price = productdata.price;
 
 					gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
 						currency: gtm4wp_currency, // ga4 version
@@ -46,7 +66,6 @@ function gtm4wp_woocommerce_handle_cart_qty_change() {
 				} else {
 					// no => handle remove from cart event
 					productdata.quantity = original_value - current_value;
-					productdata.price = productdata.price;
 
 					gtm4wp_push_ecommerce(
 						'remove_from_cart',
@@ -207,9 +226,14 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 
 	if ( product_variant_id.length > 0 ) {
 		if ( gtm4wp_last_selected_product_variation ) {
-			const qty_el = form.querySelector( '[name=quantity]' );
+			const variation_qty = gtm4wp_read_quantity(
+				form.querySelector( '[name=quantity]' ),
+				'value'
+			);
+			// No usable quantity means the form has no quantity field, so one unit
+			// is the only sensible reading; a zero cannot be added either way.
 			gtm4wp_last_selected_product_variation.quantity =
-				( qty_el && qty_el.value ) || 1;
+				null === variation_qty || variation_qty < 1 ? 1 : variation_qty;
 
 			gtm4wp_push_ecommerce(
 				'add_to_cart',
@@ -245,18 +269,22 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 				'input[name=quantity\\[' + productdata.internal_id + '\\]]'
 			);
 			if ( product_qty_input.length > 0 ) {
-				product_qty =
-					( product_qty_input[ 0 ] &&
-						product_qty_input[ 0 ].value ) ||
-					1;
+				product_qty = gtm4wp_read_quantity(
+					product_qty_input[ 0 ],
+					'value'
+				);
 			} else {
 				return true;
 			}
 
-			if ( 0 == product_qty ) {
+			// A grouped-product row left at zero was not ordered, so it is not part
+			// of this add_to_cart. An unreadable field still counts as one unit,
+			// which is what the previous `|| 1` produced.
+			if ( 0 === product_qty ) {
 				return true;
 			}
-			productdata.quantity = product_qty;
+			productdata.quantity =
+				null === product_qty || product_qty < 1 ? 1 : product_qty;
 
 			// #405: carry the originating list onto this add_to_cart item (opt-in).
 			if ( window.gtm4wp_list_attribution ) {
@@ -293,12 +321,15 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 		const productdata = gtm4wp_read_from_json( product_data_el.value, [
 			'productlink',
 		] );
+		// #69: the previous guard read `isNaN( quantity )` AFTER a lookup that
+		// short-circuits to null, and isNaN( null ) is false - so a product form
+		// with no quantity field emitted quantity: null and value: 0.
+		const simple_qty = gtm4wp_read_quantity(
+			form.querySelector( '[name=quantity]' ),
+			'value'
+		);
 		productdata.quantity =
-			form.querySelector( '[name=quantity]' ) &&
-			form.querySelector( '[name=quantity]' ).value;
-		if ( isNaN( productdata.quantity ) ) {
-			productdata.quantity = 1;
-		}
+			null === simple_qty || simple_qty < 1 ? 1 : simple_qty;
 
 		// #405: carry the originating list onto this add_to_cart item (opt-in).
 		if ( window.gtm4wp_list_attribution ) {
@@ -387,6 +418,18 @@ window.gtm4wp_track_single_add_to_cart = gtm4wp_track_single_add_to_cart;
 window.gtm4wp_track_list_add_to_cart = gtm4wp_track_list_add_to_cart;
 
 function gtm4wp_woocommerce_process_pages() {
+	// Guard against double registration: this is the bundle's single boot entry, so
+	// every document-level listener below is attached from here. A re-injected
+	// bundle (AJAX navigation, a page builder duplicating the handle) would
+	// otherwise attach them twice and double-push every ecommerce event. The media
+	// trackers and the CF7 tracker have had this since #22 / #28; both times the
+	// rule was written as a media-tracker rule, so the non-media bundles that also
+	// attach document listeners were left behind (#71).
+	if ( window.gtm4wp_woocommerce_inited ) {
+		return;
+	}
+	window.gtm4wp_woocommerce_inited = true;
+
 	// loop through WC blocks to set proper listname and position parameters
 	const gtm4wp_product_block_names = {
 		'wp-block-handpicked-products': {
@@ -552,7 +595,13 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
-				let qty = 0;
+				// #79: the cart page reads an input's value (always a string) while
+				// the mini-cart parsed its textContent, so the same removal reported
+				// quantity: "1" on one surface and 1 on the other - and the strict
+				// `0 === qty` guard below never matched the cart page's "0", so a
+				// zero-quantity line fired there but was suppressed in the mini-cart.
+				// Both surfaces now resolve through the same parse.
+				let qty = null;
 				const cart_item_el = productdata_el.closest( '.cart_item' );
 				let qty_element =
 					cart_item_el &&
@@ -566,17 +615,17 @@ function gtm4wp_woocommerce_process_pages() {
 						mini_cart_item_el &&
 						mini_cart_item_el.querySelectorAll( '.quantity' );
 					if ( qty_element && qty_element.length > 0 ) {
-						qty = parseInt( qty_element[ 0 ].textContent );
-
-						if ( Number.isNaN( qty ) ) {
-							qty = 0;
-						}
+						qty = gtm4wp_read_quantity(
+							qty_element[ 0 ],
+							'textContent'
+						);
 					}
 				} else {
-					qty = qty_element[ 0 ].value;
+					qty = gtm4wp_read_quantity( qty_element[ 0 ], 'value' );
 				}
 
-				if ( 0 === qty ) {
+				// Nothing readable, or a line already at zero: not a removal event.
+				if ( null === qty || qty < 1 ) {
 					return true;
 				}
 
@@ -915,8 +964,20 @@ function gtm4wp_woocommerce_process_pages() {
 							const dl_data_obj = JSON.parse(
 								dl_data.dataset.gtm4wp_datalayer
 							);
-							if ( dl_data_obj && window.dataLayer ) {
-								window.dataLayer.push( dl_data_obj );
+							// #66: the data layer variable name is an option on
+							// the PHP side, so every push site must go through
+							// the indirection rather than the default literal.
+							// This was the only site hardcoding window.dataLayer,
+							// and its own truthiness guard then swallowed the
+							// failure on any site using the rename - or pushed
+							// into whatever other tool owns that global there.
+							if (
+								dl_data_obj &&
+								window[ gtm4wp_datalayer_name ]
+							) {
+								window[ gtm4wp_datalayer_name ].push(
+									dl_data_obj
+								);
 							}
 						} catch ( e ) {
 							console &&
