@@ -1244,6 +1244,76 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertArrayHasKey( 'iframe', $captured_rules, 'the_tag() must allow the container iframe through wp_kses().' );
 	}
 
+	/**
+	 * The CSS allow-list is a WordPress-wide control: safe_style_css governs every
+	 * wp_kses() and wp_kses_post() call in the request, not just ours. The iframe's
+	 * style attribute needs two declarations that safecss_filter_attr() strips by
+	 * default, so the allow-list is widened - but only around the sink that needs
+	 * it, and put back immediately afterwards.
+	 *
+	 * Both directions matter and neither is sufficient alone: widened AT the
+	 * sink (or the iframe loses its style attribute) and gone AFTER it (or every
+	 * later sanitizer call in the request runs against the widened rule).
+	 */
+	public function test_the_tag_widens_the_css_allow_list_only_around_its_own_kses_call(): void {
+		$widened_during_kses = null;
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) use ( &$widened_during_kses ) {
+				$widened_during_kses = has_filter(
+					'safe_style_css',
+					array( ContainerCode::class, 'allow_iframe_hiding_styles' )
+				);
+
+				return $content;
+			}
+		);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+
+		ob_start();
+		$container->the_tag();
+		ob_get_clean();
+
+		$this->assertNotFalse(
+			$widened_during_kses,
+			'The CSS allow-list must be widened while the container markup is sanitized, or the iframe loses display/visibility.'
+		);
+		$this->assertFalse(
+			has_filter( 'safe_style_css', array( ContainerCode::class, 'allow_iframe_hiding_styles' ) ),
+			'The widening must be removed once the container markup is printed - leaving it registered relaxes wp_kses() for the whole request.'
+		);
+	}
+
+	public function test_register_hooks_does_not_widen_the_css_allow_list(): void {
+		// The regression this pins: the widening used to be registered here, for
+		// the lifetime of the request, on every non-admin request including REST.
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+		$container->register_hooks();
+
+		// Deliberately asks "is ANY callback attached", not "is ours attached":
+		// the code this replaces used an anonymous closure, which a
+		// callback-specific assertion would not have seen.
+		$this->assertFalse(
+			has_filter( 'safe_style_css' ),
+			'Registering hooks must not touch the site-wide CSS allow-list; only the_tag() may widen it, and only around its own sanitizer call.'
+		);
+	}
+
+	public function test_allow_iframe_hiding_styles_extends_the_incoming_allow_list(): void {
+		$widened = ContainerCode::allow_iframe_hiding_styles( array( 'color' ) );
+
+		$this->assertContains( 'display', $widened );
+		$this->assertContains( 'visibility', $widened );
+		$this->assertContains( 'color', $widened, 'The callback must extend the allow-list it is given, never replace it.' );
+
+		// A filter callback receives whatever the previous callback returned, which
+		// is not guaranteed to be an array.
+		$this->assertSame(
+			array( 'display', 'visibility' ),
+			ContainerCode::allow_iframe_hiding_styles( null )
+		);
+	}
+
 	public function test_register_hooks_uses_early_priority_when_loadearly_enabled(): void {
 		$container = $this->make_container( array( GTM4WP_OPTION_LOADEARLY => true ) );
 		$container->register_hooks();

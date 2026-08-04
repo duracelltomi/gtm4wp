@@ -86,16 +86,6 @@ final class ContainerCode {
 		// Standard WP theme support for body open tags.
 		add_action( 'wp_body_open', array( $this, 'body_open' ) );
 
-		// Allow the inline styles of the noscript iframe through wp_kses().
-		add_filter(
-			'safe_style_css',
-			function ( $styles ) {
-				$styles[] = 'display';
-				$styles[] = 'visibility';
-				return $styles;
-			}
-		);
-
 		// Exclude the data layer variables from WP Rocket JS minification.
 		add_filter( 'rocket_excluded_inline_js_content', array( $this, 'rocket_excluded_inline_js_content' ) );
 	}
@@ -541,29 +531,66 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 * @return void
 	 */
 	public function the_tag(): void {
-		// print_markup_block(), not a bare wp_kses(): this block mixes the noscript
-		// iframe (whose src must keep its &amp; entity form) with the console
-		// warning <script> blocks that get_tag() prepends for placement OFF, the
-		// kill switch and an excluded user role. wp_kses() encodes every bare
-		// ampersand, so a raw echo shipped `console.warn &amp;&amp; console.warn(…)`
-		// - a SyntaxError that took out the whole warning block. Only script bodies
-		// get the ampersand back; the attribute is left alone.
-		$this->script_tag->print_markup_block(
-			$this->get_tag(),
-			array_merge(
-				ScriptTag::sanitize_rules(),
-				array(
-					'noscript' => array(),
-					'iframe'   => array(
-						'src'         => array(),
-						'height'      => array(),
-						'width'       => array(),
-						'style'       => array(),
-						'aria-hidden' => array(),
-					),
+		// The iframe's inline style needs `display` and `visibility`, which
+		// safecss_filter_attr() strips from any style attribute by default. Widen
+		// the CSS allow-list around THIS wp_kses() call only, then put it back:
+		// safe_style_css is a global WordPress control, so a filter left
+		// registered would relax it for every other wp_kses()/wp_kses_post() call
+		// in the same request - including wp_filter_post_kses on content saved by
+		// users without unfiltered_html, and a REST save is not is_admin(). One
+		// line of our own markup is not a reason to loosen the rule site-wide.
+		add_filter( 'safe_style_css', array( self::class, 'allow_iframe_hiding_styles' ) );
+
+		try {
+			// print_markup_block(), not a bare wp_kses(): this block mixes the noscript
+			// iframe (whose src must keep its &amp; entity form) with the console
+			// warning <script> blocks that get_tag() prepends for placement OFF, the
+			// kill switch and an excluded user role. wp_kses() encodes every bare
+			// ampersand, so a raw echo shipped `console.warn &amp;&amp; console.warn(…)`
+			// - a SyntaxError that took out the whole warning block. Only script bodies
+			// get the ampersand back; the attribute is left alone.
+			$this->script_tag->print_markup_block(
+				$this->get_tag(),
+				array_merge(
+					ScriptTag::sanitize_rules(),
+					array(
+						'noscript' => array(),
+						'iframe'   => array(
+							'src'         => array(),
+							'height'      => array(),
+							'width'       => array(),
+							'style'       => array(),
+							'aria-hidden' => array(),
+						),
+					)
 				)
-			)
-		);
+			);
+		} finally {
+			// finally, so an exception inside the sink cannot leave the site's CSS
+			// allow-list widened for the rest of the request.
+			remove_filter( 'safe_style_css', array( self::class, 'allow_iframe_hiding_styles' ) );
+		}
+	}
+
+	/**
+	 * Adds the two declarations the noscript iframe's inline style needs to the
+	 * wp_kses() CSS allow-list.
+	 *
+	 * Public and static only because add_filter()/remove_filter() must be handed
+	 * the same callable, and WordPress invokes it from outside this class. It is
+	 * NOT a hook to register anywhere: the_tag() adds it immediately before its
+	 * own wp_kses() call and removes it immediately after, which is the whole
+	 * point - see the comment there.
+	 *
+	 * @param mixed $styles The CSS property allow-list wp_kses() is about to use.
+	 * @return array The allow-list plus `display` and `visibility`.
+	 */
+	public static function allow_iframe_hiding_styles( $styles ): array {
+		$styles   = is_array( $styles ) ? $styles : array();
+		$styles[] = 'display';
+		$styles[] = 'visibility';
+
+		return $styles;
 	}
 
 	/**
