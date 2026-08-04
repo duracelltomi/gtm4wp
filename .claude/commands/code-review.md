@@ -35,7 +35,16 @@ This plugin injects a Google Tag Manager container and builds a JavaScript `data
    - **Never read a multi-megabyte diff.** Use `git diff --name-status <sha>..HEAD` and `git log --oneline <sha>..HEAD` to find *what* changed, then read the **current files on disk** — that is the code that ships.
    - **Out of scope for findings:** deleted code, vendored/third-party libraries, `tests/` and `js/**/test/`, and `*.md`. Do not report issues in code this branch removes.
    - If no sha is recorded (first run, or a report predating the convention), fall back to the last report's date, record the sha you actually reviewed, and note the fallback.
-5. **Check staleness** — for cells marked `[x]`, run `git log <sha>..HEAD -- <path>` using the last review's recorded sha to see if files changed since. Mark stale cells `[~]`. (Use the sha, not `--since=<date>`: a date match is imprecise in both directions when commits and the review land on the same day.)
+5. **Re-derive staleness mechanically — a recorded date is a claim, never a fact (#73).** Do NOT read the matrix dates and reason about them. Compute the changed set from git first, then reconcile the matrix against it:
+   ```bash
+   git diff --name-only <sha>..HEAD | sort -u      # every file touched since the last review
+   ```
+   - Any file in that list whose component row reads `[x]` → set the row `[~]` **before** prioritizing. Do this for every row, in one pass, without exception.
+   - Then run step 6 against the corrected matrix.
+
+   Use the sha, not `--since=<date>`: a date match is imprecise in both directions when commits and the review land on the same day.
+
+   This step is mechanical because trusting it cost a whole review. R10 found the Frontend JS and Admin JS rows reading `[x] 2026-07-15` while **18** of those files had been modified on 07-16/18/22 and should have read `[~]`. R9 had taken the dates at face value and deprioritized both rows by name — and five of R10's eight findings then turned up in exactly those files. **A row whose date under-reports reality is as invisible to prioritization as a row that does not exist**, which is the same failure as the missing-row case in step 1, wearing a different disguise. Neither is caught by reading the checklist; both are caught by reconciling it against the tree.
 6. **Prioritize unreviewed areas** — focus on `[ ]` cells first, then `[~]` (stale), then `[x]` (already reviewed) only if time permits. Within `[ ]`, take the lowest-actor-reachable surfaces first: a public (A0) route outranks an admin-only (A4) screen.
 7. **Cross-reference known findings** — do NOT re-report issues already in the Known Findings Log unless: (a) the status is `wontfix` and you disagree, or (b) the issue has regressed after being `fixed`.
 8. **Check the Whole-Repo Sweeps table** — dead code, duplication, and new surface are tracked there, not in the Coverage Matrix. If any sweep is `never` or stale (older than ~4 weeks, or predating a significant feature landing), run it this review using the Section B playbook.

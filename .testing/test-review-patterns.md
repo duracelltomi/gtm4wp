@@ -33,6 +33,7 @@ on every review before anything else.
 **⭐ Highest impact — check first:**
 - **TS-1** — a *covered* line is not an *asserted behavior*: a test that exercises an output sink with only benign data leaves the security/edge case unguarded. Coverage stays green; the risk is invisible. Every security-relevant sink needs a hostile-input case.
 - **TS-2** — an escaping/XSS test must assert **both** that the safe form is present **and** that the raw break-out char is absent. One direction alone gives false confidence.
+- **TS-14** — an assertion deliberately loosened (a comment saying "not an exact count", "shape via find()", a workaround for "leaked listeners") may be routing around a *production* defect rather than a harness quirk. A comment explaining why an assertion is weak is a review lead, not housekeeping.
 - **TC-5** — every request/header-sourced dataLayer field (a `.security` PA-3 sink: `?s=`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, cookies, `$_SERVER`) ships a hostile-input regression test. This is the intersection of the two review systems.
 - **TS-6** — a whole class with **zero** tests is the cheapest, highest-value find. Run the missing-test-file sweep first every review.
 - **TS-12** — an authorization gate (a `permission_callback`, a `current_user_can()` check, a filterable capability like `gtm4wp_admin_page_capability`) is a test surface in its own right: it needs a **grant + deny** test and, if filterable, a test that the filter changes the required capability while the default stays unchanged. The XSS/output-sink lens (TS-1/TS-2/TC-5) never prompts for it, so an untested gate hides inside a component the matrix already marks `[x]`.
@@ -72,6 +73,41 @@ on every review before anything else.
 ---
 
 ## Test Smells
+
+### TS-14: The suite adapted its assertions AROUND a defect instead of failing on it ⭐
+Worse than an untested behavior is a *tested* one whose assertions were reshaped to
+tolerate the bug. The suite then stays green **because** of the defect, and every
+future reader takes the accommodation for intended behavior. TS-1 asks "covered with
+what input?"; this asks **"why is this assertion shaped so defensively?"**
+
+Confirmed 2026-07-30 while fixing #71 (two bundles missing the double-init guard).
+The WooCommerce tracker suite carried this comment:
+
+> *"prior describes in this file also leaked onto the shared document; each leaked
+> copy reads the same DOM/globals and pushes an identical event, so these assert the
+> pushed shape via find() (not an exact count)"*
+
+That is a precise description of double-pushing — the exact production symptom #71
+names — recorded as a test-harness quirk and routed around by asserting shape rather
+than count. The information needed to find the bug was written down in the suite,
+in prose, and read as housekeeping. Three further tests in the same file pinned the
+string `quantity: '3'` / `'2'` that finding #79 is about, so the defect was asserted
+as the expectation in two independent places.
+
+**Rules:**
+- **An assertion that avoids counting, ordering or identity is a question, not a
+  convention.** When a test says "not an exact count", "shape via find()", "order
+  independent" or similar, ask what would break if it *did* assert precisely — and
+  whether that thing is a production defect rather than a harness artifact.
+- **Test-harness leakage and production double-binding look identical from inside a
+  test.** Before writing a workaround comment, check whether the same shape is
+  reachable in a browser (a re-injected bundle, an AJAX navigation, a page builder
+  duplicating a handle). If it is, the workaround is hiding a finding.
+- **A comment explaining why an assertion is weak is a review lead.** Grep the suite
+  for such comments during a `/test-review` pass; they mark the places where someone
+  already saw the symptom and did not recognize it.
+- Related: **BE-1** blesses byte-exact assertions that are *deliberate*; this smell
+  is the opposite — assertions deliberately loosened to keep a defect green.
 
 ### TS-1: A covered line is not an asserted behavior ⭐
 Line/branch coverage tells you a line *executed*, not that the test would *fail if
@@ -430,6 +466,7 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-07-30 (2.0 fix session, no `/test-review` run) | Added **TS-14** (the suite adapted its assertions *around* a defect instead of failing on it) after fixing security findings #71 and #79. The WooCommerce tracker suite carried a comment describing double-pushed events as leaked-listener housekeeping and switched to shape-based assertions to tolerate it — a precise description of the production symptom #71 names, written down and read as a harness quirk. Three further tests in the same file pinned the string `quantity: '3'` / `'2'` that #79 is about, so the defect was asserted as the expectation in two independent places. Sibling evidence for the same session: the `remove_from_cart` zero-quantity test existed only for the mini-cart — the surface that always worked — and the `VisitorIp` X-Forwarded-For tests all used comma-**without**-space lists, which is why #67 survived a green suite. Litmus added: a comment explaining why an assertion is weak is a review lead, and test-harness leakage vs production double-binding look identical from inside a test. |
 | 2026-07-22 (forum-reported bug) | Added **TC-14** (conditional-tag-gated code ships a tag-true/global-null case, with the throwing-error-handler recipe) after the PageVariables `$GLOBALS['post']`-on-null warning shipped in 1.22.x and survived every review and a green suite: all fixtures set a well-formed post global (the TS-13 fixture-side dual), and nothing demanded the null case. Canonical test: `PageVariablesModuleTest::test_singular_request_without_global_post_omits_post_variables_without_warning` (verified to fail pre-fix). Companion security entry: RI-13 + the Unguarded WP-global reads sweep. |
 | 2026-07-17 (security Review 7) | Added **TS-13** (a test double more capable than the real collaborator hides the bug — the dual of TS-1, about the *collaborator* not the *input*). Prompted by the security review where three of the four most serious findings were each masked by this: `WC()` stubbed wholesale hid the null REST session (#33 / PA-11), a no-op `createController` fake hid the SDK element-replacement loop (#40 / PA-9), and plain-`stdClass` author fixtures hid the `__isset` blanking (#43 / RI-12). Each fix changed the double, not just the assertion. Cross-referenced from security PA-9/PA-11/RI-12. |
 | 2026-07-15 (issue #143) | Added **TS-12** (authorization/access-control gates are their own test surface — grant+deny + the filter customizes the required cap; the XSS-first lens never prompted for it, so the untested `gtm4wp_admin_page_capability` gate hid in an `[x]` component) and **TC-13** (the Brain Monkey capability-gate recipe). Prompted by closing the #143 gap with `AdminCapabilityFilterTest`. Also added the **Access-control coverage** Test Debt Sweep to the checklist and an access-control bullet to the pre-flight + the `test-reviewer` agent + the `/test-review` command, so the lens is applied mechanically on future runs. |
