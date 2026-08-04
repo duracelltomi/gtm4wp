@@ -307,17 +307,12 @@ final class ContainerCode {
 			}
 		}
 
-		$disabled_roles = explode( ',', (string) $this->options->get( GTM4WP_OPTION_NOGTMFORLOGGEDIN ) );
-		$current_user   = wp_get_current_user();
-		foreach ( $current_user->roles as $user_role ) {
-			if ( in_array( $user_role, $disabled_roles, true ) ) {
-				$output_container_code = false;
+		$excluded_role = $this->excluded_user_role();
+		if ( '' !== $excluded_role ) {
+			$output_container_code = false;
 
-				if ( ! $no_console_log ) {
-					$this->script_tag->print_script_block( $this->disabled_role_warning( $user_role ) );
-				}
-
-				break;
+			if ( ! $no_console_log ) {
+				$this->script_tag->print_script_block( $this->disabled_role_warning( $excluded_role ) );
 			}
 		}
 
@@ -472,6 +467,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	public function get_tag(): string {
 		$no_console_log = (bool) $this->options->get( GTM4WP_OPTION_NOCONSOLELOG );
 		$containers     = $this->containers();
+		$excluded_role  = $this->excluded_user_role();
 
 		$_gtm_tag = '
 <!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
@@ -502,6 +498,20 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 
 			if ( ! $no_console_log ) {
 				$_gtm_tag .= $this->container_suppressed_warning();
+			}
+		} elseif ( '' !== $excluded_role ) {
+			// The user-role exclusion suppresses the <head> container loader in
+			// header_begin(); this iframe is the same container by another route,
+			// so it has to go with it. It used to be emitted regardless, which
+			// meant an excluded user still loaded the container (and was counted
+			// in the reports) whenever JavaScript was unavailable - the exact
+			// case the noscript iframe exists for. Mark the code as "written" so
+			// the iframe block below is skipped, exactly like placement OFF and
+			// the kill switch above; the data layer stays active.
+			$GLOBALS['gtm4wp_container_code_written'] = true;
+
+			if ( ! $no_console_log ) {
+				$_gtm_tag .= $this->disabled_role_warning( $excluded_role );
 			}
 		}
 
@@ -641,6 +651,32 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 		}
 
 		return true;
+	}
+
+	/**
+	 * Returns the first role of the current user that the "Exclude user roles"
+	 * option turns the container code off for, or an empty string when the
+	 * container may be emitted for this user.
+	 *
+	 * Both container sinks ask this - the <head> loader in header_begin() and
+	 * the <noscript> iframe in get_tag() - so an excluded role suppresses the
+	 * whole container. The check used to live inline in header_begin() only,
+	 * which left the iframe (the very fallback that loads GTM when JavaScript
+	 * does not run) firing for an excluded user.
+	 *
+	 * @return string The matching excluded role, or '' when none matches.
+	 */
+	private function excluded_user_role(): string {
+		$disabled_roles = explode( ',', (string) $this->options->get( GTM4WP_OPTION_NOGTMFORLOGGEDIN ) );
+		$current_user   = wp_get_current_user();
+
+		foreach ( (array) ( $current_user->roles ?? array() ) as $user_role ) {
+			if ( in_array( $user_role, $disabled_roles, true ) ) {
+				return (string) $user_role;
+			}
+		}
+
+		return '';
 	}
 
 	/**

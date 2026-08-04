@@ -204,6 +204,71 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringNotContainsString( 'container code output has been suppressed', $tag );
 	}
 
+	public function test_get_tag_suppresses_iframe_for_disabled_role(): void {
+		// Regression: the "Exclude user roles" option suppressed only the <head>
+		// container loader, while the noscript iframe - the fallback that loads
+		// the container when JavaScript does not run - was still emitted, so an
+		// excluded user kept loading GTM and showing up in the reports.
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array( 'roles' => array( 'editor' ) )
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE         => 'GTM-ABC123',
+				GTM4WP_OPTION_NOGTMFORLOGGEDIN => 'administrator,editor',
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringNotContainsString( 'ns.html', $tag, 'The noscript iframe must be suppressed for an excluded user role.' );
+		$this->assertStringContainsString( 'disabled for this user role: editor', $tag );
+		$this->assertTrue( $GLOBALS['gtm4wp_container_code_written'] );
+	}
+
+	public function test_get_tag_disabled_role_suppresses_iframe_even_without_console_log(): void {
+		// The suppression must not depend on the console warning being emitted:
+		// with console logging off nothing marks the code as written, so the
+		// iframe block below would otherwise still run.
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array( 'roles' => array( 'editor' ) )
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE         => 'GTM-ABC123',
+				GTM4WP_OPTION_NOGTMFORLOGGEDIN => 'administrator,editor',
+				GTM4WP_OPTION_NOCONSOLELOG     => true,
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringNotContainsString( 'ns.html', $tag, 'An excluded role must not get the iframe with console logging off.' );
+		$this->assertStringNotContainsString( 'console.warn', $tag, 'No console warning is emitted when console logging is disabled.' );
+	}
+
+	public function test_get_tag_outputs_iframe_for_role_not_excluded(): void {
+		// The counter-direction: a user whose roles are not on the exclusion
+		// list still gets the noscript iframe.
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array( 'roles' => array( 'subscriber' ) )
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE         => 'GTM-ABC123',
+				GTM4WP_OPTION_NOGTMFORLOGGEDIN => 'administrator,editor',
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123', $tag );
+		$this->assertStringNotContainsString( 'disabled for this user role', $tag );
+	}
+
 	public function test_header_begin_outputs_datalayer_and_container_loader(): void {
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_CONTAINER_CODE )->once();
