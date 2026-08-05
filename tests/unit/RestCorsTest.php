@@ -61,27 +61,34 @@ final class RestCorsTest extends TestCase {
 	 */
 	public static function provide_cors_cases(): array {
 		return array(
-			'foreign origin on the public GET'     => array( '/gtm4wp/v2/visitor-data', 'https://evil.example', true ),
-			'foreign origin on our beacon'         => array( '/gtm4wp/v2/confirm-purchase-tracked', 'https://evil.example', true ),
+			'foreign origin on the public GET'      => array( '/gtm4wp/v2/visitor-data', 'https://evil.example', true ),
+			'foreign origin on our beacon'          => array( '/gtm4wp/v2/confirm-purchase-tracked', 'https://evil.example', true ),
 			// #97: the settings routes share the namespace and are registered on every
 			// install, so the policy has to cover them too.
-			'foreign origin on the settings route' => array( '/gtm4wp/v2/settings', 'https://evil.example', true ),
-			'look-alike host'                      => array( '/gtm4wp/v2/visitor-data', 'https://shop.example.evil.example', true ),
-			'different port is a different origin' => array( '/gtm4wp/v2/visitor-data', 'https://shop.example:8443', true ),
-			'unparseable origin'                   => array( '/gtm4wp/v2/visitor-data', 'not a url', true ),
+			'foreign origin on the settings route'  => array( '/gtm4wp/v2/settings', 'https://evil.example', true ),
+			// #102: WordPress registers an index route for the namespace itself
+			// (WP_REST_Server::register_route() -> get_namespace_index), so
+			// /gtm4wp/v2 is a real route and not merely a prefix. A prefix test
+			// requiring the trailing slash used to let exactly this one through.
+			'foreign origin on the namespace index' => array( '/gtm4wp/v2', 'https://evil.example', true ),
+			'namespace index with trailing slash'   => array( '/gtm4wp/v2/', 'https://evil.example', true ),
+			'our own origin on the namespace index' => array( '/gtm4wp/v2', 'https://shop.example', false ),
+			'look-alike host'                       => array( '/gtm4wp/v2/visitor-data', 'https://shop.example.evil.example', true ),
+			'different port is a different origin'  => array( '/gtm4wp/v2/visitor-data', 'https://shop.example:8443', true ),
+			'unparseable origin'                    => array( '/gtm4wp/v2/visitor-data', 'not a url', true ),
 			// Origin: null is what a file:// or sandboxed-iframe document sends. It is
 			// not this site, so it is stripped like any other foreign origin.
-			'null origin'                          => array( '/gtm4wp/v2/visitor-data', 'null', true ),
-			'our own origin'                       => array( '/gtm4wp/v2/visitor-data', 'https://shop.example', false ),
+			'null origin'                           => array( '/gtm4wp/v2/visitor-data', 'null', true ),
+			'our own origin'                        => array( '/gtm4wp/v2/visitor-data', 'https://shop.example', false ),
 			// No Origin means the request was not cross-origin, so core sent no CORS
 			// headers to remove in the first place.
-			'no origin header'                     => array( '/gtm4wp/v2/visitor-data', '', false ),
+			'no origin header'                      => array( '/gtm4wp/v2/visitor-data', '', false ),
 			// Strictly scoped: another plugin's routes keep WordPress' own behavior.
-			'another namespace'                    => array( '/wc/store/v1/cart', 'https://evil.example', false ),
-			'core namespace'                       => array( '/wp/v2/posts', 'https://evil.example', false ),
+			'another namespace'                     => array( '/wc/store/v1/cart', 'https://evil.example', false ),
+			'core namespace'                        => array( '/wp/v2/posts', 'https://evil.example', false ),
 			// A namespace that merely starts with ours must not be caught by a prefix
 			// match - hence the trailing slash in the comparison.
-			'look-alike namespace'                 => array( '/gtm4wp/v22/something', 'https://evil.example', false ),
+			'look-alike namespace'                  => array( '/gtm4wp/v22/something', 'https://evil.example', false ),
 		);
 	}
 

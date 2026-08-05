@@ -1679,6 +1679,11 @@ final class PageDataLayerTest extends TestCase {
 		// which the caller supplies. Driven per assertion through $stub_referer.
 		Functions\when( 'wp_unslash' )->alias( static fn ( $value ) => $value );
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => (string) $value );
+
+		// The Referer leg goes through esc_url_raw(), not sanitize_text_field() (#106).
+		// Stubbed explicitly rather than left to Brain Monkey's undefined-function
+		// handling, so the fixture states which helper the code is expected to call.
+		Functions\when( 'esc_url_raw' )->alias( static fn ( $value ) => (string) $value );
 	}
 
 	/**
@@ -1789,6 +1794,61 @@ final class PageDataLayerTest extends TestCase {
 		$this->stub_referer = 'https://shop.example/';
 		$this->apply_stub_referer();
 		$this->assertFalse( $page->check_confirm_purchase_permission( $request() ), 'Referer must not override a foreign Origin.' );
+	}
+
+	/**
+	 * #106: the Referer leg reaches the URL parser byte-for-byte.
+	 *
+	 * The value is a URL about to be parsed, so it goes through esc_url_raw().
+	 * sanitize_text_field() - what this leg used to call - strips EVERY %XX sequence
+	 * out of whatever it is handed. That cannot change the verdict today, because
+	 * only host and port are compared and removing characters can never turn a
+	 * foreign host into this one; the point is that a gate must not be built on a
+	 * sanitizer that silently rewrites the value it is judging.
+	 *
+	 * Both stubs here model the ONE behaviour that separates the two functions. An
+	 * identity stub for sanitize_text_field() - which is what the shared fixture
+	 * uses, correctly, for every other test - would make this assertion vacuous
+	 * while still executing the line (TS-1).
+	 */
+	public function test_confirm_purchase_permission_hands_the_referer_to_the_parser_unmodified(): void {
+		Functions\when( 'wp_verify_nonce' )->justReturn( 1 );
+		$this->stub_origin_helpers();
+
+		// Faithful sanitize_text_field(): percent sequences are stripped. If the
+		// production code ever calls this again, the assertion below goes red.
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => (string) preg_replace( '/%[a-f0-9]{2}/i', '', (string) $value )
+		);
+
+		$parsed = array();
+		Functions\when( 'wp_parse_url' )->alias(
+			static function ( $url, $component = -1 ) use ( &$parsed ) {
+				$parsed[] = $url;
+
+				return parse_url( $url, $component ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+			}
+		);
+
+		$page    = $this->make_page_datalayer();
+		$referer = 'https://shop.example/checkout/order%20received/42/';
+
+		$this->stub_origin  = '';
+		$this->stub_referer = $referer;
+		$this->apply_stub_referer();
+
+		$this->assertTrue(
+			$page->check_confirm_purchase_permission(
+				new \WP_REST_Request( array(), array( 'X-WP-Nonce' => 'good' ) )
+			),
+			'A same-origin Referer carrying percent-encoding still vouches for the request.'
+		);
+
+		$this->assertContains(
+			$referer,
+			$parsed,
+			'The Referer must reach wp_parse_url() exactly as the transport delivered it; sanitize_text_field() would have dropped the %20.'
+		);
 	}
 
 	/**

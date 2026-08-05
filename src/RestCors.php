@@ -111,7 +111,22 @@ final class RestCors {
 			return false;
 		}
 
-		if ( 0 !== strpos( ltrim( $route, '/' ), self::REST_NAMESPACE . '/' ) ) {
+		// Two shapes have to match, and only one of them is a route this plugin
+		// registers. WordPress auto-registers an index route for every namespace
+		// the first time it sees one (WP_REST_Server::register_route() adds
+		// '/' . $namespace -> get_namespace_index), so /gtm4wp/v2 answers requests
+		// as surely as /gtm4wp/v2/settings does. A prefix test alone therefore
+		// left the namespace's own index outside the policy that is named after
+		// the namespace - it returns only route metadata, but "every route in
+		// this namespace" has to mean every route.
+		//
+		// The trailing slash in the prefix stays: without it, a future
+		// gtm4wp/v22 namespace would be swept in by a plain strpos().
+		$path = ltrim( $route, '/' );
+
+		if ( self::REST_NAMESPACE !== $path
+			&& 0 !== strpos( $path, self::REST_NAMESPACE . '/' )
+		) {
 			return false;
 		}
 

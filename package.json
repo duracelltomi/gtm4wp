@@ -8,7 +8,8 @@
     "start": "wp-scripts start",
     "test:unit": "wp-scripts test-unit-js --passWithNoTests",
     "lint:js": "wp-scripts lint-js js",
-    "release": "node tools/build-release.js"
+    "release": "node tools/build-release.js",
+    "check-branch": "node tools/check-branch.js"
   },
   "repository": {
     "type": "git",

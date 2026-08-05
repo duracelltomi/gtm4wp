@@ -39,6 +39,7 @@
     "scripts": {
         "phpcs": "phpcs",
         "test": "phpunit",
-        "test:coverage": "phpunit --coverage-text"
+        "test:coverage": "phpunit --coverage-text",
+        "check-branch": "node tools/check-branch.js"
     }
 }

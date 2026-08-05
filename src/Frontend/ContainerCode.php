@@ -394,9 +394,25 @@ final class ContainerCode {
 	 * @return string
 	 */
 	private function disabled_role_warning( string $user_role ): string {
+		// json_literal(), not esc_js(): this is a string VALUE in a raw <script>
+		// body, where esc_js() emits &quot;/&amp;/&lt; entities the browser never
+		// decodes, so a role slug containing one of those characters reached the
+		// console as an entity instead of the character (PA-4/RI-4). The same swap
+		// was made in global_var_literal() for the same reason; this was the last
+		// esc_js'd string value left in a script body.
+		//
+		// The WHOLE message is encoded, not just the role, so the literal supplies
+		// its own quotes and the emitted line stays byte-identical to the previous
+		// output for an ordinary role slug - which is what keeps 1.x parity and the
+		// existing byte assertions (BE-1) meaningful.
+		$role_message = self::json_literal(
+			'[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $user_role . ' !!!',
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
 		return '
 ' . $this->script_tag->opening_tag() . '
-	console.warn && console.warn("[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . esc_js( $user_role ) . ' !!!");
+	console.warn && console.warn(' . $role_message . ');
 	console.warn && console.warn("[GTM4WP] Logout or login with a user having a different user role!");
 	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container code is omitted !!!");
 </script>';

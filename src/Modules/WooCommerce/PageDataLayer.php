@@ -1217,9 +1217,10 @@ final class PageDataLayer {
 	 * which reflects the request Origin and sends Access-Control-Allow-Credentials: true
 	 * — so a third-party page can read any token this site hands out, with the visitor's
 	 * own cookies attached, and replay it here. A session-bound nonce would look like a
-	 * fix and would not be one. (VisitorDataEndpoint::restrict_cors() now stops that
+	 * fix and would not be one. (GTM4WP\RestCors::restrict_cors() now stops that
 	 * reflection for this plugin's namespace, but the Origin check does not depend on
-	 * it.)
+	 * it - which is the point: the two controls are independent, so neither one being
+	 * moved, disabled or missed can quietly take the other with it.)
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return bool
@@ -1268,8 +1269,15 @@ final class PageDataLayer {
 			return self::url_matches_site( $origin, $site );
 		}
 
+		// esc_url_raw(), not sanitize_text_field(): the value is a URL that is about
+		// to be parsed, and sanitize_text_field() strips every %XX sequence out of
+		// whatever it is given. That cannot change this decision today (only host
+		// and port are compared, and removing characters can never turn a foreign
+		// host into ours), but a gate should not be built on a sanitizer that
+		// silently rewrites the thing being judged. The sibling HTTP_REFERER read in
+		// PageVariablesModule already uses esc_url_raw().
 		$referer = isset( $_SERVER['HTTP_REFERER'] )
-			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) )
+			? esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) )
 			: '';
 
 		if ( '' !== $referer ) {

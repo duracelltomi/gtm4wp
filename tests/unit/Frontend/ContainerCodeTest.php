@@ -227,6 +227,57 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertTrue( $GLOBALS['gtm4wp_container_code_written'] );
 	}
 
+	/**
+	 * #105: the excluded role is a string VALUE inside a raw <script> body, so it
+	 * goes through the hex-flag JSON encoder, not esc_js().
+	 *
+	 * The esc_js() helper emits HTML entities (&quot;, &amp;, &lt;), and the browser
+	 * never HTML-decodes inside a <script> element - so an esc_js'd role slug reached
+	 * the console as the entity text rather than the character (PA-4/RI-4). This is
+	 * the same swap #72 made in global_var_literal(); this was the last esc_js'd
+	 * string value left in a script body.
+	 *
+	 * Not a break-out either way - the value is A4-constrained at both ends (it must
+	 * appear in the user's roles AND in the admin's option) - so this pins the
+	 * encoding, which is where the defect actually was.
+	 */
+	public function test_disabled_role_warning_json_encodes_a_role_containing_special_characters(): void {
+		$role = 'shop & "manager"';
+
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array( 'roles' => array( $role ) )
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE         => 'GTM-ABC123',
+				GTM4WP_OPTION_NOGTMFORLOGGEDIN => $role,
+			)
+		);
+
+		$tag = $container->get_tag();
+
+		// Both directions (TS-2). Present: the encoder's own output, built with the
+		// same call the source uses rather than hand-typed escapes (TC-2).
+		$expected = wp_json_encode(
+			'[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $role . ' !!!',
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		$this->assertStringContainsString(
+			'console.warn(' . $expected . ')',
+			$tag,
+			'The whole warning message must be emitted as one hex-flag JSON literal.'
+		);
+
+		// Absent: the entity forms esc_js() would have produced. &amp; is the one
+		// that matters most, because print_markup_block() restores it inside a
+		// <script> body - so an esc_js'd ampersand would arrive as a bare & and the
+		// quote entities would stay visible as text.
+		$this->assertStringNotContainsString( '&quot;', $tag, 'esc_js() quote entities must not reach a <script> body.' );
+		$this->assertStringNotContainsString( '&amp;', $tag, 'esc_js() ampersand entities must not reach a <script> body.' );
+	}
+
 	public function test_get_tag_disabled_role_suppresses_iframe_even_without_console_log(): void {
 		// The suppression must not depend on the console warning being emitted:
 		// with console logging off nothing marks the code as written, so the
