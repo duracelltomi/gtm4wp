@@ -25,8 +25,11 @@ clover.xml
 /wordpress/
 
 # Composer
+# Only /vendor/ is a build artifact. composer.lock is source: it is what makes
+# `composer install` reproducible, and without it CI resolves a fresh dependency
+# set on every run - including Composer plugins, which execute code at install
+# time. Committed deliberately; see .upstream/ entry U88.
 /vendor/
-composer.lock
 
 # NPM
 node_modules

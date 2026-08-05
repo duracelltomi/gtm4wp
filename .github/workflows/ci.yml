@@ -30,19 +30,46 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: none
 
-      # install, not update: composer.lock is committed, and `composer update` here
-      # ignored it - so CI resolved a fresh dependency set on every run and never
-      # actually tested the pinned one, while any newly published version of a dev
-      # dependency (or a transitive Composer plugin, which executes code) ran in CI
-      # on first publish. The JS job has always used `npm ci` for exactly this reason.
+      # install, not update: composer.lock is committed, so this resolves the
+      # pinned set rather than a fresh one. Without the lockfile `composer
+      # install` behaves like `composer update` - any newly published version of
+      # a dev dependency (or of a transitive Composer plugin, which executes code
+      # at install time) would run in CI on first publish, unreviewed. The JS job
+      # has always used `npm ci` for exactly this reason.
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress
+
+      # Pinning without auditing just freezes known vulnerabilities in place.
+      - name: Composer security audit
+        run: composer audit --no-interaction
 
       - name: PHP_CodeSniffer (includes PHP 8.0 compatibility sniffs)
         run: vendor/bin/phpcs
 
       - name: PHPUnit
         run: vendor/bin/phpunit
+
+  # The declared floor is PHP 8.0, but PHPUnit 11 requires >= 8.2, so the suite
+  # cannot run there - `composer install` fails to resolve before a single test
+  # executes. What this job can do is parse every file with the real 8.0 parser,
+  # which catches 8.1+ syntax (enums, readonly, never, first-class callables)
+  # that would otherwise only be caught by PHPCompatibility's static model of
+  # 8.0. The model is good; the actual parser is ground truth. No dependencies
+  # are installed, so phpunit's platform requirement is irrelevant here.
+  php-floor:
+    name: PHP 8.0 — syntax check (declared floor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          coverage: none
+
+      - name: Lint every shipped PHP file against the declared floor
+        run: find duracelltomi-google-tag-manager-for-wordpress.php uninstall.php compat src -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
 
   js:
     name: JS — build + lint + unit tests
