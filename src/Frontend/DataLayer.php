@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Frontend;
 
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -46,16 +47,15 @@ final class DataLayer {
 	/**
 	 * Returns the name of the data layer JavaScript global variable.
 	 *
+	 * Resolution (including the re-validation of a stored value that the save
+	 * side would no longer accept) lives in ContainerRows so that this reader,
+	 * Compat\Globals, the option sanitizer and the admin notice all share one
+	 * definition - see ContainerRows::datalayer_name().
+	 *
 	 * @return string
 	 */
 	public function name(): string {
-		$datalayer_name = $this->options->get( GTM4WP_OPTION_DATALAYER_NAME );
-
-		if ( empty( $datalayer_name ) || ! is_string( $datalayer_name ) ) {
-			return 'dataLayer';
-		}
-
-		return $datalayer_name;
+		return ContainerRows::datalayer_name( $this->options->get( GTM4WP_OPTION_DATALAYER_NAME ) );
 	}
 
 	/**

@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\Container\AdminSchema;
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Field;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -107,6 +108,92 @@ final class ContainerAdminSchemaTest extends TestCase {
 			),
 			$field->choices
 		);
+	}
+
+	/**
+	 * Finding #114. The data layer name is emitted UNQUOTED into a <script>
+	 * body (`var <name> = <name> || [];`, `window.<name>.push(…)`), so the
+	 * sanitizer's allow-list has to be the JavaScript identifier grammar and
+	 * nothing looser - there is no escaping fix for a bare identifier, which
+	 * makes this allow-list the entire control.
+	 *
+	 * The 1.x rule this replaces admitted '-'. Both lines shipped it, so this
+	 * is not a 2.0 regression; it is a name the settings screen accepted while
+	 * the frontend it produced was a SyntaxError.
+	 *
+	 * @param string $name     Candidate variable name.
+	 * @param bool   $accepted Whether the sanitizer must accept it.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_datalayer_variable_names' )]
+	public function test_datalayer_name_allow_list_is_the_javascript_identifier_grammar( string $name, bool $accepted ): void {
+		$result = $this->field( GTM4WP_OPTION_DATALAYER_NAME )->sanitize( $name );
+
+		if ( $accepted ) {
+			$this->assertSame( $name, $result, "'{$name}' is a valid JavaScript identifier and must be stored." );
+			return;
+		}
+
+		$this->assertInstanceOf(
+			\WP_Error::class,
+			$result,
+			"'{$name}' is not a valid JavaScript identifier and must be rejected on save."
+		);
+		$this->assertSame( 'gtm4wp_invalid_datalayer_name', $result->get_error_code() );
+	}
+
+	/**
+	 * Names the sanitizer must accept and reject.
+	 *
+	 * @return array<string, array{0: string, 1: bool}>
+	 */
+	public static function provide_datalayer_variable_names(): array {
+		return array(
+			// Accepted: the default, the documented rename, and the two
+			// identifier-legal leading characters the 1.x rule wrongly excluded.
+			'the GTM default'      => array( 'dataLayer', true ),
+			'a trailing digit'     => array( 'dataLayer2', true ),
+			'an underscore inside' => array( 'my_data_layer', true ),
+			'a leading underscore' => array( '_private', true ),
+			'a leading dollar'     => array( '$dl', true ),
+			'a dollar inside'      => array( 'my$layer', true ),
+
+			// Rejected: JavaScript reads '-' as the subtraction operator, so a
+			// hyphenated name is the finding itself. The rest were rejected by
+			// the 1.x rule too and must stay rejected.
+			'a hyphen inside'      => array( 'my-layer', false ),
+			'a hyphen and digits'  => array( 'data-layer2', false ),
+			'a leading digit'      => array( '2layer', false ),
+			'a space'              => array( 'my layer', false ),
+			'a dot'                => array( 'my.layer', false ),
+			'a quote'              => array( 'a"b', false ),
+			'a script break-out'   => array( "a\x3c/script\x3e", false ),
+		);
+	}
+
+	/**
+	 * PA-2's "test the agreement, not the list": the save side and the read
+	 * side must call one predicate, so a tightening on either end cannot leave
+	 * a value the sanitizer stores and the reader silently discards.
+	 *
+	 * @return void
+	 */
+	public function test_datalayer_name_save_side_and_read_side_agree(): void {
+		$field = $this->field( GTM4WP_OPTION_DATALAYER_NAME );
+
+		foreach ( self::provide_datalayer_variable_names() as $case ) {
+			list( $name, $accepted ) = $case;
+
+			$stored_ok = ! is_wp_error( $field->sanitize( $name ) );
+			$read_ok   = ( ContainerRows::datalayer_name( $name ) === $name );
+
+			$this->assertSame(
+				$stored_ok,
+				$read_ok,
+				"Save side and read side disagree about '{$name}'."
+			);
+			$this->assertSame( $accepted, $stored_ok );
+		}
 	}
 
 	public function test_container_table_has_an_omit_id_checkbox_column(): void {

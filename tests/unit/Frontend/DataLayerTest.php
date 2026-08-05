@@ -41,6 +41,83 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertSame( 'dataLayer', $datalayer->name() );
 	}
 
+	/**
+	 * Finding #114, read side (PA-2: re-validate at the output sink, do not
+	 * trust a value because it was sanitized on save). The name is emitted
+	 * unquoted - `var <name> = <name> || [];` - so a stored value that is not a
+	 * JavaScript identifier would make the whole head <script> block a
+	 * SyntaxError, taking the data layer initialization down with it.
+	 *
+	 * The save side alone cannot cover this: 1.x accepted hyphenated names and
+	 * the migration stores them verbatim, so an upgrading site arrives here
+	 * with a value this line has to reject on its own.
+	 *
+	 * @param mixed $stored The stored option value.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_unusable_datalayer_names' )]
+	public function test_name_falls_back_when_the_stored_value_is_not_a_js_identifier( $stored ): void {
+		$datalayer = new DataLayer(
+			$this->make_options( array( GTM4WP_OPTION_DATALAYER_NAME => $stored ) )
+		);
+
+		$this->assertSame( 'dataLayer', $datalayer->name() );
+	}
+
+	/**
+	 * Stored values that cannot be emitted as a bare JavaScript identifier.
+	 *
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function provide_unusable_datalayer_names(): array {
+		return array(
+			// The finding: accepted by the 1.x sanitizer, fatal in the emitted JS.
+			'a hyphen (1.x accepted this)' => array( 'my-layer' ),
+			'a leading digit'              => array( '2layer' ),
+			'a space'                      => array( 'my layer' ),
+			'a dot'                        => array( 'my.layer' ),
+			'a quote'                      => array( 'a"b' ),
+			'a script break-out'           => array( "a\x3c/script\x3e" ),
+			'empty'                        => array( '' ),
+			'whitespace only'              => array( '   ' ),
+			'a non-string'                 => array( 12345 ),
+			'an array'                     => array( array( 'unexpected' ) ),
+		);
+	}
+
+	/**
+	 * The other direction: a name that IS a valid identifier still reaches the
+	 * output untouched, including the two leading characters the old rule
+	 * wrongly excluded. Without this the fallback above could pass by always
+	 * returning the default.
+	 *
+	 * @param string $stored The stored option value.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_usable_datalayer_names' )]
+	public function test_name_keeps_a_valid_js_identifier( string $stored ): void {
+		$datalayer = new DataLayer(
+			$this->make_options( array( GTM4WP_OPTION_DATALAYER_NAME => $stored ) )
+		);
+
+		$this->assertSame( $stored, $datalayer->name() );
+	}
+
+	/**
+	 * Stored values that are usable as a bare JavaScript identifier.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function provide_usable_datalayer_names(): array {
+		return array(
+			'a plain rename'       => array( 'myDataLayer' ),
+			'a trailing digit'     => array( 'dataLayer2' ),
+			'an underscore inside' => array( 'my_data_layer' ),
+			'a leading underscore' => array( '_private' ),
+			'a leading dollar'     => array( '$dl' ),
+		);
+	}
+
 	public function test_compile_applies_public_filter_and_mirrors_global(): void {
 		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
 			->once()

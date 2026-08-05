@@ -15,9 +15,10 @@ use GTM4WP\Module\AbstractModule;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Adds gtm.whitelist / gtm.blacklist to the main data layer to control
+ * Adds gtm.allowlist / gtm.blocklist to the main data layer to control
  * which tag, trigger and variable types are allowed to execute on the site.
- * Port of the blacklist part of gtm4wp_add_basic_datalayer_data() from 1.x.
+ * Port of the blacklist part of gtm4wp_add_basic_datalayer_data() from 1.x,
+ * which wrote the undocumented legacy gtm.whitelist / gtm.blacklist names.
  *
  * The entity ID list below is refreshed from Google's restriction
  * documentation (https://developers.google.com/tag-platform/tag-manager/restrict)
@@ -195,9 +196,9 @@ final class BlacklistModule extends AbstractModule {
 	}
 
 	/**
-	 * Registers the frontend hooks. Priority 11 keeps the gtm.whitelist /
-	 * gtm.blacklist keys after the page variables in the compiled data
-	 * layer, mirroring the 1.x key order.
+	 * Registers the frontend hooks. Priority 11 keeps the restriction key
+	 * after the page variables in the compiled data layer, mirroring the
+	 * 1.x key order.
 	 *
 	 * @return void
 	 */
@@ -248,7 +249,8 @@ final class BlacklistModule extends AbstractModule {
 	}
 
 	/**
-	 * Adds gtm.whitelist / gtm.blacklist to the data layer.
+	 * Adds the selected restriction list (gtm.allowlist or gtm.blocklist) to
+	 * the data layer.
 	 *
 	 * @param array $data_layer Array of key-value pairs output into the data layer variable.
 	 * @return array
@@ -270,16 +272,43 @@ final class BlacklistModule extends AbstractModule {
 			}
 		}
 
-		$_gtmwhitelist = array();
-		$_gtmblacklist = array();
-		if ( 1 === (int) $this->opt( GTM4WP_OPTION_BLACKLIST_ENABLE ) ) {
-			$_gtmblacklist = array_merge( $_gtmblacklist, $_gtmrestrictlistitems );
-		} else {
-			$_gtmwhitelist = array_merge( $_gtmwhitelist, $_gtmrestrictlistitems );
-		}
+		/*
+		 * gtm.allowlist / gtm.blocklist are the key names Google documents. The
+		 * gtm.whitelist / gtm.blacklist pair this replaces appears nowhere in the
+		 * current documentation, nor in the older tag-manager/web/restrict page -
+		 * neither states that the legacy names are supported, deprecated, or
+		 * anything at all. The runtime has historically read both pairs, but
+		 * "undocumented and observed to work once" is a weaker guarantee than
+		 * "documented", and the failure mode if a legacy name is ever dropped is
+		 * silent: the plugin writes the key, nothing reads it, and every tag runs
+		 * unrestricted while the settings screen still shows the restriction.
+		 *
+		 * Emit ONE key, for the selected mode only, and never an empty companion.
+		 * That is not a style choice - it is the bug this method used to have.
+		 * 1.x and pre-fix 2.0 wrote both keys and left the unselected one as an
+		 * empty array. Google Tag Manager's runtime reads the allowlist as:
+		 *
+		 *     var a = SA("gtm.allowlist") || SA("gtm.whitelist");
+		 *     ...
+		 *     a && (k = k && $A(g, h, b));
+		 *
+		 * An empty array is TRUTHY in JavaScript, so an empty allowlist is an
+		 * allowlist that "has been set" - and $A() then returns false for every
+		 * entity, because nothing is in an empty list. In blocklist mode the
+		 * plugin was therefore blocking the WHOLE container rather than the
+		 * selected entities. It fails closed, so it reads as an over-eager
+		 * restriction rather than as a defect, which is why it survived so long.
+		 * (Allowlist mode was unaffected: an empty blocklist blocks nothing.)
+		 *
+		 * Verified by replaying the runtime's own YA()/$A()/Tb()/Lb() against
+		 * this method's output, not inferred from the documentation - which
+		 * describes neither empty lists nor these key names.
+		 */
+		$mode_key = ( 1 === (int) $this->opt( GTM4WP_OPTION_BLACKLIST_ENABLE ) )
+			? 'gtm.blocklist'
+			: 'gtm.allowlist';
 
-		$data_layer['gtm.whitelist'] = $_gtmwhitelist;
-		$data_layer['gtm.blacklist'] = $_gtmblacklist;
+		$data_layer[ $mode_key ] = $_gtmrestrictlistitems;
 
 		return $data_layer;
 	}

@@ -874,6 +874,59 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $output );
 	}
 
+	/**
+	 * Findings #114 and #117 at the sink they actually matter for. This block
+	 * emits the data layer name twice over in two different grammars - once as a
+	 * string VALUE (json_literal + hex flags, RI-4 pile b) and twice as a bare
+	 * IDENTIFIER, which no escaper can protect. A stored name that is not a
+	 * valid identifier must therefore never reach either position: it would make
+	 * `var my-layer = my-layer || [];` a SyntaxError and take the whole head
+	 * <script> block down with it, including the data layer initialization.
+	 *
+	 * Assert both directions - the fallback IS emitted and the stored value is
+	 * absent - so the test cannot pass by emitting nothing at all.
+	 *
+	 * @return void
+	 */
+	public function test_header_top_never_emits_a_datalayer_name_that_is_not_a_js_identifier(): void {
+		// Accepted by the 1.x sanitizer, stored verbatim by the migration.
+		$container = $this->make_container(
+			array( GTM4WP_OPTION_DATALAYER_NAME => 'my-layer' )
+		);
+
+		ob_start();
+		$container->header_top();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'my-layer', $output, 'The unusable name must not reach the script in any position.' );
+		$this->assertStringContainsString( 'var gtm4wp_datalayer_name = "dataLayer";', $output );
+		$this->assertStringContainsString( 'var dataLayer = dataLayer || [];', $output );
+	}
+
+	/**
+	 * The name is a string VALUE on this line, so it goes through the hex-flag
+	 * encoder rather than esc_js() (RI-4 pile b, the #105/#110 shape). Output is
+	 * byte-identical for any real name - which is the point: a value that cannot
+	 * break out today must still be emitted by the encoder that would stop one.
+	 *
+	 * @return void
+	 */
+	public function test_header_top_emits_the_datalayer_name_literal_as_json(): void {
+		$container = $this->make_container(
+			array( GTM4WP_OPTION_DATALAYER_NAME => 'myDataLayer' )
+		);
+
+		ob_start();
+		$container->header_top();
+		$output = (string) ob_get_clean();
+
+		// json_literal() supplies its own quotes; nothing wraps it.
+		$this->assertStringContainsString(
+			'var gtm4wp_datalayer_name = ' . wp_json_encode( 'myDataLayer', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+			$output
+		);
+	}
+
 	public function test_header_top_renders_global_vars_from_filter(): void {
 		Filters\expectApplied( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY )
 			->once()

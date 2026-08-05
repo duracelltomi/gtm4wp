@@ -384,6 +384,39 @@ final class MediaEventsModuleTest extends TestCase {
 	}
 
 	/**
+	 * Finding #120 (RI-17 read backwards). The scheme/host gate runs BEFORE the
+	 * escaper, so it cannot see the escaper's own failure mode: esc_url()
+	 * returns '' for a scheme outside wp_allowed_protocols(), and
+	 * kses_allowed_protocols lets any plugin narrow that list. Without the
+	 * second check the embed gets `origin=` with nothing after it - exactly the
+	 * half-built value the first gate exists to prevent. A guard is only a guard
+	 * for the steps that come after it.
+	 *
+	 * @return void
+	 */
+	public function test_enable_youtube_js_api_leaves_the_embed_alone_when_the_escaper_rejects_the_origin(): void {
+		Functions\when( 'site_url' )->justReturn( 'gopher://example.com' );
+		Functions\when( 'wp_parse_url' )->justReturn(
+			array(
+				'scheme' => 'gopher',
+				'host'   => 'example.com',
+			)
+		);
+		// Models a narrowed protocol allow-list: esc_url() drops the whole URL
+		// rather than returning a partial one.
+		Functions\when( 'esc_url' )->justReturn( '' );
+
+		$module = $this->make_module( array() );
+
+		$html = '<iframe src="https://www.youtube.com/embed/abc?feature=oembed"></iframe>';
+
+		$result = $module->enable_youtube_js_api( $html, 'https://youtu.be/abc', array() );
+
+		$this->assertSame( $html, $result, 'An origin the escaper rejected must leave the embed untouched.' );
+		$this->assertStringNotContainsString( 'origin=', $result, 'No empty origin parameter may be spliced in.' );
+	}
+
+	/**
 	 * Site URLs that cannot produce an origin.
 	 *
 	 * @return array<string, array{0: mixed}>

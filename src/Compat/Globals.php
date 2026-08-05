@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Compat;
 
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -31,15 +32,14 @@ final class Globals {
 	public static function populate( Options $options ): void {
 		$GLOBALS['gtm4wp_options'] = $options->all();
 
-		/**
-		 * Check for empty is needed to prevent error in WP CLI,
-		 * bugfix by Patrick Holberg Hesselberg (carried over from 1.x).
-		 */
-		$datalayer_name = $options->get( GTM4WP_OPTION_DATALAYER_NAME );
-		if ( empty( $datalayer_name ) || ! is_string( $datalayer_name ) ) {
-			$datalayer_name = 'dataLayer';
-		}
-		$GLOBALS['gtm4wp_datalayer_name'] = $datalayer_name;
+		// Resolved through the same helper as DataLayer::name() rather than
+		// repeating the fallback here: this global is what 1.x consumers push
+		// through (window[gtm4wp_datalayer_name]), so a second definition that
+		// drifted would hand third-party code a different variable name from
+		// the one the container code declares (RI-14).
+		$GLOBALS['gtm4wp_datalayer_name'] = ContainerRows::datalayer_name(
+			$options->get( GTM4WP_OPTION_DATALAYER_NAME )
+		);
 
 		if ( ! isset( $GLOBALS['gtm4wp_datalayer_data'] ) ) {
 			$GLOBALS['gtm4wp_datalayer_data'] = array();

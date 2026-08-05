@@ -132,6 +132,16 @@ final class MediaEventsModule extends AbstractModule {
 		// identically here, and 1.x emits this byte-for-byte.
 		$origin = esc_url( $scheme . '://' . $host );
 
+		// The scheme/host gate above runs BEFORE the escaper, so it cannot see the
+		// escaper's own failure mode: esc_url() returns '' for a scheme outside
+		// wp_allowed_protocols(), which the kses_allowed_protocols filter lets any
+		// plugin narrow. Without this second check that would splice in the same
+		// half-built `origin=` the first gate exists to prevent - a guard is only a
+		// guard for the steps that come after it (RI-17, read backwards).
+		if ( '' === $origin ) {
+			return $return_value;
+		}
+
 		return str_replace(
 			'feature=oembed',
 			'feature=oembed&enablejsapi=1&origin=' . $origin,

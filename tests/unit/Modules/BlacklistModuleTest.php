@@ -13,8 +13,9 @@ use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
- * Covers the refreshed entity ID table and the gtm.whitelist/gtm.blacklist
- * data layer output ported from 1.x.
+ * Covers the refreshed entity ID table and the gtm.allowlist/gtm.blocklist
+ * data layer output (ported from 1.x, which wrote the undocumented legacy
+ * gtm.whitelist/gtm.blacklist names).
  */
 final class BlacklistModuleTest extends TestCase {
 
@@ -55,7 +56,7 @@ final class BlacklistModuleTest extends TestCase {
 		$this->assertSame( count( $valid ), count( array_unique( $valid ) ) );
 	}
 
-	public function test_blacklist_mode_populates_gtm_blacklist(): void {
+	public function test_blacklist_mode_populates_gtm_blocklist(): void {
 		$module = $this->make_module(
 			array(
 				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
@@ -65,11 +66,59 @@ final class BlacklistModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( array( 'html', 'img', 'gaawe' ), $data_layer['gtm.blacklist'] );
-		$this->assertSame( array(), $data_layer['gtm.whitelist'] );
+		$this->assertSame( array( 'html', 'img', 'gaawe' ), $data_layer['gtm.blocklist'] );
+
+		/*
+		 * The unselected mode's key must be OMITTED, never emitted as an empty
+		 * array, and this is the assertion the whole feature rests on. Verified
+		 * against Google Tag Manager's own runtime, not inferred - it reads the
+		 * allowlist as `SA("gtm.allowlist") || SA("gtm.whitelist")` and then
+		 * applies it with `a && (k = k && $A(g, h, b))`.
+		 *
+		 * An empty array is TRUTHY in JavaScript, so publishing an empty allowlist
+		 * (under either name) alongside the blocklist tells the runtime an
+		 * allowlist HAS been set - and its allow-test returns false for every
+		 * entity, because nothing is in an empty list. 1.x and pre-fix 2.0 did
+		 * exactly that in blocklist mode and blocked the ENTIRE container, not the
+		 * selected entities. It fails closed, so it looks like an over-eager
+		 * restriction rather than a bug.
+		 *
+		 * Do not "restore 1.x parity" here. The parity was the defect.
+		 */
+		$this->assertArrayNotHasKey( 'gtm.allowlist', $data_layer );
 	}
 
-	public function test_whitelist_mode_populates_gtm_whitelist(): void {
+	/**
+	 * The rule the assertion above encodes, stated as its own case so a future
+	 * change cannot satisfy the letter of it while reintroducing the behaviour:
+	 * in blocklist mode the data layer must carry NO allowlist under any of the
+	 * names Google Tag Manager reads, empty or otherwise.
+	 *
+	 * @return void
+	 */
+	public function test_blocklist_mode_publishes_no_allowlist_under_any_name(): void {
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'html,img',
+			)
+		)->add_datalayer_data( array() );
+
+		// Every key the runtime consults for an allowlist (YA(): gtm.allowlist,
+		// then gtm.whitelist). Present-and-empty is the failure mode, so assert
+		// absence rather than emptiness.
+		foreach ( array( 'gtm.allowlist', 'gtm.whitelist' ) as $allowlist_key ) {
+			$this->assertArrayNotHasKey(
+				$allowlist_key,
+				$data_layer,
+				"An allowlist under '{$allowlist_key}' - even an empty one - blocks every tag in the container."
+			);
+		}
+
+		$this->assertSame( array( 'html', 'img' ), $data_layer['gtm.blocklist'] );
+	}
+
+	public function test_whitelist_mode_populates_gtm_allowlist(): void {
 		$module = $this->make_module(
 			array(
 				GTM4WP_OPTION_BLACKLIST_ENABLE => 2,
@@ -79,8 +128,8 @@ final class BlacklistModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( array( 'gaawc', 'u' ), $data_layer['gtm.whitelist'] );
-		$this->assertSame( array(), $data_layer['gtm.blacklist'] );
+		$this->assertSame( array( 'gaawc', 'u' ), $data_layer['gtm.allowlist'] );
+		$this->assertArrayNotHasKey( 'gtm.blocklist', $data_layer );
 	}
 
 	public function test_sandboxed_scripts_group_class_is_restrictable(): void {
@@ -97,8 +146,8 @@ final class BlacklistModuleTest extends TestCase {
 			)
 		)->add_datalayer_data( array() );
 
-		$this->assertSame( array( 'html', 'sandboxedScripts' ), $blacklist['gtm.blacklist'] );
-		$this->assertSame( array(), $blacklist['gtm.whitelist'] );
+		$this->assertSame( array( 'html', 'sandboxedScripts' ), $blacklist['gtm.blocklist'] );
+		$this->assertArrayNotHasKey( 'gtm.allowlist', $blacklist );
 
 		$whitelist = $this->make_module(
 			array(
@@ -107,8 +156,8 @@ final class BlacklistModuleTest extends TestCase {
 			)
 		)->add_datalayer_data( array() );
 
-		$this->assertSame( array( 'sandboxedScripts' ), $whitelist['gtm.whitelist'] );
-		$this->assertSame( array(), $whitelist['gtm.blacklist'] );
+		$this->assertSame( array( 'sandboxedScripts' ), $whitelist['gtm.allowlist'] );
+		$this->assertArrayNotHasKey( 'gtm.blocklist', $whitelist );
 	}
 
 	public function test_unsupported_group_classes_and_hostile_input_are_filtered_out(): void {
@@ -124,7 +173,7 @@ final class BlacklistModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( array( 'sandboxedScripts' ), $data_layer['gtm.blacklist'] );
+		$this->assertSame( array( 'sandboxedScripts' ), $data_layer['gtm.blocklist'] );
 	}
 
 	public function test_invalid_and_stale_entities_are_filtered_out(): void {
@@ -138,7 +187,49 @@ final class BlacklistModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( array( 'html' ), $data_layer['gtm.blacklist'] );
+		$this->assertSame( array( 'html' ), $data_layer['gtm.blocklist'] );
+	}
+
+	/**
+	 * The key names are the whole contract with Google Tag Manager: the plugin
+	 * writes them and something else entirely decides whether to read them, so a
+	 * wrong name fails silently - every tag runs unrestricted while the settings
+	 * screen still shows the restriction. gtm.allowlist/gtm.blocklist are what
+	 * Google documents; gtm.whitelist/gtm.blacklist appear in neither the current
+	 * page nor the older one, which is why they are not merely "also emitted".
+	 *
+	 * @param int $mode The restriction mode option value.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_restriction_modes' )]
+	public function test_only_the_documented_key_names_are_emitted( int $mode ): void {
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => $mode,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'html',
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'gtm.whitelist', $data_layer, 'The legacy key name is undocumented and must not be emitted.' );
+		$this->assertArrayNotHasKey( 'gtm.blacklist', $data_layer, 'The legacy key name is undocumented and must not be emitted.' );
+
+		// Exactly one restriction key, and it is a documented one.
+		$restriction_keys = array_values(
+			array_intersect( array_keys( $data_layer ), array( 'gtm.allowlist', 'gtm.blocklist' ) )
+		);
+		$this->assertCount( 1, $restriction_keys );
+	}
+
+	/**
+	 * The two enabled restriction modes.
+	 *
+	 * @return array<string, array{0: int}>
+	 */
+	public static function provide_restriction_modes(): array {
+		return array(
+			'blocklist mode' => array( 1 ),
+			'allowlist mode' => array( 2 ),
+		);
 	}
 
 	public function test_frontend_hooks_only_registered_when_enabled(): void {

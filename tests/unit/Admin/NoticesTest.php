@@ -335,6 +335,66 @@ final class NoticesTest extends TestCase {
 		$this->assertStringNotContainsString( 'visitor-ip-untrusted-header', $output );
 	}
 
+	/**
+	 * Finding #114. A stored data layer name that is not a JavaScript identifier
+	 * is ignored by the frontend, which falls back to `dataLayer`. 1.x accepted
+	 * hyphenated names and the migration stores them verbatim, so an upgrading
+	 * site reaches this state without having done anything wrong - and both
+	 * states look identical on the settings screen. Silently substituting a
+	 * different global would be the same undiagnosable failure the name itself
+	 * caused, so it is named (PA-2: validation without a signal is half a fix).
+	 * Grant AND deny, per TC-13.
+	 *
+	 * @return void
+	 */
+	public function test_show_notices_reports_an_unusable_datalayer_variable_name(): void {
+		$notices = $this->make_notices_with_options(
+			array( GTM4WP_OPTION_DATALAYER_NAME => 'my-layer' )
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'invalid-datalayer-name', $output );
+		$this->assertStringContainsString( 'my-layer', $output, 'The notice names the rejected value so it can be found and corrected.' );
+	}
+
+	/**
+	 * The deny half: a usable name raises no notice, so the warning above cannot
+	 * pass by simply always firing.
+	 *
+	 * @param string $stored A stored name that needs no notice.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_acceptable_stored_datalayer_names' )]
+	public function test_show_notices_silent_for_a_usable_datalayer_variable_name( string $stored ): void {
+		$notices = $this->make_notices_with_options(
+			array( GTM4WP_OPTION_DATALAYER_NAME => $stored )
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'invalid-datalayer-name', $output );
+	}
+
+	/**
+	 * Stored names that must not raise the notice - including the empty default,
+	 * which means "use dataLayer" rather than "this is broken".
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function provide_acceptable_stored_datalayer_names(): array {
+		return array(
+			'unset (the default)'  => array( '' ),
+			'the GTM default'      => array( 'dataLayer' ),
+			'a plain rename'       => array( 'myDataLayer' ),
+			'a leading underscore' => array( '_private' ),
+		);
+	}
+
 	public function test_show_notices_silent_when_no_custom_visitor_ip_header_is_used(): void {
 		// REMOTE_ADDR only: nothing is being trusted, so there is nothing to warn about.
 		$notices = $this->make_notices_with_options(

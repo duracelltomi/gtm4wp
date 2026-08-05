@@ -163,6 +163,30 @@ final class Notices {
 			echo '</strong></p></div>';
 		}
 
+		// A stored data layer variable name that is not a usable JavaScript
+		// identifier is ignored by the frontend, which falls back to dataLayer.
+		// 1.x accepted names containing a hyphen, and those are stored verbatim by
+		// the migration, so an upgrading site can reach this state without ever
+		// having done anything wrong. Silently substituting a different global
+		// would be the same undiagnosable failure the name itself caused, so name
+		// it (PA-2: validation without a signal is half a fix). Not dismissible -
+		// it describes a live configuration gap and clears itself on the next save.
+		$stored_datalayer_name = trim( (string) $this->options->get( GTM4WP_OPTION_DATALAYER_NAME ) );
+		if ( ( '' !== $stored_datalayer_name ) && ! ContainerRows::is_valid_js_identifier( $stored_datalayer_name ) ) {
+			echo '<div class="gtm4wp-notice notice notice-error" data-href="?invalid-datalayer-name"><p><strong>';
+			printf(
+				/* translators: 1: the configured dataLayer variable name that was rejected. 2: opening anchor element pointing to the GTM4WP options page. 3: closing anchor element. */
+				esc_html__(
+					'The configured dataLayer variable name "%1$s" is not a valid JavaScript variable name, so Google Tag Manager for WordPress is using the default name "dataLayer" instead. Please %2$scorrect it on the settings page%3$s.',
+					'duracelltomi-google-tag-manager'
+				),
+				esc_html( $stored_datalayer_name ),
+				'<a href="' . esc_url( menu_page_url( GTM4WP_ADMINSLUG, false ) ) . '">',
+				'</a>'
+			);
+			echo '</strong></p></div>';
+		}
+
 		if ( function_exists( 'is_plugin_active' ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {
 			if ( ( false === $dismisses['wc-ga-plugin-warning'] ) && is_plugin_active( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
 				echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';

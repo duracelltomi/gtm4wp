@@ -291,10 +291,17 @@ final class AdminSchema implements AdminSchemaInterface {
 					// default in Field::sanitize(), it does not run in front of it).
 					$value = trim( Field::to_string( $value ) );
 
-					if ( ( '' !== $value ) && ( ! preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]*$/', $value ) ) ) {
+					// The reader's own predicate, not a second copy of the rule
+					// (PA-2). The name is emitted UNQUOTED into a <script> body,
+					// so this allow-list has to be the JavaScript identifier
+					// grammar - no escaper can rescue a bare identifier. The 1.x
+					// rule this replaces admitted '-', which JavaScript reads as
+					// the subtraction operator: the settings screen accepted a
+					// name that made every GTM4WP script block a SyntaxError.
+					if ( ( '' !== $value ) && ! ContainerRows::is_valid_js_identifier( $value ) ) {
 						return new \WP_Error(
 							'gtm4wp_invalid_datalayer_name',
-							__( "Invalid dataLayer variable name. Please start with a character from a-z or A-Z followed by characters from a-z, A-Z, 0-9 or '_' or '-'!", 'duracelltomi-google-tag-manager' )
+							__( "Invalid dataLayer variable name. It has to be a valid JavaScript variable name: start with a letter, '_' or '\$', followed by letters, digits, '_' or '\$'. A hyphen is not allowed.", 'duracelltomi-google-tag-manager' )
 						);
 					}
 

@@ -41,6 +41,72 @@ final class ContainerRows {
 	public const PATH_PATTERN    = '/^[a-zA-Z0-9\.\-\_\/]*$/';
 
 	/**
+	 * A valid JavaScript identifier (the ASCII subset the plugin supports).
+	 *
+	 * This is not a cosmetic allow-list: the data layer variable name and the
+	 * GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY variable names are both emitted
+	 * UNQUOTED into a <script> body - `var <name> = <name> || [];`,
+	 * `window.<name>.push(…)`, `const <name> = …`. There is no escaping fix
+	 * available for that position, because escaping is exactly what a bare
+	 * identifier must not have, so this pattern IS the control and it has to
+	 * encode the grammar the sink parses rather than merely constrain the
+	 * value. `-` is the character that makes the difference: it is a perfectly
+	 * ordinary thing to type into a settings field and JavaScript reads it as
+	 * the subtraction operator, so a name containing one turns the whole
+	 * <script> block into a SyntaxError.
+	 *
+	 * Deliberately narrower than the ECMAScript grammar (which allows most
+	 * Unicode letters): staying ASCII keeps the emitted snippet byte-identical
+	 * to 1.x for every name 1.x accepted except the hyphenated ones, which
+	 * never worked in either line.
+	 */
+	public const JS_IDENTIFIER_PATTERN = '/^[A-Za-z_$][A-Za-z0-9_$]*$/';
+
+	/**
+	 * Whether a string is usable as a bare JavaScript identifier.
+	 *
+	 * The single predicate shared by the save side (the data layer name
+	 * sanitizer in this module's AdminSchema), the read side
+	 * (DataLayer::name(), Compat\Globals) and the admin notice that reports a
+	 * rejected stored value - PA-2: one function, never two copies of a rule,
+	 * because a value the sanitizer stores and the reader then discards is
+	 * worse than one that was rejected outright.
+	 *
+	 * @param string $value The candidate identifier.
+	 * @return bool
+	 */
+	public static function is_valid_js_identifier( string $value ): bool {
+		return 1 === preg_match( self::JS_IDENTIFIER_PATTERN, $value );
+	}
+
+	/**
+	 * Resolves the data layer JavaScript variable name from its stored option
+	 * value, falling back to the GTM default.
+	 *
+	 * Re-validated here rather than trusted because it was sanitized on save
+	 * (PA-2): the row also reaches this point from a 1.x install, whose own
+	 * validation accepted names this one does not, and 1.x's are stored
+	 * verbatim by the migration. An unusable name falls back to `dataLayer` so
+	 * the container keeps working; Admin\Notices tells the admin their
+	 * configured name was ignored, because silently substituting a different
+	 * global is the same hard-to-diagnose failure the value itself would cause.
+	 *
+	 * @param mixed $stored The stored option value.
+	 * @return string A name that is safe to emit unquoted.
+	 */
+	public static function datalayer_name( $stored ): string {
+		// The empty check is also what keeps WP CLI working (bugfix by
+		// Patrick Holberg Hesselberg, carried over from 1.x).
+		if ( ! is_string( $stored ) ) {
+			return 'dataLayer';
+		}
+
+		$stored = trim( $stored );
+
+		return self::is_valid_js_identifier( $stored ) ? $stored : 'dataLayer';
+	}
+
+	/**
 	 * Returns one row with every column present as a trimmed string.
 	 *
 	 * @param array<string, mixed> $row Raw row.

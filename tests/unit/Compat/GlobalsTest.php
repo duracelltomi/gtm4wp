@@ -100,6 +100,25 @@ final class GlobalsTest extends TestCase {
 		$this->assertSame( 'dataLayer', $GLOBALS['gtm4wp_datalayer_name'] );
 	}
 
+	/**
+	 * Finding #114 / RI-14. This global is the name 1.x consumers push through
+	 * (window[gtm4wp_datalayer_name]), so it has to resolve to exactly what the
+	 * container code declares. Both sides now go through
+	 * ContainerRows::datalayer_name(); before that they were two copies of the
+	 * fallback, and only one of them was ever going to be tightened.
+	 *
+	 * @return void
+	 */
+	public function test_unusable_datalayer_name_falls_back_like_the_frontend_reader(): void {
+		Globals::populate( $this->make_options( array( GTM4WP_OPTION_DATALAYER_NAME => 'my-layer' ) ) );
+
+		$this->assertSame(
+			'dataLayer',
+			$GLOBALS['gtm4wp_datalayer_name'],
+			'A name that is not a JavaScript identifier must not be mirrored to third-party code either.'
+		);
+	}
+
 	public function test_populate_does_not_clobber_already_set_globals(): void {
 		$GLOBALS['gtm4wp_datalayer_data']              = array( 'preexisting' => 1 );
 		$GLOBALS['gtm4wp_additional_datalayer_pushes'] = array( 'queued' );

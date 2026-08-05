@@ -125,11 +125,20 @@ final class ContainerCode {
 		$datalayer_name = $this->datalayer->name();
 
 		// The data layer initialization has to use 'var' instead of 'let' since 'let' can break related browser extensions and 3rd party scripts.
+		//
+		// Two different jobs on two adjacent lines, which is why the encoders differ
+		// (RI-4's two piles). The first is a string VALUE, so it takes json_literal()
+		// with the hex flags and supplies its own quotes - byte-identical output for
+		// any real name. The second and third are the bare IDENTIFIER, which must not
+		// be quoted or encoded at all; what makes those safe is not an escaper but
+		// ContainerRows::datalayer_name(), which will not return anything that is not
+		// a valid JavaScript identifier (esc_js() could not help here - see the
+		// comment on the global-vars allow-list below, which makes the same point).
 		$_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 ' . $this->script_tag->opening_tag() . '
-	var gtm4wp_datalayer_name = "' . esc_js( $datalayer_name ) . '";
-	var ' . esc_js( $datalayer_name ) . ' = ' . esc_js( $datalayer_name ) . ' || [];';
+	var gtm4wp_datalayer_name = ' . self::json_literal( $datalayer_name, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
+	var ' . $datalayer_name . ' = ' . $datalayer_name . ' || [];';
 
 		// Load in the global variables from the gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter.
 		$added_global_js_vars = (array) apply_filters( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array() );
@@ -140,8 +149,13 @@ final class ContainerCode {
 			// it. esc_js() does not validate identifiers (it would happily emit
 			// `const foo\' = ...`), so the name is allow-listed here instead and a
 			// non-conforming entry is skipped rather than allowed to break the page.
+			//
+			// The shared constant, not a retyped copy (PA-2): this is the same
+			// grammar the data layer name has to satisfy, and the two rules were
+			// written independently and disagreed - the option's admitted '-'
+			// while this one, correctly, never did.
 			$js_var_name = (string) $js_var_name;
-			if ( ! preg_match( '/^[A-Za-z_$][A-Za-z0-9_$]*$/', $js_var_name ) ) {
+			if ( ! ContainerRows::is_valid_js_identifier( $js_var_name ) ) {
 				continue;
 			}
 
@@ -452,6 +466,31 @@ final class ContainerCode {
 		// "?id=") so no ID leaks into the request.
 		$_gtm_loader_query = $this->container_omit_id( $one_container ) ? '?\'+dl' : '?id=\'+i+dl';
 
+		/*
+		 * The four esc_js() calls below are string VALUES inside single-quoted JS
+		 * literals, so by RI-4's two-pile rule they belong in pile (b) - the pile
+		 * whose members normally get migrated to json_literal(). These four stay,
+		 * deliberately, and the reason is recorded here so the next re-derivation of
+		 * that ledger finds an answer rather than re-deciding:
+		 *
+		 * - json_literal() emits DOUBLE quotes. This block is Google's own container
+		 *   snippet reproduced byte for byte (single quotes throughout, matching 1.x
+		 *   and every copy of it Google publishes), and BE-1 keeps byte-exact tests
+		 *   over it. Migrating would change the emitted snippet for every site to buy
+		 *   nothing.
+		 * - Nothing is being reasoned about here on the basis of what the values
+		 *   "happen to" contain - which is the filing #110 ruled out. Each of the four
+		 *   passes an enforced allow-list on the way to this line, and none of those
+		 *   allow-lists admits a quote: the container ID via ContainerRows::GTM_ID_PATTERN
+		 *   in header_begin() before this method is called, the domain via
+		 *   FILTER_VALIDATE_DOMAIN in container_domain(), the path via
+		 *   ContainerRows::PATH_PATTERN in container_path(), and the data layer name via
+		 *   ContainerRows::datalayer_name() at the reader. esc_js() is therefore a
+		 *   provable no-op on all four, and the allow-lists are the actual control.
+		 *
+		 * If any of those four allow-lists is ever widened to admit a quote, this
+		 * block has to move to json_literal() and the byte-exact tests updated with it.
+		 */
 		return '
 ' . $this->script_tag->opening_tag() . '
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
