@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\WooCommerce;
 
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\VisitorData\VisitorDataEndpoint;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Options\Options;
@@ -50,16 +51,27 @@ final class PageDataLayer {
 	public const REST_ROUTE_CONFIRM_READD = '/confirm-readd-tracked';
 
 	/**
+	 * The checkout globals waiting to be printed by the wp_footer fallback,
+	 * set only when the tracker handle could no longer take an inline script
+	 * (see add_begin_checkout()). Empty on every ordinary request.
+	 *
+	 * @var string
+	 */
+	private string $deferred_checkout_js = '';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options     $options      The plugin options service.
 	 * @param ProductData $product_data The product data builder.
 	 * @param DataLayer   $datalayer    The data layer service.
+	 * @param ScriptTag   $script_tag   The script tag helper.
 	 */
 	public function __construct(
 		private Options $options,
 		private ProductData $product_data,
-		private DataLayer $datalayer
+		private DataLayer $datalayer,
+		private ScriptTag $script_tag
 	) {
 	}
 
@@ -521,16 +533,57 @@ final class PageDataLayer {
 			);
 		}
 
-		// Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4). The two
-		// window.* assignments never needed jQuery; 'before' placement emits them
-		// just ahead of the gtm4wp-woocommerce tracker that reads them.
-		wp_add_inline_script(
-			'gtm4wp-woocommerce',
-			'
+		$checkout_js = '
 			window.gtm4wp_checkout_products = ' . wp_json_encode( $gtm4wp_checkout_products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
-			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';',
-			'before'
-		);
+			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';';
+
+		/*
+		 * Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4, PA-8). The two
+		 * window.* assignments never needed jQuery; 'before' placement emits them
+		 * just ahead of the gtm4wp-woocommerce tracker that reads them.
+		 *
+		 * An inline script can only be attached while its handle is still pending.
+		 * This runs on the data layer compile filter fired from wp_head priority 10,
+		 * after wp_print_head_scripts() (priority 9), so on a site that filters the
+		 * tracker into the <head> instead of the footer the handle is already done
+		 * and the attach would silently drop the checkout data - leaving
+		 * add_shipping_info / add_payment_info to report an empty item list and a
+		 * value of 0. wp_add_inline_script() likewise returns false when the handle
+		 * is not registered at all. Print the block ourselves in the footer in both
+		 * cases; it is the same placement the WooCommerce queue used to give us,
+		 * without the deprecated call.
+		 */
+		if (
+			wp_script_is( 'gtm4wp-woocommerce', 'done' )
+			|| ! wp_add_inline_script( 'gtm4wp-woocommerce', $checkout_js, 'before' )
+		) {
+			if ( '' === $this->deferred_checkout_js ) {
+				add_action( 'wp_footer', array( $this, 'print_deferred_checkout_js' ), 5 );
+			}
+
+			$this->deferred_checkout_js = $checkout_js;
+		}
+	}
+
+	/**
+	 * Prints the checkout globals that could not be attached to the tracker
+	 * handle, as a standalone inline script block in the footer. Registered on
+	 * wp_footer by add_begin_checkout() only in that fallback case; a no-op
+	 * otherwise.
+	 *
+	 * @return void
+	 */
+	public function print_deferred_checkout_js(): void {
+		if ( '' === $this->deferred_checkout_js ) {
+			return;
+		}
+
+		$block = "\n" . $this->script_tag->opening_tag() . $this->deferred_checkout_js . "\n</script>";
+
+		// Cleared before printing so a second wp_footer pass cannot repeat the block.
+		$this->deferred_checkout_js = '';
+
+		$this->script_tag->print_script_block( $block );
 	}
 
 	/**

@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Modules\WooCommerce\PageDataLayer;
@@ -52,6 +53,23 @@ final class PageDataLayerTest extends TestCase {
 	 */
 	private array $inline_scripts = array();
 
+	/**
+	 * Whether the wp_add_inline_script() stub reports success. Set to false to
+	 * model the handle being already printed or unregistered, which is when the
+	 * wp_footer fallback has to take over.
+	 *
+	 * @var bool
+	 */
+	private bool $inline_script_succeeds = true;
+
+	/**
+	 * Whether the gtm4wp-woocommerce handle has already been printed by the time
+	 * the data layer is compiled (a tracker filtered into the <head>).
+	 *
+	 * @var bool
+	 */
+	private bool $tracker_already_done = false;
+
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -88,24 +106,41 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'is_checkout' )->justReturn( false );
 
 		// Capture the two script sinks.
-		$this->enqueued_js    = '';
-		$this->inline_js      = '';
-		$this->inline_scripts = array();
+		$this->enqueued_js            = '';
+		$this->inline_js              = '';
+		$this->inline_scripts         = array();
+		$this->inline_script_succeeds = true;
+		$this->tracker_already_done   = false;
 		Functions\when( 'wc_enqueue_js' )->alias(
 			function ( $code ) {
 				$this->enqueued_js .= $code;
 			}
 		);
+		// Returns a bool like the real function: false when the handle is already
+		// printed or not registered, which is what the wp_footer fallback keys on.
 		Functions\when( 'wp_add_inline_script' )->alias(
 			function ( $handle, $code, $position = 'after' ) {
+				if ( ! $this->inline_script_succeeds ) {
+					return false;
+				}
+
 				$this->inline_js       .= $code;
 				$this->inline_scripts[] = array(
 					'handle'   => $handle,
 					'code'     => $code,
 					'position' => $position,
 				);
+
+				return true;
 			}
 		);
+		Functions\when( 'wp_script_is' )->alias(
+			function ( $handle, $status = 'enqueued' ) {
+				return 'gtm4wp-woocommerce' === $handle && 'done' === $status && $this->tracker_already_done;
+			}
+		);
+		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => $content );
+		Functions\when( 'current_theme_supports' )->justReturn( true );
 
 		\WC_Customer::$fixtures = array();
 
@@ -152,7 +187,8 @@ final class PageDataLayerTest extends TestCase {
 		return new PageDataLayer(
 			$service_options,
 			new ProductData( $service_options ),
-			new DataLayer( $service_options )
+			new DataLayer( $service_options ),
+			new ScriptTag( $service_options )
 		);
 	}
 
@@ -250,8 +286,8 @@ final class PageDataLayerTest extends TestCase {
 		);
 		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
 
-		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
-			->add_datalayer_data( array() );
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$page_datalayer->add_datalayer_data( array() );
 
 		// The deprecated wc_enqueue_js() (WooCommerce 10.4) must not be used; the
 		// checkout globals are attached to the gtm4wp-woocommerce tracker handle
@@ -269,6 +305,91 @@ final class PageDataLayerTest extends TestCase {
 
 		// The begin_checkout event is queued and flushed as an inline push.
 		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
+
+		// The normal path attaches to the handle, so nothing is deferred to wp_footer.
+		ob_start();
+		$page_datalayer->print_deferred_checkout_js();
+		$this->assertSame( '', ob_get_clean(), 'Nothing may be printed in the footer once the handle took the inline script.' );
+	}
+
+	/**
+	 * The tracker can be filtered into the <head>
+	 * (gtm4wp_integrate-woocommerce-track-enhanced-ecommerce => false), and this
+	 * code runs on wp_head priority 10 - after wp_print_head_scripts() at 9. The
+	 * handle is 'done' by then, so wp_add_inline_script() can no longer attach and
+	 * the checkout globals must reach the page through the wp_footer fallback
+	 * instead of being dropped (which left add_shipping_info / add_payment_info
+	 * reporting an empty item list and a value of 0).
+	 */
+	public function test_checkout_globals_are_printed_in_the_footer_when_the_tracker_is_already_done(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$this->tracker_already_done = true;
+
+		$product = new \WC_Product(
+			array(
+				'id'    => 7,
+				'title' => 'Poster</script>',
+				'sku'   => 'SKU-7',
+			)
+		);
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$page_datalayer->add_datalayer_data( array() );
+
+		// The attach was never attempted against a printed handle.
+		$this->assertSame( '', $this->inline_for( 'gtm4wp-woocommerce' )['code'], 'A printed handle must not be given an inline script.' );
+		$this->assertSame( '', $this->enqueued_js, 'The deprecated wc_enqueue_js() must not come back as the fallback.' );
+
+		$this->assertTrue(
+			(bool) has_action( 'wp_footer', array( $page_datalayer, 'print_deferred_checkout_js' ) ),
+			'The footer fallback must be registered when the handle is already done.'
+		);
+
+		ob_start();
+		$page_datalayer->print_deferred_checkout_js();
+		$printed = ob_get_clean();
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $printed, 'The checkout products must still reach the page.' );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value', $printed, 'The checkout value must still reach the page.' );
+		$this->assertStringContainsString( '<script', $printed, 'The fallback must emit a complete script block.' );
+		$this->assertStringContainsString( '</script>', $printed );
+
+		// TS-2: the hostile product name stays hex-encoded on this sink too.
+		$this->assertStringContainsString( 'Poster\u003', $printed, 'The < must be hex-encoded (JSON_HEX_TAG) on the fallback sink as well.' );
+		$this->assertStringNotContainsString( 'Poster</script>', $printed );
+
+		// A second wp_footer pass must not repeat the block.
+		ob_start();
+		$page_datalayer->print_deferred_checkout_js();
+		$this->assertSame( '', ob_get_clean(), 'The deferred block must be printed exactly once.' );
+	}
+
+	/**
+	 * The other half of the same guard: wp_add_inline_script() also returns false
+	 * when the handle was never registered, and the checkout data must not be lost
+	 * in that case either.
+	 */
+	public function test_checkout_globals_are_printed_in_the_footer_when_the_handle_is_unregistered(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$this->inline_script_succeeds = false;
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertSame( '', $this->enqueued_js, 'The deprecated wc_enqueue_js() must not come back as the fallback.' );
+
+		ob_start();
+		$page_datalayer->print_deferred_checkout_js();
+		$printed = ob_get_clean();
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $printed );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value', $printed );
 	}
 
 	public function test_view_item_carries_quantity_one(): void {

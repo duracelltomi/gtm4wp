@@ -100,7 +100,7 @@ final class WooCommerceModule extends AbstractModule {
 		$frontend = Plugin::instance()->frontend();
 
 		$product_data      = new ProductData( $this->options );
-		$page_datalayer    = new PageDataLayer( $this->options, $product_data, $frontend->datalayer() );
+		$page_datalayer    = new PageDataLayer( $this->options, $product_data, $frontend->datalayer(), $frontend->script_tag() );
 		$list_tracking     = new ListTracking( $this->options, $product_data );
 		$purchase_tracking = new PurchaseTracking( $this->options, $product_data, $frontend->datalayer(), $frontend->script_tag() );
 		$store_api_data    = new StoreApiData( $product_data );
