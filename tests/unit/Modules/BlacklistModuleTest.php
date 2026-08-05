@@ -43,9 +43,15 @@ final class BlacklistModuleTest extends TestCase {
 		$this->assertContains( 'gaawe', $valid, 'GA4 Event tag must be restrictable.' );
 		$this->assertContains( 'gas', $valid, 'Google Analytics Settings variable must be restrictable.' );
 
+		/*
+		 * Documented by Google, so restrictable. `mf` was dropped during the
+		 * 2.0 refresh alongside `ua`, but only `ua` was actually retired
+		 * upstream - verified against the restriction page on 2026-08-05.
+		 */
+		$this->assertContains( 'mf', $valid, 'Mouseflow tag is still documented by Google and must be restrictable.' );
+
 		// Removed in the 2.0 refresh (no longer documented by Google).
 		$this->assertNotContains( 'ua', $valid, 'Universal Analytics tag is no longer documented.' );
-		$this->assertNotContains( 'mf', $valid, 'Mouseflow tag is no longer documented.' );
 
 		// Individual IDs only: no group classes.
 		foreach ( array( 'google', 'nonGoogleScripts', 'nonGooglePixels', 'nonGoogleIframes', 'customScripts', 'customPixels', 'sandboxedScripts' ) as $group_class ) {
@@ -180,14 +186,36 @@ final class BlacklistModuleTest extends TestCase {
 		$module = $this->make_module(
 			array(
 				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
-				// 'ua' and 'mf' are stale 1.x entries; 'evil' was never valid.
-				GTM4WP_OPTION_BLACKLIST_STATUS => 'html,ua,mf,evil',
+				// 'ua' is a stale 1.x entry Google retired; 'evil' was never valid.
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'html,ua,evil',
 			)
 		);
 
 		$data_layer = $module->add_datalayer_data( array() );
 
 		$this->assertSame( array( 'html' ), $data_layer['gtm.blocklist'] );
+	}
+
+	/**
+	 * Regression: `mf` was dropped in the 2.0 refresh alongside `ua`, but only
+	 * `ua` was retired upstream - Google still documents Mouseflow. Dropping it
+	 * failed silently: the id was filtered out of the emitted list and the
+	 * label was absent from the settings screen, so a site that restricted
+	 * Mouseflow simply stopped restricting it, with nothing to see. Asserts the
+	 * whole path, because the entity table, the admin label and the migration
+	 * each had to change for this to work.
+	 */
+	public function test_mouseflow_entity_survives_validation(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'mf',
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'mf' ), $data_layer['gtm.blocklist'] );
 	}
 
 	/**

@@ -89,7 +89,7 @@ final class PurchaseTracking {
 		}
 
 		if ( isset( $order ) ) {
-			$data_layer['new_customer'] = $this->product_data->is_new_customer( $order );
+			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
 
 			$data_layer = array_merge(
 				$data_layer,

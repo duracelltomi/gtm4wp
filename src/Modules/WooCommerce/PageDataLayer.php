@@ -758,7 +758,7 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		$data_layer['new_customer'] = $this->product_data->is_new_customer( $order );
+		$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
 
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
 
@@ -1220,8 +1220,10 @@ final class PageDataLayer {
 			return null;
 		}
 
-		$purchase_data_layer                 = $this->product_data->get_purchase_datalayer( $order );
-		$purchase_data_layer['new_customer'] = $this->product_data->is_new_customer( $order );
+		$purchase_data_layer = array_merge(
+			$this->product_data->get_purchase_datalayer( $order ),
+			$this->product_data->customer_signals( $order )
+		);
 
 		// Whether the client should consult/record the gtm4wp_orderid_tracked browser
 		// guard. When "Do not flag orders as being tracked" is on the plugin writes no

@@ -16,6 +16,10 @@ use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
+// Required here explicitly, not left to whichever test file happens to load
+// first: Brain Monkey / class definitions are process-wide, so relying on
+// another file's require is invisible until something reorders (TS-16).
+require_once __DIR__ . '/wc-datastore-stub.php';
 
 /**
  * Covers the GA4 item array mapping ported from
@@ -1201,5 +1205,48 @@ final class ProductDataTest extends TestCase {
 		);
 
 		$this->assertSame( '', Helpers::normalize_and_hash( 'sha256', '   ', true ) );
+	}
+
+	/**
+	 * Google names the same idea twice on two surfaces: Google Ads customer
+	 * acquisition reads the boolean `new_customer`, the GA4 e-commerce
+	 * reference documents a `customer_type` string of `new` / `returning`.
+	 * Both must ship together - dropping either silently breaks one
+	 * integration while the other keeps working.
+	 *
+	 * Drives both branches through the real WooCommerce analytics call, which
+	 * needs the shared stub flipped; it is restored in `finally` because that
+	 * static is process-wide and leaking it would break test-order
+	 * independence for every other purchase test.
+	 */
+	public function test_customer_signals_cover_both_branches(): void {
+		$product_data = $this->make_product_data();
+		$order        = new \WC_Order();
+
+		try {
+			\Automattic\WooCommerce\Admin\API\Reports\Orders\Stats\DataStore::$is_returning = false;
+
+			$this->assertSame(
+				array(
+					'new_customer'  => true,
+					'customer_type' => 'new',
+				),
+				$product_data->customer_signals( $order ),
+				'A first-time buyer is new_customer=true and customer_type="new".'
+			);
+
+			\Automattic\WooCommerce\Admin\API\Reports\Orders\Stats\DataStore::$is_returning = true;
+
+			$this->assertSame(
+				array(
+					'new_customer'  => false,
+					'customer_type' => 'returning',
+				),
+				$product_data->customer_signals( $order ),
+				'A repeat buyer is new_customer=false and customer_type="returning".'
+			);
+		} finally {
+			\Automattic\WooCommerce\Admin\API\Reports\Orders\Stats\DataStore::$is_returning = false;
+		}
 	}
 }

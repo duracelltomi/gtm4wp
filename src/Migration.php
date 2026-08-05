@@ -55,9 +55,15 @@ final class Migration {
 	 * Blacklist entity ids that are no longer documented by Google and were
 	 * removed from the entity table in 2.0.
 	 *
+	 * Only `ua` (Universal Analytics) belongs here. `mf` (Mouseflow) was
+	 * removed alongside it during the 2.0 refresh, but Google still documents
+	 * it - so it is back in the entity table and must NOT be stripped from
+	 * saved settings, or a site that restricts Mouseflow loses the setting on
+	 * upgrade.
+	 *
 	 * @var string[]
 	 */
-	private const REMOVED_BLACKLIST_ENTITIES = array( 'ua', 'mf' );
+	private const REMOVED_BLACKLIST_ENTITIES = array( 'ua' );
 
 	/**
 	 * Runs the pending migrations.

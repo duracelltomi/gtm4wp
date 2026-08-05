@@ -827,4 +827,33 @@ final class ProductData {
 	public function is_new_customer( \WC_Order $order ): bool {
 		return \Automattic\WooCommerce\Admin\API\Reports\Orders\Stats\DataStore::is_returning_customer( $order ) === false;
 	}
+
+	/**
+	 * Both new/returning customer signals for the purchase event.
+	 *
+	 * Google names the same idea differently on two surfaces: Google Ads
+	 * customer acquisition reads the boolean `new_customer`, while the GA4
+	 * e-commerce reference documents a `customer_type` string of `new` or
+	 * `returning`. Both are sent - they are not alternatives, and dropping
+	 * either breaks one integration while the other keeps working.
+	 *
+	 * Returned together so the two key names and the new/returning vocabulary
+	 * live in one place rather than being repeated at each emission site, and
+	 * so is_new_customer() - which queries the WooCommerce analytics store - is
+	 * called once per purchase.
+	 *
+	 * @see https://support.google.com/google-ads/answer/12077475 Google Ads: the new_customer parameter.
+	 * @see https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtm GA4: the customer_type parameter on purchase.
+	 *
+	 * @param \WC_Order $order The order being tracked.
+	 * @return array<string, bool|string>
+	 */
+	public function customer_signals( \WC_Order $order ): array {
+		$is_new_customer = $this->is_new_customer( $order );
+
+		return array(
+			'new_customer'  => $is_new_customer,
+			'customer_type' => $is_new_customer ? 'new' : 'returning',
+		);
+	}
 }

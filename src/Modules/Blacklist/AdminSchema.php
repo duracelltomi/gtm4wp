@@ -72,6 +72,7 @@ final class AdminSchema implements AdminSchemaInterface {
 			'ljs'                 => 'Lytics JS Tag',
 			'ms'                  => 'Marin Software Tag',
 			'messagemate'         => 'OwnerListens Message Mate',
+			'mf'                  => 'Mouseflow Tag',
 			'ndcr'                => 'Nielsen DCR Static Lite Tag',
 			'nudge'               => 'Nudge Content Analytics Tag',
 			'okt'                 => 'Oktopost Tracking Code',

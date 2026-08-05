@@ -13,8 +13,17 @@ namespace Automattic\WooCommerce\Admin\API\Reports\Orders\Stats;
 
 if ( ! class_exists( DataStore::class ) ) {
 	class DataStore {
+		/**
+		 * What is_returning_customer() reports. Settable so the returning-customer
+		 * branch is reachable at all - with a hardcoded false, half of the
+		 * new_customer / customer_type mapping could never be exercised. Any test
+		 * that changes it MUST restore false (use try/finally), because this is
+		 * process-wide state and leaking it breaks test-order independence.
+		 */
+		public static $is_returning = false;
+
 		public static function is_returning_customer( $order ) {
-			return false;
+			return self::$is_returning;
 		}
 	}
 }

@@ -23,9 +23,15 @@ defined( 'ABSPATH' ) || exit;
  * The entity ID list below is refreshed from Google's restriction
  * documentation (https://developers.google.com/tag-platform/tag-manager/restrict)
  * and contains individual entity IDs only. Compared to 1.x: added gaawc,
- * gaawe (tags) and gas (variable); removed ua (Universal Analytics) and mf
- * (Mouseflow). Group classes (which have no individual entity ID) live in
- * the separate GROUP_CLASS_IDS list; `sandboxedScripts` is supported there.
+ * gaawe (tags) and gas (variable); removed ua (Universal Analytics), which
+ * Google no longer documents. Group classes (which have no individual entity
+ * ID) live in the separate GROUP_CLASS_IDS list; `sandboxedScripts` is
+ * supported there to control GTM community templates.
+ *
+ * Last verified against the source page: 2026-08-05 — 72 tag, 9 trigger and
+ * 16 variable IDs, matching this table exactly. The list is tracked as entry
+ * U53 in .upstream/upstream-review-checklist.md; this comment is a record,
+ * not a control, so re-derive rather than trust it.
  *
  * Only the plain ID list lives here (needed for frontend validation);
  * the human readable labels live in the admin-only AdminSchema class.
@@ -77,6 +83,7 @@ final class BlacklistModule extends AbstractModule {
 		'ljs',
 		'ms',
 		'messagemate',
+		'mf',
 		'ndcr',
 		'nudge',
 		'okt',

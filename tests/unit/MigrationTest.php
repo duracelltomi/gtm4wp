@@ -66,7 +66,14 @@ final class MigrationTest extends TestCase {
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_BLACKLIST_SANDBOXED, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_ENABLED, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_CONTENTID, $options );
-		$this->assertSame( 'html,gaawe', $options[ GTM4WP_OPTION_BLACKLIST_STATUS ], 'Stale ua/mf entries are stripped.' );
+
+		/*
+		 * `ua` is stripped; `mf` must survive. Mouseflow was dropped alongside
+		 * Universal Analytics in the 2.0 refresh, but only `ua` was actually
+		 * retired by Google - so stripping `mf` here would silently delete a
+		 * still-valid restriction from the user's saved settings on upgrade.
+		 */
+		$this->assertSame( 'html,gaawe,mf', $options[ GTM4WP_OPTION_BLACKLIST_STATUS ], 'Stale ua is stripped; still-documented mf is preserved.' );
 
 		$this->assertSame( GTM4WP_VERSION, $this->option_store['gtm4wp-plugin-version'] );
 	}

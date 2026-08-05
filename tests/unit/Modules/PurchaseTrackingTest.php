@@ -154,6 +154,25 @@ final class PurchaseTrackingTest extends TestCase {
 	}
 
 	/**
+	 * Google publishes two names for the same idea on two surfaces: Google Ads
+	 * customer acquisition reads the boolean `new_customer`, while the GA4
+	 * e-commerce reference documents a `customer_type` string of `new` or
+	 * `returning`. Both must ship - they are not alternatives, and dropping
+	 * either silently breaks one integration while the other keeps working.
+	 * Asserts the pair together so neither can be removed as a duplicate.
+	 */
+	public function test_outputs_both_new_customer_and_customer_type(): void {
+		$output = $this->run_thankyou(
+			array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ),
+			$this->make_order()
+		);
+
+		$this->assertStringContainsString( '"new_customer":true', $output, 'Google Ads customer acquisition reads the boolean new_customer.' );
+		$this->assertStringContainsString( '"customer_type":"new"', $output, 'The GA4 e-commerce reference documents customer_type as a new/returning string.' );
+		$this->assertStringNotContainsString( '"customer_type":true', $output, 'customer_type is a string, never the raw boolean.' );
+	}
+
+	/**
 	 * TS-1 / TS-2 / stored-XSS regression. When the optional orderData block is on,
 	 * billing/shipping/coupon fields — user-controllable at checkout (finding #3) —
 	 * reach the inline-<script> purchase sink. This is the only test that drives the
