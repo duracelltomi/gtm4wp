@@ -4,12 +4,18 @@
 
 WordPress plugin that integrates Google Tag Manager into WordPress websites with comprehensive WooCommerce e-commerce tracking (GA4). The plugin manages GTM container code injection, data layer population, and event tracking for product impressions, cart actions, checkout steps, and purchases.
 
-## Security & test review systems
+## Review systems
 
-Two cumulative, self-updating review systems live under `.security/` and `.testing/`.
-Their pre-flight checklists are loaded into every session by the SessionStart hooks in
-`.claude/settings.json` (no need to `@`-import them here) — follow them **before**
-writing code (`.security/pre-flight-check.md`) or tests (`.testing/pre-flight-check.md`).
+Three cumulative, self-updating review systems live under `.security/`, `.testing/`
+and `.upstream/`. Their pre-flight checklists are loaded into every session by the
+SessionStart hooks in `.claude/settings.json` (no need to `@`-import them here) —
+follow them **before** writing code (`.security/pre-flight-check.md`), tests
+(`.testing/pre-flight-check.md`), or anything that hardcodes an external contract
+(`.upstream/pre-flight-check.md`).
+
+Each owns a different question: **is our code safe** (`.security/`) · **does our suite
+prove it** (`.testing/`) · **is what we believe about the outside world still true**
+(`.upstream/`).
 
 - **Security** (`.security/`): `/code-review` runs the review and updates
   `code-review-checklist.md` + `code-review-patterns.md` (*what* to look for) and
@@ -19,6 +25,15 @@ writing code (`.security/pre-flight-check.md`) or tests (`.testing/pre-flight-ch
   quality, not the code) and updates `test-review-checklist.md` +
   `test-review-patterns.md`. Encoded in the `test-reviewer` subagent. A
   security-relevant code change ships its regression test in the same change.
+- **Upstream** (`.upstream/`): `/upstream-review` sweeps the external dependencies —
+  WP/WC/CF7 releases *and pre-releases*, Google specs published as undated doc pages,
+  media SDKs, infrastructure headers, toolchain versions — and updates
+  `upstream-review-checklist.md` (the registry + Release Radar + drift severity rubric)
+  and `upstream-review-patterns.md` (UD/UC/UB). Encoded in the `upstream-reviewer`
+  subagent. The default lens is **silence**: the plugin writes into a dataLayer
+  something else reads, so most upstream breaks produce no error and no failed test.
+  Register every hardcoded external string, list, selector or version in the same
+  change that introduces it.
 - ⛔ **Disclosure rule (hard):** public repo — committed == published. Never commit an
   exploit payload, repro steps, or unfixed-finding detail into any file (docs, code
   comments, commit messages); live detail stays only in the git-ignored
@@ -74,6 +89,7 @@ the doc block on the constants in `src/Options/Field.php` — in short:
 - `tools/` — release build script (`build-release.js`)
 - `.security/` — cumulative security-review system (see above)
 - `.testing/` — cumulative test-review system (see above; mirrors `.security/`)
+- `.upstream/` — cumulative upstream-dependency review system (see above; same quartet)
 
 ### Global data (backward-compatible, read-only)
 

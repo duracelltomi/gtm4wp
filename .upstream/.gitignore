@@ -1,0 +1,6 @@
+# Detailed sweep reports name unfixed incompatibilities — "GTM4WP is broken on
+# WC 10.7 and not yet fixed" is a public statement about an unpatched defect on a
+# public plugin. Keep them out of version control; they are regenerated per run.
+# The cumulative framework (checklist, patterns, pre-flight) IS tracked and
+# shared; only the verbose reports stay local.
+upstream-review-report-*.md
