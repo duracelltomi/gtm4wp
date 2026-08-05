@@ -651,7 +651,7 @@ As in 2026-07-29, the value of this entry is **why this system could not have pr
 
 ### Report 13: `.security/code-review-report-2026-08-05-0752.md`
 
-**Reviewed at:** `132e7ca` · **Base:** `58d2f8f` (range `58d2f8f..132e7ca`, 6 commits) · **Fixes:** all 7 applied in the working tree — **record the fix commit sha here when it lands; it is the base for the next review.**
+**Reviewed at:** `132e7ca` · **Base:** `58d2f8f` (range `58d2f8f..132e7ca`, 6 commits) · **Fixes landed:** `d38990b` (code, tests, tooling) + `e3dddda` (this close-out) — **the base for the next review is `d38990b`**, and by the standing note above that makes its own production code something R14 has to read deliberately rather than inherit as reviewed. Recorded at last: this line had gone unfilled four reviews running.
 
 R12 left `Fixes:` unfilled again — the third review running — so the base stayed R12's
 recorded `Reviewed at:` and **R12's whole eight-finding fix session fell inside this
