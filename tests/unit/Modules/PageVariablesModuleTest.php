@@ -67,6 +67,17 @@ final class PageVariablesModuleTest extends TestCase {
 		// The module resolves the singular post once via get_post(); mirror
 		// WordPress by returning the global post, or null when it is not set up.
 		Functions\when( 'get_post' )->alias( static fn () => $GLOBALS['post'] ?? null );
+
+		// PublishPress Authors absent by default (TS-16). Brain Monkey defines a
+		// mocked function process-wide and permanently, so once ANY test stubs
+		// get_multiple_authors() every later test sees function_exists() === true
+		// and errors unless it sets its own expectation. Declaring it here as "no
+		// PublishPress authors" is outcome-equivalent to the function being
+		// absent - the module collects an empty $multiple_authors either way and
+		// takes the get_userdata() fallback - and it makes every test in this
+		// class independent of execution order. The four PublishPress tests
+		// override it with their own Functions\when().
+		Functions\when( 'get_multiple_authors' )->justReturn( array() );
 	}
 
 	protected function tearDown(): void {
@@ -1553,11 +1564,14 @@ final class PageVariablesModuleTest extends TestCase {
 	 * pagePostAuthors (names) and pagePostAuthorIDs (IDs) arrays, while the
 	 * back-compat single-value vars stay and point at the primary/first author.
 	 *
-	 * NOTE: stubbing get_multiple_authors() defines the function process-wide,
-	 * so function_exists() reports it thereafter — these two PublishPress tests
-	 * are the LAST in the class so no single-author test runs after them (the
-	 * only consumer of that gate is this module). See the single-author
-	 * fallback test below for the count() === 1 branch.
+	 * NOTE: stubbing get_multiple_authors() defines the function process-wide and
+	 * permanently, so function_exists() reports it thereafter. This class no
+	 * longer depends on these tests running last: setUp() declares the function
+	 * up front as "no PublishPress authors" (outcome-equivalent to it being
+	 * absent), and each PublishPress test overrides it with its own stub. See the
+	 * single-author fallback test below for the count() === 1 branch, and
+	 * test_no_publishpress_authors_falls_back_to_get_userdata() for the empty
+	 * result that stands in for the plugin being inactive (TS-16).
 	 */
 	public function test_multiple_authors_output_as_arrays_for_publishpress(): void {
 		Functions\when( 'is_singular' )->justReturn( true );

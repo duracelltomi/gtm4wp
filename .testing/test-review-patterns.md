@@ -38,6 +38,7 @@ on every review before anything else.
 - **TS-6** — a whole class with **zero** tests is the cheapest, highest-value find. Run the missing-test-file sweep first every review.
 - **TS-12** — an authorization gate (a `permission_callback`, a `current_user_can()` check, a filterable capability like `gtm4wp_admin_page_capability`) is a test surface in its own right: it needs a **grant + deny** test and, if filterable, a test that the filter changes the required capability while the default stays unchanged. The XSS/output-sink lens (TS-1/TS-2/TC-5) never prompts for it, so an untested gate hides inside a component the matrix already marks `[x]`.
 - **TS-15** — the only proof that a guard is tested is **deleting the guard and watching a test go red**. "The method has a test file", "the line is covered", "a finding forced a test here" are all compatible with a fix nothing asserts. Revert-and-run the highest-value guards every review; it is the one check no tooling in this project performs.
+- **TS-16** — a green suite is **not** evidence of test isolation. When the mocking framework defines functions **process-wide and permanently** (Brain Monkey does), one file's stub silently satisfies another file's missing one, and the dependency is invisible in declaration order. `--order-by=random` is a one-flag check that no other signal in this project performs.
 - **TS-13** — a test double must be **no more capable than the real collaborator**: if the mock does the safe thing the real dependency does *not* (returns a live object the real one returns null for; leaves an element the real SDK replaces; exposes a property the real object hides behind `__get`), the failure it would cause is invisible and the suite stays green over a real bug.
 
 **Test Smells (TS):**
@@ -63,6 +64,7 @@ on every review before anything else.
 - **TC-3** — extend the right base: `FrontendTestCase` for services that read `Options` (it provides the Options factory + global reset); the plain `TestCase` for pure/static helpers with no Options dependency (`VisitorIp`).
 - **TC-4** — assert hook registration via `has_action`/`has_filter` (they return the priority integer), and prove **both** the enabled and the disabled state (the `ModuleHooksTest` gate pattern).
 - **TC-13** — the Brain Monkey recipe for a TS-12 capability gate: simulate the filter with `Filters\expectApplied( 'gtm4wp_admin_page_capability' )->andReturn( 'custom_cap' )` (omit it for the default-unchanged case — `apply_filters` passes the default through), assert `current_user_can` is called `->with()` that cap for grant/deny, and capture the `add_options_page()` 3rd arg for the menu/render gate (`AdminCapabilityFilterTest`).
+- **TC-15 (JS/admin)** — an admin React component is tested with `@testing-library/react` against the local `@wordpress/*` stand-ins in `js/admin/test-support/` (mapped in `jest.config.js`), never against an installed `@wordpress/components`: those packages are build-time externals, so no installed version is "the real one". Assert a guard through its **effect** (`onChange` not called), never through a rendered `disabled`/`readOnly` prop.
 - **TC-14** — code gated on a WordPress conditional tag that then reads the companion global (`is_singular()` → `$GLOBALS['post']`) ships a tag-true/global-null case: promote warnings to failures via a throwing error handler, assert the affected keys are **absent** (omission, not placeholders) and the global-independent keys still emit.
 
 **Blessed Exceptions (BE) — do NOT flag:**
@@ -147,6 +149,50 @@ Confirmed twice in Run 5 (2026-08-05), both found only by reverting:
 - Mutation testing (Infection) is the mechanical form of this pattern and would catch
   case 1 automatically. It catches case 2 only if the mutation operator reaches the
   capability *string*, so the manual revert still earns its place.
+
+### TS-16: A green suite is not evidence of isolation — check the order ⭐
+TS-7 asks whether a test *resets* the state it writes. This asks the question one
+level up: **would the suite still pass if the tests ran in a different order?** The
+two are not the same, and the second is invisible to every other signal here —
+including a full read of the test file, because the missing stub is supplied by a
+*different* file entirely.
+
+The mechanism is specific to this project's harness and worth stating plainly:
+**Brain Monkey / Patchwork define a mocked function process-wide and permanently.**
+Once *any* test calls `Functions\when( 'foo' )`, `function_exists( 'foo' )` is true
+for the rest of the run. So a test that never stubs `foo` still passes, as long as
+some earlier file did. Nothing in the file under review hints at the dependency.
+
+Confirmed 2026-08-05 (Run 6), found by a single flag on an otherwise unchanged,
+763-green suite:
+
+- `vendor/bin/phpunit --order-by=random` → **13 errors**. Twelve tests in
+  `RestControllerTest`/`SettingsPageTest` need `wp_get_environment_type` (reached
+  via `Container/AdminSchema.php:430` when they build the real
+  `Registry::with_default_modules()`); one needs `get_multiple_authors`. Neither
+  file stubs them; `ContainerCodeTest`, `ContainerAdminSchemaTest` and
+  `ModuleConsistencyTest` do.
+- **Three of the thirteen are security regression guards** — the settings-import
+  hostile-payload test, the hostile-container-ID rejection, and the T13/finding-#11
+  admin hex-sink guard. Their execution depends on file ordering.
+- Each file still passes **alone**, so the usual "run the file on its own" check
+  says nothing. The dependency is *within-file test order* plus cross-file stub
+  leakage, and only shuffling exposes it.
+
+**Rules:**
+- **Run `--order-by=random` every review.** It is one flag, costs one suite run, and
+  is the only mechanical check in this project that can find this class. Record the
+  seed so a failure is reproducible.
+- **A test must stub every function it reaches, in its own `setUp`** — even when the
+  suite is green without it. "It passes" is compatible with "it borrows another
+  file's stub."
+- **Do not confuse this with the blessed limitation.** That the
+  `function_exists( … ) === false` *fallback leg* cannot be exercised in-process is a
+  real, documented constraint (Run 5 recorded it for `UserEvents`; see the NOTE at
+  `PageVariablesModuleTest.php:1556`). Documenting an untestable branch is correct.
+  Relying on the same stickiness for a branch you *do* test is the smell.
+- Mutation testing cannot be adopted until this is fixed — Infection reorders and
+  re-runs tests, so an order-dependent suite reports noise.
 
 ### TS-1: A covered line is not an asserted behavior ⭐
 Line/branch coverage tells you a line *executed*, not that the test would *fail if
@@ -453,6 +499,48 @@ The Brain Monkey recipe for a TS-12 gate (canonical example
   `new Registry()` (empty) keeps the test focused and skips the schema-building
   stub set the other Admin tests need.
 
+### TC-15: Admin React component harness (stand-ins, not an installed library)
+The admin app (`js/admin/`) imports `@wordpress/components`, `@wordpress/element`,
+`@wordpress/i18n` and `@wordpress/api-fetch`. All four are **build-time externals** —
+`DependencyExtractionWebpackPlugin` rewrites them to `window.wp.*`, so the plugin
+never bundles them and never pins a version; at runtime the app runs against
+whatever WordPress ships across the 6.3 → 7.x support range.
+
+Consequences for testing, settled in Run 6 (2026-08-05) while closing T36:
+
+1. **Do not install `@wordpress/components` to test against.** It is not "the real
+   thing" — it is one arbitrary point in the supported range, it drags in a large
+   tree, and the current release ships untransformed `.mjs`/`.tsx` that jest will
+   not parse without widening `transformIgnorePatterns`. Instead `jest.config.js`
+   maps the four packages to small stand-ins in **`js/admin/test-support/`**.
+2. **This is not TS-13.** The stand-ins are strictly *less* capable than the real
+   library: plain accessible DOM honouring the documented prop contract
+   (`onChange` receives the value, `disabled`/`readOnly` reach the input, `label`
+   gives the accessible name) and nothing else. TS-13 warns about a double that
+   does the safe thing the real collaborator does not; here the risk runs the other
+   way, so the rule below closes it.
+3. **Assert a guard by its effect, never by a rendered prop.** `TableControl`
+   re-checks `isCellLocked()` inside `updateCell()` precisely because `readOnly`
+   reaches the input through the library's prop pass-through and cannot be trusted
+   across every supported WordPress. So the test fires the change and asserts
+   `onChange` was **not** called. Asserting `toHaveAttribute('readonly')` would test
+   the stand-in and prove nothing.
+4. **Keep the JSX transform out of the project root.** wp-scripts' webpack applies
+   `@wordpress/babel-preset-default` only while `hasBabelConfig()` is false, so a
+   root `babel.config.js` would silently take over the production build. Configure
+   `transform` inline in `jest.config.js` instead, and verify after any admin-test
+   change that `npm run build` leaves `build/` byte-identical.
+5. `react`/`react-dom` are devDependencies pinned to **^18** to match what
+   WordPress ships (npm will otherwise pull React 19).
+
+Mechanics: `render()` + `screen` queries by role/label; `fireEvent.change` for
+controlled inputs; a deferred promise plus `act()` to land a **late** async response
+for a stale-request/cancellation guard; `apiFetch` is a `jest.fn` that rejects
+unless the test configures it, so an unexpected network call fails loudly. Note the
+wp jest preset **fails a test on any `console.error`**, so a real anchor `click()`
+(jsdom logs an unimplemented-navigation error) must be `mockImplementation`'d, not
+spied through.
+
 ### TC-14: Conditional-tag-gated code ships a tag-true/global-null case
 Code gated on a WordPress conditional tag (`is_singular()`, `is_author()`, …)
 that then reads the companion global (`$GLOBALS['post']`, `$authordata`) gets a
@@ -514,6 +602,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-08-05 (Run 6 — gaps closed) | Closed T35–T38 on the user's "close all gaps" go-ahead. **PHP 763→767 / 2463→2488 assertions; JS 23→30 suites, 309→404 tests; all green. `phpcs` exit 0 repo-wide, `lint:js` clean, and `npm run build` output verified byte-identical.** No production code changed (tests + tooling only → CHANGELOG exempt). Added **TC-15** (admin React component harness). **TS-16 was applied as the acceptance criterion, not just the diagnosis:** the suite now passes `--order-by=random` across 5 seeds with an assertion count identical to declaration order, which is what proves the fix rather than one lucky seed. Three closes were probe-verified by reverting the guard — the `uninstall.php` `WP_UNINSTALL_PLUGIN` gate, `TableControl`'s locked-cell rejection and `AxeptioVersionControl`'s `cancelled` guard — and T37's new assertion was probed with a *warning-free* `'Array'` stringify, the exact case its predecessor let through. Process lessons worth keeping: (a) the T35 fix for PageVariables is **behaviour-preserving, not a stub added for the linter** — declaring `get_multiple_authors` in `setUp` as "returns no authors" is outcome-equivalent to the function being absent, which is why the ordering NOTE could be deleted rather than reworded; (b) the jsdoc rules fire on **named** exports with destructured props but not on `export default`, so the stand-ins carry one scoped `eslint-disable` in the BE-4 spirit rather than a dozen restated prop tables; (c) `js/admin/test-support/` must NOT be named `test/` — the wp jest preset's `testMatch` includes `**/test/*.[jt]s?(x)`, so any `.js` in a `test/` dir is collected as a suite. |
+| 2026-08-05 (Run 6 — report only) | Added **TS-16** (a green suite is not evidence of isolation — check the order) after `--order-by=random` errored **13 tests** on an otherwise unchanged 763-green suite, three of them security regression guards. Root cause is the mechanism Run 5 had already written down as a *limitation* — Brain Monkey defines mocked functions process-wide and permanently — but never followed through as a *risk*: one file's stub silently satisfies another file's missing one, and each file still passes alone, so the usual isolation checks all say "fine". Two process lessons, no numbered entry: (a) **the inventory step must recurse** — the Admin JS row said `js/admin/` and the command's own one-liner is `ls js/admin/*.js`, so a `components/` subdirectory of 6 files / 939 lines was never inventoried; this is the Run-5 "invisible, not unreviewed" lesson recurring one directory level down, and it argues for `find js/admin -name '*.js'` over `ls`. (b) A **whole-schema sweep test** — `ModuleConsistencyTest::test_every_field_sanitizer_handles_non_scalar_input_without_warning`, which iterates every field of every module and promotes warnings to failures — is the shape that made the run's biggest probe come back clean; it pins fields that do not exist yet, which per-field tests never do. Worth copying wherever a contract spans a whole class of declarations. |
 | 2026-08-05 (Run 5 — gaps closed) | Closed T28–T34 on the user's "close all gaps" go-ahead. **PHP 706→763 / 2325→2463 assertions, JS 23 suites/309, all green; `phpcs` exit 0 repo-wide with warnings blocking; `lint:js` clean; no production code changed** (tests-only → CHANGELOG exempt). **TS-15 was applied as the acceptance criterion, not just the diagnosis:** four fixes were signed off by re-reverting the guard and watching the *new* test go red (#33's session load, the `Plugin::boot()` gate, the `Notices` gate, the scoped ampersand restore), and T33's exact counts by neutralizing the detach (4 tests that had passed as shape assertions failed). New process lessons worth keeping: (a) **Brain Monkey makes `function_exists()` sticky for the whole process** — once any test mocks a function it exists forever, so a "helper absent on older WooCommerce" branch is not unit-testable here; document the leg instead of faking it; (b) `setcookie`/`headers_sent` ARE redefinable via `patchwork.json`, but `UserEventsModule` uses the **positional** 7-arg signature while `VisitorDataModule` uses the options-array form — match the one under test; (c) a test-wide `document.addEventListener` capture in the **file-level** `beforeEach`/`afterEach` beats a per-describe harness: it cannot be forgotten by the next describe someone adds, which is how T26's fix left seven describes leaking; (d) `#[\PHPUnit\Framework\Attributes\DataProvider]` is the house style — a `@dataProvider` doc-comment raises a PHPUnit 11 deprecation; (e) never run bare `npx prettier` on this repo — it uses default config and reformats the whole file; `npx wp-scripts lint-js js --fix` is the correct fixer. |
 | 2026-08-05 (Run 5) | Added **TS-15** (only a revert proves a guard is tested) after two Run-5 probes: the fix for a High security finding was **deleted outright with the suite staying 706/706 green** (TS-13 — every double supplied the collaborator state whose absence is the bug), and a capability gate was **downgraded with its filter removed** while its 17 component tests stayed green (a `justReturn` stub pins no capability). Both sat inside components the matrix marked `[x]`, and neither was reachable by any mechanical signal the project has — which is the entry's point. Extended **TS-12** with "sweep for the sites, don't close the ones a finding named": the #143 fix closed the two sites the issue mentioned and the canonical test says so in its docblock; a grep found four. Also recorded (no numbered entry): **TS-14's live site is now a harness gap, not a masked defect** — the #71 double-init guard shipped and is tested in every bundle, so the loosened `find()` assertions in `woocommerce-tracker.test.js` now only block the exact-count assertions that would catch the *next* regression. And a positive process note: three Run-5 candidate gaps (`is_new_customer`, `build_config`, the no-`fetch` guard) **collapsed on verification** — read the sibling test file before logging, the global grep over `tests/` beats the per-file one. |
 | 2026-07-30 (2.0 fix session, no `/test-review` run) | Added **TS-14** (the suite adapted its assertions *around* a defect instead of failing on it) after fixing security findings #71 and #79. The WooCommerce tracker suite carried a comment describing double-pushed events as leaked-listener housekeeping and switched to shape-based assertions to tolerate it — a precise description of the production symptom #71 names, written down and read as a harness quirk. Three further tests in the same file pinned the string `quantity: '3'` / `'2'` that #79 is about, so the defect was asserted as the expectation in two independent places. Sibling evidence for the same session: the `remove_from_cart` zero-quantity test existed only for the mini-cart — the surface that always worked — and the `VisitorIp` X-Forwarded-For tests all used comma-**without**-space lists, which is why #67 survived a green suite. Litmus added: a comment explaining why an assertion is weak is a review lead, and test-harness leakage vs production double-binding look identical from inside a test. |

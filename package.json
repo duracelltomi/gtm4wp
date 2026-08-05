@@ -26,8 +26,13 @@
   },
   "homepage": "https://github.com/duracelltomi/gtm4wp#readme",
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.3",
     "@wordpress/scripts": "^30.0.0",
     "adm-zip": "^0.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "~5.3.3"
   },
   "overrides": {

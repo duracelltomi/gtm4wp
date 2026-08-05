@@ -44,6 +44,12 @@ final class RestControllerTest extends TestCase {
 		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
 		Functions\when( 'wc_get_order_statuses' )->justReturn( array() );
 		Functions\when( 'get_pages' )->justReturn( array() );
+		// Reached through Container\AdminSchema::production_only_description() when
+		// the real module registry is built. Stubbed here rather than borrowed from
+		// whichever test file happened to run first (TS-16): 'production' is exactly
+		// what the source's own function_exists() fallback returns, so this pins the
+		// value instead of inheriting another file's 'staging'.
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
 		Functions\when( 'wp_roles' )->justReturn(
 			new class() {
 				public function get_names(): array {

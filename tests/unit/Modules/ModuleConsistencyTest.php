@@ -192,11 +192,50 @@ final class ModuleConsistencyTest extends TestCase {
 						is_scalar( $sanitized ) || is_array( $sanitized ) || null === $sanitized || $sanitized instanceof \WP_Error,
 						"Module '{$module_id}': field '{$field->key}' must reduce a non-scalar submission to a scalar/array/WP_Error."
 					);
+
+					// The warning promotion above is the primary detector, but it
+					// only fires for a cast PHP complains about. A sanitizer that
+					// stringifies the submission deliberately would satisfy it and
+					// still store the useless literal "Array" - and a string IS
+					// scalar, so the type assertion above passes too. Assert the
+					// value contract as well, the way WooCommerceAdminSchemaTest
+					// does per-field, so neither route is left open.
+					foreach ( self::flatten_strings( $sanitized ) as $leaf ) {
+						$this->assertStringNotContainsString(
+							'Array',
+							$leaf,
+							"Module '{$module_id}': field '{$field->key}' must not stringify a non-scalar submission into the literal \"Array\"."
+						);
+					}
 				}
 			}
 		} finally {
 			restore_error_handler();
 		}
+	}
+
+	/**
+	 * Collects every string leaf of a sanitized value so the "Array" contract can
+	 * be asserted on table/multiselect results too, not just scalar fields.
+	 *
+	 * @param mixed $value Sanitized field value of any shape.
+	 * @return string[]
+	 */
+	private static function flatten_strings( $value ): array {
+		if ( is_string( $value ) ) {
+			return array( $value );
+		}
+
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$strings = array();
+		foreach ( $value as $one ) {
+			$strings = array_merge( $strings, self::flatten_strings( $one ) );
+		}
+
+		return $strings;
 	}
 
 	public function test_option_keys_are_owned_by_exactly_one_module(): void {

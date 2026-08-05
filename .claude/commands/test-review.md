@@ -36,15 +36,27 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
    row** is not `[ ]`, it is *invisible* to step 5's prioritization. Reconcile the
    matrix against the tree on disk before anything else:
    ```bash
-   ls -d src/*/ src/Modules/*/ && ls js/frontend/*.js js/admin/*.js
+   ls -d src/*/ src/Modules/*/ && find js -name '*.js' -not -path '*/test/*' | sort
    ```
-   Any directory or bundle with no row → **add the row now**, all cells `[ ]`,
-   before prioritizing. Reconcile drifted counts in row labels ("18 trackers", "12
-   opts") against reality — a stale count means the row was never revisited.
-   This failed once already: the **VisitorData** module (`src/Modules/VisitorData/`,
-   including a **public** REST route) and `js/frontend/gtm4wp-visitor-data.js` landed
-   2026-07-16 with no row in *either* checklist, and were backfilled by hand on
-   2026-07-17. A complete-looking matrix is the failure mode, not the reassurance.
+   **The JS half must RECURSE — `ls js/admin/*.js` is what let this fail twice.**
+   A glob only sees the top level, so a whole subdirectory is invisible to the
+   inventory *and* to the matrix row that was written from it.
+   Any directory, bundle or component file with no row → **add the row now**, all
+   cells `[ ]`, before prioritizing. Reconcile drifted counts in row labels ("18
+   trackers", "12 opts") against reality — a stale count means the row was never
+   revisited. **Count the files under a row's directory and put the number in the
+   row**, so the next run can spot drift without re-deriving it.
+   This has now failed twice, the same way each time:
+   - **VisitorData** (`src/Modules/VisitorData/`, incl. a **public** REST route) and
+     `js/frontend/gtm4wp-visitor-data.js` landed 2026-07-16 with no row in *either*
+     checklist; backfilled by hand 2026-07-17.
+   - **Run 6 (2026-08-05):** the Admin JS row read `js/admin/` and the one-liner
+     above globbed `js/admin/*.js`, so **`js/admin/components/` — 6 files, 939
+     lines including the settings-import flow and an external-host fetch — had never
+     been inventoried at all.** The row looked complete; it was covering a third of
+     its own directory.
+
+   A complete-looking matrix is the failure mode, not the reassurance.
 2. **Load the checklist** — `.testing/test-review-checklist.md` (coverage matrix,
    Test Debt Sweeps, Known Test-Gaps Log).
 3. **Load learned patterns** — `.testing/test-review-patterns.md`. Use the Test
@@ -101,11 +113,20 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
 
 1. Run — only after all edits are applied:
    - `vendor/bin/phpunit` — the full suite must stay green.
+   - `vendor/bin/phpunit --order-by=random`, **3–5 times** — a test added this run
+     must not depend on execution order either (TS-16). Assertion counts should
+     match the declaration-order run.
    - `vendor/bin/phpcs` (WordPress Coding Standards) on changed test files; fix
      errors. Pre-existing warnings unrelated to the change (the `$echo` FP-3 in
      `ContainerCode.php`, unused stub-closure params BE-2) may be left, but note
      them.
-   - **If a JS test changed:** `npm run test:unit` and `npm run lint:js`.
+   - **If a JS test changed:** `npm run test:unit` and `npm run lint:js`. Fix
+     formatting with `npx wp-scripts lint-js js --fix` — **never bare
+     `npx prettier`**, which uses default config and reformats whole files.
+   - **If an admin (React) test changed:** also `npm run build` and confirm
+     `build/` is byte-identical — the jest config deliberately configures its JSX
+     transform inline so `hasBabelConfig()` stays false and the production build
+     is untouched. A changed bundle means that isolation broke.
    - **If you enabled coverage/mutation tooling:** re-run it and record the delta.
    - **Skip all of the above when only `.md` docs changed** (verify with
      `git diff --name-only`).
@@ -116,6 +137,20 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
 
 ### A. Mechanical layer (objective, cheap — run first)
 
+0. **Order-independence check (TS-16) — one flag, run it every time.**
+   ```bash
+   vendor/bin/phpunit --order-by=random
+   ```
+   Brain Monkey defines a mocked function **process-wide and permanently**, so one
+   file's stub silently satisfies another file's missing one and the dependency is
+   invisible in declaration order — including for security regression guards. Run
+   it 3–5 times (each run picks a new seed) and record the seed on any failure.
+   A test that errors here is not self-contained: it must stub what it reaches in
+   its own `setUp`. Found 13 such tests on first use (Run 6), three of them
+   security guards. **Do not confuse this with the blessed limitation:** that a
+   `function_exists(...) === false` *fallback leg* is unreachable once anything
+   stubs the function is real and documented; relying on that stickiness for a
+   branch you *do* test is the smell.
 1. **Missing-test-file sweep (TS-6).** For every `src/**/*.php`, is there a
    matching `tests/**/*Test.php` or documented indirect coverage? One-liner:
    ```bash

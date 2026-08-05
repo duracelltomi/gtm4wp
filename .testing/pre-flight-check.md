@@ -41,6 +41,12 @@ Pay special attention to (⭐ = highest impact):
   test, this one should too.
 - **Isolate (TS-7/TS-8):** snapshot and reset `$_SERVER`/`$GLOBALS`/statics in
   `setUp`/`tearDown`; inject fixed time/IDs; never depend on test order.
+- **⭐ Stub what you reach, in your own `setUp` (TS-16):** Brain Monkey defines a
+  mocked function **process-wide and permanently**, so a test can pass purely
+  because another file stubbed the function first — and that is invisible until
+  something reorders. Never rely on it. Check a new test with
+  `vendor/bin/phpunit --order-by=random` (run it a few times; one green seed proves
+  nothing). For a JS/admin test the equivalent is TC-15's stand-ins.
 - **Tag-true/global-null case (TC-14):** code gated on a conditional tag that
   reads the companion global (`is_singular()` → `$GLOBALS['post']`) ships a case
   with the tag true and the global null — warnings promoted to failures via a

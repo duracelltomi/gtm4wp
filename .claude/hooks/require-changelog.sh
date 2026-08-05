@@ -8,7 +8,11 @@ MODE="${1:-stop}"
 # Production-code paths that REQUIRE a changelog entry (POSIX ERE, repo-relative, forward slashes).
 INCLUDE_RE='^(duracelltomi-google-tag-manager-for-wordpress\.php|uninstall\.php|compat/.*\.php|src/.*\.php|js/frontend/.*\.js|js/admin/.*\.js)$'
 # Carve-outs (test dirs / test files) even if they match the include set.
-EXCLUDE_RE='(^js/frontend/test/|^js/admin/test/|\.test\.js$)'
+# js/admin/test-support/ holds the @wordpress/* stand-ins the admin component tests
+# run against (mapped in jest.config.js, see .testing patterns TC-15). It cannot live
+# under js/admin/test/ because the wp jest preset's testMatch collects every .js in a
+# `test/` directory as a suite — hence its own carve-out here.
+EXCLUDE_RE='(^js/frontend/test/|^js/admin/test/|^js/admin/test-support/|\.test\.js$)'
 # One place to add readme.txt later: change to CHANGELOG.md|readme.txt and require both.
 CHANGELOG='CHANGELOG.md'
 
