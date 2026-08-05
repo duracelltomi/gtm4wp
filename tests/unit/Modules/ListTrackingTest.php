@@ -62,6 +62,7 @@ final class ListTrackingTest extends TestCase {
 		// (TS-7 isolation).
 		unset(
 			$GLOBALS['product'],
+			$GLOBALS['woocommerce_loop'],
 			$GLOBALS['gtm4wp_cart_item_proddata'],
 			$GLOBALS['gtm4wp_grouped_product_ix'],
 			$GLOBALS['gtm4wp_last_widget_title'],
@@ -633,5 +634,132 @@ final class ListTrackingTest extends TestCase {
 		$out = (string) ob_get_clean();
 
 		$this->assertSame( '<a href="https://example.com/p/">Item</a>', $out, 'A non-widget template must pass through unmodified.' );
+	}
+
+	/**
+	 * The list-name setters are what give every impression and click its
+	 * `item_list_name`, so a wrong or missing one silently mislabels a whole
+	 * report in GA4 - and each is a separate WooCommerce hook, so nothing else
+	 * covers them. Registered but unasserted until test-review Run 5 (gap T34).
+	 *
+	 * They all write $woocommerce_loop['listtype'], which the tearDown above now
+	 * resets (TS-7).
+	 *
+	 * @param string $method   The ListTracking method to call.
+	 * @param string $expected The list name it must set.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_list_name_setters' )]
+	public function test_loop_list_name_setters_label_the_loop( string $method, string $expected ): void {
+		$list_tracking = $this->make_list_tracking();
+
+		$list_tracking->$method();
+
+		$this->assertSame( $expected, $GLOBALS['woocommerce_loop']['listtype'] );
+	}
+
+	/**
+	 * The shortcode-loop setters: method name => list name it must set.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function provide_list_name_setters(): array {
+		return array(
+			'recent'       => array( 'before_recent_products_loop', 'Recent Products' ),
+			'sale'         => array( 'before_sale_products_loop', 'Sale Products' ),
+			'best selling' => array( 'before_best_selling_products_loop', 'Best Selling Products' ),
+			'top rated'    => array( 'before_top_rated_products_loop', 'Top Rated Products' ),
+			'featured'     => array( 'before_featured_products_loop', 'Featured Products' ),
+			'related'      => array( 'before_related_products_loop', 'Related Products' ),
+		);
+	}
+
+	/**
+	 * The three filter-position setters must label the loop AND return their
+	 * argument untouched: they run on woocommerce_related_products_args /
+	 * _columns / woocommerce_cross_sells_columns / woocommerce_upsells_columns,
+	 * where swallowing the value would change the rendered column count.
+	 *
+	 * @param string $method   The ListTracking method to call.
+	 * @param string $expected The list name it must set.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_passthrough_setters' )]
+	public function test_filter_list_name_setters_pass_their_argument_through( string $method, string $expected ): void {
+		$list_tracking = $this->make_list_tracking();
+
+		$this->assertSame( 4, $list_tracking->$method( 4 ), 'The filtered value must be returned unchanged.' );
+		$this->assertSame( $expected, $GLOBALS['woocommerce_loop']['listtype'] );
+	}
+
+	/**
+	 * The filter-position setters: method name => list name it must set.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function provide_passthrough_setters(): array {
+		return array(
+			'related'    => array( 'add_related_to_loop', 'Related Products' ),
+			'cross-sell' => array( 'add_cross_sell_to_loop', 'Cross-Sell Products' ),
+			'upsell'     => array( 'add_upsells_to_loop', 'Upsell Products' ),
+		);
+	}
+
+	public function test_reset_loop_clears_the_list_name_and_returns_the_query(): void {
+		// Hooked to loop_end / the shortcode after-hooks: without the reset, the
+		// NEXT loop on the page inherits the previous loop's list name and every
+		// impression in it is attributed to the wrong list.
+		$list_tracking = $this->make_list_tracking();
+		$list_tracking->before_sale_products_loop();
+		$this->assertSame( 'Sale Products', $GLOBALS['woocommerce_loop']['listtype'] );
+
+		$query = new \stdClass();
+
+		$this->assertSame( $query, $list_tracking->reset_loop( $query ), 'The query must be returned unchanged.' );
+		$this->assertSame( '', $GLOBALS['woocommerce_loop']['listtype'], 'The list name must not leak into the next loop.' );
+	}
+
+	public function test_reset_loop_without_an_argument_returns_null(): void {
+		// It is hooked as an action too (loop_end passes nothing).
+		$this->assertNull( $this->make_list_tracking()->reset_loop() );
+		$this->assertSame( '', $GLOBALS['woocommerce_loop']['listtype'] );
+	}
+
+	public function test_widget_title_filter_names_the_list_and_restarts_the_counter(): void {
+		// The widget title becomes the list name for the products inside it, and
+		// the per-widget counter restarts so item_index counts from 1 within each
+		// widget rather than continuing across the page.
+		$list_tracking                     = $this->make_list_tracking();
+		$GLOBALS['gtm4wp_product_counter'] = 17;
+
+		$this->assertSame(
+			'On Sale',
+			$list_tracking->widget_title_filter( 'On Sale' ),
+			'The widget title itself must pass through unmodified - other plugins render it.'
+		);
+
+		$this->assertSame( 'On Sale (widget)', $GLOBALS['gtm4wp_last_widget_title'], 'The list name marks the source as a widget.' );
+		$this->assertSame( 1, $GLOBALS['gtm4wp_product_counter'], 'The item counter restarts inside each widget.' );
+	}
+
+	public function test_before_template_part_opens_a_buffer_that_after_template_part_consumes(): void {
+		// The pair is what lets after_template_part() inject the data attribute
+		// into the widget product link. An unbalanced before_ would swallow page
+		// output, so assert the nesting level returns to where it started.
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
+
+		$list_tracking      = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$GLOBALS['product'] = $this->make_product();
+
+		$level = ob_get_level();
+
+		ob_start(); // Outer: capture what after_template_part() re-echoes.
+		$list_tracking->before_template_part();
+		echo '<a href="https://example.com/p/">Item</a>';
+		$list_tracking->after_template_part( 'content-widget-product.php' );
+		$out = (string) ob_get_clean();
+
+		$this->assertSame( $level, ob_get_level(), 'The buffer opened by before_template_part() must be consumed.' );
+		$this->assertStringContainsString( 'data-gtm4wp_product_data="', $out );
 	}
 }

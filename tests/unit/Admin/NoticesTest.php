@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Admin;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Admin\Notices;
 use GTM4WP\Modules\Container\ContainerRows;
@@ -144,7 +145,14 @@ final class NoticesTest extends TestCase {
 		Functions\expect( 'check_ajax_referer' )
 			->once()
 			->with( 'gtm4wp-notice-dismiss-nonce', 'nonce' );
-		Functions\when( 'current_user_can' )->justReturn( true );
+		// ->with(), not justReturn(): the capability the handler asks for is the
+		// point of the gate, and a bare justReturn() pins nothing. Downgrading the
+		// gate to a weaker capability used to leave this whole file green
+		// (test-review T31 / TS-12).
+		Functions\expect( 'current_user_can' )
+			->once()
+			->with( 'manage_options' )
+			->andReturn( true );
 
 		$_POST['noticeid'] = 'enter-gtm-code';
 
@@ -164,7 +172,10 @@ final class NoticesTest extends TestCase {
 	 */
 	public function test_dismiss_notice_denies_user_without_capability(): void {
 		Functions\when( 'check_ajax_referer' )->justReturn( true );
-		Functions\when( 'current_user_can' )->justReturn( false );
+		Functions\expect( 'current_user_can' )
+			->once()
+			->with( 'manage_options' )
+			->andReturn( false );
 		// The real wp_die() exits; the stub throws so we can observe the halt and
 		// prove execution never reaches the user-meta write below.
 		Functions\expect( 'wp_die' )
@@ -182,6 +193,61 @@ final class NoticesTest extends TestCase {
 		}
 
 		$this->assertCount( 0, $this->saved_meta, 'No meta may be written when the capability check fails.' );
+	}
+
+	/**
+	 * TC-13, grant side: the handler's capability is the filterable
+	 * gtm4wp_admin_page_capability, so a site that delegates the settings to a
+	 * non-admin role (issue #143) must let that role dismiss notices too — the
+	 * gate is the same one that let them see the notice in the first place.
+	 */
+	public function test_dismiss_notice_honors_a_filtered_capability(): void {
+		Functions\when( 'check_ajax_referer' )->justReturn( true );
+		Filters\expectApplied( 'gtm4wp_admin_page_capability' )
+			->once()
+			->with( 'manage_options' )
+			->andReturn( 'manage_gtm4wp' );
+		Functions\expect( 'current_user_can' )
+			->once()
+			->with( 'manage_gtm4wp' )
+			->andReturn( true );
+
+		$_POST['noticeid'] = 'enter-gtm-code';
+
+		$this->make_notices()->dismiss_notice();
+
+		$this->assertCount( 1, $this->saved_meta, 'The delegated role dismisses the notice.' );
+	}
+
+	/**
+	 * TC-13, deny side: the filtered capability is the one actually enforced, so
+	 * a user who lacks it is refused even though the filter widened the gate.
+	 */
+	public function test_dismiss_notice_denies_a_user_lacking_the_filtered_capability(): void {
+		Functions\when( 'check_ajax_referer' )->justReturn( true );
+		Filters\expectApplied( 'gtm4wp_admin_page_capability' )
+			->once()
+			->with( 'manage_options' )
+			->andReturn( 'manage_gtm4wp' );
+		Functions\expect( 'current_user_can' )
+			->once()
+			->with( 'manage_gtm4wp' )
+			->andReturn( false );
+		Functions\expect( 'wp_die' )
+			->once()
+			->with( -1, 403 )
+			->andThrow( \RuntimeException::class, 'wp_die' );
+
+		$_POST['noticeid'] = 'enter-gtm-code';
+
+		try {
+			$this->make_notices()->dismiss_notice();
+			$this->fail( 'dismiss_notice() must halt for a user lacking the filtered capability.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 'wp_die', $e->getMessage() );
+		}
+
+		$this->assertCount( 0, $this->saved_meta );
 	}
 
 	/**

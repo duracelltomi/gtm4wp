@@ -20,8 +20,42 @@
 // which jsdom keeps for the whole file, so every test has to clear it before it
 // boots the module again - otherwise the second and later tests silently get an
 // early return and no listeners at all. Mirrors the blocks tracker's suite.
+//
+// TS-7/TS-14 (test-review T33): loading the module binds delegated listeners to
+// the document (gtm4wp-woocommerce.js:503 click, capture:true, plus the cart-page
+// click/keypress ones) and jest.isolateModules never detaches them - the wp-scripts
+// jest preset shares ONE jsdom document across the whole file. Every leaked copy
+// then answers the next test's dispatched event and pushes the same payload again.
+//
+// This used to be handled per-describe, which left the seven describes above the
+// T24/T25 block leaking; the tests that came after them had to assert pushed SHAPE
+// via find() instead of exact counts, and a comment said so. That is the shape of a
+// defect being routed around rather than asserted (TS-14), so the capture is now
+// file-wide: record here, detach in afterEach, and every test can count exactly.
+let capturedDocListeners = [];
+let originalDocAdd = null;
+
 beforeEach( () => {
 	delete window.gtm4wp_woocommerce_inited;
+
+	capturedDocListeners = [];
+	originalDocAdd = document.addEventListener;
+	document.addEventListener = function ( type, fn, opts ) {
+		capturedDocListeners.push( { type, fn, opts } );
+		return originalDocAdd.call( this, type, fn, opts );
+	};
+} );
+
+afterEach( () => {
+	if ( originalDocAdd ) {
+		document.addEventListener = originalDocAdd;
+		originalDocAdd = null;
+	}
+
+	capturedDocListeners.forEach( ( { type, fn, opts } ) =>
+		document.removeEventListener( type, fn, opts )
+	);
+	capturedDocListeners = [];
 } );
 
 const PRODUCT_DATA = {
@@ -818,13 +852,10 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 // chunking and the QuickView / found_variation JSON.parse guards (test-review
 // gaps T24/T25).
 //
-// TS-7 (T26): loading the module per test binds a document-level delegated click
-// listener (gtm4wp-woocommerce.js:503, capture:true) plus the cart-page click /
-// keypress listeners, and jest.isolateModules never detaches them from the shared
-// jsdom document. bootWithCapture() records every listener each load adds so
-// detachCaptured() (called in afterEach) can remove them again - the same cleanup
-// the CheckoutWC describe above does for its cfw_step_changed listener - so the
-// click-driven tests below assert exact counts without a prior load double-firing.
+// TS-7 (T26, widened to the whole file by T33): the document-listener capture and
+// detach now live in the file-level beforeEach/afterEach at the top, so no describe
+// can leak a listener into the next one and every click-driven test below asserts
+// EXACT counts.
 // ---------------------------------------------------------------------------
 
 // The bare globals every classic-tracker test needs (undeclared reads throw in
@@ -866,28 +897,12 @@ const cleanupWooGlobals = () => {
 	delete window.gtm4wp_datalayer_max_timeout;
 };
 
-// Document listeners the current module load added, so afterEach can detach them.
-let capturedDocListeners = [];
-
+// Loads the bundle and runs the deferred process_pages() that binds its listeners.
+// The file-level beforeEach/afterEach above record and detach them, so the count of
+// listeners a load added is readable from capturedDocListeners.
 const bootWithCapture = () => {
-	capturedDocListeners = [];
-	const originalAdd = document.addEventListener;
-	document.addEventListener = function ( type, fn, opts ) {
-		capturedDocListeners.push( { type, fn, opts } );
-		return originalAdd.call( this, type, fn, opts );
-	};
-
 	jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
 	jest.runAllTimers(); // run the deferred process_pages(): binds the listeners
-
-	document.addEventListener = originalAdd;
-};
-
-const detachCaptured = () => {
-	capturedDocListeners.forEach( ( { type, fn, opts } ) =>
-		document.removeEventListener( type, fn, opts )
-	);
-	capturedDocListeners = [];
 };
 
 describe( 'gtm4wp-woocommerce cart page quantity change (T25)', () => {
@@ -923,10 +938,7 @@ describe( 'gtm4wp-woocommerce cart page quantity change (T25)', () => {
 		jest.useFakeTimers();
 	} );
 
-	afterEach( () => {
-		detachCaptured();
-		cleanupWooGlobals();
-	} );
+	afterEach( cleanupWooGlobals );
 
 	// Boot, change the visible quantity, then click "Update cart".
 	const clickUpdateCart = ( newQty ) => {
@@ -991,16 +1003,12 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 		jest.useFakeTimers();
 	} );
 
-	afterEach( () => {
-		detachCaptured();
-		cleanupWooGlobals();
-	} );
+	afterEach( cleanupWooGlobals );
 
-	// The remove-link path lives inside the always-bound delegated click listener,
-	// which prior describes in this file also leaked onto the shared document; each
-	// leaked copy reads the same DOM/globals and pushes an identical event, so these
-	// assert the pushed shape via find() (not an exact count) and the qty-0 guard via
-	// the absence of any push (which every copy agrees on).
+	// The remove-link path lives inside the always-bound delegated click listener.
+	// With the file-level detach in place there is exactly one live copy of it, so
+	// these assert the exact number of pushes - a leaked second copy would double
+	// every count and fail here rather than pass quietly (T33).
 	const clickRemove = () => {
 		bootWithCapture();
 		global.gtm4wp_push_ecommerce.mockClear();
@@ -1023,10 +1031,11 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 			'<input type="number" class="qty" value="3" /></td>' +
 			'</tr></tbody></table>';
 
-		const call = clickRemove().find(
+		const removes = clickRemove().filter(
 			( c ) => c[ 0 ] === 'remove_from_cart'
 		);
-		expect( call ).toBeDefined();
+		expect( removes ).toHaveLength( 1 );
+		const call = removes[ 0 ];
 		// qty parsed from the input value (3, as a number - #79); value = price (8) * 3.
 		expect( call[ 1 ][ 0 ] ).toEqual(
 			expect.objectContaining( { item_id: 55, quantity: 3 } )
@@ -1045,10 +1054,11 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 			'<span class="quantity">2 &times; $8.00</span>' +
 			'</li></ul>';
 
-		const call = clickRemove().find(
+		const removes = clickRemove().filter(
 			( c ) => c[ 0 ] === 'remove_from_cart'
 		);
-		expect( call ).toBeDefined();
+		expect( removes ).toHaveLength( 1 );
+		const call = removes[ 0 ];
 		// parseInt( '2 × $8.00' ) === 2; value = price (8) * 2.
 		expect( call[ 1 ][ 0 ] ).toEqual(
 			expect.objectContaining( { item_id: 55, quantity: 2 } )
@@ -1066,8 +1076,8 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 			'</li></ul>';
 
 		expect(
-			clickRemove().find( ( c ) => c[ 0 ] === 'remove_from_cart' )
-		).toBeUndefined();
+			clickRemove().filter( ( c ) => c[ 0 ] === 'remove_from_cart' )
+		).toHaveLength( 0 );
 	} );
 
 	it( 'does not fire remove_from_cart when a cart-row qty input is zero', () => {
@@ -1088,25 +1098,52 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 			'</tr></tbody></table>';
 
 		expect(
-			clickRemove().find( ( c ) => c[ 0 ] === 'remove_from_cart' )
-		).toBeUndefined();
+			clickRemove().filter( ( c ) => c[ 0 ] === 'remove_from_cart' )
+		).toHaveLength( 0 );
 	} );
 
 	it( 'binds no further listeners when the bundle is loaded twice (#71)', () => {
 		// A re-injected bundle (AJAX navigation, a page builder duplicating the
 		// handle) used to attach every document listener a second time and
-		// double-push each ecommerce event. Asserting on listener registrations
-		// rather than pushes on purpose: prior describes in this file leak
-		// listeners onto the shared document, so push counts are not reliable here.
-		document.body.innerHTML = '';
+		// double-push each ecommerce event.
+		//
+		// Both halves are asserted now (T33): the second load adds no listener,
+		// AND one click still produces exactly one push. The push half used to be
+		// impossible in this file because leaked listeners from earlier describes
+		// made counts meaningless - which is precisely the symptom #71 names,
+		// recorded as a harness quirk instead of being asserted.
+		document.body.innerHTML =
+			'<table><tbody><tr class="cart_item">' +
+			'<td class="product-remove">' +
+			'<a href="#" class="remove" data-gtm4wp_product_data=\'' +
+			JSON.stringify( REMOVE_PRODUCT ) +
+			"'>x</a></td>" +
+			'<td class="product-quantity">' +
+			'<input type="number" class="qty" value="1" /></td>' +
+			'</tr></tbody></table>';
 
+		const before = capturedDocListeners.length;
 		bootWithCapture();
-		expect( capturedDocListeners.length ).toBeGreaterThan( 0 );
+		const afterFirst = capturedDocListeners.length;
+		expect( afterFirst ).toBeGreaterThan( before );
 
 		// Second load with the guard flag left in place, exactly as the second copy
 		// of the bundle would find it.
 		bootWithCapture();
-		expect( capturedDocListeners ).toEqual( [] );
+		expect( capturedDocListeners ).toHaveLength( afterFirst );
+
+		global.gtm4wp_push_ecommerce.mockClear();
+		document
+			.querySelector( 'a.remove' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect(
+			global.gtm4wp_push_ecommerce.mock.calls.filter(
+				( c ) => c[ 0 ] === 'remove_from_cart'
+			)
+		).toHaveLength( 1 );
 	} );
 
 	it( 'keeps the de-dupe state a second copy of the bundle would have reset (#82)', () => {
@@ -1153,10 +1190,7 @@ describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {
 		jest.useFakeTimers();
 	} );
 
-	afterEach( () => {
-		detachCaptured();
-		cleanupWooGlobals();
-	} );
+	afterEach( cleanupWooGlobals );
 
 	it( 'sums the grouped-product quantities into one add_to_cart', () => {
 		document.body.innerHTML =
@@ -1342,10 +1376,7 @@ describe( 'gtm4wp-woocommerce view_item_list impression chunking (T24)', () => {
 		jest.useFakeTimers();
 	} );
 
-	afterEach( () => {
-		detachCaptured();
-		cleanupWooGlobals();
-	} );
+	afterEach( cleanupWooGlobals );
 
 	it( 'splits impressions into chunks of gtm4wp_product_per_impression', () => {
 		global.gtm4wp_product_per_impression = 2;
@@ -1409,7 +1440,6 @@ describe( 'gtm4wp-woocommerce QuickView & found_variation JSON.parse guards (T24
 
 	afterEach( () => {
 		errorSpy.mockRestore();
-		detachCaptured();
 		cleanupWooGlobals();
 	} );
 

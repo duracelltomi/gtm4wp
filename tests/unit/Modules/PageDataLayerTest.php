@@ -653,6 +653,151 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * Stubs WC() the way WooCommerce really behaves on a REST request: the object
+	 * exists but ->session is NULL, because WooCommerce::init() only calls
+	 * initialize_session() when is_request( 'frontend' ) is true, and that check
+	 * ends in `&& ! $this->is_rest_api_request()`.
+	 *
+	 * This is the whole point of the finding-#33 tests below (test-review TS-13).
+	 * stub_wc_pending() above - correctly, for every other test in this file -
+	 * always hands back a live ->session, which is exactly the collaborator state
+	 * the real WC() does not have here. Under that double the load_wc() remedy
+	 * branch never executes, so the fix could be deleted with the whole suite
+	 * staying green (probe-verified 2026-08-05).
+	 *
+	 * wc_load_cart() is WooCommerce's own remedy for this context; calling it is
+	 * what makes ->session appear, so the stub models that too.
+	 *
+	 * NOT modelled here: the `function_exists( 'wc_load_cart' )` leg of the guard
+	 * (an older WooCommerce without the helper). Brain Monkey defines a mocked
+	 * function into the process for good, so once any test in the run mocks
+	 * wc_load_cart() every later function_exists() call reports true - the "helper
+	 * absent" state cannot be reached again in the same process. The guard is
+	 * one-line and defensive; the two legs that CAN vary per request
+	 * (before_woocommerce_init, the one-shot cookie) are covered below.
+	 *
+	 * @param int  $pending_order_id  The order id the session reports once loaded.
+	 * @param bool $woo_init_happened Whether before_woocommerce_init has fired.
+	 * @return object {store, session, calls} - `calls` counts wc_load_cart() invocations.
+	 */
+	private function stub_wc_rest_without_session( int $pending_order_id, bool $woo_init_happened = true ): object {
+		$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] = '1';
+
+		$session = new class( $pending_order_id ) {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function __construct( private int $pending ) {}
+
+			public function get( $key ) {
+				if ( ProductData::PENDING_PURCHASE_SESSION_KEY === $key && $this->pending > 0 ) {
+					return $this->pending;
+				}
+				return null;
+			}
+
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		// The REST-request shape: WC() answers, but with no session at all.
+		$store           = new \stdClass();
+		$store->session  = null;
+		$store->cart     = null;
+		$store->customer = null;
+
+		$state          = new \stdClass();
+		$state->store   = $store;
+		$state->session = $session;
+		$state->calls   = 0;
+
+		Functions\when( 'WC' )->justReturn( $store );
+		Functions\when( 'did_action' )->alias(
+			static fn ( $hook ) => 'before_woocommerce_init' === $hook ? (int) $woo_init_happened : 0
+		);
+
+		// Model the real effect: wc_load_cart() initializes the session for the
+		// current request, which is why the resolver can work afterwards.
+		Functions\when( 'wc_load_cart' )->alias(
+			static function () use ( $store, $session, $state ) {
+				++$state->calls;
+				$store->session = $session;
+			}
+		);
+
+		return $state;
+	}
+
+	/**
+	 * Finding #33 (High): on the cache-safe session endpoint WC()->session is null,
+	 * so every one-shot resolver used to take its "no session" guard and silently
+	 * return null - and because the cache-safe mode ALSO omits these events from the
+	 * cached page HTML, the purchase was lost outright rather than merely delayed.
+	 *
+	 * Deleting load_wc()'s remedy left the whole suite green before this test existed.
+	 */
+	public function test_pending_purchase_resolves_on_a_rest_request_with_no_wc_session(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$state = $this->stub_wc_rest_without_session( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertSame( 1, $state->calls, 'The session must be loaded for the request; without it the resolver silently returns nothing.' );
+		$this->assertIsArray( $payload, 'The pending purchase must still resolve when WooCommerce starts the request session-less.' );
+		$this->assertSame( 'purchase', $payload['push']['event'] );
+		$this->assertSame( '1001', $payload['push']['ecommerce']['transaction_id'] );
+
+		// The #34 read-only property still holds on this path.
+		$this->assertSame( array(), $state->session->sets, 'Loading the session must not make the GET write to it.' );
+	}
+
+	public function test_session_is_not_loaded_before_woocommerce_has_initialized(): void {
+		// wc_load_cart() before before_woocommerce_init is unsafe, so the guard must
+		// hold even though the helper exists. Also proves the resolver degrades to
+		// "no one-shot" instead of erroring when no session can be obtained.
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$state = $this->stub_wc_rest_without_session( 1001, false );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertSame( 0, $state->calls, 'The session must not be loaded before WooCommerce has initialized.' );
+		$this->assertNull( $payload );
+	}
+
+	public function test_session_is_not_loaded_when_no_one_shot_event_is_pending(): void {
+		// oneshot_wc()'s gate: with no event cookie an anonymous Tier-2 fetch must pay
+		// no WooCommerce session cost at all - the remedy is for pending events only.
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$state = $this->stub_wc_rest_without_session( 1001 );
+		unset( $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertSame( 0, $state->calls, 'No pending one-shot means no session load.' );
+		$this->assertNull( $payload );
+	}
+
+	/**
 	 * Builds a recent, trackable order with the given overrides.
 	 *
 	 * @param array<string, mixed> $data Order overrides.

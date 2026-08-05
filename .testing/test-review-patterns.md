@@ -37,6 +37,7 @@ on every review before anything else.
 - **TC-5** — every request/header-sourced dataLayer field (a `.security` PA-3 sink: `?s=`, `HTTP_REFERER`, `HTTP_CF_IPCOUNTRY`, cookies, `$_SERVER`) ships a hostile-input regression test. This is the intersection of the two review systems.
 - **TS-6** — a whole class with **zero** tests is the cheapest, highest-value find. Run the missing-test-file sweep first every review.
 - **TS-12** — an authorization gate (a `permission_callback`, a `current_user_can()` check, a filterable capability like `gtm4wp_admin_page_capability`) is a test surface in its own right: it needs a **grant + deny** test and, if filterable, a test that the filter changes the required capability while the default stays unchanged. The XSS/output-sink lens (TS-1/TS-2/TC-5) never prompts for it, so an untested gate hides inside a component the matrix already marks `[x]`.
+- **TS-15** — the only proof that a guard is tested is **deleting the guard and watching a test go red**. "The method has a test file", "the line is covered", "a finding forced a test here" are all compatible with a fix nothing asserts. Revert-and-run the highest-value guards every review; it is the one check no tooling in this project performs.
 - **TS-13** — a test double must be **no more capable than the real collaborator**: if the mock does the safe thing the real dependency does *not* (returns a live object the real one returns null for; leaves an element the real SDK replaces; exposes a property the real object hides behind `__get`), the failure it would cause is invisible and the suite stays green over a real bug.
 
 **Test Smells (TS):**
@@ -108,6 +109,44 @@ as the expectation in two independent places.
   already saw the symptom and did not recognize it.
 - Related: **BE-1** blesses byte-exact assertions that are *deliberate*; this smell
   is the opposite — assertions deliberately loosened to keep a defect green.
+
+### TS-15: Only a revert proves a guard is tested ⭐
+TS-1 asks *"covered with what input?"*. This asks the blunter question: **if I delete
+this guard, does anything go red?** Every other signal this project has is compatible
+with the answer being "no":
+
+- *"The class has a test file"* — file-granular; the missing-test sweep (TS-6) counts
+  the whole file as covered no matter which method the fix lives in.
+- *"The line is covered"* — a coverage driver reports an unexecuted branch inside an
+  otherwise-green method as one uncovered line among hundreds, and reports an
+  under-asserted gate as fully covered.
+- *"A finding forced a test here"* — the test the finding forced may assert the
+  *outcome* while the guard's actual content (which capability, which sanitizer, which
+  collaborator state) is supplied by a stub.
+
+Confirmed twice in Run 5 (2026-08-05), both found only by reverting:
+
+1. The fix for a **High** security finding was deleted outright and the suite stayed at
+   **706/706 with an identical assertion count**. Cause: TS-13 — every test double
+   supplied the collaborator state whose absence *is* the bug, so the remedy branch had
+   never executed. The checklist had recorded "regression test does not stub X wholesale"
+   as though the test existed.
+2. A capability gate was downgraded to a weaker capability **and its filter removed**, and
+   its component's 17 tests stayed green — because grant/deny was asserted through a
+   `justReturn` stub that pins no capability at all (TS-12/TC-13).
+
+**Rules:**
+- On every review, pick the highest-value guards in range — the fixes for High/Medium
+  security findings, and every authorization gate — and **revert each one in the working
+  tree, run the suite, restore**. It costs a minute per guard and is the only check that
+  can distinguish a test from a covered line. Restore byte-exact and confirm with
+  `git status --porcelain`.
+- A ledger sentence asserting a test exists ("regression test does not stub…",
+  "read-only property is test-pinned") is a **claim to verify**, not evidence. Grep for
+  the test; if you cannot name the assertion that would fail, it does not exist.
+- Mutation testing (Infection) is the mechanical form of this pattern and would catch
+  case 1 automatically. It catches case 2 only if the mutation operator reaches the
+  capability *string*, so the manual revert still earns its place.
 
 ### TS-1: A covered line is not an asserted behavior ⭐
 Line/branch coverage tells you a line *executed*, not that the test would *fail if
@@ -235,6 +274,15 @@ can be removed without a test going red:
    default is checked when the filter is absent — so nothing changes unless
    filtered — and (b) a filtered custom cap is the one passed to
    `current_user_can()` / `add_options_page()`, granting or denying accordingly.
+
+**Sweep for the sites, don't close the ones a finding named (added Run 5, 2026-08-05).**
+The #143 fix below closed the two sites *the issue mentioned* and the canonical test
+says so in its own docblock ("the two enforcement sites the issue names"). A grep three
+weeks later found **four**: the gate in `Plugin::boot()` that decides whether the admin
+UI loads at all had no test, and the `Notices` gate had grant+deny that pinned no
+capability. A gate closed at the sites a finding named is a fix, not a sweep — run
+the grep in § Review Scope A.4 every time and reconcile it against the test file, and
+prove each site by revert (TS-15), not by reading.
 
 Confirmed 2026-07-15 (issue #143): the `gtm4wp_admin_page_capability` filter gates
 `RestController::can_manage()` (the REST `permission_callback`) and
@@ -466,6 +514,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-08-05 (Run 5 — gaps closed) | Closed T28–T34 on the user's "close all gaps" go-ahead. **PHP 706→763 / 2325→2463 assertions, JS 23 suites/309, all green; `phpcs` exit 0 repo-wide with warnings blocking; `lint:js` clean; no production code changed** (tests-only → CHANGELOG exempt). **TS-15 was applied as the acceptance criterion, not just the diagnosis:** four fixes were signed off by re-reverting the guard and watching the *new* test go red (#33's session load, the `Plugin::boot()` gate, the `Notices` gate, the scoped ampersand restore), and T33's exact counts by neutralizing the detach (4 tests that had passed as shape assertions failed). New process lessons worth keeping: (a) **Brain Monkey makes `function_exists()` sticky for the whole process** — once any test mocks a function it exists forever, so a "helper absent on older WooCommerce" branch is not unit-testable here; document the leg instead of faking it; (b) `setcookie`/`headers_sent` ARE redefinable via `patchwork.json`, but `UserEventsModule` uses the **positional** 7-arg signature while `VisitorDataModule` uses the options-array form — match the one under test; (c) a test-wide `document.addEventListener` capture in the **file-level** `beforeEach`/`afterEach` beats a per-describe harness: it cannot be forgotten by the next describe someone adds, which is how T26's fix left seven describes leaking; (d) `#[\PHPUnit\Framework\Attributes\DataProvider]` is the house style — a `@dataProvider` doc-comment raises a PHPUnit 11 deprecation; (e) never run bare `npx prettier` on this repo — it uses default config and reformats the whole file; `npx wp-scripts lint-js js --fix` is the correct fixer. |
+| 2026-08-05 (Run 5) | Added **TS-15** (only a revert proves a guard is tested) after two Run-5 probes: the fix for a High security finding was **deleted outright with the suite staying 706/706 green** (TS-13 — every double supplied the collaborator state whose absence is the bug), and a capability gate was **downgraded with its filter removed** while its 17 component tests stayed green (a `justReturn` stub pins no capability). Both sat inside components the matrix marked `[x]`, and neither was reachable by any mechanical signal the project has — which is the entry's point. Extended **TS-12** with "sweep for the sites, don't close the ones a finding named": the #143 fix closed the two sites the issue mentioned and the canonical test says so in its docblock; a grep found four. Also recorded (no numbered entry): **TS-14's live site is now a harness gap, not a masked defect** — the #71 double-init guard shipped and is tested in every bundle, so the loosened `find()` assertions in `woocommerce-tracker.test.js` now only block the exact-count assertions that would catch the *next* regression. And a positive process note: three Run-5 candidate gaps (`is_new_customer`, `build_config`, the no-`fetch` guard) **collapsed on verification** — read the sibling test file before logging, the global grep over `tests/` beats the per-file one. |
 | 2026-07-30 (2.0 fix session, no `/test-review` run) | Added **TS-14** (the suite adapted its assertions *around* a defect instead of failing on it) after fixing security findings #71 and #79. The WooCommerce tracker suite carried a comment describing double-pushed events as leaked-listener housekeeping and switched to shape-based assertions to tolerate it — a precise description of the production symptom #71 names, written down and read as a harness quirk. Three further tests in the same file pinned the string `quantity: '3'` / `'2'` that #79 is about, so the defect was asserted as the expectation in two independent places. Sibling evidence for the same session: the `remove_from_cart` zero-quantity test existed only for the mini-cart — the surface that always worked — and the `VisitorIp` X-Forwarded-For tests all used comma-**without**-space lists, which is why #67 survived a green suite. Litmus added: a comment explaining why an assertion is weak is a review lead, and test-harness leakage vs production double-binding look identical from inside a test. |
 | 2026-07-22 (forum-reported bug) | Added **TC-14** (conditional-tag-gated code ships a tag-true/global-null case, with the throwing-error-handler recipe) after the PageVariables `$GLOBALS['post']`-on-null warning shipped in 1.22.x and survived every review and a green suite: all fixtures set a well-formed post global (the TS-13 fixture-side dual), and nothing demanded the null case. Canonical test: `PageVariablesModuleTest::test_singular_request_without_global_post_omits_post_variables_without_warning` (verified to fail pre-fix). Companion security entry: RI-13 + the Unguarded WP-global reads sweep. |
 | 2026-07-17 (security Review 7) | Added **TS-13** (a test double more capable than the real collaborator hides the bug — the dual of TS-1, about the *collaborator* not the *input*). Prompted by the security review where three of the four most serious findings were each masked by this: `WC()` stubbed wholesale hid the null REST session (#33 / PA-11), a no-op `createController` fake hid the SDK element-replacement loop (#40 / PA-9), and plain-`stdClass` author fixtures hid the `__isset` blanking (#43 / RI-12). Each fix changed the double, not just the assertion. Cross-referenced from security PA-9/PA-11/RI-12. |

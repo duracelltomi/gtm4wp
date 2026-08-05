@@ -182,4 +182,69 @@ final class StoreApiDataTest extends TestCase {
 			$this->assertIsCallable( $entry['schema_callback'] );
 		}
 	}
+
+	/**
+	 * The schema callbacks describe the extension to every Store API consumer,
+	 * so the `item` key they declare has to keep matching the key the data
+	 * callbacks actually emit - and both must stay read-only, because the
+	 * extension is a one-way feed and a writable field would be a REST surface
+	 * nothing gates.
+	 *
+	 * Registered but never asserted until test-review Run 5 (gap T34): the
+	 * wiring test above only proved the callbacks are callable.
+	 */
+	public function test_product_schema_declares_a_readonly_item_field(): void {
+		$schema = $this->make_store_api_data()->product_schema();
+
+		$this->assertArrayHasKey( 'item', $schema, 'The schema key must match the data callback key.' );
+		$this->assertSame( array( 'object', 'null' ), $schema['item']['type'], 'The product item is an object, or null for an untrackable product.' );
+		$this->assertTrue( $schema['item']['readonly'], 'The extension is a one-way feed.' );
+		$this->assertSame( array( 'view', 'edit' ), $schema['item']['context'] );
+		$this->assertNotSame( '', $schema['item']['description'] );
+	}
+
+	public function test_cart_item_schema_declares_a_readonly_string_item_field(): void {
+		// The cart-item payload is a JSON *string* (the data callback encodes it),
+		// so the declared type differs from the product one on purpose.
+		$schema = $this->make_store_api_data()->cart_item_schema();
+
+		$this->assertArrayHasKey( 'item', $schema );
+		$this->assertSame( 'string', $schema['item']['type'], 'The cart line is delivered JSON encoded, so the schema type is string.' );
+		$this->assertTrue( $schema['item']['readonly'] );
+		$this->assertSame( array( 'view', 'edit' ), $schema['item']['context'] );
+	}
+
+	public function test_schema_keys_match_the_data_callback_keys(): void {
+		// The pairing is the contract: a renamed data key with an unchanged schema
+		// silently drops the field from every Store API response.
+		Functions\stubEscapeFunctions();
+
+		$store_api = $this->make_store_api_data();
+		$product   = new \WC_Product(
+			array(
+				'id'    => 7,
+				'title' => 'Mug',
+				'sku'   => 'SKU-7',
+			)
+		);
+
+		$this->assertSame(
+			array_keys( $store_api->product_schema() ),
+			array_keys( $store_api->extend_product_data( $product ) ),
+			'The product schema and data callback must declare the same keys.'
+		);
+
+		$this->assertSame(
+			array_keys( $store_api->cart_item_schema() ),
+			array_keys(
+				$store_api->extend_cart_item_data(
+					array(
+						'data'     => $product,
+						'quantity' => 1,
+					)
+				)
+			),
+			'The cart-item schema and data callback must declare the same keys.'
+		);
+	}
 }
