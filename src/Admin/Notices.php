@@ -181,8 +181,25 @@ final class Notices {
 	 * @return void
 	 */
 	public function print_dismiss_script(): void {
-		$nonce = wp_create_nonce( 'gtm4wp-notice-dismiss-nonce' );
-
+		// wp_json_encode() with the hex flags, not esc_js(): this is a string VALUE
+		// in a raw <script> body (no wp_kses sink, no entity decode anywhere on this
+		// path), and esc_js() emits &quot;/&amp;/&lt; entities the browser never
+		// decodes inside <script> - the same swap made in global_var_literal() and
+		// disabled_role_warning() (PA-4/RI-4).
+		//
+		// The literal supplies its own quotes, so it is NOT wrapped below and the
+		// emitted line stays byte-identical for an ordinary nonce.
+		//
+		// No false-return fallback here, unlike ContainerCode::json_literal(): that
+		// guards values supplied by a public filter, whereas wp_create_nonce()
+		// always returns 10 ASCII characters, which wp_json_encode() cannot fail on.
+		//
+		// Encoded INSIDE the echo rather than into a variable first. That is RI-17's
+		// own rule - an escape is only valid at the instant of output - and WPCS
+		// enforces it: it credits an escaping function only where the call is part of
+		// the echoed expression, so assigning the result first is reported as
+		// unescaped output. Taking the phpcs:ignore instead would have suppressed a
+		// warning that was pointing at the right thing.
 		echo '<script>
 	document.addEventListener( "click", function ( event ) {
 		if ( ! event.target.matches( ".gtm4wp-notice .notice-dismiss" ) ) {
@@ -195,7 +212,10 @@ final class Notices {
 		var body = new FormData();
 		body.append( "action", "gtm4wp_dismiss_notice" );
 		body.append( "noticeid", notice.dataset.href.substring( 1 ) );
-		body.append( "nonce", "' . esc_js( $nonce ) . '" );
+		body.append( "nonce", ' . wp_json_encode(
+			wp_create_nonce( 'gtm4wp-notice-dismiss-nonce' ),
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		) . ' );
 		window.fetch( window.ajaxurl, { method: "POST", credentials: "same-origin", body: body } );
 	} );
 </script>';

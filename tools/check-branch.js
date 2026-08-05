@@ -28,6 +28,12 @@
  *      every file under `tests/`, and the JS runner every file under `js/**\/test/`,
  *      whether or not the wiring changed. Those are executed by design and are far too
  *      noisy to diff usefully, so the report names them explicitly instead.
+ *   3. Git-ignored files inside a watched directory are outside the uncommitted-changes
+ *      leg: `git status` does not list them. `.claude/settings.json` and
+ *      `.claude/settings.local.json` (both ignored) are the ones that matter here, so
+ *      read those on disk. The branch-comparison leg is unaffected - an ignored file
+ *      cannot arrive on a branch without being force-added, and the `.claude/`
+ *      pathspec catches it once it is tracked.
  *
  * What it IS: a cheap prompt for the ordinary case - an honest contributor's branch
  * that happens to touch the build or test wiring, which is exactly the change you want
@@ -62,11 +68,25 @@ const { spawnSync } = require( 'child_process' );
  * runner or git hook means adding its config here: the recurring lesson behind #101 is
  * that a tool's config file reads as inert data right up until you notice its format
  * can reference code.
+ *
+ * Watch the SHAPE, not the one filename in the tree today. These are git pathspecs, and
+ * the branch supplies the filename as surely as it supplies the contents - so listing
+ * only the file this repo happens to use lets a branch bring its own under a name the
+ * tool prefers. PHP_CodeSniffer reads `.phpcs.xml` BEFORE `phpcs.xml`
+ * (Config::$defaultRulesetFiles), so a branch adding the dotfile overrides the tracked
+ * ruleset while a `phpcs.xml`-only pathspec reports "no executable wiring changed" -
+ * finding #101's own file, missed by the script written to prompt about it. Every tool
+ * below therefore has each of its accepted config names listed, present or not.
  */
 const EXECUTED_PATHS = [
 	// PHP toolchain.
 	'phpcs.xml', // PHP_CodeSniffer: <autoload>/<rule ref> can load PHP.
+	'.phpcs.xml', // Read in preference to phpcs.xml.
+	'phpcs.xml.dist',
+	'.phpcs.xml.dist',
 	'phpunit.xml', // Names the bootstrap and the test suites.
+	'phpunit.xml.dist', // Used when phpunit.xml is absent - so a branch deleting it matters.
+	'phpunit.dist.xml',
 	'tests/bootstrap.php', // Executed before any test.
 	'composer.json', // scripts + allow-plugins; Composer plugins execute.
 	'composer.lock', // Pins the dev dependencies that provide those executables.
@@ -74,12 +94,20 @@ const EXECUTED_PATHS = [
 	// JS toolchain.
 	'package.json', // scripts + install lifecycle hooks.
 	'package-lock.json', // Pins what npm ci installs.
+	'.npmrc', // node-options/script-shell/registry: applies to every npm run and npm ci.
 	'webpack.config.js', // Executed as JavaScript by wp-scripts build.
 	'.eslintrc.js', // Executed as JavaScript by ESLint.
+	'.eslintrc.cjs', // Same, and ahead of the non-JS eslintrc formats.
+	'eslint.config.js', // Flat config; executed if a future ESLint resolves it first.
+	'eslint.config.mjs',
+	'babel.config.js', // Executed by Babel during a build that does not pin configFile.
+	'.babelrc.js',
+	'postcss.config.js', // Executed by postcss-loader when it resolves a project config.
+	'jest.config.js', // Executed by the JS test runner when present.
 
 	// Repo tooling that runs on your machine.
 	'.githooks/', // core.hooksPath - runs on commit.
-	'.claude/', // Agent hooks and pre-approved tool permissions.
+	'.claude/', // Agent hooks and pre-approved tool permissions (see caveat 3 above).
 	'.github/workflows/', // Runs in CI; read it before it runs with any token.
 	'tools/', // Including this file.
 ];

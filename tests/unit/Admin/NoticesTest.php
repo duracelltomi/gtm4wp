@@ -87,6 +87,58 @@ final class NoticesTest extends TestCase {
 		return new Notices( new Options( array() ) );
 	}
 
+	/**
+	 * Finding #110 (PA-4/RI-4). The dismiss handler's nonce is a string VALUE in a
+	 * raw <script> body - no wp_kses sink and no entity decode anywhere on that
+	 * path - so it takes wp_json_encode() with the hex flags, not esc_js(), whose
+	 * entities the browser never decodes inside <script>.
+	 *
+	 * A real nonce is 10 ASCII characters, so neither encoder can misbehave on it;
+	 * the hostile value here is what makes the assertion say something. It fails
+	 * with esc_js() (which emits &quot;/&lt; rather than the character) and it fails
+	 * with no escaping at all (the raw quote closes the JS string), so it pins the
+	 * encoder rather than merely covering the line (TS-1/TS-2).
+	 */
+	public function test_dismiss_script_hex_encodes_the_nonce_into_the_script_body(): void {
+		Functions\when( 'wp_create_nonce' )->justReturn( 'ab"cd</script>&x' );
+
+		ob_start();
+		$this->make_notices()->print_dismiss_script();
+		$printed = ob_get_clean();
+
+		// Built with the same encoder the source uses rather than hand-typed \uXXXX
+		// sequences (TC-2), so the expectation cannot drift from the flag set.
+		$expected = wp_json_encode(
+			'ab"cd</script>&x',
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		// Present: the safe form, quotes included - the literal is not wrapped.
+		$this->assertStringContainsString( 'body.append( "nonce", ' . $expected . ' );', $printed );
+
+		// Absent: the break-out characters, and the entity form esc_js() would emit.
+		$this->assertStringNotContainsString( 'ab"cd', $printed, 'A raw quote must never reach the script body.' );
+		// Not a bare '</script>' - the block legitimately ends with one. This prefix
+		// can only come from the payload.
+		$this->assertStringNotContainsString( 'cd</script>', $printed, 'A raw closing tag must never reach the script body.' );
+		$this->assertStringNotContainsString( '&quot;', $printed, 'esc_js() entities are inert but wrong here (PA-4).' );
+	}
+
+	/**
+	 * The ordinary case stays byte-identical to the esc_js() output it replaced, so
+	 * the encoder swap is invisible to every real install (the #105 rule: encode the
+	 * whole literal, do not concatenate around the value).
+	 */
+	public function test_dismiss_script_emits_an_ordinary_nonce_unchanged(): void {
+		Functions\when( 'wp_create_nonce' )->justReturn( '0a1b2c3d4e' );
+
+		ob_start();
+		$this->make_notices()->print_dismiss_script();
+		$printed = ob_get_clean();
+
+		$this->assertStringContainsString( 'body.append( "nonce", "0a1b2c3d4e" );', $printed );
+	}
+
 	public function test_dismiss_notice_persists_valid_notice_id(): void {
 		// Nonce must be verified with the expected action + field (PA-1).
 		Functions\expect( 'check_ajax_referer' )

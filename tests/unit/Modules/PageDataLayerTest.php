@@ -70,6 +70,16 @@ final class PageDataLayerTest extends TestCase {
 	 */
 	private bool $tracker_already_done = false;
 
+	/**
+	 * Whether the gtm4wp-woocommerce handle is on the page at all. False models a
+	 * block-based checkout, where WooCommerceModule loads the block tracker
+	 * instead - so there is no reader for the checkout globals and the footer
+	 * fallback must stay silent rather than print a payload nothing consumes.
+	 *
+	 * @var bool
+	 */
+	private bool $tracker_enqueued = true;
+
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -80,7 +90,12 @@ final class PageDataLayerTest extends TestCase {
 				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			}
 		);
-		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => $content );
+		// Models the ampersand encoding that makes wp_kses() worth having a restore
+		// step for (RI-3), rather than the identity function. Under an identity stub
+		// every assertion about print_script_block()'s output is vacuous while the
+		// line still shows as covered - that is exactly how #92 stayed hidden for
+		// three reviews (test-review TS-1).
+		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => str_replace( '&', '&amp;', (string) $content ) );
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'sanitize_text_field' )->returnArg();
 		Functions\when( 'sanitize_title' )->alias(
@@ -111,6 +126,7 @@ final class PageDataLayerTest extends TestCase {
 		$this->inline_scripts         = array();
 		$this->inline_script_succeeds = true;
 		$this->tracker_already_done   = false;
+		$this->tracker_enqueued       = true;
 		Functions\when( 'wc_enqueue_js' )->alias(
 			function ( $code ) {
 				$this->enqueued_js .= $code;
@@ -136,10 +152,19 @@ final class PageDataLayerTest extends TestCase {
 		);
 		Functions\when( 'wp_script_is' )->alias(
 			function ( $handle, $status = 'enqueued' ) {
-				return 'gtm4wp-woocommerce' === $handle && 'done' === $status && $this->tracker_already_done;
+				if ( 'gtm4wp-woocommerce' !== $handle ) {
+					return false;
+				}
+
+				// 'enqueued' stays true after the script is printed - WP_Dependencies
+				// clears to_do, not queue - so a handle can be both enqueued and done.
+				if ( 'enqueued' === $status ) {
+					return $this->tracker_enqueued;
+				}
+
+				return 'done' === $status && $this->tracker_already_done;
 			}
 		);
-		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => $content );
 		Functions\when( 'current_theme_supports' )->justReturn( true );
 
 		\WC_Customer::$fixtures = array();
@@ -367,11 +392,10 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
-	 * The other half of the same guard: wp_add_inline_script() also returns false
-	 * when the handle was never registered, and the checkout data must not be lost
-	 * in that case either.
+	 * The other half of the same guard: the handle is on the page but the attach
+	 * still fails, and the checkout data must not be lost in that case either.
 	 */
-	public function test_checkout_globals_are_printed_in_the_footer_when_the_handle_is_unregistered(): void {
+	public function test_checkout_globals_are_printed_in_the_footer_when_the_attach_fails(): void {
 		Functions\when( 'is_checkout' )->justReturn( true );
 
 		$this->inline_script_succeeds = false;
@@ -390,6 +414,50 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $printed );
 		$this->assertStringContainsString( 'window.gtm4wp_checkout_value', $printed );
+	}
+
+	/**
+	 * Finding #108. A missing handle is not a missed attach - it means nothing on
+	 * the page reads these globals. That is the ordinary state of a BLOCK-based
+	 * checkout: WooCommerceModule::enqueue_scripts() loads gtm4wp-woocommerce-blocks
+	 * INSTEAD of gtm4wp-woocommerce (the block tracker reads the wc/store registry),
+	 * while is_checkout() is still true so this code still runs. Emitting the
+	 * fallback there printed a full checkout payload with no reader, duplicating the
+	 * items the begin_checkout push already carries.
+	 */
+	public function test_no_footer_fallback_when_the_classic_tracker_is_not_on_the_page(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		// The block checkout: the handle is not on the page at all. Attaching is left
+		// able to succeed, so the assertions below show the attach was never even
+		// ATTEMPTED against that handle, rather than merely having failed.
+		$this->tracker_enqueued = false;
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertFalse(
+			(bool) has_action( 'wp_footer', array( $page_datalayer, 'print_deferred_checkout_js' ) ),
+			'No footer fallback may be registered when nothing on the page reads the globals.'
+		);
+
+		ob_start();
+		$page_datalayer->print_deferred_checkout_js();
+		$this->assertSame( '', ob_get_clean(), 'The block checkout must not receive a checkout payload with no reader.' );
+
+		$this->assertSame( '', $this->enqueued_js, 'wc_enqueue_js() must not be used here either.' );
+		$this->assertSame(
+			'',
+			$this->inline_for( 'gtm4wp-woocommerce' )['code'],
+			'A handle that is not on the page must not be given an inline script.'
+		);
+
+		// The event itself is unaffected: the block tracker and the GTM container
+		// both still get begin_checkout through the data layer push.
+		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
 	}
 
 	public function test_view_item_carries_quantity_one(): void {

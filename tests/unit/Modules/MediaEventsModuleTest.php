@@ -67,6 +67,11 @@ final class MediaEventsModuleTest extends TestCase {
 		);
 		// Default: no YouTube block on the page unless a test says otherwise.
 		Functions\when( 'has_block' )->justReturn( false );
+		// Pass-through by default, because most cases here are about which bundle
+		// loads, not about escaping. The one case where the escaping IS the subject
+		// overrides this with a stub that models the real allow-list - a pass-through
+		// there would make the assertion vacuous (TS-1).
+		Functions\when( 'esc_url' )->returnArg();
 	}
 
 	protected function tearDown(): void {
@@ -297,5 +302,98 @@ final class MediaEventsModuleTest extends TestCase {
 
 		// A false (unsafe/blocked) oEmbed result must be returned as-is.
 		$this->assertFalse( $module->enable_youtube_js_api( false, 'https://youtu.be/abc', array() ) );
+	}
+
+	/**
+	 * Finding #112 (RI-17). The origin is spliced into markup the oEmbed handler
+	 * has already escaped, so the splice runs AFTER that escaping finished and
+	 * whatever it puts back is unescaped by definition. esc_url() at the point of
+	 * injection is what keeps the iframe's src attribute intact.
+	 *
+	 * The site URL is A4-set and a real hostname cannot carry a quote, so this is
+	 * hardening rather than a live break-out - which is precisely why the test has
+	 * to model the real esc_url()'s character allow-list. Brain Monkey's own stub
+	 * only rewrites & and ', so under it the hostile host survives intact and the
+	 * assertion would be vacuous while the line still showed as covered (TS-1, the
+	 * #92/#106 lesson).
+	 */
+	public function test_enable_youtube_js_api_escapes_the_injected_origin(): void {
+		Functions\when( 'site_url' )->justReturn( 'https://example.com' );
+		Functions\when( 'wp_parse_url' )->justReturn(
+			array(
+				'scheme' => 'https',
+				'host'   => 'example.com"onload=alert(1) x="',
+			)
+		);
+		Functions\when( 'esc_url' )->alias(
+			static function ( $url ) {
+				// The allow-list is what makes esc_url() an escape rather than a
+				// pass-through; everything outside it is dropped.
+				return (string) preg_replace(
+					'|[^a-z0-9\-~+_.?#=!&;,/:%@$\|*\'()\[\]\x80-\xff]|i',
+					'',
+					(string) $url
+				);
+			}
+		);
+
+		$module = $this->make_module( array() );
+
+		$html   = '<iframe src="https://www.youtube.com/embed/abc?feature=oembed"></iframe>';
+		$result = $module->enable_youtube_js_api( $html, 'https://youtu.be/abc', array() );
+
+		$this->assertStringNotContainsString( '"onload', $result, 'No quote may survive into the src attribute.' );
+		$this->assertStringNotContainsString( 'alert(1) x=', $result );
+		$this->assertStringContainsString( 'origin=https://example.com', $result, 'The usable part of the origin still reaches the embed.' );
+	}
+
+	/**
+	 * A site URL WordPress cannot resolve into a scheme and a host yields no usable
+	 * origin, so the embed is returned exactly as the oEmbed handler produced it -
+	 * rather than splicing in a half-built value, or reading array keys that are
+	 * not there and raising a warning on every embed (RI-13's omit-don't-invent
+	 * rule applied to markup).
+	 *
+	 * @param mixed $parsed What wp_parse_url() returns for the site URL.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_unusable_site_urls' )]
+	public function test_enable_youtube_js_api_leaves_the_embed_alone_without_a_usable_origin( $parsed ): void {
+		Functions\when( 'site_url' )->justReturn( 'nonsense' );
+		Functions\when( 'wp_parse_url' )->justReturn( $parsed );
+		Functions\when( 'esc_url' )->returnArg();
+
+		// Warnings become failures, so an unguarded array read cannot pass silently.
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the reported PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$module = $this->make_module( array() );
+			$html   = '<iframe src="https://www.youtube.com/embed/abc?feature=oembed"></iframe>';
+
+			$this->assertSame( $html, $module->enable_youtube_js_api( $html, 'https://youtu.be/abc', array() ) );
+		} finally {
+			restore_error_handler();
+		}
+	}
+
+	/**
+	 * Site URLs that cannot produce an origin.
+	 *
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function provide_unusable_site_urls(): array {
+		return array(
+			'wp_parse_url returned false' => array( false ),
+			'no scheme'                   => array( array( 'host' => 'example.com' ) ),
+			'no host'                     => array( array( 'scheme' => 'https' ) ),
+			'empty parts'                 => array( array() ),
+		);
 	}
 }

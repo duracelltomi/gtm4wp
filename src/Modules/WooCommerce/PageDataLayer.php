@@ -538,6 +538,26 @@ final class PageDataLayer {
 			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';';
 
 		/*
+		 * Nothing on the page reads these globals unless the classic tracker is on
+		 * it, so "the handle is not there" is not a missed attach - it means there
+		 * is no reader. That is the ordinary state of a BLOCK-based checkout:
+		 * WooCommerceModule::enqueue_scripts() deliberately loads
+		 * gtm4wp-woocommerce-blocks INSTEAD of gtm4wp-woocommerce there (the block
+		 * tracker reads the wc/store data registry, never these globals) while
+		 * is_checkout() is still true here, so this method still runs. Emitting the
+		 * fallback in that case would print a payload with no reader, duplicating
+		 * the items already queued into the begin_checkout push above.
+		 *
+		 * 'enqueued' rather than 'registered': a handle another plugin has dequeued
+		 * stays registered but is never printed, so it has no reader either. It
+		 * stays true after the script is printed (WP_Dependencies::do_items() clears
+		 * to_do, not queue), so the already-done case below is still reached.
+		 */
+		if ( ! wp_script_is( 'gtm4wp-woocommerce', 'enqueued' ) ) {
+			return;
+		}
+
+		/*
 		 * Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4, PA-8). The two
 		 * window.* assignments never needed jQuery; 'before' placement emits them
 		 * just ahead of the gtm4wp-woocommerce tracker that reads them.
@@ -548,10 +568,15 @@ final class PageDataLayer {
 		 * tracker into the <head> instead of the footer the handle is already done
 		 * and the attach would silently drop the checkout data - leaving
 		 * add_shipping_info / add_payment_info to report an empty item list and a
-		 * value of 0. wp_add_inline_script() likewise returns false when the handle
-		 * is not registered at all. Print the block ourselves in the footer in both
-		 * cases; it is the same placement the WooCommerce queue used to give us,
-		 * without the deprecated call.
+		 * value of 0. Print the block ourselves in the footer in that case; it is
+		 * the same placement the WooCommerce queue used to give us, without the
+		 * deprecated call.
+		 *
+		 * The return value of wp_add_inline_script() is still honoured as a second
+		 * leg. With the enqueued check above, core can only return false here for
+		 * an empty payload, which this one never is - but the documented contract
+		 * of the function is what this depends on, not the internals of
+		 * WP_Scripts::add_data().
 		 */
 		if (
 			wp_script_is( 'gtm4wp-woocommerce', 'done' )

@@ -100,14 +100,43 @@ final class MediaEventsModule extends AbstractModule {
 	 * @return string|false
 	 */
 	public function enable_youtube_js_api( $return_value, $url, $data ) {
-		$site_url       = site_url();
-		$site_url_parts = wp_parse_url( $site_url );
-
-		if ( is_string( $return_value ) && false !== strpos( $return_value, 'youtube.com' ) ) {
-			return str_replace( 'feature=oembed', 'feature=oembed&enablejsapi=1&origin=' . $site_url_parts['scheme'] . '://' . $site_url_parts['host'], $return_value );
+		if ( ! is_string( $return_value ) || false === strpos( $return_value, 'youtube.com' ) ) {
+			return $return_value;
 		}
 
-		return $return_value;
+		$site_url_parts = wp_parse_url( site_url() );
+		$site_url_parts = is_array( $site_url_parts ) ? $site_url_parts : array();
+
+		$scheme = (string) ( $site_url_parts['scheme'] ?? '' );
+		$host   = (string) ( $site_url_parts['host'] ?? '' );
+
+		// A site URL WordPress cannot resolve into a scheme and a host cannot
+		// produce a usable origin, and the YouTube JS API rejects a malformed one
+		// anyway. Leave the embed exactly as the oEmbed handler returned it rather
+		// than splicing in a half-built value (and rather than reading array keys
+		// that are not there).
+		if ( '' === $scheme || '' === $host ) {
+			return $return_value;
+		}
+
+		// esc_url() AT the point of injection (RI-17). $return_value is markup the
+		// oEmbed handler has already escaped, and this splice runs after that
+		// escaping finished - so whatever is put back here is unescaped by
+		// definition and the earlier escaping cannot defend the attribute. The
+		// value is A4-set today (wp_parse_url over site_url()) and a hostname
+		// cannot carry a quote, which is why nothing was exploitable; an escape
+		// that is only correct because of where its value happens to come from is
+		// not an escape.
+		//
+		// The separators stay as raw & rather than &#038;: browsers parse both
+		// identically here, and 1.x emits this byte-for-byte.
+		$origin = esc_url( $scheme . '://' . $host );
+
+		return str_replace(
+			'feature=oembed',
+			'feature=oembed&enablejsapi=1&origin=' . $origin,
+			$return_value
+		);
 	}
 
 	/**
