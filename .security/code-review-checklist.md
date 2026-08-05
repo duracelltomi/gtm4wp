@@ -185,7 +185,7 @@ Each finding is logged once. Status: `open` | `fixed` | `wontfix`.
 
 > **Reports are local-only.** The detailed report files referenced below are git-ignored (see `.security/.gitignore`) because this is a public repo and reports carry exploit PoCs / possibly-unfixed detail. This log keeps only terse summaries — never paste a working payload or the full detail of an `open` Critical/High finding here.
 >
-> **Every report records `Reviewed at: <sha>`** — the HEAD commit it actually covered. The next review reads it to scope its diff (`<sha>..HEAD`, pre-review step 4) and to check cell staleness (step 5). Reports 1–5 predate the convention and record no sha; Report 6's was reconstructed from its coverage note, so **the next review's base is `ab7fa99`** (Review 6 reviewed up to `3a5a2a0`; `ab7fa99` is its own fix commit). Everything after `ab7fa99` — 14 commits as of 2026-07-17, including the whole `#398` cache-safe data-layer rewrite and the new public VisitorData endpoint — is **unreviewed**. *(Superseded: Report 7 reviewed `ab7fa99..e8f85e5` with fixes landing as `b7a7d33`; Report 8 reviewed `b7a7d33..54d12e5` with fixes as `a2b18c7`; Report 9 reviewed `a2b18c7..1ad1187` with fixes as `599fd7d`; Report 10 reviewed `599fd7d..7a607d2` and **never recorded its fix commit**, so Report 11 took `7a607d2` as its base and reviewed R10's whole fix session as part of its range; Report 11 reviewed `7a607d2..b58d427` and **also left its fix commit unrecorded**, so Report 12 took `b58d427` as its base and reviewed R11's three fix sessions as part of its range; Report 12 reviewed `b58d427..58d2f8f` and **also left its fix commit unrecorded**, so Report 13 took `58d2f8f` as its base and reviewed R12's whole fix session as part of its range; Report 13 reviewed `58d2f8f..132e7ca` with fixes as `d38990b`, correctly recorded; Report 14 reviewed `d38990b..4ce7537` **plus `d38990b` itself**, which R13's entry had handed forward to be read deliberately rather than inherited, and **left its own `Fixes:` unfilled** — so Report 15 took `4ce7537` as its base and reviewed R14's whole six-finding fix session (`b2bd170`) as part of its range. The current base for the next review is **Report 15's entry** below.)*
+> **Every report records `Reviewed at: <sha>`** — the HEAD commit it actually covered. The next review reads it to scope its diff (`<sha>..HEAD`, pre-review step 4) and to check cell staleness (step 5). Reports 1–5 predate the convention and record no sha; Report 6's was reconstructed from its coverage note, so **the next review's base is `ab7fa99`** (Review 6 reviewed up to `3a5a2a0`; `ab7fa99` is its own fix commit). Everything after `ab7fa99` — 14 commits as of 2026-07-17, including the whole `#398` cache-safe data-layer rewrite and the new public VisitorData endpoint — is **unreviewed**. *(Superseded: Report 7 reviewed `ab7fa99..e8f85e5` with fixes landing as `b7a7d33`; Report 8 reviewed `b7a7d33..54d12e5` with fixes as `a2b18c7`; Report 9 reviewed `a2b18c7..1ad1187` with fixes as `599fd7d`; Report 10 reviewed `599fd7d..7a607d2` and **never recorded its fix commit**, so Report 11 took `7a607d2` as its base and reviewed R10's whole fix session as part of its range; Report 11 reviewed `7a607d2..b58d427` and **also left its fix commit unrecorded**, so Report 12 took `b58d427` as its base and reviewed R11's three fix sessions as part of its range; Report 12 reviewed `b58d427..58d2f8f` and **also left its fix commit unrecorded**, so Report 13 took `58d2f8f` as its base and reviewed R12's whole fix session as part of its range; Report 13 reviewed `58d2f8f..132e7ca` with fixes as `d38990b`, correctly recorded; Report 14 reviewed `d38990b..4ce7537` **plus `d38990b` itself**, which R13's entry had handed forward to be read deliberately rather than inherited, and **left its own `Fixes:` unfilled** — so Report 15 took `4ce7537` as its base and reviewed R14's whole six-finding fix session (`b2bd170`) as part of its range. Report 15 reviewed `4ce7537..80e116b` with fixes as **`707a3a1`, recorded at commit time** — the first time in six reviews this line was filled in without a later run having to reconstruct it. **The base for the next review is `707a3a1`**, whose own production code is therefore unreviewed by anyone but its author.)*
 >
 > **This has now happened four reviews running (R10, R11, R12, R13).** Each time the unfilled
 > `Fixes:` line was harmless — better than harmless, it is why #67/#72 (R10), #82–#85
@@ -871,8 +871,11 @@ ConsentMode bridges interpolate only the validated data-layer identifier.
 ### Report 15: `.security/code-review-report-2026-08-05-1325.md`
 
 **Reviewed at:** `80e116b` · **Base:** `4ce7537` (range `4ce7537..80e116b`, 3 commits —
-R14's own fix commit plus two test-suite commits) · **Fixes:** pending — **record the fix
-commit sha here when it lands; it is the base for the next review.**
+R14's own fix commit plus two test-suite commits) · **Fixes landed:** `707a3a1` —
+**the base for the next review is `707a3a1`**, and by the standing note at the top of this
+log that makes its own production code something the next run has to read deliberately
+rather than inherit as reviewed. Recorded at the same time as the commit, which breaks a
+five-review run of leaving this line unfilled.
 
 *(Filename note: this report's timestamp sorts before Report 14's, whose filename did not
 match its creation time either. Reports are ordered by number and by `Reviewed at:`, which
@@ -885,7 +888,22 @@ files, all of them R14's #108/#110/#112 fixes; **all three are correct where the
 and every premise behind them was re-derived rather than read (the block-checkout claim
 behind #108's `wp_script_is( 'enqueued' )` guard was traced to the two bundles and the
 enqueue/`wp_head` priority ordering, including the `LOADEARLY` priority-2 case).
-**No Critical/High. 1 Medium + 7 Low (#114–#121).**
+**As reviewed: no Critical/High, 1 Medium + 7 Low (#114–#121). Final, after the fix
+session: 1 High + 2 Medium + 6 Low (#114–#122).**
+
+**The review's own worst call is in its own tables, and it is worth more than the rest of
+the run.** #121 was filed **Low, at 0.5 confidence, as an RI-13 convention cleanup** — an
+empty companion key that "is probably inert". The reasoning was *the feature ships and
+nobody has complained, so the empty value must be harmless*. During the fix session the
+maintainer asked whether anything could confirm that at either end and supplied a live
+container URL; replaying the vendor runtime's own functions against the plugin's output
+inverted it in minutes. An empty array is **truthy in JavaScript**, so the empty companion
+was an allowlist that *had been set*, and the blocking mode had been disabling the **whole
+container** — in released 1.x and in 2.0 — rather than the selected entities. Re-rated
+**High**. The same question produced **#122**. So the lesson is not a lens this system was
+missing; it is that **a low-confidence finding is a request to go and measure, not a
+finding to file small** — and that the cheapest place to measure a one-ended contract is
+the other party's shipped runtime, which is downloadable.
 
 **The theme: "re-derived" is a claim like any other.** R14's whole report argued that a
 ledger is a measurement rather than a fact, and fixed one figure (#111) on that basis. Two
@@ -909,9 +927,20 @@ because R14 wrote its counting rule down beside the count.
 | 122 | Medium | fixed | Integration contract drift, found by checking #121 against the vendor's documentation instead of reasoning about it: the module wrote its data-layer keys under names that appear **nowhere** in Google's current documentation for the feature, nor in the older page it superseded — with no statement anywhere that the legacy names are supported, deprecated, or otherwise. The module's own docblocks cited that page as their authority in three places while emitting names it does not contain. Not a live defect (the runtime has read both pairs), and that is exactly what makes it worth rating: **the plugin writes the key and something else entirely decides whether to read it, so a wrong name fails silently** — every tag runs unrestricted while the settings screen still shows the restriction in place, and no test on this side can see it. Switched to the documented names. Ships a test that pins them and rejects the legacy pair outright, so "also emit the old ones for compatibility" cannot creep back in unnoticed. **Residual, stated honestly: this moves the feature onto documented ground; it does not verify the feature works.** That still wants one live check against a real container. | `src/Modules/Blacklist/BlacklistModule.php` |
 | 121 | ~~Low~~ **High** (re-rated 2026-08-05 after measurement; correctness, **not** a security finding - it fails closed) | fixed | Silent total feature failure, found by replaying the vendor runtime instead of reasoning about it. Publishing an empty companion restriction key alongside the populated one did not mean "no restriction of that kind": an empty array is truthy in JavaScript, the runtime treats it as a list that HAS been set, and its allow-test then rejects every entity. Enabling the feature in its blocking mode therefore disabled the whole container rather than the selected entities - in released 1.x and in 2.0 before this fix. Fails **closed**, which is why it survived: it reads as an over-eager restriction, not a defect, and the field description already warns the feature can affect tag deployment. The other mode was unaffected. Fixed by emitting only the selected mode's key; ships a test that asserts ABSENCE (not emptiness) of the companion under every name the runtime consults. **Originally filed Low as an RI-13 convention cleanup at 0.5 confidence, on the reasoning that the feature evidently worked so the empty key must be inert - the inference was backwards, and measuring it took ten minutes.** | `src/Modules/Blacklist/BlacklistModule.php` |
 
-**Fix session (2026-08-05).** Seven of the eight fixed; #118 left recorded by maintainer
-decision (it is rated "no added reach" over a baseline the agent already has). Four calls
-worth recording:
+**Fix session (2026-08-05), landed as `707a3a1`.** Eight of the nine fixed; #118 left
+recorded by maintainer decision (it is rated "no added reach" over a baseline the agent
+already has). The session produced **two findings the review itself did not have** —
+#122, and #121's re-rating from Low to High — both from one maintainer question about a
+0.5-confidence item. Calls worth recording:
+
+- **#121/#122 came from reading the vendor's shipped runtime, and that is now a repeatable
+  move.** Documentation settled the key *names* and ran out at the *values*: neither Google
+  page says what an empty restriction list means. `curl` of a live container, `grep` for the
+  literal, and the consuming functions lifted verbatim into a throwaway probe answered it
+  outright. Recorded in **RI-20** with the two halves that generalize: a falsy placeholder
+  is not neutral across a language boundary (PHP's empty `array()` is JavaScript's truthy
+  `[]`), and a fails-closed security feature that is completely broken looks exactly like
+  one that is working, so no bug report is ever coming.
 
 - **#114's fix is one shared predicate, not a corrected regex.** The codebase already held
   the right rule — `ContainerCode::header_top()` validates third-party global-variable
