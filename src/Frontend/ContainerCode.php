@@ -586,9 +586,15 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 * @return void
 	 */
 	public function the_tag(): void {
-		// The iframe's inline style needs `display` and `visibility`, which
-		// safecss_filter_attr() strips from any style attribute by default. Widen
-		// the CSS allow-list around THIS wp_kses() call only, then put it back:
+		// The iframe's inline style needs `display` and `visibility`. Whether
+		// safecss_filter_attr() strips those depends on the WordPress version:
+		// core added `display` to the safe_style_css default list in 7.0 and
+		// `visibility` in 7.1, so on 6.3-6.9 both are stripped and on 7.0
+		// `visibility` still is. While the floor is 6.3 this filter is
+		// load-bearing, not belt-and-braces - drop it only in the change that
+		// raises the floor past 7.1, never as a "core allows it now" cleanup.
+		//
+		// Widen the CSS allow-list around THIS wp_kses() call only, then put it back:
 		// safe_style_css is a global WordPress control, so a filter left
 		// registered would relax it for every other wp_kses()/wp_kses_post() call
 		// in the same request - including wp_filter_post_kses on content saved by

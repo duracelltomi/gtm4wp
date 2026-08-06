@@ -30,7 +30,11 @@ Identical legend to the sibling systems:
 
 - `[ ]` — never verified
 - `[x] YYYY-MM-DD` — verified on that date (often tagged with the run, e.g. `[x] 2026-08-05 (S1)`)
-- `[~]` — stale: the coupling site or the upstream moved since the recorded date
+- `[~]` — stale: the coupling site or the upstream moved since the recorded date, **or**
+  partially verified (say which part, and which part the probe did not reach)
+- `[!]` — **drifted**: the probe ran and the claim is false. Carries the `D#`. Distinct from
+  `[ ]` on purpose — "we checked and it is wrong" must never render as "we never checked",
+  and `Last verified` stays at the last date the claim was TRUE (added 2026-08-06)
 - `[-]` — N/A / not applicable
 
 ⚠️ **A coupling with no row is invisible, not unverified.** A complete-looking
@@ -136,6 +140,56 @@ reason the Release Radar sits above the registry.
 
 ---
 
+## What "we support WordPress X" means
+
+Maintainer's definition, 2026-08-06. `Tested up to:` is a published claim (UD-10), and
+this is what the claim asserts. A sweep that only answers "did the new release break us"
+has answered a *narrower* question than the one we publish.
+
+Declaring support for a version means all four:
+
+1. **We use nothing deprecated *or* removed in that version.** Deprecation is a removal
+   with a date attached and a notice bolted on. Waiting for the removal buys nothing —
+   the same migration is owed either way — and in the interim it buys `debug.log` entries
+   that users report against *this* plugin. "Still works" is not the standard.
+2. **We are ready for changed behavior**, not just for changed signatures. The dangerous
+   upstream change is the one that keeps working and returns something different.
+3. **Someone has actually run it** on that version. Reading the Field Guide is a
+   documentation check; the claim asserts more (U92).
+4. **Every unavoidable exception carries a named retire trigger** — see below.
+
+### The floor exception, and why it is not a loophole
+
+The plugin supports a **range** (6.3 → 7.1), so rules 1 and "works on the floor" can have
+no common solution. `__next40pxDefaultSize` is the worked example: deprecated no-op on
+7.1, load-bearing on 6.3–7.0 (U76). No version of that file satisfies both.
+
+This exception is *forced by the floor decision*, not a way around rule 1 — the maintainer
+decision to hold WP at 6.3 (2026-08-06) entails it. The rule is therefore:
+
+> Remove the deprecated usage as soon as the supported floor allows. Where the floor does
+> not allow it yet, it carries a **named retire trigger** in its registry row — not an
+> open-ended wait.
+
+"Tracked with a trigger" and "waiting for the inevitable" look identical in a codebase and
+are opposite in intent. The trigger is what distinguishes them, and a deprecation with no
+trigger recorded is the second one wearing the first one's clothes.
+
+### Triage by loudness — priority, never verdict
+
+Both get fixed; this decides the order.
+
+| Class | Test | Cost while it lives |
+|---|---|---|
+| **Loud** | Emits `_deprecated_function()` / `_deprecated_argument()` / `_deprecated_hook()`, a JS `deprecated()` warning, or a PHP notice | `debug.log` entries and support tickets naming this plugin. **Jumps the queue.** |
+| **Silent** | Accepted and ignored; upstream discards it deliberately | Zero user-visible cost. Hygiene only — dead code that reads as load-bearing. |
+
+`__next40pxDefaultSize` is silent (the 7.1 dev note: *"ignored at runtime"*, plus explicit
+discard guards in the components), which is why holding it to a floor trigger is
+acceptable rather than a running debt.
+
+---
+
 ## Release Radar
 
 Refreshed every sweep. `We declare` is read from the plugin header and `readme.txt`,
@@ -143,8 +197,8 @@ so the gap between what upstream ships and what we claim is visible in one row.
 
 | Upstream | Stable | Pre-release | Expected GA | We declare | Action |
 |---|---|---|---|---|---|
-| WordPress core | **7.0.2** [x] 2026-08-05 (S1) | **7.1-beta4** [x] 2026-08-05 (S1) | RC expected 2026-08-05 | `Requires at least: 6.3` / `Tested up to: 6.9.4` | **behind one major**; RC window opening — D4 |
-| WooCommerce | **11.0.0** [x] 2026-08-05 (S1) | [ ] not reached | — | `WC requires at least: 5.0` / `WC tested up to: 10.6.1` | **behind one major** — D4 |
+| WordPress core | **7.0.2** [x] 2026-08-06 (S1a) | **7.1-RC1** [x] 2026-08-06 (S1a) | **GA 2026-08-19** | `Requires at least: 6.3` / `Tested up to: 7.1` | D4a closed: both Field Guides swept, declaration bumped **ahead** of stable during the RC window. Residual: **no runtime smoke test on 7.1** — U2 is `[~]`, not `[x]` |
+| WooCommerce | **11.0.0** [x] 2026-08-06 (S1a) | [ ] not reached | — | `WC requires at least: 5.0` / `WC tested up to: 11.0.0` | D4b closed: source-checked across U17–U30 (2 findings, both fixed) and smoke-tested; claim now current |
 | Contact Form 7 | **6.1.6** [x] 2026-08-05 (S1) | [ ] not reached | — | (undeclared — no minimum stated) | declare a floor |
 | Gutenberg (for `@wordpress/components`) | [ ] | [ ] | — | n/a — unpinned runtime external | U76 still unverified |
 | PHP | — | — | — | `Requires PHP: 8.0` (CI tests 8.2, 8.4 — **executes the floor in no job**) | D5 |
@@ -170,40 +224,42 @@ have none, which is exactly why they are `every-run`.
 | ID | Dependency | Coupling site | Source / check | Watch | Failure | Cadence | Last verified |
 |---|---|---|---|---|---|---|---|
 | U1 | WP version floor `6.3` — **5 sites** | plugin header; `readme.txt`; runtime `version_compare`; `phpcs.xml` `minimum_wp_version`; `.claude/CLAUDE.md` Requirements | grep agreement | — | loud | every-run | [x] 2026-08-05 (S1) all agree |
-| U2 | `Tested up to: 6.9.4` claim | `readme.txt` | wp.org core API | U73 | deprecation | every-run | [ ] |
-| U3 | Script `strategy` array (`defer`) — the reason for the 6.3 floor | `src/Module/AbstractModule.php` `enqueue_script()`; `src/Modules/MediaEvents/MediaEventsModule.php` | core script API | U74 | silent-missing | on-WP-release | [ ] |
-| U4 | `wp_add_inline_script` + `wp_script_is(…,'done')` fallback | `src/Modules/WooCommerce/PageDataLayer.php` `print_deferred_checkout_js()` | `WP_Dependencies` behavior | U74 | silent-missing | on-WP-release | [ ] |
-| U5 | `wp_register_script()` with empty `$src` as an inline carrier | `src/Frontend/DataLayer.php` | core script API | U74 | silent-missing | on-WP-release | [ ] |
-| U6 | `wp_kses()` ampersand entity behavior | `src/Frontend/ScriptTag.php` `print_script_block()` / `restore_script_ampersands()` | core kses behavior | U74 | silent-wrong | on-WP-release | [ ] |
-| U7 | `safe_style_css` / `safecss_filter_attr()` stripping `display`+`visibility` | `src/Frontend/ContainerCode.php` `the_tag()` | core kses behavior | U74 | loud | on-WP-release | [ ] |
-| U8 | `rest_pre_serve_request` at priority 11, after core `rest_send_cors_headers` | `src/RestCors.php` | core REST behavior | U74 | silent-missing | on-WP-release | [ ] |
-| U9 | `feature=oembed` literal spliced to inject `enablejsapi=1` | `src/Modules/MediaEvents/MediaEventsModule.php` `enable_youtube_js_api()` | core oEmbed + YouTube | — | silent-missing | quarterly | [ ] |
-| U10 | Deprecated block name `core-embed/youtube` | `src/Modules/MediaEvents/MediaEventsModule.php` | core block registry | U74 | silent-missing | on-WP-release | [ ] |
-| U11 | REST nonce lifetime / `wp_get_session_token()` | `src/Modules/VisitorData/VisitorDataModule.php`, `VisitorDataEndpoint.php` | core auth behavior | U74 | loud | on-WP-release | [ ] |
+| U2 | `Tested up to: 7.1` claim | `readme.txt` | wp.org core API | U73 | deprecation | every-run | [x] 2026-08-06 (S1a) bumped 6.9.4 → 7.1 on the 7.0 + 7.1 Field Guides **plus** a maintainer smoke test of the `2.0.0-beta2` build (U92's first run). Manual evidence — re-run per release |
+| U3 | Script `strategy` array (`defer`) — the reason for the 6.3 floor | `src/Module/AbstractModule.php` `enqueue_script()`; `src/Modules/MediaEvents/MediaEventsModule.php` | core script API | U74 | silent-missing | on-WP-release | [x] 2026-08-06 (S1a) |
+| U4 | `wp_add_inline_script` + `wp_script_is(…,'done')` fallback | `src/Modules/WooCommerce/PageDataLayer.php` `print_deferred_checkout_js()` | `WP_Dependencies` behavior | U74 | silent-missing | on-WP-release | [x] 2026-08-06 (S1a) |
+| U5 | `wp_register_script()` with empty `$src` as an inline carrier | `src/Frontend/DataLayer.php` | core script API | U74 | silent-missing | on-WP-release | [ ] probe inconclusive 2026-08-06 (S1a) — `fetch-failed`, not a pass |
+| U6 | `wp_kses()` ampersand entity behavior | `src/Frontend/ScriptTag.php` `print_script_block()` / `restore_script_ampersands()` | core kses behavior | U74 | silent-wrong | on-WP-release | [x] 2026-08-06 (S1a) |
+| U7 | `safe_style_css` / `safecss_filter_attr()` stripping `display`+`visibility` | `src/Frontend/ContainerCode.php` `the_tag()` | core kses behavior | U74 | loud | on-WP-release | [x] 2026-08-06 (S1a) D10 fixed — claim re-stated with its version qualifier; filter kept, retire trigger recorded in code |
+| U8 | `rest_pre_serve_request` at priority 11, after core `rest_send_cors_headers` | `src/RestCors.php` | core REST behavior | U74 | silent-missing | on-WP-release | [x] 2026-08-06 (S1a) |
+| U9 | `feature=oembed` literal spliced to inject `enablejsapi=1` | `src/Modules/MediaEvents/MediaEventsModule.php` `enable_youtube_js_api()` | core oEmbed + YouTube | — | silent-missing | quarterly | [ ] not verifiable locally — the literal is YouTube’s oEmbed HTML, not core |
+| U10 | Deprecated block name `core-embed/youtube` | `src/Modules/MediaEvents/MediaEventsModule.php` | core block registry | U74 | silent-missing | on-WP-release | [x] 2026-08-06 (S1a) |
+| U11 | REST nonce lifetime / `wp_get_session_token()` | `src/Modules/VisitorData/VisitorDataModule.php`, `VisitorDataEndpoint.php` | core auth behavior | U74 | loud | on-WP-release | [x] 2026-08-06 (S1a) |
 | U12 | Guarded core helpers: `wp_get_environment_type()`, `is_plugin_active()`, `amp_is_request()` | `src/Frontend/ContainerCode.php`, `src/Admin/Notices.php`, `src/Modules/Amp/AmpModule.php` | — | — | loud | quarterly | [-] UB-3 |
-| U13 | `$GLOBALS['wp_version']` read directly in the requirements gate | plugin main file | core global | U74 | loud | on-WP-release | [ ] |
-| U14 | `apply_filters_deprecated()` / `_deprecated_hook()` per-call notice behavior | `src/Modules/WooCommerce/ProductData.php` | core deprecation API | U74 | loud | on-WP-release | [ ] |
+| U13 | `$GLOBALS['wp_version']` read directly in the requirements gate | plugin main file | core global | U74 | loud | on-WP-release | [x] 2026-08-06 (S1a) |
+| U14 | `apply_filters_deprecated()` / `_deprecated_hook()` per-call notice behavior | `src/Modules/WooCommerce/ProductData.php` | core deprecation API | U74 | loud | on-WP-release | [x] 2026-08-06 (S1a) |
+| U90 | `current_theme_supports( 'html5' )` — **no second argument** — decides whether the hand-built script tag carries `type="text/javascript"` | `src/Frontend/ScriptTag.php` `opening_tag()`; `compat/functions.php` `gtm4wp_generate_script_opening_tag()` | core theme-support API (`src/wp-includes/theme.php`) | U74, U93 | loud (cosmetic) | on-WP-release | [x] 2026-08-06 (S1a) verified against core trunk source — claim holds, no behaviour change |
+| U91 | `wp-theme` design tokens (`--wpds-*`) and `@wordpress/ui` — the successor styling contract for admin React screens | not yet coupled; `js/admin/style.scss` `--gtm4wp-*` is the seam that would consume it | WP 7.1 Design System Theming | U74, U86 | deprecation | on-WP-release | [x] 2026-08-06 (S1a) **deliberately not adopted** — see below |
 
 ### B. WooCommerce
 
 | ID | Dependency | Coupling site | Source / check | Watch | Failure | Cadence | Last verified |
 |---|---|---|---|---|---|---|---|
 | U15 | WC version floor `5.0` — **2 copies that can drift** | plugin header `WC requires at least`; `src/Modules/WooCommerce/WooCommerceModule.php` anchor `MIN_WC_VERSION` | grep agreement | — | loud | every-run | [x] 2026-08-05 (S1) both `5.0` |
-| U16 | `WC tested up to: 10.6.1` claim | plugin header | wp.org plugin API | U77 | deprecation | every-run | [ ] |
-| U17 | HPOS feature slug `custom_order_tables` | plugin main file, `before_woocommerce_init` | WC FeaturesUtil | U77 | loud | on-WC-release | [ ] |
-| U18 | ~30 `woocommerce_*` actions/filters registered | `src/Modules/WooCommerce/WooCommerceModule.php` `register_frontend_hooks()` | WC hook reference | U77 | silent-missing | on-WC-release | [ ] |
-| U19 | WC CRUD surface (`wc_get_order`, `wc_get_product`, order getters, `WC()->cart/session/customer`) | `src/Modules/WooCommerce/*.php` | WC public API | U77 | loud | on-WC-release | [ ] |
-| U20 | **WC-Admin internal** `…\Reports\Orders\Stats\DataStore::is_returning_customer()` — unguarded | `src/Modules/WooCommerce/ProductData.php` | WC internals (no promise) | U77 | loud | on-WC-release | [ ] |
-| U21 | `CartCheckoutUtils::is_cart_block_default()` / `is_checkout_block_default()` (guarded) | `src/Modules/WooCommerce/WooCommerceModule.php` | WC Blocks | U77 | silent-missing | on-WC-release | [ ] |
-| U22 | Store API `ExtendSchema`, `ProductSchema::IDENTIFIER`, `CartItemSchema::IDENTIFIER`; cart-item extension values must be strings | `src/Modules/WooCommerce/StoreApiData.php` | WC Store API | U77 | silent-wrong | on-WC-release | [ ] |
-| U23 | Block data stores `wc/store/cart`, `wc/store/payment`; selectors `getCartData`, `getActivePaymentMethod`; payload shape | `js/frontend/gtm4wp-woocommerce-blocks.js`, `js/frontend/lib/gtm4wp-blocks-cart-diff.js` | WC Blocks | U77 | silent-missing | on-WC-release | [ ] |
-| U24 | ~40 classic WC DOM selectors | `js/frontend/gtm4wp-woocommerce.js` | WC templates (unversioned) | U77 | silent-missing | on-WC-release | [ ] |
-| U25 | jQuery WC events `found_variation`, `checkout_place_order`, `ajaxSuccess` sniff | `js/frontend/gtm4wp-woocommerce.js` | WC templates | U77 | silent-missing | on-WC-release | [ ] |
-| U26 | Server-side regex over block markup + Product Collection collection slugs | `src/Modules/WooCommerce/ListTracking.php` | WC Blocks markup | U77 | silent-missing | on-WC-release | [ ] |
-| U27 | WC template filename literal `content-widget-product.php` | `src/Modules/WooCommerce/ListTracking.php` | WC templates | U77 | silent-missing | on-WC-release | [ ] |
-| U28 | WC option/taxonomy literals: `woocommerce_tax_display_shop`, `product_cat`, `wc-` status prefix | `src/Modules/WooCommerce/{ListTracking,PageDataLayer,Helpers,AdminSchema}.php` | WC data model | U77 | silent-wrong | on-WC-release | [ ] |
-| U29 | `WC_Product` / `WC_Product_Variation` `instanceof` structural variation detection | `src/Modules/WooCommerce/ProductData.php` | WC class hierarchy | U77 | silent-wrong | on-WC-release | [ ] |
-| U30 | Cross-sell block selectors `.wp-block-woocommerce-cart-cross-sells-block`, `.wc-block-cart-cross-sells-product` | `js/frontend/gtm4wp-woocommerce-blocks.js` | WC Blocks markup | U77 | silent-missing | on-WC-release | [ ] |
+| U16 | `WC tested up to: 11.0.0` claim | plugin header | wp.org plugin API | U77 | deprecation | every-run | [~] 2026-08-06 (S1a) bumped 10.6.1 → 11.0.0 after the D4b source check + a maintainer smoke test. Source-verified across U17–U30; no automated runtime coverage against WC 11.0 |
+| U17 | HPOS feature slug `custom_order_tables` | plugin main file, `before_woocommerce_init` | WC FeaturesUtil | U77 | loud | on-WC-release | [x] 2026-08-06 (S1a) |
+| U18 | ~30 `woocommerce_*` actions/filters registered | `src/Modules/WooCommerce/WooCommerceModule.php` `register_frontend_hooks()` | WC hook reference | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) D11 fixed — dead registration removed; all 26 remaining verified present in WC 11.0.0 |
+| U19 | WC CRUD surface (`wc_get_order`, `wc_get_product`, order getters, `WC()->cart/session/customer`) | `src/Modules/WooCommerce/*.php` | WC public API | U77 | loud | on-WC-release | [x] 2026-08-06 (S1a) |
+| U20 | **WC-Admin internal** `…\Reports\Orders\Stats\DataStore::is_returning_customer()` — unguarded | `src/Modules/WooCommerce/ProductData.php` | WC internals (no promise) | U77 | loud | on-WC-release | [x] 2026-08-06 (S1a) |
+| U21 | `CartCheckoutUtils::is_cart_block_default()` / `is_checkout_block_default()` (guarded) | `src/Modules/WooCommerce/WooCommerceModule.php` | WC Blocks | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) |
+| U22 | Store API `ExtendSchema`, `ProductSchema::IDENTIFIER`, `CartItemSchema::IDENTIFIER`; cart-item extension values must be strings | `src/Modules/WooCommerce/StoreApiData.php` | WC Store API | U77 | silent-wrong | on-WC-release | [x] 2026-08-06 (S1a) |
+| U23 | Block data stores `wc/store/cart`, `wc/store/payment`; selectors `getCartData`, `getActivePaymentMethod`; payload shape | `js/frontend/gtm4wp-woocommerce-blocks.js`, `js/frontend/lib/gtm4wp-blocks-cart-diff.js` | WC Blocks | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) |
+| U24 | ~40 classic WC DOM selectors | `js/frontend/gtm4wp-woocommerce.js` | WC templates (unversioned) | U77 | silent-missing | on-WC-release | [~] 2026-08-06 (S1a) 14 of 14 *class tokens* extracted all present; probe did not reach the full ~40 selector set |
+| U25 | jQuery WC events `found_variation`, `checkout_place_order`, `ajaxSuccess` sniff | `js/frontend/gtm4wp-woocommerce.js` | WC templates | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) |
+| U26 | Server-side regex over block markup + Product Collection collection slugs | `src/Modules/WooCommerce/ListTracking.php` | WC Blocks markup | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) |
+| U27 | WC template filename literal `content-widget-product.php` | `src/Modules/WooCommerce/ListTracking.php` | WC templates | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) |
+| U28 | WC option/taxonomy literals: `woocommerce_tax_display_shop`, `product_cat`, `wc-` status prefix | `src/Modules/WooCommerce/{ListTracking,PageDataLayer,Helpers,AdminSchema}.php` | WC data model | U77 | silent-wrong | on-WC-release | [x] 2026-08-06 (S1a) |
+| U29 | `WC_Product` / `WC_Product_Variation` `instanceof` structural variation detection | `src/Modules/WooCommerce/ProductData.php` | WC class hierarchy | U77 | silent-wrong | on-WC-release | [x] 2026-08-06 (S1a) |
+| U30 | Cross-sell block selectors `.wp-block-woocommerce-cart-cross-sells-block`, `.wc-block-cart-cross-sells-product` | `js/frontend/gtm4wp-woocommerce-blocks.js` | WC Blocks markup | U77 | silent-missing | on-WC-release | [x] 2026-08-06 (S1a) D12 fixed — prefix corrected and pinned by a regression test that fails on the old value |
 
 ### C. Third-party plugins & themes
 
@@ -287,12 +343,14 @@ relies on it report a false all-clear.
 |---|---|---|---|---|---|---|
 | U80 | WP core stable | `https://api.wordpress.org/core/version-check/1.7/` → `.offers[0].version` | U2, Radar | silent-wrong | every-run | [x] 2026-08-05 (S1) → `7.0.2` |
 | U81 | WP core beta/RC | `https://api.wordpress.org/core/version-check/1.7/?channel=beta` → `.offers[0].version` | Radar, U3–U14 | silent-wrong | every-run | [x] 2026-08-05 (S1) → `7.1-beta4` |
-| U82 | WP core dev notes / Field Guide | `https://make.wordpress.org/core/tag/dev-notes/feed/` · `https://make.wordpress.org/core/tag/field-guide/` | U3–U14 (UD-8) | silent-wrong | every-run | [~] 2026-08-05 (S1) channel resolves; **7.0 Field Guide (2026-05-14) never swept**, 7.1 not published yet |
+| U82 | WP core dev notes / Field Guide | `https://make.wordpress.org/core/tag/dev-notes/feed/` · `https://make.wordpress.org/core/tag/field-guide/` | U3–U14 (UD-8) | silent-wrong | every-run | [x] 2026-08-06 (S1a) **both swept**: 7.0 Field Guide (2026-05-14) and 7.1 Field Guide (2026-08-05), plus all 16 individual 7.1 dev notes. One finding (U90); nothing else in A reached |
+| U92 | **Runtime smoke test on a pre-release core** — the evidence channel behind the `Tested up to` claim, the same way U89 backs the PHP floor. A Field-Guide read is a *documentation* check; UD-10 says the published claim asserts more than that | WordPress Playground (`https://playground.wordpress.net/?wp=beta`) or a local beta/RC install | U2, U16, Radar | silent-wrong | on-WP-release | [x] 2026-08-06 (S1a) **first run** — maintainer smoke-tested the `2.0.0-beta2` build; WP `Tested up to: 7.1` and `WC tested up to: 11.0.0` both rest on it. Manual, so it re-runs per release, not per commit |
+| U93 | **Core source of truth — use the GitHub mirror, not Trac.** `core.trac.wordpress.org` returns **HTTP 403** to this environment, so a dev note citing a ticket number is a dead end on its own. `gh` reaches the mirror and yields the commit messages *and* the actual file source, which is strictly better evidence than a ticket summary | `gh api search/commits -f q='repo:WordPress/wordpress-develop <ticket#>'` · `gh api repos/WordPress/wordpress-develop/contents/src/wp-includes/<file>.php` | U3–U14, U90, any Trac-cited dev note | — | on-demand | [x] 2026-08-06 (S1a) both forms work; settled U90 after Trac 403 twice |
 | U83 | WooCommerce stable | `https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]=woocommerce` → `.version` | U16, Radar | silent-wrong | every-run | [x] 2026-08-05 (S1) → `11.0.0` |
 | U84 | WooCommerce beta/RC | `https://api.github.com/repos/woocommerce/woocommerce/releases` | Radar, U17–U30 | silent-wrong | every-run | [ ] |
 | U85 | WooCommerce developer blog | `https://developer.woocommerce.com/blog/` | U17–U30 (UD-8) | silent-wrong | quarterly | [ ] |
 | U86 | Gutenberg releases | `https://api.github.com/repos/WordPress/gutenberg/releases` | U76 (earliest `__next*` warning) | silent-wrong | every-run | [ ] |
-| U89 | **wp.org PHP-version usage statistics** — the evidence channel for the 8.0 floor decision (D7b trigger, UB-5's "change of circumstance") | `https://wordpress.org/about/stats/` (PHP version breakdown) | U72, D5, D7b | — | quarterly | [ ] never checked |
+| U89 | **PHP floor evidence — two sources, two questions.** *Usage:* the share still on each version (the actual cost of a floor). *Lifecycle:* whether a version is still supported at all (the argument for the floor). Feeds D7b and UB-5's "change of circumstance" | usage → `https://api.wordpress.org/stats/php/1.0/` (JSON; the `/about/stats/` page renders this via JS and is not machine-readable) · lifecycle → `https://www.php.net/supported-versions.php` | U72, D5, D7b | — | quarterly | [x] 2026-08-06 (S1a) **first measurement** — see the numbers under Sweep 1a |
 | U87 | Contact Form 7 | `https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]=contact-form-7` → `.version` | U31, U32 | silent-wrong | every-run | [x] 2026-08-05 (S1) → `6.1.6` |
 
 ---
@@ -390,6 +448,104 @@ rather than a page snapshot is deliberate (UD-3).
 - **Would a test catch it?** **No, and worse:** `js/admin/test-support/wp-components.js`
   accepts and ignores these props, so the suite is green either way (UC-3). Severity
   rises a level.
+
+**Resolved 2026-08-06 (S1a) — the flip has landed, and the answer is "keep them".**
+Both defaults are now flipped in core: `__nextHasNoMarginBottom` in components **32.0.0**
+(shipped in WP **7.0**) and `__next40pxDefaultSize` in **37.0.0** (shipped in WP **7.1**).
+The predicted failure did **not** occur, for a reason worth recording: the components
+retain an explicit discard (`__nextHasNoMarginBottom: _  // Prevent passing to internal
+component`), so the props never reach the DOM and log nothing. The 7.1 dev note is
+unambiguous — *"Passing `__next40pxDefaultSize` is ignored at runtime."*
+
+- **The props must stay.** `build/admin.asset.php` externalises to core's `wp-components`,
+  so the app renders against the *site's* WP version, and the plugin still declares
+  `Requires at least: 6.3`. Removing them as dead code would revert controls to 36px and
+  re-add bottom margins on **6.3–7.0**. They are inert only on 7.1+.
+- **Retire condition:** delete them in the same change that raises the WP floor past 7.1,
+  never before, and never as a "dead code" cleanup.
+- **Fixed in passing:** `SearchControl` in `js/admin/components/Sidebar.js` had never opted
+  into 40px, so it rendered 36px next to 40px siblings on 6.7–7.0. 7.1 hides this by making
+  40px the default; the prop was added so the older supported range matches too.
+- **UC-3 residual, unchanged:** the `wp-components` stand-in still absorbs both props, so
+  the suite remains green either way. The claim above was settled by reading upstream, not
+  by a test, and no test can settle the next one.
+
+### U90 — `current_theme_supports( 'html5' )` gating the script `type` attribute
+
+- **We depend on:** `current_theme_supports( 'html5' )`, called with **no second
+  argument**, still answering "did this theme register html5 support at all". When it is
+  false the hand-built opening tag carries `type="text/javascript"`.
+- **How it was found:** the WP 7.0 Field Guide line *"Script Loader: HTML5 script theme
+  support deprecated and removed"* (Trac #64442). Found only because the 7.0 guide was
+  finally swept (U82) — Sweep 1 had never reached it, and no registry row pointed here.
+- **Why it did not break anything:** the 7.0 change is scoped to **core's** script loader.
+  GTM4WP does not use `wp_get_script_tag()`; it composes the tag itself, so core's own
+  emission rule is not in the path. `current_theme_supports()` is untouched, and with no
+  second argument it short-circuits before the `html5` case and returns true whenever the
+  feature is registered.
+- **Claim — SETTLED 2026-08-06, verified against core trunk source (not the ticket).**
+  `add_theme_support( 'html5', array( 'script' ) )` still registers the feature: the
+  `case 'html5'` in `add_theme_support()` accepts **any** array of types, merges repeat
+  calls, and filters nothing — `'script'` and `'style'` were *documented* as deprecated
+  (a `@since` annotation, r61791) but are still accepted and stored. And
+  `current_theme_supports( 'html5' )` short-circuits on "no args passed" before reaching
+  its `case`, so it returns true for any theme with html5 support. **Our output is
+  therefore unchanged on 7.0 and 7.1, including for a theme declaring only `'script'`** —
+  the one path that could have flipped it.
+- **What core actually did (r61415, r61411):** removed CDATA wrappers, boolean-attribute
+  expansion, and the default `type` attribute, so core now **always omits**
+  `type="text/javascript"`. Note the direction: the consequence is that *our* conditional
+  is now dead weight, not that our tags changed. On a theme without html5 support the
+  plugin still emits an attribute core no longer emits anywhere.
+- **Failure:** `loud` by the rubric but **cosmetic in effect** — an obsolete attribute
+  browsers ignore. Low severity; recorded because it was an unregistered coupling, not
+  because it is dangerous.
+- **Open cleanup (maintainer's call, not a compat fix):** the `$has_html5_support`
+  conditional could be dropped entirely so the tag always omits `type`, matching core
+  7.0+. It changes output only on old-WP + non-html5-theme sites, and only by removing an
+  obsolete attribute. Deliberately not done here — it is a behaviour change dressed as
+  tidying.
+- **⚠️ A web search got this backwards.** A search-engine summary asserted that after the
+  removal `type="text/javascript"` *"will now always be included"*. The source says the
+  opposite. The claim above was settled by reading `theme.php` and the commit messages.
+  Instance of UD-11 in a new costume: a plausible secondary summary is not evidence.
+- **The narrower bug underneath:** the call asks a broader question than the code means.
+  `current_theme_supports( 'html5', 'script' )` is what the surrounding logic is actually
+  about. Pre-existing, unrelated to 7.x, and left alone deliberately — changing it changes
+  output on themes that register html5 without `'script'`. Maintainer's call, not a
+  compat fix.
+
+### U91 — `wp-theme` design tokens / `@wordpress/ui` (watch only, not adopted)
+
+- **What upstream shipped (WP 7.1):** a `wp-theme` **stylesheet** defining every `--wpds-*`
+  design token at `:root`, plus a `wp-theme` **script** exposing a `ThemeProvider`. The
+  handbook states the stylesheet is auto-loaded in admin contexts, so on 7.1 the tokens are
+  already present on our settings screen without us doing anything.
+- **Decision 2026-08-06: do not adopt, and do not enqueue.** Three reasons, recorded so the
+  next sweep does not re-litigate:
+  1. **The tokens do not reach our controls.** They are the basis for `@wordpress/ui`, not
+     `@wordpress/components`. The settings app is entirely the latter, so adopting `--wpds-*`
+     in `style.scss` would restyle our chrome while every control inside it stayed on the old
+     system — a cohesion regression, not a gain.
+  2. **`@wordpress/ui` is not usable yet.** Upstream's own wording: *"still experimental …
+     an early implementation subject to drastic and breaking changes."* Unlike
+     `@wordpress/components` it is **not** on `window.wp`, so it must be bundled from npm —
+     against a today-tiny bundle where every dep is externalised. `@wordpress/components` is
+     **not** deprecated.
+  3. **The 6.3 floor.** `--wpds-*` does not exist below 7.1, so every use needs a fallback —
+     which is exactly what the existing `--gtm4wp-*` layer already provides, including the
+     `var( --wp-admin-theme-color, #2271b1 )` bridge.
+- **⚠️ Trap for whoever adopts this:** do **not** add `'wp-theme'` to the `$deps` array of the
+  `wp_enqueue_style()` call in `src/Admin/SettingsPage.php`. `WP_Dependencies::all_deps()`
+  drops any item whose declared dependency is not registered, so on 6.3–7.0 that one word
+  silently removes the plugin's **entire** admin stylesheet — not just the tokens. Guard with
+  `wp_style_is( 'wp-theme', 'registered' )` if it is ever needed at all.
+- **Re-open trigger (the real one):** `@wordpress/components` beginning to consume `--wpds-*`,
+  or `@wordpress/ui` dropping "experimental". Watch via U86 (Gutenberg releases). A WP-floor
+  rise past 7.1 makes the migration cheap but is not by itself a reason to do it.
+- **Where it would land when it does:** `js/admin/style.scss` `--gtm4wp-*` is already the
+  seam — the ~10 colour tokens get re-pointed at `--wpds-*` with the current hex as fallback,
+  in one file, with no component changes.
 
 ### U1 / U15 / U72 — version floors written N times
 
@@ -605,12 +761,14 @@ every WooCommerce site running the plugin.
 | Sweep | Last run | Result summary |
 |---|---|---|
 | Version-floor agreement (U1, U15, U72) | 2026-08-05 (S1) | ✅ Clean: all sites agree — PHP `8.0` × 6, WP `6.3` × 5, WC `5.0` × 2. **But** no CI job executes the PHP floor (matrix 8.2/8.4) → D5. |
-| Release Radar refresh (U80–U87) | 2026-08-05 (S1) | ⚠️ WP stable **7.0.2** / beta **7.1-beta4**; WC **11.0.0**; CF7 **6.1.6**. Both our "tested up to" claims are one major behind → D4. Gutenberg + WC pre-release not reached. |
+| Release Radar refresh (U80–U87) | 2026-08-06 (S1a) | ⚠️ WP-only refresh: stable **7.0.2**, pre-release **7.1-RC1**, GA **2026-08-19**. WP claim bumped 6.9.4 → **7.1**, closing D4a. WC and CF7 not re-probed this run — D4b still open. (2026-08-05 (S1): WP stable 7.0.2 / beta 7.1-beta4; WC 11.0.0; CF7 6.1.6 — both "tested up to" claims one major behind → D4; Gutenberg + WC pre-release not reached.) |
 | Package drift (`composer outdated --direct`, `npm outdated`) | 2026-08-05 (S1) | ⚠️ phpunit 11.5.56→13.2.6, php_codesniffer 3.13.5→4.0.1, @wordpress/scripts 30.27.0→**34.0.0**, react/react-dom 18.3.1→19.2.8, typescript 5.3.3→7.0.2 → D7. `npm audit` not run. |
 | Coupling-site existence (every registry row's path + anchor still resolves) | 2026-08-05 (S1) | ✅ Clean: all 40 distinct registry paths resolve. |
+| **Behavioral contracts (A: U3–U14, B: U15–U30) against vendor source** | 2026-08-06 (S1a) | ⚠️ First real run. **24 rows `[ ]` → `[x]`** against WP 7.1-RC1 + WC 11.0.0 extracted locally. 3 findings, all "dead compensation that still reads as load-bearing": D10 (`safe_style_css` gained `display` in 7.0, `visibility` in 7.1 — our filter still needed at the floor), D11 (`woocommerce_related_products_args` never existed in our range), D12 (`wc-` vs `wp-` cross-sell class). U5 inconclusive, U9 is not a core coupling. **Lesson: these were never fetch-bound — download the vendor source and most of section A/B is a local grep.** |
 | New-coupling detection (diff-scoped hunt for unregistered upstream strings) | [ ] | Not run — no base sha before this sweep (Run 0 was the seed). Starts at Sweep 2 from `1daeddf`. |
-| Watch-channel health (each endpoint resolves and parses) | 2026-08-05 (S1) | ⚠️ U80/U81/U83/U87 resolved and parsed. U82 resolved but **no 7.1 Field Guide yet, and the 7.0 one (2026-05-14) has never been swept**. U84/U85/U86 not reached. |
+| Watch-channel health (each endpoint resolves and parses) | 2026-08-06 (S1a) | ⚠️ **U82 fully reached** — 7.0 + 7.1 Field Guides and all 16 individual 7.1 dev notes swept; one finding (U90, since verified). `core.trac.wordpress.org` returned **HTTP 403** on both attempts → new channel **U93** records the working substitute (`gh` against the `wordpress-develop` mirror), which settled U90 from source. New channel **U92** (runtime smoke test) registered, never run. U84/U85/U86 still not reached. (2026-08-05 (S1): U80/U81/U83/U87 resolved and parsed; U82 resolved but no 7.1 Field Guide yet and the 7.0 one (2026-05-14) never swept; U84/U85/U86 not reached.) |
 | Internal duplicate-contract agreement (U52, U71) | [ ] | Not run this sweep. |
+| **Deprecation audit (UD-16 / support-claim rule 1)** — deprecated *and* removed, PHP functions + arguments + hooks + JS component props, against the version we declare | 2026-08-06 (S1a) | ✅ **Clean: 0 hits across all four surfaces**, against WP **7.1-RC1** source. 465 deprecated core function names vs 555 plugin call names → 0. 37 deprecated core hooks vs 60 registered → 0. 30 `@wordpress/components` deprecation subjects; 3 touch components we use, we pass none. 5 deprecated-argument candidates, all verified false. Method + its two extraction bugs recorded under Sweep 1a — **re-read before re-running**. |
 | Mirrored-list set diff (U53) | 2026-08-05 (S1) | ⚠️ Triggers 9/9 ✅, variables 16/16 ✅, `gtm.allowlist`/`gtm.blocklist` ✅. Tags **71 of 72** — `mf` documented upstream, absent here → D2. Group classes **1 of 8** → D3. |
 
 History is appended in place, newest first, nested in parentheses — same convention as
@@ -734,13 +892,269 @@ entering the ledger as drift. Do not weaken it.
 **Standing / not actioned:**
 
 - **D3** — `accepted`, closed. Claim narrowed (UB-4); do not re-report "1 of 8".
-- **D4a** — **delegated** to the WP 7.1 session.
-- **D4b** — **open.** WooCommerce 11.0 compatibility check required before any header
-  bump. Blocked on U84/U85, the two WC channels this sweep missed.
+- **D4a** — **fixed 2026-08-06 (S1a).** See the Sweep 1a entry below.
+- **D4b** — **closed 2026-08-06 (S1a).** WC 11.0.0 verified from source across U17–U30
+  (D11, D12 found and fixed), then **smoke-tested by the maintainer**, which is the U92
+  criterion the WP side is still missing. `WC tested up to:` bumped 10.6.1 → **11.0.0**,
+  shipped in `2.0.0-beta2`. U16 stays `[~]` rather than `[x]`: the claim now rests on a
+  source check plus one manual run, not on automated runtime coverage.
 - **D7a** — blocked upstream; trigger recorded.
-- **D7b** — deferred; trigger is U89 (wp.org PHP statistics) or an upstream floor rise.
+- **D7b** — **re-deferred 2026-08-06 (S1a) with a dated trigger**, replacing the open-ended
+  one. U89 now measured; see Sweep 1a.
 - **D7c** — deferred to a dedicated `@wordpress/scripts` session; exit criteria recorded.
 - **D7d** — open, low.
 - **U54** — retracted false positive; sentinel probe now mandatory.
-- **U82** — the WP 7.0 Field Guide (2026-05-14) has never been swept, and 7.0 is
-  already stable. Owned by the WP 7.1 session (D4a).
+- **U82** — **closed 2026-08-06 (S1a).** Both Field Guides swept; produced U90.
+
+### Sweep 1a (delegated follow-up) — 2026-08-06
+
+**Reviewed at:** `b58d427` (+ uncommitted work from a parallel session) · **Base:** Sweep 1
+· **Scope:** D4a only — the WordPress 7.1 compatibility question, not a full sweep.
+
+This is the session D4a was delegated to. It held until the 7.1 Field Guide published
+(2026-08-05, one day after RC1) rather than sweeping the beta piecemeal, which is the
+behaviour the `Watch` column is meant to buy.
+
+**What was actually read:** the WP **7.0** Field Guide (never swept — the older half of
+U82's debt), the WP **7.1** Field Guide, and all 16 individual 7.1 dev notes. Each was
+checked against a locally-derived inventory of what the plugin actually touches: its core
+function surface, its hook registrations, its admin enqueue gating, and its
+`@wordpress/*` imports.
+
+**Result: no 7.1 change reaches this plugin.** The negative is worth recording as
+specifically as the positives, because "we looked and found nothing" and "we did not look"
+render identically next sweep. The four notes that *sounded* applicable and are not:
+enforced iframed editor (we register and extend no blocks), client-side media processing's
+`Document-Isolation-Policy` header (scoped to `post.php`/`post-new.php`/`site-editor.php`/
+`widgets.php`; our enqueue bails unless the hook is `settings_page_<slug>`), jQuery UI
+1.14.2 (jQuery **core** untouched; we use no jQuery UI), and JSON Schema client
+preparation (client-facing schemas only — *"does not change the server-side behaviour of
+`rest_validate_value_from_schema()`"*). The Field Guide also has **no** security,
+performance, script-loading or requirements section, which is the useful negative: the
+areas this plugin lives in did not move.
+
+| # | Sev | Stage | Status | Summary | File(s) |
+|---|-----|-------|--------|---------|---------|
+| D4a | Medium | rc | **fixed** | `Tested up to:` bumped **6.9.4 → 7.1** after sweeping both Field Guides. Also fixed the sibling site the original finding did not name — `.claude/CLAUDE.md` carried its own `tested up to 6.9.4` copy, so the claim lived in **2** places, not 1 (UC-1 again). **Residual, deliberately left open:** the bump rests on a documentation review; nothing has *run* on 7.1. Registered as **U92** rather than waved through. | `readme.txt`, `.claude/CLAUDE.md` |
+| D8 | Low | shipped | **verified — no action** | **Unregistered coupling found by sweeping the 7.0 guide:** `current_theme_supports( 'html5' )` gates the `type="text/javascript"` attribute on the hand-built script tag, and 7.0 removed html5 script theme support from the script loader (Trac #64442). **Settled from core trunk source** after Trac 403'd twice: `add_theme_support( 'html5', array( 'script' ) )` still registers the feature, and the no-arg `current_theme_supports()` short-circuits before its `case` — so our output is unchanged, including on the one path that could have flipped it. Registered as **U90**. Note the gap it exposes: this coupling predates the registry and would still be invisible if the 7.0 guide had stayed unswept. | `src/Frontend/ScriptTag.php`, `compat/functions.php` |
+| D9 | — | — | **process** | **Trac is unreachable from this environment (HTTP 403, both attempts).** Dev notes cite ticket numbers as their authority, so without a substitute every Trac-cited claim degrades to `fetch-failed`. Registered the working path as **U93**: `gh` against the `WordPress/wordpress-develop` mirror returns both the commit messages and the file source — better evidence than a ticket summary, since it settles behaviour by reading the code. Used here to convert D8 from unsettled to verified. | `.upstream/upstream-review-checklist.md` |
+
+**Not findings — decisions recorded so they are not re-litigated:**
+
+- **U76 resolved.** The `__next*` flip landed (7.0 and 7.1) and did **not** break anything;
+  the props must now be *kept* for the 6.3–7.0 range rather than cleaned up. The retire
+  condition is written into the claim block. `SearchControl` gained the 40px opt-in it had
+  always been missing.
+- **U91 opened as watch-only.** `wp-theme` / `--wpds-*` / `@wordpress/ui` — deliberately not
+  adopted, with the reasoning and the `wp_enqueue_style` dependency trap recorded in the
+  claim block. Re-open trigger is `@wordpress/components` consuming the tokens, not a
+  version number.
+
+### Behavioral-contract verification — 2026-08-06, first real run (U3–U14, U15–U30)
+
+The half of the registry that had never been touched. Sweep 1 reported
+`behavioral: 6/60` because these were judged "fetch-bound and judgment-heavy" — but with
+vendor source downloaded and grepped locally they are **mostly deterministic**, and 24 rows
+moved from `[ ]` to `[x]` in one pass. **The method, not the budget, was the blocker.**
+Sources: WP **7.1-RC1** and WooCommerce **11.0.0**, both extracted locally.
+
+**WordPress core (U3–U14):** U3 (`strategy`/defer), U4 (`wp_add_inline_script`, `'done'`
+status at `class-wp-dependencies.php:493`), U6 (`wp_kses_normalize_entities` still does
+`str_replace( '&', '&amp;' )` first — the exact behavior `restore_script_ampersands()`
+compensates for), U8, U10, U11, U13, U14 all verified. **U8 is the satisfying one:** core
+registers `add_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' )` with *no*
+priority → 10, so our 11 still runs after it, which is the whole point of that row.
+U7 drifted (**D10**). U5's probe was inconclusive and is recorded as such, not as a pass.
+U9 turns out not to be a core coupling at all — the `feature=oembed` literal is YouTube's
+oEmbed HTML; core has no such string. The row's `Source` should say so.
+
+**WooCommerce (U15–U30) — this closes D4b's check.** U17, U19, U20, U21, U22, U23, U25,
+U26, U27, U28, U29 verified against WC 11.0.0. Highlights: **U20's unguarded internal
+survived** — `…\Reports\Orders\Stats\DataStore::is_returning_customer( $order, $customer_id
+= null )` is still there, still compatible with our one-argument call (it remains
+unguarded, which is a standing risk, not new drift); Store API `ProductSchema::IDENTIFIER`
+is still `'product'` and `CartItemSchema::IDENTIFIER` still `'cart-item'`; all six jQuery
+events and all five Product Collection slugs present. Two findings: **D11**, **D12**.
+
+| # | Sev | Stage | Status | Summary | File(s) |
+|---|-----|-------|--------|---------|---------|
+| D10 | Low | shipped | **fixed** | **U7's claim is false, and version-dependent.** The code compensates for `safecss_filter_attr()` stripping `display`+`visibility`, but core added `display` to the `safe_style_css` default list in **7.0** and `visibility` in **7.1**. Measured inside the default array only: 6.3/6.7/6.9 → neither; 7.0 → `display`; 7.1 → both. **The filter must stay** — it is still load-bearing across 6.3–7.0, the same shape as U76. What is now wrong is the *comment*, which states core's behavior unconditionally; it needs the version qualifier, or the next maintainer reads it as universally true and deletes the filter. | `src/Frontend/ContainerCode.php` |
+| D11 | Low | shipped | **fixed** | **`woocommerce_related_products_args` has never existed in our supported range.** Registered in `register_frontend_hooks()`, but absent from WC **5.0.0, 8.0.0, 10.6.1 and 11.0.0** — so this is *not* 11.0 drift, it is a dead registration that predates the floor. The "Related Products" list type is set only by the sibling `woocommerce_related_products_columns`, which does exist and fires before the loop renders, so **the feature works**. The modern equivalent is `woocommerce_output_related_products_args` — but it appears in 8.0 and *not* in 5.0.0, so adopting it would need a WC-version guard. Cheapest correct fix is to drop the dead line. | `src/Modules/WooCommerce/WooCommerceModule.php` |
+| D12 | Low | shipped | **fixed** | **Cross-sell fallback selector never matches.** We select `.wp-block-woocommerce-cart-cross-sells-block a[href], .wc-block-cart-cross-sells-product a[href]`. WC 11.0 emits `wp-block-cart-cross-sells-product` — **`wp-`**, not `wc-`. The container selector is a descendant match and still catches every link inside the block, so click tracking is intact; the second selector is dead weight. Fix is a one-character class rename or deletion — but confirm against the WC floor first, since the `wc-block-*` prefix may be what older WC Blocks emitted. | `js/frontend/gtm4wp-woocommerce-blocks.js` |
+
+**All three are the same species:** dead compensation that still reads as load-bearing.
+None breaks a feature; each one lies to the next maintainer about why the code is there.
+That is precisely the class UD-2 predicts and the class no test can catch, because the
+sibling path keeps the suite green.
+
+**Disposition — all three fixed 2026-08-06** (811 PHP + 405 JS tests green, `phpcs` clean):
+
+- **D10 — fixed.** The filter stays; the *comment* now carries the version qualifier
+  (`display` added to the default list in 7.0, `visibility` in 7.1, so 6.3–6.9 strip both
+  and 7.0 still strips one) plus an explicit retire trigger: drop it in the change that
+  raises the floor past 7.1, never as a "core allows it now" cleanup. Same retire-trigger
+  discipline as U76, now written where the next reader will actually be standing.
+  - *Caught while writing it:* the first draft of that comment said 6.9/7.0 instead of
+    7.0/7.1. A comment fixing a wrong comment, wrongly — re-read against the measurement
+    before committing, not after.
+- **D11 — fixed.** The dead `woocommerce_related_products_args` registration removed, with
+  a note recording *why* only `_columns` is registered so it does not get "restored" as an
+  apparent omission. Docblocks in `ListTracking.php` and `ListTrackingTest.php` corrected —
+  both named the non-existent hook as though it fired.
+- **D12 — fixed, and the UC-3 hole it sat in is closed.** Prefix corrected to
+  `wp-block-cart-cross-sells-product`. The existing click test wrapped its link in the
+  *container* block, so it passed through the first selector and **could never fail** on a
+  wrong per-product selector — textbook UC-3. Added a case with no container, so only the
+  per-product selector can match. **Verified it fails on the old value before restoring the
+  fix**, which is the only thing that makes it a regression test rather than decoration.
+
+**What this run says about method.** Two of the three were found by diffing our beliefs
+against vendor source, and the third (D12's test hole) was found by asking "would this test
+have failed?" rather than "does this test pass?". Neither question is answered by a green
+suite, and both are cheap once the vendor source is on disk.
+
+**Registry correction:** `wc_quick_view_before_single_product` sits in section B
+(WooCommerce) but is a **third-party** quick-view plugin hook — 0 hits anywhere in WC
+11.0.0, as expected. It belongs in section C. Filed as a classification fix, not drift.
+
+### Deprecation audit — 2026-08-06, first run, clean
+
+The audit rule 1 of the support claim demands, run for the first time. Distinct from the
+7.1 sweep above: that one asked *"did 7.1 break us"*, this asks *"are we using anything
+deprecated or removed"*, and a change-detection sweep answers the first while staying
+silent on the second (UD-16).
+
+**Target:** WP **7.1-RC1** source (the version we now declare), downloaded and grepped
+locally rather than inferred from dev notes.
+
+| Surface | Core inventory | Plugin surface | Hits |
+|---|---|---|---|
+| PHP functions — deprecated | 465 names | 555 call names | **0** |
+| PHP functions — **removed** | 4,590 defined | 135 WP-shaped calls | **0** |
+| Deprecated arguments | 74 sites | 5 candidates | **0** (all false) |
+| Deprecated hooks | 37 | 60 registered | **0** |
+| JS `@wordpress/components` props | 30 subjects | 10 components used | **0** |
+
+**The five deprecated-argument candidates, each dismissed on evidence:** `get_option` /
+`update_option` notify only for the renamed option *keys* (`blacklist_keys`,
+`comment_whitelist`) — we use neither; `get_the_author( $deprecated )` — we call it with no
+arguments; `safecss_filter_attr( $css, $deprecated )` — we never call it, it appears only in
+a comment; `wp_get_environment_type` — the notice fires on the *site* defining
+`WP_ENVIRONMENT_TYPES`, which we do not.
+
+**The three JS deprecations that touch components we use** — `onClose` on `SearchControl`,
+`heading` on `CheckboxControl`, `isDefault` on `Button` — we pass none of them (`Button` uses
+the current `variant` API throughout).
+
+**⚠️ Two extraction bugs found mid-run. Read these before trusting a re-run:**
+
+1. **`grep -E "[ \t]"` does not match a tab.** In POSIX ERE a bracket expression takes `\t`
+   literally — the class matches space, backslash and the letter `t`. WordPress is
+   tab-indented, so this silently dropped every indented function definition: the core
+   inventory read 4,394 instead of 4,590, and six pluggable functions we *do* call
+   (`wp_create_nonce`, `wp_verify_nonce`, `wp_hash`, `wp_get_current_user`, `get_userdata`,
+   `is_user_logged_in`) surfaced as "removed from core". Use `[[:space:]]` in grep; `awk`
+   handles `\t` correctly, which is why the deprecated-function pass was unaffected.
+2. **`^\s*function` in the deprecated.php graveyards catches methods of deprecated classes,
+   not just deprecated global functions.** That produced the run's only false finding —
+   `is_search`, flagged because `wp-admin/includes/deprecated.php` defines it as a *method*
+   at line 672 while the live global lives in `wp-includes/query.php:716`. Anchor at column
+   zero (`^function `) for globals.
+
+Both bugs failed in the direction of a **false positive**, which is the survivable
+direction. Bug 1 could equally have hidden a real removal behind a longer list — the
+discrimination check (does the probe find things we know are there?) is what caught it.
+
+**Not covered, deliberately:** WooCommerce deprecations. That is D4b's scope and it stays
+open — this audit is core-only, and reporting it as "the deprecation audit is done" without
+that qualifier would be exactly the over-claim UD-15 warns about.
+
+### Version-floor decisions — 2026-08-06, both measured before deciding
+
+Prompted by the deprecation-policy question ("declaring a WP version means we use nothing
+deprecated"), both floors were re-examined against public data rather than intuition. Both
+**stay where they are**, for opposite reasons.
+
+**WP floor stays 6.3 — maintainer decision, no in-between win exists.** Measured from
+`api.wordpress.org/stats/wordpress/1.0/` on 2026-08-06 (share of all installs, cumulative
+exclusion by floor):
+
+| Floor | Excluded | Reach | Δ vs 6.3 | Unlocks |
+|---|---|---|---|---|
+| **6.3** (current) | 10.9% | 89.1% | — | — |
+| 6.7 | 15.7% | 84.3% | +4.8 pp | nothing |
+| 6.9 | 25.3% | 74.7% | +14.5 pp | nothing |
+| 7.0 | 36.4% | 63.6% | +25.5 pp | drop `__nextHasNoMarginBottom` |
+| 7.1 | ~100% | 0.01% | +89.1 pp | drop `__next40pxDefaultSize` |
+
+Individual shares: 7.0 = **63.6%**, 6.9 = 11.0%, 6.8 = 6.7%, 6.7 = 3.0%, 7.1 = 0.011%
+(pre-GA testers).
+
+A 6.7 floor was investigated specifically and **falsified**. The hypothesis was that
+`__nextHasNoMarginBottom` only became a *known* prop in 6.7, meaning 6.3–6.6 would currently
+receive unknown props that leak to the DOM — a real defect a 6.7 floor would repair. Counting
+occurrences in each version's shipped `components.js` kills it: both props are already handled
+at **6.3** (`__next40pxDefaultSize` 19, `__nextHasNoMarginBottom` 89), rising to 135/77 at 6.6
+and collapsing to 155/**10** at 7.0 as the flip lands. No leak, nothing to repair. *Limitation:*
+this counts strings in the bundle, so it proves the props are handled somewhere, not that every
+component we pass them to handled them in 6.3 — the 19 → 135 spread says coverage was still
+filling in. That residual is cosmetic (a control at 36px on old WP), not correctness.
+
+Confirmed at the same time: the plugin has **no** WP-version-gated code beyond the requirements
+gate itself. The `function_exists` guards (`wp_get_environment_type`, `wp_roles`,
+`wp_get_session_token`) all cover functions predating 6.3, so they are redundant *today* —
+a floor-independent cleanup, not an argument for raising anything.
+
+**PHP floor stays 8.0 for now — maintainer decision, on an explicit educative rationale.**
+The position on record: a plugin's `Requires PHP` is not merely advisory — wp.org and core
+*refuse to install or auto-update* below it, so it is an enforcement point that tells the user
+why and points them at their host. Maintainers should use it to signal that an outdated stack
+is not something to keep supporting. Recorded because it is a values decision, not a data one,
+and future sweeps should stop re-deriving it from the usage numbers alone.
+
+Measured 2026-08-06 (`api.wordpress.org/stats/php/1.0/`): **PHP < 8.0 = 23.9%** already excluded
+by today's floor (7.4 alone = **17.7%**); **8.0 itself = 4.27%**; 8.1 = 12.0%, 8.2 = 25.0%,
+8.3 = 24.5%, 8.4 = 8.1%, 8.5 = 2.4%.
+
+Two anchors worth keeping in view:
+
+- **WordPress core itself still requires PHP 7.4** — verified for both 7.0.2 and 7.1-RC1 via
+  the core version-check API. The plugin's floor is already two EOL generations ahead of core,
+  which is the educative argument working, not the plugin lagging.
+- **EOL is a poor predictor of usage.** PHP 7.4 has been end-of-life since Nov 2022 and is
+  still the second-most-installed version at 17.7%. A floor decision driven by the support
+  calendar alone would be years ahead of reality.
+
+**D7b re-deferred with a dated trigger** (replacing "wait for confirmation that dropping 8.0 is
+low risk", which had no date and would never have fired). From `php.net/supported-versions.php`
+on 2026-08-06 — active: 8.4, 8.5 · security-only: 8.2 (ends **31 Dec 2026**), 8.3 (ends 31 Dec
+2027) · EOL: 8.0 (Nov 2023), 8.1 (Dec 2025):
+
+- **Next check: 1 January 2027.** Not arbitrary — it is the day after 8.2 leaves security
+  support, so the oldest supported branch becomes 8.3, and it follows PHP 8.6's November
+  release, after which the annual usage shift has begun. The maintainer's instinct ("January")
+  and PHP's own calendar landed on the same date.
+- **Act early if either fires:** WordPress core raises its own PHP floor above 7.4 (the
+  strongest ecosystem signal — it moves every host at once), or PHP 8.0's share falls below a
+  threshold the maintainer sets. It is 4.27% today; no threshold is set yet, deliberately.
+- **Re-measure both U89 endpoints at that check** — usage *and* lifecycle. They answer
+  different questions and the numbers above are a snapshot, not a fact (staleness rule).
+
+**Process note — finding splitting.** Sweep 1 filed D4 as one finding over two upstreams and
+the maintainer split it into D4a/D4b on triage. That split is what let this session close
+half of it cleanly while the WooCommerce half stayed open and visible. Findings that bundle
+two independent upstreams should be filed split.
+
+**Process note — a secondary summary is not a source (D9, and the second instance of this
+class after U54).** The Trac 403 initially left U90 unsettled, and a web-search summary
+filled the gap with a confident, *backwards* answer: that core would now *always include*
+`type="text/javascript"`. Core does the opposite. Had the ledger recorded that, U90 would
+have carried an inverted claim while reading `[x] verified`. Two rules earned:
+
+1. **Prefer the source over any summary of it.** `gh` on `wordpress-develop` (U93) returns
+   commit messages and the file itself. A dev note's ticket number is a pointer to evidence,
+   not the evidence.
+2. **A blocked probe must stay `fetch-failed` until something authoritative replaces it.**
+   The three-outcome rule held here only because the 403 was recorded as a 403. The failure
+   mode this system is most exposed to is not a missed check — it is a plausible answer
+   arriving to fill a gap the ledger had honestly marked empty.

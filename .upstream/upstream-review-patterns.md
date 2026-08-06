@@ -25,7 +25,7 @@ breakage · Blessed Couplings (**UB**) — deliberate, do **not** flag.
 
 Each row is `ID — one-line litmus`.
 
-**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UC-1, UC-3
+**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UC-1, UC-3
 
 **Upstream Drift (UD):**
 
@@ -46,6 +46,7 @@ Each row is `ID — one-line litmus`.
 | UD-13 | A count or date copied from a summary instead of measured from the file is already wrong. Write the counting rule next to the number. |
 | UD-14 ⭐ | A truncated fetch of an **ordered** page is indistinguishable from deletion of everything after the cut. Every long-page probe carries a sentinel: the known-last item. No sentinel in the extraction → `fetch-failed`, never "removed". |
 | UD-15 ⭐ | **One finding per upstream.** Two products that ship on different release trains never share a finding, even when they share a vendor — the moment one half is delegated or accepted, the other rides along silently. |
+| UD-16 ⭐ | "Deprecated but still works" is scheduled work, not a free pass — the same migration is owed either way, plus `debug.log` entries meanwhile. Where the floor forbids removing it, the row carries a **named retire trigger**; loudness sets priority, never whether. |
 
 **Upstream Coupling anti-patterns (UC):**
 
@@ -116,6 +117,33 @@ When upstream announces a removal, the useful artifact is not "they announced it
 it is the target release and its expected date. File it in the registry with
 `Next due` set from the removal release, so the sweep raises it while there is still
 a window. See UD-7.
+
+### UD-16: "Deprecated but still works" is scheduled work, not a free pass ⭐
+
+The sibling of UD-4. UD-4 says register the removal date; this one says the *deprecation*
+already obliges you, before any date arrives.
+
+Deprecation is a removal with a date attached and a notice bolted on. Deferring costs the
+same migration later **plus** the notice in the meantime — and a `_deprecated_function()`
+entry in `debug.log` names a function, not a vendor, so the ticket lands here regardless
+of whose deprecation it is. Declaring support for a version asserts we use nothing
+deprecated in it (see the checklist's "What 'we support WordPress X' means").
+
+Two qualifiers, both load-bearing:
+
+- **The floor can make compliance impossible.** Supporting a *range* means a symbol can be
+  deprecated at the ceiling and required at the floor — `__next40pxDefaultSize` is exactly
+  that (U76). Then the rule is: remove it as soon as the floor allows, and until then carry
+  a **named retire trigger** in the registry row. A deprecation with no trigger is
+  indistinguishable from having forgotten about it.
+- **Triage by loudness, decide by neither.** Loud (emits a notice) jumps the queue because
+  it costs support tickets today. Silent (accepted and discarded upstream) is hygiene only.
+  Loudness sets order, never whether.
+
+**The trap this exists to prevent:** a change-detection sweep — "did the new release break
+us" — answers a narrower question than the claim we publish, and comes back clean while
+rule 1 is being violated by something deprecated three versions ago. The WP 7.1 sweep
+(2026-08-06) was exactly this shape: clean, and silent on the question.
 
 ### UD-5: Another vendor's DOM is unversioned by construction
 
@@ -367,9 +395,20 @@ sweep will notice, and the answer is already decided: **it stays.**
 
 The reasoning, on record 2026-08-05: many hosts still run 8.0; **WordPress core itself
 requires only PHP 7.4** — measured, not assumed — as do WooCommerce 11.0.0 and Contact
-Form 7 6.1.6; and the plugin will not force users onto a PHP upgrade for the sake of
-one plugin among the many they run. Supporting a runtime the vendor no longer patches
-is a *distribution* decision, not a correctness one, and it is the maintainer's to make.
+Form 7 6.1.6. Supporting a runtime the vendor no longer patches is a *distribution*
+decision, not a correctness one, and it is the maintainer's to make.
+
+**Rationale corrected 2026-08-06.** The original entry also said the plugin "will not force
+users onto a PHP upgrade for the sake of one plugin among the many they run". That is not
+the maintainer's position and it was inferred, not stated. The actual position: `Requires
+PHP` is **enforcement, not advice** — wp.org and core refuse to install or auto-update
+below it, so it tells the user why and points them at their host, and maintainers *should*
+use it to signal that an unsupported stack is not something to keep supporting. The floor
+stays 8.0 for now on timing, **not** on reluctance to push.
+
+This matters because the two rationales diverge on the *next* decision, not this one: the
+withdrawn version would never raise the floor, the real one raises it when the trigger
+fires. Trigger and measurements: D7b and U89. **Next scheduled check: 1 January 2027.**
 
 **Do not re-report "your floor is EOL" every sweep.** Report it once per change of
 circumstance — WordPress core raising its own floor above ours, a dependency dropping

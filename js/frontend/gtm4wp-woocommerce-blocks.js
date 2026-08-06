@@ -151,7 +151,7 @@ function gtm4wp_blocks_bind_crosssell_clicks( get_items ) {
 		}
 
 		const link = target.closest(
-			'.wp-block-woocommerce-cart-cross-sells-block a[href], .wc-block-cart-cross-sells-product a[href]'
+			'.wp-block-woocommerce-cart-cross-sells-block a[href], .wp-block-cart-cross-sells-product a[href]'
 		);
 		if ( ! link ) {
 			return;

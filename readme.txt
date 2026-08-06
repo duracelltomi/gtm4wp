@@ -4,8 +4,8 @@ Donate link: https://gtm4wp.com/
 Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 6.3
 Requires PHP: 8.0
-Tested up to: 6.9.4
-Stable tag: 1.22.4
+Tested up to: 7.1
+Stable tag: 1.22.5
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -264,7 +264,7 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 **Architecture & requirements**
 
 * Changed: complete object-oriented rewrite. Every feature is now a module that third-party plugins can extend through the `gtm4wp_register_modules` action. All public template functions (`gtm4wp_the_gtm_tag()` etc.), filter/action names, wp-config constants and the `gtm4wp-options` storage key are unchanged, so existing integrations keep working.
-* Changed: minimum requirements raised to PHP 8.0 and WordPress 6.3.
+* Changed: minimum requirements raised to PHP 8.0 and WordPress 6.3. Supported up to WordPress 7.1.
 * Updated: frontend scripts now load with the `defer` strategy where possible.
 
 **Settings screen**

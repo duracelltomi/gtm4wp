@@ -184,7 +184,12 @@ final class WooCommerceModule extends AbstractModule {
 		add_filter( 'woocommerce_cart_item_remove_link', array( $list_tracking, 'cart_item_remove_link_filter' ) );
 		add_action( 'woocommerce_cart_item_restored', array( $list_tracking, 'cart_item_restored' ) );
 
-		add_filter( 'woocommerce_related_products_args', array( $list_tracking, 'add_related_to_loop' ) );
+		// Only _columns: `woocommerce_related_products_args` does not exist in any
+		// WooCommerce release inside our supported range (checked 5.0.0, 8.0.0,
+		// 10.6.1, 11.0.0), so registering on it never fired. The modern spelling
+		// is `woocommerce_output_related_products_args`, but it is absent in 5.0
+		// and would need a version guard for no gain: _columns already fires
+		// before the loop renders, which is when the list name must be set.
 		add_filter( 'woocommerce_related_products_columns', array( $list_tracking, 'add_related_to_loop' ) );
 		add_filter( 'woocommerce_cross_sells_columns', array( $list_tracking, 'add_cross_sell_to_loop' ) );
 		add_filter( 'woocommerce_upsells_columns', array( $list_tracking, 'add_upsells_to_loop' ) );

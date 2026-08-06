@@ -236,7 +236,7 @@ final class ListTracking {
 	}
 
 	/**
-	 * Executed during woocommerce_related_products_args and woocommerce_related_products_columns.
+	 * Executed during woocommerce_related_products_columns.
 	 *
 	 * @param mixed $arg Not used by this hook, returned unchanged.
 	 * @return mixed

@@ -28,6 +28,7 @@ export default function Sidebar( {
 			) }
 		>
 			<SearchControl
+				__next40pxDefaultSize
 				__nextHasNoMarginBottom
 				label={ __(
 					'Search settings',

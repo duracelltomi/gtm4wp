@@ -367,6 +367,50 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		] );
 	} );
 
+	// UC-3 guard. The test above wraps the link in the cross-sells *container*
+	// block, so it passes through the first selector and can never fail when the
+	// per-product selector is wrong - which it was: we shipped
+	// `.wc-block-cart-cross-sells-product`, a class no WooCommerce release emits
+	// (checked 8.0.0 / 10.6.1 / 11.0.0; all emit `wp-block-...`). This case omits
+	// the container so ONLY the per-product selector can match, which pins the
+	// upstream class name rather than our own spelling of it.
+	it( 'fires select_item for a cross-sell link matched by the per-product class alone', () => {
+		mockCartData = {
+			items: [],
+			totals: { currency_code: 'EUR' },
+			crossSells: [
+				{
+					id: 11,
+					permalink: 'https://shop/p11',
+					extensions: { gtm4wp: { item: { item_id: 11, price: 7 } } },
+				},
+			],
+		};
+		const subscriber = loadTracker();
+		subscriber();
+
+		// No `.wp-block-woocommerce-cart-cross-sells-block` ancestor on purpose.
+		document.body.innerHTML =
+			'<div class="wp-block-cart-cross-sells-product">' +
+			'<a href="https://shop/p11">Buy</a></div>';
+		document
+			.querySelector( 'a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = window.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'select_item'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ] ).toEqual( [
+			expect.objectContaining( {
+				item_id: 11,
+				item_list_name: 'Cross-Sells',
+			} ),
+		] );
+	} );
+
 	it( 'does not read the cart until getCartData has finished resolving', () => {
 		const subscriber = loadTracker();
 		subscriber(); // baseline: empty cart, resolution finished

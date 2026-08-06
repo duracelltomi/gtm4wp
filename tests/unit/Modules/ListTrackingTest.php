@@ -676,9 +676,9 @@ final class ListTrackingTest extends TestCase {
 
 	/**
 	 * The three filter-position setters must label the loop AND return their
-	 * argument untouched: they run on woocommerce_related_products_args /
-	 * _columns / woocommerce_cross_sells_columns / woocommerce_upsells_columns,
-	 * where swallowing the value would change the rendered column count.
+	 * argument untouched: they run on woocommerce_related_products_columns /
+	 * woocommerce_cross_sells_columns / woocommerce_upsells_columns, where
+	 * swallowing the value would change the rendered column count.
 	 *
 	 * @param string $method   The ListTracking method to call.
 	 * @param string $expected The list name it must set.
