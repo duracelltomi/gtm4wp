@@ -63,8 +63,39 @@ const MODULES = [
 	},
 ];
 
+// A third module, the only tabbed one, so the URL tests have a tab to point at
+// while the modules the save/dirty tests drive stay single-group and flat.
+const TABBED_MODULE = {
+	id: 'page-variables',
+	title: 'Page variables',
+	available: true,
+	intro: '',
+	groups: [
+		{ id: 'post', label: 'Post data' },
+		{ id: 'visitor', label: 'Visitor data' },
+	],
+	fields: [
+		{
+			key: 'include-posttype',
+			type: 'checkbox',
+			label: 'Post type',
+			group: 'post',
+			description: '',
+			value: true,
+		},
+		{
+			key: 'include-visitor-ip-proxies',
+			type: 'text',
+			label: 'Trusted proxy addresses',
+			group: 'visitor',
+			description: '',
+			value: '',
+		},
+	],
+};
+
 const SETTINGS = {
-	modules: MODULES,
+	modules: [ ...MODULES, TABBED_MODULE ],
 	restPath: '/gtm4wp/v2/settings',
 	exportPath: '/gtm4wp/v2/export',
 	importPath: '/gtm4wp/v2/import',
@@ -87,6 +118,13 @@ function editContainerId( next ) {
 
 beforeEach( () => {
 	apiFetch.mockReset();
+} );
+
+afterEach( () => {
+	// The app writes its position into the location on every render, and the
+	// location is shared process-wide: without this reset one test would decide
+	// where the next one opens (TS-7/TS-8).
+	window.history.replaceState( null, '', '/' );
 } );
 
 describe( 'App dirty tracking', () => {
@@ -301,15 +339,9 @@ describe( 'App deep linking', () => {
 	 * @param {string} query Query string to put on the location.
 	 */
 	function renderWithQuery( query ) {
-		window.history.replaceState( {}, '', query );
+		window.history.replaceState( null, '', query );
 		render( <App settings={ DEEP_LINK_SETTINGS } /> );
 	}
-
-	afterEach( () => {
-		// The location is shared process-wide; leaving a query behind would let
-		// one deep-link test decide what the next file sees (TS-7).
-		window.history.replaceState( {}, '', '/' );
-	} );
 
 	it( 'opens the module holding the linked option, not the first one', () => {
 		renderWithQuery( '?page=gtm4wp-settings&gtm4wp-focus=wc-enabled' );
@@ -348,6 +380,90 @@ describe( 'App deep linking', () => {
 
 		expect( screen.getByDisplayValue( 'dataLayer' ) ).toBeInTheDocument();
 		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 0 );
+	} );
+} );
+
+describe( 'App bookmarkable position', () => {
+	it( 'names the open module in the fragment', () => {
+		renderApp();
+
+		expect( window.location.hash ).toBe( '#container' );
+	} );
+
+	it( 'names the open tab too, once there is one', () => {
+		renderApp();
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Page variables' } )
+		);
+
+		expect( window.location.hash ).toBe( '#page-variables/post' );
+
+		fireEvent.click( screen.getByRole( 'tab', { name: /Visitor data/ } ) );
+
+		expect( window.location.hash ).toBe( '#page-variables/visitor' );
+	} );
+
+	it( 'opens where the fragment points', () => {
+		// The other half of the round trip: what the app wrote, it can read.
+		window.history.replaceState( null, '', '#page-variables/visitor' );
+		renderApp();
+
+		expect(
+			screen.getByRole( 'heading', { name: 'Page variables' } )
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'tab', { name: /Visitor data/ } )
+		).toHaveAttribute( 'aria-selected', 'true' );
+	} );
+
+	it( 'opens the module on its first tab when the fragment names a tab that is gone', () => {
+		window.history.replaceState( null, '', '#page-variables/removed' );
+		renderApp();
+
+		expect(
+			screen.getByRole( 'tab', { name: /Post data/ } )
+		).toHaveAttribute( 'aria-selected', 'true' );
+	} );
+
+	it( 'opens normally when the fragment names a module that is gone', () => {
+		window.history.replaceState( null, '', '#removed-module/post' );
+		renderApp();
+
+		expect(
+			screen.getByRole( 'heading', { name: 'Container' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'replaces the URL rather than stacking history entries', () => {
+		// The decision this pins: back keeps meaning "leave this screen". With
+		// pushState, wandering the tabs would bury the page the visitor came
+		// from under one entry per click.
+		window.history.replaceState( null, '', '/' );
+		const before = window.history.length;
+
+		renderApp();
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Page variables' } )
+		);
+		fireEvent.click( screen.getByRole( 'tab', { name: /Visitor data/ } ) );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'WooCommerce' } )
+		);
+
+		expect( window.history.length ).toBe( before );
+	} );
+
+	it( 'leaves the query string alone', () => {
+		// Only the fragment is ours; `?page=…` is what got WordPress to render
+		// this screen in the first place.
+		window.history.replaceState( null, '', '?page=gtm4wp-settings' );
+		renderApp();
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Page variables' } )
+		);
+
+		expect( window.location.search ).toBe( '?page=gtm4wp-settings' );
+		expect( window.location.hash ).toBe( '#page-variables/post' );
 	} );
 } );
 

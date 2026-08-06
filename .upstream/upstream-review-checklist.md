@@ -330,7 +330,7 @@ No versions, no changelogs, no feeds. Verified by re-checking the recorded **cla
 | U74 | npm devDeps + the hand-maintained `overrides` block (11 transitive pins, count measured at `1daeddf`) | `package.json` | `npm outdated --json` (**exits 1 when anything is outdated**), `npm audit` | — | loud | every-run | [x] 2026-08-05 (S1) `outdated` only → D7; **`audit` not run** |
 | U75 | `@wordpress/scripts` internal config shape (webpack `defaultConfig` spread; jest `hasBabelConfig()` avoidance) | `webpack.config.js`, `jest.config.js` | wp-scripts releases | — | loud | quarterly | [ ] |
 | U76 | **`@wordpress/components` `__next*` opt-in props** — unpinned runtime external, breaks on the *user's* WP update, test stand-in cannot catch it (UC-3, UC-7) | `js/admin/components/*.js`; stand-in `js/admin/test-support/wp-components.js` | Gutenberg releases | U82 | silent-wrong | on-WP-release | [ ] |
-| U94 | **`@wordpress/components` `TabPanel` `initialTabName`** — the settings-screen deep link (`?gtm4wp-focus=<option key>`) rides entirely on this one prop, and `TabPanel` is the control Gutenberg's newer `Tabs` is meant to replace | `js/admin/components/ModulePanel.js`; stand-in `js/admin/test-support/wp-components.js` | Gutenberg releases | U82, U86 | silent-wrong | on-WP-release | [ ] |
+| U94 | **`@wordpress/components` `TabPanel` — `initialTabName` + `onSelect`** — the settings-screen deep link (`?gtm4wp-focus=`) rides on the first and the bookmarkable `#module/tab` URL on the second, and `TabPanel` is the control Gutenberg's newer `Tabs` is meant to replace | `js/admin/components/ModulePanel.js`; stand-in `js/admin/test-support/wp-components.js` | Gutenberg releases | U82, U86 | silent-wrong | on-WP-release | [ ] |
 | U77 | Build-asset declared handles (`wp-components`, `wp-element`, `wp-data`, `wp-api-fetch`, `wp-i18n`, `react-jsx-runtime`) | `build/*.asset.php` | core script handles | U78 | loud | on-WP-release | [ ] |
 | U78 | Patchwork redefining PHP internals `headers_sent`, `setcookie` | `patchwork.json` | Patchwork releases | — | loud | quarterly | [ ] |
 | U79 | Release packaging allow-list `DIST_FILES` — a new required top-level dir not listed ships broken | `tools/build-release.js` | grep vs repo tree | — | silent-missing | every-run | [ ] |
@@ -465,20 +465,26 @@ unambiguous — *"Passing `__next40pxDefaultSize` is ignored at runtime."*
 - **Retire condition:** delete them in the same change that raises the WP floor past 7.1,
   never before, and never as a "dead code" cleanup.
 
-### U94 — `TabPanel initialTabName`
+### U94 — `TabPanel` `initialTabName` + `onSelect`
 
 - **We depend on:** `TabPanel` still selecting the named tab at mount when handed
-  `initialTabName`. `ModulePanel` passes it the group a deep link resolved to.
-- **Claim:** the prop is still accepted and still selects that tab on the WP versions
+  `initialTabName` (`ModulePanel` passes it the group the URL resolved to), and still
+  calling `onSelect` with the tab name when the visitor switches tab (which is the only
+  way the app learns where it is, and therefore what to put in the location fragment).
+- **Claim:** both props are still accepted and still behave that way on the WP versions
   we declare (6.3 through the current release).
-- **Failure:** `silent-wrong`, and quietly so — the panel opens on its first tab, which
-  is exactly where the link used to land before the feature existed. Nothing errors and
-  the setting is still reachable, so nobody reports it.
-- **Would a test catch it?** **No.** `js/admin/test-support/wp-components.js` honours the
-  prop deliberately (UC-3 — a stand-in that swallowed it would make the suite green
-  *because* the coupling is untested), and two tests fail if that is undone. But the
-  stand-in is our code: it pins *our* end of the contract, never upstream's. Only a run
-  against a real `wp-components` answers this row.
+- **Failure:** `silent-wrong`, and quietly so. Lose `initialTabName` and the panel opens
+  on its first tab — exactly where a link used to land before the feature existed. Lose
+  `onSelect` and the URL simply stops following the visitor. Nothing errors, every
+  setting is still reachable, so nobody reports either one.
+- **Unverified either way:** whether the real control fires `onSelect` once on mount. The
+  app is written to be correct under both, and the stand-in takes the harsher branch
+  (it does fire), so the untested half is the *benign* one.
+- **Would a test catch it?** **No.** `js/admin/test-support/wp-components.js` honours both
+  props deliberately (UC-3 — a stand-in that swallowed them would make the suite green
+  *because* the coupling is untested); undoing either fails tests. But the stand-in is our
+  code: it pins *our* end of the contract, never upstream's. Only a run against a real
+  `wp-components` answers this row.
 - **The forward risk is `TabPanel` itself, not the prop.** Gutenberg's `Tabs` is its
   intended replacement. Watch for `TabPanel` picking up a deprecation notice (U86); the
   migration is a separate change and cannot happen while the floor is 6.3, which has no

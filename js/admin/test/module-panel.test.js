@@ -18,9 +18,15 @@ function field( key, group, label = key ) {
 
 function renderPanel(
 	module,
-	{ values = {}, errors = {}, focus = null } = {}
+	{
+		values = {},
+		errors = {},
+		activeGroupId = null,
+		focusFieldKey = null,
+	} = {}
 ) {
 	const onChange = jest.fn();
+	const onGroupSelect = jest.fn();
 
 	render(
 		<ModulePanel
@@ -33,12 +39,14 @@ function renderPanel(
 			} }
 			values={ values }
 			errors={ errors }
-			focus={ focus }
+			activeGroupId={ activeGroupId }
+			focusFieldKey={ focusFieldKey }
+			onGroupSelect={ onGroupSelect }
 			onChange={ onChange }
 		/>
 	);
 
-	return { onChange };
+	return { onChange, onGroupSelect };
 }
 
 describe( 'ModulePanel availability', () => {
@@ -188,11 +196,12 @@ describe( 'ModulePanel deep linking', () => {
 		],
 	};
 
-	it( 'opens the tab holding the linked field instead of the first one', () => {
+	it( 'opens the requested tab instead of the first one', () => {
 		// Without this the notice lands the admin on tab one and the setting it
 		// was talking about is behind a tab they have to guess.
 		renderPanel( TWO_GROUPS, {
-			focus: { moduleId: 'm', groupId: 'two', fieldKey: 'b' },
+			activeGroupId: 'two',
+			focusFieldKey: 'b',
 		} );
 
 		expect( screen.getByRole( 'tab', { name: /Two/ } ) ).toHaveAttribute(
@@ -204,7 +213,8 @@ describe( 'ModulePanel deep linking', () => {
 
 	it( 'marks the linked field and hands it the keyboard focus', () => {
 		renderPanel( TWO_GROUPS, {
-			focus: { moduleId: 'm', groupId: 'two', fieldKey: 'b' },
+			activeGroupId: 'two',
+			focusFieldKey: 'b',
 		} );
 
 		const control = screen.getByRole( 'textbox' );
@@ -219,7 +229,8 @@ describe( 'ModulePanel deep linking', () => {
 		// tabs is the visitor steering; yanking the caret back into the field
 		// each time they return would fight them.
 		renderPanel( TWO_GROUPS, {
-			focus: { moduleId: 'm', groupId: 'two', fieldKey: 'b' },
+			activeGroupId: 'two',
+			focusFieldKey: 'b',
 		} );
 
 		fireEvent.click( screen.getByRole( 'tab', { name: /One/ } ) );
@@ -241,7 +252,7 @@ describe( 'ModulePanel deep linking', () => {
 					field( 'b', 'one', 'Second field' ),
 				],
 			},
-			{ focus: { moduleId: 'm', groupId: 'one', fieldKey: 'b' } }
+			{ activeGroupId: 'one', focusFieldKey: 'b' }
 		);
 
 		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 1 );
@@ -250,7 +261,7 @@ describe( 'ModulePanel deep linking', () => {
 		).toHaveClass( 'is-focused' );
 	} );
 
-	it( 'falls back to the first tab when the linked group holds no fields', () => {
+	it( 'falls back to the first tab when the requested group holds no fields', () => {
 		// An empty group is dropped from the tab bar, so pinning the tab to it
 		// would leave the panel with nothing selected.
 		renderPanel(
@@ -262,7 +273,7 @@ describe( 'ModulePanel deep linking', () => {
 				],
 				fields: [ field( 'a', 'one' ), field( 'b', 'two' ) ],
 			},
-			{ focus: { moduleId: 'm', groupId: 'empty', fieldKey: 'gone' } }
+			{ activeGroupId: 'empty', focusFieldKey: 'gone' }
 		);
 
 		expect( screen.getByRole( 'tab', { name: /One/ } ) ).toHaveAttribute(
@@ -279,6 +290,36 @@ describe( 'ModulePanel deep linking', () => {
 			'true'
 		);
 		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 0 );
+	} );
+} );
+
+describe( 'ModulePanel tab reporting', () => {
+	// The panel is the only thing that knows which tab is showing, so if it does
+	// not report a switch upwards the URL cannot follow the visitor.
+	it( 'reports the tab the visitor switches to', () => {
+		const { onGroupSelect } = renderPanel( {
+			groups: [
+				{ id: 'one', label: 'One' },
+				{ id: 'two', label: 'Two' },
+			],
+			fields: [ field( 'a', 'one' ), field( 'b', 'two' ) ],
+		} );
+
+		onGroupSelect.mockClear();
+		fireEvent.click( screen.getByRole( 'tab', { name: /Two/ } ) );
+
+		expect( onGroupSelect ).toHaveBeenCalledWith( 'two' );
+	} );
+
+	it( 'reports nothing for a module rendered without a tab bar', () => {
+		// A single populated group renders flat, so there is no tab to name and
+		// the URL must not claim one.
+		const { onGroupSelect } = renderPanel( {
+			groups: [ { id: 'only', label: 'Only' } ],
+			fields: [ field( 'a', 'only' ) ],
+		} );
+
+		expect( onGroupSelect ).not.toHaveBeenCalled();
 	} );
 } );
 

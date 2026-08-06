@@ -7,11 +7,16 @@ import {
 	buildValueMap,
 	changedValues,
 	coerceValue,
+	defaultGroupId,
 	exportFilename,
 	focusTarget,
+	groupsWithFields,
 	isCellLocked,
 	isFieldDisabled,
+	locationHash,
+	locationTarget,
 	moduleMatchesSearch,
+	openingPosition,
 	stripTags,
 } from '../utils';
 
@@ -341,6 +346,211 @@ describe( 'focusTarget', () => {
 				'gtm4wp-focus'
 			)
 		).toBeNull();
+	} );
+} );
+
+describe( 'groupsWithFields / defaultGroupId', () => {
+	const TABBED = {
+		id: 'page-variables',
+		groups: [
+			{ id: 'post', label: 'Post data' },
+			{ id: 'empty', label: 'Empty' },
+			{ id: 'visitor', label: 'Visitor data' },
+		],
+		fields: [
+			{ key: 'a', group: 'post' },
+			{ key: 'b', group: 'visitor' },
+		],
+	};
+
+	it( 'drops declared groups that hold no fields, keeping declared order', () => {
+		expect( groupsWithFields( TABBED ).map( ( g ) => g.id ) ).toEqual( [
+			'post',
+			'visitor',
+		] );
+	} );
+
+	it( 'attaches each group its own fields', () => {
+		expect( groupsWithFields( TABBED )[ 1 ].fields ).toEqual( [
+			{ key: 'b', group: 'visitor' },
+		] );
+	} );
+
+	it( 'opens a tabbed module on its first populated group', () => {
+		expect( defaultGroupId( TABBED ) ).toBe( 'post' );
+	} );
+
+	it( 'names no group for a module that renders without a tab bar', () => {
+		// One populated group means the panel renders flat, so claiming a tab
+		// in the URL would promise something the screen does not have.
+		expect(
+			defaultGroupId( {
+				groups: [ { id: 'only' }, { id: 'empty' } ],
+				fields: [ { key: 'a', group: 'only' } ],
+			} )
+		).toBeNull();
+	} );
+
+	it( 'survives a module with no groups or fields at all', () => {
+		expect( groupsWithFields( {} ) ).toEqual( [] );
+		expect( groupsWithFields( undefined ) ).toEqual( [] );
+		expect( defaultGroupId( {} ) ).toBeNull();
+	} );
+} );
+
+describe( 'locationHash / locationTarget', () => {
+	const MODULES = [
+		{
+			id: 'container',
+			groups: [ { id: 'general' } ],
+			fields: [ { key: 'gtm-containers', group: 'general' } ],
+		},
+		{
+			id: 'page-variables',
+			groups: [ { id: 'post' }, { id: 'visitor' }, { id: 'empty' } ],
+			fields: [
+				{ key: 'a', group: 'post' },
+				{ key: 'b', group: 'visitor' },
+			],
+		},
+	];
+
+	it( 'writes module and tab into the fragment', () => {
+		expect( locationHash( 'page-variables', 'visitor' ) ).toBe(
+			'#page-variables/visitor'
+		);
+	} );
+
+	it( 'writes the module alone when there is no tab', () => {
+		expect( locationHash( 'container', null ) ).toBe( '#container' );
+	} );
+
+	it( 'writes nothing when there is no module to point at', () => {
+		expect( locationHash( '', 'visitor' ) ).toBe( '' );
+	} );
+
+	it( 'round-trips a written fragment back to the same position', () => {
+		// The property that makes a bookmark worth anything.
+		expect(
+			locationTarget(
+				MODULES,
+				locationHash( 'page-variables', 'visitor' )
+			)
+		).toEqual( { moduleId: 'page-variables', groupId: 'visitor' } );
+	} );
+
+	it( 'returns null for no fragment and for a module that is gone', () => {
+		expect( locationTarget( MODULES, '' ) ).toBeNull();
+		expect( locationTarget( MODULES, '#' ) ).toBeNull();
+		expect( locationTarget( MODULES, '#removed-module/post' ) ).toBeNull();
+	} );
+
+	it( 'keeps the module when only the tab is stale', () => {
+		// Half the bookmark is still good information, so an old tab id opens
+		// the module on its own first tab rather than throwing the link away.
+		expect( locationTarget( MODULES, '#page-variables/empty' ) ).toEqual( {
+			moduleId: 'page-variables',
+			groupId: 'post',
+		} );
+		expect( locationTarget( MODULES, '#page-variables' ) ).toEqual( {
+			moduleId: 'page-variables',
+			groupId: 'post',
+		} );
+	} );
+
+	it( 'names no tab for a module rendered without a tab bar', () => {
+		expect( locationTarget( MODULES, '#container/general' ) ).toEqual( {
+			moduleId: 'container',
+			groupId: null,
+		} );
+	} );
+
+	it( 'never returns a value taken from the fragment', () => {
+		// Same property as focusTarget: ids are matched against the schema and
+		// the schema's own values come back, so a crafted URL selects a real
+		// position or nothing.
+		expect(
+			locationTarget( MODULES, '#<script>/"onerror=alert(1)' )
+		).toBeNull();
+	} );
+} );
+
+describe( 'openingPosition', () => {
+	const MODULES = [
+		{
+			id: 'container',
+			groups: [ { id: 'general' } ],
+			fields: [ { key: 'gtm-containers', group: 'general' } ],
+		},
+		{
+			id: 'page-variables',
+			groups: [ { id: 'post' }, { id: 'visitor' } ],
+			fields: [
+				{ key: 'a', group: 'post' },
+				{ key: 'include-visitor-ip-proxies', group: 'visitor' },
+			],
+		},
+	];
+
+	const at = ( search, hash ) =>
+		openingPosition( MODULES, { search, hash }, 'gtm4wp-focus' );
+
+	it( 'opens the first module when the URL says nothing', () => {
+		expect( at( '', '' ) ).toEqual( {
+			moduleId: 'container',
+			groupId: null,
+			focusFieldKey: null,
+		} );
+	} );
+
+	it( 'follows a bookmark', () => {
+		expect( at( '', '#page-variables/visitor' ) ).toEqual( {
+			moduleId: 'page-variables',
+			groupId: 'visitor',
+			focusFieldKey: null,
+		} );
+	} );
+
+	it( 'follows a notice deep link, highlight and all', () => {
+		expect( at( '?gtm4wp-focus=include-visitor-ip-proxies', '' ) ).toEqual(
+			{
+				moduleId: 'page-variables',
+				groupId: 'visitor',
+				focusFieldKey: 'include-visitor-ip-proxies',
+			}
+		);
+	} );
+
+	it( 'lets the notice win over a stale bookmark', () => {
+		// The notice was clicked just now and says something about the site's
+		// current state; the fragment only says where someone stood last time.
+		expect(
+			at( '?gtm4wp-focus=include-visitor-ip-proxies', '#container' )
+		).toEqual( {
+			moduleId: 'page-variables',
+			groupId: 'visitor',
+			focusFieldKey: 'include-visitor-ip-proxies',
+		} );
+	} );
+
+	it( 'falls back to the bookmark when the deep link names an unknown option', () => {
+		expect(
+			at( '?gtm4wp-focus=removed', '#page-variables/visitor' )
+		).toEqual( {
+			moduleId: 'page-variables',
+			groupId: 'visitor',
+			focusFieldKey: null,
+		} );
+	} );
+
+	it( 'survives an install with no modules', () => {
+		expect( openingPosition( [], { search: '', hash: '' }, 'x' ) ).toEqual(
+			{
+				moduleId: '',
+				groupId: null,
+				focusFieldKey: null,
+			}
+		);
 	} );
 } );
 

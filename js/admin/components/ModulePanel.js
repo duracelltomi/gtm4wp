@@ -8,6 +8,7 @@ import { RawHTML, useCallback, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 import FieldControl from './FieldControl';
+import { groupsWithFields } from '../utils';
 
 function GroupFields( {
 	fields,
@@ -52,7 +53,9 @@ export default function ModulePanel( {
 	module,
 	values,
 	errors,
-	focus,
+	activeGroupId,
+	focusFieldKey,
+	onGroupSelect,
 	onChange,
 } ) {
 	// Brings the deep-linked field into view and hands it the keyboard focus, so
@@ -104,32 +107,20 @@ export default function ModulePanel( {
 		);
 	}
 
-	const groupsWithFields = module.groups
-		.map( ( group ) => ( {
-			...group,
-			fields: module.fields.filter(
-				( field ) => field.group === group.id
-			),
-		} ) )
-		.filter( ( group ) => group.fields.length > 0 );
+	const groups = groupsWithFields( module );
+	const hasTabs = groups.length > 1;
 
-	const hasTabs = groupsWithFields.length > 1;
-
-	// Only honour a deep link that names a group still holding fields; an
-	// initialTabName TabPanel cannot match would leave it with nothing selected.
-	const focusFieldKey = focus ? focus.fieldKey : undefined;
-	const initialTabName = groupsWithFields.some(
-		( group ) => focus && group.id === focus.groupId
+	// Only honour a requested tab that still holds fields; an initialTabName
+	// TabPanel cannot match would leave it with nothing selected.
+	const initialTabName = groups.some(
+		( group ) => group.id === activeGroupId
 	)
-		? focus.groupId
+		? activeGroupId
 		: undefined;
 
 	// Single group: render its fields flat. No matching group at all: fall
 	// back to every field so nothing is silently dropped.
-	const flatFields =
-		1 === groupsWithFields.length
-			? groupsWithFields[ 0 ].fields
-			: module.fields;
+	const flatFields = 1 === groups.length ? groups[ 0 ].fields : module.fields;
 
 	return (
 		<div className="gtm4wp-panel">
@@ -149,7 +140,8 @@ export default function ModulePanel( {
 					key={ module.id }
 					className="gtm4wp-tabs"
 					initialTabName={ initialTabName }
-					tabs={ groupsWithFields.map( ( group ) => {
+					onSelect={ onGroupSelect }
+					tabs={ groups.map( ( group ) => {
 						// Flag groups holding a rejected field so a hidden tab's
 						// error stays visible (dot) and announced (SR text).
 						const hasError = group.fields.some( ( field ) =>
@@ -176,7 +168,7 @@ export default function ModulePanel( {
 					} ) }
 				>
 					{ ( tab ) => {
-						const group = groupsWithFields.find(
+						const group = groups.find(
 							( candidate ) => candidate.id === tab.name
 						);
 

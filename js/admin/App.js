@@ -5,24 +5,32 @@
 
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Snackbar } from '@wordpress/components';
-import { useMemo, useState } from '@wordpress/element';
+import { useEffect, useMemo, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 import ImportExport from './components/ImportExport';
 import ModulePanel from './components/ModulePanel';
 import Sidebar from './components/Sidebar';
-import { buildValueMap, changedValues, focusTarget } from './utils';
+import {
+	buildValueMap,
+	changedValues,
+	defaultGroupId,
+	locationHash,
+	openingPosition,
+} from './utils';
 
 export default function App( { settings } ) {
 	const modules = settings.modules;
 
-	// Deep link (`?gtm4wp-focus=<option key>`, printed by SettingsPage::url()):
-	// resolved once at mount into the module, group tab and field it names, so a
-	// link from an admin notice lands on the control instead of on the screen.
-	// Cleared as soon as the visitor navigates themselves, otherwise coming back
-	// to that module would keep re-opening the linked tab.
-	const [ focus, setFocus ] = useState( () =>
-		focusTarget( modules, window.location.search, settings.focusArg )
+	// Where on the screen we are: which module, which tab of it, and whether a
+	// deep link's highlight is still live. One object rather than three pieces
+	// of state because they always move together - every navigation decides all
+	// three - and because it is exactly what the location fragment encodes.
+	//
+	// Resolved once at mount: a `?gtm4wp-focus=<option key>` link from an admin
+	// notice first, then a `#module/tab` bookmark, then the first module.
+	const [ position, setPosition ] = useState( () =>
+		openingPosition( modules, window.location, settings.focusArg )
 	);
 
 	const [ initialValues, setInitialValues ] = useState( () =>
@@ -30,20 +38,28 @@ export default function App( { settings } ) {
 	);
 	const [ values, setValues ] = useState( initialValues );
 	const [ errors, setErrors ] = useState( {} );
-	const [ activeModuleId, setActiveModuleId ] = useState( () => {
-		if ( focus ) {
-			return focus.moduleId;
-		}
-
-		return modules.length > 0 ? modules[ 0 ].id : '';
-	} );
 	const [ search, setSearch ] = useState( '' );
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ snackbar, setSnackbar ] = useState( null );
 
 	const activeModule = modules.find(
-		( module ) => module.id === activeModuleId
+		( module ) => module.id === position.moduleId
 	);
+
+	// Keep the address bar pointing at where we are, so the URL can be copied or
+	// bookmarked at any moment. replaceState, never pushState: the back button
+	// keeps meaning "leave this screen" rather than silently becoming a tab
+	// stepper, and nothing here needs a popstate handler to stay consistent.
+	//
+	// Only the fragment is rewritten, so `?page=…` (and the `gtm4wp-focus`
+	// argument that may have brought us here) is left exactly as it was.
+	useEffect( () => {
+		const hash = locationHash( position.moduleId, position.groupId );
+
+		if ( '' !== hash && hash !== window.location.hash ) {
+			window.history.replaceState( null, '', hash );
+		}
+	}, [ position.moduleId, position.groupId ] );
 
 	const changed = useMemo(
 		() => changedValues( initialValues, values ),
@@ -70,9 +86,22 @@ export default function App( { settings } ) {
 		setValues( ( previous ) => ( { ...previous, [ key ]: next } ) );
 	};
 
+	// Picking a module opens it on its own first tab and drops any deep-link
+	// highlight: from here on the visitor is steering.
 	const onModuleSelect = ( moduleId ) => {
-		setFocus( null );
-		setActiveModuleId( moduleId );
+		setPosition( {
+			moduleId,
+			groupId: defaultGroupId(
+				modules.find( ( module ) => module.id === moduleId )
+			),
+			focusFieldKey: null,
+		} );
+	};
+
+	// Reported by the tab bar. The highlight is deliberately kept: the linked
+	// field is still what the visitor came for, they have just looked elsewhere.
+	const onGroupSelect = ( groupId ) => {
+		setPosition( ( previous ) => ( { ...previous, groupId } ) );
 	};
 
 	// After an import the server returns the freshly stored, sanitized values;
@@ -165,7 +194,7 @@ export default function App( { settings } ) {
 			<div className="gtm4wp-app__body">
 				<Sidebar
 					modules={ modules }
-					activeModuleId={ activeModuleId }
+					activeModuleId={ position.moduleId }
 					onSelect={ onModuleSelect }
 					search={ search }
 					onSearch={ setSearch }
@@ -176,11 +205,9 @@ export default function App( { settings } ) {
 						module={ activeModule }
 						values={ values }
 						errors={ errors }
-						focus={
-							focus && focus.moduleId === activeModule.id
-								? focus
-								: null
-						}
+						activeGroupId={ position.groupId }
+						focusFieldKey={ position.focusFieldKey }
+						onGroupSelect={ onGroupSelect }
 						onChange={ onFieldChange }
 					/>
 				) }

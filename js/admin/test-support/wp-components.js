@@ -22,7 +22,7 @@
  */
 /* eslint-disable jsdoc/require-param-type, jsdoc/check-param-names */
 
-import { createElement as h, useState } from 'react';
+import { createElement as h, useEffect, useState } from 'react';
 
 /**
  * @param {Object} props                     Component props.
@@ -292,24 +292,55 @@ export function Notice( { children, status } ) {
  * ModulePanel depends on, so the fake keeps the selection in the DOM rather than
  * in state the test cannot see.
  *
- * `initialTabName` is honoured rather than accepted-and-ignored: the deep-link
- * feature rides entirely on it, and a stand-in that swallowed the prop would
- * make the suite green precisely because the coupling is untested (UC-3). As in
- * the real control it applies at mount only. What either does with a name that
- * matches no tab is left untested on purpose - ModulePanel never passes one.
+ * `initialTabName` and `onSelect` are honoured rather than accepted-and-ignored:
+ * the deep link rides on the first and the bookmarkable URL on the second, and a
+ * stand-in that swallowed either would make the suite green precisely because
+ * the coupling is untested (UC-3). As in the real control `initialTabName`
+ * applies at mount only. What either does with a name that matches no tab is
+ * left untested on purpose - ModulePanel never passes one.
+ *
+ * `onSelect` also fires once on mount here. Whether the real control does that
+ * is not something this file can answer, so the stand-in takes the harsher of
+ * the two possibilities: the app has to stay correct when a mount reports the
+ * tab it just opened on - and it is correct either way.
  *
  * @param {Object} props                Component props.
  * @param          props.tabs
  * @param          props.children
  * @param          props.className
  * @param          props.initialTabName
+ * @param          props.onSelect
  * @return {Object} React element.
  */
-export function TabPanel( { tabs = [], children, className, initialTabName } ) {
+export function TabPanel( {
+	tabs = [],
+	children,
+	className,
+	initialTabName,
+	onSelect,
+} ) {
 	const [ selected, setSelected ] = useState(
 		undefined === initialTabName ? tabs[ 0 ]?.name : initialTabName
 	);
 	const active = tabs.find( ( tab ) => tab.name === selected ) || tabs[ 0 ];
+	const activeName = active?.name;
+
+	useEffect( () => {
+		if ( onSelect && activeName ) {
+			onSelect( activeName );
+		}
+		// Mount only, mirroring the real control's initial selection; every
+		// later change is reported from the click handler instead.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [] );
+
+	const select = ( name ) => {
+		setSelected( name );
+
+		if ( onSelect ) {
+			onSelect( name );
+		}
+	};
 
 	return h(
 		'div',
@@ -325,8 +356,8 @@ export function TabPanel( { tabs = [], children, className, initialTabName } ) {
 						key: tab.name,
 						role: 'tab',
 						className: tab.className,
-						'aria-selected': tab.name === active?.name,
-						onClick: () => setSelected( tab.name ),
+						'aria-selected': tab.name === activeName,
+						onClick: () => select( tab.name ),
 					},
 					tab.title
 				)

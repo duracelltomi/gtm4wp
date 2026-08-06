@@ -207,6 +207,155 @@ export function focusTarget( modules, search, queryArg ) {
 }
 
 /**
+ * The groups of a module that actually hold fields, each with its own fields
+ * attached. Groups are declared independently of fields, so a declared group
+ * can end up empty; those are dropped rather than shown as an empty tab.
+ *
+ * Lives here rather than in ModulePanel because the panel is not the only thing
+ * that has to know which tab a module opens on - the URL does too, and two
+ * copies of this arithmetic would disagree the first time either changed.
+ *
+ * @param {Object} module Module description from the bootstrap data.
+ * @return {Array} Groups holding at least one field, in declared order.
+ */
+export function groupsWithFields( module ) {
+	const groups = module && module.groups ? module.groups : [];
+	const fields = module && module.fields ? module.fields : [];
+
+	return groups
+		.map( ( group ) => ( {
+			...group,
+			fields: fields.filter( ( field ) => field.group === group.id ),
+		} ) )
+		.filter( ( group ) => group.fields.length > 0 );
+}
+
+/**
+ * The group a module opens on, or null when it has no tab bar at all: a module
+ * with a single populated group renders its fields flat, so naming that group
+ * in the URL would promise a tab the screen does not have.
+ *
+ * @param {Object} module Module description from the bootstrap data.
+ * @return {?string} Group id, or null.
+ */
+export function defaultGroupId( module ) {
+	const groups = groupsWithFields( module );
+
+	return groups.length > 1 ? groups[ 0 ].id : null;
+}
+
+/**
+ * The location fragment for a position on the screen: `#<module>/<group>`, or
+ * `#<module>` for a module with no tabs.
+ *
+ * A fragment rather than a query argument because this is in-page position, not
+ * a request: it never reaches the server, and it cannot collide with anything
+ * WordPress puts in the query string of its own admin URLs.
+ *
+ * @param {string}  moduleId Active module id.
+ * @param {?string} groupId  Active group id, if the module has tabs.
+ * @return {string} Fragment including the leading `#`, or '' when there is no
+ *                  module to point at.
+ */
+export function locationHash( moduleId, groupId ) {
+	if ( ! moduleId ) {
+		return '';
+	}
+
+	return groupId ? `#${ moduleId }/${ groupId }` : `#${ moduleId }`;
+}
+
+/**
+ * Resolves a `#<module>/<group>` fragment back to a position on the screen.
+ *
+ * Every value returned comes from the schema, never from the fragment, so a
+ * hand-edited URL can only ever name a real module and a real tab or be
+ * rejected outright. A module that no longer exists yields null (open normally);
+ * a group that no longer holds fields falls back to the module's own first tab,
+ * because the module part of the bookmark is still good information.
+ *
+ * @param {Array}  modules Module descriptions from the bootstrap data.
+ * @param {string} hash    Fragment, e.g. `window.location.hash`.
+ * @return {?Object} `{ moduleId, groupId }`, or null.
+ */
+export function locationTarget( modules, hash ) {
+	const path = String( hash ?? '' ).replace( /^#/, '' );
+
+	if ( '' === path ) {
+		return null;
+	}
+
+	const wanted = path.split( '/' );
+	const module = ( modules ?? [] ).find(
+		( candidate ) => candidate.id === wanted[ 0 ]
+	);
+
+	if ( ! module ) {
+		return null;
+	}
+
+	const wantedGroup = wanted[ 1 ];
+	const groups = groupsWithFields( module );
+	const group =
+		groups.length > 1
+			? groups.find( ( candidate ) => candidate.id === wantedGroup )
+			: undefined;
+
+	return {
+		moduleId: module.id,
+		groupId: group ? group.id : defaultGroupId( module ),
+	};
+}
+
+/**
+ * Where the screen opens, in precedence order: a `?gtm4wp-focus=` deep link
+ * from an admin notice, then a `#module/tab` bookmark, then the first module.
+ *
+ * The notice wins because it was clicked deliberately and says something about
+ * the site's current state, whereas a bookmark only says where somebody was
+ * standing last time.
+ *
+ * @param {Array}  modules  Module descriptions from the bootstrap data.
+ * @param {Object} location Location-like object with `search` and `hash`.
+ * @param {string} focusArg Name of the deep-link query argument.
+ * @return {Object} `{ moduleId, groupId, focusFieldKey }`; ids are '' / null
+ *                  when there is nothing to show.
+ */
+export function openingPosition( modules, location, focusArg ) {
+	const list = modules ?? [];
+	const focused = focusTarget( list, location.search, focusArg );
+
+	if ( focused ) {
+		const module = list.find(
+			( candidate ) => candidate.id === focused.moduleId
+		);
+		const groups = groupsWithFields( module );
+		const linked = groups.some( ( group ) => group.id === focused.groupId );
+
+		return {
+			moduleId: focused.moduleId,
+			groupId:
+				linked && groups.length > 1
+					? focused.groupId
+					: defaultGroupId( module ),
+			focusFieldKey: focused.fieldKey,
+		};
+	}
+
+	const bookmarked = locationTarget( list, location.hash );
+
+	if ( bookmarked ) {
+		return { ...bookmarked, focusFieldKey: null };
+	}
+
+	return {
+		moduleId: list.length > 0 ? list[ 0 ].id : '',
+		groupId: list.length > 0 ? defaultGroupId( list[ 0 ] ) : null,
+		focusFieldKey: null,
+	};
+}
+
+/**
  * Whether a module matches a search term: its title or any field label /
  * description contains the term (case insensitive).
  *
