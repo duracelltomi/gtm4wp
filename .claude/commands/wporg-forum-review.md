@@ -201,11 +201,13 @@ edited text goes back through `humanizer` and the voice sample before being pres
 Text written straight into an already-humanized draft is where the AI register returns,
 because the rest of the file having passed once makes it look finished.
 
-Verify concrete claims against the source before writing them — settings labels against
-`master` (what reporters actually run), filter and meta-key names against the code, and
-plugin behavior against the code path rather than the changelog. See the ⚠️ section in the
-skill's step 5. Past runs shipped drafts naming settings that do not exist; each was caught
-only because a human read it first, which is not a control to rely on.
+Verify concrete claims against the source before writing them — settings labels against the
+`1.x` branch (the released line reporters actually run; `master` is the 2.0 rewrite), filter
+and meta-key names against the code, and plugin behavior against the code path rather than
+the changelog. Platform claims about GTM, GA4, consent mode or another plugin are not
+verifiable this way: those come from `.support/product-knowledge.md`, never from memory. See
+the ⚠️ section in the skill's step 5. Past runs shipped drafts naming settings that do not
+exist; each was caught only because a human read it first, which is not a control to rely on.
 
 When presenting a draft, say explicitly which of its claims are **verified** and which are
 **inferred**, so the reviewer knows where to look. Record inferences in the ledger `notes`
