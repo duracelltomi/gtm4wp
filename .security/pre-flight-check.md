@@ -17,7 +17,7 @@ Pay special attention to:
 - **Input sanitization (RI-6):** every `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE`/`$_SERVER` read is `wp_unslash()`'d and sanitized/validated before use.
 - **SQL safety (RI-7):** `$wpdb` queries with input use `$wpdb->prepare()`.
 - **WooCommerce / HPOS (RI-8):** order data via the WC CRUD API, never `get_post_meta()` on orders.
-- **WordPress hygiene (RI-1, RI-5):** `defined( 'ABSPATH' ) || exit;` on every PHP file except the main plugin file; user-facing strings use `__()`/`esc_html__()` with text domain `duracelltomi-google-tag-manager`.
+- **WordPress hygiene (RI-1, RI-5):** `defined( 'ABSPATH' ) || exit;` on every PHP file, the main plugin file included; user-facing strings use `__()`/`esc_html__()` with text domain `duracelltomi-google-tag-manager`.
 - **Globals behind conditional tags (RI-13):** `is_singular()` etc. do not guarantee `$GLOBALS['post']`/`$authordata` is set up — resolve once via the safe accessor (`get_post()`), null-gate the reads, and **omit** the affected dataLayer keys when null (no `''`/`0`/`null` placeholders). Ships a tag-true/global-null regression test (`.testing` TC-14).
 - **Build step (RI-9):** after editing anything under `js/`, run `npm run build` (→ `build/`) and `npm run lint:js` in the same change.
 - **Options (PA-5) & module wiring (PA-6):** read/write options via `Options::get()` + `GTM4WP_OPTION_*` constants with sanitization in the module's `AdminSchema`; register features through the `src/Module/` framework.

@@ -29,6 +29,8 @@
 // requirements notice below can render instead of a fatal error.
 // Do not use PHP 8+ syntax here.
 
+defined( 'ABSPATH' ) || exit;
+
 define( 'GTM4WP_VERSION', '2.0.0-beta2' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GTM4WP_PLUGIN_FILE', __FILE__ );

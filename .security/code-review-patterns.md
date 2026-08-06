@@ -28,7 +28,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-17** — an escape is only valid at the instant of output; any transform that runs *after* it (`preg_replace` replacement expansion, `sprintf`, concatenation into a new context) can put break-out characters back. Ask what happens to the string after the escaper — and, read backwards, what the escaper itself returns on input it dislikes (`esc_url` → `''`, `wp_json_encode` → `false`), because a guard placed *before* it does not cover that (#120).
 
 **Recurring Issues (RI):**
-- **RI-1** — every PHP file starts with `defined( 'ABSPATH' ) || exit;` (except the main plugin file).
+- **RI-1** — every PHP file starts with `defined( 'ABSPATH' ) || exit;` (the main plugin file included).
 - **RI-11** — every value added to the dataLayer is an *exposure* decision, not just an escaping one: does the client need it, and is the lowest actor who can read the page entitled to it? Escaping never answers "should this be here at all?"
 - **RI-5** — every user-facing string uses `__()`/`esc_html__()` with text domain `duracelltomi-google-tag-manager`.
 - **RI-6** — every `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE`/`$_SERVER` read is `wp_unslash()`'d and sanitized/validated before use.
@@ -70,7 +70,9 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 ## Recurring Issues
 
 ### RI-1: Missing `defined( 'ABSPATH' ) || exit;` guard
-Every PHP file except the main plugin entry (`duracelltomi-google-tag-manager-for-wordpress.php`) must start with the ABSPATH guard to prevent direct execution. Check every new PHP file under `src/`, `compat/`, and root.
+Every PHP file — **including** the main plugin entry (`duracelltomi-google-tag-manager-for-wordpress.php`) — must start with the ABSPATH guard to prevent direct execution. Check every new PHP file under `src/`, `compat/`, and root.
+
+The main file carried an exemption until 2026-08-06. It was not reasoned, only inherited, and wordpress.org's plugin review flags it (`missing_direct_file_access_protection` — their tooling exempts `uninstall.php`, which is guarded by `WP_UNINSTALL_PLUGIN`, but not the entry file). The guard is PHP 4 era syntax, so it does not conflict with the requirement that this file stay parseable on outdated PHP.
 
 ### RI-2: Data-layer / inline-`<script>` values must be JSON-encoded with the full hex flag set ⭐
 Any PHP value serialized into the dataLayer or an inline `<script>` must use `wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS )` (plus `JSON_UNESCAPED_UNICODE` where wanted). `JSON_HEX_TAG` alone is **not** enough — the break-out character is often `"` (or `&`, once a downstream `htmlspecialchars_decode` is involved), not `<`/`>`.

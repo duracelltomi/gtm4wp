@@ -197,5 +197,5 @@ See `.claude/skills/woocommerce-extension-developer/SKILL.md` for WooCommerce co
 - Register new features as modules under `src/Modules/` (lean `Module` + admin `AdminSchema`), keeping the defaults-vs-schema consistency unit test green
 - Never use WordPress post functions (`get_post_meta`, etc.) for WooCommerce order data - use the WC CRUD API
 - All user-facing strings must use `__()`/`esc_html__()` with text domain `'duracelltomi-google-tag-manager'`
-- Every PHP file should have a `defined( 'ABSPATH' ) || exit;` guard (except the main plugin file)
+- Every PHP file should have a `defined( 'ABSPATH' ) || exit;` guard, the main plugin file included
 - Script-context output uses `wp_json_encode()` with the hex flags — see **Coding Standards** above and `.security/pre-flight-check.md` (loaded each session)
