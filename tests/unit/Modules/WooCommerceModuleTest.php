@@ -288,4 +288,101 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertNotContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
 		$this->assertArrayNotHasKey( 'gtm4wp-woocommerce-blocks', $result['inline'] );
 	}
+
+	/**
+	 * Sets the page context the enqueue path reads, so the cache-safe cases below are
+	 * not accidentally testing a block Cart/Checkout page.
+	 *
+	 * @return void
+	 */
+	private function stub_ordinary_page(): void {
+		CartCheckoutUtils::$cart_block     = false;
+		CartCheckoutUtils::$checkout_block = false;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+	}
+
+	/**
+	 * Issue #398: the two ends of the cart-fragments delivery channel load TOGETHER.
+	 *
+	 * WooCommerce enqueues wc-cart-fragments only from WC_Widget_Cart::widget(), which
+	 * bails when woocommerce_widget_cart_is_hidden is true (default:
+	 * is_cart() || is_checkout()), and the Mini-Cart block never enqueues it at all. So
+	 * without our own enqueue the customer/cart block silently never arrived on a page
+	 * load. The runtime that reads the fragment and the script that fetches it are
+	 * useless apart, which is why both are asserted in one test.
+	 *
+	 * @return void
+	 */
+	public function test_cache_safe_mode_loads_both_ends_of_the_cart_fragments_channel(): void {
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)
+		);
+
+		$this->assertContains( 'gtm4wp-visitor-data', $result['scripts'], 'The reading end of the channel.' );
+		$this->assertContains( 'wc-cart-fragments', $result['scripts'], 'The delivering end of the channel.' );
+	}
+
+	public function test_cart_content_option_alone_also_loads_the_channel(): void {
+		// The condition is an OR, so the cart-content half needs its own case.
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+					GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+				)
+			)
+		);
+
+		$this->assertContains( 'gtm4wp-visitor-data', $result['scripts'] );
+		$this->assertContains( 'wc-cart-fragments', $result['scripts'] );
+	}
+
+	public function test_cache_safe_mode_off_does_not_load_the_channel(): void {
+		// The block is server-rendered in this configuration, so neither end is needed —
+		// and GTM4WP must not add WooCommerce's cart-refresh request to a store that
+		// would not otherwise make it.
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => false,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)
+		);
+
+		$this->assertNotContains( 'wc-cart-fragments', $result['scripts'] );
+		$this->assertNotContains( 'gtm4wp-visitor-data', $result['scripts'] );
+	}
+
+	public function test_cache_safe_mode_without_a_customer_or_cart_feature_does_not_load_the_channel(): void {
+		// Cache-safe mode on, but neither feature produces a block to deliver.
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+				)
+			)
+		);
+
+		$this->assertNotContains( 'wc-cart-fragments', $result['scripts'] );
+		$this->assertNotContains( 'gtm4wp-visitor-data', $result['scripts'] );
+	}
 }

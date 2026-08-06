@@ -205,9 +205,7 @@ final class PageDataLayerTest extends TestCase {
 	 * @return PageDataLayer
 	 */
 	private function make_page_datalayer( array $options = array() ): PageDataLayer {
-		Functions\when( 'get_option' )->justReturn( $options );
-
-		$service_options = new Options( ( new WooCommerceModule() )->defaults() );
+		$service_options = $this->make_options( $options );
 
 		return new PageDataLayer(
 			$service_options,
@@ -215,6 +213,19 @@ final class PageDataLayerTest extends TestCase {
 			new DataLayer( $service_options ),
 			new ScriptTag( $service_options )
 		);
+	}
+
+	/**
+	 * Builds just the Options service over the given stored option row, for the
+	 * static reads that take Options rather than a PageDataLayer instance.
+	 *
+	 * @param array<string, mixed> $options The stored option row.
+	 * @return Options
+	 */
+	private function make_options( array $options = array() ): Options {
+		Functions\when( 'get_option' )->justReturn( $options );
+
+		return new Options( ( new WooCommerceModule() )->defaults() );
 	}
 
 	/**
@@ -1180,27 +1191,44 @@ final class PageDataLayerTest extends TestCase {
 	 */
 	public function test_delivers_visitor_cart_client_side_gating(): void {
 		$this->assertTrue(
-			$this->make_page_datalayer(
-				array(
-					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
-					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+			PageDataLayer::delivers_visitor_cart_client_side(
+				$this->make_options(
+					array(
+						GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+						GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+					)
 				)
-			)->delivers_visitor_cart_client_side()
+			)
+		);
+
+		$this->assertTrue(
+			PageDataLayer::delivers_visitor_cart_client_side(
+				$this->make_options(
+					array(
+						GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+						GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+					)
+				)
+			),
+			'The cart-content feature on its own is enough (the condition is an OR).'
 		);
 
 		$this->assertFalse(
-			$this->make_page_datalayer(
-				array(
-					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => false,
-					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+			PageDataLayer::delivers_visitor_cart_client_side(
+				$this->make_options(
+					array(
+						GTM4WP_OPTION_CACHE_SAFE_DATALAYER => false,
+						GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+					)
 				)
-			)->delivers_visitor_cart_client_side(),
+			),
 			'Off unless the cache-safe mode is on.'
 		);
 
 		$this->assertFalse(
-			$this->make_page_datalayer( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
-				->delivers_visitor_cart_client_side(),
+			PageDataLayer::delivers_visitor_cart_client_side(
+				$this->make_options( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
+			),
 			'Off unless a customer/cart feature is enabled.'
 		);
 	}

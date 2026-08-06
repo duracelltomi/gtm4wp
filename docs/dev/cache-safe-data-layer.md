@@ -119,8 +119,8 @@ same `gtm4wp-visitor-data` runtime, with **no** new per-page request. The
      `wp_hash()`) — set on login, cleared on logout, refreshed opportunistically on
      `init`. An anonymous visitor never has it, so it never fetches user data.
 2. **WooCommerce customer & cart** ride the existing **cart-fragments** response
-   (`woocommerce_add_to_cart_fragments`), so no *new* per-page request is added —
-   the fragment AJAX already fires on cart mutation and re-applies from its
+   (`woocommerce_add_to_cart_fragments`), so GTM4WP adds no request of its own — the
+   fragment AJAX already fires on cart mutation and re-applies from its
    `sessionStorage` cache on every page. `PageDataLayer::add_visitor_cart_fragment()`
    JSON-encodes the customer/cart block (built by the same `add_customer_data` /
    `add_cart_content` server builders) into a data attribute of a cache-safe
@@ -135,9 +135,31 @@ same `gtm4wp-visitor-data` runtime, with **no** new per-page request. The
      naming into a client-side validator. A part is omitted when its builder wrote no
      keys, and that test is deliberately **not** about the part's contents: an empty
      cart and an anonymous visitor both still produce their part.
-   - Note this makes the customer/cart delivery depend on WooCommerce's
-     `wc-cart-fragments` script actually running (nothing here enqueues it). On a
-     store that does not load it — no mini-cart anywhere — the block never arrives.
+   - **GTM4WP enqueues `wc-cart-fragments` itself** (in
+     `WooCommerceModule::enqueue_scripts()`, behind the same predicate), because
+     otherwise the channel is simply absent on most stores and the block silently never
+     arrives on a page load. WooCommerce enqueues that handle from exactly **one**
+     frontend path — `WC_Widget_Cart::widget()` — and that method returns early when
+     `woocommerce_widget_cart_is_hidden` is true, whose **default is
+     `is_cart() || is_checkout()`**; the Mini-Cart *block* never enqueues it at all. So
+     the gap covered both stores with no legacy mini-cart widget **and** the cart and
+     checkout pages of stores that have one. The handle itself is registered on every
+     frontend request by `WC_Frontend_Scripts::load_scripts()`, and that class's docblock
+     explicitly supports third-party enqueueing under WooCommerce's L-1 policy (U97).
+   - **What this costs**, on a store that did not already load the script: WooCommerce's
+     `wc-ajax=get_refreshed_fragments` request fires **once per browser tab** — its cache
+     is `sessionStorage`, so a new tab refetches — including for an empty cart, after
+     which that tab goes quiet. For a visitor with Web Storage blocked it fires on
+     **every** page load: `cart-fragments.js` has no guard for that case and falls
+     straight through to `refresh_cart_fragment()`. The response renders
+     `woocommerce_mini_cart()` server-side. This is WooCommerce's request, not one of
+     ours, and it is what every mini-cart store already pays — but the storage-blocked
+     case is a genuine per-page request, so it belongs in the open next to the hard
+     constraint above rather than being described as free.
+   - Note what already worked and must not regress: `wc-add-to-cart` replaces the
+     fragment nodes itself from the add-to-cart AJAX response, so an AJAX add-to-cart
+     delivered the block even with no cart-fragments script. Only page-load delivery
+     was missing.
 3. **Client runtime** (`gtm4wp-visitor-data.js`) gained the endpoint fetch
    (once-per-session + cookie-gated, with the sessionStorage cache and logout
    cleanup) and the cart-fragment reader. Tier 1 and the endpoint fields are gathered

@@ -119,7 +119,7 @@ final class WooCommerceModule extends AbstractModule {
 		// instead on the existing cart-fragments AJAX, so no new per-page request is
 		// added. The gtm4wp-visitor-data runtime (enqueued below) reads it and pushes
 		// each half as its own event — gtm4wp.customerData and gtm4wp.cartData.
-		if ( $page_datalayer->delivers_visitor_cart_client_side() ) {
+		if ( PageDataLayer::delivers_visitor_cart_client_side( $this->options ) ) {
 			add_action( 'wp_footer', array( $page_datalayer, 'output_visitor_cart_placeholder' ) );
 			add_filter( 'woocommerce_add_to_cart_fragments', array( $page_datalayer, 'add_visitor_cart_fragment' ) );
 		}
@@ -288,25 +288,9 @@ final class WooCommerceModule extends AbstractModule {
 		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE, true );
 
 		// Cache-safe data layer (issue #398): when the customer/cart block is being
-		// delivered client-side over cart-fragments, make sure the visitor-data
-		// runtime that reads the fragment payload is loaded — even on pages where the
-		// PageVariables module declared no visitor fields of its own. Enqueuing the
-		// same handle is idempotent (VisitorDataModule may also enqueue it).
-		//
-		// Note this adds the handle WITHOUT the inline config, which only
-		// VisitorDataModule::enqueue_scripts() emits. In practice the config is always
-		// there, because declare_visitor_scoped_fields() below always declares the
-		// re-add one-shot in this mode, so build_config() never returns null here — but
-		// that is incidental (a third party can filter those fields away), which is why
-		// the runtime keeps its own fallbacks for all three event names.
-		if (
-			(bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
-			&& (
-				(bool) $this->opt( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA )
-				|| (bool) $this->opt( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL )
-			)
-		) {
-			$this->enqueue_script( 'gtm4wp-visitor-data', 'gtm4wp-visitor-data.js' );
+		// delivered client-side, load both ends of the cart-fragments channel.
+		if ( PageDataLayer::delivers_visitor_cart_client_side( $this->options ) ) {
+			$this->enqueue_visitor_cart_channel();
 		}
 
 		$this->enqueue_script( 'gtm4wp-ecommerce-generic', 'gtm4wp-ecommerce-generic.js', array(), $in_footer );
@@ -330,6 +314,54 @@ final class WooCommerceModule extends AbstractModule {
 				$this->enqueue_blocks_tracker( 'minicart', $in_footer );
 			}
 		}
+	}
+
+	/**
+	 * Loads both ends of the cart-fragments delivery channel for the cache-safe data
+	 * layer (issue #398). Called only when the customer/cart block is being delivered
+	 * client-side; the two handles are useless apart.
+	 *
+	 * The reading end is our own visitor-data runtime, needed even on pages where the
+	 * PageVariables module declared no visitor fields of its own. Enqueuing that handle
+	 * is idempotent, since VisitorDataModule may also enqueue it — but note this adds it
+	 * WITHOUT the inline config, which only that module emits. In practice the config is
+	 * always present, because declare_visitor_scoped_fields() always declares the
+	 * re-added-to-cart one-shot in this mode so the config is never null; that is
+	 * incidental though (a third party can filter those fields away), which is why the
+	 * runtime keeps its own fallbacks for all three event names.
+	 *
+	 * The delivering end is WooCommerce's own cart-fragments script, which is what
+	 * actually fetches the fragments response our filter writes into. WooCommerce
+	 * enqueues that handle from exactly one frontend path — the render of its legacy Cart
+	 * widget — and that path bails out when the woocommerce_widget_cart_is_hidden filter
+	 * is true, whose default is "the cart or the checkout page". The Mini-Cart block
+	 * never enqueues it at all. So without this the block silently never arrived on a
+	 * store with no legacy mini-cart widget, nor on the cart and checkout pages of one
+	 * that has it. An AJAX add-to-cart did still deliver it, because the wc-add-to-cart
+	 * script replaces the fragment nodes itself, so it was page-load delivery that was
+	 * missing. The cost on a store that was not loading the script: WooCommerce's
+	 * refresh request, once per browser tab (its cache is per-tab sessionStorage), and
+	 * once per page view for a visitor who has blocked Web Storage.
+	 *
+	 * That enqueue is deliberately unguarded. WooCommerce registers the handle on every
+	 * frontend request, from a callback on the same wp_enqueue_scripts priority as this
+	 * one, so ours can run first and a "is it registered yet" check would be false and
+	 * skip the enqueue — a race, not a safety net. The handle-only form merely appends to
+	 * the queue, and WordPress resolves the queue against its registry when scripts are
+	 * printed, long after every enqueue callback has run. It is not declared as a
+	 * dependency of our runtime either: the runtime reads the placeholder once and then
+	 * observes it, so it does not need that script to have run first, and a dependency
+	 * would couple our loading to WooCommerce's on every page our runtime loads —
+	 * including pages with no WooCommerce at all. Localization needs no help, because
+	 * WooCommerce localizes each of its registered handles for whoever has it enqueued,
+	 * and the jquery and cookie dependencies come from its own registration.
+	 *
+	 * @return void
+	 */
+	private function enqueue_visitor_cart_channel(): void {
+		$this->enqueue_script( 'gtm4wp-visitor-data', 'gtm4wp-visitor-data.js' );
+
+		wp_enqueue_script( 'wc-cart-fragments' );
 	}
 
 	/**

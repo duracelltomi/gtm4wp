@@ -976,15 +976,24 @@ final class PageDataLayer {
 	 * client-side over the cart-fragments AJAX (cache-safe data layer, issue #398):
 	 * the mode is on and at least one of the customer-data / cart-content features
 	 * is enabled. When on, add_datalayer_data() omits the same block from the
-	 * cacheable page HTML (Phase 1) and it rides the fragments response instead.
+	 * cacheable page HTML and it rides the fragments response instead.
 	 *
+	 * Static, and taking the Options service rather than reading $this, because four
+	 * separate behaviours have to agree on this one answer — the wp_footer
+	 * placeholder, the fragments filter, the gtm4wp-visitor-data runtime and the
+	 * wc-cart-fragments enqueue — and two of them are wired from WooCommerceModule,
+	 * which holds no PageDataLayer instance. A second copy of the condition there
+	 * would break the delivery silently the first time the two drifted. Mirrors
+	 * VisitorDataModule::is_enabled(), the same kind of shared read.
+	 *
+	 * @param Options $options The plugin options service.
 	 * @return bool
 	 */
-	public function delivers_visitor_cart_client_side(): bool {
-		return (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
+	public static function delivers_visitor_cart_client_side( Options $options ): bool {
+		return (bool) $options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
 			&& (
-				(bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA )
-				|| (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL )
+				(bool) $options->get( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA )
+				|| (bool) $options->get( GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL )
 			);
 	}
 
