@@ -17,6 +17,7 @@ a parallel 1.22.4 install where noted.
 - [ ] Activate the plugin on PHP >= 8.0 / WP >= 6.3 — no notices/errors.
 - [ ] Activating on PHP < 8.0 or WP < 6.3 shows the requirements admin notice instead of a fatal error.
 - [ ] "To start using Google Tag Manager..." notice appears until a GTM ID is entered; notice is dismissible and stays dismissed.
+- [ ] With an empty container table, setting container code placement to "Off" hides that notice (data layer only needs no GTM ID); switching back to "Footer" brings it back.
 - [ ] Settings → Google Tag Manager opens the React app: left pane navigation, accordion groups, option search.
 - [ ] Enter an invalid GTM ID in a container table row → inline validation error, stored value unchanged. Enter a valid ID → saved, snackbar shown.
 - [ ] Container table: add row / remove row works, an all-empty row is dropped on save, duplicate container IDs are rejected with an error.

@@ -514,6 +514,78 @@ final class NoticesTest extends TestCase {
 	}
 
 	/**
+	 * Container code placement OFF is the deliberate "data layer only" setup: the
+	 * container is loaded by custom coding, so the site never enters a container
+	 * ID and the empty table is the correct state, not a misconfiguration. The
+	 * prompt names a setting that would not change anything, and no save can
+	 * clear it - the only escape is a per-user dismissal, so every admin of the
+	 * site sees a permanent red error for a supported configuration.
+	 *
+	 * @return void
+	 */
+	public function test_show_notices_hides_gtm_id_prompt_when_container_code_is_off(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => '',
+				GTM4WP_OPTION_GTM_CONTAINERS => array(),
+				GTM4WP_OPTION_GTM_PLACEMENT  => GTM4WP_PLACEMENT_OFF,
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'enter-gtm-code', $output, 'Data layer only mode needs no container ID.' );
+	}
+
+	/**
+	 * The grant half of the case above, run over every placement that does emit
+	 * the container code. Without it the suppression could be far too broad - an
+	 * inverted comparison, or a loose one against the default value 0, would
+	 * silence the prompt on every site instead of only the OFF ones, and the deny
+	 * test above would stay green throughout.
+	 *
+	 * The placement is set explicitly in each case rather than left to the
+	 * default: make_notices_with_options() passes its array as both the defaults
+	 * and the stored row, so an omitted key resolves to null, and a test that
+	 * relied on that would not be testing a placement at all.
+	 *
+	 * @param int $placement A placement value that emits the container code.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_placements_that_output_the_container' )]
+	public function test_show_notices_still_prompts_for_gtm_id_for_every_active_placement( int $placement ): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => '',
+				GTM4WP_OPTION_GTM_CONTAINERS => array(),
+				GTM4WP_OPTION_GTM_PLACEMENT  => $placement,
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'enter-gtm-code', $output );
+	}
+
+	/**
+	 * Every placement except OFF: the container code is emitted, so a missing
+	 * container ID really is a misconfiguration and has to be reported.
+	 *
+	 * @return array<string, array{0: int}>
+	 */
+	public static function provide_placements_that_output_the_container(): array {
+		return array(
+			'footer (the default)'          => array( GTM4WP_PLACEMENT_FOOTER ),
+			'manually coded after body tag' => array( GTM4WP_PLACEMENT_BODYOPEN ),
+			'automatic wp_body_open'        => array( GTM4WP_PLACEMENT_BODYOPEN_AUTO ),
+		);
+	}
+
+	/**
 	 * A malformed GTM4WP_HARDCODED_* constant is ignored while the options are
 	 * built, which is invisible from the outside - the operator sees a container
 	 * that disregards their wp-config and has nothing to search for. The notice

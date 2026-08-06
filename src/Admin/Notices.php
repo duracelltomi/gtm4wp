@@ -89,7 +89,15 @@ final class Notices {
 		// have to guess which module and which tab it sits behind is only half a
 		// pointer. The link addresses the option key, so it survives regrouping.
 
-		if ( ( '' === trim( (string) $this->options->get( GTM4WP_OPTION_GTM_CODE ) ) ) && ( false === $dismisses['enter-gtm-code'] ) ) {
+		// Placement OFF is the deliberate "data layer only" setup: the container
+		// code is never emitted, so the site needs no container ID at all and the
+		// prompt below is advice no setting can act on - the admin can only
+		// dismiss it, per user, forever. Compared strictly against the int
+		// constant, exactly the way ContainerCode decides the same thing, so the
+		// notice cannot disagree with what the frontend actually emits.
+		$container_code_off = ( GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) );
+
+		if ( ! $container_code_off && ( '' === trim( (string) $this->options->get( GTM4WP_OPTION_GTM_CODE ) ) ) && ( false === $dismisses['enter-gtm-code'] ) ) {
 			echo '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code"><p><strong>';
 			printf(
 				/* translators: 1: opening anchor element pointing to the GTM4WP options page. 2: closing anchor element. */
