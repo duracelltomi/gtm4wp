@@ -218,6 +218,7 @@ final class ListTracking {
 	public function reset_loop( $query = null ) {
 		global $woocommerce_loop;
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WooCommerce's own global, not ours to prefix; the list type has to live where WC's loop already reads it.
 		$woocommerce_loop['listtype'] = '';
 
 		return $query;
@@ -232,6 +233,7 @@ final class ListTracking {
 	private function set_list_type( string $listtype ): void {
 		global $woocommerce_loop;
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WooCommerce's own global, not ours to prefix; the list type has to live where WC's loop already reads it.
 		$woocommerce_loop['listtype'] = $listtype;
 	}
 

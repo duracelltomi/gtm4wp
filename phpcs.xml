@@ -14,6 +14,82 @@
 	<rule ref="WordPress-Extra" />
 	<rule ref="PHPCompatibility" />
 
+	<!--
+	Both sniffs below are pulled in by WordPress-Core / WordPress-Extra but return
+	early when their property is unset: I18nSniff bails on an empty text_domain,
+	PrefixAllGlobalsSniff bails on empty prefixes. Enabled-but-inert reads as
+	coverage in a green build, which is worse than no check at all - the build
+	passes because the check is switched off, not because the code is right.
+	-->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="duracelltomi-google-tag-manager"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="gtm4wp"/>
+				<!--
+				The three legacy globals in the main plugin file are spelled
+				gtp4wp_ - a 1.x typo, not a second namespace. Nothing inside this
+				repo reads them; only third-party 1.x consumers do, so the typo is
+				load-bearing and renaming it would be a public API change for no
+				gain. Accepting the prefix records that it is deliberate.
+				-->
+				<element value="gtp4wp"/>
+			</property>
+		</properties>
+
+		<!--
+		The hook-name half of this sniff cannot reach a true positive here, so both
+		of its codes come off. Every hook GTM4WP defines is invoked through a
+		constant - the GTM4WP_WPFILTER_* / GTM4WP_WPACTION_* set in
+		compat/constants.php and the FILTER_* class constants - and the sniff
+		cannot resolve a constant to its string value, so our own correctly
+		prefixed hooks land in DynamicHooknameFound unread (self::FILTER_AMP_RUNNING
+		really is 'gtm4wp_amp_running'). What NonPrefixedHooknameFound sees is the
+		core and WooCommerce hooks we deliberately re-fire (the_permalink,
+		woocommerce_cart_item_product, woocommerce_thankyou_order_id,
+		wpml_current_language, ...), where the whole point is to match the name a
+		third party already listens on - prefixing those would break the
+		integration. The variable, constant, function, class and namespace halves
+		stay on; those do reach real findings.
+		-->
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound"/>
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound"/>
+
+		<!--
+		Tests: the stubs deliberately mirror WordPress and WooCommerce names
+		exactly - ABSPATH, DAY_IN_SECONDS, WP_UNINSTALL_PLUGIN, $product, the
+		Automattic\WooCommerce\Admin\API\... namespace. A test double that
+		renamed the thing it stands in for would stop standing in for it.
+		-->
+		<exclude-pattern>*/tests/*</exclude-pattern>
+	</rule>
+
+	<!--
+	The functions wordpress.org's plugin review rejects outright. None of these has
+	ever appeared here, so this is a guard against future code rather than a fix -
+	its value is that a reviewer-blocking construct fails `composer phpcs` locally
+	instead of surfacing weeks later in a directory review.
+	-->
+	<rule ref="Generic.PHP.ForbiddenFunctions">
+		<properties>
+			<property name="forbiddenFunctions" type="array">
+				<element key="eval" value="null"/>
+				<element key="create_function" value="null"/>
+				<element key="proc_open" value="null"/>
+				<element key="passthru" value="null"/>
+				<element key="move_uploaded_file" value="null"/>
+				<element key="str_rot13" value="null"/>
+			</property>
+		</properties>
+	</rule>
+
 	<!-- Exclude Common Paths. -->
 	<exclude-pattern>*/wptest/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
