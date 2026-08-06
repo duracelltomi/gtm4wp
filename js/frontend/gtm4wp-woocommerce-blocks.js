@@ -166,8 +166,12 @@ function gtm4wp_blocks_bind_crosssell_clicks( get_items ) {
 		// #405: persist the cross-sell list attribution (keyed by product id) so a
 		// later add_to_cart / checkout / purchase for this product can be attributed
 		// to it, matching the classic select_item behavior. Opt-in only.
+		// The opt-in flag is printed by the PHP side as a top-level `const` in a
+		// classic inline script, which binds lexically and never lands on `window`
+		// - so it has to be read as a bare identifier (see .eslintrc.js).
 		if (
-			window.gtm4wp_list_attribution &&
+			typeof gtm4wp_list_attribution !== 'undefined' &&
+			gtm4wp_list_attribution &&
 			match.id &&
 			typeof window.gtm4wp_store_item_list_attribution === 'function'
 		) {

@@ -43,6 +43,35 @@ function gtm4wp_read_quantity( el, prop ) {
 	return Number.isNaN( qty ) ? null : qty;
 }
 
+/**
+ * Whether the #405 "Persist product list attribution across the funnel" opt-in is on.
+ *
+ * The PHP side prints this flag - like every GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY entry -
+ * as a top-level `const` inside a CLASSIC inline <script> (ContainerCode::header_top()).
+ * A top-level `const` binds in the global LEXICAL environment record, so it never
+ * becomes a property of `window`: reading it as `window.gtm4wp_list_attribution` yields
+ * undefined on every real page and turns the whole feature off silently. It has to be
+ * read as a bare identifier, which is why .eslintrc.js both declares it as a global and
+ * forbids the `window.` spelling.
+ *
+ * The typeof guard is what makes the bare read safe: every caller runs inside a
+ * document click or jQuery event handler, where an undeclared read would throw a
+ * ReferenceError - the situation when the head block never ran (stripped by an
+ * optimizer, or the WooCommerce module added no vars).
+ *
+ * Evaluated per call rather than once at module scope on purpose: this bundle is
+ * enqueued blocking while the head block is written by wp_head, so a load-time read
+ * would depend on script order rather than on the option.
+ *
+ * @return {boolean} Whether list attribution should be stored and applied.
+ */
+function gtm4wp_list_attribution_enabled() {
+	return (
+		'undefined' !== typeof gtm4wp_list_attribution &&
+		!! gtm4wp_list_attribution
+	);
+}
+
 function gtm4wp_woocommerce_handle_cart_qty_change() {
 	document
 		.querySelectorAll( '.product-quantity input.qty' )
@@ -304,7 +333,7 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 				null === product_qty || product_qty < 1 ? 1 : product_qty;
 
 			// #405: carry the originating list onto this add_to_cart item (opt-in).
-			if ( window.gtm4wp_list_attribution ) {
+			if ( gtm4wp_list_attribution_enabled() ) {
 				gtm4wp_apply_stored_item_list(
 					productdata,
 					productdata.internal_id
@@ -349,7 +378,7 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 			null === simple_qty || simple_qty < 1 ? 1 : simple_qty;
 
 		// #405: carry the originating list onto this add_to_cart item (opt-in).
-		if ( window.gtm4wp_list_attribution ) {
+		if ( gtm4wp_list_attribution_enabled() ) {
 			gtm4wp_apply_stored_item_list(
 				productdata,
 				productdata.internal_id
@@ -771,7 +800,7 @@ function gtm4wp_woocommerce_process_pages() {
 				// attributed back to the originating list. internal_id was excluded
 				// above, so read it straight from the node. Opt-in only.
 				if (
-					window.gtm4wp_list_attribution &&
+					gtm4wp_list_attribution_enabled() &&
 					productdata.item_list_name
 				) {
 					const list_source = gtm4wp_read_json_from_node(
@@ -804,10 +833,8 @@ function gtm4wp_woocommerce_process_pages() {
 				}
 
 				let datalayer_timeout = 2000;
-				if (
-					typeof window.gtm4wp_datalayer_max_timeout !== 'undefined'
-				) {
-					datalayer_timeout = window.gtm4wp_datalayer_max_timeout;
+				if ( 'undefined' !== typeof gtm4wp_datalayer_max_timeout ) {
+					datalayer_timeout = gtm4wp_datalayer_max_timeout;
 				}
 
 				if ( datalayer_timeout > 0 ) {
@@ -971,7 +998,7 @@ function gtm4wp_woocommerce_process_pages() {
 			// unit (#348). add_to_cart later overwrites this with the chosen quantity.
 			current_product_detail_data.quantity = 1;
 
-			if ( window.gtm4wp_list_attribution ) {
+			if ( gtm4wp_list_attribution_enabled() ) {
 				gtm4wp_apply_stored_item_list(
 					current_product_detail_data,
 					list_product_id
@@ -1161,7 +1188,7 @@ function gtm4wp_woocommerce_process_pages() {
 	// handlers are idempotent (gtm4wp_checkout_step_fired dedup) and read the
 	// selected method straight from the DOM, which CheckoutWC keeps on
 	// WooCommerce's standard field names.
-	if ( window.gtm4wp_checkoutwc ) {
+	if ( 'undefined' !== typeof gtm4wp_checkoutwc && gtm4wp_checkoutwc ) {
 		window.gtm4wp_checkout_value = window.gtm4wp_checkout_value || 0;
 		window.gtm4wp_checkout_products = window.gtm4wp_checkout_products || [];
 		window.gtm4wp_checkout_products_ga4 =

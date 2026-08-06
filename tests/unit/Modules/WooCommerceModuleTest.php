@@ -93,6 +93,37 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertSame( 0, $off->add_global_vars( array() )['gtm4wp_checkoutwc'] );
 	}
 
+	/**
+	 * ContainerCode::header_top() prints each of these as a top-level `const`, which
+	 * binds lexically and never becomes a property of window - so the JS trackers
+	 * read them as BARE identifiers, and .eslintrc.js repeats the same list to make
+	 * `no-undef` catch a misspelled read (plus a rule forbidding the `window.`
+	 * spelling, which is how three of them once shipped dead).
+	 *
+	 * Nothing in either language can see a rename on THIS side: PHP would happily
+	 * emit the new name and the tracker would go on reading the old one, silently.
+	 * Pinning the set as a literal makes a rename a deliberate three-place edit
+	 * (here, the module, .eslintrc.js) rather than a silent break of the tracker.
+	 */
+	public function test_add_global_vars_emits_the_names_the_frontend_trackers_read(): void {
+		Functions\when( 'get_woocommerce_currency' )->justReturn( 'EUR' );
+
+		$this->assertSame(
+			array(
+				'gtm4wp_use_sku_instead',
+				'gtm4wp_currency',
+				'gtm4wp_product_per_impression',
+				'gtm4wp_clear_ecommerce',
+				'gtm4wp_datalayer_max_timeout',
+				'gtm4wp_console_log',
+				'gtm4wp_remarketing_prod_id_prefix',
+				'gtm4wp_list_attribution',
+				'gtm4wp_checkoutwc',
+			),
+			array_keys( $this->make_module()->add_global_vars( array() ) )
+		);
+	}
+
 	public function test_keeps_true_when_woocommerce_already_says_order_received(): void {
 		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) );
 

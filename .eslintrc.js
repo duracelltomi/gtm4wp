@@ -1,3 +1,33 @@
+/*
+ * The globals the PHP side prints into the page as top-level `const` declarations,
+ * via GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY and ContainerCode::header_top()
+ * (WooCommerceModule::add_global_vars() is the only contributor). One list, used
+ * twice below: to declare them, so `no-undef` catches a misspelled read, and to
+ * forbid the `window.` spelling of the same names.
+ *
+ * A top-level `const` in a classic (non-module) script binds in the global LEXICAL
+ * environment record and never becomes a property of `window`, so
+ * `window.gtm4wp_list_attribution` is permanently undefined in a browser. A jsdom
+ * unit test cannot catch that on its own - there `global === window`, so setting the
+ * window property satisfies a bare read too - which is exactly how three of these
+ * shipped dead. Hence the lint rule; js/frontend/test/inline-head-globals.test.js is
+ * the runtime half of the same guard.
+ *
+ * gtm4wp_datalayer_name is deliberately NOT here: it is emitted as `var`, which DOES
+ * create a window property, and several trackers read it that way.
+ */
+const inlineConstGlobals = [
+	'gtm4wp_currency',
+	'gtm4wp_clear_ecommerce',
+	'gtm4wp_use_sku_instead',
+	'gtm4wp_product_per_impression',
+	'gtm4wp_console_log',
+	'gtm4wp_remarketing_prod_id_prefix',
+	'gtm4wp_list_attribution',
+	'gtm4wp_datalayer_max_timeout',
+	'gtm4wp_checkoutwc',
+];
+
 module.exports = {
 	root: true,
 	extends: [ 'plugin:@wordpress/eslint-plugin/recommended' ],
@@ -21,16 +51,14 @@ module.exports = {
 				jquery: true,
 			},
 			globals: {
-				// Printed inline by ContainerCode::header_top() and the
-				// GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter (PHP side).
+				// Printed inline by ContainerCode::header_top() as `var`; this one
+				// really is a window property.
 				gtm4wp_datalayer_name: 'readonly',
-				gtm4wp_currency: 'readonly',
-				gtm4wp_clear_ecommerce: 'readonly',
-				gtm4wp_use_sku_instead: 'readonly',
-				gtm4wp_product_per_impression: 'readonly',
-				gtm4wp_console_log: 'readonly',
-				gtm4wp_remarketing_prod_id_prefix: 'readonly',
-				gtm4wp_list_attribution: 'readonly',
+
+				// Printed inline as top-level `const` (see the list above).
+				...Object.fromEntries(
+					inlineConstGlobals.map( ( name ) => [ name, 'readonly' ] )
+				),
 
 				// Shared helpers exposed on window by gtm4wp-ecommerce-generic.js.
 				gtm4wp_make_sure_is_float: 'readonly',
@@ -78,6 +106,28 @@ module.exports = {
 				'no-unused-vars': [
 					'error',
 					{ args: 'none', caughtErrors: 'none' },
+				],
+			},
+		},
+		{
+			/*
+			 * Production trackers only. The unit tests deliberately set
+			 * `window.<name>` - both as a stand-in for the real declaration
+			 * (jsdom makes a window property visible to a bare read) and, in
+			 * inline-head-globals.test.js, as the WRONG value a `window.` read
+			 * would pick up.
+			 */
+			files: [ 'js/frontend/**/*.js' ],
+			excludedFiles: [ 'js/frontend/test/**/*.js' ],
+			rules: {
+				'no-restricted-properties': [
+					'error',
+					...inlineConstGlobals.map( ( property ) => ( {
+						object: 'window',
+						property,
+						message:
+							'Printed by the PHP side as a top-level `const`, which binds lexically and is never a property of window. Read it as a bare identifier, with a `typeof` guard where the declaration may be absent.',
+					} ) ),
 				],
 			},
 		},
