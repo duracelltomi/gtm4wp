@@ -354,6 +354,96 @@ final class ListTrackingTest extends TestCase {
 	}
 
 	/**
+	 * The whole collection mapping, pinned as a literal table.
+	 *
+	 * The slugs are WooCommerce's, so this is what breaks when they rename one or
+	 * when someone edits a name without its id (upstream registry U26). Only the
+	 * default collection was asserted before. Four of the presets deliberately
+	 * share an identity with the legacy grid block they replace, so a store that
+	 * migrates a block keeps its GA4 list - which is only true while both sides
+	 * agree, and this is the side that can be tested here.
+	 *
+	 * @param string $collection The block's collection attribute.
+	 * @param string $name       The list name it must report.
+	 * @param string $id         The stable id it must report.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_product_collection_identities' )]
+	public function test_product_collection_preset_reports_its_own_identity( string $collection, string $name, string $id ): void {
+		$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		Functions\when( 'wc_get_product' )->alias(
+			fn ( $product_id ) => $this->make_product( array( 'id' => (int) $product_id ) )
+		);
+
+		$result = $list_tracking->add_productdata_to_product_collection_block(
+			'<li class="wc-block-product post-123">P</li>',
+			array(
+				'blockName' => 'woocommerce/product-collection',
+				'attrs'     => '' === $collection ? array() : array( 'collection' => $collection ),
+			)
+		);
+
+		$item = $this->decode_product_data( $result );
+
+		$this->assertSame( $name, $item['item_list_name'] );
+		$this->assertSame( $id, $item['item_list_id'] );
+	}
+
+	/**
+	 * WooCommerce's 14 core Product Collection slugs (CoreCollectionNames,
+	 * measured 2026-08-06 against WC trunk and the 11.0.0 tag), plus the
+	 * no-collection case that stands for a custom query or a third-party
+	 * collection.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: string}>
+	 */
+	public static function provide_product_collection_identities(): array {
+		return array(
+			'product catalog' => array( 'woocommerce/product-collection/product-catalog', 'General Product List', 'general-product-list' ),
+			'on sale'         => array( 'woocommerce/product-collection/on-sale', 'Sale Products', 'sale-products' ),
+			'best sellers'    => array( 'woocommerce/product-collection/best-sellers', 'Best Selling Products', 'best-selling-products' ),
+			'top rated'       => array( 'woocommerce/product-collection/top-rated', 'Top Rated Products', 'top-rated-products' ),
+			'new arrivals'    => array( 'woocommerce/product-collection/new-arrivals', 'New Products', 'new-products' ),
+			'featured'        => array( 'woocommerce/product-collection/featured', 'Featured Products', 'featured-products' ),
+			'related'         => array( 'woocommerce/product-collection/related', 'Related Products', 'related-products' ),
+			'upsells'         => array( 'woocommerce/product-collection/upsells', 'Upsell Products', 'upsell-products' ),
+			'cross-sells'     => array( 'woocommerce/product-collection/cross-sells', 'Cross-Sell Products', 'cross-sell-products' ),
+			'hand-picked'     => array( 'woocommerce/product-collection/hand-picked', 'Handpicked Products', 'handpicked-products' ),
+			'by category'     => array( 'woocommerce/product-collection/by-category', 'Product Category List', 'product-category-list' ),
+			'by tag'          => array( 'woocommerce/product-collection/by-tag', 'Products By Tag', 'products-by-tag' ),
+			'by brand'        => array( 'woocommerce/product-collection/by-brand', 'Products By Brand', 'products-by-brand' ),
+			'cart contents'   => array( 'woocommerce/product-collection/cart-contents', 'Cart Contents', 'cart-contents' ),
+			'custom query'    => array( '', 'Product Collection', 'product-collection' ),
+		);
+	}
+
+	/**
+	 * WooCommerce gives the legacy grid-block filter no block context, so this
+	 * path can only write a generic placeholder pair that the frontend tracker
+	 * replaces from the wp-block-{name} class on the grid container. What PHP owes
+	 * that arrangement is a pair that is *consistent* - the name and the id of the
+	 * same list - because an unknown block class leaves exactly this pair in place.
+	 * A name that does not match its id would collapse every grid on the page onto
+	 * one id in GA4, which is the defect this change fixes on the JS side.
+	 *
+	 * @return void
+	 */
+	public function test_wc_block_span_carries_a_matching_name_and_id_pair(): void {
+		$this->stub_translated_locale();
+
+		$result = $this->make_list_tracking()->add_productdata_to_wc_block(
+			'<li class="wc-block-grid__product first">ITEM</li>',
+			(object) array( 'permalink' => 'https://example.com/product/' ),
+			$this->make_product()
+		);
+
+		$item = $this->decode_product_data( $result );
+
+		$this->assertSame( 'DE General Product List', $item['item_list_name'] );
+		$this->assertSame( 'general-product-list', $item['item_list_id'] );
+	}
+
+	/**
 	 * PA-7 / TC-6: the injection uses preg_replace_callback (not a data-bearing
 	 * replacement string), so a product field carrying a literal `$1` survives
 	 * verbatim rather than being interpreted as a backreference.
@@ -703,6 +793,183 @@ final class ListTrackingTest extends TestCase {
 			'cross-sell' => array( 'add_cross_sell_to_loop', 'Cross-Sell Products' ),
 			'upsell'     => array( 'add_upsells_to_loop', 'Upsell Products' ),
 		);
+	}
+
+	/**
+	 * Pulls the GA4 item back out of an injected .gtm4wp_productdata span.
+	 *
+	 * The JSON is esc_attr()'d into an HTML attribute, so it has to come back
+	 * through the entity decode before json_decode sees it.
+	 *
+	 * @param string $html Markup containing exactly one product-data attribute.
+	 * @return array<string, mixed> The decoded GA4 item.
+	 */
+	private function decode_product_data( string $html ): array {
+		$this->assertSame(
+			1,
+			preg_match( '/data-gtm4wp_product_data="([^"]*)"/', $html, $matches ),
+			'Exactly one product-data attribute expected in the markup.'
+		);
+
+		$decoded = json_decode( html_entity_decode( $matches[1], ENT_QUOTES ), true );
+		$this->assertIsArray( $decoded, 'The product-data attribute must hold a JSON object.' );
+
+		return $decoded;
+	}
+
+	/**
+	 * Renders one classic-loop product item and returns its markup.
+	 *
+	 * @param ListTracking $list_tracking The instance under test.
+	 * @return string The echoed hidden span.
+	 */
+	private function render_shop_loop_item( ListTracking $list_tracking ): string {
+		$GLOBALS['product'] = $this->make_product();
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/product/' );
+
+		ob_start();
+		$list_tracking->after_shop_loop_item();
+
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * A translator that actually changes the string, so a locale-dependent id
+	 * cannot pass as a locale-independent one. Anything derived from the
+	 * translated name comes back slugged as "de-...".
+	 *
+	 * @return void
+	 */
+	private function stub_translated_locale(): void {
+		Functions\when( '__' )->alias( static fn ( $text ) => 'DE ' . $text );
+	}
+
+	/**
+	 * GA4 keys its list reports on item_list_id, so the id has to be the same on
+	 * every language version of a store while the name is translated. Deriving it
+	 * from the translated name - which is what the code did before the explicit
+	 * literals - gave a German store "de-sale-products" where an English one had
+	 * "sale-products", splitting one list into one report per language.
+	 *
+	 * This is the test that fails if a list literal is dropped and the derivation
+	 * comes back.
+	 *
+	 * @param string             $method The ListTracking setter to call.
+	 * @param array<int, mixed>  $args   Arguments that setter needs.
+	 * @param string             $name   The untranslated list name.
+	 * @param string             $id     The stable id it must report.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_loop_list_identities' )]
+	public function test_loop_list_id_is_stable_across_locales( string $method, array $args, string $name, string $id ): void {
+		$this->stub_translated_locale();
+
+		$list_tracking = $this->make_list_tracking();
+		$list_tracking->$method( ...$args );
+
+		$item = $this->decode_product_data( $this->render_shop_loop_item( $list_tracking ) );
+
+		$this->assertSame( 'DE ' . $name, $item['item_list_name'], 'The name is translated for the visitor...' );
+		$this->assertSame( $id, $item['item_list_id'], '...while the id stays the locale-independent literal.' );
+	}
+
+	/**
+	 * Every list setter, with the name it labels the loop with and the stable id
+	 * that name must never be derived from.
+	 *
+	 * @return array<string, array{0: string, 1: array<int, mixed>, 2: string, 3: string}>
+	 */
+	public static function provide_loop_list_identities(): array {
+		return array(
+			'recent'       => array( 'before_recent_products_loop', array(), 'Recent Products', 'recent-products' ),
+			'sale'         => array( 'before_sale_products_loop', array(), 'Sale Products', 'sale-products' ),
+			'best selling' => array( 'before_best_selling_products_loop', array(), 'Best Selling Products', 'best-selling-products' ),
+			'top rated'    => array( 'before_top_rated_products_loop', array(), 'Top Rated Products', 'top-rated-products' ),
+			'featured'     => array( 'before_featured_products_loop', array(), 'Featured Products', 'featured-products' ),
+			'related'      => array( 'add_related_to_loop', array( 4 ), 'Related Products', 'related-products' ),
+			'cross-sell'   => array( 'add_cross_sell_to_loop', array( 4 ), 'Cross-Sell Products', 'cross-sell-products' ),
+			'upsell'       => array( 'add_upsells_to_loop', array( 4 ), 'Upsell Products', 'upsell-products' ),
+		);
+	}
+
+	/**
+	 * The two lists nothing sets a loop type for: an unlabelled loop and the
+	 * search results page. Same locale rule.
+	 *
+	 * @return void
+	 */
+	public function test_unlabelled_and_search_lists_have_stable_ids(): void {
+		$this->stub_translated_locale();
+
+		$item = $this->decode_product_data( $this->render_shop_loop_item( $this->make_list_tracking() ) );
+		$this->assertSame( 'DE General Product List', $item['item_list_name'] );
+		$this->assertSame( 'general-product-list', $item['item_list_id'] );
+
+		Functions\when( 'is_search' )->justReturn( true );
+
+		$item = $this->decode_product_data( $this->render_shop_loop_item( $this->make_list_tracking() ) );
+		$this->assertSame( 'DE Search Results', $item['item_list_name'] );
+		$this->assertSame( 'search-results', $item['item_list_id'] );
+	}
+
+	public function test_grouped_product_list_has_a_stable_id(): void {
+		$this->stub_translated_locale();
+
+		$item = $this->decode_product_data(
+			(string) $this->make_list_tracking()->grouped_product_list_column_label( '', $this->make_product() )
+		);
+
+		$this->assertSame( 'DE Grouped Product Detail Page', $item['item_list_name'] );
+		$this->assertSame( 'grouped-product-detail-page', $item['item_list_id'] );
+	}
+
+	/**
+	 * $woocommerce_loop['listtype'] is a 1.x extension point third party code
+	 * writes to name a list of its own. Such a name has no stable id to pair with,
+	 * so it keeps deriving one from the name exactly as before - and, crucially,
+	 * must never inherit the id of whatever list the plugin labelled last. That
+	 * mismatch is the defect this whole change is about, just from the other side.
+	 *
+	 * @return void
+	 */
+	public function test_a_third_party_list_name_never_inherits_our_list_id(): void {
+		$list_tracking = $this->make_list_tracking();
+
+		// The plugin labels a loop, then something else relabels it mid-flight
+		// without clearing our paired identity.
+		$list_tracking->before_sale_products_loop();
+		$GLOBALS['woocommerce_loop']['listtype'] = 'Bundled Products';
+
+		$item = $this->decode_product_data( $this->render_shop_loop_item( $list_tracking ) );
+
+		$this->assertSame( 'Bundled Products', $item['item_list_name'] );
+		$this->assertSame( 'bundled-products', $item['item_list_id'], 'The id must follow the name that is actually reported.' );
+		$this->assertNotSame( 'sale-products', $item['item_list_id'] );
+	}
+
+	/**
+	 * A widget title is authored by the site owner, so there is no stable literal
+	 * to pair it with and its id keeps being derived from the title.
+	 *
+	 * @return void
+	 */
+	public function test_widget_list_id_is_still_derived_from_the_widget_title(): void {
+		$list_tracking = $this->make_list_tracking();
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/product/' );
+		$GLOBALS['product']                  = $this->make_product();
+		$GLOBALS['gtm4wp_last_widget_title'] = 'Summer Picks (widget)';
+		$GLOBALS['gtm4wp_product_counter']   = 1;
+
+		ob_start();
+		$list_tracking->before_template_part();
+		echo '<a href="https://example.com/p/">Item</a>';
+		$list_tracking->after_template_part( 'content-widget-product.php' );
+		$markup = (string) ob_get_clean();
+
+		$item = $this->decode_product_data( $markup );
+
+		$this->assertSame( 'Summer Picks (widget)', $item['item_list_name'] );
+		$this->assertSame( 'summer-picks-widget', $item['item_list_id'] );
 	}
 
 	public function test_reset_loop_clears_the_list_name_and_returns_the_query(): void {

@@ -447,38 +447,63 @@ function gtm4wp_woocommerce_process_pages() {
 	}
 	window.gtm4wp_woocommerce_inited = true;
 
-	// loop through WC blocks to set proper listname and position parameters
+	// Resolve the GA4 list identity of WooCommerce's legacy product grid blocks.
+	//
+	// WooCommerce fires woocommerce_blocks_product_grid_item_html with no block
+	// context, so ListTracking::add_productdata_to_wc_block() cannot tell one grid
+	// from another and writes the generic "General Product List" placeholder pair.
+	// The grid container carries the block name as a wp-block-{block_name} class
+	// (WC's AbstractProductGrid::get_container_classes()), so the real identity is
+	// resolved here - and BOTH halves of the pair are written back, never only the
+	// name: an item_list_name that no longer matches its item_list_id collapses
+	// every grid on the page onto one id in GA4.
+	//
+	// listid is a literal, not slugified in JS. PHP derives every other list's
+	// item_list_id with sanitize_title(), which does entity decoding, accent
+	// folding and filter application a small JS slugifier would drift from. Each
+	// value below is sanitize_title( displayname ) computed once, so it is also
+	// byte-identical to the id ListTracking gives the same list on the Product
+	// Collection path - a store migrating a legacy grid to a Product Collection
+	// block keeps its GA4 list history. Upstream registry row U99.
 	const gtm4wp_product_block_names = {
 		'wp-block-handpicked-products': {
 			displayname: 'Handpicked Products',
+			listid: 'handpicked-products',
 			counter: 1,
 		},
 		'wp-block-product-best-sellers': {
 			displayname: 'Best Selling Products',
+			listid: 'best-selling-products',
 			counter: 1,
 		},
 		'wp-block-product-category': {
 			displayname: 'Product Category List',
+			listid: 'product-category-list',
 			counter: 1,
 		},
 		'wp-block-product-new': {
 			displayname: 'New Products',
+			listid: 'new-products',
 			counter: 1,
 		},
 		'wp-block-product-on-sale': {
 			displayname: 'Sale Products',
+			listid: 'sale-products',
 			counter: 1,
 		},
 		'wp-block-products-by-attribute': {
 			displayname: 'Products By Attribute',
+			listid: 'products-by-attribute',
 			counter: 1,
 		},
 		'wp-block-product-tag': {
 			displayname: 'Products By Tag',
+			listid: 'products-by-tag',
 			counter: 1,
 		},
 		'wp-block-product-top-rated': {
 			displayname: 'Top Rated Products',
+			listid: 'top-rated-products',
 			counter: 1,
 		},
 	};
@@ -504,6 +529,14 @@ function gtm4wp_woocommerce_process_pages() {
 								'gtm4wp_product_data',
 								'item_list_name',
 								gtm4wp_product_block_names[ i ].displayname
+							);
+							// Written next to the name, never separately: the
+							// server pair is consistent and has to stay that way.
+							gtm4wp_update_json_in_node(
+								product_data_el,
+								'gtm4wp_product_data',
+								'item_list_id',
+								gtm4wp_product_block_names[ i ].listid
 							);
 							gtm4wp_update_json_in_node(
 								product_data_el,

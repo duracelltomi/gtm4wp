@@ -28,6 +28,34 @@ defined( 'ABSPATH' ) || exit;
 final class ListTracking {
 
 	/**
+	 * Keys of the product lists the plugin names itself.
+	 *
+	 * Every key resolves through list_identity() to a translated GA4
+	 * item_list_name and a locale-independent item_list_id. One key per list
+	 * rather than one per rendering path, so a list rendered by a shortcode, by a
+	 * Product Collection block and by WooCommerce's legacy grid block all report
+	 * the same identity and GA4 does not see three lists.
+	 */
+	private const LIST_GENERAL      = 'general';
+	private const LIST_SEARCH       = 'search';
+	private const LIST_RELATED      = 'related';
+	private const LIST_CROSSSELL    = 'crosssell';
+	private const LIST_UPSELL       = 'upsell';
+	private const LIST_RECENT       = 'recent';
+	private const LIST_SALE         = 'sale';
+	private const LIST_BESTSELLERS  = 'bestsellers';
+	private const LIST_TOPRATED     = 'toprated';
+	private const LIST_FEATURED     = 'featured';
+	private const LIST_NEWARRIVALS  = 'newarrivals';
+	private const LIST_HANDPICKED   = 'handpicked';
+	private const LIST_BYCATEGORY   = 'bycategory';
+	private const LIST_BYTAG        = 'bytag';
+	private const LIST_BYBRAND      = 'bybrand';
+	private const LIST_CARTCONTENTS = 'cartcontents';
+	private const LIST_COLLECTION   = 'collection';
+	private const LIST_GROUPED      = 'grouped';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options     $options      The plugin options service.
@@ -220,21 +248,119 @@ final class ListTracking {
 
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WooCommerce's own global, not ours to prefix; the list type has to live where WC's loop already reads it.
 		$woocommerce_loop['listtype'] = '';
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- see above; our own key inside WooCommerce's loop state.
+		$woocommerce_loop['gtm4wp_list_identity'] = null;
 
 		return $query;
 	}
 
 	/**
+	 * Resolves one of the plugin's own product lists to its GA4 identity.
+	 *
+	 * The id is a locale-independent literal, deliberately NOT sanitize_title() of
+	 * the translated name: GA4 keys its list reports on item_list_id, so a
+	 * multilingual store has to report one id per list, not one per language. Each
+	 * literal below is what sanitize_title() produced for the English name before
+	 * this became explicit, so an English store's payload is unchanged.
+	 *
+	 * Names the site owner authors - a widget title - are not listed here and keep
+	 * deriving their id from the name in ProductData::process_product(): there is
+	 * nothing stable to key those on.
+	 *
+	 * The other end of this table lives in js/frontend/gtm4wp-woocommerce.js
+	 * (gtm4wp_product_block_names), which resolves the same lists for WooCommerce's
+	 * legacy product grid blocks - the one path where the block is only identifiable
+	 * in the browser. Seven of that map's eight ids also appear here (all but
+	 * products-by-attribute, which has no Product Collection equivalent) and have to
+	 * be edited together; upstream registry row U99 carries the reminder.
+	 *
+	 * @param string $key One of the LIST_* constants.
+	 * @return array{0: string, 1: string} The item_list_id and the translated item_list_name.
+	 */
+	private function list_identity( string $key ): array {
+		switch ( $key ) {
+			case self::LIST_SEARCH:
+				return array( 'search-results', __( 'Search Results', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_RELATED:
+				return array( 'related-products', __( 'Related Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_CROSSSELL:
+				return array( 'cross-sell-products', __( 'Cross-Sell Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_UPSELL:
+				return array( 'upsell-products', __( 'Upsell Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_RECENT:
+				return array( 'recent-products', __( 'Recent Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_SALE:
+				return array( 'sale-products', __( 'Sale Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_BESTSELLERS:
+				return array( 'best-selling-products', __( 'Best Selling Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_TOPRATED:
+				return array( 'top-rated-products', __( 'Top Rated Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_FEATURED:
+				return array( 'featured-products', __( 'Featured Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_NEWARRIVALS:
+				return array( 'new-products', __( 'New Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_HANDPICKED:
+				return array( 'handpicked-products', __( 'Handpicked Products', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_BYCATEGORY:
+				return array( 'product-category-list', __( 'Product Category List', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_BYTAG:
+				return array( 'products-by-tag', __( 'Products By Tag', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_BYBRAND:
+				return array( 'products-by-brand', __( 'Products By Brand', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_CARTCONTENTS:
+				return array( 'cart-contents', __( 'Cart Contents', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_COLLECTION:
+				return array( 'product-collection', __( 'Product Collection', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_GROUPED:
+				return array( 'grouped-product-detail-page', __( 'Grouped Product Detail Page', 'duracelltomi-google-tag-manager' ) );
+
+			case self::LIST_GENERAL:
+			default:
+				return array( 'general-product-list', __( 'General Product List', 'duracelltomi-google-tag-manager' ) );
+		}
+	}
+
+	/**
 	 * Sets the currently rendered product list impression name.
 	 *
-	 * @param string $listtype Translated list name.
+	 * $woocommerce_loop['listtype'] keeps holding the translated name: it is a 1.x
+	 * extension point third party code reads and writes. The stable id travels
+	 * beside it under our own key, paired with the name it belongs to - so if
+	 * something else overwrites listtype with a list of its own, after_shop_loop_item()
+	 * sees the names disagree and derives that list's id from its name instead of
+	 * handing it ours.
+	 *
+	 * @param string $key One of the LIST_* constants.
 	 * @return void
 	 */
-	private function set_list_type( string $listtype ): void {
+	private function set_list_type( string $key ): void {
 		global $woocommerce_loop;
 
+		list( $list_id, $list_name ) = $this->list_identity( $key );
+
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- WooCommerce's own global, not ours to prefix; the list type has to live where WC's loop already reads it.
-		$woocommerce_loop['listtype'] = $listtype;
+		$woocommerce_loop['listtype'] = $list_name;
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- see above; our own key inside WooCommerce's loop state.
+		$woocommerce_loop['gtm4wp_list_identity'] = array(
+			'name' => $list_name,
+			'id'   => $list_id,
+		);
 	}
 
 	/**
@@ -244,7 +370,7 @@ final class ListTracking {
 	 * @return mixed
 	 */
 	public function add_related_to_loop( $arg ) {
-		$this->set_list_type( __( 'Related Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_RELATED );
 
 		return $arg;
 	}
@@ -256,7 +382,7 @@ final class ListTracking {
 	 * @return mixed
 	 */
 	public function add_cross_sell_to_loop( $arg ) {
-		$this->set_list_type( __( 'Cross-Sell Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_CROSSSELL );
 
 		return $arg;
 	}
@@ -268,7 +394,7 @@ final class ListTracking {
 	 * @return mixed
 	 */
 	public function add_upsells_to_loop( $arg ) {
-		$this->set_list_type( __( 'Upsell Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_UPSELL );
 
 		return $arg;
 	}
@@ -298,7 +424,7 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function before_recent_products_loop(): void {
-		$this->set_list_type( __( 'Recent Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_RECENT );
 	}
 
 	/**
@@ -307,7 +433,7 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function before_sale_products_loop(): void {
-		$this->set_list_type( __( 'Sale Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_SALE );
 	}
 
 	/**
@@ -316,7 +442,7 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function before_best_selling_products_loop(): void {
-		$this->set_list_type( __( 'Best Selling Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_BESTSELLERS );
 	}
 
 	/**
@@ -325,7 +451,7 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function before_top_rated_products_loop(): void {
-		$this->set_list_type( __( 'Top Rated Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_TOPRATED );
 	}
 
 	/**
@@ -334,7 +460,7 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function before_featured_products_loop(): void {
-		$this->set_list_type( __( 'Featured Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_FEATURED );
 	}
 
 	/**
@@ -343,7 +469,7 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function before_related_products_loop(): void {
-		$this->set_list_type( __( 'Related Products', 'duracelltomi-google-tag-manager' ) );
+		$this->set_list_type( self::LIST_RELATED );
 	}
 
 	/**
@@ -413,9 +539,12 @@ final class ListTracking {
 	 * @param string $listtype The name of the product list where the product is currently shown.
 	 * @param mixed  $itemix The index of the product in the product list. The first product should have the index no. 1.
 	 * @param string $permalink The link where the click should land when a user clicks on this product element.
+	 * @param string $list_id Optional. The stable GA4 item_list_id of that list. Empty (the
+	 *                        default) means derive it from the list name, which is what a
+	 *                        caller-supplied or third-party list name gets.
 	 * @return string|false|void A hidden <span> element that includes all product data needed for ecommerce reporting in product lists.
 	 */
-	public function get_product_list_item_extra_tag( $product, $listtype, $itemix, $permalink ) {
+	public function get_product_list_item_extra_tag( $product, $listtype, $itemix, $permalink, string $list_id = '' ) {
 		if ( ! isset( $product ) ) {
 			return;
 		}
@@ -425,11 +554,14 @@ final class ListTracking {
 		}
 
 		if ( is_search() ) {
-			$list_name = __( 'Search Results', 'duracelltomi-google-tag-manager' );
+			list( $list_id, $list_name ) = $this->list_identity( self::LIST_SEARCH );
 		} elseif ( '' !== $listtype ) {
+			// A caller-supplied name, so its id is whatever the caller paired with
+			// it - or nothing, for a name that came from elsewhere (a widget title,
+			// third party code writing $woocommerce_loop['listtype']).
 			$list_name = $listtype;
 		} else {
-			$list_name = __( 'General Product List', 'duracelltomi-google-tag-manager' );
+			list( $list_id, $list_name ) = $this->list_identity( self::LIST_GENERAL );
 		}
 
 		$paged          = ( get_query_var( 'paged' ) ) ? get_query_var( 'paged' ) : 1;
@@ -438,14 +570,22 @@ final class ListTracking {
 			$posts_per_page = 1;
 		}
 
+		$product_attributes = array(
+			'productlink'    => $permalink,
+			'item_list_name' => $list_name,
+			'index'          => (int) $itemix + ( $posts_per_page * ( $paged - 1 ) ),
+			'product_type'   => $product->get_type(),
+		);
+
+		// Left out when there is no stable id, so process_product() derives one from
+		// the list name the way it always has.
+		if ( '' !== $list_id ) {
+			$product_attributes['item_list_id'] = $list_id;
+		}
+
 		$eec_product_array = $this->product_data->process_product(
 			$product,
-			array(
-				'productlink'    => $permalink,
-				'item_list_name' => $list_name,
-				'index'          => (int) $itemix + ( $posts_per_page * ( $paged - 1 ) ),
-				'product_type'   => $product->get_type(),
-			),
+			$product_attributes,
 			'productlist'
 		);
 
@@ -474,8 +614,17 @@ final class ListTracking {
 		global $product, $woocommerce_loop;
 
 		$listtype = '';
+		$list_id  = '';
 		if ( isset( $woocommerce_loop['listtype'] ) && ( '' !== $woocommerce_loop['listtype'] ) ) {
 			$listtype = $woocommerce_loop['listtype'];
+
+			// Use the stable id only while it still belongs to the name in
+			// listtype: anything else has written a list name of its own there and
+			// gets its id derived from that name, not ours (see set_list_type()).
+			$identity = $woocommerce_loop['gtm4wp_list_identity'] ?? null;
+			if ( is_array( $identity ) && isset( $identity['name'], $identity['id'] ) && $identity['name'] === $listtype ) {
+				$list_id = (string) $identity['id'];
+			}
 		}
 
 		$itemix = '';
@@ -491,7 +640,8 @@ final class ListTracking {
 				'the_permalink',
 				get_permalink(),
 				0
-			)
+			),
+			$list_id
 		);
 
 		// No need to escape here as everything is handled within the function call with esc_attr() and esc_url().
@@ -566,13 +716,14 @@ final class ListTracking {
 			return $labelvalue;
 		}
 
-		$list_name = __( 'Grouped Product Detail Page', 'duracelltomi-google-tag-manager' );
+		list( $list_id, $list_name ) = $this->list_identity( self::LIST_GROUPED );
 
 		$eec_product_array = $this->product_data->process_product(
 			$product,
 			array(
 				'productlink'    => $product->get_permalink(),
 				'item_list_name' => $list_name,
+				'item_list_id'   => $list_id,
 				'index'          => $GLOBALS['gtm4wp_grouped_product_ix'],
 			),
 			'groupedproductlist'
@@ -597,6 +748,17 @@ final class ListTracking {
 	 * Executed during woocommerce_blocks_product_grid_item_html.
 	 * Adds product list impression data into a product list that has been generated using the block
 	 * templates provided by WooCommerce.
+	 *
+	 * The empty list type and the index of 0 below are deliberate placeholders, not
+	 * an oversight: this WooCommerce filter carries no block context, so PHP cannot
+	 * tell a Handpicked Products grid from a Newest Products one. The grid container
+	 * does carry the block name as a wp-block-{block_name} class, so the real
+	 * identity is resolved in the browser - js/frontend/gtm4wp-woocommerce.js
+	 * overwrites all three of item_list_name, item_list_id and index from that
+	 * class. Keep the placeholder pair self-consistent (the generic list name and
+	 * the id derived from it): when the class is unknown to the tracker, that pair
+	 * is what the item reports, and a name that does not match its id would
+	 * collapse every grid on the page onto one id in GA4.
 	 *
 	 * @param string $content Product grid item HTML.
 	 * @param object $data Product data passed to the template.
@@ -645,13 +807,14 @@ final class ListTracking {
 		}
 
 		$collection = isset( $block['attrs']['collection'] ) ? (string) $block['attrs']['collection'] : '';
-		$list_name  = $this->product_collection_list_name( $collection );
+
+		list( $list_id, $list_name ) = $this->list_identity( $this->product_collection_list_key( $collection ) );
 
 		$index = 0;
 
 		return (string) preg_replace_callback(
 			'/<li\b[^>]*>/i',
-			function ( $matches ) use ( $list_name, &$index ) {
+			function ( $matches ) use ( $list_id, $list_name, &$index ) {
 				$li_tag = $matches[0];
 
 				// Only product items carry the wc-block-product class and a post-{ID}.
@@ -670,7 +833,8 @@ final class ListTracking {
 					$product,
 					$list_name,
 					$index,
-					$product->get_permalink()
+					$product->get_permalink(),
+					$list_id
 				);
 
 				if ( ! is_string( $extra_tag ) || '' === $extra_tag ) {
@@ -684,41 +848,70 @@ final class ListTracking {
 	}
 
 	/**
-	 * Maps a Product Collection preset (the block's "collection" attribute) to a
-	 * human-readable GA4 item_list_name, mirroring the shortcode / widget list
-	 * names. Falls back to a generic name for the default catalog and custom queries.
+	 * Maps a Product Collection preset (the block's "collection" attribute) to one
+	 * of the plugin's own list keys, so the block reports the same GA4 identity as
+	 * the shortcode and legacy-grid rendering of the same list.
+	 *
+	 * The 14 slugs are WooCommerce's CoreCollectionNames enum, measured 2026-08-06
+	 * against WC trunk and the 11.0.0 tag (upstream registry U26). A collection the
+	 * plugin does not know - a newly added core one, or one a third party
+	 * registered through the documented register_product_collection() API - falls
+	 * back to the generic list rather than guessing a name from the slug.
 	 *
 	 * @param string $collection The block's collection attribute (e.g. woocommerce/product-collection/on-sale).
-	 * @return string The translated list name.
+	 * @return string One of the LIST_* constants.
 	 */
-	private function product_collection_list_name( string $collection ): string {
+	private function product_collection_list_key( string $collection ): string {
 		switch ( $collection ) {
+			case 'woocommerce/product-collection/product-catalog':
+				// The plain catalog query, i.e. what the classic shop loop renders.
+				return self::LIST_GENERAL;
+
 			case 'woocommerce/product-collection/on-sale':
-				return __( 'Sale Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_SALE;
 
 			case 'woocommerce/product-collection/best-sellers':
-				return __( 'Best Selling Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_BESTSELLERS;
 
 			case 'woocommerce/product-collection/top-rated':
-				return __( 'Top Rated Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_TOPRATED;
 
 			case 'woocommerce/product-collection/new-arrivals':
-				return __( 'New Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_NEWARRIVALS;
 
 			case 'woocommerce/product-collection/featured':
-				return __( 'Featured Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_FEATURED;
 
 			case 'woocommerce/product-collection/related':
-				return __( 'Related Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_RELATED;
 
 			case 'woocommerce/product-collection/upsells':
-				return __( 'Upsell Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_UPSELL;
 
 			case 'woocommerce/product-collection/cross-sells':
-				return __( 'Cross-Sell Products', 'duracelltomi-google-tag-manager' );
+				return self::LIST_CROSSSELL;
+
+			// The four below are the Product Collection successors of legacy grid
+			// blocks the plugin already names, so they deliberately resolve to the
+			// same list identity: a store migrating one of those blocks keeps its
+			// GA4 list history instead of starting a new list.
+			case 'woocommerce/product-collection/hand-picked':
+				return self::LIST_HANDPICKED;
+
+			case 'woocommerce/product-collection/by-category':
+				return self::LIST_BYCATEGORY;
+
+			case 'woocommerce/product-collection/by-tag':
+				return self::LIST_BYTAG;
+
+			case 'woocommerce/product-collection/by-brand':
+				return self::LIST_BYBRAND;
+
+			case 'woocommerce/product-collection/cart-contents':
+				return self::LIST_CARTCONTENTS;
 
 			default:
-				return __( 'Product Collection', 'duracelltomi-google-tag-manager' );
+				return self::LIST_COLLECTION;
 		}
 	}
 }

@@ -1501,3 +1501,255 @@ describe( 'gtm4wp-woocommerce QuickView & found_variation JSON.parse guards (T24
 		expect( errorSpy ).toHaveBeenCalled();
 	} );
 } );
+
+// ---------------------------------------------------------------------------
+// Legacy WooCommerce product grid blocks (Handpicked Products, Newest Products,
+// Products by Tag, ...).
+//
+// WooCommerce fires woocommerce_blocks_product_grid_item_html with no block
+// context, so ListTracking::add_productdata_to_wc_block() cannot tell one grid
+// from another and writes a generic placeholder pair. The real list identity
+// lives in the wp-block-{block_name} class on the grid container and is resolved
+// in the browser - which is why BOTH halves of the pair have to be written back:
+// an item_list_name that no longer matches its item_list_id collapses every grid
+// on the page onto one id in GA4.
+//
+// The rewrite loop had no test at all, which is how the missing item_list_id
+// shipped (test-review TS-6).
+// ---------------------------------------------------------------------------
+describe( 'gtm4wp-woocommerce legacy product grid block list identity', () => {
+	// Exactly what the server emits for a legacy grid item: the empty list type
+	// falls back to "General Product List" and ProductData derives the id from it.
+	// Seeding the REAL placeholder pair is what makes a stale id observable - a
+	// fixture without it would pass whether or not the id is rewritten (TS-1).
+	const serverItem = ( id, name ) => ( {
+		item_id: id,
+		item_name: name,
+		price: 5,
+		productlink: 'https://shop/p' + id,
+		internal_id: id,
+		item_list_name: 'General Product List',
+		item_list_id: 'general-product-list',
+	} );
+
+	// Mirrors WC's AbstractProductGrid markup. Three structural details the
+	// rewrite loop depends on: the product item is a descendant of .wc-block-grid,
+	// the wp-block-{name} class sits on the SAME element as wc-block-grid (the
+	// loop reads the classList of the .wc-block-grid ancestor), and the data span
+	// is inside the <li>.
+	const gridBlock = ( blockClass, items ) =>
+		'<div class="wc-block-grid ' +
+		blockClass +
+		' has-3-columns">' +
+		'<ul class="wc-block-grid__products">' +
+		items
+			.map(
+				( item ) =>
+					'<li class="wc-block-grid__product">' +
+					'<span class="gtm4wp_productdata" data-gtm4wp_product_data=\'' +
+					JSON.stringify( item ) +
+					"'></span>" +
+					'<a class="wc-block-grid__product-link" href="' +
+					item.productlink +
+					'">' +
+					item.item_name +
+					'</a></li>'
+			)
+			.join( '' ) +
+		'</ul></div>';
+
+	const pushedItems = () => {
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'view_item_list'
+		);
+		expect( call ).toBeDefined();
+		return call[ 1 ];
+	};
+
+	beforeEach( () => {
+		document.body.className = '';
+		applyWooGlobals();
+
+		// TS-13/UC-3: the double has to round-trip through the SAME dataset
+		// attribute the impression loop reads back twenty lines later, exactly as
+		// the real helper in gtm4wp-ecommerce-generic.js does. A jest.fn()
+		// recorder here would leave the suite green while nothing is ever written
+		// to the DOM - i.e. green *because* the behavior under test is untested.
+		// Deliberately less capable in one respect: the real helper also floats
+		// parsed_json.price, which is not the dimension under test.
+		global.gtm4wp_update_json_in_node = ( el, key, new_key, new_value ) => {
+			if ( ! el || ! el.dataset || ! el.dataset[ key ] ) {
+				return false;
+			}
+			const parsed = JSON.parse( el.dataset[ key ] );
+			parsed[ new_key ] = new_value;
+			el.dataset[ key ] = JSON.stringify( parsed );
+			return true;
+		};
+
+		// The shared helper above defaults its exclude list to [], which is more
+		// permissive than the real signature; use the faithful default here so
+		// productlink / internal_id do not reach the pushed items (TS-13).
+		global.gtm4wp_read_json_from_node = (
+			el,
+			key,
+			exclude = [ 'productlink', 'internal_id' ]
+		) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		global.gtm4wp_store_item_list_attribution = jest.fn();
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+		jest.useFakeTimers();
+	} );
+
+	afterEach( () => {
+		delete window.gtm4wp_list_attribution;
+		cleanupWooGlobals();
+	} );
+
+	it( 'gives every grid block on the page its own item_list_id', () => {
+		document.body.innerHTML =
+			gridBlock( 'wp-block-product-new', [ serverItem( 1, 'Newest' ) ] ) +
+			gridBlock( 'wp-block-handpicked-products', [
+				serverItem( 2, 'Picked' ),
+			] );
+
+		bootWithCapture();
+
+		const byId = Object.fromEntries(
+			pushedItems().map( ( item ) => [ item.item_id, item ] )
+		);
+
+		expect( byId[ 1 ] ).toEqual(
+			expect.objectContaining( {
+				item_list_name: 'New Products',
+				item_list_id: 'new-products',
+			} )
+		);
+		expect( byId[ 2 ] ).toEqual(
+			expect.objectContaining( {
+				item_list_name: 'Handpicked Products',
+				item_list_id: 'handpicked-products',
+			} )
+		);
+
+		// The reported symptom: two grids must not collapse onto one id.
+		expect( byId[ 1 ].item_list_id ).not.toBe( byId[ 2 ].item_list_id );
+		// TS-2, the other direction: the server placeholder has to be GONE, not
+		// merely accompanied by a corrected name.
+		expect( byId[ 1 ].item_list_id ).not.toBe( 'general-product-list' );
+		expect( byId[ 2 ].item_list_id ).not.toBe( 'general-product-list' );
+	} );
+
+	// The whole map, pinned as a literal table. This is what breaks when
+	// WooCommerce renames a container class or when someone edits one half of a
+	// name/id pair (upstream registry U99, UD-2: a comment is not a control).
+	// Do not derive the id from the name here - a test that recomputes the
+	// production formula asserts nothing.
+	it.each( [
+		[
+			'wp-block-handpicked-products',
+			'Handpicked Products',
+			'handpicked-products',
+		],
+		[
+			'wp-block-product-best-sellers',
+			'Best Selling Products',
+			'best-selling-products',
+		],
+		[
+			'wp-block-product-category',
+			'Product Category List',
+			'product-category-list',
+		],
+		[ 'wp-block-product-new', 'New Products', 'new-products' ],
+		[ 'wp-block-product-on-sale', 'Sale Products', 'sale-products' ],
+		[
+			'wp-block-products-by-attribute',
+			'Products By Attribute',
+			'products-by-attribute',
+		],
+		[ 'wp-block-product-tag', 'Products By Tag', 'products-by-tag' ],
+		[
+			'wp-block-product-top-rated',
+			'Top Rated Products',
+			'top-rated-products',
+		],
+	] )( 'reports %s as its own list name and id', ( blockClass, name, id ) => {
+		document.body.innerHTML = gridBlock( blockClass, [
+			serverItem( 7, 'Product' ),
+		] );
+
+		bootWithCapture();
+
+		expect( pushedItems()[ 0 ] ).toEqual(
+			expect.objectContaining( {
+				item_list_name: name,
+				item_list_id: id,
+			} )
+		);
+	} );
+
+	it( 'numbers the items inside one grid without splitting the list id', () => {
+		document.body.innerHTML = gridBlock( 'wp-block-product-on-sale', [
+			serverItem( 1, 'First' ),
+			serverItem( 2, 'Second' ),
+		] );
+
+		bootWithCapture();
+
+		const items = pushedItems();
+		expect( items.map( ( item ) => item.index ) ).toEqual( [ 1, 2 ] );
+		expect( items.map( ( item ) => item.item_list_id ) ).toEqual( [
+			'sale-products',
+			'sale-products',
+		] );
+	} );
+
+	it( 'leaves an unknown grid block on the consistent server pair', () => {
+		document.body.innerHTML = gridBlock( 'wp-block-product-brand-new', [
+			serverItem( 1, 'Unknown' ),
+		] );
+
+		bootWithCapture();
+
+		// Degrades to the generic list rather than to a name/id mismatch.
+		expect( pushedItems()[ 0 ] ).toEqual(
+			expect.objectContaining( {
+				item_list_name: 'General Product List',
+				item_list_id: 'general-product-list',
+			} )
+		);
+	} );
+
+	it( 'carries the grid list id into the list attribution cookie', () => {
+		document.body.innerHTML = gridBlock( 'wp-block-product-new', [
+			serverItem( 1, 'Newest' ),
+		] );
+		window.gtm4wp_list_attribution = 1; // opt-in ON
+
+		bootWithCapture();
+
+		document
+			.querySelector( '.wc-block-grid__product-link' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		// Without the id rewrite this is called with 'general-product-list', and
+		// the wrong id then rides the cookie into add_to_cart / checkout /
+		// purchase - the part the store owner actually sees in GA4.
+		expect(
+			global.gtm4wp_store_item_list_attribution
+		).toHaveBeenCalledWith( 1, 'New Products', 'new-products' );
+	} );
+} );
