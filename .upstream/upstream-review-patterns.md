@@ -25,7 +25,7 @@ breakage · Blessed Couplings (**UB**) — deliberate, do **not** flag.
 
 Each row is `ID — one-line litmus`.
 
-**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UC-1, UC-3
+**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UC-1, UC-3
 
 **Upstream Drift (UD):**
 
@@ -48,6 +48,7 @@ Each row is `ID — one-line litmus`.
 | UD-15 ⭐ | **One finding per upstream.** Two products that ship on different release trains never share a finding, even when they share a vendor — the moment one half is delegated or accepted, the other rides along silently. |
 | UD-16 ⭐ | "Deprecated but still works" is scheduled work, not a free pass — the same migration is owed either way, plus `debug.log` entries meanwhile. Where the floor forbids removing it, the row carries a **named retire trigger**; loudness sets priority, never whether. |
 | UD-17 | A gatekeeper's ruleset is an upstream dependency; its *additions* are the drift. Read its release notes for what is newly forbidden — our code can be frozen and still start failing. Prefer a construction that cannot acquire the violation over a check that catches it afterwards. |
+| UD-18 ⭐ | A shipped `Fixed:` bullet is a claim about the past, not evidence. It records what someone believed at the time, and a silent defect never contradicts it — 1.22.3 claimed the select_item timeout was fixed and it was not, through every release since. When triaging "already fixed?", confirm in the released code (`git show <tag>:<path>`), never in the changelog. |
 
 **Upstream Coupling anti-patterns (UC):**
 
@@ -219,6 +220,16 @@ inference was backwards"*.
 happened until a probe says otherwise. Reviewers systematically discount what they
 cannot see, which inverts the security instinct that "loud" is worse.
 
+**It is not only upstream couplings (2026-08-06).** The same inference failed on a
+contract wholly inside this repo: our PHP printed three inline globals as top-level
+`const` (lexical) while our JS read them as `window.<name>` (property), so
+`gtm4wp_list_attribution`, `gtm4wp_datalayer_max_timeout` and `gtm4wp_checkoutwc` were
+permanently `undefined` in a browser. Three features shipped dead — one of them
+inherited from released 1.x, where a `Fixed:` bullet had already claimed it repaired
+(UD-18) — with no error, no red test and no user report, because a silently disabled
+tracker looks exactly like a correctly configured one. `silent-*` is a property of the
+**failure mode**, not of who owns the other end; see `.security/` **RI-14**.
+
 ### UD-12: A 200 proves the host is up, nothing more
 
 A reachability check on a remote SDK or a docs page answers a question nobody asked.
@@ -324,6 +335,32 @@ tool. The generic form of the question is: **what does this ruleset now forbid t
 did not forbid when we last passed it?** And where the answer would be expensive to
 absorb, prefer the structural defence — a construction that cannot acquire the violation
 — over a check that catches it afterwards.
+
+### UD-18: A shipped `Fixed:` bullet is a claim about the past, not evidence ⭐
+
+Same shape as UD-10 — a published assertion read as an observation — but pointed at our
+own history rather than at a compatibility range. A changelog entry records what someone
+*believed* they fixed at the time. Nothing re-checks it afterwards, and if the defect was
+silent there was never a signal to contradict it.
+
+**Confirmed 2026-08-06.** `CHANGELOG.md` carries, under released **1.22.3**:
+*"Fixed: properly reading timeout for select_item eventCallback"*. The option still did
+not work. 1.x read `window.gtm4wp_datalayer_max_timeout` while the same 1.x PHP emitted
+it as a `const` (RI-14), so the configured value was never found and the hardcoded 2000
+ms default applied on every product-list click — through that "fix" and every release
+after it. Anyone triaging *"is this already fixed?"* from the changelog would have closed
+the report as resolved.
+
+**Rules:**
+- When deciding whether something is already fixed — issue triage, forum triage, a
+  duplicate check — the changelog names *where to look*, never *what is true*. Confirm
+  in the code of the released version: `git show <tag-or-branch>:<path>`.
+- Treat this as strongest exactly where the failure is silent. A loud bug that recurs
+  gets re-reported, so a wrong `Fixed:` bullet is self-correcting; a silent one is not,
+  and the bullet then actively suppresses the next investigation.
+- Applies to our own ledgers too, which `.security/` already learned independently
+  (Review 14: *"a ledger is a measurement, not a fact"*, and *"do not write a ledger as
+  an all-clear"*). A changelog is the user-facing member of that family.
 
 ---
 
@@ -526,3 +563,4 @@ and that is what the registry row tracks.
 | 2026-08-05 | Seeded: UD-1..UD-10, UC-1..UC-7, UB-1..UB-3 from the initial dependency inventory (88 couplings across WordPress core, WooCommerce, third-party plugins, Google specs, media SDKs and the toolchain). |
 | 2026-08-05 | Added **UD-14** (⭐ a truncated fetch of an ordered page reads as deletion) after Sweep 1 produced exactly that false positive on U54: five core GA4 e-commerce events reported undocumented because the alphabetical page truncated mid-`refund`. Caught by the maintainer. Countermeasure: every long-page probe carries a sentinel (the known-last item); no sentinel in the extraction → `fetch-failed`. |
 | 2026-08-05 | Added UD-11 (⭐ "it evidently works" is not evidence — from `.security/` #121, filed Low @0.5 and re-rated High after ten minutes of measurement), UD-12 (a 200 proves the host is up, nothing more), UD-13 (a copied number is already wrong — this file's own seeding produced 69/94 where the source said 71/97). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UC-1, UC-3. |
+| 2026-08-06 | Added **UD-18** (⭐ a shipped `Fixed:` bullet is a claim about the past, not evidence) after finding that `CHANGELOG.md`'s 1.22.3 entry *"properly reading timeout for select_item eventCallback"* did not fix it: 1.x read `window.gtm4wp_datalayer_max_timeout` while 1.x PHP emitted it as a `const`, so the option never took effect in any released version and the hardcoded 2000 ms default always applied. Same shape as UD-10 (a published claim read as an observation) pointed at our own history; strongest exactly where the defect is silent, since a loud bug gets re-reported and a wrong bullet is then self-correcting. Extended **UD-11** with *it is not only upstream couplings* — the same "it evidently works" inference failed on a PHP↔JS contract entirely inside this repo, disabling three shipped features; `silent-*` is a property of the failure mode, not of who owns the other end. Companion security entry: `.security/` **RI-14** (binding vs. name/value). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UC-1, UC-3. |

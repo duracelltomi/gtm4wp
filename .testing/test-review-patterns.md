@@ -40,6 +40,7 @@ on every review before anything else.
 - **TS-15** — the only proof that a guard is tested is **deleting the guard and watching a test go red**. "The method has a test file", "the line is covered", "a finding forced a test here" are all compatible with a fix nothing asserts. Revert-and-run the highest-value guards every review; it is the one check no tooling in this project performs.
 - **TS-16** — a green suite is **not** evidence of test isolation. When the mocking framework defines functions **process-wide and permanently** (Brain Monkey does), one file's stub silently satisfies another file's missing one, and the dependency is invisible in declaration order. `--order-by=random` is a one-flag check that no other signal in this project performs.
 - **TS-13** — a test double must be **no more capable than the real collaborator**: if the mock does the safe thing the real dependency does *not* (returns a live object the real one returns null for; leaves an element the real SDK replaces; exposes a property the real object hides behind `__get`), the failure it would cause is invisible and the suite stays green over a real bug.
+- **TS-17** — the *environment* absorbs couplings too, and leaves no double to interrogate. jsdom's `global === window` makes a window property satisfy a bare-identifier read, so the suite cannot tell the two binding kinds apart and passed identically over three features that shipped dead. Ask the TS-13 question **of the harness**; where it cannot be made faithful, move the guard to a tool that can see it (ESLint) and record the blind spot.
 
 **Test Smells (TS):**
 - **TS-11** — upstream raw-passthrough contract: a module that hands a value to a *shared downstream JSON sink* needs a **special-character** input proving it does NOT pre-escape (`esc_js`/`esc_attr`). With benign data (`'HU'`) an accidental pre-escape is invisible and coverage stays green (the module-boundary form of TS-1 / RI-4).
@@ -66,6 +67,7 @@ on every review before anything else.
 - **TC-13** — the Brain Monkey recipe for a TS-12 capability gate: simulate the filter with `Filters\expectApplied( 'gtm4wp_admin_page_capability' )->andReturn( 'custom_cap' )` (omit it for the default-unchanged case — `apply_filters` passes the default through), assert `current_user_can` is called `->with()` that cap for grant/deny, and capture the `add_options_page()` 3rd arg for the menu/render gate (`AdminCapabilityFilterTest`).
 - **TC-15 (JS/admin)** — an admin React component is tested with `@testing-library/react` against the local `@wordpress/*` stand-ins in `js/admin/test-support/` (mapped in `jest.config.js`), never against an installed `@wordpress/components`: those packages are build-time externals, so no installed version is "the real one". Assert a guard through its **effect** (`onChange` not called), never through a rendered `disabled`/`readOnly` prop.
 - **TC-14** — code gated on a WordPress conditional tag that then reads the companion global (`is_singular()` → `$GLOBALS['post']`) ships a tag-true/global-null case: promote warnings to failures via a throwing error handler, assert the affected keys are **absent** (omission, not placeholders) and the global-independent keys still emit.
+- **TC-16 (JS/frontend)** — a global the PHP side prints as a top-level `const` is tested by injecting a real classic `<script>` (jsdom runs it synchronously, creating a true lexical binding) and planting the **opposite** value on `window.<name>` as a decoy, in its own test file. Indirect `eval` cannot substitute — measured; `let`/`const` never escape eval's declarative environment.
 
 **Blessed Exceptions (BE) — do NOT flag:**
 - **BE-4** — snapshotting `$_POST`/`$_GET` in a test `setUp` (for TS-7 isolation) trips `WordPress.Security.NonceVerification.Missing` (a phpcs *error*, not warning). Suppress with a scoped `// phpcs:ignore WordPress.Security.NonceVerification.Missing -- test isolation snapshot; the handler's own nonce check is asserted`.
@@ -372,6 +374,44 @@ accessor), not just the happy shape. **Rule while reviewing:** when a security/c
 finding turns on a collaborator's real behavior, check whether the test double reproduces
 it; a green test over a stubbed-away contract is not coverage.
 
+### TS-17: The test *environment* can absorb a coupling, with no double to interrogate ⭐
+TS-13's rule — *"what does the real thing do here that my fake doesn't?"* — only fires
+when there is a fake to look at. Sometimes nobody wrote one and the **realm itself** is
+more permissive than the browser, so the distinction the bug turns on does not exist
+inside the harness. There is no over-capable stub to find, which is why TS-13's prompt
+misses it entirely.
+
+**Confirmed 2026-08-06.** In jest's jsdom environment `global === window`, so
+`window.gtm4wp_list_attribution = 1` in a fixture *also* satisfies a bare-identifier
+read. In a real browser those are two different bindings: the PHP side prints the
+inline globals as a top-level `const`, which is lexical and never a window property
+(RI-14). Every existing case set the window property, so the suite passed identically
+whether the tracker read `window.<name>` or the bare name — and three features shipped
+dead behind that green suite, one of them inherited from released 1.x. Nothing was
+stubbed; the environment simply cannot represent the difference.
+
+Same shape, other harnesses: `document`/`window` shared across a whole test *file* (a
+real page gets a fresh one per load), Brain Monkey defining a mocked function
+process-wide and permanently (TS-16), and Node globals that a browser lacks.
+
+**Rules:**
+- When a bug turns on a *host-environment* behavior rather than a collaborator's, ask
+  the TS-13 question **of the environment**: what does a real browser/request do here
+  that jsdom / Brain Monkey / the shared document does not? If the harness cannot
+  represent the difference, an ordinary test is not evidence — say so rather than
+  counting the file as covered.
+- Reproduce the real mechanism instead of describing it. Here that is
+  `js/frontend/test/inline-head-globals.test.js` (recipe **TC-16**): inject a genuine
+  classic `<script>` to create real lexical bindings, then plant the **opposite** value
+  on `window.<name>` as a decoy, so correct and regressed code cannot both pass.
+- Where the harness genuinely cannot be made faithful, move the guard to a tool that
+  can see it — the `no-restricted-properties` rule in `.eslintrc.js` is the static half
+  of this one — and record the blind spot rather than leaving a green suite to imply
+  coverage.
+- **TS-15 is what catches this in practice:** revert the fix and watch the new cases go
+  red. All 7 were watched failing on the unfixed source before being trusted; had the
+  harness still been absorbing the coupling, they would have stayed green and said so.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -571,6 +611,38 @@ Scoped `phpcs:ignore`s are accepted for the handler
 `WordPress.Security.EscapeOutput.ExceptionNotEscaped`) with a test-only
 justification, in the BE-4 spirit.
 
+### TC-16: Lexical-global harness (inline `<script>` + window decoy)
+The recipe TS-17 calls for, and the only way this suite can tell a real inline-head
+global from a window property. Canonical file:
+`js/frontend/test/inline-head-globals.test.js`.
+
+1. **Create the binding the way the page does.** In `beforeAll`, append a real
+   `<script>` element to `document.head` with the declarations as its `textContent`.
+   `jest-environment-jsdom` runs with `runScripts: 'dangerously'` and jsdom executes
+   an inline script synchronously on insertion, so this produces genuine global
+   *lexical* bindings — not window properties.
+2. **Use `let`, not the production `const`.** A global lexical binding can be neither
+   redeclared nor deleted for the life of a realm, so `const` would freeze the value
+   for the whole file. The binding *kind* — the thing under test — is identical.
+   Expose a setter from inside that same script (`window.gtm4wp_test_set_lexical`),
+   since only code evaluated there can assign to its own lexical bindings.
+3. **Plant a decoy.** Every helper that sets a lexical value also writes the
+   **opposite** value to `window.<name>`. This is what makes the case discriminate:
+   correct code reads the lexical value, regressed code reads the decoy, and they
+   cannot both pass. Set a decoy in `beforeEach` too, so a case that forgets one
+   still cannot pass by reading window.
+4. **Pin the harness itself.** Capture `hasOwnProperty( window, name )` in `beforeAll`
+   *before* any decoy exists and assert it is `false` in its own case. If that ever
+   flips, every other case silently stops discriminating — assert it rather than
+   trusting the mechanism.
+5. **One realm per file.** Because the bindings cannot be deleted, this needs its own
+   test file; injecting them into an existing suite shadows every `window.<name> = …`
+   in that file's setup.
+
+Do **not** try indirect `eval` (`(0, eval)( 'const x = 1' )`) — measured and rejected
+2026-08-06: `PerformEval` puts `let`/`const` in a throwaway declarative environment, so
+only `var` ever reaches the global object. It cannot create a persistent lexical global.
+
 ---
 
 ## Blessed Exceptions
@@ -602,6 +674,7 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-08-06 (bug report, no review run) | Added **TS-17** (⭐ the test *environment* can absorb a coupling, with no double to interrogate) and its recipe **TC-16** (lexical-global harness). TS-13 asks what the real collaborator does that your fake does not; here nobody wrote a fake — jest's jsdom makes `global === window`, so a fixture's `window.<name> = 1` also satisfies a bare-identifier read and the harness structurally cannot tell a lexical `const` global from a window property. The suite passed identically whether the tracker read the right spelling or the wrong one, and **three features shipped dead behind it** (`.security/` RI-14), one inherited from released 1.x. TC-16 reproduces the real page instead: inject a genuine classic `<script>` (jsdom's `runScripts: 'dangerously'` executes it synchronously, creating a true lexical binding), then plant the **opposite** value on `window.<name>` as a decoy so correct and regressed code cannot both pass; own test file, since a global lexical binding can be neither redeclared nor deleted for the life of a realm. **A proposed harness was measured and rejected before being built on:** indirect `eval` cannot create a persistent lexical global — `PerformEval` puts `let`/`const` in a throwaway declarative environment, only `var` reaches the global object. All 7 cases were watched failing on the unfixed source per TS-15, which is the check that would have exposed the harness had it still been absorbing the coupling. Where a harness genuinely cannot be made faithful, the guard moves to a tool that can see it — here `no-restricted-properties` in `.eslintrc.js`, which fails `npm run build`. |
 | 2026-08-05 (Run 6 — gaps closed) | Closed T35–T38 on the user's "close all gaps" go-ahead. **PHP 763→767 / 2463→2488 assertions; JS 23→30 suites, 309→404 tests; all green. `phpcs` exit 0 repo-wide, `lint:js` clean, and `npm run build` output verified byte-identical.** No production code changed (tests + tooling only → CHANGELOG exempt). Added **TC-15** (admin React component harness). **TS-16 was applied as the acceptance criterion, not just the diagnosis:** the suite now passes `--order-by=random` across 5 seeds with an assertion count identical to declaration order, which is what proves the fix rather than one lucky seed. Three closes were probe-verified by reverting the guard — the `uninstall.php` `WP_UNINSTALL_PLUGIN` gate, `TableControl`'s locked-cell rejection and `AxeptioVersionControl`'s `cancelled` guard — and T37's new assertion was probed with a *warning-free* `'Array'` stringify, the exact case its predecessor let through. Process lessons worth keeping: (a) the T35 fix for PageVariables is **behaviour-preserving, not a stub added for the linter** — declaring `get_multiple_authors` in `setUp` as "returns no authors" is outcome-equivalent to the function being absent, which is why the ordering NOTE could be deleted rather than reworded; (b) the jsdoc rules fire on **named** exports with destructured props but not on `export default`, so the stand-ins carry one scoped `eslint-disable` in the BE-4 spirit rather than a dozen restated prop tables; (c) `js/admin/test-support/` must NOT be named `test/` — the wp jest preset's `testMatch` includes `**/test/*.[jt]s?(x)`, so any `.js` in a `test/` dir is collected as a suite. |
 | 2026-08-05 (Run 6 — report only) | Added **TS-16** (a green suite is not evidence of isolation — check the order) after `--order-by=random` errored **13 tests** on an otherwise unchanged 763-green suite, three of them security regression guards. Root cause is the mechanism Run 5 had already written down as a *limitation* — Brain Monkey defines mocked functions process-wide and permanently — but never followed through as a *risk*: one file's stub silently satisfies another file's missing one, and each file still passes alone, so the usual isolation checks all say "fine". Two process lessons, no numbered entry: (a) **the inventory step must recurse** — the Admin JS row said `js/admin/` and the command's own one-liner is `ls js/admin/*.js`, so a `components/` subdirectory of 6 files / 939 lines was never inventoried; this is the Run-5 "invisible, not unreviewed" lesson recurring one directory level down, and it argues for `find js/admin -name '*.js'` over `ls`. (b) A **whole-schema sweep test** — `ModuleConsistencyTest::test_every_field_sanitizer_handles_non_scalar_input_without_warning`, which iterates every field of every module and promotes warnings to failures — is the shape that made the run's biggest probe come back clean; it pins fields that do not exist yet, which per-field tests never do. Worth copying wherever a contract spans a whole class of declarations. |
 | 2026-08-05 (Run 5 — gaps closed) | Closed T28–T34 on the user's "close all gaps" go-ahead. **PHP 706→763 / 2325→2463 assertions, JS 23 suites/309, all green; `phpcs` exit 0 repo-wide with warnings blocking; `lint:js` clean; no production code changed** (tests-only → CHANGELOG exempt). **TS-15 was applied as the acceptance criterion, not just the diagnosis:** four fixes were signed off by re-reverting the guard and watching the *new* test go red (#33's session load, the `Plugin::boot()` gate, the `Notices` gate, the scoped ampersand restore), and T33's exact counts by neutralizing the detach (4 tests that had passed as shape assertions failed). New process lessons worth keeping: (a) **Brain Monkey makes `function_exists()` sticky for the whole process** — once any test mocks a function it exists forever, so a "helper absent on older WooCommerce" branch is not unit-testable here; document the leg instead of faking it; (b) `setcookie`/`headers_sent` ARE redefinable via `patchwork.json`, but `UserEventsModule` uses the **positional** 7-arg signature while `VisitorDataModule` uses the options-array form — match the one under test; (c) a test-wide `document.addEventListener` capture in the **file-level** `beforeEach`/`afterEach` beats a per-describe harness: it cannot be forgotten by the next describe someone adds, which is how T26's fix left seven describes leaking; (d) `#[\PHPUnit\Framework\Attributes\DataProvider]` is the house style — a `@dataProvider` doc-comment raises a PHPUnit 11 deprecation; (e) never run bare `npx prettier` on this repo — it uses default config and reformats the whole file; `npx wp-scripts lint-js js --fix` is the correct fixer. |
