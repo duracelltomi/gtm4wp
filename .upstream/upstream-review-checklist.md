@@ -326,7 +326,7 @@ No versions, no changelogs, no feeds. Verified by re-checking the recorded **cla
 |---|---|---|---|---|---|---|---|
 | U72 | PHP floor `8.0` — **6 sites**; CI executes **none** of them (matrix is 8.2 + 8.4) | plugin header, `readme.txt`, `composer.json`, `phpcs.xml` `testVersion`, runtime `version_compare`, `.claude/CLAUDE.md` | grep agreement + CI matrix | — | loud | every-run | [x] 2026-08-05 (S1) agree; **D5** on CI |
 | U73 | Composer direct deps (phpcs, wpcs, php-compatibility, phpunit, brain/monkey) | `composer.json` | `composer outdated --direct --format=json` (exit 0 either way) | — | loud | every-run | [x] 2026-08-05 (S1) → D7 |
-| U88 | `composer.lock` is **git-ignored**, so CI resolves dependencies fresh on every run | root `.gitignore`, `.github/workflows/ci.yml` | `git ls-files --error-unmatch composer.lock` | — | loud | every-run | [x] 2026-08-05 (S1) confirmed untracked → D6 |
+| U88 | `composer.lock` **tracking status** — if it is not committed, `composer install` behaves like `composer update` and CI runs freshly published dev dependencies (and transitive Composer plugins, which execute code at install time) unreviewed | root `.gitignore`, `.github/workflows/ci.yml` | `git ls-files --error-unmatch composer.lock` | — | loud | every-run | [x] 2026-08-06 **now tracked** — `ls-files` exits 0, `check-ignore` does not match. Reverses the 2026-08-05 (S1) reading that raised D6; `ci.yml` documents the pinning rationale in place |
 | U74 | npm devDeps + the hand-maintained `overrides` block (11 transitive pins, count measured at `1daeddf`) | `package.json` | `npm outdated --json` (**exits 1 when anything is outdated**), `npm audit` | — | loud | every-run | [x] 2026-08-05 (S1) `outdated` only → D7; **`audit` not run** |
 | U75 | `@wordpress/scripts` internal config shape (webpack `defaultConfig` spread; jest `hasBabelConfig()` avoidance) | `webpack.config.js`, `jest.config.js` | wp-scripts releases | — | loud | quarterly | [ ] |
 | U76 | **`@wordpress/components` `__next*` opt-in props** — unpinned runtime external, breaks on the *user's* WP update, test stand-in cannot catch it (UC-3, UC-7) | `js/admin/components/*.js`; stand-in `js/admin/test-support/wp-components.js` | Gutenberg releases | U82 | silent-wrong | on-WP-release | [ ] |
@@ -334,6 +334,57 @@ No versions, no changelogs, no feeds. Verified by re-checking the recorded **cla
 | U77 | Build-asset declared handles (`wp-components`, `wp-element`, `wp-data`, `wp-api-fetch`, `wp-i18n`, `react-jsx-runtime`) | `build/*.asset.php` | core script handles | U78 | loud | on-WP-release | [ ] |
 | U78 | Patchwork redefining PHP internals `headers_sent`, `setcookie` | `patchwork.json` | Patchwork releases | — | loud | quarterly | [ ] |
 | U79 | Release packaging allow-list `DIST_FILES` — a new required top-level dir not listed ships broken | `tools/build-release.js` | grep vs repo tree | — | silent-missing | every-run | [ ] |
+| U97 | **Text domain `duracelltomi-google-tag-manager` == the wp.org slug** — core resolves `.mo` files by domain alone (no fallback), wp.org names packs from the GlotPress slug, so the two must agree. 14 live packs depend on it. See UB-6; the long `-for-wordpress` folder name is *not* the slug | plugin header `Text Domain`; 348 i18n calls in `src/`; `phpcs.xml` `text_domain` property | `api.wordpress.org/plugins/info/1.2/` + `/translations/plugins/1.0/` | — | silent-missing | on-demand | [x] 2026-08-06 measured — short slug 200, long slug 404, 14 packs. **Never rename**; it would orphan all 14 silently |
+| U98 | **Admin React app JS translations** — `wp_set_script_translations( 'gtm4wp-admin-app', … )` is called with no `$path`, so core requests `WP_LANG_DIR/plugins/{domain}-{locale}-{md5}.json` keyed on **`md5('build/admin.js')` = `aa377c165c6b87664fc2deacf28cbe53`**. The claim is that wp.org's pack builder hashes the same string. 2.0 is the first release this can fail on — the 1.22.5 packs contain no `.json` at all, 1.x having no JS strings | `src/Admin/SettingsPage.php:137` (handle + domain, no `$path`); `webpack.config.js` (output filename); `tools/build-release.js` `DIST_FILES` (`build`) | core `_load_script_textdomain_from_src()` vs wp.org `class-language-pack.php` | U97 | silent-missing | pre-release / after first 2.0 pack build | [~] 2026-08-06 **three of four links verified, one unobservable** — see below |
+
+**On U98 — what was measured 2026-08-06, and the one link that cannot be.** The chain
+has four links; three were tested directly.
+
+1. **Extraction records `build/admin.js`.** Ran the real `wp i18n make-pot` (WP-CLI 2.12.0)
+   against the **expanded release ZIP**, not the repo tree — the shipped tree has `build/`
+   but no `js/`, which is what wp.org receives. Result: **31 strings, every reference
+   `#: build/admin.js:1`.** The bundle is minified but not named `*.min.js`, and that
+   filename pattern is the extractor's only minification exclusion (there is no
+   line-length heuristic), so it is parsed. Terser preserves the `.__` property access —
+   `(0,s.__)("Import settings","duracelltomi-google-tag-manager")` — and the scanner reads it.
+2. **wp.org hashes that reference verbatim.** `class-language-pack.php:434` —
+   `$hash = md5( $file ); $dest = "{$base_dest}-{$hash}.json";`. No stripping, no
+   normalisation; the only filter skips paths under `src/` (ours are under `build/`).
+3. **Core requests the same name.** `_load_script_textdomain_from_src()` strips the content
+   URL path, drops the first two segments (`plugins/<slug>`), leaving `build/admin.js`, then
+   builds `$file_base . '-' . md5( $relative ) . '.json'`. Same input, same hash.
+4. **Unobservable until release:** whether wp.org's GlotPress project actually builds a JS
+   sub-project for this plugin and clears the **90 % pack threshold** per locale. Nothing
+   local can answer it. Re-check after the first 2.0 pack build.
+
+**False alarm worth recording so it is not re-raised:** WP-CLI's own `make-json` emits
+`"source":"build/a.js"` for this input and therefore a different md5. That is a `make-json`
+filename-rewriting artifact (it rewrites `*.min.js` names); wp.org's builder does no
+rewriting and does not share it. Do not "fix" the build to satisfy `make-json`.
+
+**Pinned by a test, so link 3 cannot rot silently:**
+`SettingsPageTest::test_admin_app_script_path_and_text_domain_stay_pinned_for_translations`
+asserts the registered src ends in `build/admin.js` and that the domain is
+`duracelltomi-google-tag-manager`. Verified to fail on a mutated path. The doubles for
+`wp_enqueue_script` / `wp_set_script_translations` were changed from `justReturn( true )`
+to argument-recording in the same change — they previously absorbed the exact arguments
+the coupling rides on (UC-3).
+| U95 | `readme.txt` header block as **published claims** — `Stable tag`, `Requires at least`, `Requires PHP` must agree with the plugin header. U2 covers the fourth sibling (`Tested up to`) and had a row while these three did not | `readme.txt`; plugin header | grep agreement + wp.org readme spec | — | silent-wrong | every-run | [x] 2026-08-06 `Requires at least` (6.3) and `Requires PHP` (8.0) agree. **`Stable tag: 1.22.5` deliberately trails the header `2.0.0-beta2`** — `master` is the unreleased 2.0 line, the live line is `1.x`. Retire the exception the moment they converge at 2.0.0 GA |
+| U96 | **wordpress.org Plugin Directory guidelines** + the Plugin Check ruleset the review team runs. Standing constraints this plugin must never violate: no self-update routine or `Update URI` header, no offloading assets to a CDN, no obfuscated code, no `unfiltered_uploads`, no external admin-menu links, no direct-execution-unguarded PHP file | whole release artifact; `tools/build-release.js` `DIST_FILES`; plugin header; `readme.txt` | guidelines page (undated) + Plugin Check release diffs | — | silent-missing | on-demand / pre-release | [x] 2026-08-06 tool analysed and **deliberately not adopted** — see below |
+
+**On U96 — why the tool is not wired in (2026-08-06).** Plugin Check (PCP) was evaluated
+against its own source after a wp.org recommendation. Its `security` category is
+redundant here: `late_escaping` wraps `WordPress.Security.EscapeOutput`, the same sniff
+`phpcs.xml` already runs with warnings blocking, and `wp_json_encode` is on WPCS's
+escaping-function list so the dataLayer idiom is already recognised. It performs **no
+authorization analysis at all** — no capability, permission-callback, ownership or taint
+checking — which is where `.security/` does its real work (PA-1, PA-10, FP-5). Its
+`plugin_repo` category is the part with no owner, and it is what this row now carries.
+Running the tool needs Docker + wp-env and a third-party composite action; that trade was
+declined in favour of registering the contract and moving the mechanical half into
+`phpcs.xml`, which runs in the existing CI job. **Re-open if** a wp.org submission is
+rejected on a code we do not already check, or if the review team makes a non-`plugin_repo`
+category gating.
 
 ### G. Watch channels
 

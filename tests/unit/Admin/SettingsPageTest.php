@@ -38,6 +38,20 @@ final class SettingsPageTest extends TestCase {
 	 */
 	private array $inline_scripts = array();
 
+	/**
+	 * Every wp_enqueue_script() call recorded during the test.
+	 *
+	 * @var array<int, array{handle: string, src: string}>
+	 */
+	private array $enqueued_scripts = array();
+
+	/**
+	 * Every wp_set_script_translations() call recorded during the test.
+	 *
+	 * @var array<int, array{handle: string, domain: string, path: string|null}>
+	 */
+	private array $script_translations = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -72,8 +86,32 @@ final class SettingsPageTest extends TestCase {
 		// cannot redefine, but the bootstrap inline script is emitted whether the
 		// build asset file exists or not, so the assertions do not depend on it.
 		Functions\when( 'plugins_url' )->alias( static fn ( $path ) => 'https://example.com/' . $path );
-		Functions\when( 'wp_enqueue_script' )->justReturn( true );
-		Functions\when( 'wp_set_script_translations' )->justReturn( true );
+		// Both doubles RECORD their arguments rather than swallowing them. A
+		// stand-in that accepts and ignores the very argument the coupling rides
+		// on cannot fail when that argument changes, and a green suite then reads
+		// as evidence the contract is covered when it is the opposite.
+		$this->enqueued_scripts    = array();
+		$this->script_translations = array();
+
+		Functions\when( 'wp_enqueue_script' )->alias(
+			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) {
+				$this->enqueued_scripts[] = array(
+					'handle' => $handle,
+					'src'    => (string) $src,
+				);
+				return true;
+			}
+		);
+		Functions\when( 'wp_set_script_translations' )->alias(
+			function ( $handle, $domain = 'default', $path = null ) {
+				$this->script_translations[] = array(
+					'handle' => $handle,
+					'domain' => $domain,
+					'path'   => $path,
+				);
+				return true;
+			}
+		);
 		Functions\when( 'wp_enqueue_style' )->justReturn( true );
 		Functions\when( 'wp_style_add_data' )->justReturn( true );
 		Functions\when( 'wp_json_encode' )->alias(
@@ -119,6 +157,42 @@ final class SettingsPageTest extends TestCase {
 	 */
 	private function encoded_fragment( string $value ): string {
 		return trim( (string) json_encode( $value, self::HEX_FLAGS ), '"' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+	}
+
+	/**
+	 * Pins the two strings the admin screen's translations are keyed on.
+	 *
+	 * Because wp_set_script_translations() is called with no $path, WordPress looks
+	 * for WP_LANG_DIR/plugins/{domain}-{locale}-{md5}.json where the md5 is taken
+	 * over the script src relative to the plugin root - `build/admin.js`. The
+	 * wordpress.org
+	 * language-pack builder independently hashes the source reference its string
+	 * extractor recorded, which is the same `build/admin.js`. The two md5s agree
+	 * only while that literal path and that domain both hold.
+	 *
+	 * Renaming the build output (a webpack contenthash, an entry rename) or the
+	 * domain would break every locale's admin translations with no error, no
+	 * warning and nothing else in the suite going red - the screen would simply
+	 * stay English. Measured 2026-08-06: md5('build/admin.js') =
+	 * aa377c165c6b87664fc2deacf28cbe53. Registry row U98.
+	 */
+	public function test_admin_app_script_path_and_text_domain_stay_pinned_for_translations(): void {
+		$page = $this->make_settings_page( array() );
+
+		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
+
+		$handles = array_column( $this->enqueued_scripts, 'src', 'handle' );
+
+		$this->assertArrayHasKey( 'gtm4wp-admin-app', $handles, 'The admin app script is enqueued.' );
+		$this->assertStringEndsWith(
+			'build/admin.js',
+			$handles['gtm4wp-admin-app'],
+			'The md5 wordpress.org hashes is taken over this exact relative path.'
+		);
+
+		$this->assertCount( 1, $this->script_translations, 'Translations are registered once for the admin app.' );
+		$this->assertSame( 'gtm4wp-admin-app', $this->script_translations[0]['handle'] );
+		$this->assertSame( 'duracelltomi-google-tag-manager', $this->script_translations[0]['domain'] );
 	}
 
 	public function test_enqueue_assets_hex_encodes_breakout_characters_in_stored_values(): void {

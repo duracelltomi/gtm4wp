@@ -47,6 +47,7 @@ Each row is `ID — one-line litmus`.
 | UD-14 ⭐ | A truncated fetch of an **ordered** page is indistinguishable from deletion of everything after the cut. Every long-page probe carries a sentinel: the known-last item. No sentinel in the extraction → `fetch-failed`, never "removed". |
 | UD-15 ⭐ | **One finding per upstream.** Two products that ship on different release trains never share a finding, even when they share a vendor — the moment one half is delegated or accepted, the other rides along silently. |
 | UD-16 ⭐ | "Deprecated but still works" is scheduled work, not a free pass — the same migration is owed either way, plus `debug.log` entries meanwhile. Where the floor forbids removing it, the row carries a **named retire trigger**; loudness sets priority, never whether. |
+| UD-17 | A gatekeeper's ruleset is an upstream dependency; its *additions* are the drift. Read its release notes for what is newly forbidden — our code can be frozen and still start failing. Prefer a construction that cannot acquire the violation over a check that catches it afterwards. |
 
 **Upstream Coupling anti-patterns (UC):**
 
@@ -69,6 +70,7 @@ Each row is `ID — one-line litmus`.
 | UB-3 | A `function_exists`/`method_exists`/`class_exists`-guarded optional integration that degrades cleanly is working as designed; absence is not drift. |
 | UB-4 | `GROUP_CLASS_IDS` carrying only `sandboxedScripts` is deliberate scope, not an incomplete mirror — do not report "1 of 8". |
 | UB-5 | A declared floor *below* the vendor-supported range is deliberate reach, not drift. The PHP 8.0 floor stays despite EOL; report it once per change of circumstance, not every sweep. |
+| UB-6 ⭐ | `Text Domain: duracelltomi-google-tag-manager` **already matches the wp.org slug** — the long `-for-wordpress` name is only the git folder and main-file basename. Measured: 14 live language packs. Renaming the domain would orphan every one of them. Do not "fix" it. |
 
 ---
 
@@ -295,6 +297,36 @@ half-verified.
 
 ---
 
+### UD-17: A gatekeeper's ruleset is an upstream dependency, and its *additions* are the drift
+
+**You never fail the check you already knew about. You fail the one that was added.** A
+gatekeeper — wordpress.org's plugin review, a store review, a CI policy someone else
+owns — publishes a ruleset that moves on its own schedule. Our code can be frozen and
+still start failing.
+
+**The worked example.** Plugin Check 2.0 added a `file_type` finding for AI-instruction
+directories (`.claude/`, `.cursor/`, `.aider/`) and for `.github/`. Nothing in this
+repository changed, no test went red, and no user could have reported it. The shipped
+artifact was unaffected — but only because `tools/build-release.js` (U79) packages from
+an **allow-list**, `DIST_FILES`, rather than a `.distignore` deny-list.
+
+**That structural property is the actual control, and it generalises.** An allow-list
+packager excludes the next dev-only directory *by construction*; a deny-list excludes it
+only if somebody remembers to add it. `.security/`, `.testing/`, `.upstream/` and
+`.claude/` were all born after the packager and none of them needed a packaging change.
+A deny-list would have shipped every one of them until someone noticed. When a packaging
+change is proposed, this is the property to protect — the choice is not a style
+preference.
+
+**Rule:** register the gatekeeper's ruleset itself, with its release feed as the watch
+channel, and read its release notes for *additions* rather than re-running the whole
+tool. The generic form of the question is: **what does this ruleset now forbid that it
+did not forbid when we last passed it?** And where the answer would be expensive to
+absorb, prefer the structural defence — a construction that cannot acquire the violation
+— over a check that catches it afterwards.
+
+---
+
 ## Upstream Coupling anti-patterns
 
 ### UC-1: A version floor written in N places drifts ⭐
@@ -435,6 +467,47 @@ It was a reasonable read of a mirrored list (UD-1) and it was wrong, because the
 was never intended to be complete. When an `accepted` decision lands, **narrow the
 claim** rather than muting the finding — otherwise the next sweep re-derives the same
 false gap and the maintainer answers the same question again.
+
+### UB-6: The text domain matches the wp.org slug — the *directory name* is what differs ⭐
+
+`Text Domain: duracelltomi-google-tag-manager` next to a repo folder and main file called
+`duracelltomi-google-tag-manager-for-wordpress` looks like the classic
+domain-does-not-match-slug defect. **It is not. Do not "fix" it.**
+
+Measured 2026-08-06:
+
+| Check | Result |
+|---|---|
+| `api.wordpress.org/plugins/info/1.2/?…slug=duracelltomi-google-tag-manager` | 200, `"slug":"duracelltomi-google-tag-manager"` |
+| same API, `…-for-wordpress` | **HTTP 404 — no such plugin** |
+| `api.wordpress.org/translations/plugins/1.0/?slug=duracelltomi-google-tag-manager` | **14 active language packs** (ca, en_GB, es_CL/CO/EC/ES/PE/VE, fr_FR, ja, nl_NL, nl_NL_formal, uk, zh_TW) |
+
+The wp.org **slug is the short name**. The long name is only the git directory and the main
+file's basename; on a real install the plugin lives in
+`wp-content/plugins/duracelltomi-google-tag-manager/`. So domain == slug, and the packs
+wp.org builds are named `duracelltomi-google-tag-manager-{locale}.mo` — exactly what core
+looks for.
+
+**The mechanism, so the reasoning can be re-derived rather than re-researched.** Core
+resolves translations purely by domain — `_load_textdomain_just_in_time()` builds
+`"{$path}{$domain}-{$locale}.mo"`, and `WP_Textdomain_Registry::get_paths_for_domain()`
+only ever offers `WP_LANG_DIR/plugins` and `/themes`. Nothing derived from the plugin
+folder is consulted and **there is no fallback**. wp.org's pack builder names files from
+the **GlotPress project slug**, never from the `Text Domain:` header. The two therefore
+have to agree, and here they do.
+
+**Renaming the domain to the folder name would be strictly destructive**: it orphans all
+14 packs instantly, on every site, with no error, no failing test and no user report —
+`silent-missing` at its purest. The damage is also one-directional, since the packs keep
+the slug name forever.
+
+**Why this needed writing down:** during the 2026-08-06 Plugin Check evaluation this was
+worked up as a probable finding — "translations silently never load, and 2.0 is the cheap
+moment to fix it" — and a 351-site rename was planned. The premise was a guess that the
+folder name was the slug. One API call refuted it. Register the *evidence*, not the
+conclusion, so the next reader can see it was measured. Related: `Domain Path: /languages`
+with no such directory is also **harmless** — it only feeds `load_plugin_textdomain()` for
+translating plugin-header fields, and `WP_LANG_DIR` is checked ahead of that custom path.
 
 ### UB-3: A guarded optional integration degrading cleanly
 

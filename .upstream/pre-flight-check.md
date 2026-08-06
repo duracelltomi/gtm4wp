@@ -58,6 +58,12 @@ Pay special attention to (⭐ = highest impact):
 - **Note the lead time (UD-7):** if the thing you are coupling to has a public beta/RC
   channel, put it in the row's `Watch` column. Absorbing a break at RC is planned work;
   the same work after GA is a bug fix with users already affected.
+- **wordpress.org directory compliance lives here, in U95/U96 (UD-17):** the plugin
+  header, `readme.txt` header block and what the release ZIP contains are claims made to
+  an external gatekeeper whose ruleset moves on its own schedule, and a break there is
+  silent — no error, no failing test, only a rejected update. Before changing a header
+  field or `tools/build-release.js` `DIST_FILES`, check U79/U95/U96. Keep the packager an
+  **allow-list**: it is what makes each new dev-only directory a non-event.
 
 When you finish a change that touches an external contract, self-review it against
 `.upstream/upstream-review-patterns.md` before calling it complete — the same way the
