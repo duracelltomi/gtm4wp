@@ -20,21 +20,36 @@
  *   only while a short-lived event cookie is present, fired ONCE each (with a
  *   per-event de-dupe guard — the purchase reuses the same gtm4wp_orderid_tracked
  *   guard as the order-received page), and are their own data layer events rather
- *   than part of the merged gtm4wp.visitorData push; the event cookie is cleared
- *   after delivery so a later page makes no request. After the fallback purchase the
- *   client also fires a single authenticated POST beacon so the server flags the
- *   order _ga_tracked, closing the cross-device double-count while the GET stays
- *   read-only (issue #398).
+ *   than part of the merged visitor push; the event cookie is cleared after delivery
+ *   so a later page makes no request. After the fallback purchase the client also
+ *   fires a single authenticated POST beacon so the server flags the order
+ *   _ga_tracked, closing the cross-device double-count while the GET stays read-only
+ *   (issue #398).
  *
- * All of these load-time sources are gathered into a SINGLE gtm4wp.visitorData
- * push, so a GTM setup sees them arrive together. On a cached page view the
- * endpoint replays from the cache and the push is synchronous; on the first view
- * of a session the one push fires when the endpoint responds. Only a later cart
- * change fires an additional gtm4wp.visitorData event (the cart really changed).
+ * Each data family arrives as its own data layer event, so a GTM setup can tell
+ * from the event name alone which keys it got and needs no trigger condition:
+ *
+ * - gtm4wp.visitorData  — Tier 1 + the endpoint fields, merged into ONE push. On a
+ *                         cached view the endpoint replays from the cache and that
+ *                         push is synchronous; on the first view of a session it
+ *                         fires when the endpoint responds.
+ * - gtm4wp.customerData — the WooCommerce customer* keys.
+ * - gtm4wp.cartData     — the WooCommerce cartContent.
+ *
+ * The two WooCommerce families cannot join the visitor push: they only exist once
+ * WooCommerce has applied its cart fragment, which is always later than the flush
+ * (the placeholder baked into the cacheable HTML is empty by design). They are
+ * pushed as soon as they are readable and re-pushed on a cart change, each gated on
+ * ITS OWN half having actually changed — so a quantity change fires cartData alone
+ * and a billing-field change on checkout fires customerData alone. An event
+ * therefore means "this family changed", and a family whose data is absent (its
+ * feature is off) fires no event at all. Absence of cartData is NOT an empty cart:
+ * an empty cart is delivered, with items: [].
  *
  * The PHP side (VisitorDataModule) bakes a small, cache-safe config into the page
- * telling this runtime which keys to build and how (Tier 1 producers, the endpoint
- * URL + nonce, the session/gate metadata). The config carries NO visitor value.
+ * telling this runtime which event names to use, which keys to build and how (Tier 1
+ * producers, the endpoint URL + nonce, the session/gate metadata). The config
+ * carries NO visitor value.
  */
 import {
 	gtm4wp_read_cookie,
@@ -49,9 +64,10 @@ import {
 	// attaching document-level listeners needs a guard", and this file attaches none -
 	// it pushes, fetches and observes from its module body instead, which is the same
 	// class: a re-injected bundle (AJAX navigation, a page builder duplicating the
-	// handle) would push gtm4wp.visitorData a second time, issue a second request to
+	// handle) would push the visitor event a second time, issue a second request to
 	// the session endpoint, and leave a SECOND MutationObserver on document.body with
-	// its own lastWooRaw - so every later cart change would push twice, permanently.
+	// its own de-dupe state - so every later cart change would push twice for BOTH
+	// WooCommerce events (2x gtm4wp.customerData + 2x gtm4wp.cartData), permanently.
 	if ( window.gtm4wp_visitordata_inited ) {
 		return;
 	}
@@ -59,8 +75,52 @@ import {
 
 	const config = window.gtm4wp_visitordata_config || { fields: {} };
 	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
-	const eventName = config.event || 'gtm4wp.visitorData';
 	const fields = config.fields || {};
+
+	/**
+	 * Resolves one data layer event name from the config.
+	 *
+	 * The config is baked into cacheable HTML while this script is version-busted, so
+	 * after an update the realistic state is NEW script + OLD cached config. Hence the
+	 * chain: the current per-family map, then the single pre-split `event` key an old
+	 * cached page still carries (visitor family only), then the literal. The literals
+	 * mirror VisitorDataModule::EVENT_* — that class is the authority; these exist
+	 * because WooCommerceModule can load this handle with no config at all.
+	 *
+	 * @param {string} family   The config.events key ('visitor', 'customer', 'cart').
+	 * @param {string} fallback The documented event name for that family.
+	 * @return {string} The event name to push under.
+	 */
+	function resolveEventName( family, fallback ) {
+		const events = config.events;
+
+		if ( events && 'object' === typeof events ) {
+			const configured = events[ family ];
+			if ( 'string' === typeof configured && '' !== configured ) {
+				return configured;
+			}
+		}
+
+		if (
+			'visitor' === family &&
+			'string' === typeof config.event &&
+			'' !== config.event
+		) {
+			return config.event;
+		}
+
+		return fallback;
+	}
+
+	const visitorEventName = resolveEventName(
+		'visitor',
+		'gtm4wp.visitorData'
+	);
+	const customerEventName = resolveEventName(
+		'customer',
+		'gtm4wp.customerData'
+	);
+	const cartEventName = resolveEventName( 'cart', 'gtm4wp.cartData' );
 
 	// The nonce the one-shot confirm beacons authenticate with. It starts as the
 	// config nonce (baked into the page) but is replaced with the fresh nonce the
@@ -80,8 +140,10 @@ import {
 	}
 
 	/**
-	 * The single accumulated visitor-data push. Every load-time source merges its
-	 * keys here; it is flushed once, when the (possibly async) endpoint is ready.
+	 * The single accumulated visitor push: the Tier 1 producers and the endpoint
+	 * fields merge their keys here, and it is flushed once, when the (possibly async)
+	 * endpoint is ready. The WooCommerce families are NOT collected here - they arrive
+	 * later, on the cart fragment, and are pushed as their own events.
 	 */
 	const collected = {};
 
@@ -102,13 +164,24 @@ import {
 	}
 
 	/**
-	 * Pushes a gtm4wp.visitorData event carrying the given key => value map, under
-	 * the same variable names the server used. No-op for an empty map.
+	 * Pushes one data layer event carrying the given key => value map, under the same
+	 * variable names the server used.
 	 *
-	 * @param {Object} map The data layer keys to deliver.
+	 * No-op for a map that is empty or not an object: that is what makes "a family
+	 * whose data is absent fires no event", and it is also what keeps the malformed
+	 * fragment payloads (see deliverWooBlock) from producing a garbage push. No-op
+	 * for a name that is not a non-empty string, so a partial config can never put
+	 * `{ event: undefined }` into the data layer.
+	 *
+	 * @param {string} name The data layer event name.
+	 * @param {Object} map  The data layer keys to deliver.
 	 * @return {void}
 	 */
-	function pushEvent( map ) {
+	function pushEvent( name, map ) {
+		if ( 'string' !== typeof name || '' === name ) {
+			return;
+		}
+
 		if ( ! map || 'object' !== typeof map ) {
 			return;
 		}
@@ -118,10 +191,15 @@ import {
 			return;
 		}
 
-		const push = { event: eventName };
+		// A copy, never the accumulator itself: pushing `collected` by reference would
+		// let GTM's model alias an object a later push still mutates. The event name is
+		// assigned AFTER the payload keys so a payload key called `event` cannot
+		// overwrite the one thing this whole design rests on.
+		const push = {};
 		keys.forEach( function ( key ) {
 			push[ key ] = map[ key ];
 		} );
+		push.event = name;
 
 		dataLayer().push( push );
 	}
@@ -704,29 +782,121 @@ import {
 	}
 
 	/**
-	 * Parses a cart-fragment JSON string, or null when it is empty/invalid.
+	 * Parses a cart-fragment JSON string into the two-part { customer, cart } block
+	 * PHP encodes (see WooCommerce\PageDataLayer::visitor_cart_datalayer).
+	 *
+	 * Returns null for anything that is not a usable object. The attribute is written
+	 * by somebody else's AJAX response and can legitimately hold '' (the empty
+	 * placeholder baked into the cacheable HTML), '[]' (PHP's encoding of an empty
+	 * payload), a scalar, or - right after an update - the pre-split FLAT payload
+	 * replayed from WooCommerce's own sessionStorage fragment cache. Note JSON.parse
+	 * SUCCEEDS on 'null', '5' and '[]', so the try/catch alone is not the guard: the
+	 * type check below is, and it has to happen before any property read, or a
+	 * malformed payload would throw inside the MutationObserver callback.
+	 *
+	 * A flat payload yields no customer/cart part, so it delivers nothing until the
+	 * visitor's next cart change refreshes the fragment. That is deliberate: sniffing
+	 * key prefixes to rescue it would put a copy of today's naming in the client.
 	 *
 	 * @param {?string} raw The raw JSON string.
-	 * @return {?Object} The parsed cart block, or null.
+	 * @return {?Object} The parsed two-part block, or null.
 	 */
 	function parseWoo( raw ) {
 		if ( ! raw ) {
 			return null;
 		}
+
+		let parsed;
 		try {
-			return JSON.parse( raw );
+			parsed = JSON.parse( raw );
 		} catch ( e ) {
 			return null;
 		}
+
+		if (
+			! parsed ||
+			'object' !== typeof parsed ||
+			Array.isArray( parsed )
+		) {
+			return null;
+		}
+
+		return parsed;
 	}
 
-	// The last cart block we pushed, so an unchanged fragment is not pushed twice.
-	let lastWooRaw = null;
+	// The last delivered state of each WooCommerce family, held per family so each
+	// event fires only when ITS OWN half changed: WooCommerce re-applies the whole
+	// fragment as one blob, so a single whole-payload comparison would refire
+	// customerData on every quantity change with byte-identical values.
+	let lastCustomerJson = null;
+	let lastCartJson = null;
+
+	/**
+	 * Pushes one WooCommerce family under its own event name, but only when it
+	 * actually changed since the last delivery.
+	 *
+	 * Compared as JSON rather than by identity: a fresh object arrives on every
+	 * fragment refresh, so only its serialization can tell a real change from a
+	 * re-application of the same data. A part that is absent is left alone (its
+	 * feature is off), never treated as "changed to nothing" - hence the previous
+	 * marker is returned unchanged in every early exit.
+	 *
+	 * @param {*}       part The family payload from the fragment, if any.
+	 * @param {string}  name The data layer event name for this family.
+	 * @param {?string} last The serialization delivered last time.
+	 * @return {?string} The serialization to remember as delivered.
+	 */
+	function deliverWooFamily( part, name, last ) {
+		if ( ! part || 'object' !== typeof part || Array.isArray( part ) ) {
+			return last;
+		}
+
+		let json;
+		try {
+			json = JSON.stringify( part );
+		} catch ( e ) {
+			return last;
+		}
+
+		if ( json === last ) {
+			return last;
+		}
+
+		pushEvent( name, part );
+
+		return json;
+	}
+
+	/**
+	 * Pushes the WooCommerce customer and cart families from a raw fragment payload,
+	 * each under its own event name and each only when that half changed. Used for
+	 * both the initial read and every later cart change.
+	 *
+	 * @param {?string} raw The raw data attribute value.
+	 * @return {void}
+	 */
+	function deliverWooBlock( raw ) {
+		const parsed = parseWoo( raw );
+		if ( ! parsed ) {
+			return;
+		}
+
+		lastCustomerJson = deliverWooFamily(
+			parsed.customer,
+			customerEventName,
+			lastCustomerJson
+		);
+		lastCartJson = deliverWooFamily(
+			parsed.cart,
+			cartEventName,
+			lastCartJson
+		);
+	}
 
 	/**
 	 * Watches for WooCommerce re-applying/refreshing the cart fragment after the
-	 * initial push (a same-page cart change), pushing the updated cart block as its
-	 * own gtm4wp.visitorData event. Only wired on pages that carry the placeholder.
+	 * initial delivery (a same-page cart change), pushing whichever family changed as
+	 * its own event. Only wired on pages that carry the placeholder.
 	 *
 	 * @return {void}
 	 */
@@ -740,29 +910,29 @@ import {
 		}
 
 		new window.MutationObserver( function () {
-			const raw = currentWooRaw();
-			if ( ! raw || raw === lastWooRaw ) {
-				return;
-			}
-			lastWooRaw = raw;
-			pushEvent( parseWoo( raw ) );
+			deliverWooBlock( currentWooRaw() );
 		} ).observe( document.body, { childList: true, subtree: true } );
 	}
 
 	// Gather the synchronous Tier 1 fields, then let the endpoint (sync replay or a
-	// single gated fetch) complete the pending push. When it is ready, fold in the
-	// WooCommerce cart the fragment has applied by then and flush everything as one
-	// gtm4wp.visitorData event; from then on only real cart changes push again.
+	// single gated fetch) complete the pending push, and flush it as one visitor
+	// event. Only then deliver the WooCommerce families, so the visitor event always
+	// lands FIRST: GTM's model keeps the keys of earlier pushes, so a tag triggered on
+	// customerData/cartData can read visitorId - the reverse would not work.
+	//
+	// The initial read and the observer must stay in this one synchronous block, read
+	// first: no DOM mutation can interleave between them, so the observer cannot miss a
+	// fragment that arrived before it was wired, and cannot re-deliver the one the read
+	// just handled (the per-family de-dupe absorbs its first callback). Usually the read
+	// finds nothing - the placeholder in the cacheable HTML is empty and only the
+	// fragments AJAX fills it - but it does catch the case where WooCommerce got there
+	// first while the endpoint fetch was still in flight.
 	collectClientFields();
 
 	collectEndpointFields( function () {
-		const raw = currentWooRaw();
-		if ( raw ) {
-			lastWooRaw = raw;
-			collect( parseWoo( raw ) );
-		}
+		pushEvent( visitorEventName, collected );
 
-		pushEvent( collected );
+		deliverWooBlock( currentWooRaw() );
 		observeWooChanges();
 	} );
 } )();

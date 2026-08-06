@@ -22,7 +22,7 @@ new tiers slot in behind the same option + client runtime without rework.
 |---|---|---|---|
 | 1 — client | The browser already knows it (referrer, search term, anything derived from `location.*`). | Pushed client-side as `gtm4wp.visitorData`. | **Zero network.** |
 | 2 — session | Server-only but constant per session (visitor IP, Cloudflare country). | One fetch per session, cached in `sessionStorage`. | One request / session. |
-| 3 — action | Server-only, changes on an action (logged-in user data; WooCommerce customer & cart; one-shot events). | Fetch **gated by an existing cookie** (WP logged-in cookie for user data; a cart-version cookie for Woo; an event cookie for one-shots). | One request only when the gating cookie changed. |
+| 3 — action | Server-only, changes on an action (logged-in user data; WooCommerce customer & cart; one-shot events). | Fetch **gated by an existing cookie** (WP logged-in cookie for user data; an event cookie for one-shots) — except the WooCommerce customer & cart, which ride WooCommerce's own `woocommerce_add_to_cart_fragments` response and so need no fetch of ours at all. | One request only when the gating cookie changed. |
 
 ### Hard constraint (all phases)
 
@@ -30,6 +30,41 @@ new tiers slot in behind the same option + client runtime without rework.
 exact anti-pattern that takes sites down under a cache-clear traffic spike. Tier 1
 uses zero network. Tiers 2/3 must be once-per-session or cookie-gated. If a change
 adds a plain `fetch()` on `DOMContentLoaded`, it is wrong.
+
+### One event per data family
+
+The runtime pushes **three** data layer events, one per family, so a Google Tag
+Manager setup can tell from the event name alone which keys arrived and a plain
+Custom Event trigger is enough. The names are the public contract; they live as
+`VisitorDataModule::EVENT_*` and reach the client through the config's `events` map.
+
+| Event | Keys | Gated by |
+|---|---|---|
+| `gtm4wp.visitorData` | `siteSearchTerm`, `siteSearchFrom`, `visitorIP`, `geoCloudflareCountryCode`, `visitorLoginState`, `visitorType`, `visitorEmail`, `visitorEmailHash`, `visitorRegistrationDate`, `visitorUsername`, `visitorId` | the individual Page-variables options |
+| `gtm4wp.customerData` | the 25 `customer*` keys | `GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA` |
+| `gtm4wp.cartData` | `cartContent` | `GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL` |
+
+Why not one event for everything: the WooCommerce families do not exist until
+WooCommerce has applied its cart fragment, which is **always** later than the
+visitor flush — the placeholder baked into the cacheable HTML is empty by design
+(`PageDataLayer::output_visitor_cart_placeholder()`), so the data only ever arrives
+on the fragments response. A single event name would therefore always fire twice
+with two different key sets, which is exactly the ambiguity this split removes.
+
+Three semantics worth stating, because each is easy to invert:
+
+- **An event means "this family changed."** The fragment is re-applied as one blob,
+  so the runtime de-dupes **per family**: a quantity change fires `cartData` alone, a
+  billing-field change on checkout fires `customerData` alone, and WooCommerce
+  replaying its cached fragment fires neither.
+- **`gtm4wp.visitorData` can be absent entirely** — no search term, no referrer, no
+  endpoint data (or Web Storage unavailable) means an empty map, and an empty map
+  pushes nothing. A tag triggered on `customerData`/`cartData` must not assume a
+  `visitor*` key is set. The visitor event is pushed **first** when it fires at all,
+  so reading an earlier push's keys does work; the reverse does not.
+- **Absence of `cartData` is not an empty cart.** It means the feature is off, or the
+  fragment has not arrived. An *empty cart* is delivered, as `items: []` with zeroed
+  totals — that is the state a tag reads after the last `remove_from_cart`.
 
 ## Phase 1 — shipped (2.0 beta1)
 
@@ -56,7 +91,7 @@ adds a plain `fetch()` on `DOMContentLoaded`, it is wrong.
 ## Phase 2 — shipped (2.0 beta1)
 
 The Tier 2/3 fields are now delivered client-side, behind the same option and the
-same `gtm4wp.visitorData` runtime, with **no** new per-page request. The
+same `gtm4wp-visitor-data` runtime, with **no** new per-page request. The
 `VisitorField` value object grew a server `resolver` + `cookie_gate` input
 (constructor args with defaults) — Phase 1 Tier 1 callers are unaffected.
 
@@ -87,33 +122,51 @@ same `gtm4wp.visitorData` runtime, with **no** new per-page request. The
    (`woocommerce_add_to_cart_fragments`), so no *new* per-page request is added —
    the fragment AJAX already fires on cart mutation and re-applies from its
    `sessionStorage` cache on every page. `PageDataLayer::add_visitor_cart_fragment()`
-   JSON-encodes the same customer/cart block (built by the same `add_customer_data`
-   / `add_cart_content` server builders) into a data attribute of a cache-safe
-   placeholder (`.gtm4wp-wc-visitor-data`, output in `wp_footer`); the client reads
-   it (and re-reads it via a `MutationObserver` when the fragment refreshes) and
-   pushes it under the same 1.x key names. `esc_attr( wp_json_encode( …, hex flags ) )`
-   keeps a hostile customer field from breaking out of the attribute.
+   JSON-encodes the customer/cart block (built by the same `add_customer_data` /
+   `add_cart_content` server builders) into a data attribute of a cache-safe
+   placeholder (`.gtm4wp-wc-visitor-data`, output in `wp_footer`); the client reads it
+   (and re-reads it via a `MutationObserver` when the fragment refreshes) and pushes
+   it under the same 1.x key names. `esc_attr( wp_json_encode( …, hex flags ) )` keeps
+   a hostile customer field from breaking out of the attribute.
+   - The payload is a **two-part envelope**, `{ "customer": {…}, "cart": {…} }`, so
+     each family can be pushed as its own event. The split is made in PHP, by
+     `visitor_cart_datalayer()`, where the builder that produced each key is known —
+     the client never classifies keys by name prefix, which would freeze today's
+     naming into a client-side validator. A part is omitted when its builder wrote no
+     keys, and that test is deliberately **not** about the part's contents: an empty
+     cart and an anonymous visitor both still produce their part.
+   - Note this makes the customer/cart delivery depend on WooCommerce's
+     `wc-cart-fragments` script actually running (nothing here enqueues it). On a
+     store that does not load it — no mini-cart anywhere — the block never arrives.
 3. **Client runtime** (`gtm4wp-visitor-data.js`) gained the endpoint fetch
    (once-per-session + cookie-gated, with the sessionStorage cache and logout
-   cleanup) and the cart-fragment reader. All the load-time sources (Tier 1, the
-   endpoint fields, the initial cart) are gathered into **one** `gtm4wp.visitorData`
-   push so a GTM setup sees them arrive together: on a cached view the endpoint
-   replays synchronously and the single push is synchronous; on the first view of a
-   session the one push fires when the endpoint responds. Only a subsequent cart
-   change fires an additional `gtm4wp.visitorData` event (the cart genuinely
-   changed). Because these values are delivered on the event rather than baked into
-   the page-view data layer, GTM tags that read them should trigger on the
-   `gtm4wp.visitorData` Custom Event. When Web Storage is unavailable the runtime
-   does **not** fetch (safe default = no extra data, never a per-page request).
+   cleanup) and the cart-fragment reader. Tier 1 and the endpoint fields are gathered
+   into **one** `gtm4wp.visitorData` push so a GTM setup sees them arrive together: on
+   a cached view the endpoint replays synchronously and that push is synchronous; on
+   the first view of a session it fires when the endpoint responds. The two
+   WooCommerce families are pushed as `gtm4wp.customerData` / `gtm4wp.cartData` as
+   soon as the fragment is readable, and re-pushed per family on a cart change — see
+   *One event per data family* above for why they cannot join the visitor push and for
+   the three semantics a GTM setup has to get right. Because all of these values are
+   delivered on an event rather than baked into the page-view data layer, GTM tags
+   that read them must trigger on the matching Custom Event. When Web Storage is
+   unavailable the runtime does **not** fetch (safe default = no extra data, never a
+   per-page request).
 
 Regression tests: `VisitorDataEndpointTest` (identity gate — logged-out receives no
 user data; hostile header round-trips hex-encoded; no-cache headers),
 `PageVariablesModuleTest` (Tier 2/3 field declaration + resolvers, anonymous → null,
-hostile CF country raw), `VisitorDataModuleTest` (endpoint config baking, login gate
-cookie set/clear/unchanged), `PageDataLayerTest` (cart-fragment carrier, hostile
-customer field safe), and the JS suite (once-per-session, **cookie gate suppresses
-the fetch when unchanged**, anonymous never fetches user data, logout drops cached
-identity, cart-fragment push).
+hostile CF country raw), `VisitorDataModuleTest` (endpoint config baking, the
+per-family event-name map on every config, login gate cookie set/clear/unchanged),
+`PageDataLayerTest` (cart-fragment carrier, hostile customer field safe, the
+two-part envelope — both parts, each part omitted when its builder wrote nothing,
+exact classification, empty cart still delivered, guest customer part, the fragment
+key emitted for an empty payload, flag-set parity), and the JS suite
+(once-per-session, **cookie gate suppresses the fetch when unchanged**, anonymous
+never fetches user data, logout drops cached identity, the two WooCommerce families
+as separate events, per-family de-dupe on a cart change, empty cart delivered,
+cross-family isolation, event ordering, the malformed/legacy-flat payload matrix
+delivering nothing without throwing, and the config-name fallbacks).
 
 ## Phase 3 — shipped (2.0 beta1): the WooCommerce one-shot events
 
@@ -208,5 +261,5 @@ routing + the per-key `confirm` map), and the JS suite (cookie gate → no fetch
 once; reload with the token in localStorage does not re-fire; the shared guard
 suppresses the second purchase in both orderings; the confirm beacon fires with the
 nonce after a fallback delivery, and is skipped on `flag=false` / when suppressed as
-already tracked / degrades gracefully on failure; one-shots stay out of the merged
-push and the cache; stale cookie cleared).
+already tracked / degrades gracefully on failure; one-shots stay out of all three
+data-family events and out of the cache; stale cookie cleared).

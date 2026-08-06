@@ -91,10 +91,12 @@ final class PageDataLayer {
 
 		// Under the cache-safe data layer (issue #398) the customer details and the
 		// cart are visitor/session specific, so they must not be baked into
-		// cacheable page HTML. Phase 1 omits them; a later release delivers them
-		// client-side (once per session / cookie-gated). The content-driven events
-		// below (view_item / view_cart / begin_checkout / purchase) are URL-scoped
-		// or fire only on cache-excluded pages, so they stay server-side.
+		// cacheable page HTML. They are omitted here and delivered client-side on
+		// WooCommerce's cart-fragments response instead (see visitor_cart_datalayer()),
+		// where they arrive as the gtm4wp.customerData and gtm4wp.cartData events. The
+		// content-driven events below (view_item / view_cart / begin_checkout /
+		// purchase) are URL-scoped or fire only on cache-excluded pages, so they stay
+		// server-side.
 		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
 
 		if ( ! $cache_safe ) {
@@ -987,13 +989,30 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Builds the flat customer + cart data layer block for the current session,
-	 * reusing the exact server-path builders so the client receives identical
-	 * values under identical key names. Empty when neither feature is enabled or
-	 * WooCommerce is unavailable. Derives everything from the current request's WC
-	 * session/customer — no id parameter — so a caller only ever gets its own data.
+	 * Builds the customer + cart data layer block for the current session, reusing
+	 * the exact server-path builders so the client receives identical values under
+	 * identical key names. Empty when neither feature is enabled or WooCommerce is
+	 * unavailable. Derives everything from the current request's WC session/customer
+	 * — no id parameter — so a caller only ever gets its own data.
 	 *
-	 * @return array<string, mixed>
+	 * The two families are returned as SEPARATE parts rather than one flat array
+	 * because each is delivered as its own data layer event (gtm4wp.customerData /
+	 * gtm4wp.cartData), so a Google Tag Manager setup can tell from the event name
+	 * alone which keys arrived. The split is made here, where the builder that
+	 * produced each key is known, so the client never has to classify keys by their
+	 * name prefix — that would freeze today's naming into a client-side validator and
+	 * mis-file the first key that does not match it.
+	 *
+	 * A part is omitted when its builder wrote no keys at all (its feature is off, or
+	 * there is no WC_Customer on this request). Note that this is deliberately NOT a
+	 * test of the part's contents: an EMPTY CART still produces a cart part (with
+	 * items: [] and zeroed totals), because "the cart is now empty" is exactly the
+	 * signal a tag reads after the last remove_from_cart. Likewise an anonymous
+	 * visitor still produces a customer part, with the same blank values the
+	 * server-rendered path emits for them — the contract of the cache-safe mode is the
+	 * same keys with the same values, only delivered differently.
+	 *
+	 * @return array<string, array<string, mixed>> The 'customer' and/or 'cart' part.
 	 */
 	public function visitor_cart_datalayer(): array {
 		$woo = function_exists( 'WC' ) ? WC() : null;
@@ -1001,8 +1020,19 @@ final class PageDataLayer {
 			return array();
 		}
 
-		$data = $this->add_customer_data( array(), $woo );
-		$data = $this->add_cart_content( $data, $woo );
+		$data = array();
+
+		// Built independently, from a fresh array each — neither builder may read what
+		// the other wrote, or a key could land under the wrong event name.
+		$customer = $this->add_customer_data( array(), $woo );
+		if ( array() !== $customer ) {
+			$data['customer'] = $customer;
+		}
+
+		$cart = $this->add_cart_content( array(), $woo );
+		if ( array() !== $cart ) {
+			$data['cart'] = $cart;
+		}
 
 		return $data;
 	}
@@ -1021,13 +1051,20 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Carries the customer/cart data layer block on the WooCommerce cart-fragments
-	 * response, so it is delivered — and refreshed on every cart change — without
-	 * any new per-page request (the fragments AJAX already fires on cart mutation).
-	 * The block is JSON encoded into a data attribute of the placeholder; esc_attr()
-	 * is the correct escaper for the attribute context (the client reads it back via
-	 * dataset and JSON.parse, and the JSON_HEX_* flags keep any hostile customer
-	 * field free of a raw break-out). Hooked to woocommerce_add_to_cart_fragments.
+	 * Carries the two-part customer/cart data layer block on the WooCommerce
+	 * cart-fragments response, so it is delivered — and refreshed on every cart
+	 * change — without any new per-page request (the fragments AJAX already fires on
+	 * cart mutation). The block is JSON encoded into a data attribute of the
+	 * placeholder; esc_attr() is the correct escaper for the attribute context (the
+	 * client reads it back via dataset and JSON.parse, and the JSON_HEX_* flags keep
+	 * any hostile customer field free of a raw break-out). JSON_FORCE_OBJECT must NOT
+	 * be added to the flag set: it would turn cartContent.items and
+	 * totals.applied_coupons into objects and break every setup that iterates them.
+	 * Hooked to woocommerce_add_to_cart_fragments.
+	 *
+	 * The fragment key is emitted even when the payload is empty, so WooCommerce
+	 * always replaces the placeholder: dropping the key would leave the previously
+	 * cached fragment — with its stale customer/cart data — in the DOM.
 	 *
 	 * @param mixed $fragments The cart fragments map (selector => HTML).
 	 * @return array<string, string>

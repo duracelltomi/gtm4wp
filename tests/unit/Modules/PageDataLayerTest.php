@@ -1149,6 +1149,9 @@ final class PageDataLayerTest extends TestCase {
 
 	public function test_cache_safe_off_keeps_customer_data_and_cart(): void {
 		// Negative case: with the mode explicitly off, today's behavior is unchanged.
+		// Also the negative control for the two-part split (issue #398): on the server
+		// path both families stay merged FLAT into the page-load data layer object, with
+		// no 'customer'/'cart' envelope and no events involved.
 		\WC_Customer::$fixtures[42] = array(
 			'order_count'     => 3,
 			'billing_company' => 'Marks & Spencer',
@@ -1237,11 +1240,197 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( 'cartContent', $html );
 		$this->assertStringContainsString( 'Mug', $html );
 
+		// The two families ride in SEPARATE parts, so the client can push each under
+		// its own event name. Asserted in the escaped form the attribute really carries
+		// (JSON_HEX_QUOT leaves structural quotes alone, then esc_attr() turns them into
+		// &quot;) — and, the other direction, the raw form must be absent (TS-2).
+		$this->assertStringContainsString( '&quot;customer&quot;:{', $html );
+		$this->assertStringContainsString( '&quot;cart&quot;:{', $html );
+		$this->assertStringNotContainsString( '"customer":{', $html );
+		$this->assertStringNotContainsString( '"cart":{', $html );
+
 		// The hostile customer field is present hex-encoded (TC-2) and no raw
 		// break-out survives in the fragment HTML (TS-2).
 		$safe = json_encode( 'Evil</script>"&Co', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 		$this->assertStringContainsString( trim( $safe, '"' ), $html );
 		$this->assertStringNotContainsString( '</script>', $html );
+
+		// TC-2/UC-3: the whole attribute equals the payload run through the exact flag
+		// set the source uses, so dropping any one JSON_HEX_* flag fails here.
+		$expected = esc_attr(
+			(string) json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+				$page_datalayer->visitor_cart_datalayer(),
+				JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+			)
+		);
+		$this->assertStringContainsString( 'data-gtm4wp-visitor-cart="' . $expected . '"', $html );
+	}
+
+	/**
+	 * Issue #398: the payload is split into a 'customer' and a 'cart' part so each is
+	 * delivered as its own data layer event (gtm4wp.customerData / gtm4wp.cartData).
+	 * With both features on, both parts are present and nothing else is.
+	 */
+	public function test_visitor_cart_datalayer_returns_both_parts(): void {
+		\WC_Customer::$fixtures[42] = array( 'order_count' => 3 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ), new \WC_Customer( 42 ) ); // phpcs:ignore
+
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA     => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$this->assertSame( array( 'customer', 'cart' ), array_keys( $data ) );
+		$this->assertSame( 3, $data['customer']['customerTotalOrders'] );
+		$this->assertSame( 'Mug', $data['cart']['cartContent']['items'][0]['item_name'] );
+	}
+
+	/**
+	 * Issue #398: the classification must stay exact — every customer* key in the
+	 * customer part and nothing else, cartContent in the cart part and nothing else.
+	 *
+	 * This is the guard on an invariant the event-name contract now depends on: the two
+	 * builders are called independently, on a fresh array each, so neither may read or
+	 * write the other's keys. An edit to add_cart_content() that touched a customer*
+	 * key would otherwise silently deliver it under the wrong event name.
+	 */
+	public function test_visitor_cart_datalayer_classification_is_exact(): void {
+		\WC_Customer::$fixtures[42] = array( 'order_count' => 3 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ), new \WC_Customer( 42 ) ); // phpcs:ignore
+
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA     => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$customer_keys = array_keys( $data['customer'] );
+
+		$this->assertNotEmpty( $customer_keys );
+		$this->assertSame(
+			$customer_keys,
+			array_values( array_filter( $customer_keys, fn( $key ) => str_starts_with( $key, 'customer' ) ) ),
+			'The customer part must hold only customer* keys.'
+		);
+		$this->assertArrayNotHasKey( 'cartContent', $data['customer'] );
+
+		$this->assertSame(
+			array( 'cartContent' ),
+			array_keys( $data['cart'] ),
+			'The cart part must hold cartContent and nothing else.'
+		);
+	}
+
+	/**
+	 * Issue #398: a part is omitted when its builder wrote no keys, so the client fires
+	 * no event for it at all. Each feature's absence is independent of the other's.
+	 */
+	public function test_visitor_cart_datalayer_omits_a_part_with_no_data(): void {
+		\WC_Customer::$fixtures[42] = array( 'order_count' => 3 );
+		$product                    = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+
+		// Cart feature off: no cart part.
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ), new \WC_Customer( 42 ) ); // phpcs:ignore
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$this->assertSame( array( 'customer' ), array_keys( $data ) );
+
+		// Customer feature off: no customer part.
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$this->assertSame( array( 'cart' ), array_keys( $data ) );
+
+		// Customer feature on but no WC_Customer on this request (the instanceof gate):
+		// the part is omitted rather than delivered empty.
+		$this->stub_wc( array(), null );
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$this->assertSame( array(), $data );
+	}
+
+	/**
+	 * Issue #398: an EMPTY cart is delivered, not omitted. "The cart is now empty" is
+	 * exactly the state a tag reads after the last remove_from_cart, so the omission
+	 * test must be "the builder wrote no keys", never "the cart has no items".
+	 */
+	public function test_visitor_cart_datalayer_delivers_an_empty_cart(): void {
+		$this->stub_wc( array() );
+
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$this->assertArrayHasKey( 'cart', $data, 'An empty cart must still be delivered.' );
+		$this->assertSame( array(), $data['cart']['cartContent']['items'] );
+		$this->assertSame( 0.0, $data['cart']['cartContent']['totals']['total'] );
+	}
+
+	/**
+	 * Issue #398: an anonymous visitor still gets the customer part, carrying the same
+	 * blank values the server-rendered path emits for them. The contract of the
+	 * cache-safe mode is the same keys with the same values, only delivered
+	 * differently, so this is deliberate and not a bug to be "fixed" by suppressing it.
+	 */
+	public function test_visitor_cart_datalayer_delivers_a_guest_customer_part(): void {
+		$this->stub_wc( array(), new \WC_Customer( 0 ) );
+
+		$data = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+			)
+		)->visitor_cart_datalayer();
+
+		$this->assertArrayHasKey( 'customer', $data );
+		$this->assertSame( 0, $data['customer']['customerTotalOrders'] );
+		$this->assertSame( '', $data['customer']['customerBillingEmail'] );
+	}
+
+	/**
+	 * Issue #398: the fragment key is emitted even for an empty payload. Dropping it
+	 * would leave WooCommerce's previously cached fragment — with its stale customer /
+	 * cart data — in the DOM instead of replacing it.
+	 */
+	public function test_visitor_cart_fragment_is_emitted_for_an_empty_payload(): void {
+		Functions\when( 'WC' )->justReturn( null );
+
+		$fragments = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+			)
+		)->add_visitor_cart_fragment( array() );
+
+		$this->assertArrayHasKey( 'div.gtm4wp-wc-visitor-data', $fragments );
+		// wp_json_encode( array() ) is [], which the client treats as "no data".
+		$this->assertStringContainsString( 'data-gtm4wp-visitor-cart="[]"', $fragments['div.gtm4wp-wc-visitor-data'] );
 	}
 
 	public function test_visitor_cart_placeholder_is_empty_and_cache_safe(): void {

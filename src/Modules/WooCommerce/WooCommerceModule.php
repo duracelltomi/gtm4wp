@@ -117,7 +117,8 @@ final class WooCommerceModule extends AbstractModule {
 		// Cache-safe data layer (issue #398): when the mode is on, the customer/cart
 		// block is omitted from the cacheable HTML (in add_datalayer_data) and carried
 		// instead on the existing cart-fragments AJAX, so no new per-page request is
-		// added. The gtm4wp-visitor-data runtime (enqueued below) reads and pushes it.
+		// added. The gtm4wp-visitor-data runtime (enqueued below) reads it and pushes
+		// each half as its own event — gtm4wp.customerData and gtm4wp.cartData.
 		if ( $page_datalayer->delivers_visitor_cart_client_side() ) {
 			add_action( 'wp_footer', array( $page_datalayer, 'output_visitor_cart_placeholder' ) );
 			add_filter( 'woocommerce_add_to_cart_fragments', array( $page_datalayer, 'add_visitor_cart_fragment' ) );
@@ -291,6 +292,13 @@ final class WooCommerceModule extends AbstractModule {
 		// runtime that reads the fragment payload is loaded — even on pages where the
 		// PageVariables module declared no visitor fields of its own. Enqueuing the
 		// same handle is idempotent (VisitorDataModule may also enqueue it).
+		//
+		// Note this adds the handle WITHOUT the inline config, which only
+		// VisitorDataModule::enqueue_scripts() emits. In practice the config is always
+		// there, because declare_visitor_scoped_fields() below always declares the
+		// re-add one-shot in this mode, so build_config() never returns null here — but
+		// that is incidental (a third party can filter those fields away), which is why
+		// the runtime keeps its own fallbacks for all three event names.
 		if (
 			(bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
 			&& (

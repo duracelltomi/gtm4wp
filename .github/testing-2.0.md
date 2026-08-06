@@ -43,6 +43,7 @@ a parallel 1.22.4 install where noted.
 - [ ] Checkout: `begin_checkout`, `add_shipping_info`, `add_payment_info` (JS driven)
 - [ ] Order received page: `purchase` event payload identical; `orderData` when the option is on
 - [ ] Purchase dedupe: reload order received page → no second `purchase` (order meta `_ga_tracked`, localStorage `gtm4wp_orderid_tracked`); "Only track orders younger than" respected
+- [ ] Cache-safe data layer on (WooCommerce customer data + cart content options on), cart page: **three** separate events — `gtm4wp.visitorData`, `gtm4wp.customerData`, `gtm4wp.cartData` — each carrying only its own keys, in that order, and none of them in the server-rendered `dataLayer_content`. Change a line quantity → only `gtm4wp.cartData` refires; remove the last item → `gtm4wp.cartData` fires with an empty `cartContent.items`; change a billing field on the checkout → only `gtm4wp.customerData` refires. Turn either option off → its event stops firing and the other is unaffected. Turn the mode off → both families are back in `dataLayer_content` and none of the three events fire
 - [ ] Consent mode block appears before the container loader with the configured granted/denied flags
 - [ ] Container placement modes: footer / manual (`gtm4wp_the_gtm_tag()` in theme, no double output) / automatic / off (console warnings unless disabled)
 - [ ] Container environment parameters (gtm_auth/gtm_preview) present in loader + noscript URLs, taken from the row of each container

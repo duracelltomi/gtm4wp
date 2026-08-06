@@ -51,6 +51,27 @@ final class VisitorDataModule extends AbstractModule {
 	public const SESSION_STORAGE_KEY = 'gtm4wp_visitor_session';
 
 	/**
+	 * The data layer event names the client runtime pushes under, one per data
+	 * family, baked into the client config by build_config().
+	 *
+	 * One name per family — rather than one name for everything the runtime
+	 * delivers — because the families arrive on different channels at different
+	 * moments and can never be merged into a single push: the visitor fields come
+	 * from the session endpoint, while the WooCommerce customer/cart block only
+	 * exists once WooCommerce has applied its cart fragment, which is always later.
+	 * A Google Tag Manager setup therefore has to be able to tell from the event
+	 * name alone which keys arrived, and a plain Custom Event trigger has to be
+	 * enough. Their values are part of the public data layer contract: a site
+	 * owner's triggers are written against them, so they must not change.
+	 *
+	 * These are the authority; js/frontend/gtm4wp-visitor-data.js carries the same
+	 * three strings only as a fallback for the (config-less) load path.
+	 */
+	public const EVENT_VISITOR_DATA  = 'gtm4wp.visitorData';
+	public const EVENT_CUSTOMER_DATA = 'gtm4wp.customerData';
+	public const EVENT_CART_DATA     = 'gtm4wp.cartData';
+
+	/**
 	 * Module id.
 	 *
 	 * @return string
@@ -129,10 +150,11 @@ final class VisitorDataModule extends AbstractModule {
 	 * Loads the client-side visitor-data runtime with its per-request field
 	 * config, but only when at least one field is active on this request. The
 	 * config carries only cache-safe (content/URL-derived, not visitor) information
-	 * — which data layer keys the browser computes and from which source (Tier 1),
-	 * plus the session-endpoint URL, its nonce and the field/cookie-gate metadata
-	 * for Tier 2/3 — so it is safe to bake into cached HTML. No visitor value is in
-	 * the config; those come from the endpoint at runtime.
+	 * — the data layer event name of each data family (the EVENT_* constants), which
+	 * data layer keys the browser computes and from which source (Tier 1), plus the
+	 * session-endpoint URL, its nonce and the field/cookie-gate metadata for Tier
+	 * 2/3 — so it is safe to bake into cached HTML. No visitor value is in the
+	 * config; those come from the endpoint at runtime.
 	 *
 	 * @return void
 	 */
@@ -217,8 +239,16 @@ final class VisitorDataModule extends AbstractModule {
 			return null;
 		}
 
+		// One event name per data family (see the EVENT_* constants). Built here, after
+		// the early return above, so the map can never on its own make this method
+		// return a non-null config: a request with nothing to deliver must still load
+		// no runtime at all.
 		$config = array(
-			'event'  => 'gtm4wp.visitorData',
+			'events' => array(
+				'visitor'  => self::EVENT_VISITOR_DATA,
+				'customer' => self::EVENT_CUSTOMER_DATA,
+				'cart'     => self::EVENT_CART_DATA,
+			),
 			'fields' => $client_fields,
 		);
 

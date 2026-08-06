@@ -67,7 +67,11 @@ defined( 'ABSPATH' ) || exit;
  *
  * (WooCommerce customer & cart data are session-scoped and delivered on the
  * existing cart-fragments AJAX instead — see WooCommerce\PageDataLayer — so they
- * are not declared as VisitorField resolvers here.)
+ * are not declared as VisitorField resolvers here. They must STAY that way: every
+ * non-one-shot field declared here is merged into the single
+ * VisitorDataModule::EVENT_VISITOR_DATA push, so declaring a customer* key or
+ * cartContent as a VisitorField would silently move it off its own event and break
+ * the guarantee that the event name tells a GTM setup which keys arrived.)
  */
 final class VisitorField {
 

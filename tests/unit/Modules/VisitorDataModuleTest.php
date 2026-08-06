@@ -15,9 +15,10 @@ use GTM4WP\Tests\unit\TestCase;
 
 /**
  * Covers the client-side runtime wiring: only the Tier 1 (browser-knows-it)
- * visitor-scoped fields are turned into the gtm4wp.visitorData client config,
- * the config is hex-encoded for its inline-script context, and nothing is
- * enqueued when there is no Tier 1 field to deliver.
+ * visitor-scoped fields are turned into the client config, the config advertises
+ * the data layer event name of every data family, the config is hex-encoded for its
+ * inline-script context, and nothing is enqueued when there is no Tier 1 field to
+ * deliver.
  */
 final class VisitorDataModuleTest extends TestCase {
 
@@ -145,7 +146,6 @@ final class VisitorDataModuleTest extends TestCase {
 
 		$code = $this->inline_for( 'gtm4wp-visitor-data' );
 		$this->assertStringContainsString( 'var gtm4wp_visitordata_config = ', $code );
-		$this->assertStringContainsString( '"event":"gtm4wp.visitorData"', $code );
 		// Each moved data layer key maps to its client producer token, under the
 		// SAME variable name the server used.
 		$this->assertStringContainsString( '"siteSearchTerm":"searchTerm"', $code );
@@ -153,6 +153,55 @@ final class VisitorDataModuleTest extends TestCase {
 
 		// The config is injected before the runtime reads it.
 		$this->assertSame( 'before', $this->inline_scripts[0][2] );
+	}
+
+	/**
+	 * Issue #398: the config advertises one data layer event name per data family, so
+	 * the client never has to hardcode them and a GTM setup can trigger on the name
+	 * alone. Asserted against the class constants, not hand-typed literals, so a
+	 * renamed constant cannot pass silently — while the literal values are also pinned
+	 * below, because they are the public contract a site owner's triggers are written
+	 * against.
+	 */
+	public function test_client_config_advertises_every_event_name(): void {
+		$this->scoped_fields = array(
+			new VisitorField( 'siteSearchTerm', VisitorField::TIER_CLIENT, 'searchTerm' ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$code = $this->inline_for( 'gtm4wp-visitor-data' );
+
+		$this->assertStringContainsString( '"visitor":"' . VisitorDataModule::EVENT_VISITOR_DATA . '"', $code );
+		$this->assertStringContainsString( '"customer":"' . VisitorDataModule::EVENT_CUSTOMER_DATA . '"', $code );
+		$this->assertStringContainsString( '"cart":"' . VisitorDataModule::EVENT_CART_DATA . '"', $code );
+
+		// The names themselves are the public data layer contract and must not drift.
+		$this->assertSame( 'gtm4wp.visitorData', VisitorDataModule::EVENT_VISITOR_DATA );
+		$this->assertSame( 'gtm4wp.customerData', VisitorDataModule::EVENT_CUSTOMER_DATA );
+		$this->assertSame( 'gtm4wp.cartData', VisitorDataModule::EVENT_CART_DATA );
+	}
+
+	/**
+	 * Issue #398: the event-name map is present on EVERY config, not only on one that
+	 * happens to carry a Tier 1 field. WooCommerceModule loads the same runtime handle
+	 * on a page whose only visitor-scoped fields are the endpoint ones, and that page
+	 * still has to know what to call the customer/cart events.
+	 */
+	public function test_event_names_are_present_on_an_endpoint_only_config(): void {
+		$this->scoped_fields = array(
+			new VisitorField( 'visitorIP', VisitorField::TIER_SESSION, '', static fn () => '1.2.3.4' ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$code = $this->inline_for( 'gtm4wp-visitor-data' );
+
+		$this->assertStringContainsString( '"fields":[]', $code, 'No Tier 1 field on this request.' );
+		$this->assertStringContainsString( '"customer":"' . VisitorDataModule::EVENT_CUSTOMER_DATA . '"', $code );
+		$this->assertStringContainsString( '"cart":"' . VisitorDataModule::EVENT_CART_DATA . '"', $code );
 	}
 
 	public function test_does_not_enqueue_when_no_tier1_field_is_active(): void {
