@@ -1461,6 +1461,91 @@ describe( 'gtm4wp-woocommerce QuickView & found_variation JSON.parse guards (T24
 		} );
 	} );
 
+	describe( 'list attribution (#405)', () => {
+		// Quick View builds its view_item on the server exactly like a product page
+		// does, so it arrives with no idea which list the visitor clicked. Unlike the
+		// product page this payload still carries internal_id, so the lookup key is
+		// in the item itself and no wrapper argument is needed.
+		beforeEach( () => {
+			// TS-16: stubbed here rather than inherited, so these cases cannot pass
+			// because some other file defined the helper first.
+			global.gtm4wp_apply_stored_item_list = jest.fn( ( item, id ) => {
+				if ( item && id === 42 && ! item.item_list_name ) {
+					item.item_list_name = 'Summer Sale';
+					item.item_list_id = 'summer-sale';
+				}
+				return item;
+			} );
+		} );
+
+		afterEach( () => {
+			delete window.gtm4wp_list_attribution;
+			delete global.gtm4wp_apply_stored_item_list;
+		} );
+
+		const pushQuickView = ( payload ) => {
+			bootWithCapture();
+
+			const el = document.createElement( 'div' );
+			el.id = 'gtm4wp_quickview_data';
+			el.dataset.gtm4wp_datalayer = JSON.stringify( payload );
+			document.body.appendChild( el );
+
+			ajaxSuccessCb( {}, {}, { url: '/?wc-api=WC_Quick_View' } );
+			jest.advanceTimersByTime( 500 );
+		};
+
+		const quickViewPayload = () => ( {
+			event: 'view_item',
+			ecommerce: {
+				currency: 'EUR',
+				value: 5,
+				item: { item_id: 'SKU-42', internal_id: 42 },
+			},
+		} );
+
+		it( 'enriches the Quick View item from the stored list', () => {
+			window.gtm4wp_list_attribution = 1; // opt-in ON
+
+			pushQuickView( quickViewPayload() );
+
+			const pushed = window.dataLayer.find(
+				( e ) => e.event === 'view_item'
+			);
+			expect( pushed.ecommerce.item ).toMatchObject( {
+				item_list_name: 'Summer Sale',
+				item_list_id: 'summer-sale',
+			} );
+		} );
+
+		it( 'leaves the Quick View item alone with the option off', () => {
+			window.gtm4wp_list_attribution = 0; // opt-in OFF
+
+			pushQuickView( quickViewPayload() );
+
+			const pushed = window.dataLayer.find(
+				( e ) => e.event === 'view_item'
+			);
+			expect( pushed.ecommerce.item.item_list_name ).toBeUndefined();
+			expect(
+				global.gtm4wp_apply_stored_item_list
+			).not.toHaveBeenCalled();
+		} );
+
+		it( 'still pushes a Quick View payload that carries no item', () => {
+			// A variable or grouped product gets no ecommerce block at all here, and
+			// the enrichment must not stand between that payload and the data layer.
+			window.gtm4wp_list_attribution = 1;
+
+			pushQuickView( { event: 'view_item', productType: 'variable' } );
+
+			expect( window.dataLayer ).toContainEqual( {
+				event: 'view_item',
+				productType: 'variable',
+			} );
+		} );
+	} );
+
 	it( 'swallows a malformed QuickView payload without throwing or pushing', () => {
 		bootWithCapture();
 

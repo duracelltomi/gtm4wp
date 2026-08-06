@@ -170,9 +170,219 @@ final class DataLayerTest extends FrontendTestCase {
 				),
 				'js_before'        => 'before();',
 				'js_after'         => 'after();',
+				'js_wrapper'       => '',
+				'js_wrapper_args'  => array(),
 			),
 			$GLOBALS['gtm4wp_additional_datalayer_pushes'][0]
 		);
+	}
+
+	/**
+	 * #405: the product-detail view_item is rendered into cacheable HTML, so the
+	 * visitor's originating list has to be merged in the browser. The push is
+	 * therefore wrapped in a JS call whose argument list carries the lookup id.
+	 *
+	 * The emitted call resolves the function off window with an identity fallback
+	 * on purpose: the helper lives in a separate bundle, and a load order that
+	 * puts it after this inline script must cost the attribution, never the event.
+	 *
+	 * @return void
+	 */
+	public function test_flush_pushes_wraps_the_object_in_the_named_js_function(): void {
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->queue_push( 'view_item', array( 'value' => 42 ), '', '', 'gtm4wp_enrich', array( 123, 'list' ) );
+
+		$datalayer->flush_pushes();
+
+		$this->assertCount( 1, $captured );
+		$this->assertStringContainsString(
+			'dataLayer.push((window.gtm4wp_enrich||function(d){return d;})({"event":"view_item","value":42},123,"list"));',
+			$captured[0]
+		);
+	}
+
+	public function test_flush_pushes_emits_a_plain_push_without_a_wrapper(): void {
+		// The wrapper is opt-in: with no wrapper the emitted line must stay exactly
+		// what every release so far produced, byte for byte.
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->queue_push( 'view_item', array( 'value' => 42 ) );
+
+		$datalayer->flush_pushes();
+
+		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $captured[0] );
+		$this->assertStringNotContainsString( 'function(d){return d;}', $captured[0] );
+	}
+
+	/**
+	 * The wrapper name is written into a <script> body unescaped, so it is the one
+	 * parameter of queue_push() that could be a script-injection sink. Only a plain
+	 * JavaScript identifier is emitted; anything else is dropped and the object is
+	 * pushed unwrapped, so a caller cannot smuggle statements in through it.
+	 *
+	 * @param string $hostile A wrapper value that must never reach the output.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_hostile_js_wrappers' )]
+	public function test_flush_pushes_rejects_a_wrapper_that_is_not_an_identifier( string $hostile ): void {
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->queue_push( 'view_item', array( 'value' => 42 ), '', '', $hostile );
+
+		$datalayer->flush_pushes();
+
+		// Both directions: the safe form is what got emitted, and no fragment of the
+		// hostile value survived anywhere in the script.
+		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $captured[0] );
+		$this->assertStringNotContainsString( 'alert', $captured[0] );
+		$this->assertStringNotContainsString( '</script', $captured[0] );
+		$this->assertStringNotContainsString( $hostile, $captured[0] );
+	}
+
+	/**
+	 * Wrapper values that are not a plain JavaScript identifier.
+	 *
+	 * @return array<string, string[]>
+	 */
+	public static function provide_hostile_js_wrappers(): array {
+		return array(
+			'statement injection'   => array( 'foo(1);alert(1);//' ),
+			'script tag breakout'   => array( "\x3C/script\x3E\x3Cscript\x3Ealert(1)\x3C/script\x3E" ),
+			'argument list closing' => array( 'foo),alert(1),(' ),
+			'member expression'     => array( 'window.alert' ),
+			'leading digit'         => array( '1foo' ),
+			'whitespace'            => array( 'foo bar' ),
+			'quote breakout'        => array( 'foo"),alert(1)//' ),
+			// PCRE lets `$` match before a trailing newline unless the pattern is
+			// anchored with /D, so this case fails the moment that modifier is lost.
+			'trailing newline'      => array( "gtm4wp_enrich\n" ),
+		);
+	}
+
+	/**
+	 * The push handle carries no src, so its inline script runs while the document
+	 * is parsed - ahead of every deferred bundle. A push that wraps its payload in
+	 * a function from one of those bundles therefore needs the bundle printed
+	 * first, which is what this dependency arranges.
+	 *
+	 * @return void
+	 */
+	public function test_add_push_handle_dependency_appends_the_handle_once(): void {
+		$push_script       = new \stdClass();
+		$push_script->deps = array();
+
+		$registry             = new \stdClass();
+		$registry->registered = array( DataLayer::PUSH_HANDLE => $push_script );
+
+		Functions\when( 'wp_script_is' )->justReturn( true );
+		Functions\when( 'wp_scripts' )->justReturn( $registry );
+
+		$datalayer = new DataLayer( $this->make_options() );
+
+		$this->assertTrue( $datalayer->add_push_handle_dependency( 'gtm4wp-ecommerce-generic' ) );
+		$this->assertSame( array( 'gtm4wp-ecommerce-generic' ), $push_script->deps );
+
+		// Idempotent: a second call must not duplicate the dependency.
+		$this->assertTrue( $datalayer->add_push_handle_dependency( 'gtm4wp-ecommerce-generic' ) );
+		$this->assertSame( array( 'gtm4wp-ecommerce-generic' ), $push_script->deps );
+	}
+
+	/**
+	 * WordPress drops a script whose dependency is not registered - silently, with
+	 * no error. Adding one unchecked here would therefore delete every data layer
+	 * push on the page, which no test elsewhere would notice. The guard is the only
+	 * thing standing between a load-order optimization and that outage.
+	 *
+	 * @return void
+	 */
+	public function test_add_push_handle_dependency_refuses_an_unregistered_handle(): void {
+		$push_script       = new \stdClass();
+		$push_script->deps = array();
+
+		$registry             = new \stdClass();
+		$registry->registered = array( DataLayer::PUSH_HANDLE => $push_script );
+
+		Functions\when( 'wp_script_is' )->alias(
+			static function ( $handle ) {
+				return DataLayer::PUSH_HANDLE === $handle;
+			}
+		);
+		Functions\when( 'wp_scripts' )->justReturn( $registry );
+
+		$datalayer = new DataLayer( $this->make_options() );
+
+		$this->assertFalse( $datalayer->add_push_handle_dependency( 'gtm4wp-ecommerce-generic' ) );
+		$this->assertSame( array(), $push_script->deps, 'An unregistered dependency would make WordPress drop every push.' );
+	}
+
+	/**
+	 * A wrapper the queue names but nothing defines is not an error condition -
+	 * the identity fallback covers it - but a wrapper whose ARGUMENTS cannot be
+	 * encoded means the call would be malformed, so the whole wrapper is dropped
+	 * rather than emitting a broken expression that takes the push down with it.
+	 *
+	 * @return void
+	 */
+	public function test_flush_pushes_drops_the_wrapper_when_an_argument_cannot_be_encoded(): void {
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+
+		// An invalid UTF-8 byte sequence: wp_json_encode() returns false for it.
+		$datalayer->queue_push( 'view_item', array( 'value' => 42 ), '', '', 'gtm4wp_enrich', array( "\xB1\x31" ) );
+
+		$datalayer->flush_pushes();
+
+		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $captured[0] );
+		$this->assertStringNotContainsString( 'gtm4wp_enrich', $captured[0] );
+	}
+
+	/**
+	 * Third party code appends entries to the compat global by hand and will never
+	 * carry the wrapper keys. Reading them must not warn or fatal.
+	 *
+	 * @return void
+	 */
+	public function test_flush_pushes_handles_entries_without_the_wrapper_keys(): void {
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$GLOBALS['gtm4wp_additional_datalayer_pushes'][] = array(
+			'datalayer_object' => array( 'event' => 'thirdparty.event' ),
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->flush_pushes();
+
+		$this->assertStringContainsString( 'dataLayer.push({"event":"thirdparty.event"});', $captured[0] );
 	}
 
 	public function test_queue_push_lets_event_data_override_the_event_arg(): void {

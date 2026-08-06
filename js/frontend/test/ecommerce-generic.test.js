@@ -240,6 +240,132 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			expect( map[ 20 ] ).toBeDefined();
 		} );
 
+		describe( 'event-level enrichment of a server-rendered push', () => {
+			// #405: a product page is full-page cacheable, so PHP must not merge the
+			// visitor's list into that HTML. It emits the view_item push wrapped in a
+			// call to this function instead, and the merge happens here, in the
+			// browser. PHP resolves it off window with an identity fallback, so this
+			// has to behave like one for every shape it is handed.
+
+			it( 'merges the stored list onto the first item of the event', () => {
+				window.gtm4wp_store_item_list_attribution(
+					42,
+					'Summer Sale',
+					'summer-sale'
+				);
+
+				const event_object = {
+					event: 'view_item',
+					ecommerce: {
+						currency: 'EUR',
+						value: 10,
+						items: [ { item_id: 'SKU-42' } ],
+					},
+				};
+
+				const returned = window.gtm4wp_apply_stored_item_list_to_event(
+					event_object,
+					42
+				);
+
+				expect( returned ).toBe( event_object );
+				expect( event_object.ecommerce.items[ 0 ] ).toMatchObject( {
+					item_id: 'SKU-42',
+					item_list_name: 'Summer Sale',
+					item_list_id: 'summer-sale',
+				} );
+			} );
+
+			it( 'leaves the event alone when nothing is stored for the id', () => {
+				const event_object = {
+					event: 'view_item',
+					ecommerce: { items: [ { item_id: 'SKU-42' } ] },
+				};
+
+				window.gtm4wp_apply_stored_item_list_to_event(
+					event_object,
+					999
+				);
+
+				expect(
+					event_object.ecommerce.items[ 0 ].item_list_name
+				).toBeUndefined();
+			} );
+
+			it( 'does not overwrite a list the item already belongs to', () => {
+				window.gtm4wp_store_item_list_attribution( 42, 'Summer Sale' );
+
+				const event_object = {
+					event: 'view_item',
+					ecommerce: {
+						items: [
+							{
+								item_id: 'SKU-42',
+								item_list_name: 'Related Products',
+							},
+						],
+					},
+				};
+
+				window.gtm4wp_apply_stored_item_list_to_event(
+					event_object,
+					42
+				);
+
+				expect( event_object.ecommerce.items[ 0 ].item_list_name ).toBe(
+					'Related Products'
+				);
+			} );
+
+			it( 'returns unexpected shapes untouched instead of throwing', () => {
+				// The PHP side wraps the push in this call, so a throw here would take
+				// the whole event with it - the one failure mode worse than a missing
+				// item_list_name. Every shape that is not "an event with items" has to
+				// come straight back out.
+				window.gtm4wp_store_item_list_attribution( 42, 'Summer Sale' );
+
+				const shapes = [
+					{ event: 'view_item' },
+					{ event: 'view_item', ecommerce: {} },
+					{ event: 'view_item', ecommerce: { items: [] } },
+					{
+						event: 'view_item',
+						ecommerce: { items: 'not-an-array' },
+					},
+					{ event: 'view_item', ecommerce: null },
+					null,
+					undefined,
+				];
+
+				shapes.forEach( ( shape ) => {
+					expect( () =>
+						window.gtm4wp_apply_stored_item_list_to_event(
+							shape,
+							42
+						)
+					).not.toThrow();
+
+					expect(
+						window.gtm4wp_apply_stored_item_list_to_event(
+							shape,
+							42
+						)
+					).toBe( shape );
+				} );
+			} );
+
+			it( 'is exported under the exact name the PHP side emits', () => {
+				// RI-14: PHP writes this identifier into a <script> body. A rename on
+				// either side is silent - the identity fallback swallows it - so the
+				// name itself is the contract. Its PHP half is
+				// Helpers::LIST_ATTRIBUTION_JS_WRAPPER, pinned from the other
+				// direction in PageDataLayerTest.
+				expect(
+					typeof window.gtm4wp_apply_stored_item_list_to_event
+				).toBe( 'function' );
+			} );
+		} );
+
 		it( 'treats an entry with no recency marker as the oldest', () => {
 			// Entries written by an earlier version carry no sequence, so they must
 			// drain out first rather than outliving freshly stored ones.

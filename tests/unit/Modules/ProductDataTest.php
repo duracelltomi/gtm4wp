@@ -256,8 +256,10 @@ final class ProductDataTest extends TestCase {
 
 	public function test_list_attribution_not_merged_in_cacheable_context(): void {
 		// The product-detail context is served from a cacheable page, so it is never
-		// enriched server-side (that would make the HTML visitor-specific); the client
-		// merges it there instead.
+		// enriched server-side (that would make the HTML visitor-specific) - not on a
+		// cached request, not on an uncached one. The browser merges it there instead,
+		// which is why PageDataLayer wraps that push in the client-side helper; see
+		// PageDataLayerTest::test_view_item_push_is_wrapped_for_client_side_list_attribution().
 		$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			array( 123 => array( 'item_list_name' => 'Summer Sale' ) ) // phpcs:ignore
 		);

@@ -59,6 +59,15 @@ final class ProductData {
 	 * HTML visitor-specific. The product-detail / product-list contexts are
 	 * excluded on purpose and enriched client-side instead (#405).
 	 *
+	 * "Client-side instead" is a real path, not an aspiration - if it is ever
+	 * removed, the product-detail view_item silently loses its attribution rather
+	 * than falling back to a server merge. It has three ends, all opt-in behind
+	 * GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION: the server-rendered view_item is
+	 * wrapped in Helpers::LIST_ATTRIBUTION_JS_WRAPPER by
+	 * PageDataLayer::add_product_view(), a selected variation is enriched in the
+	 * found_variation handler of gtm4wp-woocommerce.js, and Quick View is enriched
+	 * where that same file pushes the payload it read off the AJAX fragment.
+	 *
 	 * @var string[]
 	 */
 	private const LIST_ATTRIBUTION_CONTEXTS = array( 'cart', 'checkout', 'purchase', 'readdedtocart', 'block' );

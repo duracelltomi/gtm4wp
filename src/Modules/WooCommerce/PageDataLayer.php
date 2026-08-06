@@ -322,6 +322,21 @@ final class PageDataLayer {
 		$data_layer['productReviewCount']   = (int) $product->get_review_count();
 		$data_layer['productType']          = $product->get_type();
 
+		// GA4 list attribution (#405): a product page is full-page cacheable, so the
+		// list the visitor came from must never be baked into this HTML server-side.
+		// Instead the push is wrapped in a JS call that merges it from the first-party
+		// cookie in the browser - the payload below stays identical for every visitor.
+		// The cookie is keyed by the list item's product id, which is what internal_id
+		// carries here (the same value the client-side variation path looks up).
+		$list_product_id   = $eec_product_array['internal_id'] ?? $postid;
+		$list_wrapper      = '';
+		$list_wrapper_args = array();
+
+		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION ) ) {
+			$list_wrapper      = Helpers::LIST_ATTRIBUTION_JS_WRAPPER;
+			$list_wrapper_args = array( $list_product_id );
+		}
+
 		switch ( $data_layer['productType'] ) {
 			case 'variable':
 				$data_layer['productIsVariable'] = 1;
@@ -340,7 +355,11 @@ final class PageDataLayer {
 									$eec_product_array,
 								),
 							),
-						)
+						),
+						'',
+						'',
+						$list_wrapper,
+						$list_wrapper_args
 					);
 				}
 
@@ -367,7 +386,11 @@ final class PageDataLayer {
 								$eec_product_array,
 							),
 						),
-					)
+					),
+					'',
+					'',
+					$list_wrapper,
+					$list_wrapper_args
 				);
 		}
 

@@ -1613,6 +1613,113 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"event":"view_item"', $this->inline_js, 'view_item fires on the variable parent when WCVIEWITEMONPARENT is on.' );
 	}
 
+	/**
+	 * #405: ProductData refuses to merge the list attribution into the
+	 * `productdetail` context, because a product page is full-page cacheable and
+	 * the merged value is visitor-specific. The compensating path is this wrapper -
+	 * the same static HTML for everyone, with the list resolved in the browser.
+	 *
+	 * Its counterpart is
+	 * ProductDataTest::test_list_attribution_not_merged_in_cacheable_context(): that
+	 * one pins the server refusing to merge, this one pins the client being asked
+	 * to. Without this test, deleting the wrapper leaves both suites green and the
+	 * feature silently half-dead - which is exactly how it shipped the first time.
+	 *
+	 * @return void
+	 */
+	public function test_view_item_push_is_wrapped_for_client_side_list_attribution(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => true,
+				GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"view_item"', $this->inline_js );
+		$this->assertStringContainsString(
+			'(window.' . Helpers::LIST_ATTRIBUTION_JS_WRAPPER . '||function(d){return d;})(',
+			$this->inline_js,
+			'The push is wrapped in the client-side enrichment helper, with an identity fallback.'
+		);
+		$this->assertStringContainsString(
+			',7));',
+			$this->inline_js,
+			'The wrapper receives the product id the list attribution cookie is keyed by.'
+		);
+	}
+
+	public function test_view_item_push_is_not_wrapped_when_list_attribution_is_off(): void {
+		// The feature is opt-in and off by default: with the option off the emitted
+		// push must stay exactly the plain form every release so far produced.
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"view_item"', $this->inline_js );
+		$this->assertStringNotContainsString( Helpers::LIST_ATTRIBUTION_JS_WRAPPER, $this->inline_js );
+		$this->assertStringNotContainsString( 'function(d){return d;}', $this->inline_js );
+	}
+
+	public function test_variable_parent_view_item_push_is_wrapped_too(): void {
+		// The variable parent fires its own server-side view_item, and it is just as
+		// cacheable as the simple one - the found_variation event that follows is a
+		// different event, not a correction of this one.
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+
+		$product = new \WC_Product( array( 'id' => 7, 'type' => 'variable', 'title' => 'Tee', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT => true,
+				GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION  => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString(
+			'(window.' . Helpers::LIST_ATTRIBUTION_JS_WRAPPER . '||function(d){return d;})(',
+			$this->inline_js
+		);
+	}
+
+	/**
+	 * RI-14 / UC-6: PHP writes this identifier into a <script> body and JS has to
+	 * define it under exactly that name. Nothing at runtime notices a mismatch -
+	 * the identity fallback swallows it and the event fires unenriched - and the
+	 * two suites never meet, so only reading the other side's source can catch a
+	 * rename. Three shipped features have already died at this exact seam.
+	 *
+	 * @return void
+	 */
+	public function test_list_attribution_wrapper_name_matches_the_javascript_export(): void {
+		// A local source file in this repository, not a remote URL: the WP HTTP API
+		// has nothing to offer here and is not available in this suite anyway.
+		$js = file_get_contents( dirname( __DIR__, 3 ) . '/js/frontend/gtm4wp-ecommerce-generic.js' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		$this->assertIsString( $js, 'The tracker source must be readable to verify the name contract.' );
+		$this->assertStringContainsString(
+			'window.' . Helpers::LIST_ATTRIBUTION_JS_WRAPPER . ' =',
+			(string) $js,
+			'gtm4wp-ecommerce-generic.js must export the wrapper under the name PHP emits.'
+		);
+	}
+
 	public function test_grouped_product_view_sets_flag_without_firing_view_item(): void {
 		// TS-5: the productType === 'grouped' branch of add_product_view. A grouped
 		// product sets productIsVariable=0 and, unlike simple / variable-on-parent, must

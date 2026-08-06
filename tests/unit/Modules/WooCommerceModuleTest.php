@@ -215,12 +215,14 @@ final class WooCommerceModuleTest extends TestCase {
 	 * Drives enqueue_scripts() with the script machinery stubbed, capturing which
 	 * bundles were enqueued and the inline "window.gtm4wp_blocks_context" it sets.
 	 *
-	 * @param WooCommerceModule $module The module under test.
-	 * @return array{scripts: array<int, string>, inline: array<string, string>}
+	 * @param WooCommerceModule $module     The module under test.
+	 * @param bool              $is_product Whether the request is a product page.
+	 * @return array{scripts: array<int, string>, inline: array<string, string>, args: array<string, mixed>}
 	 */
-	private function run_enqueue( WooCommerceModule $module ): array {
+	private function run_enqueue( WooCommerceModule $module, bool $is_product = false ): array {
 		$enqueued = array();
 		$inline   = array();
+		$args     = array();
 
 		Functions\when( 'apply_filters' )->returnArg( 2 );
 		Functions\when( 'plugins_url' )->justReturn( 'https://example.com/build/x.js' );
@@ -228,8 +230,9 @@ final class WooCommerceModuleTest extends TestCase {
 			static fn ( $data, $options = 0 ) => json_encode( $data, $options ) // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 		);
 		Functions\when( 'wp_enqueue_script' )->alias(
-			static function ( $handle ) use ( &$enqueued ) {
-				$enqueued[] = $handle;
+			static function ( $handle, $src = '', $deps = array(), $ver = false, $script_args = array() ) use ( &$enqueued, &$args ) {
+				$enqueued[]      = $handle;
+				$args[ $handle ] = $script_args;
 			}
 		);
 		Functions\when( 'wp_add_inline_script' )->alias(
@@ -238,11 +241,18 @@ final class WooCommerceModuleTest extends TestCase {
 			}
 		);
 
+		// #405 reaches for this conditional tag when deciding whether the shared
+		// helper has to be parsed before the inline data layer pushes. Stubbed here,
+		// from the caller's argument, so no case depends on another file having
+		// defined it first and none can be reordered into a different answer.
+		Functions\when( 'is_product' )->justReturn( $is_product );
+
 		$module->enqueue_scripts();
 
 		return array(
 			'scripts' => $enqueued,
 			'inline'  => $inline,
+			'args'    => $args,
 		);
 	}
 
@@ -287,6 +297,123 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertContains( 'gtm4wp-woocommerce', $result['scripts'] );
 		$this->assertNotContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
 		$this->assertArrayNotHasKey( 'gtm4wp-woocommerce-blocks', $result['inline'] );
+	}
+
+	/**
+	 * #405: the product-detail view_item push is wrapped in a helper that
+	 * gtm4wp-ecommerce-generic.js defines, and that push is an inline script with no
+	 * src - it executes while the document is parsed, before any deferred bundle. So
+	 * on this one page the helper must NOT be deferred, or the wrapper resolves to
+	 * its identity fallback and the attribution is silently lost on every product
+	 * view. The deferred default everywhere else is asserted by its sibling below,
+	 * because dropping defer site-wide would be a real cost paid for nothing.
+	 *
+	 * @return void
+	 */
+	public function test_product_page_loads_the_shared_helper_blocking_for_list_attribution(): void {
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => true,
+					GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true,
+				)
+			),
+			true
+		);
+
+		$this->assertContains( 'gtm4wp-ecommerce-generic', $result['scripts'] );
+		$this->assertArrayNotHasKey(
+			'strategy',
+			$result['args']['gtm4wp-ecommerce-generic'],
+			'The helper must be parser-blocking on a product page, or the inline push runs first.'
+		);
+	}
+
+	public function test_shared_helper_stays_deferred_without_the_list_attribution_option(): void {
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) ),
+			true
+		);
+
+		$this->assertSame(
+			'defer',
+			$result['args']['gtm4wp-ecommerce-generic']['strategy'] ?? null,
+			'With the opt-in off there is no wrapped push, so nothing justifies blocking.'
+		);
+	}
+
+	public function test_shared_helper_stays_deferred_off_the_product_page(): void {
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => true,
+					GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true,
+				)
+			),
+			false
+		);
+
+		$this->assertSame(
+			'defer',
+			$result['args']['gtm4wp-ecommerce-generic']['strategy'] ?? null,
+			'Only the product page carries a wrapped push; every other page keeps the deferred default.'
+		);
+	}
+
+	/**
+	 * The ordering hook is the other half of the same guarantee, and it is the half
+	 * that can take the whole page down: WordPress silently drops a script whose
+	 * dependency is unregistered, so declaring one where there is no wrapped push
+	 * would risk deleting every data layer push for no benefit at all. It must
+	 * therefore leave the push handle's dependency list alone on every page that
+	 * does not carry one.
+	 *
+	 * @param array<string, mixed> $stored     Stored option values.
+	 * @param bool                 $is_product Whether the request is a product page.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_pages_without_a_wrapped_push' )]
+	public function test_push_handle_dependency_is_not_declared_without_a_wrapped_push( array $stored, bool $is_product ): void {
+		$this->stub_ordinary_page();
+		Functions\when( 'is_product' )->justReturn( $is_product );
+
+		$push_script       = new \stdClass();
+		$push_script->deps = array();
+
+		$registry             = new \stdClass();
+		$registry->registered = array( 'gtm4wp-additional-datalayer-pushes' => $push_script );
+
+		Functions\when( 'wp_script_is' )->justReturn( true );
+		Functions\when( 'wp_scripts' )->justReturn( $registry );
+
+		$this->make_module( $stored )->order_generic_before_pushes();
+
+		$this->assertSame( array(), $push_script->deps, 'Only a page with a wrapped push may constrain the push handle.' );
+	}
+
+	/**
+	 * Option/page combinations that render no wrapped view_item push.
+	 *
+	 * @return array<string, array{0: array<string, mixed>, 1: bool}>
+	 */
+	public static function provide_pages_without_a_wrapped_push(): array {
+		$on = array(
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => true,
+			GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true,
+		);
+
+		return array(
+			'not a product page'     => array( $on, false ),
+			'list attribution off'   => array( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), true ),
+			'ecommerce tracking off' => array( array( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true ), true ),
+			'nothing enabled at all' => array( array(), true ),
+		);
 	}
 
 	/**

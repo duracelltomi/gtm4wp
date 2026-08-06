@@ -55,6 +55,19 @@ final class Helpers {
 	public const LIST_ATTRIBUTION_COOKIE = 'gtm4wp_item_list_attr';
 
 	/**
+	 * Name of the JavaScript function the server-rendered product-detail
+	 * view_item push is wrapped in so the list attribution is merged in the
+	 * browser instead of being baked into cacheable HTML (#405).
+	 *
+	 * PHP writes this identifier into a <script> body and JS has to define it
+	 * under exactly this name: it must match the window export at the bottom of
+	 * js/frontend/gtm4wp-ecommerce-generic.js. A mismatch is silent - the
+	 * emitted call falls back to an identity function, so the event still fires,
+	 * just without the attribution.
+	 */
+	public const LIST_ATTRIBUTION_JS_WRAPPER = 'gtm4wp_apply_stored_item_list_to_event';
+
+	/**
 	 * Hard caps on the list-attribution cookie so a crafted or bloated cookie
 	 * can never make the reader do unbounded work: entries beyond the limit are
 	 * dropped and an oversized cookie is ignored wholesale.

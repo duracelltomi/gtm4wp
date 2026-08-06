@@ -149,6 +149,11 @@ final class WooCommerceModule extends AbstractModule {
 		add_filter( 'woocommerce_loop_add_to_cart_link', array( $list_tracking, 'add_to_cart_link_filter' ), 10, 2 );
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+
+		// Runs after every enqueue callback on the default priority, so both handles
+		// it orders are registered by then. See order_generic_before_pushes().
+		add_action( 'wp_enqueue_scripts', array( $this, 'order_generic_before_pushes' ), 20 );
+
 		add_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array( $this, 'add_global_vars' ) );
 
 		add_filter( 'woocommerce_blocks_product_grid_item_html', array( $list_tracking, 'add_productdata_to_wc_block' ), 10, 3 );
@@ -293,7 +298,19 @@ final class WooCommerceModule extends AbstractModule {
 			$this->enqueue_visitor_cart_channel();
 		}
 
-		$this->enqueue_script( 'gtm4wp-ecommerce-generic', 'gtm4wp-ecommerce-generic.js', array(), $in_footer );
+		// #405: on a product page with list attribution on, the server-rendered
+		// view_item push is wrapped in a function this file defines. That push is an
+		// inline script with no src, so it executes while the document is parsed -
+		// ahead of every deferred bundle - and the helper has to already be there.
+		// Dropping the defer on this one page is what puts it there; everywhere else
+		// (and with the option off) it stays deferred exactly as before.
+		$this->enqueue_script(
+			'gtm4wp-ecommerce-generic',
+			'gtm4wp-ecommerce-generic.js',
+			array(),
+			$in_footer,
+			$this->wraps_product_view_item() ? '' : 'defer'
+		);
 
 		if ( $this->is_block_cart_or_checkout() ) {
 			// The Cart & Checkout blocks are React-based and never fire the classic
@@ -314,6 +331,51 @@ final class WooCommerceModule extends AbstractModule {
 				$this->enqueue_blocks_tracker( 'minicart', $in_footer );
 			}
 		}
+	}
+
+	/**
+	 * Whether this request renders a product-detail view_item whose push is wrapped
+	 * in the client-side list-attribution helper (#405) - which is what makes the
+	 * load order of gtm4wp-ecommerce-generic.js matter on this page.
+	 *
+	 * Mirrors the conditions PageDataLayer::add_product_view() pushes under, so the
+	 * two never disagree about whether a wrapped push is on the page.
+	 *
+	 * @return bool
+	 */
+	private function wraps_product_view_item(): bool {
+		// Options first: both are a cheap array read, while is_product() is a
+		// WooCommerce conditional tag that inspects the main query. With the feature
+		// off - which is the default, and every non-store page - the tag is never
+		// consulted at all.
+		return true === $this->opt( GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION )
+			&& (bool) $this->opt( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE )
+			&& function_exists( 'is_product' )
+			&& is_product();
+	}
+
+	/**
+	 * Declares gtm4wp-ecommerce-generic as a dependency of the data layer push
+	 * handle, so WordPress prints the helper before the inline push that calls it.
+	 *
+	 * Only on the pages that actually carry a wrapped push - a dependency is a
+	 * loading constraint, and there is no reason to impose one anywhere else.
+	 * DataLayer::add_push_handle_dependency() refuses to add it unless both handles
+	 * are registered, because a dependency on an unregistered handle makes WordPress
+	 * drop the dependent script and would take every data layer push with it.
+	 *
+	 * Belt and braces: even if this never runs, the emitted call resolves the helper
+	 * off window with an identity fallback, so the worst case is an unenriched
+	 * view_item rather than a broken one.
+	 *
+	 * @return void
+	 */
+	public function order_generic_before_pushes(): void {
+		if ( ! $this->wraps_product_view_item() ) {
+			return;
+		}
+
+		Plugin::instance()->frontend()->datalayer()->add_push_handle_dependency( 'gtm4wp-ecommerce-generic' );
 	}
 
 	/**

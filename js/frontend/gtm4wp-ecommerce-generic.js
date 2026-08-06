@@ -258,6 +258,40 @@ function gtm4wp_apply_stored_item_list( item, product_id ) {
 	return item;
 }
 
+/**
+ * Enriches a whole data layer event object with the stored list attribution,
+ * then returns it. Companion of gtm4wp_apply_stored_item_list() for the events
+ * PHP renders server-side: the product-detail view_item is baked into cacheable
+ * HTML, so the visitor-specific list has to be merged in the browser instead.
+ *
+ * DataLayer::queue_push() emits a call to this by name off `window`, guarded by
+ * an identity fallback, so it never has to exist for the event to fire. It
+ * therefore has to be defensive in the other direction too: an event of an
+ * unexpected shape is returned untouched rather than throwing inside the push.
+ *
+ * @param {Object}        event_object The data layer object about to be pushed.
+ * @param {number|string} product_id   The product (or parent) id to look up.
+ * @return {Object} The same object, enriched when there was something to add.
+ */
+function gtm4wp_apply_stored_item_list_to_event( event_object, product_id ) {
+	try {
+		const item =
+			event_object &&
+			event_object.ecommerce &&
+			Array.isArray( event_object.ecommerce.items )
+				? event_object.ecommerce.items[ 0 ]
+				: null;
+
+		if ( item ) {
+			gtm4wp_apply_stored_item_list( item, product_id );
+		}
+	} catch ( e ) {
+		// Never let enrichment cost the event itself.
+	}
+
+	return event_object;
+}
+
 // These helpers are the public 1.x JS API called by gtm4wp-woocommerce.js
 // and third party code. webpack wraps this file into its own module scope,
 // so they have to be attached to window explicitly - without this the
@@ -270,3 +304,5 @@ window.gtm4wp_update_json_in_node = gtm4wp_update_json_in_node;
 window.gtm4wp_read_item_list_cookie = gtm4wp_read_item_list_cookie;
 window.gtm4wp_store_item_list_attribution = gtm4wp_store_item_list_attribution;
 window.gtm4wp_apply_stored_item_list = gtm4wp_apply_stored_item_list;
+window.gtm4wp_apply_stored_item_list_to_event =
+	gtm4wp_apply_stored_item_list_to_event;

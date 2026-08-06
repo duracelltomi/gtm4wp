@@ -1041,6 +1041,23 @@ function gtm4wp_woocommerce_process_pages() {
 							const dl_data_obj = JSON.parse(
 								dl_data.dataset.gtm4wp_datalayer
 							);
+							// #405: Quick View builds its view_item on the server
+							// like a product page does, so it arrives without the
+							// list the visitor clicked from. Unlike the product
+							// page this payload keeps internal_id, so the lookup
+							// key is right here in the item. Opt-in.
+							if (
+								gtm4wp_list_attribution_enabled() &&
+								dl_data_obj &&
+								dl_data_obj.ecommerce &&
+								dl_data_obj.ecommerce.item
+							) {
+								gtm4wp_apply_stored_item_list(
+									dl_data_obj.ecommerce.item,
+									dl_data_obj.ecommerce.item.internal_id
+								);
+							}
+
 							// #66: the data layer variable name is an option on
 							// the PHP side, so every push site must go through
 							// the indirection rather than the default literal.
