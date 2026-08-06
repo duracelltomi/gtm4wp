@@ -161,6 +161,104 @@ describe( 'FieldControl multiselect', () => {
 	} );
 } );
 
+describe( 'FieldControl multiselect sections', () => {
+	// The tag restriction list: one stored option value, rendered as one group
+	// per entity type.
+	const FIELD = {
+		key: 'blacklist-status',
+		type: 'multiselect',
+		label: 'Restricted entities',
+		choices: { html: 'Custom HTML', img: 'Custom Image', u: 'URL' },
+		sections: [
+			{ label: 'Tags', choices: [ 'html', 'img' ] },
+			{ label: 'Variables', choices: [ 'u' ] },
+		],
+	};
+
+	it( 'renders every choice exactly once, under its own group heading', () => {
+		renderField( FIELD, { value: [] } );
+
+		expect( screen.getByText( 'Tags' ) ).toBeInTheDocument();
+		expect( screen.getByText( 'Variables' ) ).toBeInTheDocument();
+
+		expect( screen.getAllByRole( 'checkbox' ) ).toHaveLength( 3 );
+		expect(
+			screen.getAllByRole( 'checkbox', { name: 'Custom HTML' } )
+		).toHaveLength( 1 );
+	} );
+
+	it( 'keeps the selections of the other sections when one is toggled', () => {
+		// The sections render ONE flat option value. A toggle that rebuilt the
+		// selection from its own section would silently wipe every entity of the
+		// other sections on the next save - and the screen would look right until
+		// the page was reloaded.
+		const { onChange } = renderField( FIELD, { value: [ 'html' ] } );
+
+		fireEvent.click( screen.getByRole( 'checkbox', { name: 'URL' } ) );
+
+		expect( onChange ).toHaveBeenCalledWith( [ 'html', 'u' ] );
+	} );
+
+	it( 'unchecks across sections without touching the rest of the selection', () => {
+		const { onChange } = renderField( FIELD, { value: [ 'html', 'u' ] } );
+
+		fireEvent.click(
+			screen.getByRole( 'checkbox', { name: 'Custom HTML' } )
+		);
+
+		expect( onChange ).toHaveBeenCalledWith( [ 'u' ] );
+	} );
+
+	it( 'counts the selected entries of each section', () => {
+		renderField( FIELD, { value: [ 'html' ] } );
+
+		expect( screen.getByText( '1 / 2' ) ).toBeInTheDocument();
+		expect( screen.getByText( '0 / 1' ) ).toBeInTheDocument();
+		expect(
+			screen.getByLabelText( '1 of 2 selected' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'leaves a collapsed section collapsed when the selection changes', () => {
+		// The sections are uncontrolled `<details open>`: React writes the
+		// attribute only when the prop CHANGES, so collapsing one survives the
+		// re-render every checkbox click causes. If that ever stopped holding,
+		// each click would spring every collapsed section back open - and a test
+		// that only mounts once would never see it.
+		const props = {
+			field: { description: '', ...FIELD },
+			values: {},
+			onChange: jest.fn(),
+		};
+
+		const { container, rerender } = render(
+			<FieldControl { ...props } value={ [] } />
+		);
+
+		container.querySelectorAll( 'details' )[ 0 ].open = false;
+
+		rerender( <FieldControl { ...props } value={ [ 'u' ] } /> );
+
+		expect( container.querySelectorAll( 'details' )[ 0 ].open ).toBe(
+			false
+		);
+	} );
+
+	it( 'still renders a choice that belongs to no section', () => {
+		renderField(
+			{
+				...FIELD,
+				choices: { ...FIELD.choices, sandboxedScripts: 'Sandboxed' },
+			},
+			{ value: [] }
+		);
+
+		expect(
+			screen.getByRole( 'checkbox', { name: 'Sandboxed' } )
+		).toBeInTheDocument();
+	} );
+} );
+
 describe( 'FieldControl dependencies and annotations', () => {
 	it( 'disables a control whose dependency is off', () => {
 		renderField(

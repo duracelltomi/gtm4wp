@@ -415,4 +415,25 @@
 		max-height: 420px;
 		overflow-y: auto;
 	}
+
+	&__section {
+		border-top: 1px solid var(--gtm4wp-border);
+		margin-top: var(--gtm4wp-s3);
+		padding-top: var(--gtm4wp-s2);
+	}
+
+	&__section-title {
+		align-items: center;
+		cursor: pointer;
+		display: flex;
+		font-weight: 600;
+		gap: var(--gtm4wp-s2);
+		list-style-position: inside;
+	}
+
+	&__section-count {
+		color: var(--gtm4wp-text-3);
+		font-variant-numeric: tabular-nums;
+		font-weight: 400;
+	}
 }

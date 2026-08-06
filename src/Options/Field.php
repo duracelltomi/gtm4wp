@@ -100,6 +100,17 @@ final class Field {
 	 *                                     whole table read-only and offers no add/remove row action.
 	 *                                     A single column whose value is fixed that way is marked with
 	 *                                     a 'readonly' entry in $columns instead.
+	 * @param array         $choice_sections TYPE_MULTISELECT only: an ordered list of arrays with a
+	 *                                     translated 'label' and a 'choices' list of $choices KEYS,
+	 *                                     rendered as labelled sections instead of one flat checkbox
+	 *                                     list. Purely presentational - the stored value stays the
+	 *                                     same flat list, so sanitize(), rest_type() and the REST
+	 *                                     schema never see the sections. A section carries ids only,
+	 *                                     so the labels keep their single definition in $choices; a
+	 *                                     choice no section claims is still rendered (after the
+	 *                                     sections), because a choice that exists but cannot be seen
+	 *                                     is the worse failure. Last in the signature so adding it
+	 *                                     cannot shift a positional argument of an existing caller.
 	 */
 	public function __construct(
 		public string $key,
@@ -114,7 +125,8 @@ final class Field {
 		public array $columns = array(),
 		public $derive = null,
 		public string $depends_on = '',
-		public bool $rows_locked = false
+		public bool $rows_locked = false,
+		public array $choice_sections = array()
 	) {
 	}
 
@@ -257,6 +269,7 @@ final class Field {
 			'group'       => $this->group,
 			'phase'       => $this->phase,
 			'choices'     => $this->choices,
+			'sections'    => $this->choice_sections,
 			'columns'     => $this->columns,
 			'depends_on'  => $this->depends_on,
 			'rows_locked' => $this->rows_locked,

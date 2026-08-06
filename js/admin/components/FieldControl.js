@@ -9,12 +9,12 @@ import {
 	TextareaControl,
 	ToggleControl,
 } from '@wordpress/components';
-import { RawHTML } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { Fragment, RawHTML } from '@wordpress/element';
+import { __, sprintf } from '@wordpress/i18n';
 
 import AxeptioVersionControl from './AxeptioVersionControl';
 import TableControl from './TableControl';
-import { isFieldDisabled } from '../utils';
+import { choiceSections, isFieldDisabled } from '../utils';
 
 const PHASE_LABELS = {
 	beta: __( 'Beta', 'duracelltomi-google-tag-manager' ),
@@ -125,6 +125,10 @@ export default function FieldControl( {
 
 		case 'multiselect': {
 			const selected = Array.isArray( value ) ? value : [];
+
+			// Toggling always rewrites the WHOLE selection, so a choice in one
+			// section can never drop the choices of another: the sections are a
+			// rendering of one flat option value, not four values.
 			const toggle = ( choiceValue, checked ) => {
 				const next = checked
 					? [ ...selected, choiceValue ]
@@ -132,26 +136,72 @@ export default function FieldControl( {
 				onChange( next );
 			};
 
+			const choices = ( entries ) => (
+				<div className="gtm4wp-multiselect__choices">
+					{ entries.map( ( [ choiceValue, choiceLabel ] ) => (
+						<CheckboxControl
+							__nextHasNoMarginBottom
+							key={ choiceValue }
+							label={ choiceLabel }
+							disabled={ disabled }
+							checked={ selected.includes( choiceValue ) }
+							onChange={ ( checked ) =>
+								toggle( choiceValue, checked )
+							}
+						/>
+					) ) }
+				</div>
+			);
+
 			return (
 				<fieldset className="gtm4wp-multiselect">
 					<legend className="gtm4wp-field-label">{ label }</legend>
 					{ help }
-					<div className="gtm4wp-multiselect__choices">
-						{ Object.entries( field.choices ).map(
-							( [ choiceValue, choiceLabel ] ) => (
-								<CheckboxControl
-									__nextHasNoMarginBottom
-									key={ choiceValue }
-									label={ choiceLabel }
-									disabled={ disabled }
-									checked={ selected.includes( choiceValue ) }
-									onChange={ ( checked ) =>
-										toggle( choiceValue, checked )
-									}
-								/>
-							)
-						) }
-					</div>
+					{ choiceSections( field ).map( ( section, index ) => {
+						// An unlabelled section is the whole list of a field that
+						// declares no sections - render it bare, exactly as before.
+						if ( '' === section.label ) {
+							return (
+								<Fragment key={ `section-${ index }` }>
+									{ choices( section.entries ) }
+								</Fragment>
+							);
+						}
+
+						const checkedCount = section.entries.filter(
+							( [ choiceValue ] ) =>
+								selected.includes( choiceValue )
+						).length;
+
+						// Open by default: collapsing is there to let somebody put
+						// a section away, not to hide options behind a click.
+						return (
+							<details
+								className="gtm4wp-multiselect__section"
+								key={ `section-${ index }` }
+								open
+							>
+								<summary className="gtm4wp-multiselect__section-title">
+									{ section.label }
+									<span
+										className="gtm4wp-multiselect__section-count"
+										aria-label={ sprintf(
+											/* translators: 1: number of selected entries, 2: number of entries in the group. */
+											__(
+												'%1$d of %2$d selected',
+												'duracelltomi-google-tag-manager'
+											),
+											checkedCount,
+											section.entries.length
+										) }
+									>
+										{ `${ checkedCount } / ${ section.entries.length }` }
+									</span>
+								</summary>
+								{ choices( section.entries ) }
+							</details>
+						);
+					} ) }
 				</fieldset>
 			);
 		}

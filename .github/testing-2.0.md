@@ -55,7 +55,8 @@ a parallel 1.22.4 install where noted.
 ## 4. Admin regression
 
 - [ ] Every module's options round-trip through save (change → save → reload → verify)
-- [ ] Blacklist multiselect stores comma separated string; frontend outputs `gtm.blacklist`/`gtm.whitelist` accordingly
+- [ ] Tag restrictions: the entity list renders as four collapsible sections (Tags, Triggers, Variables, Entity groups) with per-section selected counts, and still stores ONE comma separated string in `blacklist-status` - check entities in two different sections, save, reload, and confirm both survive
+- [ ] Tag restrictions: the frontend outputs `gtm.blocklist` in blocklist mode and `gtm.allowlist` in allowlist mode - and never the other key, not even as an empty array (an empty allowlist blocks the whole container)
 - [ ] Unavailable module (WooCommerce deactivated) shows disabled card with explanation
 - [ ] `gtm4wp_admin_page_capability` filter respected for the settings page and the REST endpoint
 - [ ] Settings link on the Plugins page works

@@ -295,7 +295,7 @@ No versions, no changelogs, no feeds. Verified by re-checking the recorded **cla
 | U50 | Identifier grammar `/^GTM-[A-Z0-9]+$/`, `/^env-[0-9]+$/` (UC-5) | `src/Modules/Container/ContainerRows.php:38-41` | Google id formats | — | loud | quarterly | [ ] |
 | U51 | Server-side tagging loader URL contract (custom domain/path, omit-id mode) | `src/Frontend/ContainerCode.php` | sGTM docs | — | silent-missing | quarterly | [ ] |
 | U52 | Consent Mode v2 signal names — **2 copies** (UC-6) | `src/Frontend/ConsentDefaults.php`; `src/Modules/ConsentMode/Axeptio.php` | consent mode docs | — | silent-wrong | every-run | [ ] |
-| U53 | **Tag-restriction entity ids** — 71 tags / 9 triggers / 16 variables / 1 group class (97 total, measured at `1daeddf`); `gtm.blocklist` / `gtm.allowlist` | `src/Modules/Blacklist/BlacklistModule.php` — anchors `TAG_IDS`, `TRIGGER_IDS`, `VARIABLE_IDS`, `GROUP_CLASS_IDS` | https://developers.google.com/tag-platform/tag-manager/restrict | — | silent-wrong | every-run | [ ] |
+| U53 | **Tag-restriction entity ids** — 72 tags / 9 triggers / 16 variables / 1 group class (98 total, measured at `b8f78a1`); `gtm.blocklist` / `gtm.allowlist` | `src/Modules/Blacklist/BlacklistModule.php` — anchors `TAG_IDS`, `TRIGGER_IDS`, `VARIABLE_IDS`, `GROUP_CLASS_IDS` | https://developers.google.com/tag-platform/tag-manager/restrict | — | silent-wrong | every-run | [ ] |
 | U54 | **GA4 e-commerce event names (9)** — the core of the e-commerce integration | `src/Modules/WooCommerce/{PageDataLayer,ListTracking,ProductData}.php`; `js/frontend/gtm4wp-woocommerce*.js` | https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtm | — | silent-wrong | every-run | [ ] |
 | U55 | **GA4 event + item parameter names**, incl. the `item_categoryN` cap of 5 | `src/Modules/WooCommerce/ProductData.php` | same page as U54 (`client_type=gtm` — documents the dataLayer shape, not gtag) | — | silent-wrong | every-run | [ ] |
 | U56 | Google Ads `BUSINESS_VERTICALS` (9) + `flights`/`travel` → `destination` id mapping | `src/Modules/WooCommerce/Helpers.php:26-47` | Google Ads remarketing docs | — | silent-wrong | quarterly | [ ] |
@@ -364,12 +364,14 @@ rather than a page snapshot is deliberate (UD-3).
 
 ### U53 — GTM tag-restriction entity ids ⭐
 
-- **We depend on:** `TAG_IDS` (71), `TRIGGER_IDS` (9), `VARIABLE_IDS` (16),
-  `GROUP_CLASS_IDS` (1) — 97 total — in `src/Modules/Blacklist/BlacklistModule.php`
+- **We depend on:** `TAG_IDS` (72), `TRIGGER_IDS` (9), `VARIABLE_IDS` (16),
+  `GROUP_CLASS_IDS` (1) — 98 total — in `src/Modules/Blacklist/BlacklistModule.php`
   matching Google's published entity list; emitted as `gtm.blocklist` /
   `gtm.allowlist`.
 - **Counting rule** (so the number is reproducible): lines matching `^\t\t'…',` inside
-  each `const` block. Measured 71 / 9 / 16 / 1 at `1daeddf`, 2026-08-05.
+  each `const` block. Measured 72 / 9 / 16 / 1 at `b8f78a1` (the last commit to touch
+  the lists), 2026-08-06 — it was 71 / 97 at `1daeddf`, because the D2 fix restored `mf`
+  in between. Re-measure; never carry the number forward.
 - **Claim (tags, triggers, variables):** every id in `TAG_IDS`, `TRIGGER_IDS` and
   `VARIABLE_IDS` still appears on the source page, **and** the page lists no id absent
   from them.
@@ -385,10 +387,16 @@ rather than a page snapshot is deliberate (UD-3).
   exists to prevent.)*
 - **Failure:** `silent-wrong`. An unknown id is dropped by the validator and the
   restriction the admin configured silently stops applying. The code acknowledges this.
-- **Detection:** `none` — `tests/unit/Modules/Blacklist/` pins our list to itself,
-  which proves we emit what we intend and says nothing about whether the intent is
-  current. **Canary wanted:** one live check against a real container (recorded as the
-  open residual on `.security/` finding #122).
+- **Detection:** `none` **against upstream** — `tests/unit/Modules/BlacklistModuleTest.php`
+  pins our list to itself, which proves we emit what we intend and says nothing about
+  whether the intent is current. **Canary wanted:** one live check against a real
+  container (recorded as the open residual on `.security/` finding #122).
+  - *Internal* consistency is pinned since 2026-08-06:
+    `tests/unit/Modules/BlacklistAdminSchemaTest.php` asserts the admin choices equal
+    `BlacklistModule::valid_restrictions()` and that the four choice sections partition
+    them exactly once. That closes the second half of the D2 failure — an id present in
+    the entity table but missing from the settings screen cannot be restricted at all,
+    and nothing reported it — but it is a UC-6 same-repo check, not upstream detection.
 - **Sweep 1 result (2026-08-05, `1daeddf`):** partially drifted.
   - `TRIGGER_IDS` 9/9 exact ✅ · `VARIABLE_IDS` 16/16 exact ✅ ·
     `gtm.allowlist` / `gtm.blocklist` key names confirmed current ✅

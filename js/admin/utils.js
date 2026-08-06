@@ -81,6 +81,75 @@ export function buildValueMap( modules, overrides = {} ) {
 }
 
 /**
+ * Splits a multiselect field's choices into the labelled sections its schema
+ * declares (`field.sections`, from the Field's `choice_sections`), so a long
+ * checkbox list can be rendered as several titled groups.
+ *
+ * The stored value is a flat list either way: sections are presentation only,
+ * and a section carries choice KEYS, never labels, so the labels keep their
+ * single definition in `field.choices`.
+ *
+ * Two rules exist so that no choice can disappear from the screen — an option an
+ * admin cannot see is an option they cannot set, and nothing would report it:
+ * a key no section claims is returned in a trailing unlabelled section, and a key
+ * a section claims but `choices` does not define is skipped.
+ *
+ * Lives here rather than in FieldControl for the same reason `groupsWithFields`
+ * does: it is arithmetic over the schema, and it is worth testing without a DOM.
+ *
+ * @param {Object} field Field description from the bootstrap data.
+ * @return {Array} `{ label, entries: [ [ value, label ], … ] }` list, in declared
+ *                 order. Sections that end up empty are dropped; a field with no
+ *                 sections yields a single unlabelled one holding every choice.
+ */
+export function choiceSections( field ) {
+	const choices = field && field.choices ? field.choices : {};
+	const entries = Object.entries( choices );
+	const declared =
+		field && Array.isArray( field.sections ) ? field.sections : [];
+
+	if ( 0 === declared.length ) {
+		return entries.length > 0 ? [ { label: '', entries } ] : [];
+	}
+
+	const claimed = new Set();
+	const sections = [];
+
+	declared.forEach( ( section ) => {
+		const keys =
+			section && Array.isArray( section.choices ) ? section.choices : [];
+		const sectionEntries = [];
+
+		keys.forEach( ( key ) => {
+			if (
+				! Object.prototype.hasOwnProperty.call( choices, key ) ||
+				claimed.has( key )
+			) {
+				return;
+			}
+
+			claimed.add( key );
+			sectionEntries.push( [ key, choices[ key ] ] );
+		} );
+
+		if ( sectionEntries.length > 0 ) {
+			sections.push( {
+				label: String( ( section && section.label ) ?? '' ),
+				entries: sectionEntries,
+			} );
+		}
+	} );
+
+	const unclaimed = entries.filter( ( [ key ] ) => ! claimed.has( key ) );
+
+	if ( unclaimed.length > 0 ) {
+		sections.push( { label: '', entries: unclaimed } );
+	}
+
+	return sections;
+}
+
+/**
  * Whether a field's control should be disabled because the field it depends on
  * (`field.depends_on`, an option key) is currently off/empty. Fields without a
  * dependency are never disabled by this. Mirrors the per-column `depends_on`

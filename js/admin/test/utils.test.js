@@ -6,6 +6,7 @@ import {
 	axeptioVersionOptions,
 	buildValueMap,
 	changedValues,
+	choiceSections,
 	coerceValue,
 	defaultGroupId,
 	exportFilename,
@@ -19,6 +20,103 @@ import {
 	openingPosition,
 	stripTags,
 } from '../utils';
+
+describe( 'choiceSections', () => {
+	const FIELD = {
+		choices: {
+			html: 'Custom HTML',
+			img: 'Custom Image',
+			cl: 'Click',
+			u: 'URL',
+		},
+		sections: [
+			{ label: 'Tags', choices: [ 'html', 'img' ] },
+			{ label: 'Triggers', choices: [ 'cl' ] },
+			{ label: 'Variables', choices: [ 'u' ] },
+		],
+	};
+
+	it( 'splits the choices into the declared sections, in order', () => {
+		expect( choiceSections( FIELD ) ).toEqual( [
+			{
+				label: 'Tags',
+				entries: [
+					[ 'html', 'Custom HTML' ],
+					[ 'img', 'Custom Image' ],
+				],
+			},
+			{ label: 'Triggers', entries: [ [ 'cl', 'Click' ] ] },
+			{ label: 'Variables', entries: [ [ 'u', 'URL' ] ] },
+		] );
+	} );
+
+	it( 'returns one unlabelled section when the field declares none', () => {
+		expect( choiceSections( { choices: { a: 'Alpha' } } ) ).toEqual( [
+			{ label: '', entries: [ [ 'a', 'Alpha' ] ] },
+		] );
+	} );
+
+	it( 'renders a choice no section claims rather than dropping it', () => {
+		// An option that exists but cannot be seen is an option nobody can set,
+		// and nothing would report it - so the leftovers get their own block.
+		const sections = choiceSections( {
+			choices: { ...FIELD.choices, brandNew: 'Brand new entity' },
+			sections: FIELD.sections,
+		} );
+
+		expect( sections ).toHaveLength( 4 );
+		expect( sections[ 3 ] ).toEqual( {
+			label: '',
+			entries: [ [ 'brandNew', 'Brand new entity' ] ],
+		} );
+	} );
+
+	it( 'skips a section entry the choices do not define', () => {
+		const sections = choiceSections( {
+			choices: { html: 'Custom HTML' },
+			sections: [ { label: 'Tags', choices: [ 'html', 'retired' ] } ],
+		} );
+
+		expect( sections ).toEqual( [
+			{ label: 'Tags', entries: [ [ 'html', 'Custom HTML' ] ] },
+		] );
+	} );
+
+	it( 'never renders the same choice twice', () => {
+		const sections = choiceSections( {
+			choices: { html: 'Custom HTML' },
+			sections: [
+				{ label: 'Tags', choices: [ 'html' ] },
+				{ label: 'Triggers', choices: [ 'html' ] },
+			],
+		} );
+
+		expect( sections ).toEqual( [
+			{ label: 'Tags', entries: [ [ 'html', 'Custom HTML' ] ] },
+		] );
+	} );
+
+	it( 'drops an empty section instead of showing an empty group', () => {
+		expect(
+			choiceSections( {
+				choices: { html: 'Custom HTML' },
+				sections: [
+					{ label: 'Tags', choices: [ 'html' ] },
+					{ label: 'Group classes', choices: [] },
+				],
+			} )
+		).toEqual( [
+			{ label: 'Tags', entries: [ [ 'html', 'Custom HTML' ] ] },
+		] );
+	} );
+
+	it( 'survives a field with no choices at all', () => {
+		expect( choiceSections( {} ) ).toEqual( [] );
+		expect(
+			choiceSections( { choices: {}, sections: FIELD.sections } )
+		).toEqual( [] );
+	} );
+} );
 
 describe( 'coerceValue', () => {
 	it( 'coerces checkbox values to booleans', () => {

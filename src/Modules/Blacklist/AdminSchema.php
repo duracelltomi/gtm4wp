@@ -185,7 +185,7 @@ final class AdminSchema implements AdminSchemaInterface {
 	public function intro(): string {
 		return esc_html__( 'Here you can control which types of tags, triggers and variables can be executed on your site regardless of what tags are included in your container on the Google Tag Manager site. Use this to increase security!', 'duracelltomi-google-tag-manager' ) . '<br />' .
 			esc_html__( 'Do not modify if you do not know what to do, since it can cause issues with your tag deployment!', 'duracelltomi-google-tag-manager' ) . '<br />' .
-			esc_html__( 'For example blacklisting everything and only whitelisting the Google Analytics tag without whitelisting the URL variable type will cause your Google Analytics tags to be blocked anyway since the attached triggers (Page View) can not fire!', 'duracelltomi-google-tag-manager' );
+			esc_html__( 'For example blocklisting everything and only allowlisting the Google Analytics tag without allowlisting the URL variable type will cause your Google Analytics tags to be blocked anyway since the attached triggers (Page View) can not fire!', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**
@@ -195,36 +195,29 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'mode'      => __( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
-			'tags'      => __( 'Tags', 'duracelltomi-google-tag-manager' ),
-			'triggers'  => __( 'Triggers', 'duracelltomi-google-tag-manager' ),
-			'variables' => __( 'Variables', 'duracelltomi-google-tag-manager' ),
+			'mode'     => __( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
+			'entities' => __( 'Entities', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
 	/**
 	 * Field definitions.
 	 *
-	 * The selected entities of all three entity groups are stored in the
-	 * single 1.x compatible blacklist-status option; the admin UI renders
-	 * one multiselect per entity group filtered by choice prefix.
+	 * Every selected entity - tag, trigger, variable and group class alike -
+	 * is stored in the single 1.x compatible blacklist-status option. The
+	 * four entity types are a presentation concern only: the multiselect
+	 * declares them as choice sections, so the admin UI renders four labelled
+	 * lists while the stored value stays one flat list.
+	 *
+	 * The section id lists are derived from the same four label tables that
+	 * build the choices, so an entity can never be labelled in one place and
+	 * sorted in another. BlacklistAdminSchemaTest pins that the sections cover
+	 * every choice exactly once.
 	 *
 	 * @return Field[]
 	 */
 	public function fields(): array {
-		$all_labels = array();
-		foreach ( self::tag_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Tag', 'duracelltomi-google-tag-manager' ), $label );
-		}
-		foreach ( self::trigger_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Trigger', 'duracelltomi-google-tag-manager' ), $label );
-		}
-		foreach ( self::variable_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Variable', 'duracelltomi-google-tag-manager' ), $label );
-		}
-		foreach ( self::group_class_labels() as $entity_id => $label ) {
-			$all_labels[ $entity_id ] = sprintf( '%s — %s', __( 'Group', 'duracelltomi-google-tag-manager' ), $label );
-		}
+		$all_labels = self::tag_labels() + self::trigger_labels() + self::variable_labels() + self::group_class_labels();
 
 		return array(
 			new Field(
@@ -232,12 +225,16 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_SELECT,
 				default_value: '0',
 				label: __( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Select whether the checked entities below should be blacklisted (blocked) or whitelisted (everything else blocked).', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Select whether the checked entities below should be blocklisted (blocked) or allowlisted (everything else blocked).', 'duracelltomi-google-tag-manager' ),
 				group: 'mode',
+				// The stored VALUES are part of the contract: 1 is blocklist mode
+				// in BlacklistModule::add_datalayer_data(). Only the labels moved
+				// to Google's current wording - renumbering these would silently
+				// invert the restriction mode of every site that already saved one.
 				choices: array(
 					'0' => __( 'Disabled', 'duracelltomi-google-tag-manager' ),
-					'1' => __( 'Blacklist selected entities', 'duracelltomi-google-tag-manager' ),
-					'2' => __( 'Whitelist selected entities', 'duracelltomi-google-tag-manager' ),
+					'1' => __( 'Blocklist selected entities', 'duracelltomi-google-tag-manager' ),
+					'2' => __( 'Allowlist selected entities', 'duracelltomi-google-tag-manager' ),
 				),
 				sanitizer: static function ( $value ) {
 					$value = (int) $value;
@@ -254,8 +251,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_MULTISELECT,
 				default_value: '',
 				label: __( 'Restricted entities', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Select the tag, trigger and variable types affected by the restriction mode above.', 'duracelltomi-google-tag-manager' ),
-				group: 'tags',
+				description: esc_html__( 'Select the tag, trigger, variable and entity group types affected by the restriction mode above.', 'duracelltomi-google-tag-manager' ),
+				group: 'entities',
 				choices: $all_labels,
 				sanitizer: static function ( $value ) {
 					$values = is_array( $value ) ? $value : explode( ',', Field::to_string( $value ) );
@@ -269,7 +266,25 @@ final class AdminSchema implements AdminSchemaInterface {
 					);
 
 					return implode( ',', $values );
-				}
+				},
+				choice_sections: array(
+					array(
+						'label'   => __( 'Tags', 'duracelltomi-google-tag-manager' ),
+						'choices' => array_keys( self::tag_labels() ),
+					),
+					array(
+						'label'   => __( 'Triggers', 'duracelltomi-google-tag-manager' ),
+						'choices' => array_keys( self::trigger_labels() ),
+					),
+					array(
+						'label'   => __( 'Variables', 'duracelltomi-google-tag-manager' ),
+						'choices' => array_keys( self::variable_labels() ),
+					),
+					array(
+						'label'   => __( 'Entity groups', 'duracelltomi-google-tag-manager' ),
+						'choices' => array_keys( self::group_class_labels() ),
+					),
+				)
 			),
 		);
 	}
