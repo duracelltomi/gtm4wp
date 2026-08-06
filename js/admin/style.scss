@@ -234,6 +234,33 @@
 	&:last-child {
 		margin-bottom: 0;
 	}
+
+	// The option a deep link (?gtm4wp-focus=…) pointed at. The tab is already
+	// open and the control already has the keyboard focus by the time this
+	// paints; the tint is what tells a mouse user which of the fields on the
+	// tab the notice they clicked was talking about. It fades out on its own so
+	// the screen does not stay marked up for the rest of the session.
+	&.is-focused {
+		animation: gtm4wp-field-reveal 4s ease-out 1s forwards;
+		background: var(--gtm4wp-accent-bg);
+		border-radius: var(--gtm4wp-radius);
+		box-shadow: 0 0 0 var(--gtm4wp-s2) var(--gtm4wp-accent-bg);
+	}
+}
+
+@keyframes gtm4wp-field-reveal {
+	to {
+		background: transparent;
+		box-shadow: 0 0 0 var(--gtm4wp-s2) transparent;
+	}
+}
+
+// Respect a reduced-motion preference: keep the tint, drop the fade.
+@media (prefers-reduced-motion: reduce) {
+
+	.gtm4wp-field.is-focused {
+		animation: none;
+	}
 }
 
 .gtm4wp-field-label {

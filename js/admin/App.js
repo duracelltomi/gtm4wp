@@ -11,19 +11,32 @@ import { __ } from '@wordpress/i18n';
 import ImportExport from './components/ImportExport';
 import ModulePanel from './components/ModulePanel';
 import Sidebar from './components/Sidebar';
-import { buildValueMap, changedValues } from './utils';
+import { buildValueMap, changedValues, focusTarget } from './utils';
 
 export default function App( { settings } ) {
 	const modules = settings.modules;
+
+	// Deep link (`?gtm4wp-focus=<option key>`, printed by SettingsPage::url()):
+	// resolved once at mount into the module, group tab and field it names, so a
+	// link from an admin notice lands on the control instead of on the screen.
+	// Cleared as soon as the visitor navigates themselves, otherwise coming back
+	// to that module would keep re-opening the linked tab.
+	const [ focus, setFocus ] = useState( () =>
+		focusTarget( modules, window.location.search, settings.focusArg )
+	);
 
 	const [ initialValues, setInitialValues ] = useState( () =>
 		buildValueMap( modules )
 	);
 	const [ values, setValues ] = useState( initialValues );
 	const [ errors, setErrors ] = useState( {} );
-	const [ activeModuleId, setActiveModuleId ] = useState(
-		modules.length > 0 ? modules[ 0 ].id : ''
-	);
+	const [ activeModuleId, setActiveModuleId ] = useState( () => {
+		if ( focus ) {
+			return focus.moduleId;
+		}
+
+		return modules.length > 0 ? modules[ 0 ].id : '';
+	} );
 	const [ search, setSearch ] = useState( '' );
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ snackbar, setSnackbar ] = useState( null );
@@ -55,6 +68,11 @@ export default function App( { settings } ) {
 
 	const onFieldChange = ( key, next ) => {
 		setValues( ( previous ) => ( { ...previous, [ key ]: next } ) );
+	};
+
+	const onModuleSelect = ( moduleId ) => {
+		setFocus( null );
+		setActiveModuleId( moduleId );
 	};
 
 	// After an import the server returns the freshly stored, sanitized values;
@@ -148,7 +166,7 @@ export default function App( { settings } ) {
 				<Sidebar
 					modules={ modules }
 					activeModuleId={ activeModuleId }
-					onSelect={ setActiveModuleId }
+					onSelect={ onModuleSelect }
 					search={ search }
 					onSearch={ setSearch }
 					dirtyModules={ dirtyModules }
@@ -158,6 +176,11 @@ export default function App( { settings } ) {
 						module={ activeModule }
 						values={ values }
 						errors={ errors }
+						focus={
+							focus && focus.moduleId === activeModule.id
+								? focus
+								: null
+						}
 						onChange={ onFieldChange }
 					/>
 				) }

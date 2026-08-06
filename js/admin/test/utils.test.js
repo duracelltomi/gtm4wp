@@ -8,6 +8,7 @@ import {
 	changedValues,
 	coerceValue,
 	exportFilename,
+	focusTarget,
 	isCellLocked,
 	isFieldDisabled,
 	moduleMatchesSearch,
@@ -239,6 +240,107 @@ describe( 'moduleMatchesSearch', () => {
 	it( 'does not match unrelated terms and passes empty searches', () => {
 		expect( moduleMatchesSearch( module, 'scroll' ) ).toBe( false );
 		expect( moduleMatchesSearch( module, '' ) ).toBe( true );
+	} );
+} );
+
+describe( 'focusTarget', () => {
+	const MODULES = [
+		{
+			id: 'container',
+			fields: [ { key: 'gtm-containers', group: 'general' } ],
+		},
+		{
+			id: 'page-variables',
+			fields: [
+				{ key: 'include-visitor-ip', group: 'visitor' },
+				{ key: 'include-visitor-ip-proxies', group: 'visitor' },
+			],
+		},
+	];
+
+	it( 'resolves an option key to the module and group that hold it', () => {
+		// The whole point of the feature: the link carries the option key only,
+		// and where it currently lives is looked up here.
+		expect(
+			focusTarget(
+				MODULES,
+				'?page=gtm4wp-settings&gtm4wp-focus=include-visitor-ip-proxies',
+				'gtm4wp-focus'
+			)
+		).toEqual( {
+			moduleId: 'page-variables',
+			groupId: 'visitor',
+			fieldKey: 'include-visitor-ip-proxies',
+		} );
+	} );
+
+	it( 'resolves a key held by the first module too', () => {
+		expect(
+			focusTarget(
+				MODULES,
+				'?gtm4wp-focus=gtm-containers',
+				'gtm4wp-focus'
+			)
+		).toEqual( {
+			moduleId: 'container',
+			groupId: 'general',
+			fieldKey: 'gtm-containers',
+		} );
+	} );
+
+	it( 'returns null when the query string carries no deep link', () => {
+		expect(
+			focusTarget( MODULES, '?page=gtm4wp-settings', 'gtm4wp-focus' )
+		).toBeNull();
+		expect( focusTarget( MODULES, '', 'gtm4wp-focus' ) ).toBeNull();
+	} );
+
+	it( 'returns null for an option this install does not have', () => {
+		// A removed option, or a hand-edited URL: the page must open normally
+		// rather than end up with nothing selected.
+		expect(
+			focusTarget(
+				MODULES,
+				'?gtm4wp-focus=removed-option',
+				'gtm4wp-focus'
+			)
+		).toBeNull();
+	} );
+
+	it( 'ignores a deep link when the server named no query argument', () => {
+		// Bootstrap data from a version that predates `focusArg`.
+		expect(
+			focusTarget( MODULES, '?gtm4wp-focus=gtm-containers', undefined )
+		).toBeNull();
+	} );
+
+	it( 'reads the query argument the server named, not a hardcoded one', () => {
+		// Pins the single-definition contract: rename the constant in PHP and
+		// the app follows, because the name arrives in the bootstrap data.
+		expect(
+			focusTarget(
+				MODULES,
+				'?somewhere-else=gtm-containers',
+				'somewhere-else'
+			)
+		).toEqual( {
+			moduleId: 'container',
+			groupId: 'general',
+			fieldKey: 'gtm-containers',
+		} );
+	} );
+
+	it( 'never returns a value taken from the URL', () => {
+		// The key is matched against the schema and the FIELD's own values come
+		// back, so a crafted URL cannot smuggle a class name or a selector in.
+		expect(
+			focusTarget(
+				MODULES,
+				'?gtm4wp-focus=' +
+					encodeURIComponent( '"><script>alert(1)</script>' ),
+				'gtm4wp-focus'
+			)
+		).toBeNull();
 	} );
 } );
 

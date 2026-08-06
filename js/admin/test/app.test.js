@@ -292,6 +292,65 @@ describe( 'App navigation', () => {
 	} );
 } );
 
+describe( 'App deep linking', () => {
+	const DEEP_LINK_SETTINGS = { ...SETTINGS, focusArg: 'gtm4wp-focus' };
+
+	/**
+	 * Renders the app as if it had been opened through a deep link.
+	 *
+	 * @param {string} query Query string to put on the location.
+	 */
+	function renderWithQuery( query ) {
+		window.history.replaceState( {}, '', query );
+		render( <App settings={ DEEP_LINK_SETTINGS } /> );
+	}
+
+	afterEach( () => {
+		// The location is shared process-wide; leaving a query behind would let
+		// one deep-link test decide what the next file sees (TS-7).
+		window.history.replaceState( {}, '', '/' );
+	} );
+
+	it( 'opens the module holding the linked option, not the first one', () => {
+		renderWithQuery( '?page=gtm4wp-settings&gtm4wp-focus=wc-enabled' );
+
+		expect(
+			screen.getByRole( 'heading', { name: 'WooCommerce' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'marks the linked field', () => {
+		renderWithQuery( '?gtm4wp-focus=datalayer-name' );
+
+		expect(
+			screen.getByDisplayValue( 'dataLayer' ).closest( '.gtm4wp-field' )
+		).toHaveClass( 'is-focused' );
+	} );
+
+	it( 'opens the first module when the link names an unknown option', () => {
+		renderWithQuery( '?gtm4wp-focus=an-option-that-no-longer-exists' );
+
+		expect(
+			screen.getByRole( 'heading', { name: 'Container' } )
+		).toBeInTheDocument();
+		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'drops the highlight once the visitor navigates themselves', () => {
+		// Otherwise the deep link would keep re-applying itself - reopening its
+		// tab and stealing the focus - every time that module is revisited.
+		renderWithQuery( '?gtm4wp-focus=datalayer-name' );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'WooCommerce' } )
+		);
+		fireEvent.click( screen.getByRole( 'button', { name: 'Container' } ) );
+
+		expect( screen.getByDisplayValue( 'dataLayer' ) ).toBeInTheDocument();
+		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 0 );
+	} );
+} );
+
 describe( 'App import', () => {
 	it( 'adopts imported values as the new clean baseline', async () => {
 		// Dirty the form first: an import replaces the baseline outright, so

@@ -292,14 +292,23 @@ export function Notice( { children, status } ) {
  * ModulePanel depends on, so the fake keeps the selection in the DOM rather than
  * in state the test cannot see.
  *
- * @param {Object} props           Component props.
+ * `initialTabName` is honoured rather than accepted-and-ignored: the deep-link
+ * feature rides entirely on it, and a stand-in that swallowed the prop would
+ * make the suite green precisely because the coupling is untested (UC-3). As in
+ * the real control it applies at mount only. What either does with a name that
+ * matches no tab is left untested on purpose - ModulePanel never passes one.
+ *
+ * @param {Object} props                Component props.
  * @param          props.tabs
  * @param          props.children
  * @param          props.className
+ * @param          props.initialTabName
  * @return {Object} React element.
  */
-export function TabPanel( { tabs = [], children, className } ) {
-	const [ selected, setSelected ] = useState( tabs[ 0 ]?.name );
+export function TabPanel( { tabs = [], children, className, initialTabName } ) {
+	const [ selected, setSelected ] = useState(
+		undefined === initialTabName ? tabs[ 0 ]?.name : initialTabName
+	);
 	const active = tabs.find( ( tab ) => tab.name === selected ) || tabs[ 0 ];
 
 	return h(

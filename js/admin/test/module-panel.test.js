@@ -16,7 +16,10 @@ function field( key, group, label = key ) {
 	return { key, group, label, type: 'text', description: '' };
 }
 
-function renderPanel( module, { values = {}, errors = {} } = {} ) {
+function renderPanel(
+	module,
+	{ values = {}, errors = {}, focus = null } = {}
+) {
 	const onChange = jest.fn();
 
 	render(
@@ -30,6 +33,7 @@ function renderPanel( module, { values = {}, errors = {} } = {} ) {
 			} }
 			values={ values }
 			errors={ errors }
+			focus={ focus }
 			onChange={ onChange }
 		/>
 	);
@@ -169,6 +173,112 @@ describe( 'ModulePanel error surfacing', () => {
 		expect( screen.getByRole( 'tab', { name: /One/ } ) ).not.toHaveClass(
 			'gtm4wp-tab--has-error'
 		);
+	} );
+} );
+
+describe( 'ModulePanel deep linking', () => {
+	const TWO_GROUPS = {
+		groups: [
+			{ id: 'one', label: 'One' },
+			{ id: 'two', label: 'Two' },
+		],
+		fields: [
+			field( 'a', 'one', 'First field' ),
+			field( 'b', 'two', 'Second field' ),
+		],
+	};
+
+	it( 'opens the tab holding the linked field instead of the first one', () => {
+		// Without this the notice lands the admin on tab one and the setting it
+		// was talking about is behind a tab they have to guess.
+		renderPanel( TWO_GROUPS, {
+			focus: { moduleId: 'm', groupId: 'two', fieldKey: 'b' },
+		} );
+
+		expect( screen.getByRole( 'tab', { name: /Two/ } ) ).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+		expect( screen.getByText( 'Second field' ) ).toBeInTheDocument();
+	} );
+
+	it( 'marks the linked field and hands it the keyboard focus', () => {
+		renderPanel( TWO_GROUPS, {
+			focus: { moduleId: 'm', groupId: 'two', fieldKey: 'b' },
+		} );
+
+		const control = screen.getByRole( 'textbox' );
+		expect( control.closest( '.gtm4wp-field' ) ).toHaveClass(
+			'is-focused'
+		);
+		expect( control ).toHaveFocus();
+	} );
+
+	it( 'does not grab the focus again when the tab is revisited', () => {
+		// The tint stays for as long as the link is live, but moving between
+		// tabs is the visitor steering; yanking the caret back into the field
+		// each time they return would fight them.
+		renderPanel( TWO_GROUPS, {
+			focus: { moduleId: 'm', groupId: 'two', fieldKey: 'b' },
+		} );
+
+		fireEvent.click( screen.getByRole( 'tab', { name: /One/ } ) );
+		fireEvent.click( screen.getByRole( 'tab', { name: /Two/ } ) );
+
+		const control = screen.getByRole( 'textbox' );
+		expect( control.closest( '.gtm4wp-field' ) ).toHaveClass(
+			'is-focused'
+		);
+		expect( control ).not.toHaveFocus();
+	} );
+
+	it( 'marks only the linked field', () => {
+		renderPanel(
+			{
+				groups: [ { id: 'one', label: 'One' } ],
+				fields: [
+					field( 'a', 'one', 'First field' ),
+					field( 'b', 'one', 'Second field' ),
+				],
+			},
+			{ focus: { moduleId: 'm', groupId: 'one', fieldKey: 'b' } }
+		);
+
+		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 1 );
+		expect(
+			screen.getByText( 'Second field' ).closest( '.gtm4wp-field' )
+		).toHaveClass( 'is-focused' );
+	} );
+
+	it( 'falls back to the first tab when the linked group holds no fields', () => {
+		// An empty group is dropped from the tab bar, so pinning the tab to it
+		// would leave the panel with nothing selected.
+		renderPanel(
+			{
+				groups: [
+					{ id: 'one', label: 'One' },
+					{ id: 'two', label: 'Two' },
+					{ id: 'empty', label: 'Empty' },
+				],
+				fields: [ field( 'a', 'one' ), field( 'b', 'two' ) ],
+			},
+			{ focus: { moduleId: 'm', groupId: 'empty', fieldKey: 'gone' } }
+		);
+
+		expect( screen.getByRole( 'tab', { name: /One/ } ) ).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+	} );
+
+	it( 'leaves the first tab selected and nothing marked without a deep link', () => {
+		renderPanel( TWO_GROUPS );
+
+		expect( screen.getByRole( 'tab', { name: /One/ } ) ).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+		expect( document.querySelectorAll( '.is-focused' ) ).toHaveLength( 0 );
 	} );
 } );
 

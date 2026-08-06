@@ -69,6 +69,13 @@ final class NoticesTest extends TestCase {
 		Functions\when( 'esc_html' )->returnArg();
 		Functions\when( 'esc_url' )->returnArg();
 		Functions\when( 'menu_page_url' )->justReturn( 'options-general.php?page=gtm4wp' );
+		// Reached through SettingsPage::url(), which every notice anchor below
+		// builds its deep link with. Stubbed here rather than borrowed from
+		// whichever file ran first (TS-16); the real one encodes the value, so
+		// the stand-in does too - it must not be more permissive than WordPress.
+		Functions\when( 'add_query_arg' )->alias(
+			static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . rawurlencode( (string) $value )
+		);
 	}
 
 	protected function tearDown(): void {
@@ -317,6 +324,48 @@ final class NoticesTest extends TestCase {
 		$output = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'visitor-ip-untrusted-header', $output );
+	}
+
+	/**
+	 * The notice names a setting that lives three levels down - Page variables ->
+	 * Visitor data -> the field - so landing the admin on the settings page and
+	 * leaving them to find it is only half a pointer. The anchor therefore carries
+	 * the option key the text is about. Asserted per notice rather than once,
+	 * because each anchor names its own key and pointing at the wrong option is a
+	 * silent failure: the page still opens, just not where the text says.
+	 */
+	public function test_show_notices_deep_links_each_notice_to_the_option_it_names(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP         => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER  => 'HTTP_X_FORWARDED_FOR',
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+				GTM4WP_OPTION_DATALAYER_NAME             => 'not-an-identifier',
+				GTM4WP_OPTION_GTM_CONTAINERS             => array(),
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString(
+			'gtm4wp-focus=' . GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES . '"',
+			$output
+		);
+		$this->assertStringContainsString(
+			'gtm4wp-focus=' . GTM4WP_OPTION_DATALAYER_NAME . '"',
+			$output
+		);
+		// The container list, not the derived 1.x flat key, which has no control.
+		$this->assertStringContainsString(
+			'gtm4wp-focus=' . GTM4WP_OPTION_GTM_CONTAINERS . '"',
+			$output
+		);
+		$this->assertStringNotContainsString(
+			'gtm4wp-focus=' . GTM4WP_OPTION_GTM_CODE . '"',
+			$output
+		);
 	}
 
 	public function test_show_notices_silent_once_trusted_proxies_are_configured(): void {

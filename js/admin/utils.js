@@ -157,6 +157,56 @@ export function changedValues( initialValues, currentValues ) {
 }
 
 /**
+ * Resolves a deep link into the settings screen: `?<queryArg>=<option key>`,
+ * where the query argument name is the one the server put in the bootstrap data
+ * (`focusArg`), so the contract has a single definition on our side.
+ *
+ * The address is the option key alone. Which module and which group tab hold
+ * that option is looked up here, in the schema the server just sent, so a link
+ * printed in an admin notice or in the documentation keeps working when a field
+ * is regrouped or moves to another module.
+ *
+ * Nothing from the URL is returned: the key is matched against the known fields
+ * and it is the FIELD's own values that come back, so a hand-crafted URL can
+ * only ever select an existing field or nothing at all.
+ *
+ * @param {Array}  modules  Module descriptions from the bootstrap data.
+ * @param {string} search   Query string, e.g. `window.location.search`.
+ * @param {string} queryArg Name of the query argument carrying the option key.
+ * @return {?Object} `{ moduleId, groupId, fieldKey }`, or null when there is no
+ *                   deep link or it names an option this install does not have.
+ */
+export function focusTarget( modules, search, queryArg ) {
+	if ( ! queryArg ) {
+		return null;
+	}
+
+	const wanted = new URLSearchParams( String( search ?? '' ) ).get(
+		queryArg
+	);
+
+	if ( ! wanted ) {
+		return null;
+	}
+
+	for ( const module of modules ?? [] ) {
+		const field = ( module.fields ?? [] ).find(
+			( candidate ) => candidate.key === wanted
+		);
+
+		if ( field ) {
+			return {
+				moduleId: module.id,
+				groupId: field.group,
+				fieldKey: field.key,
+			};
+		}
+	}
+
+	return null;
+}
+
+/**
  * Whether a module matches a search term: its title or any field label /
  * description contains the term (case insensitive).
  *

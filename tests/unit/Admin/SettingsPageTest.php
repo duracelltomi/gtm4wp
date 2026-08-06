@@ -158,6 +158,63 @@ final class SettingsPageTest extends TestCase {
 		$this->assertStringNotContainsString( $hostile, $inline['code'] );
 	}
 
+	/**
+	 * Deep links address an option KEY, and the app resolves the module and tab
+	 * from the schema it is handed. These pin the two halves of that contract on
+	 * the PHP side: the URL a caller builds, and the query-argument name the app
+	 * is told to look for - which exists so the name is not written a second time
+	 * in JavaScript (UC-6). The JS half is in js/admin/test/utils.test.js.
+	 */
+	public function test_url_deep_links_to_the_named_option(): void {
+		Functions\when( 'menu_page_url' )->justReturn( 'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG );
+		Functions\when( 'add_query_arg' )->alias(
+			static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . rawurlencode( (string) $value )
+		);
+
+		$this->assertSame(
+			'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG
+				. '&gtm4wp-focus=' . GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES,
+			SettingsPage::url( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )
+		);
+	}
+
+	public function test_url_without_an_option_is_the_plain_settings_page(): void {
+		Functions\when( 'menu_page_url' )->justReturn( 'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG );
+
+		$url = SettingsPage::url();
+
+		$this->assertSame( 'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG, $url );
+		$this->assertStringNotContainsString( SettingsPage::FOCUS_QUERY_ARG, $url );
+	}
+
+	public function test_bootstrap_data_names_the_focus_query_argument_for_the_app(): void {
+		$data = $this->make_settings_page( array() )->bootstrap_data();
+
+		$this->assertSame( SettingsPage::FOCUS_QUERY_ARG, $data['focusArg'] );
+	}
+
+	/**
+	 * The keys the shipped notices deep link to must be keys the app can actually
+	 * find, otherwise the link silently degrades to "opens the page" - the exact
+	 * behaviour the feature replaces, and one nothing else would report.
+	 */
+	public function test_deep_linked_option_keys_exist_in_the_schema(): void {
+		$keys = array();
+		foreach ( $this->make_settings_page( array() )->bootstrap_data()['modules'] as $module ) {
+			foreach ( $module['fields'] as $field ) {
+				$keys[] = $field['key'];
+			}
+		}
+
+		$this->assertContains( GTM4WP_OPTION_GTM_CONTAINERS, $keys );
+		$this->assertContains( GTM4WP_OPTION_DATALAYER_NAME, $keys );
+		$this->assertContains( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES, $keys );
+
+		// The 1.x flat container key is a derived mirror with no control of its
+		// own; a notice pointing at it would resolve to nothing.
+		$this->assertNotContains( GTM4WP_OPTION_GTM_CODE, $keys );
+	}
+
 	public function test_enqueue_assets_does_nothing_outside_the_settings_page(): void {
 		$page = $this->make_settings_page( array() );
 

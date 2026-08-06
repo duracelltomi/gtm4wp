@@ -21,12 +21,49 @@ defined( 'ABSPATH' ) || exit;
 final class SettingsPage {
 
 	/**
+	 * Query argument carrying the option key a deep link points at.
+	 *
+	 * Defined once here and handed to the React app in the bootstrap data
+	 * (`focusArg`) rather than written a second time in JavaScript: a contract
+	 * spelled out at both ends of our own codebase diverges long before anything
+	 * upstream moves (UC-6).
+	 */
+	public const FOCUS_QUERY_ARG = 'gtm4wp-focus';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Registry       $registry The module registry.
 	 * @param RestController $rest     The settings REST controller (for current values).
 	 */
 	public function __construct( private Registry $registry, private RestController $rest ) {
+	}
+
+	/**
+	 * URL of the plugin settings page, optionally deep linking to a single option.
+	 *
+	 * With a `$field_key` the URL carries `gtm4wp-focus=<option key>`, which the
+	 * settings app resolves against its own bootstrap data: it selects the module
+	 * and the group tab that hold the option and highlights the control. The
+	 * address is the option key alone and never a module/tab path, so the link
+	 * keeps working when a field is regrouped or moves to another module, and the
+	 * caller never has to know where the option currently lives.
+	 *
+	 * A key that matches nothing (a removed option, a hand-edited URL) simply
+	 * opens the page the way it did before.
+	 *
+	 * @param string $field_key Option key to focus - a GTM4WP_OPTION_* value - or '' for the page itself.
+	 * @return string URL for use in an href; escape it at the point of output.
+	 */
+	public static function url( string $field_key = '' ): string {
+		$url = menu_page_url( GTM4WP_ADMINSLUG, false );
+
+		if ( '' === $field_key ) {
+			return $url;
+		}
+
+		// add_query_arg() URL-encodes the value, so the key is passed raw.
+		return add_query_arg( self::FOCUS_QUERY_ARG, $field_key, $url );
 	}
 
 	/**
@@ -167,6 +204,7 @@ final class SettingsPage {
 
 		return array(
 			'modules'    => $modules,
+			'focusArg'   => self::FOCUS_QUERY_ARG,
 			'restPath'   => RestController::REST_NAMESPACE . RestController::REST_ROUTE,
 			'exportPath' => RestController::REST_NAMESPACE . RestController::REST_ROUTE_EXPORT,
 			'importPath' => RestController::REST_NAMESPACE . RestController::REST_ROUTE_IMPORT,

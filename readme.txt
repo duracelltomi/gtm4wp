@@ -270,6 +270,7 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 **Settings screen**
 
 * Added: modern React-based settings screen with left pane navigation, tabbed option groups, option search and inline per-field validation.
+* Added: admin notices now link straight to the option they are about. Clicking through opens the module, switches to the tab holding that setting and highlights it, instead of dropping you on the settings screen to work out for yourself that, say, the trusted proxy addresses live under Page variables -> Visitor data.
 * Added: **export & import of the plugin settings** (Google Tag Manager settings screen, next to "Save changes"). "Export settings" downloads all of your GTM4WP options as a JSON file; "Import settings" reads such a file back on another site (or the same one). The import is treated as untrusted: every value in the file is run back through the exact same per-field sanitizers as a normal save before anything is stored - unknown keys are dropped, every value is normalized to the field's expected type, oversized files are refused and the file is only ever parsed with `json_decode()` (never `unserialize`/`eval`), so a hand-edited or malicious file cannot inject unsafe data. Both endpoints require the settings capability and a nonce. The value set is schema driven, so every current and future option is covered automatically.
 
 **Google Tag Manager container & tag restrictions**

@@ -83,6 +83,12 @@ final class Notices {
 	public function show_notices(): void {
 		$dismisses = $this->user_dismisses();
 
+		// Every anchor below deep links to the option it is about
+		// (SettingsPage::url()), not to the settings page as a whole: a notice
+		// that names a setting and then drops the admin on a screen where they
+		// have to guess which module and which tab it sits behind is only half a
+		// pointer. The link addresses the option key, so it survives regrouping.
+
 		if ( ( '' === trim( (string) $this->options->get( GTM4WP_OPTION_GTM_CODE ) ) ) && ( false === $dismisses['enter-gtm-code'] ) ) {
 			echo '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code"><p><strong>';
 			printf(
@@ -91,7 +97,9 @@ final class Notices {
 					'To start using Google Tag Manager for WordPress, please %1$senter your GTM ID%2$s',
 					'duracelltomi-google-tag-manager'
 				),
-				'<a href="' . esc_url( menu_page_url( GTM4WP_ADMINSLUG, false ) ) . '">',
+				// The container list, not GTM4WP_OPTION_GTM_CODE: since 2.0 the flat
+				// key is a derived read-only mirror with no control of its own.
+				'<a href="' . esc_url( SettingsPage::url( GTM4WP_OPTION_GTM_CONTAINERS ) ) . '">',
 				'</a>'
 			);
 			echo '</strong></p></div>';
@@ -157,7 +165,7 @@ final class Notices {
 					'Google Tag Manager for WordPress is reading the visitor IP address from a custom HTTP header, but no trusted proxy addresses are configured. HTTP headers are sent by the visitor, so the reported IP address can be chosen by them. Please %1$sadd the addresses of your reverse proxy, load balancer or CDN%2$s, or turn the custom header off.',
 					'duracelltomi-google-tag-manager'
 				),
-				'<a href="' . esc_url( menu_page_url( GTM4WP_ADMINSLUG, false ) ) . '">',
+				'<a href="' . esc_url( SettingsPage::url( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES ) ) . '">',
 				'</a>'
 			);
 			echo '</strong></p></div>';
@@ -181,7 +189,7 @@ final class Notices {
 					'duracelltomi-google-tag-manager'
 				),
 				esc_html( $stored_datalayer_name ),
-				'<a href="' . esc_url( menu_page_url( GTM4WP_ADMINSLUG, false ) ) . '">',
+				'<a href="' . esc_url( SettingsPage::url( GTM4WP_OPTION_DATALAYER_NAME ) ) . '">',
 				'</a>'
 			);
 			echo '</strong></p></div>';
