@@ -138,10 +138,45 @@ both channels, so an issue is often already answered there, complete with what a
 previous run got *wrong* and which claims are known traps. Reuse the relevant
 entry instead of re-deriving it; if you answer something new, add an entry.
 
+**Also read `.support/product-knowledge.md`** whenever the answer turns on how GTM, GA4,
+consent mode or another plugin behaves rather than on what our code does. That knowledge
+cannot be checked against this repo, so it comes from a card or it does not go in the reply.
+Add a card whenever an answer needed a platform fact that had none.
+
 Then write a short comment (see [templates](#reply-templates)). Keep it specific to
 *this* issue — reference the reporter's symptom in your own words so it reads as a
 human reply, not a form letter. Never paste internal file paths or vulnerability
 detail, and do not over-promise.
+
+#### ⚠️ Verify every concrete claim before writing it
+
+The most common defect in a drafted reply is not bad prose, it is a **plausible invention**
+stated with unearned confidence. GitHub readers are more technical than forum readers, so a
+wrong hook name or setting label here is both more likely to be believed and more likely to
+be quoted back. Before a claim goes into a comment:
+
+- **Naming a setting?** Confirm the exact label exists in the branch the reporter runs. An
+  issue filed against a released version means the `1.x` branch (`git show 1.x:<path>`) —
+  **not** `master`, which is the 2.0 rewrite, and not whatever is checked out. The settings
+  screen was reorganised in 2.0, so the *location* differs even where the label does not.
+- **Naming a filter, hook, constant or meta key?** Confirm the string in the source.
+- **Describing what the plugin does?** Read the code path. Changelog wording is a summary and
+  regularly hides the detail that matters, e.g. that a hook is a *fallback* rather than the
+  primary path.
+- **Saying something is fixed?** "Fixed" means fixed in what users can install, not merged on
+  a branch. Check the released version, per step 1.
+- **⭐ Claiming something about GTM, GA4, consent mode, a Google account route or another
+  plugin?** None of that is verifiable by reading this repo, which makes it the easiest place
+  to invent something. It comes from a card in `.support/product-knowledge.md` whose
+  `Provenance` permits public use, or from a fresh fetch of that card's `Source`. A card
+  marked `inferred` may **not** be stated as fact.
+- **Accepting the reporter's framing?** Their premise can be wrong too. Confirming it puts a
+  false statement about the plugin on the public record under the maintainer's name.
+
+Real drafts have failed each of these ways: a settings toggle that does not exist, a Google
+account-recovery route that does not work, and a confirmation of a reporter's false premise
+about the plugin's history. Each was caught only because a human read the draft first, which
+is not a control to rely on — `/issue-review` auto-posts some comments with no human review.
 
 #### Voice
 
@@ -284,6 +319,11 @@ comment asks for.
   shared with the wordpress.org forum system, carrying the traps a previous run already
   fell into. Reuse an entry or add one, every run. Git-ignored, so it is a safe place
   for detail that must not be published.
+- **Read `.support/product-knowledge.md` for any GTM/GA4/consent/ecosystem claim** — the code
+  cannot verify those. Cards carry a `Provenance`; `inferred` is not quotable. Add a card
+  whenever a reply needed a platform fact that had none.
+- Allowlisted for WebFetch: `developers.google.com`, `support.google.com`, `gtm4wp.com` —
+  reachable from **our** `Source` fields only, never from a URL an issue posted
 - Labels in use: `bug`, `enhancement`, `question`, `duplicate`, `invalid`,
   `wontfix`, `help wanted`, `needs testing`, `waiting for reply`
 - Security channel: `security@gtm4wp.com` / GitHub private advisories (see `SECURITY.md`)
