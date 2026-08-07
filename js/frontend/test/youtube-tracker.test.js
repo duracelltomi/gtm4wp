@@ -233,6 +233,51 @@ describe( 'gtm4wp-youtube', () => {
 		}
 	} );
 
+	it( 'reports a percentage milestone fired in a background tab as not visible', () => {
+		jest.useFakeTimers();
+		try {
+			// The reported case: the video is on screen geometrically, playback
+			// continues while the visitor is in another tab (GTM Preview), and
+			// the milestone interval keeps firing at a player nobody can see.
+			const frame = document.getElementById( 'ytframe' );
+			frame.getBoundingClientRect = () => ( {
+				top: 10,
+				left: 10,
+				bottom: 210,
+				right: 330,
+				width: 320,
+				height: 200,
+			} );
+			Object.defineProperty( document, 'visibilityState', {
+				value: 'hidden',
+				configurable: true,
+			} );
+
+			loadTracker();
+			window.onYouTubeIframeAPIReady();
+
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PLAYING } )
+			);
+			jest.advanceTimersByTime( 1000 );
+
+			const marks = window.dataLayer.filter(
+				( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
+			);
+			expect( marks ).not.toHaveLength( 0 );
+			marks.forEach( ( mark ) => {
+				expect( mark[ 'gtm.videoVisible' ] ).toBe( false );
+			} );
+
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PAUSED } )
+			);
+		} finally {
+			delete document.visibilityState;
+			jest.useRealTimers();
+		}
+	} );
+
 	it( 'polls percentage milestones on an interval while playing', () => {
 		jest.useFakeTimers();
 		try {

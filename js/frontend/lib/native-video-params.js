@@ -43,10 +43,21 @@ export function gtm4wpNativeVideoStatus( state ) {
  *
  * GTM describes the variable only as "true if the video is visible in the
  * viewport" and publishes no threshold for its own YouTube trigger, so this
- * measures the player's box at the moment of the push: visible means the box
- * overlaps the viewport and is not hidden by CSS. A player scrolled halfway out
- * therefore still counts as visible, which follows the published wording rather
- * than inventing a percentage. Registered as upstream claim U102.
+ * measures at the moment of the push, in two parts: the page must be on screen
+ * at all (a background tab is not), and the player's box must overlap the
+ * viewport without being hidden by CSS. A player scrolled halfway out therefore
+ * still counts as visible, which follows the published wording rather than
+ * inventing a percentage. Registered as upstream claim U102.
+ *
+ * The tab half matters more than it looks: a video keeps playing in a
+ * background tab, so its progress milestones keep firing at a player nobody can
+ * see, and geometry alone would call every one of them visible.
+ *
+ * Two states are not detectable and are reported as the page's own visibility:
+ * a window fully covered by another window (no browser API exposes it), and a
+ * player popped out into Picture-in-Picture, which stays on screen while its
+ * tab is hidden (for a provider iframe the pop-out happens inside the embed,
+ * where nothing on this page can observe it).
  *
  * The measurement is synchronous (`getBoundingClientRect`) rather than a stored
  * IntersectionObserver ratio, so it can never report a value that a scroll
@@ -88,6 +99,14 @@ export function gtm4wpMediaVisible( target ) {
 	const view = element.ownerDocument && element.ownerDocument.defaultView;
 	if ( ! view ) {
 		return undefined;
+	}
+
+	// A page in a background tab or a minimised window is not on screen at all,
+	// whatever its geometry says — and media keeps playing there, so progress
+	// milestones do keep firing. This is checked first because no box on a page
+	// nobody is looking at can be visible.
+	if ( 'hidden' === view.document.visibilityState ) {
+		return false;
 	}
 
 	// `visibility` is inherited, so this also catches a hidden ancestor. A

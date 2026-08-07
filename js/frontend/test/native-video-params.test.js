@@ -196,8 +196,44 @@ describe( 'gtm4wpNativeVideoParams', () => {
 } );
 
 describe( 'gtm4wpMediaVisible', () => {
+	/**
+	 * Puts the document in a background tab (or a minimised window), which is
+	 * what jsdom cannot do on its own — its visibilityState is always 'visible'.
+	 *
+	 * @param {string} state 'hidden' or 'visible'.
+	 */
+	const setTabState = ( state ) => {
+		Object.defineProperty( document, 'visibilityState', {
+			value: state,
+			configurable: true,
+		} );
+	};
+
 	afterEach( () => {
 		document.body.innerHTML = '';
+		delete document.visibilityState;
+	} );
+
+	it( 'reports a player in a background tab as not visible, whatever its box says', () => {
+		// A video keeps playing in a background tab, so its progress milestones
+		// keep firing while nobody can see it. Geometry alone calls that
+		// visible, which is how a real page reported a hidden tab as true.
+		const player = attachedPlayer();
+		expect( gtm4wpMediaVisible( player ) ).toBe( true );
+
+		setTabState( 'hidden' );
+
+		expect( gtm4wpMediaVisible( player ) ).toBe( false );
+	} );
+
+	it( 'reports a player as visible again once its tab comes back to the front', () => {
+		const player = attachedPlayer();
+		setTabState( 'hidden' );
+		expect( gtm4wpMediaVisible( player ) ).toBe( false );
+
+		setTabState( 'visible' );
+
+		expect( gtm4wpMediaVisible( player ) ).toBe( true );
 	} );
 
 	it( 'reports a player inside the viewport as visible', () => {
