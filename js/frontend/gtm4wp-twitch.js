@@ -79,6 +79,16 @@ function gtm4wp_bindTwitchPlayer(
 			mediaData: gtm4wp_twitchMediaData(),
 			mediaCurrentTime: gtm4wp_twitchCurrentTime(),
 			mediaPlayerEvent: eventName,
+			...gtm4wpNativeVideoParams( {
+				provider: 'twitch',
+				// online/offline are not playback states GTM models.
+				status: '',
+				url: mediaurl,
+				title: mediaid,
+				currentTime: gtm4wp_twitchCurrentTime(),
+				duration: gtm4wp_twitchDuration(),
+				element: container,
+			} ),
 		} );
 	};
 
@@ -146,6 +156,16 @@ function gtm4wp_bindTwitchPlayer(
 			mediaType: 'twitch',
 			mediaData: gtm4wp_twitchMediaData(),
 			mediaCurrentTime: gtm4wp_twitchCurrentTime(),
+			...gtm4wpNativeVideoParams( {
+				provider: 'twitch',
+				// "Ready" has no native GTM video status.
+				status: '',
+				url: mediaurl,
+				title: mediaid,
+				currentTime: gtm4wp_twitchCurrentTime(),
+				duration: gtm4wp_twitchDuration(),
+				element: container,
+			} ),
 		} );
 	} );
 

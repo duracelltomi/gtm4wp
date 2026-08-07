@@ -93,6 +93,18 @@ describe( 'gtm4wp-html5media', () => {
 				duration: 120,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			'gtm.videoProvider': 'html5',
+			'gtm.videoUrl': 'https://example.com/media/clip.mp4',
+			'gtm.videoTitle': 'clip.mp4',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 0,
+			// jsdom gives the element a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -279,6 +291,14 @@ describe( 'gtm4wp-html5media', () => {
 			mediaPlayerEvent: 'error',
 			mediaPlayerEventParam: 4,
 			mediaCurrentTime: 10,
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			'gtm.videoProvider': 'html5',
+			'gtm.videoTitle': 'clip.mp4',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 10,
+			'gtm.videoDuration': 60,
 		} );
 	} );
 

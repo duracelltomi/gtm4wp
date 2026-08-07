@@ -54,6 +54,18 @@ function gtm4wp_initVimeoTracking() {
 								duration,
 							},
 							mediaCurrentTime: 0,
+							...gtm4wpNativeVideoParams( {
+								provider: 'vimeo',
+								// "Ready" has no native GTM video status.
+								status: '',
+								url: videourl,
+								title: vimeo_frame.getAttribute(
+									'data-player_title'
+								),
+								currentTime: 0,
+								duration,
+								element: vimeo_frame,
+							} ),
 						} );
 					} )
 					.catch( function ( error ) {
@@ -72,6 +84,17 @@ function gtm4wp_initVimeoTracking() {
 							mediaCurrentTime: 0,
 							mediaPlayerEvent: 'error',
 							mediaPlayerEventParam: error,
+							...gtm4wpNativeVideoParams( {
+								provider: 'vimeo',
+								status: '',
+								url: videourl,
+								title: vimeo_frame.getAttribute(
+									'data-player_title'
+								),
+								currentTime: 0,
+								duration: 0,
+								element: vimeo_frame,
+							} ),
 						} );
 					} ); // end of api call getDuration
 			} )
@@ -89,6 +112,15 @@ function gtm4wp_initVimeoTracking() {
 					mediaCurrentTime: 0,
 					mediaPlayerEvent: 'error',
 					mediaPlayerEventParam: error,
+					...gtm4wpNativeVideoParams( {
+						provider: 'vimeo',
+						status: '',
+						url: videourl,
+						title: 'Unknown title',
+						currentTime: 0,
+						duration: 0,
+						element: vimeo_frame,
+					} ),
 				} );
 			} ); // end of api call getVideoTitle
 
@@ -188,6 +220,20 @@ function gtm4wp_initVimeoTracking() {
 						mediaPlayerEvent: eventName,
 						mediaPlayerEventParam: eventParam,
 						mediaCurrentTime: seconds,
+						...gtm4wpNativeVideoParams( {
+							provider: 'vimeo',
+							// These events are not playback states GTM models.
+							status: '',
+							url: vimeo_frame.getAttribute( 'data-player_url' ),
+							title: vimeo_frame.getAttribute(
+								'data-player_title'
+							),
+							currentTime: seconds,
+							duration: vimeo_frame.getAttribute(
+								'data-player_duration'
+							),
+							element: vimeo_frame,
+						} ),
 					} );
 				} )
 				.catch( function ( error ) {
@@ -206,6 +252,17 @@ function gtm4wp_initVimeoTracking() {
 						mediaCurrentTime: 0,
 						mediaPlayerEvent: 'error',
 						mediaPlayerEventParam: error,
+						...gtm4wpNativeVideoParams( {
+							provider: 'vimeo',
+							status: '',
+							url: videourl,
+							title: 'Unknown title',
+							currentTime: 0,
+							duration: vimeo_frame.getAttribute(
+								'data-player_duration'
+							),
+							element: vimeo_frame,
+						} ),
 					} );
 				} ); // end call api getCurrentTime()
 		};
@@ -292,6 +349,17 @@ function gtm4wp_initVimeoTracking() {
 						mediaCurrentTime: 0,
 						mediaPlayerEvent: 'error',
 						mediaPlayerEventParam: error,
+						...gtm4wpNativeVideoParams( {
+							provider: 'vimeo',
+							status: '',
+							url: videourl,
+							title: 'Unknown title',
+							currentTime: 0,
+							duration: vimeo_frame.getAttribute(
+								'data-player_duration'
+							),
+							element: vimeo_frame,
+						} ),
 					} );
 				} ); // end call api getCurrentTime()
 		};

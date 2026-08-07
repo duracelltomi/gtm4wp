@@ -97,7 +97,11 @@ describe( 'gtm4wp-vimeo', () => {
 		await loadTracker();
 
 		expect( window.dataLayer ).toHaveLength( 1 );
-		expect( window.dataLayer[ 0 ] ).toMatchObject( {
+		// toEqual, not toMatchObject: "ready" has no native GTM status, so the
+		// exact shape is the assertion — gtm.videoStatus must be present and
+		// empty rather than absent (the data layer is merged state, so an absent
+		// key would inherit whatever the previous push left there).
+		expect( window.dataLayer[ 0 ] ).toEqual( {
 			event: 'gtm4wp.mediaPlayerReady',
 			mediaType: 'vimeo',
 			mediaData: {
@@ -108,6 +112,15 @@ describe( 'gtm4wp-vimeo', () => {
 				duration: 120,
 			},
 			mediaCurrentTime: 0,
+			'gtm.videoProvider': 'vimeo',
+			'gtm.videoUrl': 'https://player.vimeo.com/video/987654321',
+			'gtm.videoTitle': 'My Vimeo Video',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 0,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -196,6 +209,13 @@ describe( 'gtm4wp-vimeo', () => {
 			mediaPlayerEvent: 'playbackratechange',
 			mediaPlayerEventParam: 1.5,
 			mediaCurrentTime: 30,
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			'gtm.videoProvider': 'vimeo',
+			'gtm.videoTitle': 'My Vimeo Video',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 30,
 		} );
 	} );
 

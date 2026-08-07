@@ -32,6 +32,9 @@ function gtm4wp_initHTML5MediaTracking() {
 		// SoundCloud trackers.
 		const gtm4wp_pushHTML5MediaReady = function () {
 			const html5media_filename = gtm4wp_getHTML5MediaFilename();
+			const duration = isNaN( media_element.duration )
+				? 0
+				: media_element.duration;
 
 			window[ gtm4wp_datalayer_name ].push( {
 				event: 'gtm4wp.mediaPlayerReady',
@@ -43,11 +46,19 @@ function gtm4wp_initHTML5MediaTracking() {
 					author: '',
 					title: html5media_filename,
 					url: media_element.currentSrc,
-					duration: isNaN( media_element.duration )
-						? 0
-						: media_element.duration,
+					duration,
 				},
 				mediaCurrentTime: 0,
+				...gtm4wpNativeVideoParams( {
+					provider: 'html5',
+					// "Ready" has no native GTM video status.
+					status: '',
+					url: media_element.currentSrc,
+					title: html5media_filename,
+					currentTime: 0,
+					duration,
+					element: media_element,
+				} ),
 			} );
 		};
 
@@ -109,6 +120,12 @@ function gtm4wp_initHTML5MediaTracking() {
 			eventParam
 		) {
 			const html5media_filename = gtm4wp_getHTML5MediaFilename();
+			const duration = isNaN( media_element.duration )
+				? 0
+				: media_element.duration;
+			const currentTime = isNaN( media_element.currentTime )
+				? 0
+				: media_element.currentTime;
 
 			window[ gtm4wp_datalayer_name ].push( {
 				event: 'gtm4wp.mediaPlayerEvent',
@@ -118,15 +135,21 @@ function gtm4wp_initHTML5MediaTracking() {
 					author: '',
 					title: html5media_filename,
 					url: media_element.currentSrc,
-					duration: isNaN( media_element.duration )
-						? 0
-						: media_element.duration,
+					duration,
 				},
-				mediaCurrentTime: isNaN( media_element.currentTime )
-					? 0
-					: media_element.currentTime,
+				mediaCurrentTime: currentTime,
 				mediaPlayerEvent: eventName,
 				mediaPlayerEventParam: eventParam,
+				...gtm4wpNativeVideoParams( {
+					provider: 'html5',
+					// These events are not playback states GTM models.
+					status: '',
+					url: media_element.currentSrc,
+					title: html5media_filename,
+					currentTime,
+					duration,
+					element: media_element,
+				} ),
 			} );
 		};
 

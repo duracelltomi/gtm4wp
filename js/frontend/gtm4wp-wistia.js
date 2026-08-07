@@ -96,6 +96,16 @@ function gtm4wp_initWistiaTracking() {
 					mediaCurrentTime: video.time(),
 					mediaPlayerEvent: eventName,
 					mediaPlayerEventParam: eventParam,
+					...gtm4wpNativeVideoParams( {
+						provider: 'wistia',
+						// These events are not playback states GTM models.
+						status: '',
+						url: videourl,
+						title: video.name(),
+						currentTime: video.time(),
+						duration: video.duration(),
+						element: gtm4wp_wistiaElement,
+					} ),
 				} );
 			};
 
@@ -134,6 +144,16 @@ function gtm4wp_initWistiaTracking() {
 				mediaType: 'wistia',
 				mediaData: gtm4wp_wistiaMediaData(),
 				mediaCurrentTime: video.time(),
+				...gtm4wpNativeVideoParams( {
+					provider: 'wistia',
+					// "Ready" has no native GTM video status.
+					status: '',
+					url: videourl,
+					title: video.name(),
+					currentTime: video.time(),
+					duration: video.duration(),
+					element: gtm4wp_wistiaElement,
+				} ),
 			} );
 
 			video.bind( 'play', function () {

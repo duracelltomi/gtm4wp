@@ -77,6 +77,53 @@ describe( 'gtm4wp-videopress', () => {
 				duration: 120,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			'gtm.videoProvider': 'videopress',
+			'gtm.videoUrl': 'https://videopress.com/v/AbCdEfGh',
+			'gtm.videoTitle': 'AbCdEfGh',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 0,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
+		} );
+	} );
+
+	it( 'reports an unmapped player message as a mediaPlayerEvent carrying the native params', () => {
+		loadTracker();
+
+		// A start state first, so the assertion below also proves the player
+		// event CLEARS the status it left in the merged data layer.
+		dispatch( {
+			event: 'videopress_playing',
+			id: 'AbCdEfGh',
+			currentTimeMs: 30000,
+			durationMs: 120000,
+		} );
+		expect( lastPush()[ 'gtm.videoStatus' ] ).toBe( 'start' );
+
+		dispatch( {
+			event: 'videopress_volumechange',
+			id: 'AbCdEfGh',
+			currentTimeMs: 30000,
+			durationMs: 120000,
+		} );
+
+		expect( lastPush() ).toMatchObject( {
+			event: 'gtm4wp.mediaPlayerEvent',
+			mediaType: 'videopress',
+			mediaPlayerEvent: 'volumechange',
+			mediaCurrentTime: 30,
+			'gtm.videoProvider': 'videopress',
+			'gtm.videoUrl': 'https://videopress.com/v/AbCdEfGh',
+			'gtm.videoTitle': 'AbCdEfGh',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 30,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 25,
 		} );
 	} );
 

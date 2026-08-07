@@ -11,6 +11,21 @@
  * next to its existing parameters in the same data layer push, letting a Custom
  * Event trigger on the existing `gtm4wp.media*` event names resolve the built-in
  * variables.
+ *
+ * EVERY `gtm4wp.media*` push that has a player to describe carries these keys —
+ * not only the two events with a native GTM counterpart. The data layer is
+ * merged state, so a key left out of a push keeps the value the PREVIOUS push
+ * gave it: a `gtm4wp.mediaPlayerEvent` that omitted them would resolve Video
+ * Title/Status/Percent to whatever the last state change happened to leave
+ * behind, which reads as data rather than as a gap. The one exception is
+ * `gtm4wp.mediaApiReady`, which fires when the provider's SDK loads and has no
+ * player to report at all.
+ *
+ * An event with no native equivalent (player ready, and the player events that
+ * are not state changes) passes `status: ''`, which is what
+ * gtm4wpNativeVideoStatus() already returns for a state GTM does not model.
+ * Empty rather than absent, for the same merge reason: it clears the previous
+ * status instead of inheriting it.
  */
 
 /**
@@ -62,8 +77,9 @@ export function gtm4wpNativeVideoStatus( state ) {
  * The measurement is synchronous (`getBoundingClientRect`) rather than a stored
  * IntersectionObserver ratio, so it can never report a value that a scroll
  * since the last observer callback has already invalidated. Media pushes are
- * infrequent — state changes and percentage milestones, not every time update —
- * so the layout read costs nothing measurable.
+ * infrequent — player ready, state changes, percentage milestones and the
+ * user-initiated player events (rate/volume/quality/fullscreen/error), never
+ * every time update — so the layout read costs nothing measurable.
  *
  * @param {HTMLElement|Function} [target] The player element, or a function
  *                                        returning it, for a player whose SDK

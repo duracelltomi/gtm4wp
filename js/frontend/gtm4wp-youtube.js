@@ -122,6 +122,16 @@ function gtm4wp_onYouTubePlayerReady( event ) {
 			duration: event.target.getDuration(),
 		},
 		mediaCurrentTime: event.target.getCurrentTime(),
+		...gtm4wpNativeVideoParams( {
+			provider: 'youtube',
+			// "Ready" has no native GTM video status.
+			status: '',
+			url: event.target.getVideoUrl(),
+			title: videodata.title,
+			currentTime: event.target.getCurrentTime(),
+			duration: event.target.getDuration(),
+			element: gtm4wp_youtubeIframe( event.target ),
+		} ),
 	} );
 }
 
@@ -191,7 +201,16 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 	} );
 }
 
-function gtm4wp_onYouTubePlaybackQualityChange( event ) {
+/**
+ * Pushes a gtm4wp.mediaPlayerEvent for the YouTube events that are not state
+ * changes. All four report the same player, so they share one push (matching the
+ * single ...PlayerEvent helper every other tracker has).
+ *
+ * @param {Object} event     The YT.Player event.
+ * @param {string} eventName The gtm4wp media player event name.
+ * @return {void}
+ */
+function gtm4wp_pushYouTubePlayerEvent( event, eventName ) {
 	const videodata = event.target.getVideoData();
 
 	window[ gtm4wp_datalayer_name ].push( {
@@ -205,66 +224,35 @@ function gtm4wp_onYouTubePlaybackQualityChange( event ) {
 			duration: event.target.getDuration(),
 		},
 		mediaCurrentTime: event.target.getCurrentTime(),
-		mediaPlayerEvent: 'quality-change',
+		mediaPlayerEvent: eventName,
 		mediaPlayerEventParam: event.data,
+		...gtm4wpNativeVideoParams( {
+			provider: 'youtube',
+			// None of these events is a playback state GTM models.
+			status: '',
+			url: event.target.getVideoUrl(),
+			title: videodata.title,
+			currentTime: event.target.getCurrentTime(),
+			duration: event.target.getDuration(),
+			element: gtm4wp_youtubeIframe( event.target ),
+		} ),
 	} );
+}
+
+function gtm4wp_onYouTubePlaybackQualityChange( event ) {
+	gtm4wp_pushYouTubePlayerEvent( event, 'quality-change' );
 }
 
 function gtm4wp_onYouTubePlaybackRateChange( event ) {
-	const videodata = event.target.getVideoData();
-
-	window[ gtm4wp_datalayer_name ].push( {
-		event: 'gtm4wp.mediaPlayerEvent',
-		mediaType: 'youtube',
-		mediaData: {
-			id: videodata.video_id,
-			author: videodata.author,
-			title: videodata.title,
-			url: event.target.getVideoUrl(),
-			duration: event.target.getDuration(),
-		},
-		mediaCurrentTime: event.target.getCurrentTime(),
-		mediaPlayerEvent: 'ratechange',
-		mediaPlayerEventParam: event.data,
-	} );
+	gtm4wp_pushYouTubePlayerEvent( event, 'ratechange' );
 }
 
 function gtm4wp_onYouTubeError( event ) {
-	const videodata = event.target.getVideoData();
-
-	window[ gtm4wp_datalayer_name ].push( {
-		event: 'gtm4wp.mediaPlayerEvent',
-		mediaType: 'youtube',
-		mediaData: {
-			id: videodata.video_id,
-			author: videodata.author,
-			title: videodata.title,
-			url: event.target.getVideoUrl(),
-			duration: event.target.getDuration(),
-		},
-		mediaCurrentTime: event.target.getCurrentTime(),
-		mediaPlayerEvent: 'error',
-		mediaPlayerEventParam: event.data,
-	} );
+	gtm4wp_pushYouTubePlayerEvent( event, 'error' );
 }
 
 function gtm4wp_onYouTubeApiChange( event ) {
-	const videodata = event.target.getVideoData();
-
-	window[ gtm4wp_datalayer_name ].push( {
-		event: 'gtm4wp.mediaPlayerEvent',
-		mediaType: 'youtube',
-		mediaData: {
-			id: videodata.video_id,
-			author: videodata.author,
-			title: videodata.title,
-			url: event.target.getVideoUrl(),
-			duration: event.target.getDuration(),
-		},
-		mediaCurrentTime: event.target.getCurrentTime(),
-		mediaPlayerEvent: 'api-change',
-		mediaPlayerEventParam: event.data,
-	} );
+	gtm4wp_pushYouTubePlayerEvent( event, 'api-change' );
 }
 
 function gtm4wp_onYouTubePercentageChange( event ) {

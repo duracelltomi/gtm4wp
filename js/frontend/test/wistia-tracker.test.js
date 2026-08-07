@@ -110,6 +110,19 @@ describe( 'gtm4wp-wistia', () => {
 				duration: 120,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			'gtm.videoProvider': 'wistia',
+			'gtm.videoUrl': 'https://fast.wistia.net/embed/iframe/abc123def4',
+			'gtm.videoTitle': 'My Wistia Video',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 0,
+			// gtm.videoVisible is absent, not false: this stub exposes no
+			// elem() and the page carries no .wistia_async_ container, so there
+			// is nothing to measure and the key is omitted rather than guessed.
 		} );
 	} );
 
@@ -237,6 +250,12 @@ describe( 'gtm4wp-wistia', () => {
 			event: 'gtm4wp.mediaPlayerEvent',
 			mediaPlayerEvent: 'playbackratechange',
 			mediaPlayerEventParam: 1.5,
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			'gtm.videoProvider': 'wistia',
+			'gtm.videoTitle': 'My Wistia Video',
+			'gtm.videoStatus': '',
 		} );
 	} );
 

@@ -85,6 +85,16 @@ function gtm4wp_initMixcloudTracking() {
 				mediaData: gtm4wp_mixcloudMediaData(),
 				mediaCurrentTime: lastPosition,
 				mediaPlayerEvent: eventName,
+				...gtm4wpNativeVideoParams( {
+					provider: 'mixcloud',
+					// The error event is not a playback state GTM models.
+					status: '',
+					url: mediaurl,
+					title: mediaid,
+					currentTime: lastPosition,
+					duration: lastDuration,
+					element: mixcloud_frame,
+				} ),
 			} );
 		};
 
@@ -131,6 +141,18 @@ function gtm4wp_initMixcloudTracking() {
 				mediaType: 'mixcloud',
 				mediaData: gtm4wp_mixcloudMediaData(),
 				mediaCurrentTime: 0,
+				...gtm4wpNativeVideoParams( {
+					provider: 'mixcloud',
+					// "Ready" has no native GTM video status.
+					status: '',
+					url: mediaurl,
+					title: mediaid,
+					currentTime: 0,
+					// No progress event has arrived yet, so the duration is
+					// still unknown (as it is in mediaData above).
+					duration: lastDuration,
+					element: mixcloud_frame,
+				} ),
 			} );
 
 			widget.events.play.on( function () {

@@ -209,6 +209,16 @@ function gtm4wp_initVideoPressTracking() {
 					mediaType: 'videopress',
 					mediaData: gtm4wp_videoPressMediaData( guid, duration ),
 					mediaCurrentTime: currentTime,
+					...gtm4wpNativeVideoParams( {
+						provider: 'videopress',
+						// "Ready" has no native GTM video status.
+						status: '',
+						url: 'https://videopress.com/v/' + guid,
+						title: guid,
+						currentTime,
+						duration,
+						element: frame,
+					} ),
 				} );
 				break;
 
@@ -271,6 +281,16 @@ function gtm4wp_initVideoPressTracking() {
 					mediaData: gtm4wp_videoPressMediaData( guid, duration ),
 					mediaCurrentTime: currentTime,
 					mediaPlayerEvent: eventName,
+					...gtm4wpNativeVideoParams( {
+						provider: 'videopress',
+						// Not a playback state GTM models.
+						status: '',
+						url: 'https://videopress.com/v/' + guid,
+						title: guid,
+						currentTime,
+						duration,
+						element: frame,
+					} ),
 				} );
 		}
 	};

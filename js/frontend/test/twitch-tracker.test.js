@@ -101,6 +101,18 @@ describe( 'gtm4wp-twitch', () => {
 				duration: 3600,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			'gtm.videoProvider': 'twitch',
+			'gtm.videoUrl': 'https://www.twitch.tv/videos/123456789',
+			'gtm.videoTitle': '123456789',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 3600,
+			'gtm.videoPercent': 0,
+			// jsdom gives the container a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -171,6 +183,12 @@ describe( 'gtm4wp-twitch', () => {
 		expect( lastPush() ).toMatchObject( {
 			event: 'gtm4wp.mediaPlayerEvent',
 			mediaPlayerEvent: 'online',
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			'gtm.videoProvider': 'twitch',
+			'gtm.videoTitle': '123456789',
+			'gtm.videoStatus': '',
 		} );
 
 		player.emit( Ctor.OFFLINE );

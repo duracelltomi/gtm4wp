@@ -120,6 +120,20 @@ describe( 'gtm4wp-soundcloud', () => {
 				duration: 240000,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			// SoundCloud reports ms, so 240000 becomes 240 seconds here while
+			// mediaData keeps the raw API value.
+			'gtm.videoProvider': 'soundcloud',
+			'gtm.videoUrl': 'https://soundcloud.com/artist/my-track',
+			'gtm.videoTitle': 'My SoundCloud Track',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 240,
+			'gtm.videoPercent': 0,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -231,6 +245,16 @@ describe( 'gtm4wp-soundcloud', () => {
 			mediaType: 'soundcloud',
 			mediaPlayerEvent: 'click-download',
 			mediaCurrentTime: 45000,
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			// SoundCloud reports ms, so 45000 becomes 45 seconds here while
+			// mediaCurrentTime keeps the raw API value.
+			'gtm.videoProvider': 'soundcloud',
+			'gtm.videoTitle': 'My SoundCloud Track',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 45,
+			'gtm.videoDuration': 240,
 		} );
 	} );
 

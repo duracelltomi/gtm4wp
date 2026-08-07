@@ -75,6 +75,19 @@ describe( 'gtm4wp-cloudflarestream', () => {
 				duration: 120,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			'gtm.videoProvider': 'cloudflarestream',
+			'gtm.videoUrl':
+				'https://customer-abc123.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/iframe',
+			'gtm.videoTitle': '6b9e68b07dfee8cc2d116e4c51d6a957',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 0,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -170,6 +183,12 @@ describe( 'gtm4wp-cloudflarestream', () => {
 			event: 'gtm4wp.mediaPlayerEvent',
 			mediaPlayerEvent: 'ratechange',
 			mediaPlayerEventParam: 1.5,
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			'gtm.videoProvider': 'cloudflarestream',
+			'gtm.videoTitle': '6b9e68b07dfee8cc2d116e4c51d6a957',
+			'gtm.videoStatus': '',
 		} );
 	} );
 

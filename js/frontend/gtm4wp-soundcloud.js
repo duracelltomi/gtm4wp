@@ -71,6 +71,17 @@ function gtm4wp_initSoundCloudTracking() {
 						duration: sound.duration,
 					},
 					mediaCurrentTime: 0,
+					...gtm4wpNativeVideoParams( {
+						provider: 'soundcloud',
+						// "Ready" has no native GTM video status.
+						status: '',
+						url: sound.permalink_url,
+						title: sound.title,
+						currentTime: 0,
+						// SoundCloud reports ms; gtm.video* wants seconds.
+						duration: sound.duration / 1000,
+						element: soundcloud_frame,
+					} ),
 				} );
 			} ); // end of api call getCurrentSound
 
@@ -204,6 +215,17 @@ function gtm4wp_initSoundCloudTracking() {
 					},
 					mediaCurrentTime: currentPosition,
 					mediaPlayerEvent: eventName,
+					...gtm4wpNativeVideoParams( {
+						provider: 'soundcloud',
+						// These events are not playback states GTM models.
+						status: '',
+						url: sound.permalink_url,
+						title: sound.title,
+						// SoundCloud reports ms; gtm.video* wants seconds.
+						currentTime: currentPosition / 1000,
+						duration: sound.duration / 1000,
+						element: soundcloud_frame,
+					} ),
 				} );
 			} );
 		};

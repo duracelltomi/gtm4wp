@@ -95,6 +95,16 @@ function gtm4wp_initDailymotionTracking() {
 				mediaCurrentTime: gtm4wp_dailymotionCurrentTime(),
 				mediaPlayerEvent: eventName,
 				mediaPlayerEventParam: eventParam,
+				...gtm4wpNativeVideoParams( {
+					provider: 'dailymotion',
+					// These events are not playback states GTM models.
+					status: '',
+					url: videourl,
+					title: videoid,
+					currentTime: gtm4wp_dailymotionCurrentTime(),
+					duration: gtm4wp_dailymotionDuration(),
+					element: liveFrame,
+				} ),
 			} );
 		};
 
@@ -142,6 +152,16 @@ function gtm4wp_initDailymotionTracking() {
 				mediaType: 'dailymotion',
 				mediaData: gtm4wp_dailymotionMediaData(),
 				mediaCurrentTime: gtm4wp_dailymotionCurrentTime(),
+				...gtm4wpNativeVideoParams( {
+					provider: 'dailymotion',
+					// "Ready" has no native GTM video status.
+					status: '',
+					url: videourl,
+					title: videoid,
+					currentTime: gtm4wp_dailymotionCurrentTime(),
+					duration: gtm4wp_dailymotionDuration(),
+					element: liveFrame,
+				} ),
 			} );
 		} );
 

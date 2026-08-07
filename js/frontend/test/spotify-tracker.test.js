@@ -178,6 +178,21 @@ describe( 'gtm4wp-spotify', () => {
 				duration: 0,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			// The controller reports no duration before the first
+			// playback_update, so it is 0 here as it is in mediaData.
+			'gtm.videoProvider': 'spotify',
+			'gtm.videoUrl':
+				'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+			'gtm.videoTitle': URI,
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 0,
+			'gtm.videoPercent': 0,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 

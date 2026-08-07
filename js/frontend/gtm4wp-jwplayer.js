@@ -79,13 +79,25 @@ function gtm4wp_initJWPlayerTracking() {
 		};
 
 		const gtm4wp_onJWPlayerEvent = function ( eventName, eventParam ) {
+			const mediaData = gtm4wp_jwMediaData();
+
 			window[ gtm4wp_datalayer_name ].push( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'jwplayer',
-				mediaData: gtm4wp_jwMediaData(),
+				mediaData,
 				mediaCurrentTime: gtm4wp_jwCurrentTime(),
 				mediaPlayerEvent: eventName,
 				mediaPlayerEventParam: eventParam,
+				...gtm4wpNativeVideoParams( {
+					provider: 'jwplayer',
+					// These events are not playback states GTM models.
+					status: '',
+					url: mediaData.url,
+					title: mediaData.title,
+					currentTime: gtm4wp_jwCurrentTime(),
+					duration: mediaData.duration,
+					element: container,
+				} ),
 			} );
 		};
 
@@ -132,11 +144,23 @@ function gtm4wp_initJWPlayerTracking() {
 		// The player instances found in the DOM are already set up, so the ready
 		// signal is pushed immediately rather than waiting for the 'ready' event
 		// (which may have fired before this tracker ran).
+		const gtm4wp_jwReadyMediaData = gtm4wp_jwMediaData();
+
 		window[ gtm4wp_datalayer_name ].push( {
 			event: 'gtm4wp.mediaPlayerReady',
 			mediaType: 'jwplayer',
-			mediaData: gtm4wp_jwMediaData(),
+			mediaData: gtm4wp_jwReadyMediaData,
 			mediaCurrentTime: gtm4wp_jwCurrentTime(),
+			...gtm4wpNativeVideoParams( {
+				provider: 'jwplayer',
+				// "Ready" has no native GTM video status.
+				status: '',
+				url: gtm4wp_jwReadyMediaData.url,
+				title: gtm4wp_jwReadyMediaData.title,
+				currentTime: gtm4wp_jwCurrentTime(),
+				duration: gtm4wp_jwReadyMediaData.duration,
+				element: container,
+			} ),
 		} );
 
 		player.on( 'play', function () {

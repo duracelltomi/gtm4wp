@@ -137,6 +137,10 @@ describe( 'gtm4wp-youtube', () => {
 
 		capturedEvents.onReady( ytEvent() );
 
+		// toEqual, not toMatchObject: "ready" has no native GTM status, so the
+		// exact shape is the assertion — gtm.videoStatus must be present and
+		// empty rather than absent (the data layer is merged state, so an absent
+		// key would inherit whatever the previous push left there).
 		expect( lastPush() ).toEqual( {
 			event: 'gtm4wp.mediaPlayerReady',
 			mediaType: 'youtube',
@@ -148,6 +152,15 @@ describe( 'gtm4wp-youtube', () => {
 				duration: 120,
 			},
 			mediaCurrentTime: 30,
+			'gtm.videoProvider': 'youtube',
+			'gtm.videoUrl': 'https://www.youtube.com/watch?v=abc123',
+			'gtm.videoTitle': 'My Video',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 30,
+			'gtm.videoDuration': 120,
+			'gtm.videoPercent': 25,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -358,6 +371,74 @@ describe( 'gtm4wp-youtube', () => {
 			mediaPlayerEvent: 'error',
 			mediaPlayerEventParam: 2,
 		} );
+	} );
+
+	it( 'carries the built-in gtm.video* variables on every media push that has a player', () => {
+		loadTracker();
+		window.onYouTubeIframeAPIReady();
+
+		// The four gtm.video* keys GTM's built-in Video variables read that are
+		// NOT derived from the player state, so they must be identical on every
+		// push regardless of which event produced it.
+		const identity = {
+			'gtm.videoProvider': 'youtube',
+			'gtm.videoUrl': 'https://www.youtube.com/watch?v=abc123',
+			'gtm.videoTitle': 'My Video',
+			'gtm.videoDuration': 120,
+		};
+
+		capturedEvents.onReady( ytEvent() );
+		expect( lastPush() ).toMatchObject( {
+			...identity,
+			'gtm.videoStatus': '',
+		} );
+
+		capturedEvents.onPlaybackQualityChange( ytEvent( { data: 'hd720' } ) );
+		expect( lastPush() ).toMatchObject( {
+			...identity,
+			'gtm.videoStatus': '',
+			mediaPlayerEvent: 'quality-change',
+		} );
+
+		capturedEvents.onApiChange( ytEvent() );
+		expect( lastPush() ).toMatchObject( {
+			...identity,
+			'gtm.videoStatus': '',
+			mediaPlayerEvent: 'api-change',
+		} );
+
+		// mediaApiReady is the one exception: it fires when the IFrame API
+		// script loads, before any player exists, so it has nothing to report.
+		const apiReady = window.dataLayer.find(
+			( entry ) => entry.event === 'gtm4wp.mediaApiReady'
+		);
+		expect( apiReady ).toBeDefined();
+		expect( Object.keys( apiReady ) ).toEqual( [ 'event', 'mediaType' ] );
+	} );
+
+	it( 'clears a stale gtm.videoStatus when a player event follows a state change', () => {
+		jest.useFakeTimers();
+		try {
+			loadTracker();
+			window.onYouTubeIframeAPIReady();
+
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PLAYING } )
+			);
+			expect( lastPush()[ 'gtm.videoStatus' ] ).toBe( 'start' );
+
+			// The data layer merges pushes, so omitting gtm.videoStatus here
+			// would leave Video Status resolving to 'start' during an event that
+			// is not a playback start at all.
+			capturedEvents.onError( ytEvent( { data: 2 } ) );
+			expect( lastPush()[ 'gtm.videoStatus' ] ).toBe( '' );
+
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PAUSED } )
+			);
+		} finally {
+			jest.useRealTimers();
+		}
 	} );
 
 	it( 'pushes only the API-ready signal when the page has no YouTube embeds', () => {

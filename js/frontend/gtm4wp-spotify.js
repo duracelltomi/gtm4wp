@@ -122,6 +122,18 @@ function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 			mediaType: 'spotify',
 			mediaData: info,
 			mediaCurrentTime: 0,
+			...gtm4wpNativeVideoParams( {
+				provider: 'spotify',
+				// "Ready" has no native GTM video status.
+				status: '',
+				url: info.url,
+				title: info.title,
+				currentTime: 0,
+				// The controller reports no duration until the first
+				// playback_update, so ready carries 0 (as mediaData does).
+				duration: 0,
+				element: liveFrame,
+			} ),
 		} );
 	} );
 

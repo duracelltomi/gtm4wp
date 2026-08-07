@@ -80,6 +80,16 @@ function gtm4wp_initCloudflareStreamTracking() {
 				mediaCurrentTime: gtm4wp_streamCurrentTime(),
 				mediaPlayerEvent: eventName,
 				mediaPlayerEventParam: eventParam,
+				...gtm4wpNativeVideoParams( {
+					provider: 'cloudflarestream',
+					// These events are not playback states GTM models.
+					status: '',
+					url: videourl,
+					title: videoid,
+					currentTime: gtm4wp_streamCurrentTime(),
+					duration: gtm4wp_streamDuration(),
+					element: stream_frame,
+				} ),
 			} );
 		};
 
@@ -127,6 +137,16 @@ function gtm4wp_initCloudflareStreamTracking() {
 				mediaType: 'cloudflarestream',
 				mediaData: gtm4wp_streamMediaData(),
 				mediaCurrentTime: gtm4wp_streamCurrentTime(),
+				...gtm4wpNativeVideoParams( {
+					provider: 'cloudflarestream',
+					// "Ready" has no native GTM video status.
+					status: '',
+					url: videourl,
+					title: videoid,
+					currentTime: gtm4wp_streamCurrentTime(),
+					duration: gtm4wp_streamDuration(),
+					element: stream_frame,
+				} ),
 			} );
 		} );
 

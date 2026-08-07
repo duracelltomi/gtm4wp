@@ -98,6 +98,19 @@ describe( 'gtm4wp-mixcloud', () => {
 				duration: 0,
 			},
 			mediaCurrentTime: 0,
+			// "Ready" has no native GTM status, but the built-in Video
+			// variables still resolve: gtm.videoStatus is present and empty
+			// rather than absent, so it cannot inherit an earlier push's value.
+			// No progress tick has arrived yet, so the duration is still 0.
+			'gtm.videoProvider': 'mixcloud',
+			'gtm.videoUrl': 'https://www.mixcloud.com/spartacus/party-time/',
+			'gtm.videoTitle': '/spartacus/party-time/',
+			'gtm.videoStatus': '',
+			'gtm.videoCurrentTime': 0,
+			'gtm.videoDuration': 0,
+			'gtm.videoPercent': 0,
+			// jsdom gives the iframe a 0×0 box, so it measures as off screen.
+			'gtm.videoVisible': false,
 		} );
 	} );
 
@@ -204,6 +217,12 @@ describe( 'gtm4wp-mixcloud', () => {
 			event: 'gtm4wp.mediaPlayerEvent',
 			mediaType: 'mixcloud',
 			mediaPlayerEvent: 'error',
+			// A player event is still a gtm4wp.media* push, so it carries the
+			// built-in Video variables — with an empty status, which also clears
+			// the one a preceding state change left in the merged data layer.
+			'gtm.videoProvider': 'mixcloud',
+			'gtm.videoTitle': '/spartacus/party-time/',
+			'gtm.videoStatus': '',
 		} );
 	} );
 
