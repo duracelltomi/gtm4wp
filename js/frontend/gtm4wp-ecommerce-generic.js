@@ -147,6 +147,24 @@ const GTM4WP_LIST_ATTR_COOKIE = 'gtm4wp_item_list_attr';
 const GTM4WP_LIST_ATTR_MAX_ENTRIES = 20;
 const GTM4WP_LIST_ATTR_TTL_DAYS = 3;
 
+// Second, independent bound on the cookie, measured the way the browser measures
+// it: name + value, in bytes, AFTER percent-encoding. The entry cap alone does not
+// bound the size, because item_list_name is not ours - it can be a widget title, a
+// long category name or a translation - and encodeURIComponent triples every {, },
+// ", : and , in the JSON. Twenty entries of built-in list names come to ~2.6 KB,
+// but twenty entries whose names run ~50 characters exceed the ~4096 bytes browsers
+// accept for one cookie.
+//
+// The budget is set just under that ceiling on purpose: every byte withheld here is
+// a product the visitor is no longer attributed for, so headroom is not free. 4096
+// has two readings - Chromium enforces it over name + value alone
+// (kMaxCookieNamePlusValueSize), while RFC 6265 6.1 measures name + value +
+// attributes - and gtm4wp_write_cookie() emits a fixed 58 bytes of attributes
+// (';expires=' + a fixed-width UTC date + ';path=/;SameSite=Lax'). 3900 clears the
+// stricter of the two by 138 bytes, so it holds whichever reading an engine uses.
+// Raise it only against a re-measured attribute length; do not round it up to 4096.
+const GTM4WP_LIST_ATTR_MAX_BYTES = 3900;
+
 /**
  * Reads and parses the list-attribution cookie into a productId -> list-data map.
  *
@@ -167,8 +185,9 @@ function gtm4wp_read_item_list_cookie() {
 }
 
 /**
- * Stores the list attribution for a product id, newest wins, capping the number of
- * entries so the cookie stays small. No-op without a product id or list name.
+ * Stores the list attribution for a product id, newest wins, evicting the least
+ * recently stored entries until the cookie is within BOTH caps: the entry count and
+ * the encoded byte size. No-op without a product id or list name.
  *
  * @param {number|string} product_id     The product (or parent) id the list was shown for.
  * @param {string}        item_list_name The GA4 list name.
@@ -211,10 +230,10 @@ function gtm4wp_store_item_list_attribution(
 	// A sequence number rather than a clock: several products can be stored inside
 	// the same millisecond (a list page wiring every tile at once), and tied stamps
 	// would fall back to Object.keys order - the very numeric ordering this fix
-	// exists to stop relying on. It also stays short, which matters because the
-	// cookie is byte-capped on the PHP side. The PHP reader takes only
-	// item_list_name and item_list_id from each entry, so this field is ignored
-	// there and needs no coordinated change.
+	// exists to stop relying on. It also stays short, which matters because every
+	// byte it costs is a byte the size cap below has to evict for. The PHP reader
+	// takes only item_list_name and item_list_id from each entry, so this field is
+	// ignored there and needs no coordinated change.
 	const next_seq =
 		Object.keys( map ).reduce(
 			( max, key ) => Math.max( max, stored_at( key ) ),
@@ -226,9 +245,38 @@ function gtm4wp_store_item_list_attribution(
 		map[ product_id ].item_list_id = item_list_id;
 	}
 
+	// Now evict by measured size, oldest first, until the encoded cookie fits the
+	// byte budget. An oversized cookie does not corrupt anything - the browser
+	// rejects the whole assignment and keeps the previous value - but the failure
+	// is silent and it does not clear itself: the next click re-reads the same
+	// oversized map, drops one entry, adds one, arrives at the same size and is
+	// rejected again, so the attribution freezes on whatever fitted last until the
+	// TTL expires. keys_by_age no longer contains product_id (deleted above and
+	// re-added since), so the entry the visitor just clicked is never a candidate -
+	// it is the freshest attribution there is.
+	const fits = ( value ) =>
+		GTM4WP_LIST_ATTR_COOKIE.length + value.length <=
+		GTM4WP_LIST_ATTR_MAX_BYTES;
+
+	let encoded = encodeURIComponent( JSON.stringify( map ) );
+	while ( ! fits( encoded ) && keys_by_age.length ) {
+		delete map[ keys_by_age.shift() ];
+		encoded = encodeURIComponent( JSON.stringify( map ) );
+	}
+
+	// Nothing left to evict and still over budget: one list name longer than the
+	// whole cookie. Leave the previous cookie alone rather than write something the
+	// browser would drop anyway. Truncating the name to make it fit would be worse
+	// than skipping it - the same list would then reach GA4 under a full name from
+	// the server-rendered events and a truncated one from the cookie-carried
+	// events, splitting one list into two rows in the report.
+	if ( ! fits( encoded ) ) {
+		return;
+	}
+
 	gtm4wp_write_cookie(
 		GTM4WP_LIST_ATTR_COOKIE,
-		encodeURIComponent( JSON.stringify( map ) ),
+		encoded,
 		GTM4WP_LIST_ATTR_TTL_DAYS,
 		true
 	);

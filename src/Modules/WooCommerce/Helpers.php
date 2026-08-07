@@ -71,6 +71,15 @@ final class Helpers {
 	 * Hard caps on the list-attribution cookie so a crafted or bloated cookie
 	 * can never make the reader do unbounded work: entries beyond the limit are
 	 * dropped and an oversized cookie is ignored wholesale.
+	 *
+	 * The byte cap is measured on the DECODED value, because PHP URL-decodes
+	 * $_COOKIE before we see it, while the writer's own budget
+	 * (GTM4WP_LIST_ATTR_MAX_BYTES in js/frontend/gtm4wp-ecommerce-generic.js) is
+	 * measured on the encoded bytes a browser counts against its ~4096-byte
+	 * per-cookie limit. The same number therefore means different things on the
+	 * two sides and they are not a pair to keep in sync: anything a browser
+	 * accepted decodes to well under this cap, so this one only ever rejects a
+	 * cookie no browser wrote.
 	 */
 	public const LIST_ATTRIBUTION_MAX_ENTRIES      = 20;
 	public const LIST_ATTRIBUTION_COOKIE_MAX_BYTES = 4096;

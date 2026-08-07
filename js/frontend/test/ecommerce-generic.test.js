@@ -212,6 +212,85 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			expect( map[ 2 ] ).toBeDefined();
 		} );
 
+		// The size the browser measures: cookie name + percent-encoded value, in
+		// bytes. Mirrors the reader's own parsing so the test sees exactly what was
+		// handed to document.cookie, not the decoded JSON.
+		const stored_cookie_bytes = () => {
+			const parts = ( '; ' + document.cookie ).split(
+				'; gtm4wp_item_list_attr='
+			);
+			if ( 2 !== parts.length ) {
+				return 0;
+			}
+			return (
+				'gtm4wp_item_list_attr'.length +
+				parts.pop().split( ';' ).shift().length
+			);
+		};
+
+		it( 'keeps the cookie within the browser byte limit when list names are long', () => {
+			// item_list_name is not ours: a widget title, a long category name or a
+			// translation all land in it. A name this length is unremarkable for a
+			// widget title, and twenty of them serialize past 6 KB once
+			// encodeURIComponent has tripled every JSON delimiter - well past what a
+			// browser accepts, so without the size cap the write would be rejected
+			// wholesale and the attribution would freeze until the TTL ran out.
+			const long_name =
+				'Handpicked Products From The Summer Sale Season Collection For Women And Men';
+			for ( let id = 1; id <= 20; id++ ) {
+				window.gtm4wp_store_item_list_attribution(
+					id,
+					long_name + ' ' + id,
+					'handpicked-products-from-the-summer-sale-season-collection-for-women-and-men-' +
+						id
+				);
+			}
+
+			// Asserted against the browser's ~4096-byte name+value limit rather than
+			// the plugin's own (lower) budget: the limit is the real contract, so
+			// tuning the internal budget must not need a test edit, while eviction
+			// breaking must fail here.
+			expect( stored_cookie_bytes() ).toBeGreaterThan( 0 );
+			expect( stored_cookie_bytes() ).toBeLessThanOrEqual( 4096 );
+
+			const map = window.gtm4wp_read_item_list_cookie();
+			// Size, not the entry cap, is what bound it here: fewer than 20 survive.
+			expect( Object.keys( map ).length ).toBeLessThan( 20 );
+			expect( Object.keys( map ).length ).toBeGreaterThan( 0 );
+			// The just-clicked entry always survives - it is the freshest
+			// attribution the visitor has - and the oldest went first.
+			expect( map[ 20 ] ).toMatchObject( {
+				item_list_name: long_name + ' 20',
+			} );
+			expect( map[ 1 ] ).toBeUndefined();
+		} );
+
+		it( 'leaves the previous cookie intact when one entry cannot fit at all', () => {
+			window.gtm4wp_store_item_list_attribution(
+				42,
+				'Summer Sale',
+				'summer-sale'
+			);
+			const before = stored_cookie_bytes();
+
+			// A single list name longer than the whole budget. Writing it would be a
+			// silent no-op in a real browser, so nothing is written at all and the
+			// usable attribution already stored is not thrown away.
+			window.gtm4wp_store_item_list_attribution(
+				99,
+				'X'.repeat( 4000 ),
+				'x'
+			);
+
+			expect( stored_cookie_bytes() ).toBe( before );
+
+			const map = window.gtm4wp_read_item_list_cookie();
+			expect( map[ 99 ] ).toBeUndefined();
+			expect( map[ 42 ] ).toMatchObject( {
+				item_list_name: 'Summer Sale',
+			} );
+		} );
+
 		it( 'evicts the least recently stored entry, not the lowest product id', () => {
 			// #68: the sibling test above stores ids 1..21 ASCENDING, so insertion
 			// order and numeric key order coincide and the old shift()-based
