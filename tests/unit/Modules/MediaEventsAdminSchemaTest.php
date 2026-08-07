@@ -97,6 +97,36 @@ final class MediaEventsAdminSchemaTest extends TestCase {
 		);
 	}
 
+	public function test_the_dynamic_player_option_is_the_only_advanced_field(): void {
+		$schema = new AdminSchema();
+
+		// Declaration order is tab order, and opening on the players tab is the
+		// point of the split - assertSame rather than a membership check.
+		$this->assertSame(
+			array( 'players', 'advanced' ),
+			array_keys( $schema->groups() ),
+			'The media panel renders one tab per populated group, in declared order.'
+		);
+
+		$this->assertSame(
+			'advanced',
+			$this->field( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC )->group,
+			'The dynamic player option is a cross-cutting behavior switch, not a player toggle.'
+		);
+
+		foreach ( $schema->fields() as $field ) {
+			if ( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC === $field->key ) {
+				continue;
+			}
+
+			$this->assertSame(
+				'players',
+				$field->group,
+				"Field '{$field->key}' turns a single player on and belongs on the players tab."
+			);
+		}
+	}
+
 	public function test_html5_media_is_an_off_by_default_experimental_checkbox(): void {
 		$field = $this->field( GTM4WP_OPTION_EVENTS_HTML5MEDIA );
 

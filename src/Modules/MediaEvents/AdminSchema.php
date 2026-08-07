@@ -45,7 +45,8 @@ final class AdminSchema implements AdminSchemaInterface {
 	 */
 	public function groups(): array {
 		return array(
-			'players' => __( 'Media players', 'duracelltomi-google-tag-manager' ),
+			'players'  => __( 'Media players', 'duracelltomi-google-tag-manager' ),
+			'advanced' => __( 'Advanced', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -167,8 +168,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Track dynamically inserted players', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'By default the media trackers above only wire players that are present when the page loads. Check this option to also track players inserted after page load — e.g. opened in a popup/lightbox or loaded via AJAX — by watching the page for new embeds. This adds a single shared MutationObserver on the page, which has a small per-change cost, so leave it off unless your site injects media players at runtime.', 'duracelltomi-google-tag-manager' ),
-				group: 'players',
+				description: esc_html__( 'By default the media trackers on the Media players tab only wire players that are present when the page loads. Check this option to also track players inserted after page load — e.g. opened in a popup/lightbox or loaded via AJAX — by watching the page for new embeds. This adds a single shared MutationObserver on the page, which has a small per-change cost, so leave it off unless your site injects media players at runtime.', 'duracelltomi-google-tag-manager' ),
+				group: 'advanced',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
 		);
