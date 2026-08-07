@@ -771,3 +771,215 @@ describe( 'gtm4wpObserveMedia', () => {
 		expect( second ).toHaveLength( 1 );
 	} );
 } );
+
+/**
+ * The provider SDKs used to be enqueued by PHP on every front-end page, so an
+ * enabled provider cost a third-party request even on pages with none of its
+ * embeds. They are now fetched here, and only after the scan proves the page has
+ * one. The failure mode of getting this wrong is silent in both directions: a
+ * missing fetch means the tracker never wires and no event is ever pushed, and a
+ * fetch that happens anyway is invisible except in the network panel — so both
+ * directions are asserted.
+ */
+describe( 'gtm4wpObserveMedia SDK loading', () => {
+	const SDK = 'https://sdk.example.test/player.js';
+	const flush = () => new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
+
+	/** Every script tag requesting the fake SDK, matched as the trackers write it. */
+	const sdkTags = () =>
+		Array.from( document.getElementsByTagName( 'script' ) ).filter(
+			( tag ) => tag.getAttribute( 'src' ) === SDK
+		);
+
+	beforeEach( () => {
+		document.body.innerHTML = '';
+	} );
+
+	afterEach( () => {
+		if ( window.gtm4wp_media_observer ) {
+			window.gtm4wp_media_observer.disconnect();
+		}
+		delete window.gtm4wp_media_observer;
+		delete window.gtm4wp_media_scanners;
+		delete window.gtm4wp_media_observe_dynamic;
+		sdkTags().forEach( ( tag ) => tag.remove() );
+		document.body.innerHTML = '';
+	} );
+
+	it( 'does not fetch the SDK when the page has no matching embed', () => {
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 0 );
+	} );
+
+	it( 'fetches the SDK once, however many embeds match', () => {
+		document.body.innerHTML = '<video></video><video></video>';
+
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 1 );
+		expect( sdkTags()[ 0 ].async ).toBe( true );
+	} );
+
+	it( 'wires the embed only once the injected SDK reports ready', () => {
+		document.body.innerHTML = '<video></video>';
+		const wired = [];
+		let ready = false;
+
+		gtm4wpObserveMedia(
+			'video',
+			( el ) => wired.push( el ),
+			() => ready,
+			SDK
+		);
+
+		// Nothing is wired yet, and — critically — the element is left unmarked,
+		// otherwise the rescan below would skip it and the embed would never be
+		// tracked at all.
+		expect( wired ).toHaveLength( 0 );
+		expect(
+			document
+				.querySelector( 'video' )
+				.hasAttribute( 'data-gtm4wp-media-wired' )
+		).toBe( false );
+
+		ready = true;
+		sdkTags()[ 0 ].dispatchEvent( new Event( 'load' ) );
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'does not fetch an SDK the page already provides', () => {
+		document.body.innerHTML = '<video></video>';
+		const wired = [];
+
+		gtm4wpObserveMedia(
+			'video',
+			( el ) => wired.push( el ),
+			() => true,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 0 );
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'attaches to a tag already requesting the same src rather than duplicating it', () => {
+		document.body.innerHTML = '<video></video>';
+		const existing = document.createElement( 'script' );
+		existing.src = SDK;
+		document.head.appendChild( existing );
+
+		const wired = [];
+		let ready = false;
+
+		gtm4wpObserveMedia(
+			'video',
+			( el ) => wired.push( el ),
+			() => ready,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 1 );
+
+		// The rescan must hang off the pre-existing tag, not a second request.
+		ready = true;
+		existing.dispatchEvent( new Event( 'load' ) );
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'lets a callback-style SDK drive the rescan (YouTube/Spotify shape)', () => {
+		document.body.innerHTML = '<video></video>';
+		const wired = [];
+		let ready = false;
+		let apiReady;
+
+		gtm4wpObserveMedia(
+			'video',
+			( el ) => wired.push( el ),
+			() => ready,
+			{
+				src: SDK,
+				subscribe: ( rescan ) => {
+					apiReady = rescan;
+				},
+			}
+		);
+
+		expect( sdkTags() ).toHaveLength( 1 );
+		expect( wired ).toHaveLength( 0 );
+
+		// The script's own load event is too early for these SDKs; the vendor
+		// callback is what signals readiness.
+		ready = true;
+		apiReady();
+
+		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'registers the ready callback even when the page has no embed to wire', () => {
+		let subscribed = false;
+
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			{
+				src: SDK,
+				subscribe: () => {
+					subscribed = true;
+				},
+			}
+		);
+
+		// Nothing is fetched, but the global callback is still claimed, which is
+		// what keeps a site that loads the SDK itself working.
+		expect( sdkTags() ).toHaveLength( 0 );
+		expect( subscribed ).toBe( true );
+	} );
+
+	it( 'fetches the SDK when the first matching embed is inserted later', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 0 );
+
+		document.body.appendChild( document.createElement( 'video' ) );
+		await flush();
+
+		expect( sdkTags() ).toHaveLength( 1 );
+	} );
+
+	it( 'does not fetch the SDK when an unrelated element is inserted later', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			SDK
+		);
+
+		document.body.appendChild( document.createElement( 'audio' ) );
+		await flush();
+
+		expect( sdkTags() ).toHaveLength( 0 );
+	} );
+} );

@@ -12,9 +12,10 @@ const gtm4wp_dailymotion_percentage_tracking_marks = {};
 function gtm4wp_initDailymotionTracking() {
 	// Wire every Dailymotion iframe already on the page and any inserted later
 	// (popup/lightbox, AJAX). The Dailymotion JS SDK (api.dmcdn.net/all.js) is
-	// enqueued as a dependency but can still be missing at runtime (consent
-	// manager, ad blocker, network error), so it is re-checked per element: a
-	// frame is only wired once the SDK is available.
+	// handed to gtm4wpObserveMedia rather than enqueued by PHP, so a page with no
+	// Dailymotion embed never requests it. It can still be missing at runtime
+	// (consent manager, ad blocker, network error), so it is re-checked per
+	// element: a frame is only wired once the SDK is available.
 	//
 	// The gtm.videoVisible measurement uses `liveFrame`, not the iframe itself:
 	// DM.player() replaces the element it is given with its own player, which
@@ -216,7 +217,8 @@ function gtm4wp_initDailymotionTracking() {
 			return (
 				typeof DM !== 'undefined' && typeof DM.player !== 'undefined'
 			);
-		}
+		},
+		'https://api.dmcdn.net/all.js'
 	);
 }
 

@@ -198,38 +198,55 @@ function gtm4wp_initSpotifyTracking() {
 	}
 	window.gtm4wp_spotify_inited = true;
 
-	// The Spotify iFrame API invokes the global onSpotifyIframeApiReady callback
-	// when it loads. A previously registered callback (another integration) is
-	// preserved and chained so this tracker does not clobber it. If the API never
-	// loads (consent manager / ad blocker), the callback never fires and nothing
-	// is pushed — graceful by design.
-	const previous = window.onSpotifyIframeApiReady;
+	// Spotify hands its controller factory to the global onSpotifyIframeApiReady
+	// callback instead of exposing a global object, so "the SDK is ready" here
+	// means "that callback has fired" and the IFrameAPI it was given IS the SDK.
+	// That is why the SDK is described to gtm4wpObserveMedia in the object form:
+	// the script's own load event fires too early to wire anything.
+	let spotifyApi = null;
 
-	window.onSpotifyIframeApiReady = function ( IFrameAPI ) {
-		if ( typeof previous === 'function' ) {
-			previous( IFrameAPI );
-		}
+	// Wire the Spotify embeds present now and any inserted later (popup/AJAX).
+	// The observer scans first and only fetches the iFrame API if this page
+	// actually has an embed, so a page without one never calls open.spotify.com.
+	gtm4wpObserveMedia(
+		'iframe[src*="open.spotify.com/embed"]',
+		function ( spotify_frame, liveFrame ) {
+			spotifyApi.createController(
+				spotify_frame,
+				{ uri: gtm4wp_spotifyUriFromSrc( spotify_frame ) },
+				function ( controller ) {
+					gtm4wp_bindSpotifyController(
+						controller,
+						spotify_frame,
+						liveFrame
+					);
+				}
+			);
+		},
+		function () {
+			return null !== spotifyApi;
+		},
+		{
+			src: 'https://open.spotify.com/embed/iframe-api/v1',
+			subscribe( rescan ) {
+				// A previously registered callback (another integration, or the
+				// site loading the API for its own reasons) is preserved and
+				// chained so this tracker does not clobber it. If the API never
+				// loads (consent manager / ad blocker) the callback never fires
+				// and nothing is pushed — graceful by design.
+				const previous = window.onSpotifyIframeApiReady;
 
-		// Wire the Spotify embeds present now and any inserted later
-		// (popup/AJAX). The IFrameAPI handed to this callback is captured in the
-		// wiring closure so late-inserted embeds get their own controller.
-		gtm4wpObserveMedia(
-			'iframe[src*="open.spotify.com/embed"]',
-			function ( spotify_frame, liveFrame ) {
-				IFrameAPI.createController(
-					spotify_frame,
-					{ uri: gtm4wp_spotifyUriFromSrc( spotify_frame ) },
-					function ( controller ) {
-						gtm4wp_bindSpotifyController(
-							controller,
-							spotify_frame,
-							liveFrame
-						);
+				window.onSpotifyIframeApiReady = function ( IFrameAPI ) {
+					if ( typeof previous === 'function' ) {
+						previous( IFrameAPI );
 					}
-				);
-			}
-		);
-	};
+
+					spotifyApi = IFrameAPI;
+					rescan();
+				};
+			},
+		}
+	);
 }
 
 gtm4wp_initSpotifyTracking();

@@ -326,4 +326,46 @@ describe( 'gtm4wp-vimeo', () => {
 		expect( constructed ).toHaveLength( 0 );
 		expect( window.gtm4wp_media_observer ).toBeUndefined();
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65).
+		const SDK = 'https://player.vimeo.com/api/player.js';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from Vimeo on a page with no Vimeo embed', () => {
+			document.body.innerHTML = '';
+			delete global.Vimeo;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-vimeo' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches the Player SDK when an embed is present and the SDK is not', () => {
+			delete global.Vimeo;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-vimeo' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

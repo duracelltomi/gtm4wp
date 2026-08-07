@@ -257,4 +257,46 @@ describe( 'gtm4wp-twitch', () => {
 		expect( secondId ).toBe( 'gtm4wp-twitch-1' );
 		expect( secondId ).not.toBe( firstId );
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65).
+		const SDK = 'https://embed.twitch.tv/embed/v1.js';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from Twitch on a page with no Twitch embed', () => {
+			document.body.innerHTML = '';
+			delete global.Twitch;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-twitch' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches the Embed API when an embed is present and the SDK is not', () => {
+			delete global.Twitch;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-twitch' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

@@ -303,21 +303,33 @@ export function gtm4wpOnReady( callback ) {
  * takes the element's slot. Keep this invariant when adding a provider: never
  * assume the element handed to wireElement survives the call.
  *
- * @param {string}   selector    CSS selector identifying the provider embed.
- * @param {Function} wireElement Called once with each matching element to wire
- *                               it (the same wiring the tracker runs at init).
- *                               Receives a second argument: a function
- *                               resolving the element that currently occupies
- *                               the wired element's slot, for a tracker whose
- *                               SDK replaces it (Spotify).
- * @param {Function} [isReady]   Optional predicate; when it returns a falsy value
- *                               the element is left unwired AND unmarked (e.g.
- *                               the player SDK has not loaded), so a later
- *                               insertion can still wire it once the SDK exists.
+ * @param {string}        selector    CSS selector identifying the provider embed.
+ * @param {Function}      wireElement Called once with each matching element to wire
+ *                                    it (the same wiring the tracker runs at init).
+ *                                    Receives a second argument: a function
+ *                                    resolving the element that currently occupies
+ *                                    the wired element's slot, for a tracker whose
+ *                                    SDK replaces it (Spotify).
+ * @param {Function}      [isReady]   Optional predicate; when it returns a falsy value
+ *                                    the element is left unwired AND unmarked (e.g.
+ *                                    the player SDK has not loaded), so a later
+ *                                    insertion can still wire it once the SDK exists.
+ * @param {string|Object} [sdk]       The provider SDK to load, and ONLY once this page
+ *                                    is known to contain a matching embed. A string is
+ *                                    the script URL, ready when the script fires load.
+ *                                    Use the object form `{ src, subscribe }` for an
+ *                                    SDK that signals readiness through a global
+ *                                    callback instead of its own load event (YouTube's
+ *                                    onYouTubeIframeAPIReady, Spotify's
+ *                                    onSpotifyIframeApiReady): `subscribe` is handed a
+ *                                    rescan function to call from that callback. Omit
+ *                                    for a tracker with no SDK to fetch (HTML5 media)
+ *                                    or one that binds to a runtime the page already
+ *                                    loads (Wistia, JW Player, VideoPress).
  * @return {MutationObserver|null} The shared observer, or null when runtime
  *                                 tracking is not enabled.
  */
-export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
+export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 	const wireOnce = function ( element ) {
 		// Skip when this element — or an ancestor the tracker already marked
 		// (e.g. the Twitch container whose SDK-injected iframe also matches the
@@ -397,8 +409,80 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
 		}
 	};
 
-	// Wire everything already present (this happens regardless of the opt-in).
-	document.querySelectorAll( selector ).forEach( wireOnce );
+	const sdkSrc = 'string' === typeof sdk ? sdk : ( sdk && sdk.src ) || '';
+	let sdkRequested = false;
+
+	// Re-run the whole scan. Elements wired on an earlier pass carry the marker
+	// and are skipped, so this is idempotent and safe to call from every
+	// readiness signal an SDK offers.
+	const rescan = function () {
+		document.querySelectorAll( selector ).forEach( wireOnce );
+	};
+
+	// Fetch the provider SDK at most once, and only from a caller that has
+	// already found a matching embed. That deferral is the point: a page with
+	// no embed of this provider must cost zero bytes and zero requests to the
+	// vendor — which also means no visitor IP, User-Agent or Referer reaches
+	// them from a page that never had their player on it.
+	const ensureSdk = function () {
+		if ( '' === sdkSrc || sdkRequested ) {
+			return;
+		}
+		sdkRequested = true;
+
+		// Already usable: the site loads this SDK itself, or a re-executed
+		// bundle got here first. Nothing to fetch and nothing to wait for.
+		if ( typeof isReady === 'function' && isReady() ) {
+			return;
+		}
+
+		// A tag for this exact src may already be in flight — the site's own,
+		// or one this function added before the bundle was re-executed. Attach
+		// to that one instead of requesting the same script twice. Compared on
+		// the literal attribute rather than the resolved .src property, because
+		// these URLs are written as literals by the trackers (YouTube's is
+		// protocol-relative, so the two forms never match as strings).
+		let tag = null;
+		const scripts = document.getElementsByTagName( 'script' );
+
+		for ( let i = 0; i < scripts.length; i++ ) {
+			if ( scripts[ i ].getAttribute( 'src' ) === sdkSrc ) {
+				tag = scripts[ i ];
+				break;
+			}
+		}
+
+		if ( ! tag ) {
+			tag = document.createElement( 'script' );
+			tag.async = true;
+			tag.src = sdkSrc;
+			( document.head || document.documentElement ).appendChild( tag );
+		}
+
+		// `load` fires once the script has executed, which for an SDK that
+		// hands its API to a global callback is still too early — YouTube sets
+		// YT and only THEN calls onYouTubeIframeAPIReady. That is what the
+		// `subscribe` form is for. Registering both means neither signal is
+		// load-bearing on its own, and a rescan that arrives while isReady() is
+		// still false costs nothing: it wires nothing and marks nothing.
+		tag.addEventListener( 'load', rescan );
+	};
+
+	// Let a callback-style SDK drive the rescan. Registered before anything is
+	// fetched, so the callback cannot fire before the tracker is listening.
+	if ( sdk && 'function' === typeof sdk.subscribe ) {
+		sdk.subscribe( rescan );
+	}
+
+	// Wire everything already present (this happens regardless of the opt-in),
+	// and only then decide whether this page owes the vendor a request.
+	const present = document.querySelectorAll( selector );
+
+	present.forEach( wireOnce );
+
+	if ( present.length ) {
+		ensureSdk();
+	}
 
 	// Runtime tracking of later-inserted players is opt-in.
 	if ( ! window.gtm4wp_media_observe_dynamic ) {
@@ -414,7 +498,7 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
 	).filter( function ( scanner ) {
 		return scanner.selector !== selector;
 	} );
-	window.gtm4wp_media_scanners.push( { selector, wireOnce } );
+	window.gtm4wp_media_scanners.push( { selector, wireOnce, ensureSdk } );
 
 	if ( ! window.gtm4wp_media_observer ) {
 		window.gtm4wp_media_observer = new MutationObserver( function (
@@ -427,15 +511,28 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
 						return;
 					}
 					window.gtm4wp_media_scanners.forEach( function ( scanner ) {
+						let matched = false;
+
 						if ( node.matches( scanner.selector ) ) {
 							scanner.wireOnce( node );
+							matched = true;
 						}
 						// The added node may be a wrapper (a lightbox/popup
 						// container) holding the embed; querySelectorAll scans
 						// only that added subtree, never the whole document.
-						node.querySelectorAll( scanner.selector ).forEach(
-							scanner.wireOnce
-						);
+						const inner = node.querySelectorAll( scanner.selector );
+
+						inner.forEach( scanner.wireOnce );
+
+						// First sighting of this provider on a page that loaded
+						// without one (a player opened in a lightbox): the SDK
+						// was deliberately not fetched at init, so fetch it now.
+						// wireOnce above left these elements unmarked while
+						// isReady() was false, and the SDK's load/ready signal
+						// rescans the document and picks them up.
+						if ( matched || inner.length ) {
+							scanner.ensureSdk();
+						}
 					} );
 				} );
 			} );

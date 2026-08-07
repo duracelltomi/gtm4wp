@@ -231,4 +231,46 @@ describe( 'gtm4wp-dailymotion', () => {
 
 		expect( window.dataLayer ).toHaveLength( 0 );
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65).
+		const SDK = 'https://api.dmcdn.net/all.js';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from Dailymotion on a page with no Dailymotion embed', () => {
+			document.body.innerHTML = '';
+			delete global.DM;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-dailymotion' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches the JS SDK when an embed is present and the SDK is not', () => {
+			delete global.DM;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-dailymotion' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

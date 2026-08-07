@@ -333,4 +333,57 @@ describe( 'gtm4wp-spotify', () => {
 
 		expect( window.onSpotifyIframeApiReady ).toBe( firstCallback );
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65).
+		const SDK = 'https://open.spotify.com/embed/iframe-api/v1';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from Spotify on a page with no Spotify embed', () => {
+			document.body.innerHTML = '';
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-spotify' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'still claims onSpotifyIframeApiReady on a page with no embed', () => {
+			document.body.innerHTML = '';
+			delete window.onSpotifyIframeApiReady;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-spotify' );
+			} );
+
+			// Nothing is fetched, but the callback is registered anyway, so a
+			// site that loads the iFrame API itself is still tracked.
+			expect( sdkTags() ).toHaveLength( 0 );
+			expect( typeof window.onSpotifyIframeApiReady ).toBe( 'function' );
+		} );
+
+		it( 'fetches the iFrame API when the page has an embed', () => {
+			jest.isolateModules( () => {
+				require( '../gtm4wp-spotify' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

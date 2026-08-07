@@ -459,4 +459,49 @@ describe( 'gtm4wp-youtube', () => {
 			/already utilizing YouTube API/
 		);
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65). Protocol-
+		// relative, which is why the lib compares the literal src attribute
+		// rather than the resolved .src property when looking for a tag already
+		// requesting it.
+		const SDK = '//www.youtube.com/iframe_api';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from YouTube on a page with no YouTube embed', () => {
+			document.body.innerHTML = '';
+			delete global.YT;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-youtube' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches the IFrame API when an embed is present and the SDK is not', () => {
+			delete global.YT;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-youtube' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

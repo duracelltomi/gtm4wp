@@ -202,11 +202,12 @@ function gtm4wp_initTwitchTracking() {
 	// are only available on a player created through the Embed API. Each iframe is
 	// therefore replaced with a Twitch.Player pointing at the same channel/video,
 	// which re-creates the embed under our control so its events can be tracked.
-	// The Twitch Embed API (embed.twitch.tv/embed/v1.js) is enqueued as a
-	// dependency but can still be missing at runtime (consent manager, ad blocker,
-	// network error), so it is re-checked per element: a frame is only wired once
-	// the SDK is available, and this also covers iframes inserted later
-	// (popup/AJAX).
+	// The Twitch Embed API (embed.twitch.tv/embed/v1.js) is handed to
+	// gtm4wpObserveMedia rather than enqueued by PHP, so a page with no Twitch
+	// embed never requests it. It can still be missing at runtime (consent
+	// manager, ad blocker, network error), so it is re-checked per element: a
+	// frame is only wired once the SDK is available, and this also covers iframes
+	// inserted later (popup/AJAX).
 	const gtm4wp_wireTwitchFrame = function ( twitch_frame ) {
 		let params;
 		try {
@@ -276,7 +277,8 @@ function gtm4wp_initTwitchTracking() {
 				typeof Twitch !== 'undefined' &&
 				typeof Twitch.Player !== 'undefined'
 			);
-		}
+		},
+		'https://embed.twitch.tv/embed/v1.js'
 	);
 }
 

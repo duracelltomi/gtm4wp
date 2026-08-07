@@ -12,9 +12,10 @@ const gtm4wp_soundclound_percentage_tracking_marks = {};
 function gtm4wp_initSoundCloudTracking() {
 	// Wire every SoundCloud iframe already on the page and any inserted later
 	// (popup/lightbox, AJAX). The SoundCloud Widget API (w.soundcloud.com/player/api.js)
-	// is enqueued as a dependency but can still be missing at runtime (consent
-	// manager, ad blocker, network error), so it is re-checked per element: a
-	// frame is only wired once the SDK is available.
+	// is handed to gtm4wpObserveMedia rather than enqueued by PHP, so a page with
+	// no SoundCloud embed never requests it. It can still be missing at runtime
+	// (consent manager, ad blocker, network error), so it is re-checked per
+	// element: a frame is only wired once the SDK is available.
 	const gtm4wp_wireSoundCloudFrame = function ( soundcloud_frame ) {
 		const widget = SC.Widget( soundcloud_frame );
 		let sound = {};
@@ -238,7 +239,8 @@ function gtm4wp_initSoundCloudTracking() {
 			return (
 				typeof SC !== 'undefined' && typeof SC.Widget !== 'undefined'
 			);
-		}
+		},
+		'https://w.soundcloud.com/player/api.js'
 	);
 }
 

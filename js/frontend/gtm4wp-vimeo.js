@@ -12,10 +12,11 @@ const gtm4wp_vimeo_percentage_tracking_marks = {};
 function gtm4wp_initVimeoTracking() {
 	// Wire every Vimeo iframe already on the page and any inserted later
 	// (popup/lightbox, AJAX). The Vimeo Player SDK (player.vimeo.com/api/player.js)
-	// is enqueued as a dependency but can still be missing at runtime (consent
-	// manager, ad blocker, network error), so it is re-checked per element: a
-	// frame is only wired once the SDK is available, otherwise it is left for a
-	// later insertion to pick up.
+	// is handed to gtm4wpObserveMedia rather than enqueued by PHP, so a page with
+	// no Vimeo embed never requests it. It can still be missing at runtime
+	// (consent manager, ad blocker, network error), so it is re-checked per
+	// element: a frame is only wired once the SDK is available, otherwise it is
+	// left for the SDK's load event or a later insertion to pick up.
 	const gtm4wp_wireVimeoFrame = function ( vimeo_frame ) {
 		const vimeoapi = new Vimeo.Player( vimeo_frame );
 		const videourl = vimeo_frame.getAttribute( 'src' ).split( '?' ).shift();
@@ -419,7 +420,8 @@ function gtm4wp_initVimeoTracking() {
 				typeof Vimeo !== 'undefined' &&
 				typeof Vimeo.Player !== 'undefined'
 			);
-		}
+		},
+		'https://player.vimeo.com/api/player.js'
 	);
 }
 

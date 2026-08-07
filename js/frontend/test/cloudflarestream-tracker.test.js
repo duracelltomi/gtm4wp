@@ -203,4 +203,48 @@ describe( 'gtm4wp-cloudflarestream', () => {
 
 		expect( window.dataLayer ).toHaveLength( 0 );
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65) — the one
+		// floating `sdk.latest.js` among the media SDKs, so it cannot be diffed
+		// and only its reachability and shape can be checked.
+		const SDK = 'https://embed.cloudflarestream.com/embed/sdk.latest.js';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from Cloudflare on a page with no Stream embed', () => {
+			document.body.innerHTML = '';
+			delete global.Stream;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-cloudflarestream' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches the Player SDK when an embed is present and the SDK is not', () => {
+			delete global.Stream;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-cloudflarestream' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

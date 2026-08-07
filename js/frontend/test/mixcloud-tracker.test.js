@@ -258,4 +258,48 @@ describe( 'gtm4wp-mixcloud', () => {
 		await flushPromises();
 		expect( window.dataLayer ).toHaveLength( 0 );
 	} );
+
+	describe( 'SDK loading', () => {
+		// Pins the URL registered as an upstream coupling (U65). At ~190 KB this
+		// is by far the largest of the media SDKs, and it used to be requested on
+		// every front-end page of a site with Mixcloud tracking enabled.
+		const SDK = 'https://widget.mixcloud.com/media/js/widgetApi.js';
+
+		const sdkTags = () =>
+			Array.from( document.getElementsByTagName( 'script' ) ).filter(
+				( tag ) => tag.getAttribute( 'src' ) === SDK
+			);
+
+		// Earlier tests in this file exercise the SDK-missing path, which now
+		// injects a tag of its own; start from a clean head so this describe
+		// measures only the requests it caused.
+		beforeEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		afterEach( () => {
+			sdkTags().forEach( ( tag ) => tag.remove() );
+		} );
+
+		it( 'requests nothing from Mixcloud on a page with no Mixcloud embed', () => {
+			document.body.innerHTML = '';
+			delete global.Mixcloud;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-mixcloud' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches the Widget API when an embed is present and the SDK is not', () => {
+			delete global.Mixcloud;
+
+			jest.isolateModules( () => {
+				require( '../gtm4wp-mixcloud' );
+			} );
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
 } );

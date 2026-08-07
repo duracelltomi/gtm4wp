@@ -12,7 +12,9 @@ const gtm4wp_mixcloud_percentage_tracking_marks = {};
 function gtm4wp_initMixcloudTracking() {
 	// Wire every Mixcloud iframe already on the page and any inserted later
 	// (popup/lightbox, AJAX). The Mixcloud Widget API
-	// (widget.mixcloud.com/media/js/widgetApi.js) is enqueued as a dependency but
+	// (widget.mixcloud.com/media/js/widgetApi.js) is handed to gtm4wpObserveMedia
+	// rather than enqueued by PHP, so a page with no Mixcloud embed never requests
+	// it — this SDK is by far the largest of the media trackers' dependencies. It
 	// can still be missing at runtime (consent manager, ad blocker, network
 	// error), so it is re-checked per element: a frame is only wired once the SDK
 	// is available.
@@ -191,7 +193,8 @@ function gtm4wp_initMixcloudTracking() {
 				typeof Mixcloud !== 'undefined' &&
 				typeof Mixcloud.PlayerWidget !== 'undefined'
 			);
-		}
+		},
+		'https://widget.mixcloud.com/media/js/widgetApi.js'
 	);
 }
 

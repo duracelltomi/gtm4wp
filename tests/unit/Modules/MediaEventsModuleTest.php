@@ -3,9 +3,11 @@
  * Unit tests for the MediaEvents module PHP surface.
  *
  * Covers enqueue_scripts() — the conditional loading of the 12 tracker bundles,
- * with the YouTube branch's block/iframe-content detection — and
- * enable_youtube_js_api(), the oEmbed HTML rewrite that turns on the YouTube
- * JS API. The JS trackers themselves are tested under js/frontend/test/.
+ * and the rule that PHP enqueues NO provider SDK: each tracker fetches its own
+ * from the DOM scan, so an enabled provider costs nothing on a page without one
+ * of its embeds. Also covers enable_youtube_js_api(), the oEmbed HTML rewrite
+ * that turns on the YouTube JS API. The JS trackers themselves are tested under
+ * js/frontend/test/.
  *
  * @package GTM4WP
  */
@@ -18,10 +20,48 @@ use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
- * The module must load a tracker bundle only when its option is enabled, and
- * the YouTube tracker only when the current post actually embeds a YouTube video.
+ * The module must load a tracker bundle when — and only when — its option is
+ * enabled, and must never enqueue a third-party player SDK.
  */
 final class MediaEventsModuleTest extends TestCase {
+
+	/**
+	 * Every media option, mapped to the bundle handle it enqueues, in the order
+	 * enqueue_scripts() emits them.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function all_trackers(): array {
+		return array(
+			GTM4WP_OPTION_EVENTS_YOUTUBE          => 'gtm4wp-youtube',
+			GTM4WP_OPTION_EVENTS_VIMEO            => 'gtm4wp-vimeo',
+			GTM4WP_OPTION_EVENTS_SOUNDCLOUD       => 'gtm4wp-soundcloud',
+			GTM4WP_OPTION_EVENTS_HTML5MEDIA       => 'gtm4wp-html5media',
+			GTM4WP_OPTION_EVENTS_DAILYMOTION      => 'gtm4wp-dailymotion',
+			GTM4WP_OPTION_EVENTS_MIXCLOUD         => 'gtm4wp-mixcloud',
+			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM => 'gtm4wp-cloudflarestream',
+			GTM4WP_OPTION_EVENTS_WISTIA           => 'gtm4wp-wistia',
+			GTM4WP_OPTION_EVENTS_JWPLAYER         => 'gtm4wp-jwplayer',
+			GTM4WP_OPTION_EVENTS_VIDEOPRESS       => 'gtm4wp-videopress',
+			GTM4WP_OPTION_EVENTS_SPOTIFY          => 'gtm4wp-spotify',
+			GTM4WP_OPTION_EVENTS_TWITCH           => 'gtm4wp-twitch',
+		);
+	}
+
+	/**
+	 * The provider SDK handles PHP used to enqueue on every front-end page.
+	 *
+	 * @var string[]
+	 */
+	private const VENDOR_SDK_HANDLES = array(
+		'gtm4wp-vimeo-api',
+		'gtm4wp-soundcloud-api',
+		'gtm4wp-dailymotion-api',
+		'gtm4wp-mixcloud-api',
+		'gtm4wp-cloudflarestream-api',
+		'gtm4wp-spotify-api',
+		'gtm4wp-twitch-api',
+	);
 
 	/**
 	 * Handles passed to wp_enqueue_script() during a test.
@@ -29,6 +69,15 @@ final class MediaEventsModuleTest extends TestCase {
 	 * @var string[]
 	 */
 	private array $enqueued = array();
+
+	/**
+	 * Handle => src for every wp_enqueue_script() call, so a test can assert on
+	 * the URL and not only on the handle: a vendor SDK re-added under any name
+	 * is still a third-party request.
+	 *
+	 * @var array<string, string>
+	 */
+	private array $enqueued_src = array();
 
 	/**
 	 * Inline scripts captured from wp_add_inline_script(): each entry is
@@ -49,13 +98,15 @@ final class MediaEventsModuleTest extends TestCase {
 		parent::setUp();
 
 		$this->enqueued       = array();
+		$this->enqueued_src   = array();
 		$this->inline_scripts = array();
 		$this->post_backup    = $GLOBALS['post'] ?? null;
 
 		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path );
 		Functions\when( 'wp_enqueue_script' )->alias(
 			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) {
-				$this->enqueued[] = $handle;
+				$this->enqueued[]              = $handle;
+				$this->enqueued_src[ $handle ] = (string) $src;
 				return true;
 			}
 		);
@@ -65,8 +116,6 @@ final class MediaEventsModuleTest extends TestCase {
 				return true;
 			}
 		);
-		// Default: no YouTube block on the page unless a test says otherwise.
-		Functions\when( 'has_block' )->justReturn( false );
 		// Pass-through by default, because most cases here are about which bundle
 		// loads, not about escaping. The one case where the escaping IS the subject
 		// overrides this with a stub that models the real allow-list - a pass-through
@@ -107,9 +156,61 @@ final class MediaEventsModuleTest extends TestCase {
 		$GLOBALS['post'] = (object) array( 'post_content' => $content );
 	}
 
-	public function test_youtube_bundle_enqueued_when_post_has_youtube_block(): void {
-		Functions\when( 'has_block' )->justReturn( true );
-		$this->set_post_content( '' );
+	/**
+	 * With every provider on, the enqueued set must be EXACTLY the 12 own
+	 * bundles. Asserted as an exact list rather than 12 assertContains calls so
+	 * that re-adding a vendor SDK fails here even if it is given a handle this
+	 * test never heard of — the named-handle check below cannot do that.
+	 */
+	public function test_every_enabled_tracker_is_enqueued_and_nothing_else(): void {
+		$module = $this->make_module( array_fill_keys( array_keys( self::all_trackers() ), true ) );
+		$module->enqueue_scripts();
+
+		$this->assertSame( array_values( self::all_trackers() ), $this->enqueued );
+
+		foreach ( self::VENDOR_SDK_HANDLES as $sdk_handle ) {
+			$this->assertNotContains(
+				$sdk_handle,
+				$this->enqueued,
+				$sdk_handle . ' must be fetched by the tracker on demand, never enqueued for every page.'
+			);
+		}
+	}
+
+	/**
+	 * The handle list above proves which names were used; this proves where the
+	 * bytes come from. Every enqueued src must be one of our own build files —
+	 * a vendor URL re-added under any handle at all is a third-party request on
+	 * every front-end page, which is the whole defect being guarded here.
+	 */
+	public function test_no_enqueued_script_points_at_a_third_party_host(): void {
+		$module = $this->make_module( array_fill_keys( array_keys( self::all_trackers() ), true ) );
+		$module->enqueue_scripts();
+
+		$this->assertNotEmpty( $this->enqueued_src, 'Nothing was enqueued, so the loop below would assert nothing.' );
+
+		foreach ( $this->enqueued_src as $handle => $src ) {
+			// plugins_url() is stubbed to https://example.com/<path> in setUp, so
+			// anything else came from a hardcoded vendor URL.
+			$this->assertStringStartsWith(
+				'https://example.com/',
+				$src,
+				$handle . ' points outside the plugin: ' . $src
+			);
+		}
+	}
+
+	/**
+	 * The YouTube tracker used to load only when $GLOBALS['post']->post_content
+	 * mentioned youtube.com / youtu.be or carried the legacy block. That silently
+	 * dropped tracking for every YouTube embed living anywhere else — a widget, a
+	 * block template, page-builder meta, a shortcode's output, a reusable block —
+	 * and on an archive it inspected only the first post of the loop. The tracker
+	 * now loads whenever the option is on and lets its own DOM scan decide, which
+	 * is the only check that sees the rendered page.
+	 */
+	public function test_youtube_tracker_is_enqueued_regardless_of_post_content(): void {
+		$this->set_post_content( '<p>Just some text, no embeds at all.</p>' );
 
 		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
 		$module->enqueue_scripts();
@@ -117,63 +218,36 @@ final class MediaEventsModuleTest extends TestCase {
 		$this->assertContains( 'gtm4wp-youtube', $this->enqueued );
 	}
 
-	public function test_youtube_bundle_enqueued_when_content_has_a_youtube_iframe(): void {
-		$this->set_post_content( '<p>Watch:</p><iframe src="https://www.youtube.com/embed/abc"></iframe>' );
+	/**
+	 * TC-14: the branch used to read $GLOBALS['post'] behind an isset() guard, so
+	 * a request where the global is absent (a 404, a REST-rendered view, a
+	 * template with no main query post) took the silent no-enqueue path. Nothing
+	 * may read that global now — asserted with warnings promoted to failures so an
+	 * unguarded read cannot pass quietly.
+	 */
+	public function test_youtube_tracker_is_enqueued_when_there_is_no_global_post(): void {
+		unset( $GLOBALS['post'] );
 
-		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
-		$module->enqueue_scripts();
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the reported PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
 
-		$this->assertContains( 'gtm4wp-youtube', $this->enqueued );
-	}
+		try {
+			$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
+			$module->enqueue_scripts();
 
-	public function test_youtube_bundle_not_enqueued_without_a_youtube_embed(): void {
-		// has_block is false (setUp default); content has neither a youtube iframe.
-		$this->set_post_content( '<p>Just some text, no embeds.</p>' );
-
-		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
-		$module->enqueue_scripts();
-
-		$this->assertNotContains( 'gtm4wp-youtube', $this->enqueued );
-	}
-
-	public function test_youtube_iframe_alone_without_youtube_host_does_not_enqueue(): void {
-		// A non-YouTube embed must not trigger the tracker: detection looks for a
-		// youtube.com / youtu.be URL (or the legacy block), which a Vimeo iframe
-		// does not contain.
-		$this->set_post_content( '<iframe src="https://vimeo.com/embed/123"></iframe>' );
-
-		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
-		$module->enqueue_scripts();
-
-		$this->assertNotContains( 'gtm4wp-youtube', $this->enqueued );
-	}
-
-	public function test_youtube_bundle_enqueued_for_a_modern_core_embed_block_url(): void {
-		// A modern core/embed YouTube block stores only the bare URL in
-		// post_content - no <iframe>, and has_block( 'core-embed/youtube' ) is
-		// false (setUp default). The tracker must still enqueue on the
-		// youtube.com URL. Before broadening detection this content was missed.
-		$this->set_post_content( '<!-- wp:embed {"url":"https://www.youtube.com/watch?v=abc","type":"video","providerNameSlug":"youtube"} --><figure class="wp-block-embed"><div class="wp-block-embed__wrapper">https://www.youtube.com/watch?v=abc</div></figure><!-- /wp:embed -->' );
-
-		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
-		$module->enqueue_scripts();
-
-		$this->assertContains( 'gtm4wp-youtube', $this->enqueued );
-	}
-
-	public function test_youtube_bundle_enqueued_for_a_classic_youtu_be_autoembed(): void {
-		// Classic-editor URL auto-embed: a bare youtu.be short URL on its own
-		// line, with no block and no <iframe> in the stored content.
-		$this->set_post_content( "Watch this:\nhttps://youtu.be/abc123\nThanks" );
-
-		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
-		$module->enqueue_scripts();
-
-		$this->assertContains( 'gtm4wp-youtube', $this->enqueued );
+			$this->assertContains( 'gtm4wp-youtube', $this->enqueued );
+		} finally {
+			restore_error_handler();
+		}
 	}
 
 	public function test_youtube_bundle_not_enqueued_when_option_disabled(): void {
-		Functions\when( 'has_block' )->justReturn( true );
 		$this->set_post_content( '<iframe src="https://www.youtube.com/embed/abc"></iframe>' );
 
 		// Option off: the whole YouTube branch is skipped regardless of the embed.
@@ -183,20 +257,11 @@ final class MediaEventsModuleTest extends TestCase {
 		$this->assertNotContains( 'gtm4wp-youtube', $this->enqueued );
 	}
 
-	public function test_vimeo_enqueues_both_the_sdk_and_the_tracker_when_enabled(): void {
+	public function test_enabling_one_provider_loads_only_that_tracker(): void {
 		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_VIMEO => true ) );
 		$module->enqueue_scripts();
 
-		$this->assertContains( 'gtm4wp-vimeo-api', $this->enqueued );
-		$this->assertContains( 'gtm4wp-vimeo', $this->enqueued );
-	}
-
-	public function test_twitch_enqueues_both_the_sdk_and_the_tracker_when_enabled(): void {
-		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_TWITCH => true ) );
-		$module->enqueue_scripts();
-
-		$this->assertContains( 'gtm4wp-twitch-api', $this->enqueued );
-		$this->assertContains( 'gtm4wp-twitch', $this->enqueued );
+		$this->assertSame( array( 'gtm4wp-vimeo' ), $this->enqueued );
 	}
 
 	public function test_no_tracker_is_enqueued_when_every_option_is_disabled(): void {
