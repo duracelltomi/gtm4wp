@@ -73,6 +73,7 @@ function gtm4wp_initJWPlayerTracking() {
 					title: mediaData.title,
 					currentTime: gtm4wp_jwCurrentTime(),
 					duration: mediaData.duration,
+					element: container,
 				} ),
 			} );
 		};
@@ -121,6 +122,7 @@ function gtm4wp_initJWPlayerTracking() {
 							currentTime: videoCurrentTime,
 							duration: videoDuration,
 							percent: i,
+							element: container,
 						} ),
 					} );
 				}

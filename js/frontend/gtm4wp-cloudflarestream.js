@@ -67,6 +67,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 					title: videoid,
 					currentTime: gtm4wp_streamCurrentTime(),
 					duration: gtm4wp_streamDuration(),
+					element: stream_frame,
 				} ),
 			} );
 		};
@@ -113,6 +114,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 							currentTime: videoCurrentTime,
 							duration: videoDuration,
 							percent: i,
+							element: stream_frame,
 						} ),
 					} );
 				}

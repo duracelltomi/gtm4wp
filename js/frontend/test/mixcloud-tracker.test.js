@@ -123,6 +123,28 @@ describe( 'gtm4wp-mixcloud', () => {
 		} );
 	} );
 
+	it( 'reports the embed’s viewport position as gtm.videoVisible, per push', async () => {
+		const frame = document.querySelector( 'iframe' );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		frame.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+		await loadTracker();
+
+		widget.emit( 'progress', 30, 120 );
+		widget.emit( 'play' );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		widget.emit( 'pause' );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
 	it( 'maps ended to an "ended" state with the native "complete" status', async () => {
 		await loadTracker();
 

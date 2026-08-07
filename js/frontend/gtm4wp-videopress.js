@@ -37,6 +37,45 @@ function gtm4wp_isVideoPressOrigin( origin ) {
 	}
 }
 
+/**
+ * Finds the embed a VideoPress message came from, so the push can report whether
+ * that player is in the viewport (gtm.videoVisible).
+ *
+ * This tracker never wires an element — it listens on the window — so the frame
+ * is resolved per message: first by the message's own source window, which is
+ * exact even with several embeds of the same video on the page, then by the guid
+ * in the embed URL for a player whose message arrives from a nested frame.
+ *
+ * @param {Window} source The message event's source window.
+ * @param {string} guid   The VideoPress guid the message reported.
+ * @return {HTMLElement|null} The embed iframe, or null when it cannot be found.
+ */
+function gtm4wp_videoPressFrame( source, guid ) {
+	const frames = document.querySelectorAll(
+		'iframe[src*="videopress.com"],iframe[src*="video.wordpress.com"]'
+	);
+
+	if ( source ) {
+		for ( let i = 0; i < frames.length; i++ ) {
+			if ( frames[ i ].contentWindow === source ) {
+				return frames[ i ];
+			}
+		}
+	}
+
+	if ( guid ) {
+		for ( let i = 0; i < frames.length; i++ ) {
+			if (
+				( frames[ i ].getAttribute( 'src' ) || '' ).indexOf( guid ) > -1
+			) {
+				return frames[ i ];
+			}
+		}
+	}
+
+	return null;
+}
+
 function gtm4wp_initVideoPressTracking() {
 	// No SDK is enqueued: VideoPress players emit their state to the parent
 	// window via postMessage, so a single window 'message' listener serves every
@@ -55,7 +94,8 @@ function gtm4wp_initVideoPressTracking() {
 	const gtm4wp_onVideoPressPercentageChange = function (
 		guid,
 		currentTime,
-		duration
+		duration,
+		frame
 	) {
 		if ( ! duration ) {
 			return;
@@ -83,6 +123,7 @@ function gtm4wp_initVideoPressTracking() {
 						currentTime,
 						duration,
 						percent: i,
+						element: frame,
 					} ),
 				} );
 			}
@@ -93,7 +134,8 @@ function gtm4wp_initVideoPressTracking() {
 		guid,
 		playerState,
 		currentTime,
-		duration
+		duration,
+		frame
 	) {
 		if ( gtm4wp_videopress_last_state[ guid ] === playerState ) {
 			return;
@@ -113,6 +155,7 @@ function gtm4wp_initVideoPressTracking() {
 				title: guid,
 				currentTime,
 				duration,
+				element: frame,
 			} ),
 		} );
 	};
@@ -146,6 +189,18 @@ function gtm4wp_initVideoPressTracking() {
 		const currentTime = ( data.currentTimeMs || 0 ) / 1000;
 		const duration = ( data.durationMs || 0 ) / 1000;
 
+		// Resolved lazily and at most once per message: only a push that carries
+		// gtm.videoVisible reads it, while timeupdate messages — most of them —
+		// arrive several times a second and usually push nothing.
+		let resolvedFrame;
+		const frame = function () {
+			if ( undefined === resolvedFrame ) {
+				resolvedFrame = gtm4wp_videoPressFrame( event.source, guid );
+			}
+
+			return resolvedFrame;
+		};
+
 		switch ( eventName ) {
 			case 'loadedmetadata':
 			case 'durationchange':
@@ -163,7 +218,8 @@ function gtm4wp_initVideoPressTracking() {
 					guid,
 					'play',
 					currentTime,
-					duration
+					duration,
+					frame
 				);
 				break;
 
@@ -173,7 +229,8 @@ function gtm4wp_initVideoPressTracking() {
 					guid,
 					'pause',
 					currentTime,
-					duration
+					duration,
+					frame
 				);
 				break;
 
@@ -182,7 +239,8 @@ function gtm4wp_initVideoPressTracking() {
 					guid,
 					'ended',
 					currentTime,
-					duration
+					duration,
+					frame
 				);
 				break;
 
@@ -192,7 +250,8 @@ function gtm4wp_initVideoPressTracking() {
 					guid,
 					'seeked',
 					currentTime,
-					duration
+					duration,
+					frame
 				);
 				break;
 
@@ -200,7 +259,8 @@ function gtm4wp_initVideoPressTracking() {
 				gtm4wp_onVideoPressPercentageChange(
 					guid,
 					currentTime,
-					duration
+					duration,
+					frame
 				);
 				break;
 

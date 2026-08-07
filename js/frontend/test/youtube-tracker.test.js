@@ -59,6 +59,13 @@ describe( 'gtm4wp-youtube', () => {
 		Ctor.prototype.getCurrentTime = function () {
 			return this._currentTime;
 		};
+		// Part of the YouTube IFrame API: the DOM node of the embed this player
+		// drives. The tracker measures it for gtm.videoVisible, so the stub must
+		// expose it too — a stub without it would make the suite pass by
+		// silently dropping the key.
+		Ctor.prototype.getIframe = function () {
+			return document.getElementById( this.id );
+		};
 
 		YT = {
 			Player: Ctor,
@@ -188,6 +195,39 @@ describe( 'gtm4wp-youtube', () => {
 				mediaPlayerState: 'ended',
 				'gtm.videoStatus': 'complete',
 			} );
+		} finally {
+			jest.useRealTimers();
+		}
+	} );
+
+	it( 'reports the embed iframe’s viewport position as gtm.videoVisible, per push', () => {
+		jest.useFakeTimers();
+		try {
+			const frame = document.getElementById( 'ytframe' );
+			// jsdom gives every element a 0×0 box, so the player is measured
+			// through a stubbed rect against the default 1024×768 viewport.
+			let box = { top: 10, left: 10, bottom: 210, right: 330 };
+			frame.getBoundingClientRect = () => ( {
+				...box,
+				width: 320,
+				height: 200,
+			} );
+
+			loadTracker();
+			window.onYouTubeIframeAPIReady();
+
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PLAYING } )
+			);
+			expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+			// Scrolled below the fold by the time the next event fires. PAUSED
+			// also clears the percentage interval PLAYING started.
+			box = { top: 900, left: 10, bottom: 1100, right: 330 };
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PAUSED } )
+			);
+			expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
 		} finally {
 			jest.useRealTimers();
 		}

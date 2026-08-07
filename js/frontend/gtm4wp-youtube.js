@@ -95,6 +95,19 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 	throw gtm4wp_err;
 }
 
+/**
+ * The player's iframe, whose viewport position becomes gtm.videoVisible.
+ *
+ * getIframe() is part of the YouTube IFrame Player API; it is guarded so a
+ * player object without it simply omits that one key instead of throwing.
+ *
+ * @param {Object} target The YT.Player the event carries.
+ * @return {HTMLElement|null} The embed iframe, or null when unavailable.
+ */
+function gtm4wp_youtubeIframe( target ) {
+	return typeof target.getIframe === 'function' ? target.getIframe() : null;
+}
+
 function gtm4wp_onYouTubePlayerReady( event ) {
 	const videodata = event.target.getVideoData();
 
@@ -173,6 +186,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 			title: videodata.title,
 			currentTime: event.target.getCurrentTime(),
 			duration: event.target.getDuration(),
+			element: gtm4wp_youtubeIframe( event.target ),
 		} ),
 	} );
 }
@@ -292,6 +306,7 @@ function gtm4wp_onYouTubePercentageChange( event ) {
 					currentTime: event.target.getCurrentTime(),
 					duration: event.target.getDuration(),
 					percent: i,
+					element: gtm4wp_youtubeIframe( event.target ),
 				} ),
 			} );
 		}

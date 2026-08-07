@@ -73,6 +73,7 @@ function gtm4wp_initMixcloudTracking() {
 					title: mediaid,
 					currentTime: lastPosition,
 					duration: lastDuration,
+					element: mixcloud_frame,
 				} ),
 			} );
 		};
@@ -117,6 +118,7 @@ function gtm4wp_initMixcloudTracking() {
 							currentTime: position,
 							duration,
 							percent: i,
+							element: mixcloud_frame,
 						} ),
 					} );
 				}

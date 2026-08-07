@@ -61,7 +61,12 @@ function gtm4wp_spotifyUriFromSrc( frame ) {
 	return '';
 }
 
-function gtm4wp_onSpotifyPercentageChange( uri, currentTime, duration ) {
+function gtm4wp_onSpotifyPercentageChange(
+	uri,
+	currentTime,
+	duration,
+	liveFrame
+) {
 	if ( ! duration ) {
 		return;
 	}
@@ -89,13 +94,25 @@ function gtm4wp_onSpotifyPercentageChange( uri, currentTime, duration ) {
 					currentTime,
 					duration,
 					percent: i,
+					element: liveFrame,
 				} ),
 			} );
 		}
 	);
 }
 
-function gtm4wp_bindSpotifyController( controller, frame ) {
+/**
+ * Binds the data layer pushes to one Spotify embed controller.
+ *
+ * @param {Object}      controller The Spotify EmbedController.
+ * @param {HTMLElement} frame      The iframe handed to createController. Read for
+ *                                 its src only: the SDK replaces this node, so it
+ *                                 is detached by the time playback starts.
+ * @param {Function}    liveFrame  Resolves the iframe that took the original's
+ *                                 place, so gtm.videoVisible measures the embed
+ *                                 that is actually on screen.
+ */
+function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 	const fallbackUri = gtm4wp_spotifyUriFromSrc( frame );
 
 	controller.addListener( 'ready', function () {
@@ -116,7 +133,12 @@ function gtm4wp_bindSpotifyController( controller, frame ) {
 		const currentTime = ( data.position || 0 ) / 1000;
 		const duration = ( data.duration || 0 ) / 1000;
 
-		gtm4wp_onSpotifyPercentageChange( uri, currentTime, duration );
+		gtm4wp_onSpotifyPercentageChange(
+			uri,
+			currentTime,
+			duration,
+			liveFrame
+		);
 
 		// Derive a discrete player state from the update flags.
 		let playerState;
@@ -149,6 +171,7 @@ function gtm4wp_bindSpotifyController( controller, frame ) {
 				title: info.title,
 				currentTime,
 				duration,
+				element: liveFrame,
 			} ),
 		} );
 	} );
@@ -180,14 +203,15 @@ function gtm4wp_initSpotifyTracking() {
 		// wiring closure so late-inserted embeds get their own controller.
 		gtm4wpObserveMedia(
 			'iframe[src*="open.spotify.com/embed"]',
-			function ( spotify_frame ) {
+			function ( spotify_frame, liveFrame ) {
 				IFrameAPI.createController(
 					spotify_frame,
 					{ uri: gtm4wp_spotifyUriFromSrc( spotify_frame ) },
 					function ( controller ) {
 						gtm4wp_bindSpotifyController(
 							controller,
-							spotify_frame
+							spotify_frame,
+							liveFrame
 						);
 					}
 				);

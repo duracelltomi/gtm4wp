@@ -144,6 +144,31 @@ describe( 'gtm4wp-html5media', () => {
 		} );
 	} );
 
+	it( 'reports the media element’s viewport position as gtm.videoVisible, per push', () => {
+		const el = createMedia( 'video', {
+			readyState: 1,
+			duration: 120,
+			currentTime: 5,
+		} );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		el.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+		loadTracker();
+
+		el.dispatchEvent( new Event( 'playing' ) );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		el.dispatchEvent( new Event( 'pause' ) );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
 	it( 'maps the "waiting" event to a buffering state and the native buffering status', () => {
 		const el = createMedia( 'video', {
 			readyState: 1,

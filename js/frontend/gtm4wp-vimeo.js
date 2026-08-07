@@ -233,6 +233,7 @@ function gtm4wp_initVimeoTracking() {
 					title: vimeo_frame.getAttribute( 'data-player_title' ),
 					currentTime: data.seconds,
 					duration: data.duration,
+					element: vimeo_frame,
 				} ),
 			} );
 		};
@@ -271,6 +272,7 @@ function gtm4wp_initVimeoTracking() {
 							),
 							currentTime: seconds,
 							duration,
+							element: vimeo_frame,
 						} ),
 					} );
 				} )
@@ -333,6 +335,7 @@ function gtm4wp_initVimeoTracking() {
 							currentTime: data.seconds,
 							duration: videoDuration,
 							percent: i,
+							element: vimeo_frame,
 						} ),
 					} );
 				}

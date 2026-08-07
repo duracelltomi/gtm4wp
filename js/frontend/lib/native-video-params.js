@@ -2,17 +2,15 @@
  * Google Tag Manager built-in "Video *" variable support.
  *
  * GTM ships built-in Video variables (Video Status, Video URL, Video Title,
- * Video Provider, Video Duration, Video Current Time, Video Percent) that only
- * read the flat `gtm.video*` data layer keys emitted by GTM's own native
- * YouTube trigger. GTM4WP's media trackers push their own bespoke
- * `gtm4wp.media*` shape, so those variables never resolve.
+ * Video Provider, Video Duration, Video Current Time, Video Percent, Video
+ * Visible) that only read the flat `gtm.video*` data layer keys emitted by
+ * GTM's own native YouTube trigger. GTM4WP's media trackers push their own
+ * bespoke `gtm4wp.media*` shape, so those variables never resolve.
  *
  * These helpers build the `gtm.video*` keys so each tracker can spread them
  * next to its existing parameters in the same data layer push, letting a Custom
  * Event trigger on the existing `gtm4wp.media*` event names resolve the built-in
- * variables. `gtm.videoVisible` is intentionally omitted: GTM4WP does not
- * measure viewport visibility, and emitting a guessed value would be worse than
- * leaving the variable undefined.
+ * variables.
  */
 
 /**
@@ -40,6 +38,90 @@ export function gtm4wpNativeVideoStatus( state ) {
 }
 
 /**
+ * Reports whether a media player sits inside the browser viewport, for GTM's
+ * built-in "Video Visible" variable (`gtm.videoVisible`).
+ *
+ * GTM describes the variable only as "true if the video is visible in the
+ * viewport" and publishes no threshold for its own YouTube trigger, so this
+ * measures the player's box at the moment of the push: visible means the box
+ * overlaps the viewport and is not hidden by CSS. A player scrolled halfway out
+ * therefore still counts as visible, which follows the published wording rather
+ * than inventing a percentage. Registered as upstream claim U102.
+ *
+ * The measurement is synchronous (`getBoundingClientRect`) rather than a stored
+ * IntersectionObserver ratio, so it can never report a value that a scroll
+ * since the last observer callback has already invalidated. Media pushes are
+ * infrequent — state changes and percentage milestones, not every time update —
+ * so the layout read costs nothing measurable.
+ *
+ * @param {HTMLElement|Function} [target] The player element, or a function
+ *                                        returning it, for a player whose SDK
+ *                                        can swap the element out or that is
+ *                                        resolved per event (VideoPress).
+ * @return {boolean|undefined} Whether the player is in the viewport, or
+ *                             undefined when there is nothing to measure (no
+ *                             element, or one detached from the document) — the
+ *                             caller then omits the key instead of guessing.
+ */
+export function gtm4wpMediaVisible( target ) {
+	let element = target;
+
+	// A resolver reaches into player-SDK or DOM code (Wistia's elem(), the slot
+	// lookup): never let it turn a data layer push into an exception.
+	if ( typeof target === 'function' ) {
+		try {
+			element = target();
+		} catch ( e ) {
+			return undefined;
+		}
+	}
+
+	if (
+		! element ||
+		1 !== element.nodeType ||
+		! element.isConnected ||
+		typeof element.getBoundingClientRect !== 'function'
+	) {
+		return undefined;
+	}
+
+	const view = element.ownerDocument && element.ownerDocument.defaultView;
+	if ( ! view ) {
+		return undefined;
+	}
+
+	// `visibility` is inherited, so this also catches a hidden ancestor. A
+	// `display: none` ancestor collapses the box to 0×0, caught by the rect below.
+	if ( typeof view.getComputedStyle === 'function' ) {
+		const style = view.getComputedStyle( element );
+
+		if (
+			style &&
+			( 'hidden' === style.visibility || 'none' === style.display )
+		) {
+			return false;
+		}
+	}
+
+	const rect = element.getBoundingClientRect();
+	if ( ! rect || rect.width <= 0 || rect.height <= 0 ) {
+		return false;
+	}
+
+	const viewportHeight =
+		view.innerHeight || view.document.documentElement.clientHeight || 0;
+	const viewportWidth =
+		view.innerWidth || view.document.documentElement.clientWidth || 0;
+
+	return (
+		rect.top < viewportHeight &&
+		rect.bottom > 0 &&
+		rect.left < viewportWidth &&
+		rect.right > 0
+	);
+}
+
+/**
  * Builds the flat `gtm.video*` keys that populate GTM's built-in Video
  * variables, ready to be spread into a data layer push.
  *
@@ -47,15 +129,19 @@ export function gtm4wpNativeVideoStatus( state ) {
  * API reports milliseconds (SoundCloud) must convert before calling. `percent`
  * is derived from time / duration when not supplied.
  *
- * @param {Object} args
- * @param {string} args.provider    Video provider, e.g. 'youtube', 'vimeo'.
- * @param {string} args.status      Already-mapped `gtm.videoStatus` (may be '').
- * @param {string} args.url         Video URL.
- * @param {string} args.title       Video title.
- * @param {number} args.currentTime Current playback position, in seconds.
- * @param {number} args.duration    Total duration, in seconds.
- * @param {number} [args.percent]   Integer 0-100; computed from time/duration
- *                                  when omitted.
+ * @param {Object}               args
+ * @param {string}               args.provider    Video provider, e.g. 'youtube', 'vimeo'.
+ * @param {string}               args.status      Already-mapped `gtm.videoStatus` (may be '').
+ * @param {string}               args.url         Video URL.
+ * @param {string}               args.title       Video title.
+ * @param {number}               args.currentTime Current playback position, in seconds.
+ * @param {number}               args.duration    Total duration, in seconds.
+ * @param {number}               [args.percent]   Integer 0-100; computed from time/duration
+ *                                                when omitted.
+ * @param {HTMLElement|Function} [args.element]   The player element (or a function returning
+ *                                                it) whose viewport position becomes
+ *                                                `gtm.videoVisible`. Omitting it omits that
+ *                                                one key; every other key is unaffected.
  * @return {Object} The `gtm.video*` keys to spread into a data layer push.
  */
 export function gtm4wpNativeVideoParams( {
@@ -66,6 +152,7 @@ export function gtm4wpNativeVideoParams( {
 	currentTime,
 	duration,
 	percent,
+	element,
 } ) {
 	const dur = Number( duration ) || 0;
 	const cur = Number( currentTime ) || 0;
@@ -77,7 +164,7 @@ export function gtm4wpNativeVideoParams( {
 		pct = Math.floor( ( cur / dur ) * 100 );
 	}
 
-	return {
+	const params = {
 		'gtm.videoProvider': provider,
 		'gtm.videoUrl': url,
 		'gtm.videoTitle': title,
@@ -86,6 +173,15 @@ export function gtm4wpNativeVideoParams( {
 		'gtm.videoDuration': Math.floor( dur ),
 		'gtm.videoPercent': pct,
 	};
+
+	// Left out entirely when there is no element to measure: an absent variable
+	// is honest, a guessed false is not.
+	const visible = gtm4wpMediaVisible( element );
+	if ( typeof visible === 'boolean' ) {
+		params[ 'gtm.videoVisible' ] = visible;
+	}
+
+	return params;
 }
 
 /**
@@ -175,6 +271,10 @@ export function gtm4wpOnReady( callback ) {
  * @param {string}   selector    CSS selector identifying the provider embed.
  * @param {Function} wireElement Called once with each matching element to wire
  *                               it (the same wiring the tracker runs at init).
+ *                               Receives a second argument: a function
+ *                               resolving the element that currently occupies
+ *                               the wired element's slot, for a tracker whose
+ *                               SDK replaces it (Spotify).
  * @param {Function} [isReady]   Optional predicate; when it returns a falsy value
  *                               the element is left unwired AND unmarked (e.g.
  *                               the player SDK has not loaded), so a later
@@ -203,8 +303,39 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady ) {
 			? Array.prototype.indexOf.call( parent.childNodes, element )
 			: -1;
 
+		// Resolves whichever element currently occupies this slot: the wired
+		// element itself, or — once an SDK has replaced it — its replacement.
+		// Trackers hand this to gtm4wpNativeVideoParams so `gtm.videoVisible` is
+		// measured on the node that is actually on screen; a detached original
+		// would report a 0×0 box forever.
+		const liveElement = function () {
+			if ( element.isConnected ) {
+				return element;
+			}
+
+			if ( parent && slot > -1 ) {
+				const node = parent.childNodes[ slot ];
+
+				// Same test as the re-mark below: only a node this scanner would
+				// itself recognise as the provider's embed counts as the
+				// replacement. Without it, a node that merely shifted into the
+				// slot after an unrelated removal would be measured as if it
+				// were the player.
+				if (
+					node &&
+					1 === node.nodeType &&
+					( node.matches( selector ) ||
+						node.querySelector( selector ) )
+				) {
+					return node;
+				}
+			}
+
+			return null;
+		};
+
 		element.setAttribute( 'data-gtm4wp-media-wired', '1' );
-		wireElement( element );
+		wireElement( element, liveElement );
 
 		// Some SDKs REPLACE the element they are given with their own iframe
 		// rather than reusing it in place — Spotify's createController() does

@@ -106,6 +106,27 @@ describe( 'gtm4wp-jwplayer', () => {
 		} );
 	} );
 
+	it( 'reports the player container’s viewport position as gtm.videoVisible, per push', () => {
+		const container = document.querySelector( '.jwplayer' );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		container.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+		loadTracker();
+
+		player.emit( 'play' );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		player.emit( 'pause' );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
 	it( 'maps complete to an "ended" state and seeked to a "seeked" state', () => {
 		loadTracker();
 

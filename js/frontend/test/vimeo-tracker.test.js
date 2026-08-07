@@ -134,6 +134,27 @@ describe( 'gtm4wp-vimeo', () => {
 		} );
 	} );
 
+	it( 'reports the embed’s viewport position as gtm.videoVisible, per push', async () => {
+		const frame = document.querySelector( 'iframe' );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		frame.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+		const player = await loadTracker();
+
+		player.emit( 'playing', { duration: 120, percent: 0.04, seconds: 5 } );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		player.emit( 'pause', { duration: 120, percent: 0.04, seconds: 5 } );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
 	it( 'maps bufferstart to a "buffering" state and the native buffering status', async () => {
 		const player = await loadTracker();
 

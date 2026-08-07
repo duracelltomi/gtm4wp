@@ -15,7 +15,14 @@ function gtm4wp_initDailymotionTracking() {
 	// enqueued as a dependency but can still be missing at runtime (consent
 	// manager, ad blocker, network error), so it is re-checked per element: a
 	// frame is only wired once the SDK is available.
-	const gtm4wp_wireDailymotionFrame = function ( dailymotion_frame ) {
+	//
+	// The gtm.videoVisible measurement uses `liveFrame`, not the iframe itself:
+	// DM.player() replaces the element it is given with its own player, which
+	// would leave a detached node behind to measure.
+	const gtm4wp_wireDailymotionFrame = function (
+		dailymotion_frame,
+		liveFrame
+	) {
 		const src = dailymotion_frame.getAttribute( 'src' );
 		const videourl = src.split( '?' ).shift();
 
@@ -72,6 +79,7 @@ function gtm4wp_initDailymotionTracking() {
 					title: videoid,
 					currentTime: gtm4wp_dailymotionCurrentTime(),
 					duration: gtm4wp_dailymotionDuration(),
+					element: liveFrame,
 				} ),
 			} );
 		};
@@ -121,6 +129,7 @@ function gtm4wp_initDailymotionTracking() {
 							currentTime: videoCurrentTime,
 							duration: videoDuration,
 							percent: i,
+							element: liveFrame,
 						} ),
 					} );
 				}

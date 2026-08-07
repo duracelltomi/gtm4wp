@@ -139,6 +139,31 @@ describe( 'gtm4wp-twitch', () => {
 		} );
 	} );
 
+	it( 'reports the SDK container’s viewport position as gtm.videoVisible, per push', () => {
+		loadTracker();
+		// The tracker replaced the original iframe with a container of its own,
+		// which the Embed SDK fills - that container is the visible player.
+		const container = document.querySelector( '[data-gtm4wp-media-wired]' );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		container.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+		player._duration = 3600;
+
+		player.emit( Ctor.PLAY );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		// PAUSE also stops the percentage-polling interval PLAY started.
+		player.emit( Ctor.PAUSE );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
 	it( 'tracks ONLINE/OFFLINE as player events', () => {
 		loadTracker();
 

@@ -143,6 +143,7 @@ function gtm4wp_initSoundCloudTracking() {
 					// SoundCloud reports milliseconds; gtm.video* wants seconds.
 					currentTime: eventData.currentPosition / 1000,
 					duration: sound.duration / 1000,
+					element: soundcloud_frame,
 				} ),
 			} );
 		};
@@ -182,6 +183,7 @@ function gtm4wp_initSoundCloudTracking() {
 							currentTime: eventData.currentPosition / 1000,
 							duration: sound.duration / 1000,
 							percent: i,
+							element: soundcloud_frame,
 						} ),
 					} );
 				}

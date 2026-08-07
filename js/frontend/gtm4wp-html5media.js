@@ -97,6 +97,7 @@ function gtm4wp_initHTML5MediaTracking() {
 					title: html5media_filename,
 					currentTime,
 					duration,
+					element: media_element,
 				} ),
 			} );
 		};
@@ -256,6 +257,7 @@ function gtm4wp_initHTML5MediaTracking() {
 							currentTime: videoCurrentTime,
 							duration: videoDuration,
 							percent: i,
+							element: media_element,
 						} ),
 					} );
 				}

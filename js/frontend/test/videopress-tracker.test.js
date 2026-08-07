@@ -38,6 +38,18 @@ describe( 'gtm4wp-videopress', () => {
 		window.dispatchEvent( new MessageEvent( 'message', { data, origin } ) );
 	};
 
+	// Dispatches a message the way a real player does: from the embed's own
+	// window, which is how the tracker tells one embed on the page from another.
+	const fromFrame = ( frame, data, origin = 'https://videopress.com' ) => {
+		window.dispatchEvent(
+			new MessageEvent( 'message', {
+				data,
+				origin,
+				source: frame.contentWindow,
+			} )
+		);
+	};
+
 	function loadTracker() {
 		jest.isolateModules( () => {
 			require( '../gtm4wp-videopress' );
@@ -104,6 +116,63 @@ describe( 'gtm4wp-videopress', () => {
 			mediaPlayerState: 'seeked',
 			'gtm.videoStatus': 'seek',
 		} );
+	} );
+
+	it( 'reports the sending embed’s viewport position as gtm.videoVisible, per push', () => {
+		const frame = document.querySelector( 'iframe' );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		frame.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+		loadTracker();
+
+		// The player posts from its own window, which is how the tracker knows
+		// which embed on the page the message belongs to.
+		fromFrame( frame, {
+			event: 'videopress_playing',
+			id: 'AbCdEfGh',
+			currentTimeMs: 30000,
+			durationMs: 120000,
+		} );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		fromFrame( frame, {
+			event: 'videopress_pause',
+			id: 'AbCdEfGh',
+			currentTimeMs: 31000,
+			durationMs: 120000,
+		} );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
+	it( 'falls back to the guid in the embed URL when the message has no source window', () => {
+		const frame = document.querySelector( 'iframe' );
+		frame.getBoundingClientRect = () => ( {
+			top: 10,
+			left: 10,
+			bottom: 210,
+			right: 330,
+			width: 320,
+			height: 200,
+		} );
+		loadTracker();
+
+		// A message relayed without a source window (a nested player frame) still
+		// identifies its embed through the guid in the src.
+		dispatch( {
+			event: 'videopress_playing',
+			id: 'AbCdEfGh',
+			currentTimeMs: 30000,
+			durationMs: 120000,
+		} );
+
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
 	} );
 
 	it( 'emits mediaPlaybackPercentage milestones on timeupdate', () => {

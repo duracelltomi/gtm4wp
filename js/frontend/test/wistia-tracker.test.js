@@ -16,6 +16,13 @@ class FakeWistiaVideo {
 		this._duration = 120;
 		this._hashedId = 'abc123def4';
 		this._time = 0;
+		// The container element. Wistia's runtime exposes it as elem(), but its
+		// Player API documents no DOM accessor, so a runtime without one is a
+		// case the tracker has to survive — `null` models that.
+		this._elem = null;
+	}
+	elem() {
+		return this._elem;
 	}
 	bind( event, cb ) {
 		this.handlers[ event ] = cb;
@@ -122,6 +129,67 @@ describe( 'gtm4wp-wistia', () => {
 			'gtm.videoDuration': 120,
 			'gtm.videoPercent': 25,
 		} );
+	} );
+
+	/**
+	 * Gives an element a layout box: jsdom reports 0×0 for everything, so a
+	 * player is only measurable against the default 1024×768 viewport with a
+	 * stubbed rect.
+	 *
+	 * @param {HTMLElement} element The element to measure.
+	 * @param {Function}    readBox Returns the current box, so a test can move
+	 *                              the player between two pushes.
+	 */
+	const measurable = ( element, readBox ) => {
+		element.getBoundingClientRect = () => ( {
+			...readBox(),
+			width: 320,
+			height: 200,
+		} );
+	};
+
+	const ON_SCREEN = { top: 10, left: 10, bottom: 210, right: 330 };
+	const OFF_SCREEN = { top: 900, left: 10, bottom: 1100, right: 330 };
+
+	it( 'reports the container’s viewport position as gtm.videoVisible, per push', () => {
+		const container = document.createElement( 'div' );
+		document.body.appendChild( container );
+		let box = ON_SCREEN;
+		measurable( container, () => box );
+		video._elem = container;
+
+		loadTracker();
+
+		video.emit( 'play' );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		box = OFF_SCREEN;
+		video.emit( 'pause' );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
+	it( 'falls back to the wistia_async_<hashedId> embed container when the runtime exposes no element', () => {
+		document.body.innerHTML =
+			'<div class="wistia_embed wistia_async_abc123def4"></div>';
+		const container = document.querySelector( '.wistia_async_abc123def4' );
+		measurable( container, () => ON_SCREEN );
+		// video._elem stays null: this is the documented-markup path.
+
+		loadTracker();
+		video.emit( 'play' );
+
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+	} );
+
+	it( 'omits gtm.videoVisible when the player cannot be found in the page', () => {
+		// No elem(), no matching embed markup: nothing to measure, so the key is
+		// left out rather than reported as a (possibly wrong) false.
+		document.body.innerHTML = '';
+
+		loadTracker();
+		video.emit( 'play' );
+
+		expect( lastPush() ).not.toHaveProperty( 'gtm.videoVisible' );
 	} );
 
 	it( 'maps end to an "ended" state and seek to a "seeked" state', () => {

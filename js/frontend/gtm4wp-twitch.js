@@ -9,7 +9,16 @@ import {
 const gtm4wp_twitch_percentage_tracking = 10;
 const gtm4wp_twitch_percentage_tracking_marks = {};
 
-function gtm4wp_bindTwitchPlayer( player, channel, video, collection ) {
+// `container` is the div the tracker put in the iframe's place, which the Twitch
+// Embed SDK fills with its own player iframe — so it is the element whose
+// viewport position the pushes report as gtm.videoVisible.
+function gtm4wp_bindTwitchPlayer(
+	player,
+	channel,
+	video,
+	collection,
+	container
+) {
 	const mediaid = video || channel || collection || '';
 	let mediaurl = '';
 	if ( video ) {
@@ -58,6 +67,7 @@ function gtm4wp_bindTwitchPlayer( player, channel, video, collection ) {
 				title: mediaid,
 				currentTime: gtm4wp_twitchCurrentTime(),
 				duration: gtm4wp_twitchDuration(),
+				element: container,
 			} ),
 		} );
 	};
@@ -106,6 +116,7 @@ function gtm4wp_bindTwitchPlayer( player, channel, video, collection ) {
 						currentTime: videoCurrentTime,
 						duration: videoDuration,
 						percent: i,
+						element: container,
 					} ),
 				} );
 			}
@@ -228,7 +239,13 @@ function gtm4wp_initTwitchTracking() {
 		}
 
 		const player = new Twitch.Player( container.id, options );
-		gtm4wp_bindTwitchPlayer( player, channel, video, collection );
+		gtm4wp_bindTwitchPlayer(
+			player,
+			channel,
+			video,
+			collection,
+			container
+		);
 	};
 
 	gtm4wpObserveMedia(

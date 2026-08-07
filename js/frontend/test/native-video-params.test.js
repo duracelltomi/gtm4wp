@@ -8,10 +8,47 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaVisible,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from '../lib/native-video-params';
+
+/**
+ * Gives an element a layout box, which jsdom otherwise reports as 0×0 for
+ * everything. The default box sits inside the (1024×768) jsdom viewport.
+ *
+ * @param {HTMLElement} element The element to measure.
+ * @param {Object}      [rect]  Overrides for the default on-screen box.
+ * @return {HTMLElement} The same element, for chaining.
+ */
+const withBox = ( element, rect = {} ) => {
+	const box = {
+		top: 10,
+		left: 10,
+		bottom: 210,
+		right: 330,
+		width: 320,
+		height: 200,
+		...rect,
+	};
+	element.getBoundingClientRect = () => box;
+
+	return element;
+};
+
+/**
+ * An element attached to the document (detached ones cannot be measured).
+ *
+ * @param {Object} [rect] Overrides for the default on-screen box.
+ * @return {HTMLElement} The attached, measurable element.
+ */
+const attachedPlayer = ( rect ) => {
+	const element = document.createElement( 'div' );
+	document.body.appendChild( element );
+
+	return withBox( element, rect );
+};
 
 describe( 'gtm4wpNativeVideoStatus', () => {
 	it( 'maps each GTM4WP state to its GTM built-in Video status', () => {
@@ -54,7 +91,37 @@ describe( 'gtm4wpNativeVideoParams', () => {
 		} );
 	} );
 
-	it( 'does not emit gtm.videoVisible (visibility is not tracked)', () => {
+	it( 'emits gtm.videoVisible true for a player inside the viewport', () => {
+		const params = gtm4wpNativeVideoParams( {
+			provider: 'youtube',
+			status: 'start',
+			url: 'u',
+			title: 't',
+			currentTime: 0,
+			duration: 10,
+			element: attachedPlayer(),
+		} );
+
+		expect( params[ 'gtm.videoVisible' ] ).toBe( true );
+	} );
+
+	it( 'emits gtm.videoVisible false for a player scrolled out of the viewport', () => {
+		const params = gtm4wpNativeVideoParams( {
+			provider: 'youtube',
+			status: 'start',
+			url: 'u',
+			title: 't',
+			currentTime: 0,
+			duration: 10,
+			element: attachedPlayer( { top: 900, bottom: 1100 } ),
+		} );
+
+		expect( params[ 'gtm.videoVisible' ] ).toBe( false );
+		// The other keys are unaffected by the visibility verdict.
+		expect( params[ 'gtm.videoStatus' ] ).toBe( 'start' );
+	} );
+
+	it( 'omits gtm.videoVisible entirely when there is no element to measure', () => {
 		const params = gtm4wpNativeVideoParams( {
 			provider: 'youtube',
 			status: 'start',
@@ -64,6 +131,8 @@ describe( 'gtm4wpNativeVideoParams', () => {
 			duration: 10,
 		} );
 
+		// An absent variable says "not measured"; a false would claim the player
+		// is off screen, which is a different (and possibly wrong) statement.
 		expect( params ).not.toHaveProperty( 'gtm.videoVisible' );
 	} );
 
@@ -123,6 +192,98 @@ describe( 'gtm4wpNativeVideoParams', () => {
 		expect( params[ 'gtm.videoCurrentTime' ] ).toBe( 0 );
 		expect( params[ 'gtm.videoDuration' ] ).toBe( 0 );
 		expect( params[ 'gtm.videoPercent' ] ).toBe( 0 );
+	} );
+} );
+
+describe( 'gtm4wpMediaVisible', () => {
+	afterEach( () => {
+		document.body.innerHTML = '';
+	} );
+
+	it( 'reports a player inside the viewport as visible', () => {
+		expect( gtm4wpMediaVisible( attachedPlayer() ) ).toBe( true );
+	} );
+
+	it( 'reports a player only partly on screen as visible (no percentage threshold)', () => {
+		// GTM publishes no minimum-visible fraction for its own Video Visible
+		// variable, so an embed straddling the fold counts as visible.
+		expect(
+			gtm4wpMediaVisible( attachedPlayer( { top: 700, bottom: 900 } ) )
+		).toBe( true );
+	} );
+
+	it( 'reports a player scrolled past in any direction as not visible', () => {
+		expect(
+			gtm4wpMediaVisible( attachedPlayer( { top: 800, bottom: 1000 } ) )
+		).toBe( false );
+		expect(
+			gtm4wpMediaVisible( attachedPlayer( { top: -300, bottom: -100 } ) )
+		).toBe( false );
+		expect(
+			gtm4wpMediaVisible( attachedPlayer( { left: 1100, right: 1420 } ) )
+		).toBe( false );
+		expect(
+			gtm4wpMediaVisible( attachedPlayer( { left: -400, right: -80 } ) )
+		).toBe( false );
+	} );
+
+	it( 'reports a box with no area as not visible (a display:none ancestor)', () => {
+		expect(
+			gtm4wpMediaVisible(
+				attachedPlayer( {
+					top: 0,
+					left: 0,
+					bottom: 0,
+					right: 0,
+					width: 0,
+					height: 0,
+				} )
+			)
+		).toBe( false );
+	} );
+
+	it( 'reports a CSS-hidden player as not visible even though it has a box', () => {
+		const hidden = attachedPlayer();
+		hidden.style.visibility = 'hidden';
+		expect( gtm4wpMediaVisible( hidden ) ).toBe( false );
+
+		const undisplayed = attachedPlayer();
+		undisplayed.style.display = 'none';
+		expect( gtm4wpMediaVisible( undisplayed ) ).toBe( false );
+	} );
+
+	it( 'returns undefined when there is nothing to measure', () => {
+		expect( gtm4wpMediaVisible( undefined ) ).toBeUndefined();
+		expect( gtm4wpMediaVisible( null ) ).toBeUndefined();
+		// A detached node — the element an SDK replaced, or one removed from a
+		// closed lightbox — is unmeasurable, not off screen.
+		expect(
+			gtm4wpMediaVisible( withBox( document.createElement( 'div' ) ) )
+		).toBeUndefined();
+	} );
+
+	it( 'returns undefined instead of propagating a throwing resolver', () => {
+		// A resolver reaches into player-SDK code (Wistia's elem()); a throw
+		// there must cost the one variable, not the whole data layer push.
+		expect(
+			gtm4wpMediaVisible( () => {
+				throw new Error( 'player destroyed' );
+			} )
+		).toBeUndefined();
+	} );
+
+	it( 'accepts a resolver function and measures whatever it returns', () => {
+		const onScreen = attachedPlayer();
+		const offScreen = attachedPlayer( { top: 900, bottom: 1100 } );
+		let current = onScreen;
+
+		const resolve = () => current;
+
+		expect( gtm4wpMediaVisible( resolve ) ).toBe( true );
+		current = offScreen;
+		expect( gtm4wpMediaVisible( resolve ) ).toBe( false );
+		current = null;
+		expect( gtm4wpMediaVisible( resolve ) ).toBeUndefined();
 	} );
 } );
 
@@ -485,6 +646,56 @@ describe( 'gtm4wpObserveMedia', () => {
 				.hasAttribute( 'data-gtm4wp-media-wired' )
 		).toBe( true );
 		expect( wired ).toHaveLength( 1 );
+	} );
+
+	it( 'hands the wiring a resolver that follows an SDK’s replacement', () => {
+		document.body.innerHTML = '<video id="original"></video>';
+		let resolve;
+
+		gtm4wpObserveMedia( 'video', ( element, liveElement ) => {
+			resolve = liveElement;
+			// While the wired element is still in the document it resolves to itself.
+			expect( liveElement() ).toBe( element );
+
+			const replacement = document.createElement( 'video' );
+			replacement.id = 'replacement';
+			element.parentElement.replaceChild( replacement, element );
+		} );
+
+		// Once the SDK swapped the node out, the resolver reports the live one —
+		// this is what keeps gtm.videoVisible measured on the visible player
+		// instead of on a detached element that has no box at all.
+		expect( resolve().id ).toBe( 'replacement' );
+	} );
+
+	it( 'resolves to null when an unrelated node shifts into the wired element’s slot', () => {
+		document.body.innerHTML = '<video></video>';
+		let resolve;
+
+		gtm4wpObserveMedia( 'video', ( element, liveElement ) => {
+			resolve = liveElement;
+		} );
+
+		// The player is gone and a paragraph now occupies its position. That is
+		// not the player, so there is nothing to measure — reporting the
+		// paragraph's box would put a stranger's visibility on the event.
+		const other = document.createElement( 'p' );
+		document.body.replaceChild( other, document.querySelector( 'video' ) );
+
+		expect( resolve() ).toBeNull();
+	} );
+
+	it( 'resolves to null when the wired element is removed and nothing takes its slot', () => {
+		document.body.innerHTML = '<video></video>';
+		let resolve;
+
+		gtm4wpObserveMedia( 'video', ( element, liveElement ) => {
+			resolve = liveElement;
+		} );
+
+		document.querySelector( 'video' ).remove();
+
+		expect( resolve() ).toBeNull();
 	} );
 
 	it( 'shares one observer across providers and wires each provider’s late insertions', async () => {

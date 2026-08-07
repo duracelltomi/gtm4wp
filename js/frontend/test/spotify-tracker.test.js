@@ -198,6 +198,30 @@ describe( 'gtm4wp-spotify', () => {
 		} );
 	} );
 
+	it( 'measures gtm.videoVisible on the iframe the SDK put in the original’s place', () => {
+		loadTracker();
+		// createController replaced the embed: the element the tracker was handed
+		// is detached and has no box at all, so a tracker measuring THAT would
+		// report nothing. Only the live replacement can answer the question.
+		const live = document.querySelector( 'iframe' );
+		// jsdom gives every element a 0×0 box, so the player is measured through
+		// a stubbed rect against the default 1024×768 viewport.
+		let box = { top: 10, left: 10, bottom: 210, right: 330 };
+		live.getBoundingClientRect = () => ( {
+			...box,
+			width: 320,
+			height: 200,
+		} );
+
+		update( { isPaused: false, position: 30000, duration: 120000 } );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( true );
+
+		// Scrolled below the fold by the time the next event fires.
+		box = { top: 900, left: 10, bottom: 1100, right: 330 };
+		update( { isPaused: true, position: 30000, duration: 120000 } );
+		expect( lastPush()[ 'gtm.videoVisible' ] ).toBe( false );
+	} );
+
 	it( 'derives a pause state when isPaused flips to true', () => {
 		loadTracker();
 

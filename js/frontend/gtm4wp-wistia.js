@@ -31,6 +31,31 @@ function gtm4wp_initWistiaTracking() {
 			const videoid = video.hashedId();
 			const videourl = 'https://fast.wistia.net/embed/iframe/' + videoid;
 
+			// The element whose viewport position the pushes report as
+			// gtm.videoVisible. Wistia's Player API documents no DOM accessor,
+			// so the documented async-embed markup (a container carrying the
+			// `wistia_async_<hashedId>` class) is the contract relied on here;
+			// the undocumented elem() the runtime also exposes is preferred when
+			// present, because it is exact for a page with two embeds of the
+			// same video. Resolved per push: a player inserted later (popup /
+			// lightbox) is not in the DOM when onReady runs.
+			const gtm4wp_wistiaElement = function () {
+				if ( typeof video.elem === 'function' ) {
+					const element = video.elem();
+
+					if ( element && 1 === element.nodeType ) {
+						return element;
+					}
+				}
+
+				try {
+					return document.querySelector( '.wistia_async_' + videoid );
+				} catch ( e ) {
+					// A hashed id that is not a valid class selector.
+					return null;
+				}
+			};
+
 			const gtm4wp_wistiaMediaData = function () {
 				return {
 					id: videoid,
@@ -55,6 +80,7 @@ function gtm4wp_initWistiaTracking() {
 						title: video.name(),
 						currentTime: video.time(),
 						duration: video.duration(),
+						element: gtm4wp_wistiaElement,
 					} ),
 				} );
 			};
@@ -96,6 +122,7 @@ function gtm4wp_initWistiaTracking() {
 								currentTime: video.time(),
 								duration: video.duration(),
 								percent: i,
+								element: gtm4wp_wistiaElement,
 							} ),
 						} );
 					}
