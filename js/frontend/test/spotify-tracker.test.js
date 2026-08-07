@@ -25,7 +25,38 @@ class FakeSpotifyController {
 	}
 }
 
+/**
+ * A stand-in for the oEmbed Response. Deliberately no more permissive than the
+ * real thing: the tracker reads `ok` before it reads the body, so a double that
+ * always parsed would hide the non-2xx branch.
+ *
+ * @param {Object}  body The JSON body the response resolves to.
+ * @param {boolean} [ok] Whether the response reports success.
+ * @return {Object} The stub Response.
+ */
+function oembedResponse( body, ok = true ) {
+	return {
+		ok,
+		json: () => Promise.resolve( body ),
+	};
+}
+
 const URI = 'spotify:track:4cOdK2wGLETKBW3PvgPWqT';
+const EMBED_SRC = 'https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT';
+
+// Spotify's oEmbed markup carries the real title on the iframe, prefixed with
+// its own literal, and WordPress core preserves that attribute rather than
+// composing one of its own. Pins the prefix registered as U104.
+const EMBED_TITLE = 'Never Gonna Give You Up';
+const TITLE_ATTR = 'Spotify Embed: ' + EMBED_TITLE;
+
+// The exact request the oEmbed fallback must issue, written out rather than
+// rebuilt with encodeURIComponent so it pins the upstream contract (U105)
+// instead of restating the source's own arithmetic.
+const OEMBED_URL =
+	'https://open.spotify.com/oembed?url=' +
+	'https%3A%2F%2Fopen.spotify.com%2Ftrack%2F4cOdK2wGLETKBW3PvgPWqT';
+const OEMBED_TITLE = 'Fetched Track Title';
 
 describe( 'gtm4wp-spotify', () => {
 	let controller;
@@ -41,10 +72,22 @@ describe( 'gtm4wp-spotify', () => {
 		delete window.gtm4wp_spotify_inited;
 		controller = new FakeSpotifyController();
 		document.body.innerHTML =
-			'<iframe src="https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT"></iframe>';
+			'<iframe title="' +
+			TITLE_ATTR +
+			'" src="' +
+			EMBED_SRC +
+			'"></iframe>';
+		// jsdom provides no fetch. Stubbed here rather than relied on from
+		// another test file, and asserted against in both directions: the tests
+		// below check not only what it returned but that it was not called at
+		// all on the path that must stay offline.
+		global.fetch = jest.fn( () =>
+			Promise.resolve( oembedResponse( { title: OEMBED_TITLE } ) )
+		);
 	} );
 
 	afterEach( () => {
+		delete global.fetch;
 		delete window.onSpotifyIframeApiReady;
 		// The shared media observer lives on the (jsdom) window, which persists
 		// across tests; disconnect and reset it so nothing leaks into the next.
@@ -173,7 +216,7 @@ describe( 'gtm4wp-spotify', () => {
 			mediaData: {
 				id: '4cOdK2wGLETKBW3PvgPWqT',
 				author: '',
-				title: URI,
+				title: EMBED_TITLE,
 				url: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
 				duration: 0,
 			},
@@ -186,7 +229,7 @@ describe( 'gtm4wp-spotify', () => {
 			'gtm.videoProvider': 'spotify',
 			'gtm.videoUrl':
 				'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
-			'gtm.videoTitle': URI,
+			'gtm.videoTitle': EMBED_TITLE,
 			'gtm.videoStatus': '',
 			'gtm.videoCurrentTime': 0,
 			'gtm.videoDuration': 0,
@@ -332,6 +375,225 @@ describe( 'gtm4wp-spotify', () => {
 		} );
 
 		expect( window.onSpotifyIframeApiReady ).toBe( firstCallback );
+	} );
+
+	describe( 'title resolution', () => {
+		// The Spotify embed API carries no title at all - its playback_update
+		// reports only isPaused/isBuffering/position/duration/playingURI - so the
+		// title comes from the embed markup, and from oEmbed when the markup has
+		// none. Before this the URI itself was reported as the title.
+
+		const embedWithoutTitle = () => {
+			document.body.innerHTML =
+				'<iframe src="' + EMBED_SRC + '"></iframe>';
+		};
+
+		it( 'strips Spotify’s prefix off the embed title and asks for nothing', async () => {
+			loadTracker();
+			controller.emit( 'ready' );
+			await flush();
+
+			expect( lastPush().mediaData.title ).toBe( EMBED_TITLE );
+			expect( lastPush()[ 'gtm.videoTitle' ] ).toBe( EMBED_TITLE );
+			// The markup already answered the question. A lookup here would be a
+			// third-party request on every page carrying an embed, for nothing.
+			expect( global.fetch ).not.toHaveBeenCalled();
+		} );
+
+		it( 'uses a title attribute carrying no Spotify prefix verbatim', async () => {
+			document.body.innerHTML =
+				'<iframe title="Hand written title" src="' +
+				EMBED_SRC +
+				'"></iframe>';
+
+			loadTracker();
+			controller.emit( 'ready' );
+			await flush();
+
+			expect( lastPush().mediaData.title ).toBe( 'Hand written title' );
+			expect( global.fetch ).not.toHaveBeenCalled();
+		} );
+
+		it( 'reads the title before the SDK replaces the embed node', async () => {
+			// createController() does parentElement.replaceChild(), and the
+			// replacement carries only the src - so a tracker reading the title
+			// after wiring reads it off a node that no longer has one.
+			loadTracker();
+			expect(
+				document.querySelector( 'iframe' ).getAttribute( 'title' )
+			).toBeNull();
+
+			controller.emit( 'ready' );
+			await flush();
+
+			expect( lastPush().mediaData.title ).toBe( EMBED_TITLE );
+		} );
+
+		it( 'looks the title up from oEmbed when the embed carries none', async () => {
+			embedWithoutTitle();
+
+			loadTracker();
+			await flush();
+
+			expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+			expect( global.fetch ).toHaveBeenCalledWith( OEMBED_URL, {
+				credentials: 'omit',
+			} );
+
+			update( { isPaused: false, position: 30000 } );
+			expect( lastPush().mediaData.title ).toBe( OEMBED_TITLE );
+			expect( lastPush()[ 'gtm.videoTitle' ] ).toBe( OEMBED_TITLE );
+		} );
+
+		it( 'reports the URI on an event that fires before the lookup lands', async () => {
+			embedWithoutTitle();
+
+			loadTracker();
+			// No flush: the request is in flight, exactly as it would be if the
+			// SDK reported ready first. The event is pushed anyway rather than
+			// held back, so a hanging request can never cost an event.
+			controller.emit( 'ready' );
+
+			expect( lastPush().mediaData.title ).toBe( URI );
+			expect( lastPush()[ 'gtm.videoTitle' ] ).toBe( URI );
+
+			// ...and once it lands, later events carry the real title.
+			await flush();
+			update( { isPaused: false, position: 30000 } );
+			expect( lastPush().mediaData.title ).toBe( OEMBED_TITLE );
+		} );
+
+		it( 'does not repeat the lookup as playback_update repeats', async () => {
+			embedWithoutTitle();
+
+			loadTracker();
+			await flush();
+
+			// playback_update arrives every few hundred ms for the whole of
+			// playback; one lookup per URI is the entire budget.
+			for ( let i = 0; i < 8; i++ ) {
+				update( { isPaused: false, position: i * 1000 } );
+			}
+			await flush();
+
+			expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		} );
+
+		it.each( [
+			[
+				'the request is blocked',
+				() => Promise.reject( new Error( 'blocked' ) ),
+			],
+			[
+				'the endpoint answers non-2xx',
+				() => Promise.resolve( oembedResponse( {}, false ) ),
+			],
+			[
+				'the body does not parse',
+				() =>
+					Promise.resolve( {
+						ok: true,
+						json: () => Promise.reject( new Error( 'bad json' ) ),
+					} ),
+			],
+			[
+				'the title is not a string',
+				() => Promise.resolve( oembedResponse( { title: 42 } ) ),
+			],
+			[
+				'the title is empty',
+				() => Promise.resolve( oembedResponse( { title: '   ' } ) ),
+			],
+		] )(
+			'falls back to the URI and never retries when %s',
+			async ( _label, response ) => {
+				embedWithoutTitle();
+				global.fetch = jest.fn( response );
+
+				loadTracker();
+				await flush();
+
+				for ( let i = 0; i < 8; i++ ) {
+					update( { isPaused: false, position: i * 1000 } );
+				}
+				await flush();
+
+				expect( lastPush().mediaData.title ).toBe( URI );
+				// The failure is remembered. Without that, every single
+				// playback_update would re-request open.spotify.com.
+				expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+			}
+		);
+
+		it( 'resolves a playlist track’s own title, not the playlist’s', async () => {
+			document.body.innerHTML =
+				'<iframe title="Spotify Embed: Today’s Top Hits" ' +
+				'src="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M"></iframe>';
+
+			loadTracker();
+			// The embed's own title came from the markup, so nothing was asked
+			// for until a track inside the playlist started.
+			expect( global.fetch ).not.toHaveBeenCalled();
+
+			update( { isPaused: false, position: 0 } );
+			await flush();
+
+			expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+			expect( global.fetch ).toHaveBeenCalledWith( OEMBED_URL, {
+				credentials: 'omit',
+			} );
+
+			update( { isPaused: true, position: 0 } );
+			expect( lastPush().mediaData.title ).toBe( OEMBED_TITLE );
+			expect( lastPush().mediaData.title ).not.toBe( 'Today’s Top Hits' );
+		} );
+
+		it( 'percent-encodes the URI into the lookup URL', async () => {
+			embedWithoutTitle();
+
+			loadTracker();
+			await flush();
+			global.fetch.mockClear();
+
+			update( {
+				isPaused: false,
+				position: 0,
+				playingURI: 'spotify:track:</script>&x',
+			} );
+			await flush();
+
+			expect( global.fetch ).toHaveBeenCalledWith(
+				'https://open.spotify.com/oembed?url=' +
+					'https%3A%2F%2Fopen.spotify.com%2Ftrack%2F%3C%2Fscript%3E%26x',
+				{ credentials: 'omit' }
+			);
+		} );
+
+		it( 'asks for nothing when the URI carries no type and id', async () => {
+			document.body.innerHTML =
+				'<iframe src="https://open.spotify.com/embed/"></iframe>';
+
+			loadTracker();
+			await flush();
+
+			// Nothing addressable to look up, so no request is built from it.
+			expect( global.fetch ).not.toHaveBeenCalled();
+		} );
+
+		it( 'carries the resolved title on every kind of push', async () => {
+			loadTracker();
+
+			controller.emit( 'ready' );
+			update( { isPaused: false, position: 60000, duration: 240000 } );
+			update( { isPaused: true, position: 60000, duration: 240000 } );
+			await flush();
+
+			expect( window.dataLayer.length ).toBeGreaterThan( 3 );
+			window.dataLayer.forEach( ( entry ) => {
+				expect( entry.mediaData.title ).toBe( EMBED_TITLE );
+				expect( entry[ 'gtm.videoTitle' ] ).toBe( EMBED_TITLE );
+			} );
+		} );
 	} );
 
 	describe( 'SDK loading', () => {

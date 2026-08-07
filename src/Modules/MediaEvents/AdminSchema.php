@@ -160,7 +160,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Spotify events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Spotify track, episode or playlist embedded on your site. Each event also populates Google Tag Manager\'s built-in Video variables. Note: the Spotify embed only reports periodic playback updates, so play, pause and finished states are derived from those updates.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Spotify track, episode or playlist embedded on your site. Each event also populates Google Tag Manager\'s built-in Video variables. Note: the Spotify embed only reports periodic playback updates, so play, pause and finished states are derived from those updates, and it reports no title at all - the title is read from the embed on the page, and only when the embed carries none is it looked up once from Spotify\'s public oEmbed endpoint.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
 			),
