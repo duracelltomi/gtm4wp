@@ -81,7 +81,7 @@ module.exports = {
 				YT: 'readonly',
 				SC: 'readonly',
 				Vimeo: 'readonly',
-				DM: 'readonly',
+				dailymotion: 'readonly',
 				Mixcloud: 'readonly',
 				Stream: 'readonly',
 				jwplayer: 'readonly',

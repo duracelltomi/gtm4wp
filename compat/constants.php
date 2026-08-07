@@ -110,6 +110,7 @@ define( 'GTM4WP_OPTION_EVENTS_VIMEO', 'event-vimeo' );
 define( 'GTM4WP_OPTION_EVENTS_SOUNDCLOUD', 'event-soundcloud' );
 define( 'GTM4WP_OPTION_EVENTS_HTML5MEDIA', 'event-html5-media' );
 define( 'GTM4WP_OPTION_EVENTS_DAILYMOTION', 'event-dailymotion' );
+define( 'GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID', 'event-dailymotion-playerid' );
 define( 'GTM4WP_OPTION_EVENTS_MIXCLOUD', 'event-mixcloud' );
 define( 'GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM', 'event-cloudflare-stream' );
 define( 'GTM4WP_OPTION_EVENTS_WISTIA', 'event-wistia' );

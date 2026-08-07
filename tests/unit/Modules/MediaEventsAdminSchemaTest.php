@@ -69,25 +69,28 @@ final class MediaEventsAdminSchemaTest extends TestCase {
 	public function test_media_field_phases_are_pinned(): void {
 		$expected = array(
 			// Google ships a native YouTube Video trigger; migrate to that.
-			GTM4WP_OPTION_EVENTS_YOUTUBE          => Field::PHASE_DEPRECATED,
+			GTM4WP_OPTION_EVENTS_YOUTUBE              => Field::PHASE_DEPRECATED,
 
 			// The two players carried over from 1.x, proven in the field.
-			GTM4WP_OPTION_EVENTS_VIMEO            => Field::PHASE_STABLE,
-			GTM4WP_OPTION_EVENTS_SOUNDCLOUD       => Field::PHASE_STABLE,
+			GTM4WP_OPTION_EVENTS_VIMEO                => Field::PHASE_STABLE,
+			GTM4WP_OPTION_EVENTS_SOUNDCLOUD           => Field::PHASE_STABLE,
 
 			// New in 2.0, no real-world usage yet. HTML5 belongs here too: 1.x
 			// shipped no native media tracker at all (only the YouTube, Vimeo
 			// and SoundCloud ones), so this is a new player, not a promotion.
-			GTM4WP_OPTION_EVENTS_HTML5MEDIA       => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_DAILYMOTION      => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_MIXCLOUD         => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_WISTIA           => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_JWPLAYER         => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_VIDEOPRESS       => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_SPOTIFY          => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_TWITCH           => Field::PHASE_EXPERIMENTAL,
-			GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC    => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_HTML5MEDIA           => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_DAILYMOTION          => Field::PHASE_EXPERIMENTAL,
+			// Not a player of its own: it configures the Dailymotion one, so it
+			// shares its phase and sits directly beneath it.
+			GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_MIXCLOUD             => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM     => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_WISTIA               => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_JWPLAYER             => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_VIDEOPRESS           => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_SPOTIFY              => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_TWITCH               => Field::PHASE_EXPERIMENTAL,
+			GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC        => Field::PHASE_EXPERIMENTAL,
 		);
 
 		$this->assertSame(
@@ -136,5 +139,26 @@ final class MediaEventsAdminSchemaTest extends TestCase {
 			'An experimental option must stay off by default - it is the half of the contract the phase map does not cover.'
 		);
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
+	}
+
+	/**
+	 * The Dailymotion player ID is optional by design: the ID-less player library
+	 * works without a Dailymotion Studio account, so an empty value has to keep
+	 * meaning "use Dailymotion's default player" rather than "feature off".
+	 */
+	public function test_dailymotion_player_id_is_an_optional_text_field_gated_on_the_player(): void {
+		$field = $this->field( GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID );
+
+		$this->assertSame( Field::TYPE_TEXT, $field->type );
+		$this->assertSame(
+			'',
+			$field->default_value,
+			'Empty means "Dailymotion\'s default player" - the option must never ship a guessed id.'
+		);
+		$this->assertSame( GTM4WP_OPTION_EVENTS_DAILYMOTION, $field->depends_on );
+		$this->assertNull(
+			$field->sanitizer,
+			'A custom sanitizer REPLACES the type-defensive default, and the player ID grammar is Dailymotion\'s to change - the value is url-encoded where it enters the URL, never format-checked here.'
+		);
 	}
 }

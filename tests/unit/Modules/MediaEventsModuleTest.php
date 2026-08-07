@@ -51,6 +51,10 @@ final class MediaEventsModuleTest extends TestCase {
 	/**
 	 * The provider SDK handles PHP used to enqueue on every front-end page.
 	 *
+	 * The Dailymotion entry now also stands for geo.dailymotion.com: PHP builds
+	 * that library's URL (it carries the configured player ID) but publishes it as
+	 * data for the tracker to fetch — it must never become an enqueue again.
+	 *
 	 * @var string[]
 	 */
 	private const VENDOR_SDK_HANDLES = array(
@@ -114,6 +118,16 @@ final class MediaEventsModuleTest extends TestCase {
 			function ( $handle, $code, $position = 'after' ) {
 				$this->inline_scripts[] = array( $handle, $code, $position );
 				return true;
+			}
+		);
+		// Stubbed HERE rather than relied on from whichever test file ran first:
+		// Brain Monkey defines a mocked function process-wide and permanently, so a
+		// borrowed stub makes these cases pass for a reason that vanishes on a
+		// reorder (TS-16). The real flags are passed straight through, because the
+		// hex escaping is the subject of two cases below.
+		Functions\when( 'wp_json_encode' )->alias(
+			static function ( $data, $options = 0, $depth = 512 ) {
+				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			}
 		);
 		// Pass-through by default, because most cases here are about which bundle
@@ -318,6 +332,146 @@ final class MediaEventsModuleTest extends TestCase {
 
 		$this->assertContains( 'gtm4wp-vimeo', $this->enqueued );
 		$this->assertCount( 0, $this->flag_inline_scripts() );
+	}
+
+	/**
+	 * Filters the captured inline scripts down to the ones publishing the
+	 * Dailymotion player library URL.
+	 *
+	 * @return array<int, array{0:string,1:string,2:string}>
+	 */
+	private function dailymotion_config_scripts(): array {
+		return array_values(
+			array_filter(
+				$this->inline_scripts,
+				static fn ( $script ) => false !== strpos( $script[1], 'gtm4wp_dailymotion_config' )
+			)
+		);
+	}
+
+	/**
+	 * Returns the `sdk` URL published for Dailymotion, decoded from the emitted
+	 * JSON rather than string-matched, so the assertion is about the value that
+	 * reaches JavaScript and not about how it happens to be spelled.
+	 */
+	private function dailymotion_sdk_url( string $code ): string {
+		$json = trim( substr( $code, (int) strpos( $code, '=' ) + 1 ) );
+		$json = rtrim( $json, ';' );
+
+		$decoded = json_decode( $json, true );
+		$this->assertIsArray( $decoded, 'The published config is not decodable JSON: ' . $code );
+
+		return (string) ( $decoded['sdk'] ?? '' );
+	}
+
+	/**
+	 * Dailymotion sunset the attach-to-an-existing-iframe SDK, so the tracker now
+	 * builds the player itself from the Player Embeds library. With no player ID
+	 * configured that library is the ID-less one, which is what keeps the feature
+	 * usable without a Dailymotion Studio account.
+	 */
+	public function test_dailymotion_publishes_the_idless_player_library_by_default(): void {
+		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_DAILYMOTION => true ) );
+		$module->enqueue_scripts();
+
+		$config_scripts = $this->dailymotion_config_scripts();
+		$this->assertCount( 1, $config_scripts );
+
+		[ $handle, $code, $position ] = $config_scripts[0];
+		$this->assertSame( 'gtm4wp-dailymotion', $handle );
+		// Before the bundle, so the URL exists when the tracker reads it.
+		$this->assertSame( 'before', $position );
+		$this->assertSame( 'https://geo.dailymotion.com/libs/player.js', $this->dailymotion_sdk_url( $code ) );
+	}
+
+	public function test_dailymotion_publishes_the_configured_player_library(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_DAILYMOTION          => true,
+				GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => '  xabcd  ',
+			)
+		);
+		$module->enqueue_scripts();
+
+		$config_scripts = $this->dailymotion_config_scripts();
+		$this->assertCount( 1, $config_scripts );
+
+		// Trimmed: a pasted ID routinely carries surrounding whitespace, and an
+		// untrimmed one would be percent-encoded into a 404 rather than ignored.
+		$this->assertSame(
+			'https://geo.dailymotion.com/libs/player/xabcd.js',
+			$this->dailymotion_sdk_url( $config_scripts[0][1] )
+		);
+	}
+
+	/**
+	 * The stored ID is spliced into a URL PATH, so it is url-encoded at the point
+	 * of injection. Both directions (TS-2): the traversal must be gone AND the URL
+	 * must still be the library URL it was supposed to be — asserting only the
+	 * first would pass for an implementation that dropped the value entirely.
+	 */
+	public function test_dailymotion_player_id_cannot_escape_its_path_segment(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_DAILYMOTION          => true,
+				GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => '../../evil?x=1#f',
+			)
+		);
+		$module->enqueue_scripts();
+
+		$sdk = $this->dailymotion_sdk_url( $this->dailymotion_config_scripts()[0][1] );
+
+		$this->assertStringStartsWith( 'https://geo.dailymotion.com/libs/player/', $sdk );
+		$this->assertStringEndsWith( '.js', $sdk );
+
+		// Everything that could change which URL this is, or which host it names.
+		$segment = substr( $sdk, strlen( 'https://geo.dailymotion.com/libs/player/' ) );
+		$this->assertStringNotContainsString( '/', $segment );
+		$this->assertStringNotContainsString( '?', $segment );
+		$this->assertStringNotContainsString( '#', $segment );
+	}
+
+	/**
+	 * The URL is printed into an inline <script> body, so the hex flags are what
+	 * stand between a stored ID and a closed script tag. Both directions again:
+	 * the raw break-out must be absent AND the escaped form present, because an
+	 * implementation that silently dropped the value would satisfy the first.
+	 */
+	public function test_dailymotion_player_id_cannot_break_out_of_the_script_block(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_DAILYMOTION          => true,
+				GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => '</script><script>alert(1)</script>',
+			)
+		);
+		$module->enqueue_scripts();
+
+		$code = $this->dailymotion_config_scripts()[0][1];
+
+		$this->assertStringNotContainsString( '</script>', $code );
+		$this->assertStringNotContainsString( '<script>', $code );
+		// rawurlencode() already turned '<' into %3C; the hex flags are the second
+		// layer, asserted on a character they alone can be responsible for.
+		$this->assertStringContainsString( '%3C', $code );
+	}
+
+	/**
+	 * The player ID field depends_on the Dailymotion checkbox, and Field's doc
+	 * block is explicit that the admin UI only disables the control — the module
+	 * owns ignoring the value. A stored ID from a since-disabled provider must not
+	 * put anything on the page.
+	 */
+	public function test_dailymotion_player_id_is_ignored_when_the_provider_is_off(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_DAILYMOTION          => false,
+				GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => 'xabcd',
+			)
+		);
+		$module->enqueue_scripts();
+
+		$this->assertNotContains( 'gtm4wp-dailymotion', $this->enqueued );
+		$this->assertCount( 0, $this->dailymotion_config_scripts() );
 	}
 
 	public function test_enable_youtube_js_api_adds_jsapi_params_to_a_youtube_embed(): void {

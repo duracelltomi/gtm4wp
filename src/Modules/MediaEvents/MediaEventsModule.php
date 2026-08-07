@@ -51,19 +51,20 @@ final class MediaEventsModule extends AbstractModule {
 	 */
 	public function defaults(): array {
 		return array(
-			GTM4WP_OPTION_EVENTS_YOUTUBE          => false,
-			GTM4WP_OPTION_EVENTS_VIMEO            => false,
-			GTM4WP_OPTION_EVENTS_SOUNDCLOUD       => false,
-			GTM4WP_OPTION_EVENTS_HTML5MEDIA       => false,
-			GTM4WP_OPTION_EVENTS_DAILYMOTION      => false,
-			GTM4WP_OPTION_EVENTS_MIXCLOUD         => false,
-			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM => false,
-			GTM4WP_OPTION_EVENTS_WISTIA           => false,
-			GTM4WP_OPTION_EVENTS_JWPLAYER         => false,
-			GTM4WP_OPTION_EVENTS_VIDEOPRESS       => false,
-			GTM4WP_OPTION_EVENTS_SPOTIFY          => false,
-			GTM4WP_OPTION_EVENTS_TWITCH           => false,
-			GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC    => false,
+			GTM4WP_OPTION_EVENTS_YOUTUBE              => false,
+			GTM4WP_OPTION_EVENTS_VIMEO                => false,
+			GTM4WP_OPTION_EVENTS_SOUNDCLOUD           => false,
+			GTM4WP_OPTION_EVENTS_HTML5MEDIA           => false,
+			GTM4WP_OPTION_EVENTS_DAILYMOTION          => false,
+			GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => '',
+			GTM4WP_OPTION_EVENTS_MIXCLOUD             => false,
+			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM     => false,
+			GTM4WP_OPTION_EVENTS_WISTIA               => false,
+			GTM4WP_OPTION_EVENTS_JWPLAYER             => false,
+			GTM4WP_OPTION_EVENTS_VIDEOPRESS           => false,
+			GTM4WP_OPTION_EVENTS_SPOTIFY              => false,
+			GTM4WP_OPTION_EVENTS_TWITCH               => false,
+			GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC        => false,
 		);
 	}
 
@@ -229,6 +230,37 @@ final class MediaEventsModule extends AbstractModule {
 			$in_footer = (bool) apply_filters( 'gtm4wp_dailymotion', true );
 
 			$this->enqueue_media_tracker( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', array(), $in_footer );
+
+			// Dailymotion is the one media tracker whose library URL is not a
+			// fixed literal in the JS: a site can name the player configuration
+			// its embeds use, and each player has its own generated library. So
+			// the URL is built here and handed to the tracker, which passes it
+			// straight to gtm4wpObserveMedia(). The Player ID itself never
+			// reaches JavaScript and no URL is ever assembled client side.
+			//
+			// rawurlencode() AT the point of injection (RI-17), not a format
+			// regex. The scheme and host are literals, so the configured value
+			// can only ever land in ONE path segment, and rawurlencode() cannot
+			// emit '/', ':', '?' or '#' - which makes a stored "../../evil" a 404
+			// on geo.dailymotion.com rather than a different URL. A validating
+			// regex is the wrong tool here: it would encode Dailymotion's CURRENT
+			// Player ID grammar as a gate and reject their next one, with the
+			// failure presenting as user error rather than a plugin bug (.upstream
+			// UC-5). The encoder is the identity function for every id Dailymotion
+			// actually issues, so it costs nothing on the legitimate path.
+			$player_id = trim( (string) $this->opt( GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID ) );
+
+			$config = array(
+				'sdk' => ( '' === $player_id )
+					? 'https://geo.dailymotion.com/libs/player.js'
+					: 'https://geo.dailymotion.com/libs/player/' . rawurlencode( $player_id ) . '.js',
+			);
+
+			wp_add_inline_script(
+				'gtm4wp-dailymotion',
+				'var gtm4wp_dailymotion_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+				'before'
+			);
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_MIXCLOUD ) ) {

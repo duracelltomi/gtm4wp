@@ -96,9 +96,19 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Dailymotion video events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Dailymotion video embedded on your site. Each event also populates Google Tag Manager\'s built-in Video variables.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a Dailymotion video embedded on your site. Each event also populates Google Tag Manager\'s built-in Video variables. Note: Dailymotion no longer lets any script listen to a video it did not create itself, so tracking works by rebuilding each embed with Dailymotion\'s current player. The video keeps the size WordPress gave it and plays as before, but the player your visitors see is the one Dailymotion builds - see the player ID setting below. If the player library cannot be loaded, the embed is left exactly as it was and simply goes untracked.', 'duracelltomi-google-tag-manager' ),
 				group: 'players',
 				phase: Field::PHASE_EXPERIMENTAL
+			),
+			new Field(
+				key: GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID,
+				type: Field::TYPE_TEXT,
+				default_value: '',
+				label: __( 'Dailymotion player ID', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Optional. The ID of the player configuration to load, found in the Players tab of your Dailymotion Studio account. Leave it empty to use Dailymotion\'s default player, which needs no account. Filling it in is also what removes Dailymotion\'s "initialized without a player id" console warning. If an embed code already names a player of its own, that one is used for that embed regardless of this setting.', 'duracelltomi-google-tag-manager' ),
+				group: 'players',
+				phase: Field::PHASE_EXPERIMENTAL,
+				depends_on: GTM4WP_OPTION_EVENTS_DAILYMOTION
 			),
 			new Field(
 				key: GTM4WP_OPTION_EVENTS_MIXCLOUD,
