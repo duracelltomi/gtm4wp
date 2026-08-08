@@ -8,6 +8,7 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaBareUrl,
 	gtm4wpMediaSrcUrl,
 	gtm4wpMediaVisible,
 	gtm4wpMediaMilestones,
@@ -67,6 +68,37 @@ describe( 'gtm4wpNativeVideoStatus', () => {
 		// GTM has no native status for it, so it must resolve to ''.
 		expect( gtm4wpNativeVideoStatus( 'bufferend' ) ).toBe( '' );
 		expect( gtm4wpNativeVideoStatus( undefined ) ).toBe( '' );
+	} );
+} );
+
+describe( 'gtm4wpMediaBareUrl', () => {
+	// The string-taking half, used by the HTML5 media tracker on a media
+	// element's currentSrc (a resolved absolute URL, and a property rather than
+	// an attribute, so gtm4wpMediaSrcUrl cannot reach it).
+	it( 'cuts the query off a media file URL', () => {
+		expect(
+			gtm4wpMediaBareUrl(
+				'https://example.com/wp-content/uploads/clip.mp4?ver=6.8.1'
+			)
+		).toBe( 'https://example.com/wp-content/uploads/clip.mp4' );
+	} );
+
+	it( 'cuts a signed CDN token off, so the identifier does not rotate per request', () => {
+		const url = gtm4wpMediaBareUrl(
+			'https://cdn.example.com/media/clip.mp4?token=abc123&expires=1799999999#t=5'
+		);
+
+		expect( url ).toBe( 'https://cdn.example.com/media/clip.mp4' );
+		expect( url ).not.toContain( 'token' );
+		expect( url.split( '/' ).pop() ).toBe( 'clip.mp4' );
+	} );
+
+	it( 'returns an empty string for a missing URL rather than the page URL', () => {
+		// currentSrc is '' until resource selection settles, and the tracker
+		// calls this on every push — including before that happens.
+		expect( gtm4wpMediaBareUrl( '' ) ).toBe( '' );
+		expect( gtm4wpMediaBareUrl( undefined ) ).toBe( '' );
+		expect( gtm4wpMediaBareUrl( null ) ).toBe( '' );
 	} );
 } );
 

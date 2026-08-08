@@ -2,6 +2,7 @@ import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
+	gtm4wpMediaBareUrl,
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
@@ -20,10 +21,18 @@ function gtm4wp_initHTML5MediaTracking() {
 		// from the live currentSrc on every push because a source can still be
 		// resolving when the element is first seen, and <source>-based players
 		// only settle currentSrc after resource selection.
+		//
+		// The query and the fragment are cut off BEFORE the last path segment is
+		// taken (U106), because an identifier has to be stable: a `?ver=` cache
+		// buster would make the same file a different video after every plugin
+		// update, and a signed CDN token would make it a different video on every
+		// single request - besides putting the token itself into the data layer.
+		// The reported `url` keeps them, since there they are part of the request
+		// that actually played.
 		const gtm4wp_getHTML5MediaFilename = function () {
-			return media_element.currentSrc
-				? media_element.currentSrc.split( '/' ).pop()
-				: '';
+			return gtm4wpMediaBareUrl( media_element.currentSrc )
+				.split( '/' )
+				.pop();
 		};
 
 		// Pushes gtm4wp.mediaPlayerReady once the element's metadata (and thus

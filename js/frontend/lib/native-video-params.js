@@ -53,11 +53,11 @@ export function gtm4wpNativeVideoStatus( state ) {
 }
 
 /**
- * Reads an embed's `src` as the bare media URL: absolute, with the query string
- * AND the fragment removed.
+ * Reduces a media URL to its bare form: absolute, with the query string AND the
+ * fragment removed.
  *
- * Every iframe-based tracker needs this before it can pull an id out of the path,
- * and the fragment half is not an edge case. WordPress core's
+ * Every tracker that reads an identifier out of a URL needs this first, and the
+ * fragment half is not an edge case. WordPress core's
  * `wp_filter_oembed_result()` appends `#?secret=<10 chars>` to the iframe src of
  * every oEmbed result whose provider is not in core's own trusted list (it also
  * adds `sandbox="allow-scripts"` and drops `allow`/`allowfullscreen`) — so for
@@ -67,16 +67,17 @@ export function gtm4wpNativeVideoStatus( state ) {
  * the id `iframe#`. Registered as upstream claim U106.
  *
  * `origin + pathname` drops both in one step and resolves a relative or
- * protocol-relative src on the way.
+ * protocol-relative URL on the way.
  *
- * @param {HTMLElement} element The embed element carrying the `src`.
- * @return {string} The media URL without query or fragment, or '' when there is
- *                  no `src` to read.
+ * @param {string} url The media URL, e.g. an iframe `src` or a media element's
+ *                     `currentSrc`.
+ * @return {string} The URL without query or fragment, or '' when there is
+ *                  nothing to read.
  */
-export function gtm4wpMediaSrcUrl( element ) {
-	const src = ( element && element.getAttribute( 'src' ) ) || '';
+export function gtm4wpMediaBareUrl( url ) {
+	const src = url || '';
 
-	// An empty src has to short-circuit: new URL( '', href ) resolves to the
+	// An empty URL has to short-circuit: new URL( '', href ) resolves to the
 	// PAGE, so an embed with nothing to play would otherwise report the article
 	// it sits on as the media URL.
 	if ( '' === src ) {
@@ -88,11 +89,25 @@ export function gtm4wpMediaSrcUrl( element ) {
 
 		return parsed.origin + parsed.pathname;
 	} catch ( e ) {
-		// A src no URL parser accepts still must not throw inside a tracker's
+		// A URL no parser accepts still must not throw inside a tracker's
 		// wiring: fall back to cutting the two delimiters off by hand, '#' first
 		// so a '?' living inside the fragment cannot be mistaken for a query.
 		return src.split( '#' ).shift().split( '?' ).shift();
 	}
+}
+
+/**
+ * The same bare URL, read straight off an embed's `src` attribute — what every
+ * iframe tracker wants before it pulls an id out of the path.
+ *
+ * @see gtm4wpMediaBareUrl
+ *
+ * @param {HTMLElement} element The embed element carrying the `src`.
+ * @return {string} The media URL without query or fragment, or '' when the
+ *                  element has no `src`.
+ */
+export function gtm4wpMediaSrcUrl( element ) {
+	return gtm4wpMediaBareUrl( element && element.getAttribute( 'src' ) );
 }
 
 /**

@@ -76,6 +76,50 @@ describe( 'gtm4wp-html5media', () => {
 		} );
 	}
 
+	it( 'identifies the file by its bare name, keeping the query and fragment out of the id and title', () => {
+		// A `?ver=` cache buster, a signed CDN token or a media handler's query
+		// used to land in the id and the title verbatim (U106): an identifier
+		// that changes with every plugin update, or with every request when the
+		// token rotates, and the token itself pushed into the data layer. The
+		// reported url still carries them, because that is the request that
+		// actually played.
+		createMedia( 'video', {
+			readyState: 1,
+			duration: 120,
+			currentSrc:
+				'https://cdn.example.com/media/clip.mp4?token=abc123&expires=1799999999#t=5',
+		} );
+
+		loadTracker();
+
+		expect( window.dataLayer[ 0 ].mediaData ).toEqual( {
+			id: 'clip.mp4',
+			author: '',
+			title: 'clip.mp4',
+			url: 'https://cdn.example.com/media/clip.mp4?token=abc123&expires=1799999999#t=5',
+			duration: 120,
+		} );
+		expect( window.dataLayer[ 0 ][ 'gtm.videoTitle' ] ).toBe( 'clip.mp4' );
+	} );
+
+	it( 'reports an empty id and title while the source is still unresolved', () => {
+		// currentSrc is '' until resource selection settles, and the tracker asks
+		// for the filename on every push. It must not fall back to the page URL.
+		createMedia( 'video', {
+			readyState: 1,
+			duration: 120,
+			currentSrc: '',
+		} );
+
+		loadTracker();
+
+		expect( window.dataLayer[ 0 ].mediaData ).toMatchObject( {
+			id: '',
+			title: '',
+			url: '',
+		} );
+	} );
+
 	it( 'pushes mediaPlayerReady with the real duration once metadata is available', () => {
 		createMedia( 'video', { readyState: 1, duration: 120 } );
 
