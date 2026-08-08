@@ -124,6 +124,24 @@ describe( 'gtm4wp-vimeo', () => {
 		} );
 	} );
 
+	it( 'strips a fragment from the embed src, so the video id is not "987654321#t=30s"', async () => {
+		// The id is the last path segment, so anything dangling on it becomes part
+		// of the id and of every reported URL. The fragment here carries no query,
+		// which is the shape cutting the src at the '?' never handled — a
+		// hand-written `#t=`, or the `#?secret=` WordPress appends for a provider
+		// outside its trusted list (U106).
+		document.body.innerHTML =
+			'<iframe src="https://player.vimeo.com/video/987654321#t=30s"></iframe>';
+
+		await loadTracker();
+
+		expect( window.dataLayer[ 0 ].mediaData ).toMatchObject( {
+			id: '987654321',
+			url: 'https://player.vimeo.com/video/987654321',
+		} );
+		expect( JSON.stringify( window.dataLayer[ 0 ] ) ).not.toContain( '#' );
+	} );
+
 	it( 'tracks the "playing" event (not "play") as a start state with native params', async () => {
 		const player = await loadTracker();
 

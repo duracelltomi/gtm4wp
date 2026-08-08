@@ -2,6 +2,7 @@ import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
+	gtm4wpMediaSrcUrl,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
 
@@ -14,34 +15,49 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 		let playerID = youtube_frame.getAttribute( 'id' );
 
 		if ( playerID === null || playerID === undefined || playerID === '' ) {
-			const _gtm4wp_temp = youtube_frame
-				.getAttribute( 'src' )
-				.split( '?' );
-			const _gtm4wp_temp2 = _gtm4wp_temp[ 0 ].split( '/' );
+			const _gtm4wp_temp2 =
+				gtm4wpMediaSrcUrl( youtube_frame ).split( '/' );
 
 			playerID =
 				'youtubeplayer_' + _gtm4wp_temp2[ _gtm4wp_temp2.length - 1 ];
 			youtube_frame.setAttribute( 'id', playerID );
 		}
 
-		let gtm4wp_yturl = youtube_frame.getAttribute( 'src' );
-		if ( gtm4wp_yturl.indexOf( 'enablejsapi=1' ) == -1 ) {
+		const gtm4wp_ytsrc = youtube_frame.getAttribute( 'src' );
+
+		// The fragment is held aside for both halves of what follows: a '?' INSIDE
+		// a fragment is not a query, and anything appended AFTER a '#' is part of
+		// the fragment, so YouTube would never see the parameters and the JS API
+		// would stay switched off - which fires no error and fails no test (U106).
+		const gtm4wp_ythashpos = gtm4wp_ytsrc.indexOf( '#' );
+		const gtm4wp_ytbase =
+			-1 === gtm4wp_ythashpos
+				? gtm4wp_ytsrc
+				: gtm4wp_ytsrc.slice( 0, gtm4wp_ythashpos );
+		const gtm4wp_ythash =
+			-1 === gtm4wp_ythashpos
+				? ''
+				: gtm4wp_ytsrc.slice( gtm4wp_ythashpos );
+
+		if ( gtm4wp_ytbase.indexOf( 'enablejsapi=1' ) == -1 ) {
 			// Use the correct query separator: '?' when the src carries no
 			// query yet, '&' otherwise. (The previous code always appended
 			// '?' and then '&enablejsapi=1', producing a stray '?&'.) The
 			// origin is a scheme://host built from location, which the
 			// YouTube API expects raw and un-encoded - matching the
 			// server-side enable_youtube_js_api() oEmbed filter.
-			const gtm4wp_ytsep = gtm4wp_yturl.indexOf( '?' ) == -1 ? '?' : '&';
+			const gtm4wp_ytsep = gtm4wp_ytbase.indexOf( '?' ) == -1 ? '?' : '&';
 
-			gtm4wp_yturl +=
-				gtm4wp_ytsep +
-				'enablejsapi=1&origin=' +
-				document.location.protocol +
-				'//' +
-				document.location.hostname;
-
-			youtube_frame.setAttribute( 'src', gtm4wp_yturl );
+			youtube_frame.setAttribute(
+				'src',
+				gtm4wp_ytbase +
+					gtm4wp_ytsep +
+					'enablejsapi=1&origin=' +
+					document.location.protocol +
+					'//' +
+					document.location.hostname +
+					gtm4wp_ythash
+			);
 		}
 
 		new YT.Player( playerID, {

@@ -2,6 +2,7 @@ import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
+	gtm4wpMediaSrcUrl,
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
@@ -19,7 +20,11 @@ function gtm4wp_initVimeoTracking() {
 	// left for the SDK's load event or a later insertion to pick up.
 	const gtm4wp_wireVimeoFrame = function ( vimeo_frame ) {
 		const vimeoapi = new Vimeo.Player( vimeo_frame );
-		const videourl = vimeo_frame.getAttribute( 'src' ).split( '?' ).shift();
+		// Read through gtm4wpMediaSrcUrl() so the id is the last path segment and
+		// not the last path segment plus whatever fragment the embed carries: a
+		// `#t=30` or WordPress' own `#?secret=` (U106) would otherwise become part
+		// of the video id and of every reported URL.
+		const videourl = gtm4wpMediaSrcUrl( vimeo_frame );
 		const videoid = videourl.split( '/' ).pop();
 
 		vimeo_frame.setAttribute( 'data-player_id', videoid );

@@ -2,6 +2,7 @@ import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
 	gtm4wpMediaMilestones,
+	gtm4wpMediaSrcUrl,
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
 } from './lib/native-video-params';
@@ -18,13 +19,13 @@ function gtm4wp_initCloudflareStreamTracking() {
 	// manager, ad blocker, network error), so it is re-checked per element: a
 	// frame is only wired once the SDK is available.
 	const gtm4wp_wireStreamFrame = function ( stream_frame ) {
-		const videourl = stream_frame
-			.getAttribute( 'src' )
-			.split( '?' )
-			.shift();
+		const videourl = gtm4wpMediaSrcUrl( stream_frame );
 
 		// The video UID is the last path segment, or the one before it when the
-		// embed URL ends in /iframe (…/{uid}/iframe).
+		// embed URL ends in /iframe (…/{uid}/iframe). That is why the src is read
+		// through gtm4wpMediaSrcUrl(): WordPress renders a Stream embed as
+		// …/{uid}/iframe#?secret=… (U106), and a '#' left on the last segment makes
+		// it miss the /iframe test, so every event reports 'iframe#' as the video.
 		const parts = videourl.split( '/' ).filter( Boolean );
 		let videoid = parts[ parts.length - 1 ];
 		if ( videoid === 'iframe' && parts.length >= 2 ) {
@@ -33,7 +34,18 @@ function gtm4wp_initCloudflareStreamTracking() {
 
 		// The Stream player mirrors the HTML5 media API: events carry no payload,
 		// so the current time and duration are read from the player object.
-		// Title/author are not exposed, so the UID is reused as the title.
+		//
+		// The Player SDK exposes no title and no author, so the UID stands in as
+		// the title - unless the embed carries a title attribute, which is the one
+		// real title available client-side. WordPress fills that attribute from the
+		// oEmbed response (`wp_filter_oembed_iframe_title_attribute()`) and its
+		// oEmbed sanitizer keeps it, so on a site whose provider returns a title
+		// the embed has one; Cloudflare's own copy-paste snippet does not.
+		const frametitle = (
+			stream_frame.getAttribute( 'title' ) || ''
+		).trim();
+		const videotitle = frametitle || videoid;
+
 		const player = Stream( stream_frame );
 
 		const gtm4wp_streamCurrentTime = function () {
@@ -48,7 +60,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 			return {
 				id: videoid,
 				author: '',
-				title: videoid,
+				title: videotitle,
 				url: videourl,
 				duration: gtm4wp_streamDuration(),
 			};
@@ -65,7 +77,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 					provider: 'cloudflarestream',
 					status: gtm4wpNativeVideoStatus( playerState ),
 					url: videourl,
-					title: videoid,
+					title: videotitle,
 					currentTime: gtm4wp_streamCurrentTime(),
 					duration: gtm4wp_streamDuration(),
 					element: stream_frame,
@@ -86,7 +98,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 					// These events are not playback states GTM models.
 					status: '',
 					url: videourl,
-					title: videoid,
+					title: videotitle,
 					currentTime: gtm4wp_streamCurrentTime(),
 					duration: gtm4wp_streamDuration(),
 					element: stream_frame,
@@ -121,7 +133,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 							provider: 'cloudflarestream',
 							status: 'progress',
 							url: videourl,
-							title: videoid,
+							title: videotitle,
 							currentTime: videoCurrentTime,
 							duration: videoDuration,
 							percent: i,
@@ -143,7 +155,7 @@ function gtm4wp_initCloudflareStreamTracking() {
 					// "Ready" has no native GTM video status.
 					status: '',
 					url: videourl,
-					title: videoid,
+					title: videotitle,
 					currentTime: gtm4wp_streamCurrentTime(),
 					duration: gtm4wp_streamDuration(),
 					element: stream_frame,

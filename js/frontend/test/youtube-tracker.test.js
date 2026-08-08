@@ -131,6 +131,33 @@ describe( 'gtm4wp-youtube', () => {
 		expect( src ).not.toContain( '?&' );
 	} );
 
+	it( 'appends enablejsapi BEFORE a fragment, and keeps the fragment out of the derived player id', () => {
+		// An embed whose src carries a fragment — a hand-written `#t=`, or the
+		// `#?secret=` WordPress appends for a provider outside its trusted list
+		// (U106). Both halves of this used to read the src as a flat string: the
+		// separator check saw the '?' inside the fragment and appended the
+		// parameters after the '#', where YouTube never sees them, so the JS API
+		// stayed off with no error and no failing test to show it (U106).
+		document.body.innerHTML =
+			'<iframe src="https://www.youtube.com/embed/abc123#t=30"></iframe>';
+
+		loadTracker();
+		window.onYouTubeIframeAPIReady();
+
+		const frame = document.querySelector( 'iframe' );
+		const src = frame.getAttribute( 'src' );
+
+		expect( src ).toContain( 'embed/abc123?enablejsapi=1' );
+		expect( src ).toMatch( /#t=30$/ );
+		expect( src.indexOf( 'enablejsapi=1' ) ).toBeLessThan(
+			src.indexOf( '#' )
+		);
+		expect( src ).not.toContain( '#t=30&' );
+		// The player id is the src's last path segment: a '#' left on it travels
+		// into the element id the YT.Player constructor is handed.
+		expect( frame.getAttribute( 'id' ) ).toBe( 'youtubeplayer_abc123' );
+	} );
+
 	it( 'pushes mediaPlayerReady with the video metadata on the onReady event', () => {
 		loadTracker();
 		window.onYouTubeIframeAPIReady();

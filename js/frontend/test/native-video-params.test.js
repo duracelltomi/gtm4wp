@@ -8,6 +8,7 @@
 import {
 	gtm4wpNativeVideoStatus,
 	gtm4wpNativeVideoParams,
+	gtm4wpMediaSrcUrl,
 	gtm4wpMediaVisible,
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
@@ -66,6 +67,132 @@ describe( 'gtm4wpNativeVideoStatus', () => {
 		// GTM has no native status for it, so it must resolve to ''.
 		expect( gtm4wpNativeVideoStatus( 'bufferend' ) ).toBe( '' );
 		expect( gtm4wpNativeVideoStatus( undefined ) ).toBe( '' );
+	} );
+} );
+
+describe( 'gtm4wpMediaSrcUrl', () => {
+	/**
+	 * An iframe carrying the given src attribute (omitted entirely when null).
+	 *
+	 * @param {string|null} src The src attribute value, or null for no attribute.
+	 * @return {HTMLElement} The iframe, not inserted into the document.
+	 */
+	const frameWithSrc = ( src ) => {
+		const frame = document.createElement( 'iframe' );
+
+		if ( null !== src ) {
+			frame.setAttribute( 'src', src );
+		}
+
+		return frame;
+	};
+
+	it( 'leaves a src that carries neither a query nor a fragment untouched', () => {
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc(
+					'https://customer-abc123.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/iframe'
+				)
+			)
+		).toBe(
+			'https://customer-abc123.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/iframe'
+		);
+	} );
+
+	it( 'strips a query string', () => {
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc(
+					'https://player.vimeo.com/video/76979871?h=8272103f6e&autoplay=1'
+				)
+			)
+		).toBe( 'https://player.vimeo.com/video/76979871' );
+	} );
+
+	it( 'strips a fragment', () => {
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc( 'https://www.youtube.com/embed/dQw4w9WgXcQ#t=30' )
+			)
+		).toBe( 'https://www.youtube.com/embed/dQw4w9WgXcQ' );
+	} );
+
+	it( "strips WordPress' own #?secret= fragment, which is a '?' living inside a fragment", () => {
+		// WordPress core's wp_filter_oembed_result() renders this for every
+		// oEmbed provider that is not in its trusted list (U106). Cutting at the
+		// '?' alone left the '#' on the last path segment, which is what made a
+		// Cloudflare Stream embed report the video id "iframe#".
+		const url = gtm4wpMediaSrcUrl(
+			frameWithSrc(
+				'https://customer-f33zs165nr7gyfy4.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/iframe#?secret=ty1V7TXUb1'
+			)
+		);
+
+		expect( url ).toBe(
+			'https://customer-f33zs165nr7gyfy4.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/iframe'
+		);
+		expect( url ).not.toContain( '#' );
+		expect( url ).not.toContain( 'secret' );
+		expect( url.split( '/' ).pop() ).toBe( 'iframe' );
+	} );
+
+	it( 'strips a query and a fragment together, in either order', () => {
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc( 'https://example.com/embed/abc?autoplay=1#t=30' )
+			)
+		).toBe( 'https://example.com/embed/abc' );
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc( 'https://example.com/embed/abc#t=30?autoplay=1' )
+			)
+		).toBe( 'https://example.com/embed/abc' );
+	} );
+
+	it( 'resolves a protocol-relative src against the page protocol', () => {
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc(
+					'//customer-abc123.cloudflarestream.com/uid/iframe'
+				)
+			)
+		).toBe(
+			window.location.protocol +
+				'//customer-abc123.cloudflarestream.com/uid/iframe'
+		);
+	} );
+
+	it( 'resolves a root-relative src against the page', () => {
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc( '/wp-content/uploads/clip.mp4?ver=2' )
+			)
+		).toBe(
+			window.location.protocol +
+				'//' +
+				window.location.host +
+				'/wp-content/uploads/clip.mp4'
+		);
+	} );
+
+	it( 'returns an empty string for an absent or empty src rather than the page URL', () => {
+		expect( gtm4wpMediaSrcUrl( frameWithSrc( null ) ) ).toBe( '' );
+		expect( gtm4wpMediaSrcUrl( frameWithSrc( '' ) ) ).toBe( '' );
+		expect( gtm4wpMediaSrcUrl( null ) ).toBe( '' );
+		expect( gtm4wpMediaSrcUrl( undefined ) ).toBe( '' );
+	} );
+
+	it( 'still strips both delimiters, without throwing, for a src no URL parser accepts', () => {
+		// Port out of range: new URL() throws, so this exercises the hand-rolled
+		// fallback — which must cut the '#' before the '?' for the same reason
+		// the parsed path does.
+		expect(
+			gtm4wpMediaSrcUrl(
+				frameWithSrc(
+					'https://example.com:999999/embed/abc?autoplay=1#?secret=x'
+				)
+			)
+		).toBe( 'https://example.com:999999/embed/abc' );
 	} );
 } );
 

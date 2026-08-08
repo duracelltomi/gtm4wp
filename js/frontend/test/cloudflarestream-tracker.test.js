@@ -192,6 +192,110 @@ describe( 'gtm4wp-cloudflarestream', () => {
 		} );
 	} );
 
+	describe( 'embed URL parsing', () => {
+		const UID = '6b9e68b07dfee8cc2d116e4c51d6a957';
+
+		/**
+		 * Replaces the fixture with a single Stream iframe.
+		 *
+		 * @param {string} attributes The iframe's attributes.
+		 */
+		const withEmbed = ( attributes ) => {
+			document.body.innerHTML = '<iframe ' + attributes + '></iframe>';
+		};
+
+		it( 'recovers the UID from the #?secret= fragment WordPress appends to the embed', () => {
+			// This is what a WordPress page actually renders: core's
+			// wp_filter_oembed_result() appends "#?secret=<10 chars>" to the
+			// iframe src of every oEmbed result whose provider is not in its
+			// trusted list, and Cloudflare Stream is not one (U106). Cutting the
+			// src at the '?' alone left the '#' on the last path segment, so the
+			// /iframe test missed and every event reported the video as "iframe#".
+			withEmbed(
+				'src="https://customer-f33zs165nr7gyfy4.cloudflarestream.com/' +
+					UID +
+					'/iframe#?secret=ty1V7TXUb1" data-secret="ty1V7TXUb1"'
+			);
+			loadTracker();
+
+			player.emit( 'loadedmetadata' );
+
+			const push = window.dataLayer[ 0 ];
+			expect( push.mediaData ).toEqual( {
+				id: UID,
+				author: '',
+				title: UID,
+				url:
+					'https://customer-f33zs165nr7gyfy4.cloudflarestream.com/' +
+					UID +
+					'/iframe',
+				duration: 120,
+			} );
+			expect( push[ 'gtm.videoTitle' ] ).toBe( UID );
+			expect( push[ 'gtm.videoUrl' ] ).toBe(
+				'https://customer-f33zs165nr7gyfy4.cloudflarestream.com/' +
+					UID +
+					'/iframe'
+			);
+			// The other direction: nothing anywhere in the push still carries the
+			// fragment, the secret, or the "iframe#" the parse used to produce.
+			const serialized = JSON.stringify( push );
+			expect( serialized ).not.toContain( 'iframe#' );
+			expect( serialized ).not.toContain( '#' );
+			expect( serialized ).not.toContain( 'secret' );
+		} );
+
+		it( 'parses the UID from the legacy videodelivery.net embed the selector also matches', () => {
+			withEmbed( 'src="https://iframe.videodelivery.net/' + UID + '"' );
+			loadTracker();
+
+			player.emit( 'loadedmetadata' );
+
+			expect( window.dataLayer[ 0 ].mediaData ).toMatchObject( {
+				id: UID,
+				title: UID,
+				url: 'https://iframe.videodelivery.net/' + UID,
+			} );
+		} );
+
+		it( 'reports the embed’s title attribute as the title, keeping the UID as the id', () => {
+			// The Player SDK exposes no title, so the accessible title attribute
+			// is the only real one available client-side. WordPress fills it in
+			// from the oEmbed response (wp_filter_oembed_iframe_title_attribute())
+			// and its oEmbed sanitizer keeps it.
+			withEmbed(
+				'title="Cloudflare Stream demo" src="https://customer-abc123.cloudflarestream.com/' +
+					UID +
+					'/iframe#?secret=ty1V7TXUb1"'
+			);
+			loadTracker();
+
+			player.emit( 'play' );
+
+			expect( lastPush().mediaData ).toMatchObject( {
+				id: UID,
+				title: 'Cloudflare Stream demo',
+			} );
+			expect( lastPush()[ 'gtm.videoTitle' ] ).toBe(
+				'Cloudflare Stream demo'
+			);
+		} );
+
+		it( 'falls back to the UID when the title attribute is empty or blank', () => {
+			withEmbed(
+				'title="   " src="https://customer-abc123.cloudflarestream.com/' +
+					UID +
+					'/iframe"'
+			);
+			loadTracker();
+
+			player.emit( 'play' );
+
+			expect( lastPush().mediaData.title ).toBe( UID );
+			expect( lastPush()[ 'gtm.videoTitle' ] ).toBe( UID );
+		} );
+	} );
+
 	it( 'does not throw or push anything when the Stream SDK failed to load', () => {
 		delete global.Stream;
 
