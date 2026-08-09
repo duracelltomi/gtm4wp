@@ -83,7 +83,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Also push GA4 recommended events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'In addition to the gtm4wp.contactForm7* events, push Google Analytics 4 recommended form events: form_start (on first field interaction), form_submit (on submit) and generate_lead (on a successful send). Each carries form_id, form_name and form_destination. Useful because GA4 Enhanced Measurement does not reliably capture Contact Form 7 AJAX submissions on its own.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'In addition to the gtm4wp.contactForm7* events, push Google Analytics 4 recommended form events: form_start (on first field interaction), form_submit (on submit) and generate_lead (on a successful send). Each carries form_id, form_name and form_destination. Like GA4 Enhanced Measurement, form_submit fires on every submission attempt, including one Contact Form 7 rejects, so form_submit and generate_lead also carry form_status with the Contact Form 7 status (mail_sent, validation_failed, spam and so on) to tell the two apart. Useful because GA4 Enhanced Measurement does not reliably capture Contact Form 7 AJAX submissions on its own.', 'duracelltomi-google-tag-manager' ),
 				group: 'cf7'
 			),
 		);
