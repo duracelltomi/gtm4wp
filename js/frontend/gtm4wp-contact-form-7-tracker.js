@@ -15,6 +15,9 @@
  * (mail_sent, validation_failed, spam and so on) so a container can tell an accepted
  * submission from a rejected one without reading the gtm4wp.contactForm7* pushes.
  *
+ * Both submission events come from the same Contact Form 7 event (wpcf7submit), which
+ * puts form_submit before the generate_lead it produced; see the constant below.
+ *
  * @see https://contactform7.com/dom-events/
  */
 
@@ -49,17 +52,27 @@ const gtm4wp_ctf7_event_pairs = {
 };
 
 /**
- * Contact Form 7 DOM event to GA4 recommended event map. Only the events that
- * have a meaningful GA4 counterpart are listed; form_start is handled separately
+ * The single Contact Form 7 DOM event both GA4 submission events are derived from.
+ *
+ * wpcf7submit is the last event Contact Form 7 fires and the only one it fires for
+ * every outcome, so deriving form_submit AND generate_lead from it keeps them in
+ * GA4's own order: the submission first, the lead it produced second. generate_lead
+ * is deliberately NOT taken from wpcf7mailsent, which Contact Form 7 fires BEFORE
+ * wpcf7submit and would therefore reverse the pair. form_start is handled separately
  * (on first field interaction).
  *
  * @constant
- * @type {Object}
+ * @type {string}
  */
-const gtm4wp_ctf7_ga4_event_pairs = {
-	wpcf7submit: 'form_submit',
-	wpcf7mailsent: 'generate_lead',
-};
+const gtm4wp_ctf7_ga4_submit_event = 'wpcf7submit';
+
+/**
+ * Contact Form 7 submission status that counts as a generated lead.
+ *
+ * @constant
+ * @type {string}
+ */
+const gtm4wp_ctf7_ga4_lead_status = 'mail_sent';
 
 /**
  * Normalizes the Contact Form 7 inputs array according to the configured
@@ -210,14 +223,23 @@ function gtm4wp_cf7_push_ga4( w, name, form, status ) {
 
 			if (
 				gtm4wp_cf7_config.ga4events &&
-				gtm4wp_ctf7_ga4_event_pairs[ event.type ]
+				gtm4wp_ctf7_ga4_submit_event === event.type
 			) {
 				gtm4wp_cf7_push_ga4(
 					w,
-					gtm4wp_ctf7_ga4_event_pairs[ event.type ],
+					'form_submit',
 					event.target,
 					cf7data.status
 				);
+
+				if ( gtm4wp_ctf7_ga4_lead_status === cf7data.status ) {
+					gtm4wp_cf7_push_ga4(
+						w,
+						'generate_lead',
+						event.target,
+						cf7data.status
+					);
+				}
 			}
 		} );
 	}

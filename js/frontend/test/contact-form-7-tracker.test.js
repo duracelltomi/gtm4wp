@@ -100,7 +100,7 @@ describe( 'gtm4wp-contact-form-7-tracker', () => {
 	it( 'pushes GA4 recommended events only when ga4events is enabled', () => {
 		window.gtm4wp_cf7_config.ga4events = true;
 
-		fireCf7( 'wpcf7mailsent', form(), {
+		fireCf7( 'wpcf7submit', form(), {
 			contactFormId: 42,
 			status: 'mail_sent',
 		} );
@@ -115,6 +115,52 @@ describe( 'gtm4wp-contact-form-7-tracker', () => {
 			form_destination: 'https://example.com/contact',
 			form_status: 'mail_sent',
 		} );
+	} );
+
+	it( 'pushes form_submit before the generate_lead it produced', () => {
+		// Both GA4 submission events are derived from wpcf7submit precisely so they
+		// land in GA4's order. Firing the full CF7 sequence a successful send
+		// produces: taking generate_lead from wpcf7mailsent instead - the event CF7
+		// fires first - would reverse the pair and this test would fail.
+		window.gtm4wp_cf7_config.ga4events = true;
+
+		fireCf7( 'wpcf7beforesubmit', form(), { contactFormId: 42 } );
+		fireCf7( 'wpcf7mailsent', form(), {
+			contactFormId: 42,
+			status: 'mail_sent',
+		} );
+		fireCf7( 'wpcf7submit', form(), {
+			contactFormId: 42,
+			status: 'mail_sent',
+		} );
+
+		const ga4 = window.dataLayer
+			.map( ( entry ) => entry.event )
+			.filter( ( name ) => ! name.startsWith( 'gtm4wp.' ) );
+		expect( ga4 ).toEqual( [ 'form_submit', 'generate_lead' ] );
+	} );
+
+	it( 'pushes no generate_lead when the mail could not be sent', () => {
+		window.gtm4wp_cf7_config.ga4events = true;
+
+		fireCf7( 'wpcf7mailfailed', form(), {
+			contactFormId: 42,
+			status: 'mail_failed',
+		} );
+		fireCf7( 'wpcf7submit', form(), {
+			contactFormId: 42,
+			status: 'mail_failed',
+		} );
+
+		expect(
+			window.dataLayer.filter(
+				( entry ) => entry.event === 'generate_lead'
+			)
+		).toHaveLength( 0 );
+		expect(
+			window.dataLayer.find( ( entry ) => entry.event === 'form_submit' )
+				.form_status
+		).toBe( 'mail_failed' );
 	} );
 
 	it( 'does not push GA4 events at all when ga4events is disabled', () => {
