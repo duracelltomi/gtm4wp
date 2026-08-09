@@ -14,6 +14,19 @@ function isChecked( value ) {
 	return value === true || value === '1' || value === 1;
 }
 
+// Repeats the column header inside the cell. It is hidden while the header row
+// is on screen and takes over from it in the stacked mobile layout, where a
+// six-column grid does not fit. Hidden from assistive tech either way: the
+// control it labels already names its column and row in its `aria-label`, and
+// the header row is what carries the column for a screen reader on desktop.
+function CellLabel( { column } ) {
+	return (
+		<span className="gtm4wp-table__cell-label" aria-hidden="true">
+			{ column.label }
+		</span>
+	);
+}
+
 function emptyRow( columns ) {
 	const row = {};
 
@@ -143,6 +156,7 @@ export default function TableControl( {
 
 										return (
 											<td key={ column.key }>
+												<CellLabel column={ column } />
 												<CheckboxControl
 													__nextHasNoMarginBottom
 													aria-label={ cellLabel }
@@ -171,6 +185,7 @@ export default function TableControl( {
 
 									return (
 										<td key={ column.key }>
+											<CellLabel column={ column } />
 											<TextControl
 												__next40pxDefaultSize
 												__nextHasNoMarginBottom
