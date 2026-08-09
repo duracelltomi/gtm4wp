@@ -4,7 +4,14 @@
  * Every size comes from the token block below — a single 13px anchored type
  * scale and a 4px spacing scale — so nothing is picked ad hoc. The accent
  * follows the visitor's WordPress admin colour scheme, with static fallbacks.
+ *
+ * Small screens are handled in one block at the bottom of this file rather than
+ * scattered per rule, so the phone layout can be read as a whole.
  */
+
+// wp-admin's own breakpoint: at or below this width the admin menu collapses,
+// the admin bar grows to 46px and every control gets touch sized.
+$gtm4wp-mobile: 782px;
 
 .gtm4wp-app {
 	// Typography — anchored to wp-admin's 13px base.
@@ -56,6 +63,10 @@
 		border-radius: var(--gtm4wp-radius);
 		box-shadow: var(--gtm4wp-shadow-sticky);
 		display: flex;
+		// The buttons cannot shrink below their labels, so once the title and
+		// the action group stop fitting side by side the group has to move to
+		// its own line — without this it would simply be cut off at the edge.
+		flex-wrap: wrap;
 		gap: var(--gtm4wp-s4);
 		justify-content: space-between;
 		padding: var(--gtm4wp-s3) var(--gtm4wp-s5);
@@ -99,7 +110,7 @@
 		grid-template-columns: 240px minmax(0, 1fr);
 		margin-top: var(--gtm4wp-s5);
 
-		@media (max-width: 782px) {
+		@media (max-width: $gtm4wp-mobile) {
 			grid-template-columns: 1fr;
 		}
 	}
@@ -205,13 +216,23 @@
 
 // Section tabs (mirrors @wordpress/components TabPanel, full-bleed underline).
 .gtm4wp-tabs {
+
+	// The strip is a flex row inside a panel that clips its overflow, so a tab
+	// set wider than the panel would be unreachable: nothing could scroll to it
+	// and nothing could wrap it into view. Scroll the strip itself instead, and
+	// keep the items at their natural width so a long label stays on one line
+	// rather than being squeezed into a column of single words.
 	.components-tab-panel__tabs {
 		border-bottom: 1px solid var(--gtm4wp-border);
+		overflow-x: auto;
 		padding: 0 var(--gtm4wp-s6);
+		scrollbar-width: thin;
 	}
 
 	.components-tab-panel__tabs-item {
+		flex: 0 0 auto;
 		font-size: var(--gtm4wp-fs-section);
+		white-space: nowrap;
 	}
 
 	// Red dot on tabs whose group holds a field the server rejected.
@@ -397,6 +418,13 @@
 		cursor: not-allowed;
 	}
 
+	// Repeats the column header next to the cell itself. Redundant while the
+	// header row is on screen; the mobile layout at the bottom of this file
+	// drops that row and shows these instead.
+	&__cell-label {
+		display: none;
+	}
+
 	&__actions {
 		text-align: center;
 	}
@@ -435,5 +463,138 @@
 		color: var(--gtm4wp-text-3);
 		font-variant-numeric: tabular-nums;
 		font-weight: 400;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Small screens.
+//
+// Everything above assumes a screen wide enough for a two pane layout and a
+// multi column table. On a phone neither holds: the header's title and buttons
+// stop fitting on one line, and the container table has more columns than the
+// viewport has room for. The rules below reflow rather than shrink — nothing
+// here relies on the visitor zooming out or scrolling sideways.
+// ---------------------------------------------------------------------------
+
+@media (max-width: $gtm4wp-mobile) {
+
+	.gtm4wp-app__header {
+		align-items: stretch;
+		// Title first, then the actions across the full width: the three
+		// buttons together are wider than a phone, so side by side they simply
+		// ran off the edge of the card.
+		flex-direction: column;
+		gap: var(--gtm4wp-s3);
+		padding: var(--gtm4wp-s3) var(--gtm4wp-s4);
+		// A sticky header this tall would eat a third of a phone screen for the
+		// whole session; wp-admin lets its own page titles scroll away too.
+		position: static;
+
+		h1 {
+			font-size: var(--gtm4wp-fs-panel);
+		}
+	}
+
+	.gtm4wp-app__actions {
+		flex-wrap: wrap;
+	}
+
+	// Export and import share one row, save takes the next.
+	.gtm4wp-app__io {
+		flex: 1 1 100%;
+	}
+
+	.gtm4wp-app__actions .components-button {
+		flex: 1 1 auto;
+		justify-content: center;
+	}
+
+	// Full width bar rather than a centred pill that could overflow.
+	.gtm4wp-app__snackbar {
+		left: var(--gtm4wp-s4);
+		right: var(--gtm4wp-s4);
+		transform: none;
+	}
+
+	.gtm4wp-panel__head {
+		padding: var(--gtm4wp-s4) var(--gtm4wp-s4) var(--gtm4wp-s3);
+	}
+
+	.gtm4wp-panel__body {
+		padding: var(--gtm4wp-s4);
+	}
+
+	.gtm4wp-tabs .components-tab-panel__tabs {
+		padding: 0 var(--gtm4wp-s4);
+	}
+
+	// One card per row, one labelled cell per line. A six column grid cannot be
+	// squeezed into a phone: at that width the header labels overlap each other
+	// and the inputs are too narrow to read what is in them.
+	//
+	// The header row goes away with the columns, so each cell carries its own
+	// label. Nothing is lost for assistive tech: dropping the table semantics
+	// here is why every input already names its column and row in its
+	// `aria-label`, which is what gets announced either way.
+	.gtm4wp-table {
+
+		&__scroll {
+			// No columns left to scroll past.
+			overflow-x: visible;
+		}
+
+		&__cell-label {
+			color: var(--gtm4wp-text-2);
+			display: block;
+			font-size: var(--gtm4wp-fs-micro);
+			font-weight: 600;
+			letter-spacing: .04em;
+			margin-bottom: var(--gtm4wp-s1);
+			text-transform: uppercase;
+		}
+
+		&__table {
+			border: none;
+			border-radius: 0;
+			display: block;
+
+			thead {
+				display: none;
+			}
+
+			tbody,
+			tr,
+			td {
+				display: block;
+			}
+
+			tr {
+				border: 1px solid var(--gtm4wp-border);
+				border-radius: var(--gtm4wp-radius);
+				margin-bottom: var(--gtm4wp-s3);
+				padding: var(--gtm4wp-s3);
+			}
+
+			tr:last-child {
+				margin-bottom: 0;
+			}
+
+			td {
+				border-bottom: none;
+				padding: 0 0 var(--gtm4wp-s3);
+			}
+
+			td:last-child {
+				padding-bottom: 0;
+			}
+
+			// The remove button ends the card, separated from the fields it
+			// acts on.
+			td.gtm4wp-table__actions {
+				border-top: 1px solid var(--gtm4wp-border);
+				padding-top: var(--gtm4wp-s2);
+				text-align: right;
+			}
+		}
 	}
 }

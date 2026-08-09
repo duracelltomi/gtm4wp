@@ -217,6 +217,89 @@ describe( 'TableControl row actions', () => {
 	} );
 } );
 
+describe( 'TableControl cell labels', () => {
+	// The stacked mobile layout drops the header row - six columns do not fit
+	// across a phone - so every cell carries its own copy of the column label.
+	// The pair of properties below is what makes that safe, and neither is
+	// visible from the stylesheet that relies on them:
+	//
+	// - one label per cell rather than one per column, or the labels would run
+	//   out on the second row and only the first card would be readable;
+	// - `aria-hidden`, because nothing about this is new information for a
+	//   screen reader. The control is already named "<column>, row <n>", so an
+	//   exposed label would simply be read out twice per field.
+	it( 'repeats the column label inside every cell of every row', () => {
+		renderTable( {
+			value: [
+				{ id: 'GTM-AAA', domain: 'a.example' },
+				{ id: 'GTM-BBB', domain: 'b.example' },
+			],
+		} );
+
+		const labels = Array.from(
+			document.querySelectorAll( '.gtm4wp-table__cell-label' )
+		);
+
+		expect( labels.map( ( node ) => node.textContent ) ).toEqual( [
+			'Container ID',
+			'Domain',
+			'Container ID',
+			'Domain',
+		] );
+	} );
+
+	it( 'keeps the cell labels out of the accessibility tree', () => {
+		renderTable( { value: [ { id: 'GTM-AAA', domain: 'a.example' } ] } );
+
+		const labels = Array.from(
+			document.querySelectorAll( '.gtm4wp-table__cell-label' )
+		);
+
+		expect( labels ).toHaveLength( 2 );
+		labels.forEach( ( node ) =>
+			expect( node ).toHaveAttribute( 'aria-hidden', 'true' )
+		);
+
+		// The name the visitor actually hears still comes from the control.
+		expect(
+			screen.getByRole( 'textbox', { name: 'Container ID, row 1' } )
+		).toHaveValue( 'GTM-AAA' );
+	} );
+
+	it( 'labels a checkbox cell as well, where the control shows no label of its own', () => {
+		renderTable( {
+			field: {
+				columns: [
+					{ key: 'path', label: 'Custom path' },
+					{
+						key: 'noid',
+						label: 'Omit container ID',
+						type: 'checkbox',
+					},
+				],
+			},
+			value: [ { path: '/gtm.js', noid: '' } ],
+		} );
+
+		const labels = Array.from(
+			document.querySelectorAll( '.gtm4wp-table__cell-label' )
+		);
+
+		expect( labels.map( ( node ) => node.textContent ) ).toEqual( [
+			'Custom path',
+			'Omit container ID',
+		] );
+	} );
+
+	it( 'adds no labels while the table has no rows', () => {
+		renderTable( { value: [] } );
+
+		expect(
+			document.querySelectorAll( '.gtm4wp-table__cell-label' )
+		).toHaveLength( 0 );
+	} );
+} );
+
 describe( 'TableControl checkbox columns', () => {
 	const CHECKBOX_COLUMNS = [
 		{ key: 'path', label: 'Custom path' },
