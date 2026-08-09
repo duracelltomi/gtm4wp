@@ -4,7 +4,7 @@
  */
 
 import { Notice, TabPanel } from '@wordpress/components';
-import { RawHTML, useCallback, useRef } from '@wordpress/element';
+import { RawHTML, useCallback, useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 import FieldControl from './FieldControl';
@@ -88,6 +88,39 @@ export default function ModulePanel( {
 		}
 	}, [] );
 
+	// Keeps the selected tab inside the visible part of the tab strip. A module
+	// with more tabs than fit across the panel - Consent mode anywhere, any
+	// multi-tab module on a phone - scrolls its strip sideways, so a tab opened
+	// from a bookmark or an admin notice can start out beyond its edge: the
+	// panel below shows the right settings while the strip still appears to be
+	// on its first tab, with nothing marking where you actually are.
+	//
+	// The scroll offset is set directly rather than through scrollIntoView,
+	// which would also scroll the page vertically and undo the deep-link reveal
+	// above - that has just brought a field further down the page into view.
+	const tabStrip = useRef( null );
+
+	useEffect( () => {
+		const strip = tabStrip.current
+			? tabStrip.current.querySelector( '.components-tab-panel__tabs' )
+			: null;
+		const selected = strip
+			? strip.querySelector( '[aria-selected="true"]' )
+			: null;
+
+		if ( ! strip || ! selected ) {
+			return;
+		}
+
+		const stripBox = strip.getBoundingClientRect();
+		const tabBox = selected.getBoundingClientRect();
+
+		// Centred where there is room; the browser clamps the first and last
+		// tab back to the respective end of the strip.
+		strip.scrollLeft +=
+			tabBox.left - stripBox.left - ( stripBox.width - tabBox.width ) / 2;
+	}, [ module.id, activeGroupId ] );
+
 	if ( ! module.available ) {
 		return (
 			<div className="gtm4wp-panel">
@@ -134,58 +167,62 @@ export default function ModulePanel( {
 			</div>
 
 			{ hasTabs ? (
-				<TabPanel
-					// Remount per module so the selected tab never carries over
-					// to a module that has no such group.
-					key={ module.id }
-					className="gtm4wp-tabs"
-					initialTabName={ initialTabName }
-					onSelect={ onGroupSelect }
-					tabs={ groups.map( ( group ) => {
-						// Flag groups holding a rejected field so a hidden tab's
-						// error stays visible (dot) and announced (SR text).
-						const hasError = group.fields.some( ( field ) =>
-							Boolean( errors[ field.key ] )
-						);
+				<div ref={ tabStrip }>
+					<TabPanel
+						// Remount per module so the selected tab never carries over
+						// to a module that has no such group.
+						key={ module.id }
+						className="gtm4wp-tabs"
+						initialTabName={ initialTabName }
+						onSelect={ onGroupSelect }
+						tabs={ groups.map( ( group ) => {
+							// Flag groups holding a rejected field so a hidden tab's
+							// error stays visible (dot) and announced (SR text).
+							const hasError = group.fields.some( ( field ) =>
+								Boolean( errors[ field.key ] )
+							);
 
-						return {
-							name: group.id,
-							title: hasError ? (
-								<>
-									{ group.label }
-									<span className="screen-reader-text">
-										{ __(
-											'(has errors)',
-											'duracelltomi-google-tag-manager'
-										) }
-									</span>
-								</>
-							) : (
-								group.label
-							),
-							className: hasError ? 'gtm4wp-tab--has-error' : '',
-						};
-					} ) }
-				>
-					{ ( tab ) => {
-						const group = groups.find(
-							( candidate ) => candidate.id === tab.name
-						);
+							return {
+								name: group.id,
+								title: hasError ? (
+									<>
+										{ group.label }
+										<span className="screen-reader-text">
+											{ __(
+												'(has errors)',
+												'duracelltomi-google-tag-manager'
+											) }
+										</span>
+									</>
+								) : (
+									group.label
+								),
+								className: hasError
+									? 'gtm4wp-tab--has-error'
+									: '',
+							};
+						} ) }
+					>
+						{ ( tab ) => {
+							const group = groups.find(
+								( candidate ) => candidate.id === tab.name
+							);
 
-						return (
-							<div className="gtm4wp-panel__body">
-								<GroupFields
-									fields={ group ? group.fields : [] }
-									values={ values }
-									errors={ errors }
-									focusFieldKey={ focusFieldKey }
-									revealFocused={ revealFocused }
-									onChange={ onChange }
-								/>
-							</div>
-						);
-					} }
-				</TabPanel>
+							return (
+								<div className="gtm4wp-panel__body">
+									<GroupFields
+										fields={ group ? group.fields : [] }
+										values={ values }
+										errors={ errors }
+										focusFieldKey={ focusFieldKey }
+										revealFocused={ revealFocused }
+										onChange={ onChange }
+									/>
+								</div>
+							);
+						} }
+					</TabPanel>
+				</div>
 			) : (
 				<div className="gtm4wp-panel__body">
 					<GroupFields

@@ -124,6 +124,18 @@ $gtm4wp-mobile: 782px;
 	}
 }
 
+// Phone navigation. Hidden until the media query at the bottom of this file
+// turns it on and hides the left pane in its place.
+.gtm4wp-mobile-nav {
+	display: none;
+
+	&__empty {
+		color: var(--gtm4wp-text-3);
+		font-size: var(--gtm4wp-fs-help);
+		margin: var(--gtm4wp-s2) 0 0;
+	}
+}
+
 .gtm4wp-sidebar {
 	align-self: start;
 	background: var(--gtm4wp-surface);
@@ -516,6 +528,33 @@ $gtm4wp-mobile: 782px;
 		transform: none;
 	}
 
+	// The left pane is twelve items tall - above the panel on a narrow screen
+	// that is a screenful of navigation before any setting is visible. The
+	// dropdown replaces it and is what gets pinned instead: two controls high,
+	// so it can stay on screen without taking the screen.
+	.gtm4wp-sidebar {
+		display: none;
+	}
+
+	.gtm4wp-mobile-nav {
+		background: var(--gtm4wp-surface);
+		border: 1px solid var(--gtm4wp-border);
+		border-radius: var(--gtm4wp-radius);
+		box-shadow: var(--gtm4wp-shadow-sticky);
+		display: grid;
+		gap: var(--gtm4wp-s2);
+		margin-top: var(--gtm4wp-s3);
+		padding: var(--gtm4wp-s3);
+		position: sticky;
+		// Clears the admin bar, which is 46px tall and fixed at this width.
+		top: 46px;
+		z-index: 10;
+	}
+
+	.gtm4wp-app__body {
+		margin-top: var(--gtm4wp-s3);
+	}
+
 	.gtm4wp-panel__head {
 		padding: var(--gtm4wp-s4) var(--gtm4wp-s4) var(--gtm4wp-s3);
 	}
@@ -526,6 +565,12 @@ $gtm4wp-mobile: 782px;
 
 	.gtm4wp-tabs .components-tab-panel__tabs {
 		padding: 0 var(--gtm4wp-s4);
+	}
+
+	// Narrower gutters fit roughly one more tab on screen, which is the
+	// difference between the strip looking scrollable and looking finished.
+	.gtm4wp-tabs .components-tab-panel__tabs-item {
+		padding-inline: var(--gtm4wp-s3);
 	}
 
 	// One card per row, one labelled cell per line. A six column grid cannot be
@@ -596,5 +641,15 @@ $gtm4wp-mobile: 782px;
 				text-align: right;
 			}
 		}
+	}
+}
+
+// Phone-sized screens only: wp-admin stops pinning its admin bar here and lets
+// it scroll away, so the pinned navigation above has the top of the viewport to
+// itself. Left at 46px it would float that far below it.
+@media (max-width: 600px) {
+
+	.gtm4wp-mobile-nav {
+		top: 0;
 	}
 }

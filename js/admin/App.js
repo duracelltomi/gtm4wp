@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 import ImportExport from './components/ImportExport';
+import MobileNav from './components/MobileNav';
 import ModulePanel from './components/ModulePanel';
 import Sidebar from './components/Sidebar';
 import {
@@ -191,6 +192,16 @@ export default function App( { settings } ) {
 					</Button>
 				</div>
 			</header>
+			{ /* Phone navigation; the stylesheet hides whichever of this and
+			     the left pane below does not fit the viewport. */ }
+			<MobileNav
+				modules={ modules }
+				activeModuleId={ position.moduleId }
+				onSelect={ onModuleSelect }
+				search={ search }
+				onSearch={ setSearch }
+				dirtyModules={ dirtyModules }
+			/>
 			<div className="gtm4wp-app__body">
 				<Sidebar
 					modules={ modules }
