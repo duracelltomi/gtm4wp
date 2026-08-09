@@ -51,6 +51,13 @@ final class UserEventsModuleTest extends TestCase {
 	private array $enqueued = array();
 
 	/**
+	 * Every wp_add_inline_script() call recorded during the test.
+	 *
+	 * @var array<int, array{handle: string, code: string, position: string}>
+	 */
+	private array $inline_scripts = array();
+
+	/**
 	 * Snapshot of $_COOKIE, restored in tearDown so a failing assertion cannot
 	 * leak event cookies into a sibling test (TS-7).
 	 *
@@ -61,9 +68,10 @@ final class UserEventsModuleTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->cookie_writes = array();
-		$this->enqueued      = array();
-		$this->cookie_backup = $_COOKIE;
+		$this->cookie_writes  = array();
+		$this->enqueued       = array();
+		$this->inline_scripts = array();
+		$this->cookie_backup  = $_COOKIE;
 
 		Functions\stubEscapeFunctions();
 		Functions\when( 'wp_unslash' )->returnArg();
@@ -79,6 +87,21 @@ final class UserEventsModuleTest extends TestCase {
 				$this->enqueued[] = array(
 					'handle' => $handle,
 					'args'   => $args,
+				);
+				return true;
+			}
+		);
+		Functions\when( 'wp_json_encode' )->alias(
+			static function ( $data, $options = 0, $depth = 512 ) {
+				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			}
+		);
+		Functions\when( 'wp_add_inline_script' )->alias(
+			function ( $handle, $code, $position = 'after' ) {
+				$this->inline_scripts[] = array(
+					'handle'   => $handle,
+					'code'     => (string) $code,
+					'position' => $position,
 				);
 				return true;
 			}
@@ -440,6 +463,111 @@ final class UserEventsModuleTest extends TestCase {
 		$this->make_module( array( GTM4WP_OPTION_EVENTS_FORMMOVE => false ) )->enqueue_scripts();
 
 		$this->assertSame( array(), $this->enqueued );
+	}
+
+	public function test_filled_only_config_is_printed_alongside_the_tracker(): void {
+		// The option crosses the PHP -> JS boundary, so the assertion is on the
+		// bytes the browser receives, not on the option value (RI-14). `var` is
+		// load-bearing: the tracker reads window.gtm4wp_form_move_config, and a
+		// top-level `const` would bind lexically and never reach it.
+		$this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_FORMMOVE            => true,
+				GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY => true,
+			)
+		)->enqueue_scripts();
+
+		$this->assertCount( 1, $this->inline_scripts );
+		$this->assertSame( 'gtm4wp-form-move-tracker', $this->inline_scripts[0]['handle'] );
+		$this->assertSame( 'before', $this->inline_scripts[0]['position'], 'The config must be printed before the bundle that reads it.' );
+		$this->assertSame(
+			'var gtm4wp_form_move_config = {"filledOnly":true};',
+			$this->inline_scripts[0]['code']
+		);
+	}
+
+	public function test_filled_only_config_reports_the_option_being_off(): void {
+		// The off state has to be transmitted too: the tracker defaults to false
+		// only when no config reaches it at all.
+		$this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_FORMMOVE            => true,
+				GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY => false,
+			)
+		)->enqueue_scripts();
+
+		$this->assertSame(
+			'var gtm4wp_form_move_config = {"filledOnly":false};',
+			$this->inline_scripts[0]['code']
+		);
+	}
+
+	public function test_filled_only_value_is_always_a_boolean(): void {
+		// A stored value from a hand-edited option row or an older import must not
+		// reach the browser as a string or a number: the tracker branches on it
+		// directly, and "0" would be truthy there while false is not.
+		$this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_FORMMOVE            => true,
+				GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY => '0',
+			)
+		)->enqueue_scripts();
+
+		$this->assertSame(
+			'var gtm4wp_form_move_config = {"filledOnly":false};',
+			$this->inline_scripts[0]['code'],
+			'A falsy stored value must be cast to a real JSON false.'
+		);
+	}
+
+	public function test_upgrading_from_1x_leaves_the_form_events_unchanged(): void {
+		// The upgrade path, asserted rather than assumed. A site coming from 1.x
+		// has a gtm4wp-options row that predates the sub-option, so the key is
+		// simply absent from storage. Options merges defaults UNDER the stored
+		// values (array_merge( $defaults, $stored )), so an absent key keeps its
+		// default - and the default has to be the 1.x behavior, or every existing
+		// site silently loses leave events on upgrade.
+		$stored_by_1x = array(
+			GTM4WP_OPTION_EVENTS_FORMMOVE   => true,
+			GTM4WP_OPTION_EVENTS_NEWUSERREG => true,
+			GTM4WP_OPTION_EVENTS_USERLOGIN  => true,
+		);
+
+		$this->assertArrayNotHasKey(
+			GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY,
+			$stored_by_1x,
+			'Guards the premise of this test: 1.x never stored this key.'
+		);
+
+		$module = $this->make_module( $stored_by_1x );
+
+		$this->assertFalse(
+			( new UserEventsModule() )->defaults()[ GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY ],
+			'The sub-option must default to off.'
+		);
+
+		$module->enqueue_scripts();
+
+		$this->assertSame( array( 'gtm4wp-form-move-tracker' ), array_column( $this->enqueued, 'handle' ) );
+		$this->assertSame(
+			'var gtm4wp_form_move_config = {"filledOnly":false};',
+			$this->inline_scripts[0]['code'],
+			'A 1.x options row must produce the unfiltered tracker.'
+		);
+	}
+
+	public function test_no_config_is_printed_when_the_form_move_option_is_off(): void {
+		// The sub-option is meaningless without its parent, and the tracker that
+		// reads the config is not on the page at all in that state.
+		$this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_FORMMOVE            => false,
+				GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY => true,
+			)
+		)->enqueue_scripts();
+
+		$this->assertSame( array(), $this->enqueued );
+		$this->assertSame( array(), $this->inline_scripts, 'No config may be printed without the tracker.' );
 	}
 
 	public function test_form_move_tracker_placement_is_filterable(): void {

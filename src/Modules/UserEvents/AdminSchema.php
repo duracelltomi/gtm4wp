@@ -65,6 +65,16 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'events'
 			),
 			new Field(
+				key: GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Only report fields the visitor filled in', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to push gtm4wp.formElementLeave only for a field that was empty when the visitor entered it and holds a value when they leave it, so that tabbing through a form without typing no longer produces an event for every field. Text inputs, textareas and dropdowns are checked this way; checkboxes, radio buttons and buttons are always reported, because they carry no "empty" state. A field that was already filled in when the visitor entered it, for example one your theme pre-fills, reports nothing when they leave it unchanged. gtm4wp.formElementEnter is never affected and keeps firing for every field.', 'duracelltomi-google-tag-manager' ),
+				group: 'events',
+				phase: Field::PHASE_BETA,
+				depends_on: GTM4WP_OPTION_EVENTS_FORMMOVE
+			),
+			new Field(
 				key: GTM4WP_OPTION_EVENTS_NEWUSERREG,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,

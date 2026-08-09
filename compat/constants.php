@@ -102,6 +102,7 @@ define( 'GTM4WP_OPTION_INCLUDE_WEATHERUNITS', 'weather-weatherunits' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI', 'weather-openweathermap-apikey' );
 
 define( 'GTM4WP_OPTION_EVENTS_FORMMOVE', 'event-form-move' );
+define( 'GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY', 'event-form-move-filled-only' );
 define( 'GTM4WP_OPTION_EVENTS_NEWUSERREG', 'event-new-user-registration' );
 define( 'GTM4WP_OPTION_EVENTS_USERLOGIN', 'event-user-logged-in' );
 

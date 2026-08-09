@@ -50,6 +50,25 @@ describe( 'gtm4wp-form-move-tracker', () => {
 		expect( window.dataLayer[ 0 ].formID ).toBe( '(no form ID)' );
 	} );
 
+	it( 'pushes formElementLeave for an empty field while the filled-only option is off', () => {
+		// The default is unchanged behavior, and this is the case the sub-option
+		// exists to suppress. Without this assertion nothing here would fail if
+		// the filled-only branch started running with no config present, since
+		// every other case in this file uses a field that is empty at both ends
+		// and would simply stop reporting (TS-2's two directions, applied to the
+		// option gate rather than to escaping).
+		document.body.innerHTML = '<form id="f"><input id="empty" /></form>';
+		const el = document.getElementById( 'empty' );
+
+		dispatchFocus( el, 'focusin' );
+		dispatchFocus( el, 'focusout' );
+
+		expect( window.dataLayer.map( ( push ) => push.event ) ).toEqual( [
+			'gtm4wp.formElementEnter',
+			'gtm4wp.formElementLeave',
+		] );
+	} );
+
 	it( 'ignores focus on non-form elements', () => {
 		document.body.innerHTML = '<div id="notinput">x</div>';
 
