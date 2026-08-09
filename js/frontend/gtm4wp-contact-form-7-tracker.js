@@ -9,6 +9,12 @@
  * When GA4 mode is enabled it additionally pushes the Google Analytics 4
  * recommended form events (form_start, form_submit, generate_lead).
  *
+ * form_submit follows the GA4 Enhanced Measurement definition and fires on every
+ * submission attempt, including one the server rejects. The submission events
+ * therefore carry a form_status parameter holding the Contact Form 7 status
+ * (mail_sent, validation_failed, spam and so on) so a container can tell an accepted
+ * submission from a rejected one without reading the gtm4wp.contactForm7* pushes.
+ *
  * @see https://contactform7.com/dom-events/
  */
 
@@ -129,7 +135,8 @@ function gtm4wp_prepare_cf7_data( eventdata ) {
 /**
  * Builds the GA4 form fields (form_id, form_name, form_destination) from a
  * Contact Form 7 <form> element. Used for events that lack a CF7 detail object
- * (form_start) as well as the submission events, so all GA4 events share one shape.
+ * (form_start) as well as the submission events, so all GA4 events share one base
+ * shape; the submission events add form_status on top.
  *
  * @param {Element} form The Contact Form 7 <form> element.
  * @return {Object} GA4 form fields.
@@ -151,16 +158,25 @@ function gtm4wp_cf7_ga4_form_fields( form ) {
 /**
  * Pushes a GA4 recommended form event for the given form element.
  *
- * @param {Object}  w    Window.
- * @param {string}  name GA4 event name.
- * @param {Element} form The Contact Form 7 <form> element.
+ * The Contact Form 7 status is added as form_status when there is one. form_start
+ * fires on the first field interaction, long before a status exists, so the key is
+ * omitted there rather than pushed as an empty placeholder.
+ *
+ * @param {Object}  w      Window.
+ * @param {string}  name   GA4 event name.
+ * @param {Element} form   The Contact Form 7 <form> element.
+ * @param {string}  status Contact Form 7 submission status, if any.
  * @return {void}
  */
-function gtm4wp_cf7_push_ga4( w, name, form ) {
+function gtm4wp_cf7_push_ga4( w, name, form, status ) {
+	const fields = gtm4wp_cf7_ga4_form_fields( form );
+
+	if ( status ) {
+		fields.form_status = status;
+	}
+
 	w[ gtm4wp_datalayer_name ] = w[ gtm4wp_datalayer_name ] || [];
-	w[ gtm4wp_datalayer_name ].push(
-		Object.assign( { event: name }, gtm4wp_cf7_ga4_form_fields( form ) )
-	);
+	w[ gtm4wp_datalayer_name ].push( Object.assign( { event: name }, fields ) );
 }
 
 /**
@@ -199,7 +215,8 @@ function gtm4wp_cf7_push_ga4( w, name, form ) {
 				gtm4wp_cf7_push_ga4(
 					w,
 					gtm4wp_ctf7_ga4_event_pairs[ event.type ],
-					event.target
+					event.target,
+					cf7data.status
 				);
 			}
 		} );
