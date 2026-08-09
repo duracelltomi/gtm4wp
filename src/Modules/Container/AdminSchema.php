@@ -366,8 +366,9 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * admin notice instead), and promises what the save route enforces - the
 	 * stored container setup is kept and used again once the constants are gone.
 	 *
-	 * Rendered through RawHTML in the settings app; the constant names are
-	 * class constants of HardcodedContainers, never user input.
+	 * Rendered as HTML in the settings app (FieldControl's help slot, an
+	 * innerHTML sink - PA-13); the constant names are class constants of
+	 * HardcodedContainers, never user input.
 	 *
 	 * @param array{columns: array<string, string>, rows: string[]} $locks Lock report of HardcodedContainers::locks().
 	 * @return string
@@ -421,9 +422,10 @@ final class AdminSchema implements AdminSchemaInterface {
 	 * here. The common trap is a staging copy with no WP_ENVIRONMENT_TYPE set:
 	 * WordPress then reports "production" and the container keeps loading.
 	 *
-	 * The readout is rendered through RawHTML in the settings app, so the
-	 * environment value is escaped even though wp_get_environment_type() can
-	 * only return one of the four values whitelisted by WordPress core.
+	 * The readout is rendered as HTML in the settings app (FieldControl's help
+	 * slot, an innerHTML sink - PA-13), so the environment value is escaped even
+	 * though wp_get_environment_type() can only return one of the four values
+	 * whitelisted by WordPress core.
 	 *
 	 * @return string
 	 */

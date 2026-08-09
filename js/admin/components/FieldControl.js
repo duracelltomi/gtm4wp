@@ -9,7 +9,7 @@ import {
 	TextareaControl,
 	ToggleControl,
 } from '@wordpress/components';
-import { Fragment, RawHTML } from '@wordpress/element';
+import { Fragment } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 
 import AxeptioVersionControl from './AxeptioVersionControl';
@@ -41,9 +41,20 @@ function FieldHelp( { field, error } ) {
 	return (
 		<>
 			{ error && <span className="gtm4wp-field-error">{ error }</span> }
-			<RawHTML className="gtm4wp-field-help">
-				{ field.description }
-			</RawHTML>
+			{ /*
+			   Descriptions carry markup (links, <code>, <br />), so they go in as
+			   HTML - trusted because every dynamic part is esc_html()'d in the
+			   module's AdminSchema (PA-13). A <span> rather than RawHTML: every
+			   @wordpress/components control renders its `help` slot inside a <p>,
+			   and RawHTML always wraps in a <div>, which React rejects there.
+			   Descriptions must stay phrasing content for the same reason.
+			*/ }
+			<span
+				className="gtm4wp-field-help"
+				dangerouslySetInnerHTML={ {
+					__html: field.description ?? '',
+				} }
+			/>
 		</>
 	);
 }

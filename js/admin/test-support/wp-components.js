@@ -25,6 +25,28 @@
 import { createElement as h, useEffect, useState } from 'react';
 
 /**
+ * Renders the `help` slot the way every BaseControl-backed control does: inside a
+ * `<p class="components-base-control__help">`, as a SIBLING of the label.
+ *
+ * Not cosmetic, and not a case of the stand-in modelling the library for its own
+ * sake (UC-3): the `<p>` is what makes the slot phrasing-content-only, so help
+ * markup that is not valid inside a paragraph fails here — with
+ * `@wordpress/jest-console` turning React's validateDOMNesting error into a test
+ * failure — instead of only in a browser console. A stand-in that accepted any
+ * `help` node was green precisely because the constraint was untested.
+ *
+ * @param {any} help Help node, if any.
+ * @return {Object|null} React element.
+ */
+function helpSlot( help ) {
+	if ( ! help ) {
+		return null;
+	}
+
+	return h( 'p', { className: 'components-base-control__help' }, help );
+}
+
+/**
  * @param {Object} props                     Component props.
  * @param          props.label
  * @param          props.help
@@ -62,10 +84,15 @@ export function TextControl( {
 	} );
 
 	if ( hideLabelFromVision ) {
-		return h( 'div', null, input, help );
+		return h( 'div', null, input, helpSlot( help ) );
 	}
 
-	return h( 'label', null, h( 'span', null, label ), input, help );
+	return h(
+		'div',
+		null,
+		h( 'label', null, h( 'span', null, label ), input ),
+		helpSlot( help )
+	);
 }
 
 /**
@@ -87,16 +114,20 @@ export function TextareaControl( {
 	rows,
 } ) {
 	return h(
-		'label',
+		'div',
 		null,
-		h( 'span', null, label ),
-		h( 'textarea', {
-			rows,
-			value: value ?? '',
-			disabled: Boolean( disabled ),
-			onChange: ( event ) => onChange( event.target.value ),
-		} ),
-		help
+		h(
+			'label',
+			null,
+			h( 'span', null, label ),
+			h( 'textarea', {
+				rows,
+				value: value ?? '',
+				disabled: Boolean( disabled ),
+				onChange: ( event ) => onChange( event.target.value ),
+			} )
+		),
+		helpSlot( help )
 	);
 }
 
@@ -119,25 +150,29 @@ export function SelectControl( {
 	disabled,
 } ) {
 	return h(
-		'label',
+		'div',
 		null,
-		h( 'span', null, label ),
 		h(
-			'select',
-			{
-				value: value ?? '',
-				disabled: Boolean( disabled ),
-				onChange: ( event ) => onChange( event.target.value ),
-			},
-			options.map( ( option ) =>
-				h(
-					'option',
-					{ key: option.value, value: option.value },
-					option.label
+			'label',
+			null,
+			h( 'span', null, label ),
+			h(
+				'select',
+				{
+					value: value ?? '',
+					disabled: Boolean( disabled ),
+					onChange: ( event ) => onChange( event.target.value ),
+				},
+				options.map( ( option ) =>
+					h(
+						'option',
+						{ key: option.value, value: option.value },
+						option.label
+					)
 				)
 			)
 		),
-		help
+		helpSlot( help )
 	);
 }
 
@@ -170,7 +205,12 @@ export function CheckboxControl( {
 		return h( 'div', null, input );
 	}
 
-	return h( 'label', null, input, h( 'span', null, label ), help );
+	return h(
+		'div',
+		null,
+		h( 'label', null, input, h( 'span', null, label ) ),
+		helpSlot( help )
+	);
 }
 
 /**
@@ -186,17 +226,21 @@ export function CheckboxControl( {
  */
 export function ToggleControl( { label, help, checked, onChange, disabled } ) {
 	return h(
-		'label',
+		'div',
 		null,
-		h( 'input', {
-			type: 'checkbox',
-			role: 'switch',
-			checked: Boolean( checked ),
-			disabled: Boolean( disabled ),
-			onChange: ( event ) => onChange( event.target.checked ),
-		} ),
-		h( 'span', null, label ),
-		help
+		h(
+			'label',
+			null,
+			h( 'input', {
+				type: 'checkbox',
+				role: 'switch',
+				checked: Boolean( checked ),
+				disabled: Boolean( disabled ),
+				onChange: ( event ) => onChange( event.target.checked ),
+			} ),
+			h( 'span', null, label )
+		),
+		helpSlot( help )
 	);
 }
 

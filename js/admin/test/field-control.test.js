@@ -15,7 +15,7 @@ import FieldControl from '../components/FieldControl';
 function renderField( field, { value, values = {}, error } = {} ) {
 	const onChange = jest.fn();
 
-	render(
+	const { container } = render(
 		<FieldControl
 			field={ { description: '', ...field } }
 			value={ value }
@@ -25,7 +25,7 @@ function renderField( field, { value, values = {}, error } = {} ) {
 		/>
 	);
 
-	return { onChange };
+	return { container, onChange };
 }
 
 describe( 'FieldControl type routing', () => {
@@ -309,6 +309,48 @@ describe( 'FieldControl dependencies and annotations', () => {
 		expect( screen.queryByText( 'Beta' ) ).not.toBeInTheDocument();
 		expect( screen.queryByText( 'Experimental' ) ).not.toBeInTheDocument();
 		expect( screen.queryByText( 'Deprecated' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'renders the description markup of a field', () => {
+		const { container } = renderField( {
+			key: 'k',
+			type: 'select',
+			label: 'Field',
+			choices: { a: 'Alpha' },
+			description:
+				'Read the <a href="https://gtm4wp.com/">docs</a>.<br />Use <code>gtm4wp</code>.',
+		} );
+
+		const helpNode = container.querySelector( '.gtm4wp-field-help' );
+
+		expect( helpNode.querySelector( 'a' ) ).toHaveAttribute(
+			'href',
+			'https://gtm4wp.com/'
+		);
+		expect( helpNode.querySelector( 'code' ) ).toBeInTheDocument();
+	} );
+
+	it( 'keeps the description inside the phrasing content a help slot allows', () => {
+		// Every @wordpress/components control renders `help` inside a <p>, so a
+		// <div> wrapper there is invalid HTML: React logs a validateDOMNesting
+		// error and the browser closes the paragraph early, dropping the styling
+		// off the rest of the description. That is what RawHTML - which always
+		// renders a <div> - did here. The stand-in reproduces the <p>, so the
+		// nesting error alone would fail this test; the assertions pin the
+		// wrapper element so the reason stays legible.
+		const { container } = renderField( {
+			key: 'k',
+			type: 'select',
+			label: 'Field',
+			choices: { a: 'Alpha' },
+			description: 'Plain description.',
+		} );
+
+		const helpNode = container.querySelector( '.gtm4wp-field-help' );
+
+		expect( helpNode.tagName ).toBe( 'SPAN' );
+		expect( helpNode.closest( 'p' ) ).not.toBeNull();
+		expect( helpNode.querySelector( 'div' ) ).toBeNull();
 	} );
 
 	it( 'renders a validation error alongside the field', () => {
