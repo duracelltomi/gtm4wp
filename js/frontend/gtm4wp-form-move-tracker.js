@@ -100,7 +100,44 @@ if ( ! window.gtm4wp_form_move_inited ) {
 			formClass:
 				( elem.form && elem.form.getAttribute( 'class' ) ) ||
 				'(no form class)',
+
+			...gtm4wp_form_move_native_params( elem.form ),
 		} );
+	}
+
+	/**
+	 * Builds the flat `gtm.element*` keys that populate GTM's built-in Form
+	 * variables, ready to be spread into a data layer push.
+	 *
+	 * Google publishes no "Form Name" built-in, so the form's name attribute has
+	 * no key here and stays available as our own `formName`. See U108.
+	 *
+	 * @param {HTMLFormElement|null} form The form the focused element belongs to.
+	 * @return {Object} The `gtm.element*` keys, empty when there is no form.
+	 */
+	function gtm4wp_form_move_native_params( form ) {
+		// Omitted rather than emptied when the element belongs to no form: the
+		// six keys above fall back to "(no form ID)" style placeholders, and
+		// feeding one of those to a built-in variable would have GTM report the
+		// placeholder as though it were the form's real id.
+		if ( ! form ) {
+			return {};
+		}
+
+		// DOM properties, not getAttribute(): these have to match what GTM
+		// itself pushes on a form submission, where an absent attribute reads as
+		// an empty string and `action` resolves to an absolute URL (falling back
+		// to the document URL when the attribute is missing).
+		//
+		// These are the same keys GTM's Clicks category reads, so on our events
+		// Click ID and Click Classes resolve to the form as well. That is how
+		// Google defines them; it is not something we can separate.
+		return {
+			'gtm.elementId': form.id || '',
+			'gtm.elementClasses': form.className || '',
+			'gtm.elementUrl': form.action || '',
+			'gtm.elementTarget': form.target || '',
+		};
 	}
 
 	/**

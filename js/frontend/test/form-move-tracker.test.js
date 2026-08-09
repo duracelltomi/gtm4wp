@@ -77,6 +77,90 @@ describe( 'gtm4wp-form-move-tracker', () => {
 		expect( window.dataLayer ).toHaveLength( 0 );
 	} );
 
+	// -----------------------------------------------------------------------
+	// GTM built-in Form variables (U108)
+	// -----------------------------------------------------------------------
+
+	it( 'fills the GTM built-in Form variables from the form element', () => {
+		document.body.innerHTML =
+			'<form id="signup" name="signupForm" class="fcls wide" action="/subscribe" target="_blank">' +
+			'<input id="email" name="email" /></form>';
+
+		dispatchFocus( document.getElementById( 'email' ), 'focusin' );
+
+		expect( window.dataLayer[ 0 ] ).toMatchObject( {
+			// Resolved to an absolute URL by the DOM, which is what GTM's
+			// built-in Form URL reports on a real form submission.
+			'gtm.elementUrl': 'http://localhost/subscribe',
+			'gtm.elementId': 'signup',
+			'gtm.elementClasses': 'fcls wide',
+			'gtm.elementTarget': '_blank',
+		} );
+	} );
+
+	it( 'fills them on formElementLeave as well', () => {
+		document.body.innerHTML =
+			'<form id="signup" class="fcls"><input id="email" /></form>';
+
+		dispatchFocus( document.getElementById( 'email' ), 'focusout' );
+
+		expect( window.dataLayer[ 0 ] ).toMatchObject( {
+			event: 'gtm4wp.formElementLeave',
+			'gtm.elementId': 'signup',
+			'gtm.elementClasses': 'fcls',
+		} );
+	} );
+
+	it( 'sends empty strings, never the readable placeholders, to the built-ins', () => {
+		// The two halves disagree on purpose. Our own keys keep the "(no form
+		// ID)" placeholders they have always had, but a built-in variable must
+		// not report a placeholder as though it were the form's real id, so the
+		// gtm.* keys carry what GTM itself would send: an empty string.
+		document.body.innerHTML = '<form><input id="email" /></form>';
+
+		dispatchFocus( document.getElementById( 'email' ), 'focusin' );
+
+		const push = window.dataLayer[ 0 ];
+
+		expect( push.formID ).toBe( '(no form ID)' );
+		expect( push[ 'gtm.elementId' ] ).toBe( '' );
+		expect( push[ 'gtm.elementClasses' ] ).toBe( '' );
+		expect( push[ 'gtm.elementTarget' ] ).toBe( '' );
+		// A form with no action attribute posts to the current page, and that is
+		// what the DOM and GTM both report.
+		expect( push[ 'gtm.elementUrl' ] ).toBe( 'http://localhost/' );
+	} );
+
+	it( 'omits the built-in keys entirely for an element in no form', () => {
+		// Absent, not empty: with no form there is no Form ID to report, and an
+		// empty gtm.elementId would linger in GTM's data model and be read by a
+		// later tag as though this event had described a form.
+		document.body.innerHTML = '<input id="lonely" />';
+
+		dispatchFocus( document.getElementById( 'lonely' ), 'focusin' );
+
+		const push = window.dataLayer[ 0 ];
+
+		expect( push ).not.toHaveProperty( 'gtm.elementId' );
+		expect( push ).not.toHaveProperty( 'gtm.elementClasses' );
+		expect( push ).not.toHaveProperty( 'gtm.elementUrl' );
+		expect( push ).not.toHaveProperty( 'gtm.elementTarget' );
+		expect( push.formID ).toBe( '(no form ID)' );
+	} );
+
+	it( 'sends no gtm.elementName, because GTM has no Form Name built-in', () => {
+		// formName stays our own key. Guards against someone "completing the
+		// set" later by inventing a key inside Google's namespace that no
+		// built-in variable reads (U108).
+		document.body.innerHTML =
+			'<form id="f" name="signupForm"><input id="email" /></form>';
+
+		dispatchFocus( document.getElementById( 'email' ), 'focusin' );
+
+		expect( window.dataLayer[ 0 ].formName ).toBe( 'signupForm' );
+		expect( window.dataLayer[ 0 ] ).not.toHaveProperty( 'gtm.elementName' );
+	} );
+
 	it( 'does not re-register its listeners when the bundle loads twice (#71)', () => {
 		// The import at the top of this file already booted the tracker once, so
 		// executing the module again here is exactly what a re-injected bundle does
