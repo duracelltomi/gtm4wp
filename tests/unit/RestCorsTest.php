@@ -73,6 +73,20 @@ final class RestCorsTest extends TestCase {
 			'foreign origin on the namespace index' => array( '/gtm4wp/v2', 'https://evil.example', true ),
 			'namespace index with trailing slash'   => array( '/gtm4wp/v2/', 'https://evil.example', true ),
 			'our own origin on the namespace index' => array( '/gtm4wp/v2', 'https://shop.example', false ),
+			// WordPress resolves REST routes case-insensitively
+			// (WP_REST_Server::match_request_to_handler() matches with an /i regex),
+			// so a route spelled in any casing reaches the same callback and has to
+			// reach the same policy - a case-sensitive comparison would serve the
+			// response with core's reflected grant still on it.
+			'mixed-case namespace'                  => array( '/GTM4WP/v2/visitor-data', 'https://evil.example', true ),
+			'upper-case route'                      => array( '/GTM4WP/V2/VISITOR-DATA', 'https://evil.example', true ),
+			'mixed-case settings route'             => array( '/Gtm4Wp/V2/Settings', 'https://evil.example', true ),
+			'mixed-case namespace index'            => array( '/GTM4WP/V2', 'https://evil.example', true ),
+			// Case-insensitivity must not become "strip everything": our own origin
+			// stays untouched however the URL is spelled, and a look-alike namespace
+			// stays outside the policy in every casing.
+			'our own origin, mixed-case route'      => array( '/GTM4WP/V2/visitor-data', 'https://shop.example', false ),
+			'mixed-case look-alike namespace'       => array( '/GTM4WP/V22/something', 'https://evil.example', false ),
 			'look-alike host'                       => array( '/gtm4wp/v2/visitor-data', 'https://shop.example.evil.example', true ),
 			'different port is a different origin'  => array( '/gtm4wp/v2/visitor-data', 'https://shop.example:8443', true ),
 			'unparseable origin'                    => array( '/gtm4wp/v2/visitor-data', 'not a url', true ),

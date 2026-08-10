@@ -122,7 +122,16 @@ final class RestCors {
 		//
 		// The trailing slash in the prefix stays: without it, a future
 		// gtm4wp/v22 namespace would be swept in by a plain strpos().
-		$path = ltrim( $route, '/' );
+		//
+		// Lowercased first, because the route arrives exactly as the URL spelled
+		// it while WordPress resolves it case-INSENSITIVELY:
+		// WP_REST_Server::match_request_to_handler() matches every registered
+		// route with preg_match( '@^' . $route . '$@i', $path ). The same callback
+		// therefore answers the namespace in any casing, and a case-sensitive
+		// comparison here would leave those requests outside the policy while
+		// still serving them. The namespace is lowercase ASCII, so strtolower()
+		// normalizes it exactly the way that match does.
+		$path = strtolower( ltrim( $route, '/' ) );
 
 		if ( self::REST_NAMESPACE !== $path
 			&& 0 !== strpos( $path, self::REST_NAMESPACE . '/' )
