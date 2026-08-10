@@ -531,28 +531,237 @@ final class Helpers {
 	}
 
 	/**
-	 * Returns the result of normalizing and hashing an email address. For this use case, Google
-	 * Ads requires removal of any '.' characters preceding "gmail.com" or "googlemail.com".
+	 * Returns the result of normalizing and hashing an email address.
 	 *
-	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web#php
+	 * For gmail.com and googlemail.com Google folds the local part the way those
+	 * mailboxes actually resolve, before hashing: all '.' characters removed, and
+	 * a '+' together with everything after it discarded. Both rules apply to
+	 * those two domains ONLY - everywhere else "jane.doe" and "janedoe" are
+	 * different mailboxes, and stripping either would hash the wrong person.
+	 *
+	 * Note which of Google's two artifacts this follows. Their prose documents
+	 * both rules; the PHP sample on the same page implements only the dot rule,
+	 * and this function was originally ported from that sample (#321), which is
+	 * how the plus rule went missing. Do not "restore" this to match the sample.
+	 *
+	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: the normalization rules, in prose.
 	 *
 	 * @param string $hash_algorithm the hash algorithm to use.
 	 * @param string $email_address the email address to normalize and hash.
-	 * @return string the normalized and hashed email address.
+	 * @return string the normalized and hashed email address, or '' if nothing is left to hash.
 	 */
 	public static function normalize_and_hash_email_address( string $hash_algorithm, string $email_address ): string {
 		$normalized_email = strtolower( $email_address );
 		$email_parts      = explode( '@', $normalized_email );
 		if (
 			count( $email_parts ) > 1
-			&& preg_match( '/^(gmail|googlemail)\.com\s*/', $email_parts[1] )
+			// Anchored at both ends on purpose: an unanchored match also accepts
+			// "gmail.com.example.com", and folding a third party's local part
+			// would silently hash a value that can never match. The \s* absorbs
+			// trailing whitespace, which normalize_and_hash() strips afterwards.
+			&& preg_match( '/^(gmail|googlemail)\.com\s*$/', $email_parts[1] )
 		) {
-			// Removes any '.' characters from the portion of the email address before the domain
-			// if the domain is gmail.com or googlemail.com.
-			$email_parts[0]   = str_replace( '.', '', $email_parts[0] );
+			$email_parts[0] = str_replace( '.', '', $email_parts[0] );
+
+			$plus_position = strpos( $email_parts[0], '+' );
+			if ( false !== $plus_position ) {
+				$email_parts[0] = substr( $email_parts[0], 0, $plus_position );
+			}
+
+			// A local part that was nothing but a tag leaves no address behind,
+			// and hashing a bare "@gmail.com" would be a value no lookup can
+			// ever match - so there is nothing honest to return but ''.
+			if ( '' === $email_parts[0] ) {
+				return '';
+			}
+
 			$normalized_email = sprintf( '%s@%s', $email_parts[0], $email_parts[1] );
 		}
 
 		return self::normalize_and_hash( $hash_algorithm, $normalized_email, true );
+	}
+
+	/**
+	 * Digit-count bounds of an E.164 number, excluding the leading "+".
+	 *
+	 * The maximum is the standard's own hard limit. The minimum is deliberately
+	 * below the shortest real number (Saint Helena, +290 plus four digits) so it
+	 * only ever rejects junk like "-" or "n/a", never a valid number: a validator
+	 * that encodes today's formats rejects tomorrow's (upstream UC-5).
+	 */
+	private const E164_MAX_DIGITS = 15;
+	private const E164_MIN_DIGITS = 5;
+
+	/**
+	 * National trunk prefixes that are NOT a single leading "0".
+	 *
+	 * Every other territory in WooCommerce's country list either uses "0" or has
+	 * no trunk prefix at all, which is what self::DEFAULT_TRUNK_PREFIX covers.
+	 * This is a mirror of a numbering-plan fact nothing in this code can verify,
+	 * so it carries an upstream registry row rather than only this comment
+	 * (upstream UD-1/UD-2). North America needs no entry: its trunk prefix and
+	 * its calling code are both "1", so the generic paths below already handle it.
+	 *
+	 * @var array<string, string>
+	 */
+	private const NATIONAL_TRUNK_PREFIXES = array(
+		'HU' => '06',
+		'RU' => '8',
+		'KZ' => '8',
+		'BY' => '8',
+		'LT' => '8',
+	);
+
+	private const DEFAULT_TRUNK_PREFIX = '0';
+
+	/**
+	 * Returns the international calling code of a country as bare digits, or an
+	 * empty string when it cannot be resolved.
+	 *
+	 * The table itself is WooCommerce's, on purpose: mirroring ~200 calling codes
+	 * here would be a snapshot that looks correct forever while the source moves.
+	 * WC_Countries::get_country_calling_code() has existed since WooCommerce 3.6,
+	 * well below the 5.0 floor this module declares, but it is still somebody
+	 * else's API, so the reach is guarded rather than assumed.
+	 *
+	 * Every unresolvable case returns '' and the caller declines to guess: an
+	 * absent WooCommerce and an unknown country code are different events, and
+	 * neither of them wants a fallback that invents a country (RI-19).
+	 *
+	 * @param string $country_code ISO 3166-1 alpha-2 country code of the address.
+	 * @return string The calling code without the leading "+", or '' if unknown.
+	 */
+	private static function country_calling_code( string $country_code ): string {
+		$country_code = strtoupper( trim( $country_code ) );
+		if ( '' === $country_code || ! function_exists( 'WC' ) ) {
+			return '';
+		}
+
+		$wc = WC();
+		if ( ! is_object( $wc ) ) {
+			return '';
+		}
+
+		// WooCommerce exposes several of its sub-objects through __get(), which
+		// makes isset()/?? report false even when the value is really there
+		// (RI-12), so the property is reached the way that pattern prescribes.
+		$countries = ( property_exists( $wc, 'countries' ) || method_exists( $wc, '__get' ) ) ? $wc->countries : null;
+		if ( ! is_object( $countries ) || ! method_exists( $countries, 'get_country_calling_code' ) ) {
+			return '';
+		}
+
+		$calling_code = $countries->get_country_calling_code( $country_code );
+
+		// WooCommerce answers with an array for the few territories that carry
+		// more than one code; the first entry is the country's own.
+		if ( is_array( $calling_code ) ) {
+			$calling_code = reset( $calling_code );
+		}
+
+		if ( ! is_scalar( $calling_code ) ) {
+			return '';
+		}
+
+		return (string) preg_replace( '/\D+/', '', (string) $calling_code );
+	}
+
+	/**
+	 * Assembles a validated E.164 string from bare digits.
+	 *
+	 * @param string $digits The digits of the number, without a leading "+".
+	 * @return string The E.164 number, or '' when the digit count is implausible.
+	 */
+	private static function to_e164( string $digits ): string {
+		$length = strlen( $digits );
+		if ( $length < self::E164_MIN_DIGITS || $length > self::E164_MAX_DIGITS ) {
+			return '';
+		}
+
+		return '+' . $digits;
+	}
+
+	/**
+	 * Converts a WooCommerce billing phone number into E.164 format.
+	 *
+	 * Google requires this exact format before hashing: "Format phone numbers
+	 * according to the E164 standard." A number that is merely lowercased and
+	 * stripped of spaces still fails to match, silently, because a hash either
+	 * matches or does not and nothing reports which.
+	 *
+	 * Order of the branches matters. An explicit international form is taken at
+	 * face value; only a number without one is anchored to the order's country,
+	 * and a number carrying a trunk prefix is resolved before the "looks like it
+	 * already has its calling code" branch, because the trunk prefix is the
+	 * unambiguous signal of the two.
+	 *
+	 * Returns '' whenever the number cannot be placed with confidence. The caller
+	 * decides what to do with that; inventing a country would produce a hash that
+	 * can never match, which is worse than sending nothing.
+	 *
+	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: normalization rules before hashing.
+	 *
+	 * @param string $phone_number The phone number as the customer typed it.
+	 * @param string $country_code ISO 3166-1 alpha-2 country code of the billing address.
+	 * @return string The number in E.164 format, or '' if it cannot be normalized.
+	 */
+	public static function normalize_phone_number( string $phone_number, string $country_code = '' ): string {
+		$phone_number = trim( $phone_number );
+		if ( '' === $phone_number ) {
+			return '';
+		}
+
+		$has_plus = str_starts_with( $phone_number, '+' );
+		$digits   = (string) preg_replace( '/\D+/', '', $phone_number );
+		if ( '' === $digits ) {
+			return '';
+		}
+
+		// Already international: a leading "+", or the "00" call prefix.
+		if ( $has_plus ) {
+			return self::to_e164( $digits );
+		}
+
+		if ( str_starts_with( $digits, '00' ) ) {
+			return self::to_e164( substr( $digits, 2 ) );
+		}
+
+		$calling_code = self::country_calling_code( $country_code );
+		if ( '' === $calling_code ) {
+			return '';
+		}
+
+		$trunk_prefix = self::NATIONAL_TRUNK_PREFIXES[ strtoupper( trim( $country_code ) ) ] ?? self::DEFAULT_TRUNK_PREFIX;
+
+		// A national number: drop the trunk prefix, then prepend the country's
+		// calling code. The length test keeps a prefix-shaped number that is too
+		// short to survive the cut from being mangled into nonsense.
+		if ( str_starts_with( $digits, $trunk_prefix ) && strlen( $digits ) - strlen( $trunk_prefix ) >= 4 ) {
+			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );
+		}
+
+		// International form with the "+" left off.
+		if ( str_starts_with( $digits, $calling_code ) && strlen( $digits ) - strlen( $calling_code ) >= 4 ) {
+			return self::to_e164( $digits );
+		}
+
+		// A local number with no prefix of any kind.
+		return self::to_e164( $calling_code . $digits );
+	}
+
+	/**
+	 * Returns the result of normalizing a phone number to E.164 and hashing it.
+	 *
+	 * @param string $hash_algorithm The hash algorithm to use.
+	 * @param string $phone_number   The phone number to normalize and hash.
+	 * @param string $country_code   ISO 3166-1 alpha-2 country code of the billing address.
+	 * @return string The hashed E.164 number, or '' if it cannot be normalized.
+	 */
+	public static function normalize_and_hash_phone_number( string $hash_algorithm, string $phone_number, string $country_code = '' ): string {
+		$normalized = self::normalize_phone_number( $phone_number, $country_code );
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		return hash( $hash_algorithm, $normalized );
 	}
 }

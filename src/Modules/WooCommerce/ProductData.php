@@ -461,7 +461,10 @@ final class ProductData {
 		$billing_email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $order->get_billing_email() );
 		$billing_first_hash = Helpers::normalize_and_hash( 'sha256', $order->get_billing_first_name(), false );
 		$billing_last_hash  = Helpers::normalize_and_hash( 'sha256', $order->get_billing_last_name(), false );
-		$billing_phone_hash = Helpers::normalize_and_hash( 'sha256', $order->get_billing_phone(), true );
+		// The phone is normalized to E.164 against the billing country before
+		// hashing, which is what Google matches on; the name fields only want
+		// lowercase + trim, so they keep the generic helper.
+		$billing_phone_hash = Helpers::normalize_and_hash_phone_number( 'sha256', (string) $order->get_billing_phone(), (string) $order->get_billing_country() );
 
 		// Values are passed raw: the single output sink (the purchase data
 		// layer) runs everything through wp_json_encode() with the full hex
@@ -648,7 +651,13 @@ final class ProductData {
 
 		$phone = (string) $order->get_billing_phone();
 		if ( '' !== $phone ) {
-			$user_data['sha256_phone_number'] = Helpers::normalize_and_hash( 'sha256', $phone, true );
+			// Omitted rather than sent empty when the number cannot be placed in
+			// E.164: this object is Google's user_data, where a present-but-empty
+			// identifier is the consumer's call to interpret, not ours (RI-13).
+			$phone_hash = Helpers::normalize_and_hash_phone_number( 'sha256', $phone, (string) $order->get_billing_country() );
+			if ( '' !== $phone_hash ) {
+				$user_data['sha256_phone_number'] = $phone_hash;
+			}
 		}
 
 		$address    = array();

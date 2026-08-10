@@ -346,4 +346,54 @@ if ( ! class_exists( 'WC_Customer' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WC_Countries' ) ) {
+	/**
+	 * Mirrors WC_Countries::get_country_calling_code(). The real method prefixes
+	 * the code with "+", answers with an array for the few territories carrying
+	 * more than one, and returns an empty string for a country it does not know.
+	 *
+	 * The stub is deliberately no more permissive than that (UC-3): a double that
+	 * answered every country with a plausible code would make the
+	 * unknown-country branch unreachable, and the suite would be green because
+	 * that branch is untested rather than because it works.
+	 */
+	class WC_Countries {
+		/**
+		 * @var array<string, string|array<int, string>>
+		 */
+		public static array $calling_codes = array(
+			'HU' => '+36',
+			'DE' => '+49',
+			'US' => '+1',
+			'CA' => '+1',
+			'RU' => '+7',
+			'NL' => '+31',
+		);
+
+		public function get_country_calling_code( $cc ) {
+			return self::$calling_codes[ strtoupper( (string) $cc ) ] ?? '';
+		}
+	}
+}
+
+if ( ! class_exists( 'GTM4WP_Test_WooCommerce' ) ) {
+	/**
+	 * Stands in for the WooCommerce main class. The real one reaches several of
+	 * its sub-objects through __get(), so the countries property is exposed the
+	 * same way here: a plain public property would let isset()-based code pass
+	 * the test and still fail in production (RI-12).
+	 */
+	class GTM4WP_Test_WooCommerce {
+		private $countries_instance;
+
+		public function __construct() {
+			$this->countries_instance = new WC_Countries();
+		}
+
+		public function __get( $name ) {
+			return 'countries' === $name ? $this->countries_instance : null;
+		}
+	}
+}
+
 // phpcs:enable

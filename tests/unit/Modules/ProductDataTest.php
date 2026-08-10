@@ -52,6 +52,11 @@ final class ProductDataTest extends TestCase {
 			}
 		);
 
+		// The billing phone is normalized to E.164 against the order's country,
+		// which reaches WC()->countries. Stubbed here rather than relied upon
+		// from another file, because Brain Monkey defines it process-wide (TS-16).
+		Functions\when( 'WC' )->justReturn( new \GTM4WP_Test_WooCommerce() );
+
 		// Isolate the cookie superglobal between tests (TS-7).
 		unset( $_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] );
 	}
@@ -378,7 +383,7 @@ final class ProductDataTest extends TestCase {
 		$this->assertIsArray( $user_data );
 		// gmail dots are stripped and the address is lowercased before hashing.
 		$this->assertSame( hash( 'sha256', 'johndoe@gmail.com' ), $user_data['sha256_email_address'] );
-		// Phone: all spaces removed, then hashed.
+		// Phone: already in international form, so it only loses its spaces.
 		$this->assertSame( hash( 'sha256', '+1555123' ), $user_data['sha256_phone_number'] );
 		$this->assertSame( hash( 'sha256', 'john' ), $user_data['address']['sha256_first_name'] );
 		$this->assertSame( hash( 'sha256', 'doe' ), $user_data['address']['sha256_last_name'] );
@@ -421,6 +426,92 @@ final class ProductDataTest extends TestCase {
 		$this->assertArrayHasKey( 'sha256_email_address', $user_data );
 		$this->assertArrayNotHasKey( 'sha256_phone_number', $user_data, 'An empty phone must not be hashed.' );
 		$this->assertArrayNotHasKey( 'address', $user_data, 'No name/address fields means no address block.' );
+	}
+
+	public function test_user_data_normalizes_a_national_phone_number_to_e164(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		// A Hungarian customer typing the number the way they dial it. This is
+		// the shape the previous normalization got wrong: it only lowercased and
+		// stripped spaces, so the hash could never match Google's.
+		$order = new \WC_Order(
+			array(
+				'order_number'    => '1001',
+				'total'           => 100.0,
+				'currency'        => 'HUF',
+				'billing_email'   => 'a@b.com',
+				'billing_phone'   => '06 20 123 4567',
+				'billing_country' => 'HU',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'];
+
+		$this->assertSame( hash( 'sha256', '+36201234567' ), $user_data['sha256_phone_number'] );
+		$this->assertNotSame(
+			hash( 'sha256', '06201234567' ),
+			$user_data['sha256_phone_number'],
+			'The pre-E.164 hash must not survive.'
+		);
+	}
+
+	public function test_user_data_omits_a_phone_that_cannot_be_placed_in_e164(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		// A national number with no country to anchor it to. Guessing a calling
+		// code would produce a hash that can never match, so the key is dropped.
+		$order = new \WC_Order(
+			array(
+				'order_number'    => '1001',
+				'total'           => 100.0,
+				'currency'        => 'EUR',
+				'billing_email'   => 'a@b.com',
+				'billing_phone'   => '20 123 4567',
+				'billing_country' => '',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'];
+
+		$this->assertArrayHasKey( 'sha256_email_address', $user_data );
+		$this->assertArrayNotHasKey( 'sha256_phone_number', $user_data );
+	}
+
+	public function test_raw_order_datalayer_hashes_the_phone_in_e164(): void {
+		$order = new \WC_Order(
+			array(
+				'order_number'    => '1001',
+				'total'           => 100.0,
+				'currency'        => 'HUF',
+				'billing_phone'   => '06 20 123 4567',
+				'billing_country' => 'HU',
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		$this->assertSame( hash( 'sha256', '+36201234567' ), $raw['customer']['billing']['phone_hash'] );
+		$this->assertNotSame( hash( 'sha256', '06201234567' ), $raw['customer']['billing']['phone_hash'] );
+	}
+
+	public function test_raw_order_datalayer_keeps_the_phone_hash_key_when_not_normalizable(): void {
+		$order = new \WC_Order(
+			array(
+				'order_number'    => '1001',
+				'total'           => 100.0,
+				'currency'        => 'EUR',
+				'billing_phone'   => '20 123 4567',
+				'billing_country' => '',
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		// orderData has always emitted this key with '' for a missing phone, and
+		// third-party GTM variables read it by path, so the key stays put here
+		// even though user_data above drops its own.
+		$this->assertArrayHasKey( 'phone_hash', $raw['customer']['billing'] );
+		$this->assertSame( '', $raw['customer']['billing']['phone_hash'] );
 	}
 
 	public function test_order_status_trackable_is_filterable(): void {
@@ -1207,6 +1298,51 @@ final class ProductDataTest extends TestCase {
 		);
 
 		$this->assertSame( '', Helpers::normalize_and_hash( 'sha256', '   ', true ) );
+	}
+
+	public function test_helpers_email_normalization_strips_gmail_plus_suffixes(): void {
+		// Google's own worked example: Jane.Doe+Shopping@googlemail.com is
+		// lowercased and then folded to janedoe@googlemail.com before hashing.
+		$actual = Helpers::normalize_and_hash_email_address( 'sha256', 'Jane.Doe+Shopping@googlemail.com' );
+
+		$this->assertSame( hash( 'sha256', 'janedoe@googlemail.com' ), $actual );
+		$this->assertNotSame(
+			hash( 'sha256', 'jane.doe+shopping@googlemail.com' ),
+			$actual,
+			'The un-normalized hash must not survive.'
+		);
+		$this->assertNotSame(
+			hash( 'sha256', 'janedoe+shopping@googlemail.com' ),
+			$actual,
+			'Removing only the dots is the pre-fix behavior and must not survive.'
+		);
+
+		$this->assertSame(
+			hash( 'sha256', 'janedoe@gmail.com' ),
+			Helpers::normalize_and_hash_email_address( 'sha256', 'jane.doe+shop+ping@gmail.com' ),
+			'Everything from the first + onwards goes, gmail.com included.'
+		);
+	}
+
+	public function test_helpers_email_normalization_keeps_plus_suffixes_on_other_domains(): void {
+		// Outside gmail/googlemail a + suffix addresses a real, distinct mailbox,
+		// so folding it would hash a different person than the one who ordered.
+		$this->assertSame(
+			hash( 'sha256', 'jane.doe+shop@example.com' ),
+			Helpers::normalize_and_hash_email_address( 'sha256', 'Jane.Doe+Shop@example.com' )
+		);
+	}
+
+	public function test_helpers_email_normalization_only_folds_the_exact_google_domains(): void {
+		// A domain that merely starts with gmail.com is somebody else's domain.
+		$this->assertSame(
+			hash( 'sha256', 'jane.doe+shop@gmail.com.example.com' ),
+			Helpers::normalize_and_hash_email_address( 'sha256', 'Jane.Doe+Shop@gmail.com.example.com' )
+		);
+	}
+
+	public function test_helpers_email_normalization_empty_when_the_local_part_is_only_a_tag(): void {
+		$this->assertSame( '', Helpers::normalize_and_hash_email_address( 'sha256', '+shopping@gmail.com' ) );
 	}
 
 	/**

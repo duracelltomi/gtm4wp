@@ -11,10 +11,17 @@ use Brain\Monkey\Functions;
 use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Tests\unit\TestCase;
 
+// Required here explicitly rather than left to whichever test file happens to
+// load first: the WC_Countries / WooCommerce doubles the phone tests below reach
+// are process-wide class definitions, and depending on another file's require is
+// invisible until something reorders (TS-16).
+require_once __DIR__ . '/wc-stubs.php';
+
 /**
- * Covers the static helpers ported from ecommerce-generic.php. The
- * normalize_and_hash* helpers are exercised by ProductDataTest; this file
- * covers the string/id/taxonomy helpers that had no test.
+ * Covers the static helpers ported from ecommerce-generic.php. The email and
+ * name normalize_and_hash* helpers are exercised by ProductDataTest; this file
+ * covers the string/id/taxonomy helpers that had no test, plus the E.164 phone
+ * normalization that feeds Google's enhanced-conversions user_data.
  */
 final class HelpersTest extends TestCase {
 
@@ -373,5 +380,120 @@ final class HelpersTest extends TestCase {
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 
 		$this->assertSame( '', Helpers::get_product_category( 7 ) );
+	}
+
+	/**
+	 * Points WC() at the country stub. Stubbed per test rather than once for the
+	 * file: Brain Monkey defines a function process-wide, so a test that leans on
+	 * another file having done this passes only until something reorders (TS-16).
+	 *
+	 * @return void
+	 */
+	private function stub_woocommerce_countries(): void {
+		Functions\when( 'WC' )->justReturn( new \GTM4WP_Test_WooCommerce() );
+	}
+
+	public function test_normalize_phone_number_keeps_explicit_international_format(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '+36 20 123 4567', 'HU' ) );
+		// The country is not even consulted when the number carries its own "+".
+		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '+36 (20) 123-4567', '' ) );
+	}
+
+	public function test_normalize_phone_number_converts_the_double_zero_call_prefix(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '0036 20 123 4567', 'HU' ) );
+	}
+
+	public function test_normalize_phone_number_strips_a_multi_digit_trunk_prefix(): void {
+		$this->stub_woocommerce_countries();
+
+		// Hungary dials 06 nationally. Stripping only the leading zero would
+		// leave the 6 in place and produce +366201234567, which never matches.
+		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '06 20 123 4567', 'HU' ) );
+		$this->assertStringNotContainsString( '+366', Helpers::normalize_phone_number( '06 20 123 4567', 'HU' ) );
+	}
+
+	public function test_normalize_phone_number_strips_a_single_zero_trunk_prefix(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '030 12345678', 'DE' ) );
+	}
+
+	public function test_normalize_phone_number_strips_a_non_zero_trunk_prefix(): void {
+		$this->stub_woocommerce_countries();
+
+		// Russia dials 8 nationally while its calling code is 7.
+		$this->assertSame( '+74951234567', Helpers::normalize_phone_number( '8 (495) 123-45-67', 'RU' ) );
+	}
+
+	public function test_normalize_phone_number_handles_north_american_numbers(): void {
+		$this->stub_woocommerce_countries();
+
+		// Both the bare 10 digit form and the 1-prefixed form land on the same
+		// E.164 number, which is why North America needs no trunk-prefix entry.
+		$this->assertSame( '+15551234567', Helpers::normalize_phone_number( '(555) 123-4567', 'US' ) );
+		$this->assertSame( '+15551234567', Helpers::normalize_phone_number( '1 (555) 123-4567', 'US' ) );
+	}
+
+	public function test_normalize_phone_number_accepts_the_international_form_without_a_plus(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '49 30 12345678', 'DE' ) );
+	}
+
+	public function test_normalize_phone_number_prepends_the_calling_code_to_a_local_number(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '+31612345678', Helpers::normalize_phone_number( '612345678', 'NL' ) );
+	}
+
+	public function test_normalize_phone_number_empty_when_the_country_cannot_anchor_it(): void {
+		$this->stub_woocommerce_countries();
+
+		// No country at all, and a country WooCommerce does not know: two
+		// different events, both of which decline to guess rather than invent a
+		// calling code that would hash to something unmatchable (RI-19).
+		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', '' ) );
+		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', 'ZZ' ) );
+	}
+
+	public function test_normalize_phone_number_empty_when_woocommerce_is_not_there(): void {
+		Functions\when( 'WC' )->justReturn( null );
+		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', 'HU' ) );
+
+		// Present, but without the countries object the real class exposes.
+		Functions\when( 'WC' )->justReturn( new \stdClass() );
+		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', 'HU' ) );
+	}
+
+	public function test_normalize_phone_number_rejects_implausible_input(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '', Helpers::normalize_phone_number( 'n/a', 'HU' ) );
+		$this->assertSame( '', Helpers::normalize_phone_number( '  ', 'HU' ) );
+		$this->assertSame( '', Helpers::normalize_phone_number( '12', 'HU' ) );
+		// Past E.164's 15 digit ceiling.
+		$this->assertSame( '', Helpers::normalize_phone_number( '+1234567890123456', 'HU' ) );
+	}
+
+	public function test_normalize_and_hash_phone_number_hashes_the_e164_form(): void {
+		$this->stub_woocommerce_countries();
+
+		$actual = Helpers::normalize_and_hash_phone_number( 'sha256', '06 20 123 4567', 'HU' );
+
+		// Both directions: the E.164 hash is what ships, and the pre-fix hash of
+		// the merely space-stripped number is gone. Asserting only the first
+		// would still pass if the normalization silently regressed.
+		$this->assertSame( hash( 'sha256', '+36201234567' ), $actual );
+		$this->assertNotSame( hash( 'sha256', '06201234567' ), $actual );
+	}
+
+	public function test_normalize_and_hash_phone_number_empty_when_not_normalizable(): void {
+		$this->stub_woocommerce_countries();
+
+		$this->assertSame( '', Helpers::normalize_and_hash_phone_number( 'sha256', '20 123 4567', 'ZZ' ) );
 	}
 }

@@ -25,7 +25,7 @@ breakage · Blessed Couplings (**UB**) — deliberate, do **not** flag.
 
 Each row is `ID — one-line litmus`.
 
-**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UC-1, UC-3
+**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UC-1, UC-3
 
 **Upstream Drift (UD):**
 
@@ -49,6 +49,7 @@ Each row is `ID — one-line litmus`.
 | UD-16 ⭐ | "Deprecated but still works" is scheduled work, not a free pass — the same migration is owed either way, plus `debug.log` entries meanwhile. Where the floor forbids removing it, the row carries a **named retire trigger**; loudness sets priority, never whether. |
 | UD-17 | A gatekeeper's ruleset is an upstream dependency; its *additions* are the drift. Read its release notes for what is newly forbidden — our code can be frozen and still start failing. Prefer a construction that cannot acquire the violation over a check that catches it afterwards. |
 | UD-18 ⭐ | A shipped `Fixed:` bullet is a claim about the past, not evidence. It records what someone believed at the time, and a silent defect never contradicts it — 1.22.3 claimed the select_item timeout was fixed and it was not, through every release since. When triaging "already fixed?", confirm in the released code (`git show <tag>:<path>`), never in the changelog. |
+| UD-19 ⭐ | A vendor's **sample code is not the vendor's spec**, and porting the sample inherits whatever it omits. Google's enhanced-conversions page states the gmail plus-suffix rule in prose and leaves it out of the PHP sample on the same page; our helper was ported from the sample, so it was wrong from the day it was written and stayed wrong through a review that cited that URL. Port from the prose; if you port from a sample, diff it against the prose in the same change and say in the docblock which one you followed. |
 
 **Upstream Coupling anti-patterns (UC):**
 
@@ -362,6 +363,41 @@ the report as resolved.
   (Review 14: *"a ledger is a measurement, not a fact"*, and *"do not write a ledger as
   an all-clear"*). A changelog is the user-facing member of that family.
 
+### UD-19: A vendor's sample code is not the vendor's spec ⭐
+
+The usual drift story is that the source moves and our copy stays still (UD-1). This one
+is worse, because there is nothing to drift *from*: the copy was incomplete on the day it
+was made, and the page it cites has said so the whole time.
+
+**Confirmed 2026-08-10.** Google's enhanced-conversions page carries both a prose list of
+the normalization rules and a set of language samples. For gmail/googlemail the prose
+requires removing **all periods** *and* **the plus suffix**; the **PHP sample on the same
+page implements only the periods** (the Java sample handles both).
+`Helpers::normalize_and_hash_email_address()` was ported from the PHP sample under issue
+**#321** and inherited exactly that omission, so every customer using a `+tag` gmail
+address produced a hash Google could never match. The docblock cited the page — with the
+`#php` anchor, which is the tell — and the code disagreed with the page's own prose.
+
+Note what this defeats. UD-2 says a comment is not a control; here the comment was not
+merely stale, it was *accurate about the sample it named*. RI-20's "open the page a
+docblock cites" was performed and would still pass, because the cited anchor said what
+the code did. The question that catches this is one level up: **which artifact on that
+page is the specification, and did I port from that one?**
+
+**Rules:**
+- **Port from the prose; treat samples as illustration.** A vendor's sample is written
+  once, by one person, in N languages, and is not what their own service validates
+  against. Where a sample and the prose disagree, the prose is the contract.
+- **If you do port a sample, diff it against the prose in the same change** and record
+  which you followed in the docblock. Ours now says so explicitly, including a
+  *do not "restore" this to match the sample* line, because the sample is still wrong
+  upstream and the next reader will find it.
+- **Drop the `#anchor` from a cited URL when the anchor is a sample.** It narrows the
+  next reviewer's attention to the artifact you must not trust.
+- **A per-language sample gap is invisible to every check we own.** No test, no type, no
+  lint compares a port against its source; only reading both does. So the registry row's
+  claim must name the *rules*, never "matches Google's PHP sample".
+
 ---
 
 ## Upstream Coupling anti-patterns
@@ -564,3 +600,4 @@ and that is what the registry row tracks.
 | 2026-08-05 | Added **UD-14** (⭐ a truncated fetch of an ordered page reads as deletion) after Sweep 1 produced exactly that false positive on U54: five core GA4 e-commerce events reported undocumented because the alphabetical page truncated mid-`refund`. Caught by the maintainer. Countermeasure: every long-page probe carries a sentinel (the known-last item); no sentinel in the extraction → `fetch-failed`. |
 | 2026-08-05 | Added UD-11 (⭐ "it evidently works" is not evidence — from `.security/` #121, filed Low @0.5 and re-rated High after ten minutes of measurement), UD-12 (a 200 proves the host is up, nothing more), UD-13 (a copied number is already wrong — this file's own seeding produced 69/94 where the source said 71/97). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UC-1, UC-3. |
 | 2026-08-06 | Added **UD-18** (⭐ a shipped `Fixed:` bullet is a claim about the past, not evidence) after finding that `CHANGELOG.md`'s 1.22.3 entry *"properly reading timeout for select_item eventCallback"* did not fix it: 1.x read `window.gtm4wp_datalayer_max_timeout` while 1.x PHP emitted it as a `const`, so the option never took effect in any released version and the hardcoded 2000 ms default always applied. Same shape as UD-10 (a published claim read as an observation) pointed at our own history; strongest exactly where the defect is silent, since a loud bug gets re-reported and a wrong bullet is then self-correcting. Extended **UD-11** with *it is not only upstream couplings* — the same "it evidently works" inference failed on a PHP↔JS contract entirely inside this repo, disabling three shipped features; `silent-*` is a property of the failure mode, not of who owns the other end. Companion security entry: `.security/` **RI-14** (binding vs. name/value). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UC-1, UC-3. |
+| 2026-08-10 | Added **UD-19** (⭐ a vendor's sample code is not the vendor's spec) after fixing two enhanced-conversions normalization gaps in one session. Google's page states the gmail **plus-suffix** rule in prose and omits it from the PHP sample on the same page; `normalize_and_hash_email_address()` was ported from that sample under #321 and inherited the omission, so every `+tag` gmail address had produced an unmatchable hash since the feature shipped. The sibling gap was **E.164** on phone numbers — an explicitly deferred TODO on #321, closed here by delegating the calling-code table to `WC_Countries::get_country_calling_code()` (new **U111**) plus a 5-entry trunk-prefix mirror (new **U110**), which avoids the libphonenumber dependency that blocked it in 2024. Both fixes ship regression tests proven to fail against the old behavior. UD-19 is the case RI-20's "open the page a docblock cites" does **not** catch: the citation was accurate about the artifact it named, and the artifact was the wrong one. ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UC-1, UC-3. |
