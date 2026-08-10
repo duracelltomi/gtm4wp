@@ -7,12 +7,129 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_videopress_percentage_tracking = 10;
-const gtm4wp_videopress_percentage_tracking_marks = {};
+
+// Every store in this file is keyed on the guid the player reports and is
+// therefore null-prototype: see the note on gtm4wp_videopress_playback below for
+// what a guid of `__proto__` does to a plain object. The milestone store is
+// handed to the shared gtm4wpMediaMilestones(), whose "first time for this key"
+// test is `typeof marks[ key ] === 'undefined'` — on a plain object that reads
+// Object.prototype, skips the initialisation and then calls .indexOf() on it.
+const gtm4wp_videopress_percentage_tracking_marks = Object.create( null );
 
 // Tracks the last player state pushed per video so the duplicate signals the
 // VideoPress player emits (play + playing, seeking + seeked) collapse to a
 // single state change.
-const gtm4wp_videopress_last_state = {};
+const gtm4wp_videopress_last_state = Object.create( null );
+
+// Playback position and duration per video, carried from the one message that
+// reports each to the many that do not.
+//
+// VideoPress does not repeat these on every message the way the other embedded
+// players do. `videopress_timeupdate` carries the position and NO duration,
+// `videopress_durationchange` carries the duration and NO position, and the
+// state messages (`videopress_playing`, `_pause`, `_ended`, `_seeking`,
+// `_volumechange`) carry neither — only `event` and `id`. Reading the values off
+// whichever message happens to be in hand therefore reports 0 for both on every
+// state change, and leaves the percentage tracking with no duration to divide
+// by, which its zero-duration guard turns into total silence. Registered as
+// upstream claim U109.
+//
+// Both stores below are keyed on a guid taken from the message, and this one is
+// written back THROUGH that lookup, so they are null-prototype: on a plain
+// object a guid of `__proto__` resolves to `Object.prototype` — truthy, so the
+// "not seen yet" branch is skipped — and the next assignment would write a
+// playback position onto every object on the page. The origin check upstream
+// makes that a VideoPress-only reach rather than an open one, which is a reason
+// to keep it cheap to close, not a reason to leave it open.
+const gtm4wp_videopress_playback = Object.create( null );
+
+// Videos whose gtm4wp.mediaPlayerReady has already been pushed. The message
+// reporting the duration is what stands in for a "ready" signal here, and
+// VideoPress can report the duration more than once for one video (a quality
+// switch changes the source), so the push is held to once per video.
+const gtm4wp_videopress_ready = Object.create( null );
+
+// The player messages that arrive WITHOUT the `videopress_` prefix every other
+// one carries. Documented as `toggle_fullscreen`; the prefixed spelling is
+// handled by the normal path, because Jetpack's own player bridge relays it
+// under that name instead.
+const gtm4wp_videopress_unprefixed_events = [ 'toggle_fullscreen' ];
+
+/**
+ * Reads a number out of a player message, telling "not reported" apart from 0.
+ *
+ * @param {*} value The raw property value.
+ * @return {number|null} The number, or null when the message did not carry one.
+ */
+function gtm4wp_videoPressNumber( value ) {
+	if ( undefined === value || null === value || '' === value ) {
+		return null;
+	}
+
+	const number = Number( value );
+
+	return Number.isFinite( number ) ? number : null;
+}
+
+/**
+ * Reads one playback value out of a message, in seconds.
+ *
+ * VideoPress reports both a millisecond and a second form (`currentTimeMs`
+ * alongside `currentTime`, `durationMs` alongside `duration`); the millisecond
+ * one is preferred as the more precise of the two.
+ *
+ * Returning null rather than 0 for a message that carries neither is the whole
+ * point: 0 is also a perfectly real playback position, so a caller that cannot
+ * tell the two apart has no way to keep the last reported value — which is what
+ * this tracker needs to do on every message VideoPress sends without one.
+ *
+ * @param {*} ms      The millisecond form, when the message carried one.
+ * @param {*} seconds The second form, when the message carried one.
+ * @return {number|null} The value in seconds, or null when the message reported
+ *                       neither.
+ */
+function gtm4wp_videoPressSeconds( ms, seconds ) {
+	const fromMs = gtm4wp_videoPressNumber( ms );
+
+	if ( null !== fromMs ) {
+		return fromMs / 1000;
+	}
+
+	return gtm4wp_videoPressNumber( seconds );
+}
+
+/**
+ * Records whatever playback values a message carried, and returns everything
+ * currently known about that video's playback.
+ *
+ * @param {string} guid The VideoPress guid the message reported.
+ * @param {Object} data The player message payload.
+ * @return {{currentTime: number, duration: number}} The video's known position
+ *                                                   and duration, in seconds.
+ */
+function gtm4wp_videoPressPlayback( guid, data ) {
+	const playback = gtm4wp_videopress_playback[ guid ] || {
+		currentTime: 0,
+		duration: 0,
+	};
+
+	const currentTime = gtm4wp_videoPressSeconds(
+		data.currentTimeMs,
+		data.currentTime
+	);
+	if ( null !== currentTime ) {
+		playback.currentTime = currentTime;
+	}
+
+	const duration = gtm4wp_videoPressSeconds( data.durationMs, data.duration );
+	if ( null !== duration ) {
+		playback.duration = duration;
+	}
+
+	gtm4wp_videopress_playback[ guid ] = playback;
+
+	return playback;
+}
 
 /**
  * Validates that a postMessage originated from a VideoPress player.
@@ -174,20 +291,31 @@ function gtm4wp_initVideoPressTracking() {
 			}
 		}
 
-		if (
-			! data ||
-			typeof data.event !== 'string' ||
-			data.event.indexOf( 'videopress_' ) !== 0
-		) {
+		if ( ! data || typeof data.event !== 'string' ) {
 			return;
 		}
 
-		const eventName = data.event.substring( 'videopress_'.length );
+		let eventName;
+		if ( data.event.indexOf( 'videopress_' ) === 0 ) {
+			eventName = data.event.substring( 'videopress_'.length );
+		} else if (
+			gtm4wp_videopress_unprefixed_events.indexOf( data.event ) > -1
+		) {
+			// Accepting an unprefixed name widens nothing: the origin was
+			// already checked above, so this only reaches messages a VideoPress
+			// player sent. Without it the fullscreen message — the one player
+			// message that carries no prefix — is dropped on the floor.
+			eventName = data.event;
+		} else {
+			return;
+		}
+
 		const guid = data.id || '';
-		// VideoPress reports times in milliseconds; gtm4wp media events and the
-		// gtm.video* variables use seconds.
-		const currentTime = ( data.currentTimeMs || 0 ) / 1000;
-		const duration = ( data.durationMs || 0 ) / 1000;
+		// Times come from the running record rather than from this message: see
+		// gtm4wp_videopress_playback for why the message alone is never enough.
+		const playback = gtm4wp_videoPressPlayback( guid, data );
+		const currentTime = playback.currentTime;
+		const duration = playback.duration;
 
 		// Resolved lazily and at most once per message: only a push that carries
 		// gtm.videoVisible reads it, while timeupdate messages — most of them —
@@ -202,8 +330,20 @@ function gtm4wp_initVideoPressTracking() {
 		};
 
 		switch ( eventName ) {
+			// VideoPress has no "player ready" message of its own. The duration
+			// arriving is the first moment there is a player worth describing,
+			// which makes `durationchange` the signal — held to one push per
+			// video, because the duration is reported again on a quality switch.
+			// `loadedmetadata` is not a name VideoPress sends today; it is kept
+			// so a player build that adopts the HTML5-native spelling still maps
+			// here rather than falling through to a generic player event.
 			case 'loadedmetadata':
 			case 'durationchange':
+				if ( gtm4wp_videopress_ready[ guid ] ) {
+					break;
+				}
+				gtm4wp_videopress_ready[ guid ] = true;
+
 				window[ gtm4wp_datalayer_name ].push( {
 					event: 'gtm4wp.mediaPlayerReady',
 					mediaType: 'videopress',
@@ -222,6 +362,12 @@ function gtm4wp_initVideoPressTracking() {
 				} );
 				break;
 
+			// VideoPress documents `playing`, `pause` and `seeking`. The
+			// HTML5-native spellings beside each of them are tolerated aliases,
+			// not names the player is known to send: `play` is the one another
+			// Automattic consumer (Sensei's player adapter) also listens for,
+			// and the duplicate-state guard above collapses the pair anyway if
+			// a build ever sends both.
 			case 'play':
 			case 'playing':
 				gtm4wp_onVideoPressStateChange(
@@ -274,13 +420,30 @@ function gtm4wp_initVideoPressTracking() {
 				);
 				break;
 
-			default:
+			default: {
+				// The two player messages carrying a value worth reporting,
+				// under the same key the HTML5 tracker uses for its own
+				// fullscreenchange and ratechange pushes. The key is added only
+				// when there is something to put in it, so the other player
+				// events keep the shape they have always had.
+				const eventParam = {};
+				if ( 'toggle_fullscreen' === eventName ) {
+					eventParam.mediaPlayerEventParam = !! data.isFullScreen;
+				} else if (
+					'toggle-source' === eventName &&
+					data.qualityLevelInternalName
+				) {
+					eventParam.mediaPlayerEventParam =
+						data.qualityLevelInternalName;
+				}
+
 				window[ gtm4wp_datalayer_name ].push( {
 					event: 'gtm4wp.mediaPlayerEvent',
 					mediaType: 'videopress',
 					mediaData: gtm4wp_videoPressMediaData( guid, duration ),
 					mediaCurrentTime: currentTime,
 					mediaPlayerEvent: eventName,
+					...eventParam,
 					...gtm4wpNativeVideoParams( {
 						provider: 'videopress',
 						// Not a playback state GTM models.
@@ -292,6 +455,7 @@ function gtm4wp_initVideoPressTracking() {
 						element: frame,
 					} ),
 				} );
+			}
 		}
 	};
 
