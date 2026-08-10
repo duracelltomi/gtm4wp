@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\UserEvents;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\AbstractModule;
 use GTM4WP\Plugin;
 
@@ -96,7 +97,7 @@ final class UserEventsModule extends AbstractModule {
 
 			wp_add_inline_script(
 				'gtm4wp-form-move-tracker',
-				'var gtm4wp_form_move_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+				'var gtm4wp_form_move_config = ' . ScriptTag::json_literal( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 				'before'
 			);
 		}

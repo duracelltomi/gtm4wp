@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\ConsentMode;
 
 use GTM4WP\Frontend\ConsentDefaults;
 use GTM4WP\Frontend\ContainerCode;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -76,7 +77,12 @@ final class Axeptio {
 	 * @return string
 	 */
 	public function add_head_js( $inline_js, $datalayer_name ) {
-		$axeptio_settings = wp_json_encode(
+		// json_literal(), not a bare wp_json_encode(): the result is concatenated
+		// into an assignment in the head <script>, and the encoder returns false -
+		// which PHP renders as '' - for a value it cannot encode, giving
+		// `window.axeptioSettings = ;`. That is a SyntaxError, and it would take the
+		// SDK loader below it and the rest of the head block with it (#141).
+		$axeptio_settings = ScriptTag::json_literal(
 			$this->settings(),
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);

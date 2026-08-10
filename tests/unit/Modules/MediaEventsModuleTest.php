@@ -69,6 +69,41 @@ final class MediaEventsModuleTest extends TestCase {
 	);
 
 	/**
+	 * The trackers that request a third-party player SDK at runtime, and so take
+	 * the consent gate — in enqueue_scripts() order (#143).
+	 *
+	 * Kept as an explicit list rather than derived from all_trackers(): the split
+	 * is the thing under test, so a change to it must show up here as a diff.
+	 *
+	 * @var string[]
+	 */
+	private const SDK_FETCHING_TRACKERS = array(
+		'gtm4wp-youtube',
+		'gtm4wp-vimeo',
+		'gtm4wp-soundcloud',
+		'gtm4wp-dailymotion',
+		'gtm4wp-mixcloud',
+		'gtm4wp-cloudflarestream',
+		'gtm4wp-spotify',
+		'gtm4wp-twitch',
+	);
+
+	/**
+	 * The trackers that fetch nothing at all: HTML5 media binds to the native
+	 * element API, and Wistia, JW Player and VideoPress each hook a runtime the
+	 * page already loads. They get no gate, because there is no vendor request for
+	 * one to withhold (#143). In enqueue_scripts() order.
+	 *
+	 * @var string[]
+	 */
+	private const SDK_LESS_TRACKERS = array(
+		'gtm4wp-html5media',
+		'gtm4wp-wistia',
+		'gtm4wp-jwplayer',
+		'gtm4wp-videopress',
+	);
+
+	/**
 	 * Handles passed to wp_enqueue_script() during a test.
 	 *
 	 * @var string[]
@@ -331,16 +366,20 @@ final class MediaEventsModuleTest extends TestCase {
 
 	/**
 	 * #125 (option A): the consent gate is enqueued once, before the trackers,
-	 * and every tracker declares it as a dependency.
+	 * and every SDK-fetching tracker declares it as a dependency.
 	 *
 	 * The dependency is the load-order guarantee - without it a tracker could
 	 * read the flag before the gate had set it, which is a race that would show
 	 * up as intermittently missing media events rather than as anything
 	 * diagnosable.
 	 *
+	 * #143: a tracker that fetches nothing must NOT declare it. That half is
+	 * asserted here alongside the positive case, so the two cannot drift apart -
+	 * the pair is the whole contract.
+	 *
 	 * @return void
 	 */
-	public function test_consent_gate_is_enqueued_once_and_every_tracker_depends_on_it(): void {
+	public function test_consent_gate_is_enqueued_once_and_every_sdk_fetching_tracker_depends_on_it(): void {
 		$deps   = array();
 		$handle = MediaEventsModule::GATE_HANDLE;
 
@@ -369,7 +408,11 @@ final class MediaEventsModuleTest extends TestCase {
 		$this->assertSame( $handle, $this->enqueued[0], 'The gate is enqueued before the first tracker.' );
 
 		$this->assertContains( $handle, $deps['gtm4wp-vimeo'] );
-		$this->assertContains( $handle, $deps['gtm4wp-html5media'] );
+		$this->assertNotContains(
+			$handle,
+			$deps['gtm4wp-html5media'],
+			'HTML5 media fetches no SDK, so depending on the gate would only make it undequeuable for nothing.'
+		);
 
 		// Our own build file, never a vendor URL - the gate exists to be blocked,
 		// so it must not itself be a third-party request.
@@ -430,16 +473,82 @@ final class MediaEventsModuleTest extends TestCase {
 	 * request for every remaining one. The assignment is idempotent, so repeating
 	 * it is free; publishing it once is what would not be.
 	 *
+	 * #143 narrowed "every tracker" to "every SDK-fetching tracker": the flag has
+	 * to track the gate exactly, and a tracker with nothing to fetch gets no gate.
+	 * Announcing an expectation no gate was enqueued for would make an SDK-fetching
+	 * tracker loaded some other way read "expected but never ran" as a refusal.
+	 *
 	 * @return void
 	 */
-	public function test_gate_expectation_is_published_for_every_tracker(): void {
+	public function test_gate_expectation_is_published_for_every_sdk_fetching_tracker(): void {
 		$module = $this->make_module( array_fill_keys( array_keys( self::all_trackers() ), true ) );
 		$module->enqueue_scripts();
 
 		$handles = array_column( $this->gate_expectations(), 0 );
 
-		$this->assertSame( array_values( self::all_trackers() ), $handles );
+		$this->assertSame( self::SDK_FETCHING_TRACKERS, $handles );
 		$this->assertNotContains( MediaEventsModule::GATE_HANDLE, $handles );
+
+		// Both directions (TS-2): the four that fetch nothing must be absent, not
+		// merely un-asserted.
+		foreach ( self::SDK_LESS_TRACKERS as $sdk_less ) {
+			$this->assertNotContains(
+				$sdk_less,
+				$handles,
+				$sdk_less . ' fetches no SDK, so it must not announce a gate expectation.'
+			);
+		}
+	}
+
+	/**
+	 * #143: a site running only the trackers that fetch nothing gets no gate.
+	 *
+	 * The gate exists to be a blockable stand-in for a vendor request. Where there
+	 * is no vendor request - HTML5 media, Wistia, JW Player and VideoPress all bind
+	 * to something already on the page - it is an extra <script src> on every page
+	 * view that gates nothing, and "block gtm4wp-media-gate to stop every SDK
+	 * request" would read as a working lever while doing nothing at all.
+	 *
+	 * @return void
+	 */
+	public function test_consent_gate_is_not_enqueued_for_trackers_that_fetch_no_sdk(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_HTML5MEDIA => true,
+				GTM4WP_OPTION_EVENTS_WISTIA     => true,
+				GTM4WP_OPTION_EVENTS_JWPLAYER   => true,
+				GTM4WP_OPTION_EVENTS_VIDEOPRESS => true,
+			)
+		);
+		$module->enqueue_scripts();
+
+		$this->assertSame( self::SDK_LESS_TRACKERS, $this->enqueued, 'Only the four bundles, no gate.' );
+		$this->assertNotContains( MediaEventsModule::GATE_HANDLE, $this->enqueued );
+		$this->assertSame( array(), $this->gate_expectations(), 'No gate means no expectation to publish.' );
+	}
+
+	/**
+	 * ...but one SDK-fetching tracker anywhere in the set brings the gate back for
+	 * itself, without giving it to the ones that do not need it. The pair of tests
+	 * is what stops #143's fix from being read as "the gate is optional".
+	 *
+	 * @return void
+	 */
+	public function test_one_sdk_fetching_tracker_brings_the_gate_back(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_HTML5MEDIA => true,
+				GTM4WP_OPTION_EVENTS_VIMEO      => true,
+			)
+		);
+		$module->enqueue_scripts();
+
+		$this->assertContains( MediaEventsModule::GATE_HANDLE, $this->enqueued );
+		$this->assertSame(
+			array( 'gtm4wp-vimeo' ),
+			array_column( $this->gate_expectations(), 0 ),
+			'Only the tracker that actually fetches an SDK expects the gate.'
+		);
 	}
 
 	/**

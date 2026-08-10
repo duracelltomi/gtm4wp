@@ -362,6 +362,61 @@ final class DataLayerTest extends FrontendTestCase {
 	}
 
 	/**
+	 * #141, and the sibling of the test directly above: wrapper_fragments() guarded
+	 * the encoder's false return for the wrapper ARGUMENTS while the push object
+	 * three lines below it did not, so an unencodable event emitted `.push()` - a
+	 * call with no arguments that silently pushes nothing, or pushes `undefined`
+	 * once a wrapper is involved. Omit the statement instead.
+	 *
+	 * @return void
+	 */
+	public function test_flush_pushes_omits_the_statement_when_the_object_cannot_be_encoded(): void {
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->queue_push( 'view_item', array( 'value' => NAN ) );
+
+		$datalayer->flush_pushes();
+
+		// The argument-less call is the defect; assert it is absent in both the
+		// bare and the wrapped spelling (TS-2).
+		$this->assertStringNotContainsString( 'dataLayer.push();', $captured[0] );
+		$this->assertStringNotContainsString( '.push(', $captured[0] );
+	}
+
+	/**
+	 * An unencodable event must not take its neighbours with it: the queue is
+	 * flushed as a whole, so dropping one entry has to leave the rest emitted.
+	 *
+	 * @return void
+	 */
+	public function test_flush_pushes_keeps_encodable_events_when_a_sibling_cannot_be_encoded(): void {
+		$captured = array();
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code, $position ) use ( &$captured ) {
+				$captured[] = $code;
+			}
+		);
+
+		$datalayer = new DataLayer( $this->make_options() );
+		$datalayer->queue_push( 'broken_event', array( 'value' => NAN ) );
+		$datalayer->queue_push( 'view_item', array( 'value' => 42 ) );
+
+		$datalayer->flush_pushes();
+
+		$all = implode( "\n", $captured );
+
+		$this->assertStringContainsString( 'dataLayer.push({"event":"view_item","value":42});', $all );
+		$this->assertStringNotContainsString( 'broken_event', $all );
+		$this->assertStringNotContainsString( 'dataLayer.push();', $all );
+	}
+
+	/**
 	 * Third party code appends entries to the compat global by hand and will never
 	 * carry the wrapper keys. Reading them must not warn or fatal.
 	 *

@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\ClientDeviceData;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\AbstractModule;
 
 defined( 'ABSPATH' ) || exit;
@@ -90,7 +91,7 @@ final class ClientDeviceDataModule extends AbstractModule {
 
 		wp_add_inline_script(
 			'gtm4wp-client-device-data',
-			'var gtm4wp_clientdevice_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+			'var gtm4wp_clientdevice_config = ' . ScriptTag::json_literal( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 			'before'
 		);
 	}

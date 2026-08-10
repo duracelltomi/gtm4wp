@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\VisitorData;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\AbstractModule;
 use GTM4WP\Options\Options;
 
@@ -169,7 +170,7 @@ final class VisitorDataModule extends AbstractModule {
 
 		wp_add_inline_script(
 			'gtm4wp-visitor-data',
-			'var gtm4wp_visitordata_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+			'var gtm4wp_visitordata_config = ' . ScriptTag::json_literal( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 			'before'
 		);
 	}

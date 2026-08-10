@@ -65,6 +65,44 @@ final class ScriptTag {
 	}
 
 	/**
+	 * Encodes one value as a JavaScript literal, never returning an empty string.
+	 *
+	 * The encoder returns FALSE for a value it cannot encode, and PHP renders
+	 * FALSE as '' in string concatenation - so a sink that writes
+	 * `'var x = ' . wp_json_encode( $v, $f ) . ';'` emits `var x = ;`, a SyntaxError
+	 * that takes down the WHOLE <script> block rather than the one value. The
+	 * reachable triggers are INF/NAN, a resource, and nesting past the encoder's
+	 * depth limit; invalid UTF-8 is NOT one, because wp_json_encode() repairs that
+	 * itself (_wp_json_sanity_check), which is why no request-sourced string can get
+	 * here. It takes a value supplied by a third party through one of the public
+	 * filters - which is exactly the input this plugin is built to accept.
+	 *
+	 * Falling back to the `null` literal keeps the block parseable and confines the
+	 * failure to one value. Every JS reader of these globals already copes with the
+	 * value being absent (`window.x || {}`, `typeof x === 'string' ? …`), and `null`
+	 * takes the same branch as absent at each of them.
+	 *
+	 * This lives here, next to the wp_kses/ampersand contract, because it is the same
+	 * question those answer: what has to be true for a string to be safe to put in a
+	 * <script> body. It was private to ContainerCode until 2026-08-10 with a single
+	 * caller, so eight sibling sinks kept the defect it was written to fix (#141).
+	 *
+	 * Use this where the assignment MUST exist. Where the whole statement can simply
+	 * be left out, prefer that: call wp_json_encode() directly, test `false ===`, and
+	 * omit - an absent key is honest where an invented `null` is not (RI-13).
+	 * DataLayer::wrapper_fragments() is the reference for that shape.
+	 *
+	 * @param mixed $value The value to encode.
+	 * @param int   $flags wp_json_encode() flags for this value's context.
+	 * @return string A JavaScript literal, never an empty string.
+	 */
+	public static function json_literal( $value, int $flags ): string {
+		$json = wp_json_encode( $value, $flags );
+
+		return false === $json ? 'null' : $json;
+	}
+
+	/**
 	 * Safely outputs an inline script block.
 	 *
 	 * The block is sanitized with wp_kses() so only the allow-listed <script>

@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Frontend\ScriptTag;
@@ -223,6 +224,43 @@ final class PurchaseTrackingTest extends TestCase {
 			trim( (string) json_encode( "a\x22\x3E", $flags ), '"' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 			$output,
 			'The coupon " and > must be hex-encoded (JSON_HEX_QUOT / JSON_HEX_TAG).'
+		);
+	}
+
+	/**
+	 * #141: order data reaches the sink through public filters, so a third party
+	 * can put a value in it that wp_json_encode() refuses. The encoder then returns
+	 * false, PHP concatenates that as '', and the emitted line was `.push()` - a
+	 * call that pushes nothing.
+	 *
+	 * The part that makes this worse than a dropped event is the line after it:
+	 * flagging _ga_tracked on an order whose event was never actually pushed
+	 * suppresses that purchase permanently, on every later page view too. So the
+	 * assertion that matters is the meta one - bailing has to leave the order
+	 * un-flagged so the next request can try again.
+	 *
+	 * @return void
+	 */
+	public function test_does_not_flag_order_tracked_when_the_payload_cannot_be_encoded(): void {
+		$order = $this->make_order();
+
+		Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )
+			->andReturn( array( 'brokenValue' => NAN ) );
+
+		$output = $this->run_thankyou(
+			array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ),
+			$order
+		);
+
+		// The argument-less push is the defect.
+		$this->assertStringNotContainsString( 'dataLayer.push();', $output );
+		$this->assertStringNotContainsString( '.push(', $output );
+
+		// ...and the order must stay eligible for a later attempt.
+		$this->assertArrayNotHasKey(
+			'_ga_tracked',
+			$order->saved_meta,
+			'An order whose purchase event was never emitted must not be flagged as tracked.'
 		);
 	}
 

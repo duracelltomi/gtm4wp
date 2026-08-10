@@ -427,6 +427,47 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringNotContainsString( '"orderNumber":42', $output, 'A zero-padded order number must not be coerced into a JSON number.' );
 	}
 
+	/**
+	 * #141: the primary data layer sink concatenated the encoder result straight
+	 * into the block, so a value wp_json_encode() refuses emitted
+	 * `var dataLayer_content = ;` - a SyntaxError that took the whole head
+	 * <script>, the data layer initialization inside it AND every container loader
+	 * after it. The guard that existed for exactly this (ContainerCode's private
+	 * json_literal(), now ScriptTag::json_literal()) had one caller and never
+	 * reached here.
+	 *
+	 * NAN, not invalid UTF-8: real wp_json_encode() repairs bad UTF-8, so only a
+	 * trigger that fails in production too proves anything here.
+	 *
+	 * @return void
+	 */
+	public function test_header_begin_omits_the_datalayer_push_when_the_content_cannot_be_encoded(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn( array( 'brokenValue' => NAN ) );
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		// The empty assignment is the defect. Assert its absence directly, in both
+		// spellings it could take (TS-2).
+		$this->assertStringNotContainsString( 'var dataLayer_content = ;', $output );
+		$this->assertStringNotContainsString( 'var dataLayer_content =  ;', $output );
+
+		// Omitted, not invented: no assignment and no push at all, rather than a
+		// `null` the consumer would read as data (RI-13).
+		$this->assertStringNotContainsString( 'var dataLayer_content', $output );
+		$this->assertStringNotContainsString( 'dataLayer.push( dataLayer_content );', $output );
+
+		// ...and the failure stays confined to the data layer content: the block
+		// still closes and the container still loads. This is what separates the
+		// fix from the defect - both omit a usable data layer, only one keeps GTM.
+		$this->assertStringContainsString( "'GTM-AAA111'", $output );
+		$this->assertStringContainsString( '</script>', $output );
+	}
+
 	public function test_header_begin_keeps_typed_numbers_as_json_numbers(): void {
 		// The counter-direction of dropping JSON_NUMERIC_CHECK: values the
 		// builders type as PHP floats/ints (prices, totals, quantities) must

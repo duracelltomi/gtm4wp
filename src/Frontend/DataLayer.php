@@ -263,10 +263,21 @@ final class DataLayer {
 			}
 
 			if ( array_key_exists( 'datalayer_object', $one_event ) ) {
-				list( $wrapper_open, $wrapper_close ) = $this->wrapper_fragments( $one_event );
+				// Same false-return guard wrapper_fragments() applies to the wrapper
+				// ARGUMENTS a few lines above, which is where this one was missing
+				// until 2026-08-10 (#141): an unencodable object emitted `.push()`,
+				// a call with no arguments that silently pushes nothing - or, with a
+				// wrapper, pushes undefined into the data layer. Skip the statement
+				// instead, so a queued event that cannot be serialized is absent
+				// rather than present-and-meaningless (RI-13).
+				$encoded_object = wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
-				$datalayer_push_code .= '
-	' . esc_js( $datalayer_name ) . '.push(' . $wrapper_open . wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . $wrapper_close . ');';
+				if ( false !== $encoded_object ) {
+					list( $wrapper_open, $wrapper_close ) = $this->wrapper_fragments( $one_event );
+
+					$datalayer_push_code .= '
+	' . esc_js( $datalayer_name ) . '.push(' . $wrapper_open . $encoded_object . $wrapper_close . ');';
+				}
 			}
 
 			if ( array_key_exists( 'js_after', $one_event ) ) {

@@ -137,7 +137,7 @@ final class ContainerCode {
 		$_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 ' . $this->script_tag->opening_tag() . '
-	var gtm4wp_datalayer_name = ' . self::json_literal( $datalayer_name, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
+	var gtm4wp_datalayer_name = ' . ScriptTag::json_literal( $datalayer_name, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
 	var ' . $datalayer_name . ' = ' . $datalayer_name . ' || [];';
 
 		// Load in the global variables from the gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter.
@@ -220,11 +220,11 @@ final class ContainerCode {
 		}
 
 		if ( is_array( $value ) ) {
-			return self::json_literal( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+			return ScriptTag::json_literal( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 		}
 
 		if ( is_int( $value ) || is_float( $value ) ) {
-			return self::json_literal( $value, 0 );
+			return ScriptTag::json_literal( $value, 0 );
 		}
 
 		// Everything else is rendered as a JSON string literal, with the SAME hex
@@ -235,32 +235,10 @@ final class ContainerCode {
 		// (RI-4/PA-4, #72). Verified inert, never a break-out: esc_js backslashed
 		// the quotes. This is a data-correctness fix, and it makes every branch of
 		// this function agree on one encoder.
-		return self::json_literal(
+		return ScriptTag::json_literal(
 			is_scalar( $value ) ? (string) $value : '',
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);
-	}
-
-	/**
-	 * Encodes one value as a JavaScript literal, never returning an empty string.
-	 *
-	 * The encoder returns false when it cannot encode the value at all. Casting that
-	 * to a string yields '', which would emit `const someVar = ;` - a SyntaxError
-	 * that takes down the WHOLE head <script> block, including the data layer
-	 * initialization above the global vars (#85). The filter that supplies these
-	 * values is public, so the input is third-party. Falling back to the `null`
-	 * literal keeps the block parseable and the failure confined to one variable,
-	 * which is the same "skip rather than break the page" principle the JS-identifier
-	 * allow-list on the variable NAME already applies in header_top().
-	 *
-	 * @param mixed $value The value to encode.
-	 * @param int   $flags wp_json_encode() flags for this value's context.
-	 * @return string A JavaScript literal, never an empty string.
-	 */
-	private static function json_literal( $value, int $flags ): string {
-		$json = wp_json_encode( $value, $flags );
-
-		return false === $json ? 'null' : $json;
 	}
 
 	/**
@@ -373,11 +351,25 @@ final class ContainerCode {
 			// really are numbers (prices, totals, counts) are typed at their source
 			// instead - the same contract the additional-push and cart-fragments
 			// sinks have always had, so all sinks now agree on types.
-			$script_tag .= '
-	var dataLayer_content = ' . wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';';
+			$datalayer_json = wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
-			$script_tag .= '
+			// Omit BOTH lines rather than emit a literal we do not have (#141).
+			// wp_json_encode() returns false for a value it cannot encode - INF/NAN,
+			// a resource, or nesting past its depth limit, all of which reach the
+			// data layer only through the public compile filter - and PHP renders
+			// false as '', so concatenating it here would emit
+			// `var dataLayer_content = ;`: a SyntaxError that takes this whole block,
+			// the data layer initialization in it, and every container loader after
+			// it. Dropping the push instead costs one page's data layer content and
+			// leaves the container loading. See ScriptTag::json_literal() for the
+			// assignment-position half of this rule.
+			if ( false !== $datalayer_json ) {
+				$script_tag .= '
+	var dataLayer_content = ' . $datalayer_json . ';';
+
+				$script_tag .= '
 	' . esc_js( $datalayer_name ) . '.push( dataLayer_content );';
+			}
 		}
 
 		$script_tag .= '
@@ -419,7 +411,7 @@ final class ContainerCode {
 		// its own quotes and the emitted line stays byte-identical to the previous
 		// output for an ordinary role slug - which is what keeps 1.x parity and the
 		// existing byte assertions (BE-1) meaningful.
-		$role_message = self::json_literal(
+		$role_message = ScriptTag::json_literal(
 			'[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $user_role . ' !!!',
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);

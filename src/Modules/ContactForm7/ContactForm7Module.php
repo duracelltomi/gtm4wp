@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\ContactForm7;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\AbstractModule;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,7 +82,7 @@ final class ContactForm7Module extends AbstractModule {
 
 		wp_add_inline_script(
 			'gtm4wp-contact-form-7-tracker',
-			'var gtm4wp_cf7_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+			'var gtm4wp_cf7_config = ' . ScriptTag::json_literal( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 			'before'
 		);
 	}

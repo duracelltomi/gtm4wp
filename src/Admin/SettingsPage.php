@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Admin;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\Registry;
 
 defined( 'ABSPATH' ) || exit;
@@ -151,7 +152,7 @@ final class SettingsPage {
 
 		wp_add_inline_script(
 			'gtm4wp-admin-app',
-			'var gtm4wpSettings = ' . wp_json_encode( $this->bootstrap_data(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+			'var gtm4wpSettings = ' . ScriptTag::json_literal( $this->bootstrap_data(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 			'before'
 		);
 	}

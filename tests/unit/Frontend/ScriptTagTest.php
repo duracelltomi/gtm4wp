@@ -266,4 +266,66 @@ final class ScriptTagTest extends FrontendTestCase {
 
 		$this->assertSame( '<noscript>plain &amp; markup</noscript>', $output );
 	}
+
+	/**
+	 * #141: the guard that makes an unencodable value survivable.
+	 *
+	 * NAN is used deliberately rather than an invalid UTF-8 sequence: real
+	 * wp_json_encode() REPAIRS bad UTF-8 (_wp_json_sanity_check), so a test built
+	 * on that trigger would pass against the stub and prove nothing about
+	 * production. NAN fails in both, which is what makes this case faithful
+	 * (test-review UC-3 - the double must be no more permissive than the real
+	 * collaborator).
+	 *
+	 * @return void
+	 */
+	public function test_json_literal_falls_back_to_the_null_literal_when_the_value_cannot_be_encoded(): void {
+		$literal = ScriptTag::json_literal( array( 'value' => NAN ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		// Both directions (TS-2): the parseable fallback is present AND the empty
+		// string that would emit `var x = ;` is absent. The second assertion is the
+		// one that fails if the guard is removed.
+		$this->assertSame( 'null', $literal );
+		$this->assertNotSame( '', $literal, 'An empty literal makes the whole <script> block a SyntaxError.' );
+	}
+
+	/**
+	 * The guard must be inert on every value that encodes normally.
+	 *
+	 * @return void
+	 */
+	public function test_json_literal_returns_the_encoded_value_unchanged_for_an_ordinary_value(): void {
+		$value = array(
+			'event' => 'view_item',
+			'sku'   => '000035180',
+		);
+
+		$this->assertSame(
+			wp_json_encode( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ),
+			ScriptTag::json_literal( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS )
+		);
+	}
+
+	/**
+	 * The hex flags must still reach the encoder through the helper - a guard that
+	 * quietly dropped them would turn every caller into an RI-2 defect.
+	 *
+	 * @return void
+	 */
+	public function test_json_literal_applies_the_hex_flags_it_is_given(): void {
+		$literal = ScriptTag::json_literal( array( 'x' => '</script>"&' ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		// Both directions (TS-2): the hex-escaped forms are present AND no raw
+		// break-out character survives. Built from the same encoder the source
+		// uses rather than hand-typed \uXXXX (TC-2).
+		$this->assertSame(
+			wp_json_encode( array( 'x' => '</script>"&' ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ),
+			$literal
+		);
+
+		$this->assertStringNotContainsString( '</script>', $literal );
+		$this->assertStringNotContainsString( '<', $literal );
+		$this->assertStringNotContainsString( '&', $literal );
+		$this->assertStringNotContainsString( '"&', $literal );
+	}
 }

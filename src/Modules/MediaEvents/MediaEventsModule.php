@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\MediaEvents;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\AbstractModule;
 
 defined( 'ABSPATH' ) || exit;
@@ -53,16 +54,21 @@ final class MediaEventsModule extends AbstractModule {
 	private bool $gate_enqueued = false;
 
 	/**
-	 * Handle of the consent gate every media tracker depends on.
+	 * Handle of the consent gate every SDK-FETCHING media tracker depends on.
 	 *
 	 * Public because *blocking* it - rewriting or removing its <script src> tag,
 	 * which is what a consent manager does through script_loader_tag - is a
 	 * documented way for a site to withhold every media provider's SDK request,
 	 * so the name is part of the plugin's contract rather than an internal detail.
 	 *
-	 * NOT dequeuing: see the note in enqueue_media_tracker(). Every tracker
-	 * declares this handle as a dependency, and WordPress re-adds a registered
-	 * dependency to the print queue whether or not it was dequeued, so
+	 * Not every tracker: four of them fetch nothing (HTML5 media, Wistia, JW
+	 * Player, VideoPress), so they neither enqueue the gate nor depend on it, and
+	 * a site running only those never receives it at all - there would be no
+	 * vendor request for it to withhold (#143).
+	 *
+	 * NOT dequeuing: see the note in enqueue_media_tracker(). Each SDK-fetching
+	 * tracker declares this handle as a dependency, and WordPress re-adds a
+	 * registered dependency to the print queue whether or not it was dequeued, so
 	 * wp_dequeue_script() on this handle has no effect at all. The server-side
 	 * switch is the gtm4wp_media_sdk_blocked filter.
 	 */
@@ -197,22 +203,47 @@ final class MediaEventsModule extends AbstractModule {
 	 * (see enqueue_gate()) and publishes the third-party SDK veto, when the site
 	 * has set one - see sdk_blocked().
 	 *
-	 * @param string $handle    Script handle.
-	 * @param string $file      File name inside the build directory.
-	 * @param array  $deps      Script dependencies.
-	 * @param bool   $in_footer Whether to print the script in the footer.
+	 * @param string $handle      Script handle.
+	 * @param string $file        File name inside the build directory.
+	 * @param array  $deps        Script dependencies.
+	 * @param bool   $in_footer   Whether to print the script in the footer.
+	 * @param bool   $fetches_sdk Whether this tracker requests a third-party player
+	 *                            SDK at runtime. False for the trackers that have
+	 *                            nothing to fetch (see enqueue_scripts()); they get
+	 *                            no consent gate, because there is no vendor request
+	 *                            for one to withhold. Flip this the moment such a
+	 *                            tracker gains an SDK.
 	 * @return void
 	 */
-	private function enqueue_media_tracker( string $handle, string $file, array $deps, bool $in_footer ): void {
-		$this->enqueue_gate( $in_footer );
+	private function enqueue_media_tracker( string $handle, string $file, array $deps, bool $in_footer, bool $fetches_sdk = true ): void {
+		// The gate only has a job where a vendor request exists to refuse. Four of
+		// the twelve trackers fetch nothing at all, so on a site running only those
+		// - self-hosted HTML5 video is the ordinary case - the gate would be an
+		// extra <script src> on every page that gates nothing, and "block
+		// gtm4wp-media-gate to stop every SDK request" would read as a lever that
+		// works while doing nothing at all (#143).
+		if ( $fetches_sdk ) {
+			$this->enqueue_gate( $in_footer );
+		}
 
-		// Declared as a dependency of every tracker, not merely enqueued beside
-		// them: WordPress then guarantees the gate is printed first, so a tracker
-		// can never read the flag before the gate has had the chance to set it.
-		// That ordering is load-bearing rather than defensive - the bundles are
-		// enqueued with strategy 'defer', so at the moment a tracker runs
-		// document.readyState is already 'interactive' and gtm4wpOnReady() calls
-		// the init synchronously, reading the flag right then.
+		// Declared as a dependency of every SDK-fetching tracker, not merely
+		// enqueued beside them: WordPress then guarantees the gate is printed
+		// first, so a tracker can never read the flag before the gate has had the
+		// chance to set it. That ordering is load-bearing rather than defensive -
+		// the bundles are enqueued with strategy 'defer', so at the moment a
+		// tracker runs document.readyState is already 'interactive' and
+		// gtm4wpOnReady() calls the init synchronously, reading the flag right
+		// then.
+		//
+		// The 'defer' half of that was verified against core rather than assumed
+		// (PA-16: name the WordPress function that carries the claim and read it).
+		// WP_Scripts::filter_eligible_strategies() demotes a handle to blocking for
+		// an inline script attached in the 'after' position only - "Handles with
+		// inline scripts attached in the 'after' position cannot be delayed",
+		// because an 'after' inline would run before the delayed script. Every
+		// inline script this module attaches uses 'before', so the trackers keep
+		// their deferred strategy and the reasoning above stands. Re-check this if
+		// any of them ever moves to 'after'.
 		//
 		// The edge has a consequence worth stating where it is created, because
 		// it is the opposite of what it looks like: it makes this handle
@@ -224,7 +255,9 @@ final class MediaEventsModule extends AbstractModule {
 		// a missing dependency makes all_deps() drop every tracker that names it
 		// (and emits _doing_it_wrong on WP 6.9.1+). Blocking the tag works;
 		// the gtm4wp_media_sdk_blocked filter works.
-		$deps[] = self::GATE_HANDLE;
+		if ( $fetches_sdk ) {
+			$deps[] = self::GATE_HANDLE;
+		}
 
 		$this->enqueue_script( $handle, $file, $deps, $in_footer );
 
@@ -244,7 +277,14 @@ final class MediaEventsModule extends AbstractModule {
 		// blocking any single tracker must not take the expectation away from the
 		// others. The assignment is idempotent, so repeating it costs a few bytes
 		// and nothing else.
-		wp_add_inline_script( $handle, 'window.gtm4wp_media_gate_expected = true;', 'before' );
+		//
+		// It tracks the gate EXACTLY, which is why it sits under the same
+		// condition: announcing an expectation no gate was enqueued for would make
+		// an SDK-fetching tracker loaded some other way read "expected but never
+		// ran" as a refusal, failing closed on a page where nothing was refused.
+		if ( $fetches_sdk ) {
+			wp_add_inline_script( $handle, 'window.gtm4wp_media_gate_expected = true;', 'before' );
+		}
 
 		if ( ! $this->dynamic_flag_published && $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_observe_dynamic = true;', 'before' );
@@ -259,6 +299,10 @@ final class MediaEventsModule extends AbstractModule {
 
 	/**
 	 * Enqueues the consent gate once, and tells the trackers to expect it.
+	 *
+	 * Only reached from a tracker that actually fetches an SDK, so a site running
+	 * only the four fetch-nothing trackers never pays for a gate with nothing to
+	 * gate (#143). A tracker that gains an SDK must flip its $fetches_sdk argument.
 	 *
 	 * The gate (js/frontend/gtm4wp-media-gate.js) carries no logic. It exists to
 	 * be a real, enqueued `<script src>` that a consent manager can refuse by
@@ -387,7 +431,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Vanilla tracker: it binds to <video>/<audio> elements with the
 			// native addEventListener API and has no SDK to fetch at all.
-			$this->enqueue_media_tracker( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_DAILYMOTION ) ) {
@@ -422,7 +466,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			wp_add_inline_script(
 				'gtm4wp-dailymotion',
-				'var gtm4wp_dailymotion_config = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+				'var gtm4wp_dailymotion_config = ' . ScriptTag::json_literal( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
 				'before'
 			);
 		}
@@ -446,7 +490,7 @@ final class MediaEventsModule extends AbstractModule {
 			// player runtime and the tracker binds through the global
 			// `window._wq` ready queue, so it works whether that runtime is
 			// already present or arrives later.
-			$this->enqueue_media_tracker( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_JWPLAYER ) ) {
@@ -454,7 +498,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Nothing to fetch: the site already loads its own JW Player
 			// library; the tracker only hooks the existing `jwplayer` global.
-			$this->enqueue_media_tracker( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', array(), $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_VIDEOPRESS ) ) {
@@ -462,7 +506,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Nothing to fetch: VideoPress uses a postMessage API, so the
 			// tracker listens for messages from the player iframes directly.
-			$this->enqueue_media_tracker( 'gtm4wp-videopress', 'gtm4wp-videopress.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-videopress', 'gtm4wp-videopress.js', array(), $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_SPOTIFY ) ) {
