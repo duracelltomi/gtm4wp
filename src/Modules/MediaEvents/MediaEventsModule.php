@@ -36,6 +36,32 @@ final class MediaEventsModule extends AbstractModule {
 	private bool $dynamic_flag_published = false;
 
 	/**
+	 * Whether the third-party SDK veto has been published to the page.
+	 *
+	 * Same one-shot shape as $dynamic_flag_published: a single boolean the
+	 * shared helper reads, printed at most once per request.
+	 *
+	 * @var bool
+	 */
+	private bool $sdk_blocked_published = false;
+
+	/**
+	 * Whether the consent gate has been enqueued for this request.
+	 *
+	 * @var bool
+	 */
+	private bool $gate_enqueued = false;
+
+	/**
+	 * Handle of the consent gate every media tracker depends on.
+	 *
+	 * Public because blocking or dequeuing it is the documented way for a site
+	 * to withhold every media provider's SDK request, so the name is part of the
+	 * plugin's contract with consent managers rather than an internal detail.
+	 */
+	public const GATE_HANDLE = 'gtm4wp-media-gate';
+
+	/**
 	 * Module id.
 	 *
 	 * @return string
@@ -160,6 +186,10 @@ final class MediaEventsModule extends AbstractModule {
 	 * unless the site enabled GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC, so the shared
 	 * MutationObserver is never created on sites that do not need it.
 	 *
+	 * On the first call it also enqueues the consent gate every tracker depends on
+	 * (see enqueue_gate()) and publishes the third-party SDK veto, when the site
+	 * has set one - see sdk_blocked().
+	 *
 	 * @param string $handle    Script handle.
 	 * @param string $file      File name inside the build directory.
 	 * @param array  $deps      Script dependencies.
@@ -167,12 +197,96 @@ final class MediaEventsModule extends AbstractModule {
 	 * @return void
 	 */
 	private function enqueue_media_tracker( string $handle, string $file, array $deps, bool $in_footer ): void {
+		$this->enqueue_gate( $in_footer );
+
+		// Declared as a dependency of every tracker, not merely enqueued beside
+		// them: WordPress then guarantees the gate is printed first, so a tracker
+		// can never read the flag before the gate has had the chance to set it.
+		// A dequeued gate does NOT drop the trackers with it - WordPress only
+		// discards a script whose dependency was never *registered*, and the gate
+		// stays registered either way.
+		$deps[] = self::GATE_HANDLE;
+
 		$this->enqueue_script( $handle, $file, $deps, $in_footer );
 
 		if ( ! $this->dynamic_flag_published && $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_observe_dynamic = true;', 'before' );
 			$this->dynamic_flag_published = true;
 		}
+
+		if ( ! $this->sdk_blocked_published && $this->sdk_blocked() ) {
+			wp_add_inline_script( $handle, 'window.gtm4wp_media_sdk_blocked = true;', 'before' );
+			$this->sdk_blocked_published = true;
+		}
+	}
+
+	/**
+	 * Enqueues the consent gate once, and tells the trackers to expect it.
+	 *
+	 * The gate (js/frontend/gtm4wp-media-gate.js) carries no logic. It exists to
+	 * be a real, enqueued `<script src>` that a consent manager or a
+	 * wp_dequeue_script() can refuse - because the SDK requests themselves are
+	 * made from JavaScript and therefore pass through no server-side control at
+	 * all. Blocking the gate withholds every media SDK request while leaving the
+	 * trackers running for the players already on the page.
+	 *
+	 * The companion inline flag is what makes a blocked gate distinguishable from
+	 * no gate at all. It is attached to the gate's own handle with position
+	 * 'before', so WordPress prints it in a SEPARATE <script> tag ahead of the
+	 * gate's src tag: a consent manager that rewrites the src tag therefore
+	 * suppresses the gate while leaving the expectation standing, which is
+	 * exactly the state that has to mean "refused". Were the flag inside the gate
+	 * file, blocking it would erase the evidence that it was ever expected, and
+	 * the trackers would fetch as though no gate existed.
+	 *
+	 * @param bool $in_footer Whether to print the script in the footer.
+	 * @return void
+	 */
+	private function enqueue_gate( bool $in_footer ): void {
+		if ( $this->gate_enqueued ) {
+			return;
+		}
+
+		$this->gate_enqueued = true;
+
+		$this->enqueue_script( self::GATE_HANDLE, 'gtm4wp-media-gate.js', array(), $in_footer );
+		wp_add_inline_script( self::GATE_HANDLE, 'window.gtm4wp_media_gate_expected = true;', 'before' );
+	}
+
+	/**
+	 * Whether the site has vetoed every third-party media SDK request.
+	 *
+	 * The trackers fetch their provider SDK from JavaScript, only on a page that
+	 * actually contains that provider's embed. That is a large privacy and
+	 * performance win over enqueuing eight SDKs on every page, and it costs one
+	 * thing: no <script src="https://vendor…"> tag is ever served, so the request
+	 * never passes through `script_loader_tag` and a consent manager whose rule
+	 * names the vendor's domain has nothing to match. This filter is that lever,
+	 * given back.
+	 *
+	 * Per-provider control needs nothing new: each tracker is its own script
+	 * handle, so `wp_dequeue_script( 'gtm4wp-vimeo' )` - or a consent manager
+	 * blocking that handle - stops Vimeo's SDK request by stopping the bundle
+	 * that would make it. This filter is the all-providers switch for the case
+	 * where consent has not been given yet and the answer is not per provider.
+	 *
+	 * Returning true does not disable tracking of players the page already
+	 * carries; it only withholds the vendor request, which is what a blocked
+	 * <script> tag used to do.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @return bool
+	 */
+	private function sdk_blocked(): bool {
+		/**
+		 * Filters whether GTM4WP may request a third-party media player SDK.
+		 *
+		 * @since 2.0.0
+		 *
+		 * @param bool $blocked Whether to withhold every media SDK request. Default false.
+		 */
+		return (bool) apply_filters( 'gtm4wp_media_sdk_blocked', false );
 	}
 
 	/**

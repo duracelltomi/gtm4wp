@@ -2424,6 +2424,48 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertTrue( $page->check_confirm_purchase_permission( $request() ), 'Scheme alone does not disqualify an origin.' );
 	}
 
+	/**
+	 * #130: an explicit default port in home_url() must not lock every guest out.
+	 *
+	 * A browser never puts the default port in Origin, so a site configured as
+	 * `https://shop.example:443` compared 443 against null and refused every
+	 * beacon - fail-closed, silent, and indistinguishable from the feature simply
+	 * not being used. Each side is normalized against its OWN scheme, which is
+	 * what keeps this from smuggling back the scheme comparison the gate leaves
+	 * out on purpose.
+	 *
+	 * @return void
+	 */
+	public function test_confirm_purchase_permission_treats_an_explicit_default_port_as_absent(): void {
+		Functions\when( 'wp_verify_nonce' )->justReturn( 1 );
+		$this->stub_origin_helpers();
+		Functions\when( 'home_url' )->justReturn( 'https://shop.example:443' );
+
+		$page    = $this->make_page_datalayer();
+		$request = static fn () => new \WP_REST_Request( array(), array( 'X-WP-Nonce' => 'good' ) );
+
+		$this->stub_origin = 'https://shop.example';
+		$this->assertTrue(
+			$page->check_confirm_purchase_permission( $request() ),
+			'An https site declaring :443 must still accept its own port-less Origin.'
+		);
+
+		// The scheme exclusion still holds: an http home_url behind a
+		// TLS-terminating proxy and an https Origin both reduce to "no port".
+		Functions\when( 'home_url' )->justReturn( 'http://shop.example:80' );
+		$this->assertTrue(
+			$page->check_confirm_purchase_permission( $request() ),
+			'An http site declaring :80 must accept an https Origin with no port.'
+		);
+
+		// And a genuinely different port survives normalization and is refused.
+		Functions\when( 'home_url' )->justReturn( 'https://shop.example:8443' );
+		$this->assertFalse(
+			$page->check_confirm_purchase_permission( $request() ),
+			'A non-default port is significant and must still be compared.'
+		);
+	}
+
 	public function test_confirm_purchase_permission_falls_back_to_the_referer_only_when_origin_is_absent(): void {
 		Functions\when( 'wp_verify_nonce' )->justReturn( 1 );
 		$this->stub_origin_helpers();

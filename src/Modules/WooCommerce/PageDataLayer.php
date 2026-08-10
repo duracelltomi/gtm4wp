@@ -93,8 +93,18 @@ final class PageDataLayer {
 		// cart are visitor/session specific, so they must not be baked into
 		// cacheable page HTML. They are omitted here and delivered client-side on
 		// WooCommerce's cart-fragments response instead (see visitor_cart_datalayer()),
-		// where they arrive as the gtm4wp.customerData and gtm4wp.cartData events. The
-		// content-driven events below (view_item / view_cart / begin_checkout /
+		// where they arrive as the gtm4wp.customerData and gtm4wp.cartData events.
+		//
+		// That response is one WooCommerce already makes on a store showing a mini-cart;
+		// on a store that is not, WooCommerceModule::enqueue_visitor_cart_channel() loads
+		// the script itself and the store therefore does pay one uncached wc-ajax round
+		// trip per browser tab. Only for a visitor who already has WooCommerce state -
+		// the enqueue is gated on that, because the script has no empty-cart bail-out of
+		// its own. This comment used to say "no new per-page request is added", which was
+		// true before that enqueue existed and is the sort of promise worth correcting
+		// rather than leaving for someone to trust.
+		//
+		// The content-driven events below (view_item / view_cart / begin_checkout /
 		// purchase) are URL-scoped or fire only on cache-excluded pages, so they stay
 		// server-side.
 		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
@@ -1459,7 +1469,44 @@ final class PageDataLayer {
 			return false;
 		}
 
-		return ( $parts['port'] ?? null ) === ( $site['port'] ?? null );
+		return self::normalized_port( $parts ) === self::normalized_port( $site );
+	}
+
+	/**
+	 * A URL's port, with its own scheme's default port reported as "absent".
+	 *
+	 * A browser never puts the default port in Origin, so a site whose home_url
+	 * carries one explicitly (`https://example.com:443`, which some reverse-proxy
+	 * setups produce) would otherwise compare 443 against null and refuse every
+	 * guest beacon on that site - silently, and fail-closed, which is the shape
+	 * that never generates a bug report.
+	 *
+	 * Each side is normalized against ITS OWN scheme rather than against the
+	 * other's. That is what keeps this from reintroducing the scheme comparison
+	 * url_matches_site() deliberately leaves out: an http home_url behind a
+	 * TLS-terminating proxy and an https Origin both reduce to "no explicit
+	 * port" and still match, which is the case the scheme exclusion exists for.
+	 * A genuinely different port (:8080, :8443) survives normalization and is
+	 * still refused.
+	 *
+	 * @param array<string, mixed> $parts Parsed URL parts from wp_parse_url().
+	 * @return int|null The significant port, or null when it is the scheme default.
+	 */
+	private static function normalized_port( array $parts ): ?int {
+		$defaults = array(
+			'http'  => 80,
+			'https' => 443,
+		);
+
+		$port = isset( $parts['port'] ) ? (int) $parts['port'] : null;
+
+		if ( null === $port ) {
+			return null;
+		}
+
+		$scheme = strtolower( (string) ( $parts['scheme'] ?? '' ) );
+
+		return ( isset( $defaults[ $scheme ] ) && $defaults[ $scheme ] === $port ) ? null : $port;
 	}
 
 	/**

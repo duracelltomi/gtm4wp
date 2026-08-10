@@ -547,6 +547,40 @@ describe( 'gtm4wp-dailymotion', () => {
 			expect( lastPush().mediaData.id ).toBe( 'x2jvvep' );
 		} );
 
+		/**
+		 * #127: createPlayer() throwing SYNCHRONOUSLY must restore the embed too.
+		 *
+		 * The embed is already gone by the time createPlayer() is called - the
+		 * container replaced it a few lines earlier - and a .catch() cannot see a
+		 * synchronous throw. Without the try/catch the visitor is left with an
+		 * empty div where their video was, no restore and no error event: a
+		 * tracking failure turned into a content failure, which is the one outcome
+		 * this tracker is written to avoid. Asserted through the same observable
+		 * contract as the rejection case, because the two must be indistinguishable
+		 * from the outside.
+		 */
+		it( 'restores the original embed when the player creation throws synchronously', async () => {
+			const thrown = new Error( 'SDK exploded' );
+			global.dailymotion.createPlayer = function () {
+				throw thrown;
+			};
+
+			await loadTracker();
+
+			expect( container() ).toBeNull();
+			const restored = document.querySelector( 'iframe' );
+			expect( restored.getAttribute( 'src' ) ).toBe(
+				'https://geo.dailymotion.com/player.html?video=x2jvvep&'
+			);
+			expect( restored.getAttribute( 'data-gtm4wp-media-wired' ) ).toBe(
+				'1'
+			);
+
+			expect( window.dataLayer ).toHaveLength( 1 );
+			expect( lastPush().mediaPlayerEvent ).toBe( 'error' );
+			expect( lastPush().mediaPlayerEventParam ).toBe( thrown );
+		} );
+
 		it( 'keeps a created player when only the event wiring fails', async () => {
 			// A rejection handler cannot see which half of the .then threw, so
 			// the two failures have to be told apart deliberately. Tearing the

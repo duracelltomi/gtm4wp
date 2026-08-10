@@ -61,7 +61,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Form fill events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor moves between elements of a form (comment, contact, etc).', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor moves between elements of a form (comment, contact, etc). Each event describes the field in inputID, inputName and inputClass and its form in formID, formName and formClass, and also populates Google Tag Manager\'s built-in Form variables: Form ID, Form Classes, Form URL (the form\'s action, resolved to an absolute URL) and Form Target. Google publishes no built-in Form Name variable, so the form\'s name attribute stays available on formName only. Note that the keys behind those built-ins are the ones Google Tag Manager\'s Clicks category reads, so on these events Click ID and Click Classes resolve to the form as well. No field value is ever included.', 'duracelltomi-google-tag-manager' ),
 				group: 'events'
 			),
 			new Field(

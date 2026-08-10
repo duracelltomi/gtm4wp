@@ -85,6 +85,66 @@ final class Helpers {
 	public const LIST_ATTRIBUTION_COOKIE_MAX_BYTES = 4096;
 
 	/**
+	 * Cookies whose mere PRESENCE means this browser already has WooCommerce
+	 * state - a cart, or a session holding guest checkout fields.
+	 *
+	 * The session cookie is matched by prefix because WooCommerce appends
+	 * COOKIEHASH to it, and that hash is derived from siteurl rather than from
+	 * anything readable here.
+	 *
+	 * @var string[]
+	 */
+	private const WC_STATE_COOKIES         = array( 'woocommerce_items_in_cart', 'woocommerce_cart_hash' );
+	private const WC_SESSION_COOKIE_PREFIX = 'wp_woocommerce_session_';
+
+	/**
+	 * Whether this browser plausibly has WooCommerce state worth delivering.
+	 *
+	 * A presence check over cookies and the login state - never a value read,
+	 * never a session or cart load. That restraint is the whole point: the
+	 * caller (WooCommerceModule::enqueue_visitor_cart_channel()) runs on every
+	 * front-end page of a store in cache-safe mode, and touching WC()->cart
+	 * there would perform exactly the session + cart load this gate exists to
+	 * avoid, handing a session cookie to a visitor who has none.
+	 *
+	 * This is PageDataLayer::oneshot_wc()'s rule applied to the second delivery
+	 * channel. That method's docblock states the consequence for the REST
+	 * endpoint - "page caches routinely bypass the cache for any visitor
+	 * carrying one, which would defeat the very mode this code serves" - and the
+	 * cart-fragments channel added later did not inherit it. Verified 2026-08-10
+	 * against WooCommerce's own client/legacy/js/frontend/cart-fragments.js: it
+	 * has NO empty-cart bail-out, so an ungated enqueue costs every visitor one
+	 * uncached wc-ajax round trip per browser tab. WooCommerce itself stopped
+	 * enqueuing that script on all routes in 7.8 for this reason.
+	 *
+	 * Logged-in counts on its own: the customer half of the payload is populated
+	 * for a logged-in visitor with an empty cart and no session cookie, and that
+	 * is precisely the visitor a cart-only gate would silently drop.
+	 *
+	 * @return bool
+	 */
+	public static function visitor_has_wc_state(): bool {
+		if ( is_user_logged_in() ) {
+			return true;
+		}
+
+		foreach ( self::WC_STATE_COOKIES as $one_cookie ) {
+			if ( isset( $_COOKIE[ $one_cookie ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only; no value is read.
+				return true;
+			}
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only; no value is read.
+		foreach ( array_keys( $_COOKIE ) as $one_name ) {
+			if ( 0 === strpos( (string) $one_name, self::WC_SESSION_COOKIE_PREFIX ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Name of the short-lived, JS-readable event cookie the cache-safe data layer
 	 * (issue #398, Phase 3) sets when a WooCommerce one-shot event is queued in the
 	 * session — a product re-added to the cart ("Undo") or a placed order awaiting

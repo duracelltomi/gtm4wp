@@ -44,6 +44,14 @@ final class NoticesTest extends TestCase {
 
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'esc_url_raw' )->returnArg();
+		// Modelled on core's real behaviour, never returnArg(): sanitize_key()
+		// lowercases and strips everything outside [a-z0-9_-], and that stripping
+		// is the whole reason the handler can hand an allow-list a value the
+		// request did not literally contain. An identity stub would make this
+		// test pass against a handler that did no sanitizing at all (TS-1/TS-16).
+		Functions\when( 'sanitize_key' )->alias(
+			static fn ( $key ) => (string) preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) )
+		);
 		Functions\when( 'get_current_user_id' )->justReturn( 1 );
 		// Brain Monkey's stubTranslationFunctions() does not cover _n(); the
 		// malformed-constant notice uses it for its singular/plural forms.
@@ -273,14 +281,17 @@ final class NoticesTest extends TestCase {
 	}
 
 	/**
-	 * A path-traversal-style notice id is reduced by basename() before the
-	 * allow-list check, so it cannot smuggle in an unexpected key.
+	 * A path-traversal-style notice id cannot smuggle in an unexpected key.
+	 *
+	 * The mechanism changed in 2.0 (esc_url_raw() + basename() -> sanitize_key(),
+	 * finding #131) and the observable contract did not: sanitize_key() strips the
+	 * dots and slashes, so this still reduces to the allow-listed key. Kept
+	 * because it pins the contract rather than the implementation.
 	 */
-	public function test_dismiss_notice_basenames_path_traversal_id(): void {
+	public function test_dismiss_notice_reduces_path_traversal_id(): void {
 		Functions\when( 'check_ajax_referer' )->justReturn( true );
 		Functions\when( 'current_user_can' )->justReturn( true );
 
-		// basename() reduces this to the allow-listed "enter-gtm-code".
 		$_POST['noticeid'] = '../../enter-gtm-code';
 
 		$this->make_notices()->dismiss_notice();
@@ -288,6 +299,26 @@ final class NoticesTest extends TestCase {
 		$this->assertCount( 1, $this->saved_meta );
 		$stored = json_decode( $this->saved_meta[0][1], true );
 		$this->assertTrue( $stored['enter-gtm-code'] );
+	}
+
+	/**
+	 * A hostile notice id carrying markup is dropped, in both directions: no
+	 * meta is written at all, and nothing resembling the payload survives
+	 * anywhere in what was stored (TS-2).
+	 *
+	 * The gate under test is the allow-list, not the sanitizer - which is the
+	 * point of #131. sanitize_key() would happily reduce this to a bare string;
+	 * it is array_key_exists() against DEFAULT_DISMISSES that refuses it.
+	 */
+	public function test_dismiss_notice_rejects_a_markup_bearing_id(): void {
+		Functions\when( 'check_ajax_referer' )->justReturn( true );
+		Functions\when( 'current_user_can' )->justReturn( true );
+
+		$_POST['noticeid'] = '<script>alert(1)</script>';
+
+		$this->make_notices()->dismiss_notice();
+
+		$this->assertCount( 0, $this->saved_meta, 'An id outside the allow-list must not be persisted.' );
 	}
 
 	/**

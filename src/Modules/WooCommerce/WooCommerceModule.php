@@ -405,25 +405,44 @@ final class WooCommerceModule extends AbstractModule {
 	 * refresh request, once per browser tab (its cache is per-tab sessionStorage), and
 	 * once per page view for a visitor who has blocked Web Storage.
 	 *
-	 * That enqueue is deliberately unguarded. WooCommerce registers the handle on every
-	 * frontend request, from a callback on the same wp_enqueue_scripts priority as this
-	 * one, so ours can run first and a "is it registered yet" check would be false and
-	 * skip the enqueue — a race, not a safety net. The handle-only form merely appends to
-	 * the queue, and WordPress resolves the queue against its registry when scripts are
-	 * printed, long after every enqueue callback has run. It is not declared as a
-	 * dependency of our runtime either: the runtime reads the placeholder once and then
-	 * observes it, so it does not need that script to have run first, and a dependency
-	 * would couple our loading to WooCommerce's on every page our runtime loads —
-	 * including pages with no WooCommerce at all. Localization needs no help, because
-	 * WooCommerce localizes each of its registered handles for whoever has it enqueued,
-	 * and the jquery and cookie dependencies come from its own registration.
+	 * That enqueue does not check whether WooCommerce has registered the handle yet.
+	 * WooCommerce registers it on every frontend request, from a callback on the same
+	 * wp_enqueue_scripts priority as this one, so ours can run first and a "is it
+	 * registered yet" check would be false and skip the enqueue — a race, not a safety
+	 * net. The handle-only form merely appends to the queue, and WordPress resolves the
+	 * queue against its registry when scripts are printed, long after every enqueue
+	 * callback has run. It is not declared as a dependency of our runtime either: the
+	 * runtime reads the placeholder once and then observes it, so it does not need that
+	 * script to have run first, and a dependency would couple our loading to
+	 * WooCommerce's on every page our runtime loads — including pages with no
+	 * WooCommerce at all. Localization needs no help, because WooCommerce localizes each
+	 * of its registered handles for whoever has it enqueued, and the jquery and cookie
+	 * dependencies come from its own registration.
+	 *
+	 * It IS gated on the visitor having WooCommerce state, though, and only that half is
+	 * gated — our own runtime always loads. WooCommerce's cart-fragments script has no
+	 * empty-cart bail-out (verified against its own source), so an ungated enqueue makes
+	 * every visitor of the store pay an uncached wc-ajax round trip per browser tab,
+	 * including one who has never touched the shop — which is what WooCommerce itself
+	 * stopped doing in 7.8, and what PageDataLayer::oneshot_wc() already refuses to do on
+	 * the other delivery channel for the same reason.
+	 *
+	 * Nothing is lost by waiting. A visitor with no WooCommerce state has an empty cart
+	 * and blank customer fields, so page-load delivery would carry nothing a tag could
+	 * use; and the moment they DO add something, WooCommerce's own wc-add-to-cart script
+	 * splices our fragment into the page from the add-to-cart response (the paragraph
+	 * above), so the very first cartData/customerData still fires on that same page
+	 * without this script. From their next page view onward the cookie exists and the
+	 * gate is open.
 	 *
 	 * @return void
 	 */
 	private function enqueue_visitor_cart_channel(): void {
 		$this->enqueue_script( 'gtm4wp-visitor-data', 'gtm4wp-visitor-data.js' );
 
-		wp_enqueue_script( 'wc-cart-fragments' );
+		if ( Helpers::visitor_has_wc_state() ) {
+			wp_enqueue_script( 'wc-cart-fragments' );
+		}
 	}
 
 	/**

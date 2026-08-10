@@ -59,8 +59,14 @@ final class ContainerRows {
 	 * Unicode letters): staying ASCII keeps the emitted snippet byte-identical
 	 * to 1.x for every name 1.x accepted except the hyphenated ones, which
 	 * never worked in either line.
+	 *
+	 * The D modifier is not decoration. Without it PCRE lets `$` match before a
+	 * trailing newline, so "name\n" passes a pattern that reads as though it
+	 * could not - and this pattern is the whole control for an unquoted sink, so
+	 * "reads as though it could not" is not good enough. Anchoring to the true
+	 * end of the subject is what makes the paragraphs above true.
 	 */
-	public const JS_IDENTIFIER_PATTERN = '/^[A-Za-z_$][A-Za-z0-9_$]*$/';
+	public const JS_IDENTIFIER_PATTERN = '/^[A-Za-z_$][A-Za-z0-9_$]*$/D';
 
 	/**
 	 * Whether a string is usable as a bare JavaScript identifier.

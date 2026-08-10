@@ -461,82 +461,95 @@ function gtm4wp_initDailymotionTracking() {
 			options.player = info.playerid;
 		}
 
-		// Whether createPlayer() got as far as handing over a player. The catch
-		// below covers the bind step too - a promise rejection handler cannot see
-		// which half of the .then threw - and the two failures call for opposite
-		// responses, so they are told apart here rather than guessed at.
+		// Whether createPlayer() got as far as handing over a player. The failure
+		// handler below covers the bind step too - a promise rejection handler
+		// cannot see which half of the .then threw - and the two failures call for
+		// opposite responses, so they are told apart here rather than guessed at.
 		let created = false;
 
-		dailymotion
-			.createPlayer( container.id, options )
-			.then( function ( player ) {
-				created = true;
-				gtm4wp_bindDailymotionPlayer(
-					player,
-					info.videoid,
-					videourl,
-					container
+		const gtm4wp_onDailymotionFailure = function ( error ) {
+			// The player exists and the visitor is watching it; only the
+			// event wiring failed. Tearing the container out here would
+			// destroy a working video and restart it from an iframe, to
+			// report a problem that is ours - so report it and stop.
+			if ( ! created ) {
+				// The original iframe is already gone by the time this runs,
+				// so without the restore a failure to TRACK the video becomes
+				// a failure to SHOW it: the visitor is left with an empty box
+				// where the player was. Put the untouched original back.
+				//
+				// Marked FIRST, then replaced: the restored iframe matches
+				// this tracker's selector again, so with runtime tracking on
+				// the shared observer would wire it, replace it, fail,
+				// restore it - forever.
+				dailymotion_frame.setAttribute(
+					'data-gtm4wp-media-wired',
+					'1'
 				);
-			} )
-			.catch( function ( error ) {
-				// The player exists and the visitor is watching it; only the
-				// event wiring failed. Tearing the container out here would
-				// destroy a working video and restart it from an iframe, to
-				// report a problem that is ours - so report it and stop.
-				if ( ! created ) {
-					// The original iframe is already gone by the time this runs,
-					// so without the restore a failure to TRACK the video becomes
-					// a failure to SHOW it: the visitor is left with an empty box
-					// where the player was. Put the untouched original back.
-					//
-					// Marked FIRST, then replaced: the restored iframe matches
-					// this tracker's selector again, so with runtime tracking on
-					// the shared observer would wire it, replace it, fail,
-					// restore it - forever.
-					dailymotion_frame.setAttribute(
-						'data-gtm4wp-media-wired',
-						'1'
+				if ( container.parentNode ) {
+					container.parentNode.replaceChild(
+						dailymotion_frame,
+						container
 					);
-					if ( container.parentNode ) {
-						container.parentNode.replaceChild(
-							dailymotion_frame,
-							container
-						);
-					}
 				}
+			}
 
-				// Reported like every other unrecoverable player failure in the
-				// family (see the Vimeo tracker's .catch): a mediaPlayerEvent named
-				// 'error' carrying the reason, measured on whichever node is
-				// actually on screen now.
-				window[ gtm4wp_datalayer_name ].push( {
-					event: 'gtm4wp.mediaPlayerEvent',
-					mediaType: 'dailymotion',
-					mediaData: {
-						id: info.videoid,
-						author: '',
-						title: info.videoid,
-						url: videourl,
-						duration: 0,
-					},
-					mediaCurrentTime: 0,
-					mediaPlayerEvent: 'error',
-					mediaPlayerEventParam: error,
-					...gtm4wpNativeVideoParams( {
-						provider: 'dailymotion',
-						status: '',
-						url: videourl,
-						title: info.videoid,
-						currentTime: 0,
-						duration: 0,
-						// Whichever node the branch above left on the page: the
-						// container still holding the player, or the restored
-						// embed. The other one is detached and would report no
-						// position at all.
-						element: created ? container : dailymotion_frame,
-					} ),
-				} );
+			// Reported like every other unrecoverable player failure in the
+			// family (see the Vimeo tracker's .catch): a mediaPlayerEvent named
+			// 'error' carrying the reason, measured on whichever node is
+			// actually on screen now.
+			window[ gtm4wp_datalayer_name ].push( {
+				event: 'gtm4wp.mediaPlayerEvent',
+				mediaType: 'dailymotion',
+				mediaData: {
+					id: info.videoid,
+					author: '',
+					title: info.videoid,
+					url: videourl,
+					duration: 0,
+				},
+				mediaCurrentTime: 0,
+				mediaPlayerEvent: 'error',
+				mediaPlayerEventParam: error,
+				...gtm4wpNativeVideoParams( {
+					provider: 'dailymotion',
+					status: '',
+					url: videourl,
+					title: info.videoid,
+					currentTime: 0,
+					duration: 0,
+					// Whichever node the branch above left on the page: the
+					// container still holding the player, or the restored
+					// embed. The other one is detached and would report no
+					// position at all.
+					element: created ? container : dailymotion_frame,
+				} ),
 			} );
+		};
+
+		// The try/catch is not belt and braces on top of the .catch: the embed is
+		// ALREADY GONE by this line (replaceChild above), and a promise rejection
+		// handler cannot see a synchronous throw. Without it, a createPlayer() that
+		// threw rather than rejected would leave the visitor looking at an empty
+		// div where their video was, with no restore and no error event - a
+		// tracking failure turned into a content failure, which is the one outcome
+		// this tracker is written to avoid.
+		try {
+			dailymotion
+				.createPlayer( container.id, options )
+				.then( function ( player ) {
+					created = true;
+					gtm4wp_bindDailymotionPlayer(
+						player,
+						info.videoid,
+						videourl,
+						container
+					);
+				} )
+				.catch( gtm4wp_onDailymotionFailure );
+		} catch ( error ) {
+			gtm4wp_onDailymotionFailure( error );
+		}
 	};
 
 	gtm4wpObserveMedia(

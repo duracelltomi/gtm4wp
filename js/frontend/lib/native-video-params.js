@@ -440,7 +440,17 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		};
 
 		element.setAttribute( 'data-gtm4wp-media-wired', '1' );
-		wireElement( element, liveElement );
+
+		// One provider's wiring must never cost another's. This runs inside
+		// forEach over every match on the page and, with runtime tracking on,
+		// inside the shared MutationObserver callback across every registered
+		// scanner - so an exception escaping here would abandon the remaining
+		// embeds and the remaining providers for that pass, from one bad embed.
+		// The tracker is responsible for its own cleanup (the Dailymotion one
+		// restores the embed it replaced); this only stops the blast radius.
+		try {
+			wireElement( element, liveElement );
+		} catch ( e ) {}
 
 		// Some SDKs REPLACE the element they are given with their own iframe
 		// rather than reusing it in place — Spotify's createController() does
@@ -486,6 +496,55 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		if ( '' === sdkSrc || sdkRequested ) {
 			return;
 		}
+
+		// Two ways the site can refuse this request, checked HERE rather than at
+		// the top of gtm4wpObserveMedia so a refusal costs the vendor request
+		// and nothing else: players already on the page are still wired, and a
+		// site that loads an SDK itself keeps working normally.
+		//
+		// 1. The gtm4wp_media_sdk_blocked filter, decided server-side.
+		// 2. The gate script (js/frontend/gtm4wp-media-gate.js), which exists to
+		//    be blockable: it is a real enqueued <script src>, so a consent
+		//    manager or a wp_dequeue_script() can refuse it, and refusing it
+		//    leaves gtm4wp_media_sdk_allowed unset.
+		//
+		// The gate is only consulted when PHP said it enqueued one. That
+		// distinction is what keeps "the gate was blocked" apart from "no gate
+		// is in play at all" - a tracker loaded on its own, or a unit test -
+		// which a bare `! allowed` check cannot tell apart, and getting it wrong
+		// in that direction silently ends media tracking rather than a request.
+		const gateExpected = !! window.gtm4wp_media_gate_expected;
+		const gateOpen =
+			! gateExpected || true === window.gtm4wp_media_sdk_allowed;
+
+		if ( window.gtm4wp_media_sdk_blocked || ! gateOpen ) {
+			sdkRequested = true;
+
+			// Only the gate case is reported, and only where the site asked for
+			// console output. The filter is a deliberate server-side decision
+			// and needs no telling; a blocked gate is something that happened TO
+			// the site, and it fails closed - so without a word here it looks
+			// exactly like a player that simply never fires (RI-20). Guarded
+			// with typeof because the flag is a top-level `const` the head block
+			// may never have printed.
+			if (
+				! window.gtm4wp_media_sdk_blocked &&
+				typeof gtm4wp_console_log !== 'undefined' &&
+				gtm4wp_console_log &&
+				window.console &&
+				window.console.warn
+			) {
+				window.console.warn(
+					'GTM4WP: a media player SDK was not loaded because gtm4wp-media-gate.js did not run. ' +
+						'That is expected if a consent manager or an optimization plugin blocked it, and it means ' +
+						'this player will not report any events. SDK: ' +
+						sdkSrc
+				);
+			}
+
+			return;
+		}
+
 		sdkRequested = true;
 
 		// Already usable: the site loads this SDK itself, or a re-executed

@@ -279,8 +279,13 @@ final class Notices {
 
 		$dismisses = $this->user_dismisses();
 
-		$noticeid = isset( $_POST['noticeid'] ) ? esc_url_raw( wp_unslash( $_POST['noticeid'] ) ) : '';
-		$noticeid = trim( basename( $noticeid ) );
+		// sanitize_key(), not esc_url_raw() + basename(): a notice id is an
+		// opaque key and never a URL, and a sanitizer that rewrites the value it
+		// is judging has no place in front of an allow-list (RI-18). The
+		// allow-list on the next line is what makes this safe either way - this
+		// only makes that obvious. Every DEFAULT_DISMISSES key is already
+		// lowercase kebab-case, so sanitize_key() passes them through untouched.
+		$noticeid = isset( $_POST['noticeid'] ) ? sanitize_key( wp_unslash( $_POST['noticeid'] ) ) : '';
 
 		if ( array_key_exists( $noticeid, $dismisses ) ) {
 			$dismisses[ $noticeid ] = true;

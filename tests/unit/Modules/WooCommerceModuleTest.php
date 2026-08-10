@@ -22,12 +22,33 @@ require_once __DIR__ . '/wc-blocks-stub.php';
  */
 final class WooCommerceModuleTest extends TestCase {
 
+	/**
+	 * Snapshot of $_COOKIE, restored in tearDown (TS-7).
+	 *
+	 * @var array<string, mixed>
+	 */
+	private array $cookie_backup = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 
 		// Reset the block-detection stub between tests (TS-7 isolation).
 		CartCheckoutUtils::$checkout_block = false;
 		CartCheckoutUtils::$cart_block     = false;
+
+		$this->cookie_backup = $_COOKIE;
+		$_COOKIE             = array();
+
+		// Stubbed in our own setUp rather than relied on from another file
+		// (TS-16). The default is the case that matters most for #124: an
+		// anonymous visitor who has never touched the shop.
+		Functions\when( 'is_user_logged_in' )->justReturn( false );
+	}
+
+	protected function tearDown(): void {
+		$_COOKIE = $this->cookie_backup;
+
+		parent::tearDown();
 	}
 
 	/**
@@ -439,10 +460,16 @@ final class WooCommerceModuleTest extends TestCase {
 	 * load. The runtime that reads the fragment and the script that fetches it are
 	 * useless apart, which is why both are asserted in one test.
 	 *
+	 * Since #124 the DELIVERING end is additionally gated on the visitor already
+	 * having WooCommerce state - WooCommerce's own cart-fragments script has no
+	 * empty-cart bail-out, so an ungated enqueue costs every visitor of the store an
+	 * uncached wc-ajax round trip per browser tab. The reading end is never gated.
+	 *
 	 * @return void
 	 */
 	public function test_cache_safe_mode_loads_both_ends_of_the_cart_fragments_channel(): void {
 		$this->stub_ordinary_page();
+		$_COOKIE['woocommerce_items_in_cart'] = '1';
 
 		$result = $this->run_enqueue(
 			$this->make_module(
@@ -461,6 +488,7 @@ final class WooCommerceModuleTest extends TestCase {
 	public function test_cart_content_option_alone_also_loads_the_channel(): void {
 		// The condition is an OR, so the cart-content half needs its own case.
 		$this->stub_ordinary_page();
+		$_COOKIE['woocommerce_items_in_cart'] = '1';
 
 		$result = $this->run_enqueue(
 			$this->make_module(
@@ -473,6 +501,89 @@ final class WooCommerceModuleTest extends TestCase {
 		);
 
 		$this->assertContains( 'gtm4wp-visitor-data', $result['scripts'] );
+		$this->assertContains( 'wc-cart-fragments', $result['scripts'] );
+	}
+
+	/**
+	 * #124: a visitor with no WooCommerce state costs the store no cart-fragments
+	 * request, while the reading end still loads.
+	 *
+	 * Both directions asserted (TS-2). The negative half is the finding; the
+	 * positive half is what stops a future "just skip the whole channel" from
+	 * passing this test, because the runtime is what delivers the very first
+	 * cartData - WooCommerce's own wc-add-to-cart script splices our fragment in
+	 * from the add-to-cart response, with no cart-fragments script involved.
+	 *
+	 * @return void
+	 */
+	public function test_cache_safe_mode_skips_cart_fragments_without_wc_state(): void {
+		$this->stub_ordinary_page();
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)
+		);
+
+		$this->assertContains( 'gtm4wp-visitor-data', $result['scripts'], 'The reading end is never gated.' );
+		$this->assertNotContains(
+			'wc-cart-fragments',
+			$result['scripts'],
+			'A visitor with no cart and no session must not pay WooCommerce cart-refresh request.'
+		);
+	}
+
+	/**
+	 * #124: a logged-in visitor opens the gate on its own, with no cookie at all.
+	 *
+	 * This is the case a cart-only gate would silently drop: the customer half of
+	 * the payload is populated for a logged-in visitor whose cart is empty.
+	 *
+	 * @return void
+	 */
+	public function test_cache_safe_mode_loads_cart_fragments_for_a_logged_in_visitor(): void {
+		$this->stub_ordinary_page();
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)
+		);
+
+		$this->assertContains( 'wc-cart-fragments', $result['scripts'] );
+	}
+
+	/**
+	 * #124: the WooCommerce session cookie opens the gate too - that is where a
+	 * guest's checkout-entered customer fields live, so gating on the cart cookie
+	 * alone would drop them. Matched by PREFIX, because WooCommerce appends
+	 * COOKIEHASH to the name.
+	 *
+	 * @return void
+	 */
+	public function test_cache_safe_mode_loads_cart_fragments_for_a_guest_with_a_session(): void {
+		$this->stub_ordinary_page();
+		$_COOKIE['wp_woocommerce_session_2f1e3b4c5d6a7b8c9d0e1f2a3b4c5d6e'] = 'guest|||1|||2|||3';
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)
+		);
+
 		$this->assertContains( 'wc-cart-fragments', $result['scripts'] );
 	}
 

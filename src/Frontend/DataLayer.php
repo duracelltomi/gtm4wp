@@ -34,20 +34,6 @@ final class DataLayer {
 	public const PUSH_HANDLE = 'gtm4wp-additional-datalayer-pushes';
 
 	/**
-	 * A single JavaScript identifier, and nothing else. queue_push()'s
-	 * $js_wrapper names a function that is written straight into a <script>
-	 * body, so it is validated against this before emission and silently
-	 * dropped when it does not match - the pattern is what keeps that
-	 * parameter from being a script-injection sink.
-	 *
-	 * The D modifier is not decoration: without it PCRE lets `$` match before a
-	 * trailing newline, so "name\n" would pass a pattern that reads as if it
-	 * could not. Anchoring it to the true end of the subject is what makes the
-	 * sentence above true.
-	 */
-	private const JS_IDENTIFIER_PATTERN = '/^[A-Za-z_$][A-Za-z0-9_$]*$/D';
-
-	/**
 	 * The most recently compiled data layer content, or null before the
 	 * first compile() call. Lets consumers (e.g. the AMP module) read the
 	 * compiled data without re-running the compile filter and its side
@@ -217,13 +203,21 @@ final class DataLayer {
 	 * degrades to an unwrapped push instead of a ReferenceError that would
 	 * take the whole event with it.
 	 *
+	 * The name is written unquoted into a <script> body, so what keeps this
+	 * parameter from being a script-injection sink is the identifier grammar -
+	 * and that grammar has exactly ONE definition in this plugin
+	 * (ContainerRows::is_valid_js_identifier(), PA-2). It is deliberately not
+	 * re-stated here: this class held its own copy until 2026-08-10 and the two
+	 * had already drifted apart in the modifier that anchors the pattern, which
+	 * is the drift PA-2 exists to stop.
+	 *
 	 * @param array $one_event A single entry of the push queue.
 	 * @return string[] The opening and closing fragment, in that order.
 	 */
 	private function wrapper_fragments( array $one_event ): array {
 		$wrapper = $one_event['js_wrapper'] ?? '';
 
-		if ( ! is_string( $wrapper ) || 1 !== preg_match( self::JS_IDENTIFIER_PATTERN, $wrapper ) ) {
+		if ( ! is_string( $wrapper ) || ! ContainerRows::is_valid_js_identifier( $wrapper ) ) {
 			return array( '', '' );
 		}
 

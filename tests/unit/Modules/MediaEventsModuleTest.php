@@ -14,6 +14,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\MediaEvents\MediaEventsModule;
 use GTM4WP\Options\Options;
@@ -171,16 +172,21 @@ final class MediaEventsModuleTest extends TestCase {
 	}
 
 	/**
-	 * With every provider on, the enqueued set must be EXACTLY the 12 own
-	 * bundles. Asserted as an exact list rather than 12 assertContains calls so
-	 * that re-adding a vendor SDK fails here even if it is given a handle this
-	 * test never heard of — the named-handle check below cannot do that.
+	 * With every provider on, the enqueued set must be EXACTLY the consent gate
+	 * plus the 12 own bundles. Asserted as an exact list rather than 13
+	 * assertContains calls so that re-adding a vendor SDK fails here even if it is
+	 * given a handle this test never heard of — the named-handle check below
+	 * cannot do that. The gate leads because every tracker declares it as a
+	 * dependency, so it has to be enqueued before the first one.
 	 */
 	public function test_every_enabled_tracker_is_enqueued_and_nothing_else(): void {
 		$module = $this->make_module( array_fill_keys( array_keys( self::all_trackers() ), true ) );
 		$module->enqueue_scripts();
 
-		$this->assertSame( array_values( self::all_trackers() ), $this->enqueued );
+		$this->assertSame(
+			array_merge( array( MediaEventsModule::GATE_HANDLE ), array_values( self::all_trackers() ) ),
+			$this->enqueued
+		);
 
 		foreach ( self::VENDOR_SDK_HANDLES as $sdk_handle ) {
 			$this->assertNotContains(
@@ -275,7 +281,7 @@ final class MediaEventsModuleTest extends TestCase {
 		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_VIMEO => true ) );
 		$module->enqueue_scripts();
 
-		$this->assertSame( array( 'gtm4wp-vimeo' ), $this->enqueued );
+		$this->assertSame( array( MediaEventsModule::GATE_HANDLE, 'gtm4wp-vimeo' ), $this->enqueued );
 	}
 
 	public function test_no_tracker_is_enqueued_when_every_option_is_disabled(): void {
@@ -321,6 +327,156 @@ final class MediaEventsModuleTest extends TestCase {
 		$this->assertSame( 'before', $position );
 		// Attached to a media tracker handle that was actually enqueued.
 		$this->assertContains( $handle, $this->enqueued );
+	}
+
+	/**
+	 * #125 (option A): the consent gate is enqueued once, before the trackers,
+	 * and every tracker declares it as a dependency.
+	 *
+	 * The dependency is the load-order guarantee - without it a tracker could
+	 * read the flag before the gate had set it, which is a race that would show
+	 * up as intermittently missing media events rather than as anything
+	 * diagnosable.
+	 *
+	 * @return void
+	 */
+	public function test_consent_gate_is_enqueued_once_and_every_tracker_depends_on_it(): void {
+		$deps   = array();
+		$handle = MediaEventsModule::GATE_HANDLE;
+
+		Functions\when( 'wp_enqueue_script' )->alias(
+			function ( $script_handle, $src = '', $script_deps = array(), $ver = false, $args = array() ) use ( &$deps ) {
+				$this->enqueued[]                     = $script_handle;
+				$this->enqueued_src[ $script_handle ] = (string) $src;
+				$deps[ $script_handle ]               = $script_deps;
+				return true;
+			}
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_VIMEO      => true,
+				GTM4WP_OPTION_EVENTS_HTML5MEDIA => true,
+			)
+		);
+		$module->enqueue_scripts();
+
+		$this->assertSame(
+			1,
+			count( array_keys( $this->enqueued, $handle, true ) ),
+			'The gate is shared, so it must be enqueued once however many trackers are on.'
+		);
+		$this->assertSame( $handle, $this->enqueued[0], 'The gate is enqueued before the first tracker.' );
+
+		$this->assertContains( $handle, $deps['gtm4wp-vimeo'] );
+		$this->assertContains( $handle, $deps['gtm4wp-html5media'] );
+
+		// Our own build file, never a vendor URL - the gate exists to be blocked,
+		// so it must not itself be a third-party request.
+		$this->assertStringStartsWith( 'https://example.com/', $this->enqueued_src[ $handle ] );
+	}
+
+	/**
+	 * #125 (option A): the gate is only enqueued when something needs it.
+	 *
+	 * @return void
+	 */
+	public function test_consent_gate_is_not_enqueued_without_a_tracker(): void {
+		$module = $this->make_module( array() );
+		$module->enqueue_scripts();
+
+		$this->assertSame( array(), $this->enqueued );
+	}
+
+	/**
+	 * #125 (option A): the "expect a gate" flag rides on the GATE's handle, in a
+	 * separate tag printed before it.
+	 *
+	 * That placement is the whole mechanism. A consent manager rewrites the src
+	 * tag and leaves the inline one standing, so the expectation survives while
+	 * the gate does not - which is exactly the state that has to read as
+	 * "refused". Put the flag inside the gate file and blocking it would erase
+	 * the evidence it was ever expected, and the trackers would fetch as though
+	 * no gate existed. Fails open, silently, in the one case it exists for.
+	 *
+	 * @return void
+	 */
+	public function test_gate_expectation_is_published_before_the_gate_itself(): void {
+		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_VIMEO => true ) );
+		$module->enqueue_scripts();
+
+		$expectation = array_values(
+			array_filter(
+				$this->inline_scripts,
+				static fn ( $script ) => false !== strpos( $script[1], 'gtm4wp_media_gate_expected' )
+			)
+		);
+
+		$this->assertCount( 1, $expectation );
+
+		[ $handle, $code, $position ] = $expectation[0];
+		$this->assertSame( MediaEventsModule::GATE_HANDLE, $handle, 'Attached to the gate, not to a tracker.' );
+		$this->assertSame( 'window.gtm4wp_media_gate_expected = true;', $code );
+		$this->assertSame( 'before', $position );
+	}
+
+	/**
+	 * Filters the captured inline scripts down to the third-party SDK veto.
+	 *
+	 * @return array<int, array{0:string,1:string,2:string}>
+	 */
+	private function sdk_blocked_inline_scripts(): array {
+		return array_values(
+			array_filter(
+				$this->inline_scripts,
+				static fn ( $script ) => false !== strpos( $script[1], 'gtm4wp_media_sdk_blocked' )
+			)
+		);
+	}
+
+	/**
+	 * #125: the gtm4wp_media_sdk_blocked filter is the lever a site gets back for
+	 * the SDK requests that no longer pass through script_loader_tag.
+	 *
+	 * Published exactly once, before the bundle that reads it, on a handle that was
+	 * really enqueued - the same three properties the dynamic-observer flag has.
+	 *
+	 * @return void
+	 */
+	public function test_sdk_veto_published_once_when_filtered_on(): void {
+		Filters\expectApplied( 'gtm4wp_media_sdk_blocked' )->andReturn( true );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_EVENTS_VIMEO      => true,
+				GTM4WP_OPTION_EVENTS_HTML5MEDIA => true,
+			)
+		);
+		$module->enqueue_scripts();
+
+		$veto_scripts = $this->sdk_blocked_inline_scripts();
+		$this->assertCount( 1, $veto_scripts, 'Published once, not once per bundle.' );
+
+		[ $handle, $code, $position ] = $veto_scripts[0];
+		$this->assertSame( 'window.gtm4wp_media_sdk_blocked = true;', $code );
+		$this->assertSame( 'before', $position );
+		$this->assertContains( $handle, $this->enqueued );
+	}
+
+	/**
+	 * #125, the other direction: with no filter the page carries nothing at all.
+	 *
+	 * A veto that shipped as `= false` would read the same to a consent manager
+	 * and would still cost every page a line of inline script, so the absence is
+	 * the contract worth pinning (RI-13's omit-don't-invent, applied to a flag).
+	 *
+	 * @return void
+	 */
+	public function test_sdk_veto_absent_by_default(): void {
+		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_VIMEO => true ) );
+		$module->enqueue_scripts();
+
+		$this->assertSame( array(), $this->sdk_blocked_inline_scripts() );
 	}
 
 	public function test_dynamic_observer_flag_not_published_when_option_disabled(): void {

@@ -622,6 +622,46 @@ describe( 'gtm4wpObserveMedia', () => {
 		).toHaveLength( 2 );
 	} );
 
+	/**
+	 * #127: one embed's wiring failure must not abandon the rest of the page.
+	 *
+	 * wireOnce runs inside forEach over every match, so an exception escaping the
+	 * tracker's callback would skip every remaining embed - and inside the shared
+	 * MutationObserver it would skip every remaining PROVIDER too, from one bad
+	 * element. Only the blast radius is contained here; a tracker that has to undo
+	 * something (the Dailymotion one restores the embed it replaced) is still
+	 * responsible for its own cleanup.
+	 */
+	it( 'keeps wiring the remaining embeds when one tracker callback throws', () => {
+		document.body.innerHTML =
+			'<video id="a"></video><video id="b"></video>';
+		const wired = [];
+
+		gtm4wpObserveMedia( 'video', ( el ) => {
+			if ( 'a' === el.id ) {
+				throw new Error( 'tracker blew up' );
+			}
+			wired.push( el.id );
+		} );
+
+		expect( wired ).toEqual( [ 'b' ] );
+	} );
+
+	it( 'keeps other providers scanning when one throws inside the shared observer', async () => {
+		window.gtm4wp_media_observe_dynamic = true;
+		const audios = [];
+
+		gtm4wpObserveMedia( 'video', () => {
+			throw new Error( 'tracker blew up' );
+		} );
+		gtm4wpObserveMedia( 'audio', ( el ) => audios.push( el ) );
+
+		document.body.innerHTML = '<video></video><audio></audio>';
+		await flush();
+
+		expect( audios ).toHaveLength( 1 );
+	} );
+
 	it( 'does not wire the same element twice on a repeat call (marker guard)', () => {
 		document.body.innerHTML = '<video></video>';
 		const wired = [];
@@ -961,8 +1001,206 @@ describe( 'gtm4wpObserveMedia SDK loading', () => {
 		delete window.gtm4wp_media_observer;
 		delete window.gtm4wp_media_scanners;
 		delete window.gtm4wp_media_observe_dynamic;
+		delete window.gtm4wp_media_sdk_blocked;
+		delete window.gtm4wp_media_gate_expected;
+		delete window.gtm4wp_media_sdk_allowed;
 		sdkTags().forEach( ( tag ) => tag.remove() );
 		document.body.innerHTML = '';
+	} );
+
+	/**
+	 * #125 (option A): the consent gate.
+	 *
+	 * `gtm4wp-media-gate.js` exists to be blocked. It is a real enqueued
+	 * `<script src>`, so a consent manager or a `wp_dequeue_script()` can refuse
+	 * it — and refusing it has to withhold every media SDK request, because the
+	 * requests themselves pass through no server-side control at all.
+	 *
+	 * The pair of flags is the mechanism, and each case below pins one state of
+	 * it: PHP prints `gtm4wp_media_gate_expected` in a separate inline tag (which
+	 * survives a blocked src tag), and the gate file sets
+	 * `gtm4wp_media_sdk_allowed` only if it actually ran.
+	 */
+	describe( 'consent gate', () => {
+		it( 'fetches when the gate is expected AND ran', () => {
+			document.body.innerHTML = '<video></video>';
+			window.gtm4wp_media_gate_expected = true;
+			window.gtm4wp_media_sdk_allowed = true;
+
+			gtm4wpObserveMedia(
+				'video',
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+
+		it( 'withholds the fetch when the gate was expected but did not run', () => {
+			document.body.innerHTML = '<video></video>';
+			window.gtm4wp_media_gate_expected = true;
+
+			// isReady MUST be false: ensureSdk() also bails when the SDK is
+			// already usable, so `() => true` would make this pass with no gate
+			// logic present at all. That is what the probe found.
+			gtm4wpObserveMedia(
+				'video',
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'still wires the players already on the page while the gate is shut', () => {
+			document.body.innerHTML = '<video></video>';
+			window.gtm4wp_media_gate_expected = true;
+			const wired = [];
+
+			gtm4wpObserveMedia(
+				'video',
+				( el ) => wired.push( el ),
+				() => true,
+				SDK
+			);
+
+			expect( wired ).toHaveLength( 1 );
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'fetches when no gate is in play at all (a tracker loaded on its own)', () => {
+			// The distinction that keeps a missing gate from reading as a blocked
+			// one. Without it, any context that loads a tracker without the gate -
+			// third-party code, or a test - would silently never fetch.
+			document.body.innerHTML = '<video></video>';
+
+			gtm4wpObserveMedia(
+				'video',
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+
+		it( 'warns about a blocked gate when console output is enabled, so it does not fail silently', () => {
+			document.body.innerHTML = '<video></video>';
+			window.gtm4wp_media_gate_expected = true;
+			global.gtm4wp_console_log = true;
+			const warn = jest
+				.spyOn( window.console, 'warn' )
+				.mockImplementation( () => {} );
+
+			try {
+				gtm4wpObserveMedia(
+					'video',
+					() => {},
+					() => true,
+					SDK
+				);
+
+				expect( warn ).toHaveBeenCalledTimes( 1 );
+				expect( warn.mock.calls[ 0 ][ 0 ] ).toContain(
+					'gtm4wp-media-gate.js'
+				);
+				expect( warn.mock.calls[ 0 ][ 0 ] ).toContain( SDK );
+			} finally {
+				warn.mockRestore();
+				delete global.gtm4wp_console_log;
+			}
+		} );
+
+		it( 'says nothing when the block was the site’s own server-side decision', () => {
+			// gtm4wp_media_sdk_blocked is deliberate, so there is nothing to
+			// report; the warning exists for the case where something else did it.
+			document.body.innerHTML = '<video></video>';
+			window.gtm4wp_media_sdk_blocked = true;
+			global.gtm4wp_console_log = true;
+			const warn = jest
+				.spyOn( window.console, 'warn' )
+				.mockImplementation( () => {} );
+
+			try {
+				gtm4wpObserveMedia(
+					'video',
+					() => {},
+					() => false,
+					SDK
+				);
+
+				expect( sdkTags() ).toHaveLength( 0 );
+				expect( warn ).not.toHaveBeenCalled();
+			} finally {
+				warn.mockRestore();
+				delete global.gtm4wp_console_log;
+			}
+		} );
+	} );
+
+	/**
+	 * #125: the site's veto on third-party SDK requests.
+	 *
+	 * Moving the SDKs off wp_enqueue_script means no <script src="https://vendor…">
+	 * is ever served, so `script_loader_tag` never sees one and a consent manager
+	 * whose rule names the vendor's domain has nothing to match. This flag is that
+	 * lever, given back — MediaEventsModule prints it from the
+	 * gtm4wp_media_sdk_blocked filter.
+	 *
+	 * Both directions matter and both are asserted: withholding the request is the
+	 * point, and still wiring the embeds already on the page is what keeps the veto
+	 * from quietly turning into "media tracking is off".
+	 */
+	it( 'withholds the SDK request when the site has vetoed it', () => {
+		document.body.innerHTML = '<video></video>';
+		window.gtm4wp_media_sdk_blocked = true;
+
+		// isReady MUST be false here. ensureSdk() also returns early when the SDK
+		// is already usable, so a `() => true` predicate makes this assertion pass
+		// whether the veto works or not - the test would be green against a build
+		// with no veto in it at all. Probe-caught: neutering the gate left this
+		// case passing.
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 0 );
+	} );
+
+	it( 'still wires the players already on the page while the veto holds', () => {
+		// The other half, and the reason a veto is not the same as switching media
+		// tracking off: a site whose SDK is present anyway keeps reporting.
+		document.body.innerHTML = '<video></video>';
+		window.gtm4wp_media_sdk_blocked = true;
+		const wired = [];
+
+		gtm4wpObserveMedia(
+			'video',
+			( el ) => wired.push( el ),
+			() => true,
+			SDK
+		);
+
+		expect( wired ).toHaveLength( 1 );
+		expect( sdkTags() ).toHaveLength( 0 );
+	} );
+
+	it( 'fetches the SDK normally when the veto is absent (the default)', () => {
+		document.body.innerHTML = '<video></video>';
+
+		gtm4wpObserveMedia(
+			'video',
+			() => {},
+			() => false,
+			SDK
+		);
+
+		expect( sdkTags() ).toHaveLength( 1 );
 	} );
 
 	it( 'does not fetch the SDK when the page has no matching embed', () => {
