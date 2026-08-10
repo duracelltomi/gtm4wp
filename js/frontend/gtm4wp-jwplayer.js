@@ -7,7 +7,10 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_jwplayer_percentage_tracking = 10;
-const gtm4wp_jwplayer_percentage_tracking_marks = {};
+// Keyed by the media id the provider reports, so a null prototype: on a plain
+// object a key of `__proto__` resolves to Object.prototype instead of a missing
+// entry, and writing it back sets the store's prototype instead of a property.
+const gtm4wp_jwplayer_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initJWPlayerTracking() {
 	// No SDK is enqueued for JW Player: the site loads its own JW library, so this
@@ -17,7 +20,11 @@ function gtm4wp_initJWPlayerTracking() {
 	// with the `jwplayer`/`jw-player` class during setup; each such element
 	// carries the id used to fetch the player instance. `seen` guards against two
 	// containers sharing one id (the data-attribute marker guards the element).
-	const gtm4wp_jwplayer_seen = {};
+	//
+	// A null prototype, because the id comes off the page: on a plain object an
+	// id of `__proto__` reads Object.prototype back as truthy, so the very first
+	// such player would be skipped as one already wired.
+	const gtm4wp_jwplayer_seen = Object.create( null );
 
 	const gtm4wp_wireJWPlayerContainer = function ( container ) {
 		const id = container.getAttribute( 'id' );

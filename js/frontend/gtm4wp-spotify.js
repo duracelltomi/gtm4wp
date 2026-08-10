@@ -6,13 +6,18 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_spotify_percentage_tracking = 10;
-const gtm4wp_spotify_percentage_tracking_marks = {};
+// Keyed by the media id the provider reports, so a null prototype: on a plain
+// object a key of `__proto__` resolves to Object.prototype instead of a missing
+// entry, and writing it back sets the store's prototype instead of a property.
+const gtm4wp_spotify_percentage_tracking_marks = Object.create( null );
 
 // The Spotify iFrame API exposes no discrete play/pause/seek/end events — only a
 // periodic `playback_update` carrying isPaused/isBuffering/position/duration. The
 // player state is derived from those updates, and the last state pushed per URI
-// is tracked so the repeated updates collapse to a single state change.
-const gtm4wp_spotify_last_state = {};
+// is tracked so the repeated updates collapse to a single state change. A null
+// prototype for the same reason as the title cache above: a URI must never read
+// an inherited Object member back as if it were a stored state.
+const gtm4wp_spotify_last_state = Object.create( null );
 
 // Resolved titles, keyed by Spotify URI. A null prototype so a URI can never
 // read an inherited Object member back as if it were a cached title.

@@ -353,6 +353,35 @@ describe( 'gtm4wp-youtube', () => {
 		}
 	} );
 
+	it( 'stops the progress poll for a video id that collides with an Object member', () => {
+		jest.useFakeTimers();
+		try {
+			loadTracker();
+			window.onYouTubeIframeAPIReady();
+
+			player._data.video_id = '__proto__';
+
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PLAYING } )
+			);
+			capturedEvents.onStateChange(
+				ytEvent( { data: YT.PlayerState.PAUSED } )
+			);
+
+			// On a plain-object interval store, assigning under `__proto__`
+			// creates no own property, so the pause branch hands
+			// clearInterval() Object.prototype and the poll runs for the life of
+			// the page. Assert the poll is actually dead, not that a call was
+			// made: only silence after the pause proves the interval is gone.
+			const settled = window.dataLayer.length;
+			jest.advanceTimersByTime( 5000 );
+
+			expect( window.dataLayer ).toHaveLength( settled );
+		} finally {
+			jest.useRealTimers();
+		}
+	} );
+
 	it( 'polls no percentage milestone when the video duration is 0 (regression: Infinity milestones)', () => {
 		jest.useFakeTimers();
 		try {

@@ -289,6 +289,17 @@ export function gtm4wpNativeVideoParams( {
  * `percentage` (e.g. `if ( ! duration ) return;`): `time / 0` is `Infinity`,
  * which is greater than every mark and would fire them all.
  *
+ * `key` is a media id the provider reports, so it is never assumed to be an
+ * ordinary property name. The already-fired list is resolved into a local
+ * variable and type-checked rather than read back out of the store on each
+ * pass: a key of `__proto__` reads `Object.prototype` off a plain object — an
+ * existing value, so a `typeof … === 'undefined'` test skips the initialisation
+ * and the loop then calls `.indexOf()` on it — and writing that key back does
+ * not create an own property either. Callers should still declare the store
+ * with `Object.create( null )`, which is what makes the write a plain property;
+ * this end holds regardless, because the store belongs to the caller and a
+ * third-party tracker may hand over any object at all.
+ *
  * @param {Object}   marks       Per-key store of already-fired marks (mutated).
  * @param {string}   key         Media item key (video id / uri / currentSrc).
  * @param {number}   percentage  Integer playback percentage (0-100).
@@ -303,13 +314,16 @@ export function gtm4wpMediaMilestones(
 	step,
 	onMilestone
 ) {
-	if ( typeof marks[ key ] === 'undefined' ) {
-		marks[ key ] = [];
+	let fired = marks[ key ];
+
+	if ( ! Array.isArray( fired ) ) {
+		fired = [];
+		marks[ key ] = fired;
 	}
 
 	for ( let i = 0; i < 100; i += step ) {
-		if ( percentage > i && marks[ key ].indexOf( i ) === -1 ) {
-			marks[ key ].push( i );
+		if ( percentage > i && fired.indexOf( i ) === -1 ) {
+			fired.push( i );
 			onMilestone( i );
 		}
 	}

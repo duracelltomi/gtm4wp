@@ -8,12 +8,11 @@ import {
 
 const gtm4wp_videopress_percentage_tracking = 10;
 
-// Every store in this file is keyed on the guid the player reports and is
-// therefore null-prototype: see the note on gtm4wp_videopress_playback below for
-// what a guid of `__proto__` does to a plain object. The milestone store is
-// handed to the shared gtm4wpMediaMilestones(), whose "first time for this key"
-// test is `typeof marks[ key ] === 'undefined'` — on a plain object that reads
-// Object.prototype, skips the initialisation and then calls .indexOf() on it.
+// Keyed by the media id the provider reports, so a null prototype: on a plain
+// object a key of `__proto__` resolves to Object.prototype instead of a missing
+// entry, and writing it back sets the store's prototype instead of a property.
+// Every store in this file is declared that way; the one below carries the case
+// where it matters most.
 const gtm4wp_videopress_percentage_tracking_marks = Object.create( null );
 
 // Tracks the last player state pushed per video so the duplicate signals the

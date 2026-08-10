@@ -551,6 +551,51 @@ describe( 'gtm4wpMediaMilestones', () => {
 
 		expect( fired ).toEqual( [ 0, 10, 20, 30, 40, 50, 60, 70, 80, 90 ] );
 	} );
+
+	// The key is a media id the provider reports, so it is not necessarily an
+	// ordinary property name. `__proto__` is the one that matters: on a plain
+	// object it reads Object.prototype back as an existing entry, which used to
+	// skip the initialisation and then call .indexOf() on Object.prototype.
+	describe( 'a key that collides with an Object member', () => {
+		it( 'fires the milestones on a null-prototype store, as the trackers declare theirs', () => {
+			const marks = Object.create( null );
+			const fired = [];
+
+			gtm4wpMediaMilestones( marks, '__proto__', 25, 10, ( i ) =>
+				fired.push( i )
+			);
+
+			expect( fired ).toEqual( [ 0, 10, 20 ] );
+			expect( marks.__proto__ ).toEqual( [ 0, 10, 20 ] );
+		} );
+
+		it( 'still fires them on a plain-object store, and pollutes nothing', () => {
+			// A third-party tracker owns its own store and may hand over any
+			// object, so this end has to hold on its own.
+			const marks = {};
+			const fired = [];
+
+			gtm4wpMediaMilestones( marks, '__proto__', 25, 10, ( i ) =>
+				fired.push( i )
+			);
+
+			expect( fired ).toEqual( [ 0, 10, 20 ] );
+			expect( Object.prototype ).not.toHaveProperty( 'indexOf' );
+			expect( {} ).not.toHaveProperty( '0' );
+		} );
+
+		it( 'does not re-fire a mark already recorded under that key', () => {
+			const marks = Object.create( null );
+			const fired = [];
+
+			gtm4wpMediaMilestones( marks, '__proto__', 25, 10, () => {} );
+			gtm4wpMediaMilestones( marks, '__proto__', 45, 10, ( i ) =>
+				fired.push( i )
+			);
+
+			expect( fired ).toEqual( [ 30, 40 ] );
+		} );
+	} );
 } );
 
 describe( 'gtm4wpOnReady', () => {

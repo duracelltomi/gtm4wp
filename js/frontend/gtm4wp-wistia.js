@@ -5,7 +5,10 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_wistia_percentage_tracking = 10;
-const gtm4wp_wistia_percentage_tracking_marks = {};
+// Keyed by the media id the provider reports, so a null prototype: on a plain
+// object a key of `__proto__` resolves to Object.prototype instead of a missing
+// entry, and writing it back sets the store's prototype instead of a property.
+const gtm4wp_wistia_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initWistiaTracking() {
 	// Bind once: if this bundle is executed twice (e.g. re-injected by a tag

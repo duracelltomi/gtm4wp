@@ -220,6 +220,19 @@ describe( 'gtm4wp-jwplayer', () => {
 		);
 	} );
 
+	it( 'wires a container whose id collides with an Object member', () => {
+		// The id is read straight off the page, so it is whatever the markup
+		// says. On a plain-object "already wired" store, `__proto__` reads
+		// Object.prototype back as truthy and the player would be skipped as one
+		// that had been wired already — before any player existed at all.
+		document.body.innerHTML = '<div id="__proto__" class="jwplayer"></div>';
+
+		loadTracker();
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+		expect( window.dataLayer[ 0 ].event ).toBe( 'gtm4wp.mediaPlayerReady' );
+	} );
+
 	it( 'does not throw or push anything when the JW Player global is missing', () => {
 		delete global.jwplayer;
 
