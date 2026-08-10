@@ -55,9 +55,16 @@ final class MediaEventsModule extends AbstractModule {
 	/**
 	 * Handle of the consent gate every media tracker depends on.
 	 *
-	 * Public because blocking or dequeuing it is the documented way for a site
-	 * to withhold every media provider's SDK request, so the name is part of the
-	 * plugin's contract with consent managers rather than an internal detail.
+	 * Public because *blocking* it - rewriting or removing its <script src> tag,
+	 * which is what a consent manager does through script_loader_tag - is a
+	 * documented way for a site to withhold every media provider's SDK request,
+	 * so the name is part of the plugin's contract rather than an internal detail.
+	 *
+	 * NOT dequeuing: see the note in enqueue_media_tracker(). Every tracker
+	 * declares this handle as a dependency, and WordPress re-adds a registered
+	 * dependency to the print queue whether or not it was dequeued, so
+	 * wp_dequeue_script() on this handle has no effect at all. The server-side
+	 * switch is the gtm4wp_media_sdk_blocked filter.
 	 */
 	public const GATE_HANDLE = 'gtm4wp-media-gate';
 
@@ -202,12 +209,42 @@ final class MediaEventsModule extends AbstractModule {
 		// Declared as a dependency of every tracker, not merely enqueued beside
 		// them: WordPress then guarantees the gate is printed first, so a tracker
 		// can never read the flag before the gate has had the chance to set it.
-		// A dequeued gate does NOT drop the trackers with it - WordPress only
-		// discards a script whose dependency was never *registered*, and the gate
-		// stays registered either way.
+		// That ordering is load-bearing rather than defensive - the bundles are
+		// enqueued with strategy 'defer', so at the moment a tracker runs
+		// document.readyState is already 'interactive' and gtm4wpOnReady() calls
+		// the init synchronously, reading the flag right then.
+		//
+		// The edge has a consequence worth stating where it is created, because
+		// it is the opposite of what it looks like: it makes this handle
+		// IMMUNE to wp_dequeue_script(). WP_Dependencies::dequeue() only unsets
+		// from the queue, while all_deps() appends any still-REGISTERED
+		// dependency to $to_do regardless - so a dequeued gate is printed anyway,
+		// sets its flag, and every SDK loads. Do not document dequeuing this
+		// handle as a lever, and do not reach for wp_deregister_script() instead:
+		// a missing dependency makes all_deps() drop every tracker that names it
+		// (and emits _doing_it_wrong on WP 6.9.1+). Blocking the tag works;
+		// the gtm4wp_media_sdk_blocked filter works.
 		$deps[] = self::GATE_HANDLE;
 
 		$this->enqueue_script( $handle, $file, $deps, $in_footer );
+
+		// The "a gate was printed for this page" flag rides on every TRACKER
+		// handle, never on the gate's own. It is what lets a tracker read a gate
+		// that did not run as "refused" rather than "absent", so it has to
+		// outlive the gate - and on the gate's handle it cannot:
+		// WP_Scripts::do_item() builds $tag from the 'before' inline AND the src
+		// tag and only then applies script_loader_tag, so both reach a consent
+		// manager as ONE string. A blocker that rewrites the src in place leaves
+		// the flag standing, but one that replaces or empties the whole string
+		// takes the expectation with the gate, and the trackers then fetch as
+		// though no gate existed - failing open in the one case the flag exists
+		// for.
+		//
+		// Deliberately per tracker rather than one-shot like the two flags below:
+		// blocking any single tracker must not take the expectation away from the
+		// others. The assignment is idempotent, so repeating it costs a few bytes
+		// and nothing else.
+		wp_add_inline_script( $handle, 'window.gtm4wp_media_gate_expected = true;', 'before' );
 
 		if ( ! $this->dynamic_flag_published && $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_observe_dynamic = true;', 'before' );
@@ -224,11 +261,25 @@ final class MediaEventsModule extends AbstractModule {
 	 * Enqueues the consent gate once, and tells the trackers to expect it.
 	 *
 	 * The gate (js/frontend/gtm4wp-media-gate.js) carries no logic. It exists to
-	 * be a real, enqueued `<script src>` that a consent manager or a
-	 * wp_dequeue_script() can refuse - because the SDK requests themselves are
-	 * made from JavaScript and therefore pass through no server-side control at
-	 * all. Blocking the gate withholds every media SDK request while leaving the
-	 * trackers running for the players already on the page.
+	 * be a real, enqueued `<script src>` that a consent manager can refuse by
+	 * rewriting or removing its tag through script_loader_tag - because the SDK
+	 * requests themselves are made from JavaScript and therefore pass through no
+	 * server-side control at all. Blocking the gate withholds every media SDK
+	 * request while leaving the trackers running for the players already on the
+	 * page. wp_dequeue_script() is NOT one of the ways to refuse it - see the
+	 * note in enqueue_media_tracker() - and the server-side equivalent is the
+	 * gtm4wp_media_sdk_blocked filter.
+	 *
+	 * Note what the gate is NOT. It is served from this site's own domain, so a
+	 * consent manager's third-party-domain blocklist will never match it: pulling
+	 * this lever takes a rule naming this handle, i.e. deliberate configuration.
+	 * Zero-configuration blocking comes from somewhere else entirely and already
+	 * works - every SDK-fetching tracker selects on `iframe[src*="<vendor>"]` and
+	 * reaches ensureSdk() only once such an embed is found, so a consent manager
+	 * that blocks the EMBED by domain (moving src to data-src, or swapping in a
+	 * placeholder) leaves nothing for the selector to match and the vendor is
+	 * never contacted. That property is the one to protect; this gate is the
+	 * lever for a site that wants to act without relying on it.
 	 *
 	 * The companion inline flag is what makes a blocked gate distinguishable from
 	 * no gate at all. It is attached to the gate's own handle with position
@@ -250,7 +301,6 @@ final class MediaEventsModule extends AbstractModule {
 		$this->gate_enqueued = true;
 
 		$this->enqueue_script( self::GATE_HANDLE, 'gtm4wp-media-gate.js', array(), $in_footer );
-		wp_add_inline_script( self::GATE_HANDLE, 'window.gtm4wp_media_gate_expected = true;', 'before' );
 	}
 
 	/**

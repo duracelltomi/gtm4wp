@@ -519,8 +519,19 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		// 1. The gtm4wp_media_sdk_blocked filter, decided server-side.
 		// 2. The gate script (js/frontend/gtm4wp-media-gate.js), which exists to
 		//    be blockable: it is a real enqueued <script src>, so a consent
-		//    manager or a wp_dequeue_script() can refuse it, and refusing it
-		//    leaves gtm4wp_media_sdk_allowed unset.
+		//    manager can refuse it by rewriting or removing its tag, and a gate
+		//    that never ran leaves gtm4wp_media_sdk_allowed unset. Blocking the
+		//    tag, not wp_dequeue_script() - every tracker declares that handle as
+		//    a dependency, so WordPress prints it whether or not it was dequeued.
+		//
+		// Both of these take deliberate configuration. Note that the check that
+		// needs NONE is the one above this function: ensureSdk() is reached only
+		// from `if ( present.length )` and the observer's `if ( matched || … )`,
+		// and every SDK-fetching tracker selects on the embed's own vendor domain
+		// - so a consent manager that blocks the EMBED (src -> data-src, or a
+		// placeholder node) already withholds the vendor request here, with no
+		// rule naming GTM4WP anywhere. Keep it that way: never widen a selector
+		// to match a consent-blocked embed.
 		//
 		// The gate is only consulted when PHP said it enqueued one. That
 		// distinction is what keeps "the gate was blocked" apart from "no gate
@@ -549,9 +560,10 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 				window.console.warn
 			) {
 				window.console.warn(
-					'GTM4WP: a media player SDK was not loaded because gtm4wp-media-gate.js did not run. ' +
-						'That is expected if a consent manager or an optimization plugin blocked it, and it means ' +
-						'this player will not report any events. SDK: ' +
+					'GTM4WP: a media player library was not requested because gtm4wp-media-gate.js did not run. ' +
+						'That is expected if a consent manager or an optimization plugin blocked it. Players ' +
+						'already on the page are still tracked; only the events that need this library are missing. ' +
+						'Library: ' +
 						sdkSrc
 				);
 			}

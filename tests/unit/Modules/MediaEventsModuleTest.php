@@ -389,35 +389,71 @@ final class MediaEventsModuleTest extends TestCase {
 	}
 
 	/**
-	 * #125 (option A): the "expect a gate" flag rides on the GATE's handle, in a
-	 * separate tag printed before it.
+	 * #125 (option A) / #134: the "expect a gate" flag rides on the TRACKER
+	 * handles, never on the gate's own.
 	 *
-	 * That placement is the whole mechanism. A consent manager rewrites the src
-	 * tag and leaves the inline one standing, so the expectation survives while
-	 * the gate does not - which is exactly the state that has to read as
-	 * "refused". Put the flag inside the gate file and blocking it would erase
-	 * the evidence it was ever expected, and the trackers would fetch as though
-	 * no gate existed. Fails open, silently, in the one case it exists for.
+	 * The flag is what lets a tracker read a gate that did not run as "refused"
+	 * rather than "absent", so it has to outlive the gate. On the gate's own
+	 * handle it cannot: WP_Scripts::do_item() builds $tag from the 'before'
+	 * inline AND the src tag and only then applies script_loader_tag, so both
+	 * reach a consent manager as ONE string. A blocker that rewrites the src in
+	 * place leaves the flag standing, but one that replaces or empties the whole
+	 * string takes the expectation with the gate - and the trackers then fetch as
+	 * though no gate existed, failing open in the one case the flag exists for.
 	 *
 	 * @return void
 	 */
-	public function test_gate_expectation_is_published_before_the_gate_itself(): void {
+	public function test_gate_expectation_is_published_on_the_tracker_not_the_gate(): void {
 		$module = $this->make_module( array( GTM4WP_OPTION_EVENTS_VIMEO => true ) );
 		$module->enqueue_scripts();
 
-		$expectation = array_values(
+		$expectation = $this->gate_expectations();
+
+		$this->assertCount( 1, $expectation );
+
+		[ $handle, $code, $position ] = $expectation[0];
+		$this->assertSame( 'gtm4wp-vimeo', $handle, 'Attached to the tracker, not to the gate.' );
+		$this->assertNotSame(
+			MediaEventsModule::GATE_HANDLE,
+			$handle,
+			'On the gate handle the flag shares one script_loader_tag string with the tag it must outlive.'
+		);
+		$this->assertSame( 'window.gtm4wp_media_gate_expected = true;', $code );
+		$this->assertSame( 'before', $position );
+	}
+
+	/**
+	 * #134: the flag is published per tracker, not once.
+	 *
+	 * Blocking any single tracker handle must not take the expectation away from
+	 * the others - otherwise refusing one provider quietly re-opens the vendor
+	 * request for every remaining one. The assignment is idempotent, so repeating
+	 * it is free; publishing it once is what would not be.
+	 *
+	 * @return void
+	 */
+	public function test_gate_expectation_is_published_for_every_tracker(): void {
+		$module = $this->make_module( array_fill_keys( array_keys( self::all_trackers() ), true ) );
+		$module->enqueue_scripts();
+
+		$handles = array_column( $this->gate_expectations(), 0 );
+
+		$this->assertSame( array_values( self::all_trackers() ), $handles );
+		$this->assertNotContains( MediaEventsModule::GATE_HANDLE, $handles );
+	}
+
+	/**
+	 * Every captured inline script that publishes the gate expectation.
+	 *
+	 * @return array<int, array{0: string, 1: string, 2: string}>
+	 */
+	private function gate_expectations(): array {
+		return array_values(
 			array_filter(
 				$this->inline_scripts,
 				static fn ( $script ) => false !== strpos( $script[1], 'gtm4wp_media_gate_expected' )
 			)
 		);
-
-		$this->assertCount( 1, $expectation );
-
-		[ $handle, $code, $position ] = $expectation[0];
-		$this->assertSame( MediaEventsModule::GATE_HANDLE, $handle, 'Attached to the gate, not to a tracker.' );
-		$this->assertSame( 'window.gtm4wp_media_gate_expected = true;', $code );
-		$this->assertSame( 'before', $position );
 	}
 
 	/**

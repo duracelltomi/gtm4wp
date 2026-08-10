@@ -19,7 +19,8 @@ This plugin injects a Google Tag Manager container and builds a JavaScript `data
    ls -d src/*/ src/Modules/*/                                    # component groups
    ls js/frontend/*.js js/admin/*.js                              # bundles
    grep -rnE "register_rest_route|permission_callback|wp_ajax_|admin_post_" src/
-   ls .claude/hooks/ .claude/commands/ .claude/skills/ .githooks/ .github/workflows/  # toolchain (PA-14)
+   ls .claude/hooks/ .claude/commands/ .claude/skills/ .claude/agents/ .githooks/ .github/workflows/  # toolchain (PA-14)
+   head -5 .claude/agents/*.md    # the tool-restriction key must be `tools:` — `allowed-tools:` is the SLASH-COMMAND key and is silently ignored in an agent file (#140)
    ```
    - Any directory or bundle with no Coverage Matrix row → **add the row now**, all cells `[ ]`, before prioritizing.
    - Any route/handler absent from the **Public Surface Inventory** → **add the row now** with its actor + gate, `Reviewed [ ]`.

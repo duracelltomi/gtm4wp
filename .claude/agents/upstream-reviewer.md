@@ -1,7 +1,7 @@
 ---
 name: upstream-reviewer
 description: Check GTM4WP's external dependencies for drift — WordPress/WooCommerce releases and pre-releases, third-party plugin integrations, Google specifications, media SDKs, and toolchain versions. Use when auditing what the outside world changed, before a release, or when a previously-working integration is reported broken. Complements code-reviewer (which reviews our code) and test-reviewer (which reviews our suite).
-allowed-tools: Read, Grep, Glob, WebFetch, WebSearch, Bash(git log*), Bash(git diff*), Bash(git ls-files*), Bash(composer outdated*), Bash(npm outdated*), Bash(npm ls*)
+tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 
 # Upstream Review Agent

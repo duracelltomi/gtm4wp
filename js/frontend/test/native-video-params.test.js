@@ -1259,6 +1259,101 @@ describe( 'gtm4wpObserveMedia SDK loading', () => {
 		expect( sdkTags() ).toHaveLength( 0 );
 	} );
 
+	/**
+	 * #139: the zero-configuration consent property, which is the one doing the
+	 * real work — and the only one that needs no third party to integrate with
+	 * GTM4WP at all.
+	 *
+	 * Every SDK-fetching tracker selects on the embed's OWN vendor domain
+	 * (`iframe[src*="vimeo.com"]`, `iframe[src*="player.twitch.tv"]`, …), and
+	 * `ensureSdk()` is reachable only once such an embed is found. So a consent
+	 * manager that blocks the EMBED by domain — moving `src` to `data-src`, or
+	 * swapping in a placeholder, which is the ordinary zero-config thing these
+	 * plugins do — leaves the selector nothing to match, and the vendor is never
+	 * contacted. No rule naming GTM4WP is involved anywhere.
+	 *
+	 * Nothing in the code forces this to keep working, which is why it is pinned
+	 * here: the change that would destroy it looks exactly like a bug fix.
+	 * Someone notices that embeds behind a consent banner are not tracked and
+	 * widens the selector to `iframe[data-src*=…]` or a placeholder class —
+	 * restoring tracking and silently re-opening the vendor request for every
+	 * visitor who has not consented, with no error and no other red test.
+	 */
+	describe( 'a consent-blocked embed (zero-configuration protection)', () => {
+		const VENDOR = 'iframe[src*="vendor.example"]';
+
+		it( 'contacts the vendor for an embed the visitor has consented to', () => {
+			document.body.innerHTML =
+				'<iframe src="https://vendor.example/embed/1"></iframe>';
+
+			gtm4wpObserveMedia(
+				VENDOR,
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+
+		it( 'never contacts the vendor while the embed src is held back', () => {
+			// Exactly what a consent manager leaves in the page: the iframe is
+			// still there, the vendor URL is still readable, but it is not a src
+			// any more, so nothing has been requested from that domain yet.
+			document.body.innerHTML =
+				'<iframe data-src="https://vendor.example/embed/1"></iframe>';
+
+			gtm4wpObserveMedia(
+				VENDOR,
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'never contacts the vendor for a placeholder that replaced the embed', () => {
+			document.body.innerHTML =
+				'<div class="cmp-placeholder" data-service="vendor.example">Accept to view</div>';
+
+			gtm4wpObserveMedia(
+				VENDOR,
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
+
+		it( 'contacts the vendor once consent restores the src, and not before', async () => {
+			document.body.innerHTML =
+				'<iframe data-src="https://vendor.example/embed/1"></iframe>';
+			window.gtm4wp_media_observe_dynamic = true;
+
+			gtm4wpObserveMedia(
+				VENDOR,
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 0 );
+
+			// The visitor accepts: the consent manager puts the real src back by
+			// replacing the placeholder iframe with a live one.
+			const blocked = document.querySelector( 'iframe' );
+			const live = document.createElement( 'iframe' );
+			live.setAttribute( 'src', 'https://vendor.example/embed/1' );
+			blocked.replaceWith( live );
+
+			await flush();
+
+			expect( sdkTags() ).toHaveLength( 1 );
+		} );
+	} );
+
 	it( 'fetches the SDK once, however many embeds match', () => {
 		document.body.innerHTML = '<video></video><video></video>';
 

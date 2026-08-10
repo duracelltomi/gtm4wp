@@ -78,12 +78,18 @@ export function gtm4wp_diff_cart_items( previous, current ) {
 	const previous_list = Array.isArray( previous ) ? previous : [];
 	const current_list = Array.isArray( current ) ? current : [];
 
-	const previous_by_key = {};
+	// Keyed by the Store API cart-item key, so a null prototype - the same rule
+	// the media trackers follow. WooCommerce generates that key as a hash, so no
+	// real cart reaches an inherited Object member; on a plain object one that
+	// did would resolve to a truthy non-entry, making `before.quantity`
+	// undefined, the delta NaN and `NaN > 0` false - so the line would be
+	// silently dropped from add_to_cart/remove_from_cart rather than throwing.
+	const previous_by_key = Object.create( null );
 	previous_list.forEach( ( entry ) => {
 		previous_by_key[ entry.key ] = entry;
 	} );
 
-	const current_by_key = {};
+	const current_by_key = Object.create( null );
 	current_list.forEach( ( entry ) => {
 		current_by_key[ entry.key ] = entry;
 	} );

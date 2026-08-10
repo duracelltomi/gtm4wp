@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Review recent code changes for security, quality, and WordPress/GTM4WP convention compliance. Use when reviewing a PR, checking recent work, or before committing.
-allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(php *), Bash(vendor/bin/phpcs*), Bash(vendor/bin/phpunit*)
+tools: Read, Grep, Glob, Bash
 ---
 
 # Code Review Agent

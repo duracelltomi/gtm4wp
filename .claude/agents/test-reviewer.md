@@ -1,7 +1,7 @@
 ---
 name: test-reviewer
 description: Review the GTM4WP unit-test suite for coverage completeness and assertion quality — untested classes, benign-only security sinks, weak/tautological assertions. Use when auditing tests, before relying on the suite, or after adding a feature. Complements code-reviewer (which reviews the code, not the tests).
-allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(find *), Bash(php *), Bash(composer test*), Bash(vendor/bin/phpcs*), Bash(vendor/bin/phpunit*), Bash(vendor/bin/infection*), Bash(npm run test*), Bash(npm run lint*)
+tools: Read, Grep, Glob, Bash
 ---
 
 # Test Review Agent
