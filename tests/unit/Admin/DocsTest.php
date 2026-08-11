@@ -97,6 +97,50 @@ final class DocsTest extends TestCase {
 		);
 	}
 
+	/**
+	 * A third party schema naming its own documentation site with an absolute
+	 * URL is the obvious mistake to make against a contract that asks for a
+	 * path, and resolving it against the base would produce
+	 * https://gtm4wp.com/https://example.com/... - a link that reads as
+	 * configured and goes nowhere. Used as given instead.
+	 *
+	 * @return void
+	 */
+	public function test_an_absolute_url_is_used_as_given_rather_than_resolved(): void {
+		$this->pass_through_url_validation();
+
+		$this->assertSame(
+			'https://example.com/docs/their-page#their-option',
+			Docs::url( 'https://example.com/docs/their-page', 'their-option' )
+		);
+		// Both directions (TS-2): the doubled form is gone, not merely unlikely.
+		$this->assertStringNotContainsString(
+			self::BASE . 'https://',
+			Docs::url( 'https://example.com/docs/their-page' )
+		);
+		// http as well as https - the protocol allow-list below is what decides
+		// which schemes survive, and it must stay the only place that decides.
+		$this->assertSame(
+			'http://example.com/docs',
+			Docs::url( 'http://example.com/docs' )
+		);
+	}
+
+	/**
+	 * The leniency above must not become a second way to write the documentation
+	 * domain down: a path that merely mentions http is still a path.
+	 *
+	 * @return void
+	 */
+	public function test_a_path_that_only_contains_http_is_still_resolved(): void {
+		$this->pass_through_url_validation();
+
+		$this->assertSame(
+			self::BASE . 'how-to-use-http-headers',
+			Docs::url( 'how-to-use-http-headers' )
+		);
+	}
+
 	public function test_the_filter_can_redirect_a_link_to_another_site(): void {
 		$this->pass_through_url_validation();
 

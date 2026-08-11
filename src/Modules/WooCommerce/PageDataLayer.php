@@ -851,7 +851,17 @@ final class PageDataLayer {
 		// stopped recognising each other's entries. See the contract on
 		// ProductData::ORDER_TRACKED_COOKIE - all three sites store the order
 		// number verbatim.
-		$order_number = wp_json_encode(
+		// json_literal(), not a bare wp_json_encode(): the result is interpolated
+		// into three JavaScript EXPRESSION positions below, and the encoder returns
+		// false - which PHP renders as '' - for a value it cannot encode, leaving
+		// `( == gtm4wp_orderid_tracked )`. That is a SyntaxError taking the whole
+		// duplicate-purchase guard with it (RI-21/#141).
+		//
+		// The value is a (string) cast scalar, so today the encoder cannot actually
+		// fail on it. Routed through the shared helper anyway, because an
+		// undocumented exemption is indistinguishable from an oversight, and the
+		// next person to widen this line should not have to re-derive the argument.
+		$order_number = ScriptTag::json_literal(
 			(string) $order->get_order_number(),
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);

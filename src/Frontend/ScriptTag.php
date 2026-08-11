@@ -180,7 +180,7 @@ final class ScriptTag {
 	 * expanded as a backreference (PA-7). On a PCRE failure the callback returns
 	 * null, in which case the sanitized input is emitted unchanged rather than the
 	 * empty string - the same "degrade, never blank the output" rule as
-	 * ContainerCode::json_literal() (#85).
+	 * self::json_literal() (#85).
 	 *
 	 * @param string $markup wp_kses()-sanitized markup.
 	 * @return string

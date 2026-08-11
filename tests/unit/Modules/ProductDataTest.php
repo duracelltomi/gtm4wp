@@ -388,6 +388,65 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'US', $user_data['address']['country'] );
 	}
 
+	/**
+	 * A gmail address whose local part is nothing but a "+" tag folds away to
+	 * nothing, and the helper says so by returning ''. The key must then be
+	 * ABSENT rather than present and empty: this object is Google's user_data,
+	 * where an empty identifier is the consumer's to interpret (RI-13). The
+	 * sibling phone branch has always done this; the email branch had not.
+	 *
+	 * @return void
+	 */
+	public function test_purchase_datalayer_omits_an_email_hash_that_folds_away_to_nothing(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		$order = new \WC_Order(
+			array(
+				'order_number'       => '1002',
+				'total'              => 100.0,
+				'currency'           => 'EUR',
+				'billing_email'      => '+shopping@gmail.com',
+				'billing_first_name' => 'John',
+				'billing_country'    => 'US',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'] ?? null;
+
+		$this->assertIsArray( $user_data );
+		// Both directions (TS-2): the key is gone, not merely falsy, and the rest
+		// of the block still ships - an unusable email must not cost the order its
+		// other identifiers.
+		$this->assertArrayNotHasKey( 'sha256_email_address', $user_data );
+		$this->assertNotSame( '', $user_data['sha256_email_address'] ?? 'absent' );
+		$this->assertSame( hash( 'sha256', 'john' ), $user_data['address']['sha256_first_name'] );
+	}
+
+	/**
+	 * The same address at any other domain is a real, separate mailbox and must
+	 * still be hashed - the guard above must not turn into "drop tagged emails".
+	 *
+	 * @return void
+	 */
+	public function test_purchase_datalayer_keeps_a_tagged_email_outside_gmail(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		$order = new \WC_Order(
+			array(
+				'order_number'    => '1003',
+				'total'           => 100.0,
+				'currency'        => 'EUR',
+				'billing_email'   => '+shopping@example.com',
+				'billing_country' => 'US',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'] ?? null;
+
+		$this->assertIsArray( $user_data );
+		$this->assertSame( hash( 'sha256', '+shopping@example.com' ), $user_data['sha256_email_address'] );
+	}
+
 	public function test_purchase_datalayer_omits_user_data_when_customer_data_off(): void {
 		$product_data = $this->make_product_data();
 

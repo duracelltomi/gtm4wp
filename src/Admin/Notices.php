@@ -230,7 +230,7 @@ final class Notices {
 		// The literal supplies its own quotes, so it is NOT wrapped below and the
 		// emitted line stays byte-identical for an ordinary nonce.
 		//
-		// No false-return fallback here, unlike ContainerCode::json_literal(): that
+		// No false-return fallback here, unlike ScriptTag::json_literal(): that
 		// guards values supplied by a public filter, whereas wp_create_nonce()
 		// always returns 10 ASCII characters, which wp_json_encode() cannot fail on.
 		//

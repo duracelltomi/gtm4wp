@@ -651,11 +651,22 @@ final class Helpers {
 	 * cannot express, and it made every Italian landline hash to a value Google
 	 * could never match.
 	 *
-	 * Not modelled, deliberately: Argentina's mobile "9" and Brazil's carrier
-	 * selection codes (both need libphonenumber's transform rules), and dialling
-	 * a foreign number with a national international-access code other than "00"
-	 * (US "011", JP "010", AU "0011", RU "810"). Those return a wrong number
-	 * rather than none. See tools/generate-phone-table.php.
+	 * Not modelled, deliberately - each returns a wrong number rather than none,
+	 * and each needs data this two-column table does not carry. See
+	 * tools/generate-phone-table.php for why the line is drawn here.
+	 *
+	 * - Argentina's mobile "9" and Brazil's carrier selection codes, which need
+	 *   libphonenumber's nationalPrefixTransformRule.
+	 * - Dialling a foreign number with a national international-access code other
+	 *   than "00" (US "011", JP "010", AU "0011", RU "810").
+	 * - A national number that legitimately begins with its OWN calling code, so
+	 *   the branch below reads it as an international form with the "+" left off.
+	 *   Kazakhstan is the concrete case: calling code 7, and its mobile ranges all
+	 *   start with 7, so a bare "701 234 5678" comes out one digit short and
+	 *   inside the length bounds. The trunk-prefixed spelling ("8 701 …") is
+	 *   correct, which is what keeps this narrow. Telling the two apart needs
+	 *   per-country possible lengths - a third column, and the point at which
+	 *   adopting the library beats growing this one.
 	 *
 	 * Returns '' whenever the number cannot be placed with confidence. The caller
 	 * decides what to do with that; inventing a country would produce a hash that

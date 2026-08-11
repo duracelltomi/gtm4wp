@@ -48,7 +48,9 @@ final class Docs {
 	 *
 	 * @param string $path   Documentation path relative to self::BASE, without a leading
 	 *                       slash and without a fragment. An empty path means "no
-	 *                       documentation for this", and returns an empty string.
+	 *                       documentation for this", and returns an empty string. An
+	 *                       absolute http(s) URL is accepted and used as given - see
+	 *                       the note in the body.
 	 * @param string $anchor Fragment to append, always an option key. Empty for a
 	 *                       module-level link, which points at the whole page.
 	 * @return string Absolute URL, or '' when there is nothing to link to. Escape it at
@@ -59,7 +61,20 @@ final class Docs {
 			return '';
 		}
 
-		$url = self::BASE . ltrim( $path, '/' );
+		// A third party module's schema may name its own documentation site, and
+		// giving an absolute URL where the contract asks for a path is the obvious
+		// way to do it. Resolving that against BASE produces
+		// https://gtm4wp.com/https://example.com/... - a link that reads as
+		// configured and goes nowhere. Accept it instead; the protocol allow-list
+		// at the bottom of this method is the same guard either way.
+		//
+		// The built-in schemas are held to the path form by
+		// ModuleConsistencyTest::test_every_field_declares_a_documentation_page, so
+		// this leniency cannot quietly become a second way to write the domain
+		// down - which is the thing BASE exists to prevent.
+		$url = 1 === preg_match( '#^https?://#i', $path )
+			? $path
+			: self::BASE . ltrim( $path, '/' );
 
 		if ( '' !== $anchor ) {
 			$url .= '#' . rawurlencode( $anchor );

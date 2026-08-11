@@ -646,7 +646,17 @@ final class ProductData {
 
 		$email = (string) $order->get_billing_email();
 		if ( '' !== $email ) {
-			$user_data['sha256_email_address'] = Helpers::normalize_and_hash_email_address( 'sha256', $email );
+			// Omitted rather than sent empty, for the same reason as the phone
+			// below: the helper returns '' when folding leaves no address to hash
+			// - a gmail.com address whose local part is nothing but a "+" tag -
+			// and a present-but-empty identifier is the consumer's call to
+			// interpret, not ours (RI-13). The guard belongs here rather than in
+			// the helper: '' is the honest answer to "hash this", and only the
+			// caller knows the key is optional.
+			$email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $email );
+			if ( '' !== $email_hash ) {
+				$user_data['sha256_email_address'] = $email_hash;
+			}
 		}
 
 		$phone = (string) $order->get_billing_phone();
