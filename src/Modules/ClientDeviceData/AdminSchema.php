@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\ClientDeviceData;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,7 +19,22 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Field definitions of the client device data module.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation hub of this module on gtm4wp.com. Each of the three options
+	 * has a page of its own below it.
+	 */
+	private const DOC_PAGE = 'use-special-3rd-party-data-in-google-tag-manager';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_PAGE;
+	}
 
 	/**
 	 * Module title.
@@ -62,7 +78,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Browser data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the name and version of the browser the visitor uses.', 'duracelltomi-google-tag-manager' ),
-				group: 'device'
+				group: 'device',
+				doc: self::DOC_PAGE . '/browser-attributes-in-the-data-layer'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_OSDATA,
@@ -70,7 +87,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'OS data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the name and version of the operating system the visitor uses.', 'duracelltomi-google-tag-manager' ),
-				group: 'device'
+				group: 'device',
+				doc: self::DOC_PAGE . '/operating-system-attributes-in-the-data-layer'
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_DEVICEDATA,
@@ -78,7 +96,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Device data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the type of device the user is currently using (desktop or mobile) including model data where available.', 'duracelltomi-google-tag-manager' ),
-				group: 'device'
+				group: 'device',
+				doc: self::DOC_PAGE . '/device-attributes-in-the-data-layer'
 			),
 		);
 	}

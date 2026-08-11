@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\ConsentMode;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,7 +19,33 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Field definitions of the consent module, ported from the 1.x Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation hub of this module on gtm4wp.com and the per-tool setup
+	 * guides below it - one page per accordion group, which is how the settings
+	 * and the documentation happen to line up here.
+	 */
+	private const DOC_BASE      = 'setup-gtm4wp-features/consent-mode-and-consent-tools';
+	private const DOC_CONSENT   = self::DOC_BASE . '/how-to-setup-google-consent-mode';
+	private const DOC_COOKIEBOT = self::DOC_BASE . '/cookiebot-gtm4wp-how-to-setup';
+	private const DOC_COOKIEYES = self::DOC_BASE . '/cookieyes-gtm4wp-how-to-setup';
+	private const DOC_AXEPTIO   = self::DOC_BASE . '/axeptio-gtm4wp-how-to-setup';
+
+	/**
+	 * The WebToffee guide predates the consent hub and still lives beside it
+	 * rather than under it.
+	 */
+	private const DOC_WEBTOFFEE = 'setup-gtm4wp-features/webtoffee-gdpr-cookie-consent-plugin-gtm4wp-how-to-setup';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_BASE;
+	}
 
 	/**
 	 * Module title.
@@ -74,7 +101,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'<a href="https://developers.google.com/tag-platform/gtagjs/reference#consent" target="_blank" rel="noopener">',
 					'</a>'
 				),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS,
@@ -82,7 +110,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Analytics Storage', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the analytics_storage flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS,
@@ -90,7 +119,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Ad Storage', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the ad_storage flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA,
@@ -98,7 +128,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Ad User Data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the ad_user_data flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO,
@@ -106,7 +137,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Ad Personalization', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the ad_personalization flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC,
@@ -114,7 +146,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Functionality Storage', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the functionality_storage flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO,
@@ -122,7 +155,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Personalization Storage', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the personalization_storage flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY,
@@ -130,7 +164,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Security Storage', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select this checkbox to make the security_storage flag "granted" by default.', 'duracelltomi-google-tag-manager' ),
-				group: 'consent-mode'
+				group: 'consent-mode',
+				doc: self::DOC_CONSENT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_COOKIEBOT,
@@ -146,7 +181,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'<a href="https://support.cookiebot.com/hc/en-us/articles/360009192739-Google-Tag-Manager-and-Automatic-cookie-blocking" target="_blank" rel="noopener">',
 					'</a>'
 				),
-				group: 'cookiebot'
+				group: 'cookiebot',
+				doc: self::DOC_COOKIEBOT
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
@@ -158,7 +194,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'duracelltomi-google-tag-manager'
 				),
 				group: 'webtoffee',
-				phase: Field::PHASE_DEPRECATED
+				phase: Field::PHASE_DEPRECATED,
+				doc: self::DOC_WEBTOFFEE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_COOKIEYES,
@@ -175,7 +212,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'</a>'
 				),
 				group: 'cookieyes',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_COOKIEYES
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO,
@@ -186,7 +224,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'Enable this to let GTM4WP load the Axeptio CMP SDK directly. No separate Axeptio plugin is required. Enter your Axeptio project ID and cookies version below.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'axeptio'
+				group: 'axeptio',
+				doc: self::DOC_AXEPTIO
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID,
@@ -197,7 +236,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'Your Axeptio project identifier, passed to the SDK as the clientId. You can find it in your Axeptio dashboard.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'axeptio'
+				group: 'axeptio',
+				doc: self::DOC_AXEPTIO
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION,
@@ -208,7 +248,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'The cookies version (cookiesVersion) loaded by the SDK. The list is fetched automatically from your Axeptio project once a valid Project ID is set above.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'axeptio'
+				group: 'axeptio',
+				doc: self::DOC_AXEPTIO
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE,
@@ -219,7 +260,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'When enabled, Axeptio drives Google Consent Mode v2: it fires both the "default" (everything denied) and the "update" commands using its certified vendor mapping. Use this instead of the plugin\'s own "Google Consent Mode" feature, and do not enable both. A dedicated dataLayer event (gtm4wp.axeptioConsentUpdate) is also pushed whenever the visitor updates their choices.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'axeptio'
+				group: 'axeptio',
+				doc: self::DOC_AXEPTIO
 			),
 		);
 	}

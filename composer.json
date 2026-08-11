@@ -40,6 +40,10 @@
         "phpcs": "phpcs",
         "test": "phpunit",
         "test:coverage": "phpunit --coverage-text",
+        "test:doc-links": "phpunit -c phpunit-network.xml",
         "check-branch": "node tools/check-branch.js"
+    },
+    "scripts-descriptions": {
+        "test:doc-links": "Probes gtm4wp.com for every settings-screen help link: page reachable without a redirect, option anchor present. Needs the network, so it is outside the unit suite and outside CI - run it before a release (upstream registry U107)."
     }
 }

@@ -362,4 +362,77 @@ final class SettingsPageTest extends TestCase {
 			'The React app is told where to POST a settings import.'
 		);
 	}
+
+	/**
+	 * The bootstrap payload is where the documentation paths declared by the
+	 * schemas become the absolute URLs the settings app renders as an href. Each
+	 * field's fragment is its own option key, which is what makes a help icon
+	 * land on the section that documents THAT option rather than on the page top.
+	 */
+	public function test_bootstrap_data_resolves_documentation_links_for_modules_and_fields(): void {
+		$page = $this->make_settings_page( array() );
+
+		$modules = $page->bootstrap_data()['modules'];
+		$by_id   = array_column( $modules, null, 'id' );
+
+		$this->assertArrayHasKey( 'woocommerce', $by_id );
+		$this->assertSame(
+			'https://gtm4wp.com/google-tag-manager-for-woocommerce',
+			$by_id['woocommerce']['docUrl'],
+			'A module panel links to its own documentation page.'
+		);
+
+		$fields = array_column( $by_id['woocommerce']['fields'], 'doc', 'key' );
+
+		$this->assertSame(
+			'https://gtm4wp.com/google-tag-manager-for-woocommerce/woocommerce-settings-reference#' . GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE,
+			$fields[ GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ],
+			'An option deep links to its own anchor, which is its option key.'
+		);
+
+		// Not one page for the whole module: the media trackers each have their
+		// own, and collapsing them onto the hub would look identical in a test
+		// that only checked "a link is present".
+		$media  = array_column( $by_id['media-events']['fields'], 'doc', 'key' );
+		$prefix = 'https://gtm4wp.com/track-embedded-media-players-in-google-tag-manager/';
+
+		$this->assertSame(
+			$prefix . 'youtube-video-tracking#' . GTM4WP_OPTION_EVENTS_YOUTUBE,
+			$media[ GTM4WP_OPTION_EVENTS_YOUTUBE ]
+		);
+		$this->assertSame(
+			$prefix . 'spotify-tracking#' . GTM4WP_OPTION_EVENTS_SPOTIFY,
+			$media[ GTM4WP_OPTION_EVENTS_SPOTIFY ]
+		);
+	}
+
+	/**
+	 * A third party module registered through 'gtm4wp_register_modules' predates
+	 * DocumentedSchemaInterface and never implements it. It must still render:
+	 * the panel simply gets no header link. Asserted through the real registry
+	 * extension point rather than by calling the schema directly, because the
+	 * instanceof check lives in the loop, not in the schema.
+	 */
+	public function test_a_module_schema_without_the_documentation_interface_still_boots(): void {
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$registry = new Registry();
+		$registry->add( new UndocumentedThirdPartyModule() );
+
+		$page    = new SettingsPage( $registry, new RestController( $registry ) );
+		$modules = $page->bootstrap_data()['modules'];
+
+		$this->assertCount( 1, $modules );
+		$this->assertSame( 'third-party', $modules[0]['id'] );
+		$this->assertSame(
+			'',
+			$modules[0]['docUrl'],
+			'No interface, no header link - and no fatal.'
+		);
+		$this->assertSame(
+			'',
+			$modules[0]['fields'][0]['doc'],
+			'A field that declares no page gets an empty string, never a bare base URL.'
+		);
+	}
 }

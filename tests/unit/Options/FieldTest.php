@@ -297,4 +297,41 @@ final class FieldTest extends TestCase {
 			$dependent->to_ui_array( false )['depends_on']
 		);
 	}
+
+	/**
+	 * $doc is last in the constructor signature, so adding it cannot shift a
+	 * positional argument of an existing caller - the same rule the docblock
+	 * states for $choice_sections. The positional construction below is what
+	 * makes that a test rather than a comment: it fails if the parameter is ever
+	 * moved up the list.
+	 *
+	 * The UI array deliberately does NOT carry it. The path here is relative to
+	 * the documentation base, and it is SettingsPage that resolves it to an
+	 * absolute URL under the same key; a raw path leaking into that slot would
+	 * render as a relative href pointing inside wp-admin.
+	 */
+	public function test_doc_defaults_to_empty_and_stays_at_the_end_of_the_signature(): void {
+		$this->assertSame( '', $this->make_field( Field::TYPE_CHECKBOX, false )->doc );
+
+		$positional = new Field(
+			'gtm4wp-options-example',
+			Field::TYPE_CHECKBOX,
+			false,
+			'Example',
+			'',
+			'general',
+			Field::PHASE_STABLE,
+			array(),
+			null,
+			array(),
+			null,
+			'',
+			false,
+			array(),
+			'some-page/some-option'
+		);
+
+		$this->assertSame( 'some-page/some-option', $positional->doc );
+		$this->assertArrayNotHasKey( 'doc', $positional->to_ui_array( false ) );
+	}
 }

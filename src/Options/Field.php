@@ -111,6 +111,15 @@ final class Field {
 	 *                                     sections), because a choice that exists but cannot be seen
 	 *                                     is the worse failure. Last in the signature so adding it
 	 *                                     cannot shift a positional argument of an existing caller.
+	 * @param string        $doc           Documentation path on gtm4wp.com, relative to the base URL in
+	 *                                     \GTM4WP\Admin\Docs and WITHOUT a fragment: the anchor is always
+	 *                                     this field's own $key, appended by Docs::url(). Storing only the
+	 *                                     path keeps the domain in one place, and deriving the anchor from
+	 *                                     the key means the deep link cannot drift out of step with the
+	 *                                     option it points at - the key is frozen public API, the heading
+	 *                                     wording on the page is not. Empty for an option with no page yet,
+	 *                                     which renders no help icon rather than a broken one. Same
+	 *                                     end-of-signature rule as $choice_sections above.
 	 */
 	public function __construct(
 		public string $key,
@@ -126,7 +135,8 @@ final class Field {
 		public $derive = null,
 		public string $depends_on = '',
 		public bool $rows_locked = false,
-		public array $choice_sections = array()
+		public array $choice_sections = array(),
+		public string $doc = ''
 	) {
 	}
 

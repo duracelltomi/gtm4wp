@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\Container;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,7 +20,27 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the container module. Labels and descriptions are
  * ported from the 1.x General and Advanced admin tabs.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation page of this module on gtm4wp.com.
+	 */
+	private const DOC_PAGE = 'setup-gtm4wp-features/container-settings-reference';
+
+	/**
+	 * The excluded roles option predates the reference page and has a guide of
+	 * its own, which answers more than a reference entry could.
+	 */
+	private const DOC_EXCLUDE_ROLES = 'setup-gtm4wp-features/how-to-exclude-admin-users-from-being-tracked';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_PAGE;
+	}
 
 	/**
 	 * Module title.
@@ -241,7 +262,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					return $rows;
 				},
 				derive: static fn ( $rows ) => ContainerRows::legacy_values( is_array( $rows ) ? $rows : array() ),
-				rows_locked: array() !== $locks['rows']
+				rows_locked: array() !== $locks['rows'],
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_GTM_PLACEMENT,
@@ -276,7 +298,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					}
 
 					return $value;
-				}
+				},
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_DATALAYER_NAME,
@@ -306,7 +329,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					}
 
 					return $value;
-				}
+				},
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_LOADEARLY,
@@ -314,7 +338,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Load GTM container as early as possible', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Turning on this option will load your Google Tag Manager container as early as possible during page load. This can cause issues if you are using jQuery in your custom HTML tags that fire on \'Page View\' events.', 'duracelltomi-google-tag-manager' ),
-				group: 'advanced'
+				group: 'advanced',
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_NOCONSOLELOG,
@@ -322,7 +347,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Do not use console.log() messages on frontend', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'GTM4WP puts several useful messages into the console of your browser which can also help give proper support in some cases. If you see any issues regarding this functionality, you can disable it here.', 'duracelltomi-google-tag-manager' ),
-				group: 'advanced'
+				group: 'advanced',
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_PRODUCTIONONLY,
@@ -331,7 +357,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Only output the container on production environments', 'duracelltomi-google-tag-manager' ),
 				description: $this->production_only_description(),
 				group: 'advanced',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_NOGTMFORLOGGEDIN,
@@ -350,7 +377,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					}
 
 					return implode( ',', array_filter( array_map( 'sanitize_key', explode( ',', Field::to_string( $value ) ) ) ) );
-				}
+				},
+				doc: self::DOC_EXCLUDE_ROLES
 			),
 		);
 	}

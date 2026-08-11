@@ -5,10 +5,30 @@
 
 import { Notice, TabPanel } from '@wordpress/components';
 import { RawHTML, useCallback, useEffect, useRef } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
+import DocLink from './DocLink';
 import FieldControl from './FieldControl';
 import { groupsWithFields } from '../utils';
+
+/**
+ * Accessible name of a help link. The target is named rather than left as a
+ * bare "Help", because a screen reader user listing the links on this screen
+ * would otherwise hear the same word up to thirty times in a row.
+ *
+ * @param {string} name Label of the option, or title of the module.
+ * @return {string} Translated link text.
+ */
+function docLabel( name ) {
+	return sprintf(
+		/* translators: %s: name of the option or module the documentation link points at. */
+		__(
+			'Documentation: %s (opens in a new tab)',
+			'duracelltomi-google-tag-manager'
+		),
+		name
+	);
+}
 
 function GroupFields( {
 	fields,
@@ -35,12 +55,35 @@ function GroupFields( {
 						key={ field.key }
 						ref={ isFocused ? revealFocused : undefined }
 					>
-						<FieldControl
-							field={ field }
-							value={ values[ field.key ] }
-							values={ values }
-							error={ errors[ field.key ] }
-							onChange={ ( next ) => onChange( field.key, next ) }
+						{ /*
+						   The control is wrapped rather than made a flex item
+						   directly, so the row can put the help icon beside it
+						   without any control having to know it is in a row.
+						   min-width:0 lives on this wrapper in the stylesheet -
+						   without it the table control refuses to shrink and
+						   pushes the icon off the panel.
+						*/ }
+						<div className="gtm4wp-field__control">
+							<FieldControl
+								field={ field }
+								value={ values[ field.key ] }
+								values={ values }
+								error={ errors[ field.key ] }
+								onChange={ ( next ) =>
+									onChange( field.key, next )
+								}
+							/>
+						</div>
+
+						{ /*
+						   After the control in the DOM, so tabbing through a
+						   panel reaches the setting before its help, and so the
+						   deep-link reveal keeps finding the control first.
+						*/ }
+						<DocLink
+							className="gtm4wp-field__doc"
+							url={ field.doc }
+							label={ docLabel( field.label ) }
 						/>
 					</div>
 				);
@@ -121,11 +164,25 @@ export default function ModulePanel( {
 			tabBox.left - stripBox.left - ( stripBox.width - tabBox.width ) / 2;
 	}, [ module.id, activeGroupId ] );
 
+	// One definition for both branches below: an unavailable module is exactly
+	// when its documentation is most worth reaching, because the panel says the
+	// module cannot run and the page says what it needs.
+	const moduleDoc = (
+		<DocLink
+			className="gtm4wp-panel__doc"
+			url={ module.docUrl }
+			label={ docLabel( module.title ) }
+		/>
+	);
+
 	if ( ! module.available ) {
 		return (
 			<div className="gtm4wp-panel">
 				<div className="gtm4wp-panel__head">
-					<h2>{ module.title }</h2>
+					<div className="gtm4wp-panel__heading">
+						<h2>{ module.title }</h2>
+						{ moduleDoc }
+					</div>
 				</div>
 				<div className="gtm4wp-panel__body">
 					<Notice status="warning" isDismissible={ false }>
@@ -158,7 +215,10 @@ export default function ModulePanel( {
 	return (
 		<div className="gtm4wp-panel">
 			<div className="gtm4wp-panel__head">
-				<h2>{ module.title }</h2>
+				<div className="gtm4wp-panel__heading">
+					<h2>{ module.title }</h2>
+					{ moduleDoc }
+				</div>
 				{ module.intro && (
 					<RawHTML className="gtm4wp-panel__intro">
 						{ module.intro }

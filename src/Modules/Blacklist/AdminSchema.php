@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\Blacklist;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,7 +25,23 @@ defined( 'ABSPATH' ) || exit;
  * Vendor names are product names and are not translated, matching 1.x
  * behavior.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation page of this module on gtm4wp.com. Both options deep link
+	 * into it: the two restriction modes are easy to read as each other's
+	 * opposite, and getting that backwards disables containers outright.
+	 */
+	private const DOC_PAGE = 'setup-gtm4wp-features/restriction-mode';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_PAGE;
+	}
 
 	/**
 	 * Human readable labels of the tag entity IDs.
@@ -244,7 +261,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					}
 
 					return $value;
-				}
+				},
+				doc: self::DOC_PAGE
 			),
 			new Field(
 				key: GTM4WP_OPTION_BLACKLIST_STATUS,
@@ -284,7 +302,8 @@ final class AdminSchema implements AdminSchemaInterface {
 						'label'   => __( 'Entity groups', 'duracelltomi-google-tag-manager' ),
 						'choices' => array_keys( self::group_class_labels() ),
 					),
-				)
+				),
+				doc: self::DOC_PAGE
 			),
 		);
 	}

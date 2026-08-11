@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\WooCommerce;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,7 +20,33 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the WooCommerce module, ported from the 1.x
  * Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation hub of this module on gtm4wp.com.
+	 */
+	private const DOC_PAGE = 'google-tag-manager-for-woocommerce';
+
+	/**
+	 * The per-option reference every field of this module deep links into. It
+	 * already carries an `<a name="…">` anchor per option key, which is where
+	 * the convention the rest of the plugin now follows came from.
+	 *
+	 * Separate from the setup guides linked out of the descriptions below: a
+	 * guide answers "how do I build this in Google Tag Manager", the reference
+	 * answers "what does this one switch do", and the help icon asks the second
+	 * question.
+	 */
+	private const DOC_REFERENCE = self::DOC_PAGE . '/woocommerce-settings-reference';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_PAGE;
+	}
 
 	/**
 	 * Module title.
@@ -44,7 +71,7 @@ final class AdminSchema implements AdminSchemaInterface {
 			),
 			'<a href="https://developers.google.com/analytics/devguides/collection/ga4/ecommerce?client_type=gtm" target="_blank" rel="noopener">',
 			'</a>',
-			'<a href="https://gtm4wp.com/how-to-articles/how-to-setup-enhanced-ecommerce-tracking-google-analytics-4-ga4-version" target="_blank" rel="noopener">',
+			'<a href="https://gtm4wp.com/google-tag-manager-for-woocommerce/how-to-setup-enhanced-ecommerce-tracking-google-analytics-4-ga4-version" target="_blank" rel="noopener">',
 			'</a>'
 		);
 	}
@@ -143,7 +170,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Track e-commerce', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Choose this option if you would like to track e-commerce data with GA4 ecommerce tracking.', 'duracelltomi-google-tag-manager' ),
-				group: 'general'
+				group: 'general',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION,
@@ -151,7 +179,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: 10,
 				label: __( 'Products per impression', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'If you have many products shown on product category pages and/or on your site home, you could miss pageviews in Google Analytics due to the amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by entering a number here (minimum 10-15 recommended). Leave this value 0 to include product impression data in your pageview hit.', 'duracelltomi-google-tag-manager' ),
-				group: 'products'
+				group: 'products',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCUSESKU,
@@ -159,7 +188,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Use SKU instead of ID', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this to use product SKU instead of the ID of the products for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set.', 'duracelltomi-google-tag-manager' ),
-				group: 'products'
+				group: 'products',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY,
@@ -178,7 +208,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				// of the type-defensive default, never before it).
 				sanitizer: static function ( $value ) {
 					return sanitize_text_field( Field::to_string( $value ) );
-				}
+				},
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH,
@@ -186,7 +217,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Include full category path.', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this to include the full category path of each product in ecommerce tracking. WARNING! This can lead to performance issues on large sites with lots of traffic!', 'duracelltomi-google-tag-manager' ),
-				group: 'products'
+				group: 'products',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL,
@@ -199,11 +231,12 @@ final class AdminSchema implements AdminSchemaInterface {
 						'Select which vertical category to add next to each product to utilize dynamic remarketing for Google Ads. Use the plugin\'s %1$sofficial setup guide for dynamic remarketing%2$s to setup your Google Tag Manager container.',
 						'duracelltomi-google-tag-manager'
 					),
-					'<a href="https://gtm4wp.com/how-to-articles/how-to-setup-dynamic-remarketing-in-google-ads-adwords" target="_blank" rel="noopener">',
+					'<a href="https://gtm4wp.com/google-tag-manager-for-woocommerce/how-to-setup-dynamic-remarketing-in-google-ads-adwords" target="_blank" rel="noopener">',
 					'</a>'
 				),
 				group: 'products',
-				choices: $business_verticals
+				choices: $business_verticals,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX,
@@ -211,7 +244,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: '',
 				label: __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( "Some product feed generator plugins prefix product IDs with a fixed text like 'woocommerce_gpf'. You can enter this prefix here so that tags in your website include this prefix as well.", 'duracelltomi-google-tag-manager' ),
-				group: 'products'
+				group: 'products',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT,
@@ -219,7 +253,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Fire view_item on parent product', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'If this option is turned on, the view_item event will be also fired during page load of a variable product using parent product data.', 'duracelltomi-google-tag-manager' ),
-				group: 'products'
+				group: 'products',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION,
@@ -228,7 +263,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Persist product list attribution across the funnel', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'When a visitor clicks a product in a list, remember which list it was (item_list_name / item_list_id) in a first-party cookie and carry it onto the later view_item, add_to_cart, begin_checkout, add_shipping_info, add_payment_info and purchase events, so GA4 can attribute the whole funnel to the originating list. On a product page the list is merged in by the browser rather than by the server, so the attribution also works when the page is served from a full-page cache. Only enable this if you are NOT already doing the same with custom JavaScript in Google Tag Manager, otherwise the attribution would be set twice.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL,
@@ -236,7 +272,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this option to include the content of the cart in the data layer on each page. Especially useful for site personalization tools.', 'duracelltomi-google-tag-manager' ),
-				group: 'datalayer'
+				group: 'datalayer',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA,
@@ -244,7 +281,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to add all customer data (billing and shipping data, total number of orders and order value) into the data layer', 'duracelltomi-google-tag-manager' ),
-				group: 'datalayer'
+				group: 'datalayer',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCORDERDATA,
@@ -252,7 +290,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to add all order attributes into the data layer on the order received page regardless and independently from ecommerce tracking', 'duracelltomi-google-tag-manager' ),
-				group: 'datalayer'
+				group: 'datalayer',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE,
@@ -261,7 +300,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Only track orders younger than', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'To prevent duplicate transaction tracking at the order received page, enter the maximum age (in minutes) of the order or its payment for the transaction to be measured. Viewing the order received page of older orders will be ignored from transaction tracking, as it is considered to be measured in an earlier session.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX,
@@ -269,7 +309,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Exclude tax from revenue', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to exclude tax from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),
-				group: 'purchase'
+				group: 'purchase',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING,
@@ -277,7 +318,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Exclude shipping from revenue', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to exclude shipping costs from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),
-				group: 'purchase'
+				group: 'purchase',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX,
@@ -285,7 +327,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: '',
 				label: __( 'Transaction ID prefix', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Text to prepend to the transaction_id sent with the purchase event, for example to tell several stores apart in one GA4 property or to match the order id format of another system. Leave this empty to send the WooCommerce order number unchanged. Only the purchase event is affected: the order number in the orderData variable and the duplicate tracking guards of the plugin keep using the raw order number.', 'duracelltomi-google-tag-manager' ),
-				group: 'purchase'
+				group: 'purchase',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG,
@@ -293,7 +336,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Do not flag orders as being tracked', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Turn this on to prevent the plugin from flagging orders as being already tracked. Leaving this unchecked ensures that no order data will be tracked multiple times in any ad or measurement system. Please only turn this feature on if you really need it!', 'duracelltomi-google-tag-manager' ),
-				group: 'purchase'
+				group: 'purchase',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES,
@@ -303,7 +347,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'The purchase event is sent when an order first reaches one of these statuses, i.e. at order placement - not when payment physically clears. This is why Cash on Delivery (Processing) and bank transfer (On hold) orders are tracked at checkout even though the money arrives later. Leave Failed, Cancelled and Pending payment unchecked so unpaid orders are not counted as sales.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
-				choices: $order_status_choices
+				choices: $order_status_choices,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE,
@@ -312,7 +357,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Turn this on if some purchases are missing. When the customer lands on a heavily customized thank-you page, or on the order-pay page instead of the order received page, the purchase event is emitted on the next page they view in the same browser session instead. The order tracked flag and browser cookie still prevent double counting. Note: this cannot capture orders where the buyer pays via an asynchronous gateway and never returns to the site - that case needs server side tracking.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE,
@@ -322,7 +368,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'If your theme or another plugin shows the order confirmation on a custom page instead of the standard WooCommerce order received endpoint, select it here so the purchase event fires on it. The order is resolved from the current browser session.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
-				choices: $order_received_page_choices
+				choices: $order_received_page_choices,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL,
@@ -338,7 +385,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'<a href="https://developers.google.com/analytics/devguides/collection/ga4/ecommerce?client_type=gtm#clear_the_ecommerce_object" target="_blank" rel="noopener">',
 					'</a>'
 				),
-				group: 'advanced'
+				group: 'advanced',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT,
@@ -346,7 +394,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: 2000,
 				label: __( 'Set maximum timeout for select_item event', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'When a user clicks on a product in a list, the select_item event uses a callback function with Google Tag Manager (GTM). This ensures that GTM can fire all related tags before the browser navigates to the product detail page. You can customize a timeout period (in milliseconds). This timeout only comes into play if a tag fails to fire within the specified time for some reason. Set this to 0 to open the product immediately without waiting for GTM: the select_item event is still pushed to the data layer, but the click is no longer held back. Use 0 (or a lower value than 2000) if product links feel slow to open - for example when a consent tool blocks GTM so the callback never returns.', 'duracelltomi-google-tag-manager' ),
-				group: 'advanced'
+				group: 'advanced',
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC,
@@ -363,7 +412,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'</a>'
 				),
 				group: 'advanced',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
 			),
 		);
 	}

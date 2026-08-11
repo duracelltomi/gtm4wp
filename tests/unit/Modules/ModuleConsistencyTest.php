@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\ModuleInterface;
 use GTM4WP\Module\Registry;
 use GTM4WP\Tests\unit\TestCase;
@@ -130,6 +131,63 @@ final class ModuleConsistencyTest extends TestCase {
 			$found_dependency,
 			'At least one built-in field is expected to declare a depends_on (e.g. parent categories on the category list).'
 		);
+	}
+
+	/**
+	 * The control behind the in-app help links, and the reason they cannot rot
+	 * quietly.
+	 *
+	 * A missing documentation link is invisible from inside the plugin: the icon
+	 * is simply not rendered, nothing errors, and no other test goes red. So the
+	 * absence is made a failure here instead. A new option added without a `doc`
+	 * fails this test in the same change that introduces it, which is the only
+	 * moment anybody knows where its documentation belongs.
+	 *
+	 * Deliberately NOT asserted here: that the page exists on gtm4wp.com. That
+	 * claim needs the network and lives in tests/network/DocLinksTest.php, run
+	 * before a release. This test only pins that every option names a target.
+	 */
+	public function test_every_field_declares_a_documentation_page(): void {
+		foreach ( $this->builtin_modules() as $module_id => $module ) {
+			$schema_class = $module->admin_schema();
+			$schema       = new $schema_class();
+
+			$this->assertInstanceOf(
+				DocumentedSchemaInterface::class,
+				$schema,
+				"Module '{$module_id}': the admin schema must declare the module's own documentation page."
+			);
+			$this->assertNotSame(
+				'',
+				$schema->doc_url(),
+				"Module '{$module_id}': doc_url() must name a page."
+			);
+
+			foreach ( $schema->fields() as $field ) {
+				$this->assertNotSame(
+					'',
+					$field->doc,
+					"Module '{$module_id}': field '{$field->key}' has no documentation page. Add one to the schema, or a page to gtm4wp.com first."
+				);
+
+				// A path, never a URL: the domain has exactly one definition,
+				// in \GTM4WP\Admin\Docs. A full URL here would still render a
+				// working link today and silently escape that single definition.
+				$this->assertStringStartsNotWith(
+					'http',
+					$field->doc,
+					"Module '{$module_id}': field '{$field->key}' must carry a path relative to the documentation base, not a full URL."
+				);
+
+				// The fragment is appended from the option key, so a path that
+				// brings its own would produce two of them.
+				$this->assertStringNotContainsString(
+					'#',
+					$field->doc,
+					"Module '{$module_id}': field '{$field->key}' must not carry a fragment; the anchor is its option key."
+				);
+			}
+		}
 	}
 
 	public function test_module_ids_are_unique_and_stable(): void {

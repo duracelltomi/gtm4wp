@@ -245,6 +245,16 @@ export function ToggleControl( { label, help, checked, onChange, disabled } ) {
 }
 
 /**
+ * `href` switches the rendered element from <button> to <a>, exactly as the real
+ * component does. Honoured rather than accepted-and-ignored (UC-3): the help
+ * links are anchors on purpose - an interactive <button> next to a control would
+ * be picked up by ModulePanel's "focus the first control in this row" query, and
+ * `rel` only means anything on an anchor. A stand-in that rendered every Button
+ * as a <button> would make those tests green for the wrong reason.
+ *
+ * A button gets no `href`/`target`/`rel`, so passing them to one is not silently
+ * swallowed here either.
+ *
  * @param {Object} props               Component props.
  * @param          props.children
  * @param          props.onClick
@@ -255,6 +265,9 @@ export function ToggleControl( { label, help, checked, onChange, disabled } ) {
  * @param          props.isDestructive
  * @param          props.isBusy
  * @param          props.className
+ * @param          props.href
+ * @param          props.target
+ * @param          props.rel
  * @return {Object} React element.
  */
 export function Button( {
@@ -267,19 +280,30 @@ export function Button( {
 	isDestructive,
 	isBusy,
 	className,
+	href,
+	target,
+	rel,
 } ) {
+	const shared = {
+		className,
+		'aria-label': label,
+		'data-variant': variant,
+		'data-icon': icon,
+		'data-destructive': isDestructive ? 'true' : undefined,
+		'data-busy': isBusy ? 'true' : undefined,
+		onClick,
+	};
+
+	if ( undefined !== href ) {
+		return h( 'a', { ...shared, href, target, rel }, children );
+	}
+
 	return h(
 		'button',
 		{
+			...shared,
 			type: 'button',
-			className,
 			disabled: Boolean( disabled ),
-			'aria-label': label,
-			'data-variant': variant,
-			'data-icon': icon,
-			'data-destructive': isDestructive ? 'true' : undefined,
-			'data-busy': isBusy ? 'true' : undefined,
-			onClick,
 		},
 		children
 	);

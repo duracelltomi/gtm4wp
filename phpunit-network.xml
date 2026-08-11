@@ -1,0 +1,24 @@
+<phpunit
+	bootstrap="tests/bootstrap.php"
+	colors="true"
+	>
+	<!--
+		The probes that need the network, kept out of phpunit.xml so `composer
+		test` and CI stay offline and deterministic. Run with:
+
+			composer test:doc-links
+
+		The switch is set here rather than exported by the composer script,
+		because a `VAR=1 cmd` prefix is POSIX shell syntax and composer runs its
+		scripts through cmd.exe on Windows. Setting it through PHPUnit's own
+		<env> works the same on both.
+	-->
+	<php>
+		<env name="GTM4WP_CHECK_DOC_LINKS" value="1"/>
+	</php>
+	<testsuites>
+		<testsuite name="network">
+			<directory suffix="Test.php">./tests/network/</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>

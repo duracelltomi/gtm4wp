@@ -215,6 +215,16 @@ $gtm4wp-mobile: 782px;
 		padding: var(--gtm4wp-s5) var(--gtm4wp-s6) var(--gtm4wp-s4);
 	}
 
+	// Title and its documentation link on one line, the link pushed to the far
+	// edge. `gap` rather than a margin so the two never touch when a long module
+	// title wraps.
+	&__heading {
+		align-items: center;
+		display: flex;
+		gap: var(--gtm4wp-s3);
+		justify-content: space-between;
+	}
+
 	&__body {
 		padding: var(--gtm4wp-s5) var(--gtm4wp-s6) var(--gtm4wp-s6);
 	}
@@ -261,11 +271,44 @@ $gtm4wp-mobile: 782px;
 }
 
 .gtm4wp-field {
+	display: flex;
+	gap: var(--gtm4wp-s2);
 	margin-bottom: var(--gtm4wp-s6);
 	max-width: 48em;
 
 	&:last-child {
 		margin-bottom: 0;
+	}
+
+	// The control takes whatever the help icon does not. `min-width: 0` is the
+	// load-bearing half: a flex item defaults to `min-width: auto`, which means
+	// "never shrink below my content", and the table control's own horizontal
+	// scroller has content wider than the panel. Without this it would push the
+	// icon out past the right edge instead of scrolling inside itself.
+	&__control {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	// Present but quiet: at rest the icon reads as punctuation next to the
+	// setting, and it comes up to full strength when it is actually being aimed
+	// at. `align-self` keeps it level with the label rather than centred against
+	// a description that may run several lines.
+	&__doc {
+		align-self: flex-start;
+		flex: 0 0 auto;
+
+		&.components-button {
+			color: var(--gtm4wp-text-3);
+			opacity: .55;
+			transition: opacity .15s ease-out;
+		}
+
+		&.components-button:hover,
+		&.components-button:focus-visible {
+			color: var(--gtm4wp-accent);
+			opacity: 1;
+		}
 	}
 
 	// The option a deep link (?gtm4wp-focus=…) pointed at. The tab is already

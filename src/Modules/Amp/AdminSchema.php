@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\Amp;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,7 +19,21 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Field definitions of the AMP module, ported from the 1.x Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation page of this module on gtm4wp.com.
+	 */
+	private const DOC_PAGE = 'setup-gtm4wp-features/amp-support';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_PAGE;
+	}
 
 	/**
 	 * Module title.
@@ -91,7 +106,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					}
 
 					return $value;
-				}
+				},
+				doc: self::DOC_PAGE
 			),
 		);
 	}

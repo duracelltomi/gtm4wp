@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\PageVariables;
 
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,7 +21,36 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the page variables module. Labels and descriptions
  * are ported from the 1.x Basic data admin tab.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation hub of this module on gtm4wp.com, and the pages below it that
+	 * document individual data layer variables. This module's options are spread
+	 * across the widest set of pages, which is why they are named here rather than
+	 * spelled out on each of the 37 fields.
+	 */
+	private const DOC_BASE      = 'use-basic-wordpress-data-in-google-tag-manager';
+	private const DOC_POST      = self::DOC_BASE . '/wordpress-page-post-attributes-in-google-tag-manager';
+	private const DOC_VISITOR   = self::DOC_BASE . '/wordpress-site-user-and-visitor-data';
+	private const DOC_SEARCH    = self::DOC_BASE . '/site-search-usage-on-your-wordpress-site';
+	private const DOC_TAXONOMY  = self::DOC_BASE . '/wordpress-taxonomy-llisting-page-post-count-in-google-tag-manager';
+	private const DOC_MULTISITE = self::DOC_BASE . '/wordpress-multisite-information';
+
+	/**
+	 * The Cloudflare country code is the one option of this module documented
+	 * under the third party data hub rather than the basic data one, because it
+	 * is the surviving part of the retired geo integration.
+	 */
+	private const DOC_GEO = 'use-special-3rd-party-data-in-google-tag-manager/track-country-city-and-other-geo-data-of-the-current-visitor';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_BASE;
+	}
 
 	/**
 	 * Module title.
@@ -68,7 +98,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: true,
 				label: __( 'Posttype of current post/archive', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the type of the current post or archive page (post, page or any custom post type).', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_CATEGORIES,
@@ -76,7 +107,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: true,
 				label: __( 'Category list of current post/archive', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the categories of the current post or archive page in the pageCategory data layer variable. Categories are listed by their slug (for example news-and-events), not by their display name.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES,
@@ -86,7 +118,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'Check this option to also add the parent (ancestor) categories to the pageCategory data layer variable. When off, only the categories directly assigned to the current post or archive are listed. Requires the "Category list of current post/archive" option above to be enabled.', 'duracelltomi-google-tag-manager' ),
 				group: 'post',
 				phase: Field::PHASE_BETA,
-				depends_on: GTM4WP_OPTION_INCLUDE_CATEGORIES
+				depends_on: GTM4WP_OPTION_INCLUDE_CATEGORIES,
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_TAGS,
@@ -94,7 +127,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: true,
 				label: __( 'Tags of current post', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the tags of the current post in the pageAttributes data layer variable. Tags are listed by their slug (for example black-friday), not by their display name.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_AUTHORID,
@@ -102,7 +136,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post author ID', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the ID of the author on the current post or author page in the pagePostAuthorID data layer variable. On a post with several authors (PublishPress Authors) the full list is added as pagePostAuthorIDs as well.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_AUTHOR,
@@ -110,7 +145,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: true,
 				label: __( 'Post author name', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the display name of the author on the current post or author page in the pagePostAuthor data layer variable. On a post with several authors (PublishPress Authors) the full list is added as pagePostAuthors as well.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTDATE,
@@ -118,7 +154,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post date', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the date of the current post. This will include 9 dataLayer variables: full date, year, month, day, day name, hour, minute, ISO 8601 date and Unix timestamp. On date based archive pages only the parts the archive covers are included.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTTITLE,
@@ -126,7 +163,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post title', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the title of the current post.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTCOUNT,
@@ -134,7 +172,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post count', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the count of the posts currently shown on the page and the total number of posts in the category/tag/any taxonomy.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_TAXONOMY
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTID,
@@ -142,7 +181,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post ID', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the post id.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTFORMAT,
@@ -150,7 +190,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post Format', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the format of the current post in the postFormat data layer variable. The format is reported by its slug (aside, gallery, video and so on), and posts with no format set report standard.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTTERMLIST,
@@ -158,7 +199,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post Terms', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include taxonomy values associated with a given post, in the pagePostTerms data layer variable. Custom fields are a separate option below.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTMETA,
@@ -166,7 +208,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Post custom fields (meta)', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the custom fields (post meta) of the current post in the pagePostTerms.meta data layer variable. Read this before enabling it: this publishes EVERY custom field whose name does not start with an underscore, together with its value, into the data layer of the public page, where any visitor can read it. That includes fields created by other plugins and themes - Advanced Custom Fields stores its values this way - so it may expose internal notes, ids, prices or contact details you did not intend to make public. Review your custom fields first, and use the gtm4wp_post_meta_in_datalayer filter to exclude individual keys. Until 2.0 this data was sent as part of the "Post Terms" option above; if you had that enabled, this option was turned on for you during the upgrade so your Google Tag Manager setup keeps working.', 'duracelltomi-google-tag-manager' ),
-				group: 'post'
+				group: 'post',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT,
@@ -174,7 +217,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Content word count', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the number of words in the current post content. Useful to normalize scroll depth and engagement metrics against the length of the content.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_READINGTIME,
@@ -182,7 +226,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Estimated reading time', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the estimated reading time of the current post in minutes (based on 200 words per minute, adjustable with the gtm4wp_reading_time_wpm filter).', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_MODIFIEDDATE,
@@ -190,7 +235,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Last modified date', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the last modified date of the current post. This will include the same set of date variables as the post date option (full date, year, month, day, day name, hour, minute, ISO and Unix timestamp).', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_CONTENTAGE,
@@ -198,7 +244,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Content age in days', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the number of days elapsed since the current post was published. Useful to segment engagement by fresh versus evergreen content.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_COMMENTCOUNT,
@@ -206,7 +253,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Comment count', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the number of comments on the current post and whether commenting is open or closed.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_PAGETEMPLATE,
@@ -214,7 +262,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Page template', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the template file assigned to the current post or page (returns "default" when no custom template is used). Useful to segment behavior by page layout.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_FEATUREDIMAGE,
@@ -222,7 +271,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Featured image presence', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include whether the current post has a featured image set.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_PAGEHIERARCHY,
@@ -230,7 +280,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Page hierarchy', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the parent post ID and the depth of the current post in the page hierarchy (0 for top level pages).', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_POSTSTICKY,
@@ -238,7 +289,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Sticky post', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include whether the current post is marked as sticky.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY,
@@ -246,7 +298,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Primary category', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the primary category of the current post as chosen in Yoast SEO or Rank Math (falls back to the first assigned category). This adds two data layer variables: pagePrimaryCategory holds the category slug and pagePrimaryCategoryName holds its display name. Useful as a single content grouping dimension.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_PAGELANGUAGE,
@@ -254,7 +307,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Page language', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the language code of the current page, detected from WPML or Polylang and falling back to the site locale. Useful to segment behavior on multilingual sites.', 'duracelltomi-google-tag-manager' ),
-				group: 'content'
+				group: 'content',
+				doc: self::DOC_POST
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_SEARCHDATA,
@@ -262,7 +316,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Search data', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the search term, referring page URL and number of results on the search page.', 'duracelltomi-google-tag-manager' ),
-				group: 'search'
+				group: 'search',
+				doc: self::DOC_SEARCH
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_LOGGEDIN,
@@ -270,7 +325,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Logged in status', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include whether there is a logged in user on your website, in the visitorLoginState data layer variable. The value is either logged-in or logged-out.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_USERROLE,
@@ -278,7 +334,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Logged in user role', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the role of the logged in user in the visitorType data layer variable. Roles are reported by their slug, a user with several roles reports them comma separated, and a visitor who is not logged in reports visitor-logged-out.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_USERID,
@@ -286,7 +343,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Logged in user ID', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the ID of the logged in user.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_USERNAME,
@@ -294,7 +352,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Logged in user name', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the username of the logged in user.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_USEREMAIL,
@@ -302,7 +361,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Logged in user email', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the email address of the logged in user.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_USERREGDATE,
@@ -310,7 +370,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Logged in user creation date', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the date of creation (registration) of the logged in user.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_VISITOR_IP,
@@ -318,7 +379,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Visitor IP', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this option to include the IP address of the visitor. You might use this to filter internal traffic inside your GTM container. Please be aware that per GDPR its not allowed to transmit this full IP address to Google Analytics or to any other measurement system without explicit consent from the visitor.', 'duracelltomi-google-tag-manager' ),
-				group: 'visitor'
+				group: 'visitor',
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER,
@@ -338,7 +400,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					// own copy of the pattern, and two copies of an allow-list is a
 					// divergence waiting for the next tightening (PA-2). One rule now.
 					return VisitorIp::normalize_header_name( Field::to_string( $value ) );
-				}
+				},
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES,
@@ -366,7 +429,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					$valid = array_values( array_filter( $entries, array( VisitorIp::class, 'is_valid_range' ) ) );
 
 					return implode( "\n", $valid );
-				}
+				},
+				doc: self::DOC_VISITOR
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_MISCGEOCF,
@@ -375,7 +439,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Cloudflare country code', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Add the country code of the user provided by Cloudflare (if Cloudflare is used with your site)', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_GEO
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_SITEID,
@@ -383,7 +448,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Site ID', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'ID of the current site in a WordPress Multisite environment', 'duracelltomi-google-tag-manager' ),
-				group: 'site'
+				group: 'site',
+				doc: self::DOC_MULTISITE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_SITENAME,
@@ -391,7 +457,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				default_value: false,
 				label: __( 'Site name', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Name of the current site in a WordPress Multisite environment', 'duracelltomi-google-tag-manager' ),
-				group: 'site'
+				group: 'site',
+				doc: self::DOC_MULTISITE
 			),
 		);
 	}

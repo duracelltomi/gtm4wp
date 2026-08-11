@@ -11,6 +11,7 @@
 namespace GTM4WP\Admin;
 
 use GTM4WP\Frontend\ScriptTag;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\Registry;
 
 defined( 'ABSPATH' ) || exit;
@@ -181,7 +182,14 @@ final class SettingsPage {
 
 			$fields = array();
 			foreach ( $schema->fields() as $field ) {
-				$fields[] = $field->to_ui_array( $values[ $field->key ] ?? $field->default_value );
+				$ui = $field->to_ui_array( $values[ $field->key ] ?? $field->default_value );
+
+				// Resolved here rather than inside to_ui_array() so that Field, which
+				// belongs to the options layer, never learns the documentation domain.
+				// The anchor is the option key itself - see the Docs class docblock.
+				$ui['doc'] = Docs::url( $field->doc, $field->key );
+
+				$fields[] = $ui;
 			}
 
 			$groups = array();
@@ -200,6 +208,11 @@ final class SettingsPage {
 				'fields'             => $fields,
 				'available'          => $module->is_available(),
 				'unavailableMessage' => $schema->unavailable_message(),
+				// instanceof, not method_exists(): a third party schema predating
+				// the interface stays valid and simply gets no header link.
+				'docUrl'             => $schema instanceof DocumentedSchemaInterface
+					? Docs::url( $schema->doc_url() )
+					: '',
 			);
 		}
 

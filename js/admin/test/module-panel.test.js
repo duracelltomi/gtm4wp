@@ -340,3 +340,115 @@ describe( 'ModulePanel field wiring', () => {
 		expect( onChange ).toHaveBeenCalledWith( 'gtm-code', 'GTM-BBB' );
 	} );
 } );
+
+describe( 'ModulePanel documentation links', () => {
+	const DOC = 'https://gtm4wp.com/some-page#gtm-code';
+
+	it( 'links the panel header to the module documentation', () => {
+		renderPanel( {
+			title: 'WooCommerce',
+			docUrl: 'https://gtm4wp.com/google-tag-manager-for-woocommerce',
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [ field( 'a', 'g' ) ],
+		} );
+
+		const link = screen.getByRole( 'link', {
+			name: 'Documentation: WooCommerce (opens in a new tab)',
+		} );
+
+		expect( link ).toHaveAttribute(
+			'href',
+			'https://gtm4wp.com/google-tag-manager-for-woocommerce'
+		);
+		expect( link ).toHaveAttribute( 'target', '_blank' );
+		expect( link ).toHaveAttribute( 'rel', 'noopener noreferrer' );
+	} );
+
+	it( 'links the header of an unavailable module too', () => {
+		// The module cannot run, which is precisely when the page explaining
+		// what it needs is worth reaching.
+		renderPanel( {
+			title: 'WooCommerce',
+			available: false,
+			unavailableMessage: 'WooCommerce is not active.',
+			docUrl: 'https://gtm4wp.com/google-tag-manager-for-woocommerce',
+			groups: [],
+			fields: [],
+		} );
+
+		expect(
+			screen.getByRole( 'link', {
+				name: 'Documentation: WooCommerce (opens in a new tab)',
+			} )
+		).toBeInTheDocument();
+	} );
+
+	it( 'names the option, not just "help", on a field link', () => {
+		// Thirty identical "Help" links on one panel is what this avoids: the
+		// accessible name has to say which setting it belongs to.
+		renderPanel( {
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [
+				{ ...field( 'gtm-code', 'g', 'Container ID' ), doc: DOC },
+			],
+		} );
+
+		expect(
+			screen.getByRole( 'link', {
+				name: 'Documentation: Container ID (opens in a new tab)',
+			} )
+		).toHaveAttribute( 'href', DOC );
+	} );
+
+	it( 'renders no icon for an option that has no page yet', () => {
+		renderPanel( {
+			docUrl: '',
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [ { ...field( 'gtm-code', 'g' ), doc: '' } ],
+		} );
+
+		expect( screen.queryByRole( 'link' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'keeps the help link out of the control label', () => {
+		// The load-bearing one. Every control renders its label as a <label>
+		// element, and an anchor placed inside one would toggle the setting on
+		// click as well as opening the page. The link is a sibling of the
+		// control for that reason, which is only observable as behaviour.
+		const { onChange } = renderPanel( {
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [
+				{
+					key: 'load-early',
+					group: 'g',
+					label: 'Load early',
+					type: 'checkbox',
+					description: '',
+					doc: DOC,
+				},
+			],
+		} );
+
+		fireEvent.click( screen.getByRole( 'link' ) );
+
+		expect( onChange ).not.toHaveBeenCalled();
+		expect( screen.getByRole( 'switch' ) ).not.toBeChecked();
+	} );
+
+	it( 'leaves the deep-link focus on the control, not on the help link', () => {
+		// ModulePanel focuses the first input/textarea/select/button it finds in
+		// the revealed row. An anchor is none of those on purpose, so arriving
+		// from a notice still lands on the setting itself.
+		renderPanel(
+			{
+				groups: [ { id: 'g', label: 'General' } ],
+				fields: [
+					{ ...field( 'gtm-code', 'g', 'Container ID' ), doc: DOC },
+				],
+			},
+			{ focusFieldKey: 'gtm-code' }
+		);
+
+		expect( screen.getByRole( 'textbox' ) ).toHaveFocus();
+	} );
+} );
