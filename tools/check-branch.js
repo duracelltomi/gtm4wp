@@ -77,6 +77,16 @@ const { spawnSync } = require( 'child_process' );
  * ruleset while a `phpcs.xml`-only pathspec reports "no executable wiring changed" -
  * finding #101's own file, missed by the script written to prompt about it. Every tool
  * below therefore has each of its accepted config names listed, present or not.
+ *
+ * That covers the configs a tool DISCOVERS. The other half is a config a documented
+ * command PASSES: `phpunit -c phpunit-network.xml` reaches a file under no name PHPUnit
+ * would ever look for, so a discovery-shaped list has no reason to contain it (#148).
+ * Those are the more dangerous of the two, because such a file usually arrives as
+ * somebody's side project rather than as project wiring. So: read the project's own
+ * script definitions - `composer.json` and `package.json` scripts, the CI steps, the
+ * copy-paste commands in the docs - and make sure every path that appears after a
+ * config flag is matched by something below. Globbing the family is cheaper than
+ * chasing each new file, which is why the PHPUnit entries are patterns.
  */
 const EXECUTED_PATHS = [
 	// PHP toolchain.
@@ -84,9 +94,9 @@ const EXECUTED_PATHS = [
 	'.phpcs.xml', // Read in preference to phpcs.xml.
 	'phpcs.xml.dist',
 	'.phpcs.xml.dist',
-	'phpunit.xml', // Names the bootstrap and the test suites.
-	'phpunit.xml.dist', // Used when phpunit.xml is absent - so a branch deleting it matters.
-	'phpunit.dist.xml',
+	'phpunit*.xml', // ANY PHPUnit config: names the bootstrap, the test suites and <extensions>.
+	'phpunit*.xml.dist', // Used when the plain file is absent - so a branch deleting one matters.
+	'phpunit*.dist.xml',
 	'tests/bootstrap.php', // Executed before any test.
 	'composer.json', // scripts + allow-plugins; Composer plugins execute.
 	'composer.lock', // Pins the dev dependencies that provide those executables.
