@@ -82,6 +82,16 @@ function read_source( string $source ): string {
 	return $xml;
 }
 
+// Stated rather than assumed. SimpleXML is enabled on most builds and this script
+// is also run by a CI job on a runner whose default extension set is not
+// something this repository controls or can check - so the requirement is
+// asserted here, where the message can name the fix, instead of arriving as an
+// undefined-function fatal several lines later.
+if ( ! function_exists( 'simplexml_load_string' ) ) {
+	fwrite( STDERR, "This script needs the SimpleXML extension (php -m | grep -i simplexml).\n" );
+	exit( 1 );
+}
+
 $source = $argv[1] ?? SOURCE_URL;
 $xml    = read_source( $source );
 

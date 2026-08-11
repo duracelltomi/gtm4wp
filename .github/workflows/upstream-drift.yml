@@ -1,0 +1,85 @@
+name: Upstream drift
+
+# Detects drift in data this repository MIRRORS from an external source, on a
+# schedule rather than at release time.
+#
+# The release script already refuses to package a mirror older than a year, and
+# warns after six months. That catches "nobody has looked in a long while". It
+# cannot catch "the source changed last week", because the age of our copy says
+# nothing about whether it is still true - which is the whole point of registry
+# row U110 and of upstream pattern UD-11 ("it evidently works" is not evidence).
+# This job goes and looks.
+#
+# It reports; it never writes. A red run means the numbering plan moved and the
+# generated table wants regenerating, reviewing and committing in the normal way,
+# with the test suite green - not applying automatically. Regenerating on a
+# schedule and pushing would put a behaviour change into the tree that no test
+# run and no changelog ever saw.
+on:
+  schedule:
+    # Monthly, on the 8th at 05:17 UTC. Off the hour and off the 1st on purpose:
+    # GitHub queues scheduled jobs, and everybody's cron says midnight on the 1st.
+    - cron: '17 5 8 * *'
+  workflow_dispatch:
+
+# Nothing here writes to the repository or calls the API. Scheduled workflows
+# only ever run on the default branch of this repository, so a fork's schedule
+# cannot reach this.
+permissions:
+  contents: read
+
+jobs:
+  phone-table:
+    name: Phone dialling table vs libphonenumber
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The floor, not the newest: the generator has to keep working on the
+      # oldest PHP the plugin supports, and a generator that only runs on 8.4 is
+      # a generator the maintainer cannot run.
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: simplexml
+          coverage: none
+
+      # No dependencies: the generator is deliberately plain PHP, so this step
+      # cannot be the thing that breaks when a dev dependency moves.
+      - name: Regenerate the table from upstream metadata
+        run: php tools/generate-phone-table.php
+
+      # Scoped to the generated paths rather than the whole tree. On a fresh
+      # checkout the two are the same thing, and saying which files this job is
+      # about is what stops it quietly becoming "did anything change at all".
+      #
+      # -I skips the generator's own "Generated: <date>" stamp. Without it this
+      # job is red on every run but the one that happens to fall on the day the
+      # table was last committed, reporting a date as a numbering-plan change -
+      # and a monthly job that cries wolf gets muted, which is worse than not
+      # having one. Verified both ways: -I passes when only the stamp moved, and
+      # still fails on a real entry change.
+      - name: Report any drift
+        env:
+          GENERATED: src/Modules/WooCommerce/CountryPhoneData.php tests/unit/Modules/phone-corpus.php
+          IGNORE_STAMP: '^ \* Generated: '
+        run: |
+          if git diff --quiet -I "$IGNORE_STAMP" -- $GENERATED; then
+            echo "No drift: the generated table still matches upstream."
+            exit 0
+          fi
+
+          echo "::warning::The national numbering plans moved. Regenerate, review and commit."
+          echo
+          echo "Changed files:"
+          git diff --name-only -I "$IGNORE_STAMP" -- $GENERATED
+          echo
+          # Full diff of the table, which is small and readable. The test corpus
+          # is 489 lines and would bury it, so only its shape is summarised.
+          git --no-pager diff -I "$IGNORE_STAMP" -- src/Modules/WooCommerce/CountryPhoneData.php
+          echo
+          git --no-pager diff --stat -I "$IGNORE_STAMP" -- tests/unit/Modules/phone-corpus.php
+          echo
+          echo "Run 'composer generate:phone-table' locally, check the suite is green, and commit."
+          exit 1

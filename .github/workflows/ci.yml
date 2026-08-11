@@ -68,8 +68,12 @@ jobs:
           php-version: '8.0'
           coverage: none
 
+      # tools/ is not shipped, but it is linted here for a specific reason: the
+      # upstream-drift job runs tools/generate-phone-table.php on this same 8.0,
+      # so 8.1+ syntax there would surface as a monthly red build rather than at
+      # the commit that introduced it. Nothing else in tools/ is PHP today.
       - name: Lint every shipped PHP file against the declared floor
-        run: find duracelltomi-google-tag-manager-for-wordpress.php uninstall.php compat src -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+        run: find duracelltomi-google-tag-manager-for-wordpress.php uninstall.php compat src tools -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
 
   js:
     name: JS — build + lint + unit tests
