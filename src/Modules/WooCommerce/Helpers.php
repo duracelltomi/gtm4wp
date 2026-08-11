@@ -593,77 +593,26 @@ final class Helpers {
 	private const E164_MIN_DIGITS = 5;
 
 	/**
-	 * National trunk prefixes that are NOT a single leading "0".
+	 * Matches a phone extension written after the number itself.
 	 *
-	 * Every other territory in WooCommerce's country list either uses "0" or has
-	 * no trunk prefix at all, which is what self::DEFAULT_TRUNK_PREFIX covers.
-	 * This is a mirror of a numbering-plan fact nothing in this code can verify,
-	 * so it carries an upstream registry row rather than only this comment
-	 * (upstream UD-1/UD-2). North America needs no entry: its trunk prefix and
-	 * its calling code are both "1", so the generic paths below already handle it.
-	 *
-	 * @var array<string, string>
+	 * Cut before the digits are harvested, or the extension is absorbed into the
+	 * subscriber number and the result is a well-formed number nobody has. No
+	 * leading \b: "0121 234 5678x22" has no word boundary before the "x".
 	 */
-	private const NATIONAL_TRUNK_PREFIXES = array(
-		'HU' => '06',
-		'RU' => '8',
-		'KZ' => '8',
-		'BY' => '8',
-		'LT' => '8',
-	);
-
-	private const DEFAULT_TRUNK_PREFIX = '0';
+	private const EXTENSION_PATTERN = '/(?:extension|ext|x|#)\W*\d+\s*$/i';
 
 	/**
-	 * Returns the international calling code of a country as bare digits, or an
-	 * empty string when it cannot be resolved.
+	 * Matches the trunk prefix printed in parentheses inside an international
+	 * number - "+49 (0) 30 12345678".
 	 *
-	 * The table itself is WooCommerce's, on purpose: mirroring ~200 calling codes
-	 * here would be a snapshot that looks correct forever while the source moves.
-	 * WC_Countries::get_country_calling_code() has existed since WooCommerce 3.6,
-	 * well below the 5.0 floor this module declares, but it is still somebody
-	 * else's API, so the reach is guarded rather than assumed.
-	 *
-	 * Every unresolvable case returns '' and the caller declines to guess: an
-	 * absent WooCommerce and an unknown country code are different events, and
-	 * neither of them wants a fallback that invents a country (RI-19).
-	 *
-	 * @param string $country_code ISO 3166-1 alpha-2 country code of the address.
-	 * @return string The calling code without the leading "+", or '' if unknown.
+	 * The convention means "dial this digit only from inside the country", so it
+	 * is exactly the digit E.164 must not carry. Removed unconditionally: the
+	 * pattern is a lone zero in brackets, so an area code in brackets - "(030)"
+	 * - does not match and is left alone. Standard on business stationery across
+	 * the German-speaking countries and the Netherlands, and taking the "+" form
+	 * at face value silently mangled every one of them.
 	 */
-	private static function country_calling_code( string $country_code ): string {
-		$country_code = strtoupper( trim( $country_code ) );
-		if ( '' === $country_code || ! function_exists( 'WC' ) ) {
-			return '';
-		}
-
-		$wc = WC();
-		if ( ! is_object( $wc ) ) {
-			return '';
-		}
-
-		// WooCommerce exposes several of its sub-objects through __get(), which
-		// makes isset()/?? report false even when the value is really there
-		// (RI-12), so the property is reached the way that pattern prescribes.
-		$countries = ( property_exists( $wc, 'countries' ) || method_exists( $wc, '__get' ) ) ? $wc->countries : null;
-		if ( ! is_object( $countries ) || ! method_exists( $countries, 'get_country_calling_code' ) ) {
-			return '';
-		}
-
-		$calling_code = $countries->get_country_calling_code( $country_code );
-
-		// WooCommerce answers with an array for the few territories that carry
-		// more than one code; the first entry is the country's own.
-		if ( is_array( $calling_code ) ) {
-			$calling_code = reset( $calling_code );
-		}
-
-		if ( ! is_scalar( $calling_code ) ) {
-			return '';
-		}
-
-		return (string) preg_replace( '/\D+/', '', (string) $calling_code );
-	}
+	private const COURTESY_ZERO_PATTERN = '/\(\s*0\s*\)/';
 
 	/**
 	 * Assembles a validated E.164 string from bare digits.
@@ -694,6 +643,20 @@ final class Helpers {
 	 * already has its calling code" branch, because the trunk prefix is the
 	 * unambiguous signal of the two.
 	 *
+	 * The dialling facts come from CountryPhoneData, which is GENERATED from
+	 * libphonenumber's metadata (tools/generate-phone-table.php). A null national
+	 * prefix there means the country has none at all, so nothing may be stripped
+	 * and a leading zero is part of the number - Italy and six others. Reading
+	 * that as "uses 0" is what a hand-written table of exceptions plus a default
+	 * cannot express, and it made every Italian landline hash to a value Google
+	 * could never match.
+	 *
+	 * Not modelled, deliberately: Argentina's mobile "9" and Brazil's carrier
+	 * selection codes (both need libphonenumber's transform rules), and dialling
+	 * a foreign number with a national international-access code other than "00"
+	 * (US "011", JP "010", AU "0011", RU "810"). Those return a wrong number
+	 * rather than none. See tools/generate-phone-table.php.
+	 *
 	 * Returns '' whenever the number cannot be placed with confidence. The caller
 	 * decides what to do with that; inventing a country would produce a hash that
 	 * can never match, which is worse than sending nothing.
@@ -710,7 +673,13 @@ final class Helpers {
 			return '';
 		}
 
-		$has_plus = str_starts_with( $phone_number, '+' );
+		// Both run BEFORE the digits are harvested: an extension and a courtesy
+		// zero are digits, and once they are in the string nothing downstream can
+		// tell them from the number.
+		$phone_number = (string) preg_replace( self::EXTENSION_PATTERN, '', $phone_number );
+		$phone_number = (string) preg_replace( self::COURTESY_ZERO_PATTERN, '', $phone_number );
+
+		$has_plus = str_starts_with( ltrim( $phone_number ), '+' );
 		$digits   = (string) preg_replace( '/\D+/', '', $phone_number );
 		if ( '' === $digits ) {
 			return '';
@@ -725,12 +694,18 @@ final class Helpers {
 			return self::to_e164( substr( $digits, 2 ) );
 		}
 
-		$calling_code = self::country_calling_code( $country_code );
-		if ( '' === $calling_code ) {
+		$dialling = CountryPhoneData::lookup( $country_code );
+		if ( null === $dialling ) {
 			return '';
 		}
 
-		$trunk_prefix = self::NATIONAL_TRUNK_PREFIXES[ strtoupper( trim( $country_code ) ) ] ?? self::DEFAULT_TRUNK_PREFIX;
+		list( $calling_code, $trunk_prefix ) = $dialling;
+
+		// No trunk prefix in this country's plan, so there is nothing to strip and
+		// a leading zero is significant. Anchor it and stop.
+		if ( null === $trunk_prefix ) {
+			return self::to_e164( $calling_code . $digits );
+		}
 
 		// A national number: drop the trunk prefix, then prepend the country's
 		// calling code. The length test keeps a prefix-shaped number that is too

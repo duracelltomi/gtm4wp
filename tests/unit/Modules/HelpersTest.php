@@ -12,9 +12,8 @@ use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Tests\unit\TestCase;
 
 // Required here explicitly rather than left to whichever test file happens to
-// load first: the WC_Countries / WooCommerce doubles the phone tests below reach
-// are process-wide class definitions, and depending on another file's require is
-// invisible until something reorders (TS-16).
+// load first: these doubles are process-wide class definitions, and depending on
+// another file's require is invisible until something reorders (TS-16).
 require_once __DIR__ . '/wc-stubs.php';
 
 /**
@@ -382,34 +381,17 @@ final class HelpersTest extends TestCase {
 		$this->assertSame( '', Helpers::get_product_category( 7 ) );
 	}
 
-	/**
-	 * Points WC() at the country stub. Stubbed per test rather than once for the
-	 * file: Brain Monkey defines a function process-wide, so a test that leans on
-	 * another file having done this passes only until something reorders (TS-16).
-	 *
-	 * @return void
-	 */
-	private function stub_woocommerce_countries(): void {
-		Functions\when( 'WC' )->justReturn( new \GTM4WP_Test_WooCommerce() );
-	}
-
 	public function test_normalize_phone_number_keeps_explicit_international_format(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '+36 20 123 4567', 'HU' ) );
 		// The country is not even consulted when the number carries its own "+".
 		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '+36 (20) 123-4567', '' ) );
 	}
 
 	public function test_normalize_phone_number_converts_the_double_zero_call_prefix(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '0036 20 123 4567', 'HU' ) );
 	}
 
 	public function test_normalize_phone_number_strips_a_multi_digit_trunk_prefix(): void {
-		$this->stub_woocommerce_countries();
-
 		// Hungary dials 06 nationally. Stripping only the leading zero would
 		// leave the 6 in place and produce +366201234567, which never matches.
 		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '06 20 123 4567', 'HU' ) );
@@ -417,61 +399,140 @@ final class HelpersTest extends TestCase {
 	}
 
 	public function test_normalize_phone_number_strips_a_single_zero_trunk_prefix(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '030 12345678', 'DE' ) );
 	}
 
 	public function test_normalize_phone_number_strips_a_non_zero_trunk_prefix(): void {
-		$this->stub_woocommerce_countries();
-
 		// Russia dials 8 nationally while its calling code is 7.
 		$this->assertSame( '+74951234567', Helpers::normalize_phone_number( '8 (495) 123-45-67', 'RU' ) );
+
+		// Turkmenistan is the same shape and was missing while its four ex-Soviet
+		// siblings were present - the gap a hand-written exception list leaves.
+		$this->assertSame( '+99312345678', Helpers::normalize_phone_number( '8 12 345678', 'TM' ) );
+	}
+
+	/**
+	 * The defect that made this table generated rather than written.
+	 *
+	 * These countries have NO trunk prefix, so their leading zero is part of the
+	 * number. Reading "not in the exceptions list" as "dials 0" removed a
+	 * significant digit and produced a number that is well formed, passes every
+	 * length check, and can never match. Italy is the commercially important one.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_keeps_a_significant_leading_zero(): void {
+		$this->assertSame( '+390669821234', Helpers::normalize_phone_number( '06 6982 1234', 'IT' ) );
+		$this->assertSame( '+390212345678', Helpers::normalize_phone_number( '02 1234 5678', 'IT' ) );
+		$this->assertSame( '+2250123456789', Helpers::normalize_phone_number( '01 23 45 67 89', 'CI' ) );
+		$this->assertSame( '+2290120211234', Helpers::normalize_phone_number( '01 20 21 12 34', 'BJ' ) );
+		$this->assertSame( '+24101441234', Helpers::normalize_phone_number( '01 44 12 34', 'GA' ) );
+
+		// Both directions (TS-2): the zero survives, and the value the old
+		// leading-zero strip produced is gone.
+		$this->assertNotSame( '+39669821234', Helpers::normalize_phone_number( '06 6982 1234', 'IT' ) );
+	}
+
+	/**
+	 * Italian mobiles begin with 3, so they were never affected - which is
+	 * exactly why the landline defect could ship unnoticed.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_leaves_a_country_without_a_leading_zero_alone(): void {
+		$this->assertSame( '+393201234567', Helpers::normalize_phone_number( '320 1234567', 'IT' ) );
 	}
 
 	public function test_normalize_phone_number_handles_north_american_numbers(): void {
-		$this->stub_woocommerce_countries();
-
 		// Both the bare 10 digit form and the 1-prefixed form land on the same
-		// E.164 number, which is why North America needs no trunk-prefix entry.
-		$this->assertSame( '+15551234567', Helpers::normalize_phone_number( '(555) 123-4567', 'US' ) );
-		$this->assertSame( '+15551234567', Helpers::normalize_phone_number( '1 (555) 123-4567', 'US' ) );
+		// E.164 number, which is why North America needs no special entry.
+		$this->assertSame( '+12015550123', Helpers::normalize_phone_number( '(201) 555-0123', 'US' ) );
+		$this->assertSame( '+12015550123', Helpers::normalize_phone_number( '1 (201) 555-0123', 'US' ) );
+
+		// A trunk prefix of "1" with a calling code that is NOT 1: the case the
+		// North America reasoning does not transfer to.
+		$this->assertSame( '+6922471234', Helpers::normalize_phone_number( '1 247 1234', 'MH' ) );
+	}
+
+	/**
+	 * The Channel Islands and the Isle of Man carry their area code inside
+	 * WooCommerce's calling-code table, which pushed the result past E.164's 15
+	 * digit ceiling and dropped the number entirely. Reading the calling code
+	 * from the generated table instead is what fixes it.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_handles_territories_with_their_own_area_code(): void {
+		$this->assertSame( '+441534456789', Helpers::normalize_phone_number( '01534 456789', 'JE' ) );
+		$this->assertSame( '+441624756789', Helpers::normalize_phone_number( '01624 756789', 'IM' ) );
 	}
 
 	public function test_normalize_phone_number_accepts_the_international_form_without_a_plus(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '49 30 12345678', 'DE' ) );
 	}
 
 	public function test_normalize_phone_number_prepends_the_calling_code_to_a_local_number(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '+31612345678', Helpers::normalize_phone_number( '612345678', 'NL' ) );
 	}
 
-	public function test_normalize_phone_number_empty_when_the_country_cannot_anchor_it(): void {
-		$this->stub_woocommerce_countries();
+	/**
+	 * "+49 (0) 30 ..." is standard business stationery across the German
+	 * speaking countries and the Netherlands, and the bracketed zero is precisely
+	 * the digit E.164 must not carry. Taking the "+" form at face value mangled
+	 * every one of them.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_drops_a_courtesy_trunk_prefix(): void {
+		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '+49 (0) 30 12345678', 'DE' ) );
+		$this->assertSame( '+31612345678', Helpers::normalize_phone_number( '+31 (0)6 12345678', 'NL' ) );
 
-		// No country at all, and a country WooCommerce does not know: two
-		// different events, both of which decline to guess rather than invent a
-		// calling code that would hash to something unmatchable (RI-19).
+		// Also in the national and the 00 spellings, since the convention is not
+		// tied to the "+".
+		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '(0)30 12345678', 'DE' ) );
+		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '0049 (0) 30 12345678', 'DE' ) );
+	}
+
+	/**
+	 * An area code in brackets is not a courtesy zero and must survive.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_keeps_a_bracketed_area_code(): void {
+		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '(030) 12345678', 'DE' ) );
+	}
+
+	public function test_normalize_phone_number_cuts_an_extension(): void {
+		// Absorbed into the subscriber number otherwise, which yields a number
+		// that is well formed and belongs to nobody.
+		$this->assertSame( '+441212345678', Helpers::normalize_phone_number( '0121 234 5678 x22', 'GB' ) );
+		$this->assertSame( '+441212345678', Helpers::normalize_phone_number( '0121 234 5678x22', 'GB' ) );
+		$this->assertSame( '+441212345678', Helpers::normalize_phone_number( '0121 234 5678 ext. 22', 'GB' ) );
+		$this->assertSame( '+441212345678', Helpers::normalize_phone_number( '0121 234 5678 #4', 'GB' ) );
+	}
+
+	public function test_normalize_phone_number_empty_when_the_country_cannot_anchor_it(): void {
+		// No country at all, and a country the table does not know: two different
+		// events, both of which decline to guess rather than invent a calling code
+		// that would hash to something unmatchable (RI-19).
 		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', '' ) );
 		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', 'ZZ' ) );
 	}
 
-	public function test_normalize_phone_number_empty_when_woocommerce_is_not_there(): void {
+	/**
+	 * The dialling facts no longer come from WooCommerce, so an absent WC() is
+	 * not an obstacle any more. Asserted rather than assumed, because the
+	 * previous implementation returned '' in exactly this situation.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_does_not_need_woocommerce(): void {
 		Functions\when( 'WC' )->justReturn( null );
-		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', 'HU' ) );
 
-		// Present, but without the countries object the real class exposes.
-		Functions\when( 'WC' )->justReturn( new \stdClass() );
-		$this->assertSame( '', Helpers::normalize_phone_number( '20 123 4567', 'HU' ) );
+		$this->assertSame( '+36201234567', Helpers::normalize_phone_number( '06 20 123 4567', 'HU' ) );
 	}
 
 	public function test_normalize_phone_number_rejects_implausible_input(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '', Helpers::normalize_phone_number( 'n/a', 'HU' ) );
 		$this->assertSame( '', Helpers::normalize_phone_number( '  ', 'HU' ) );
 		$this->assertSame( '', Helpers::normalize_phone_number( '12', 'HU' ) );
@@ -479,9 +540,40 @@ final class HelpersTest extends TestCase {
 		$this->assertSame( '', Helpers::normalize_phone_number( '+1234567890123456', 'HU' ) );
 	}
 
-	public function test_normalize_and_hash_phone_number_hashes_the_e164_form(): void {
-		$this->stub_woocommerce_countries();
+	/**
+	 * Every territory's own example number, spelled nationally, against the E.164
+	 * the numbering plan says it is.
+	 *
+	 * This is the control that makes the generated table trustworthy: both halves
+	 * of each case are read out of the upstream metadata, so it fails when this
+	 * function disagrees with the numbering plan rather than when it merely
+	 * changes. Regenerate with `composer generate:phone-table`.
+	 *
+	 * It proves the per-country table and nothing about how people type - the
+	 * courtesy zero, extension and international-form cases above are where that
+	 * lives.
+	 *
+	 * @param string $country  ISO 3166-1 alpha-2 code.
+	 * @param string $typed    The example number in its national spelling.
+	 * @param string $expected The E.164 form.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_national_number_corpus' )]
+	public function test_normalize_phone_number_matches_the_numbering_plan_of_every_country( string $country, string $typed, string $expected ): void {
+		$this->assertSame( $expected, Helpers::normalize_phone_number( $typed, $country ) );
+	}
 
+	/**
+	 * The generated corpus, kept in its own file so regenerating it never
+	 * rewrites a hand-written test.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: string}>
+	 */
+	public static function provide_national_number_corpus(): array {
+		return require __DIR__ . '/phone-corpus.php';
+	}
+
+	public function test_normalize_and_hash_phone_number_hashes_the_e164_form(): void {
 		$actual = Helpers::normalize_and_hash_phone_number( 'sha256', '06 20 123 4567', 'HU' );
 
 		// Both directions: the E.164 hash is what ships, and the pre-fix hash of
@@ -492,8 +584,6 @@ final class HelpersTest extends TestCase {
 	}
 
 	public function test_normalize_and_hash_phone_number_empty_when_not_normalizable(): void {
-		$this->stub_woocommerce_countries();
-
 		$this->assertSame( '', Helpers::normalize_and_hash_phone_number( 'sha256', '20 123 4567', 'ZZ' ) );
 	}
 }

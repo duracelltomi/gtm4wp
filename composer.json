@@ -41,9 +41,11 @@
         "test": "phpunit",
         "test:coverage": "phpunit --coverage-text",
         "test:doc-links": "phpunit -c phpunit-network.xml",
-        "check-branch": "node tools/check-branch.js"
+        "check-branch": "node tools/check-branch.js",
+        "generate:phone-table": "php tools/generate-phone-table.php"
     },
     "scripts-descriptions": {
-        "test:doc-links": "Probes gtm4wp.com for every settings-screen help link: page reachable without a redirect, option anchor present. Needs the network, so it is outside the unit suite and outside CI - run it before a release (upstream registry U107)."
+        "test:doc-links": "Probes gtm4wp.com for every settings-screen help link: page reachable without a redirect, option anchor present. Needs the network, so it is outside the unit suite and outside CI - run it before a release (upstream registry U107).",
+        "generate:phone-table": "Regenerates src/Modules/WooCommerce/CountryPhoneData.php and its test corpus from Google libphonenumber's numbering-plan metadata. Needs the network. Run it before a release and commit the result (upstream registry U110)."
     }
 }

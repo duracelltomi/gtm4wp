@@ -52,11 +52,6 @@ final class ProductDataTest extends TestCase {
 			}
 		);
 
-		// The billing phone is normalized to E.164 against the order's country,
-		// which reaches WC()->countries. Stubbed here rather than relied upon
-		// from another file, because Brain Monkey defines it process-wide (TS-16).
-		Functions\when( 'WC' )->justReturn( new \GTM4WP_Test_WooCommerce() );
-
 		// Isolate the cookie superglobal between tests (TS-7).
 		unset( $_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ] );
 	}
