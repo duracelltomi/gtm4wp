@@ -876,12 +876,29 @@ final class PageDataLayer {
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 
 			// Dropped after the GTM4WP_WPFILTER_EEC_ORDER_DATA filter rather than
-			// never built: the filter keeps seeing the shape it has always been
-			// handed, and this stays the last write before the data layer - the
-			// sink - so the gate has the final say. The rest of orderData (totals,
-			// items, payment method) stays: the purchase event already carries the
-			// same figures, so withholding those too would be theatre, while
-			// customer holds the names, addresses, email, phone and their hashes.
+			// never built, so the filter keeps seeing the shape it has always been
+			// handed. Be precise about what that ordering buys: this is the last
+			// write to the 'customer' KEY, not to orderData as a whole, so a filter
+			// that copies billing details onto a key of its own survives this unset.
+			// The gate has the final say over the key it names and no say over
+			// anything else a third party writes.
+			//
+			// The line drawn here is IDENTITY, not sensitivity. 'customer' holds the
+			// names, addresses, email, phone and their hashes, and that is the whole
+			// of what is withheld; everything else in orderData describes the ORDER
+			// rather than the buyer, and this visitor is already being told about the
+			// order by the purchase event that deliberately keeps firing.
+			//
+			// Do NOT extend this unset to 'attributes' or 'totals' on the theory that
+			// the purchase event duplicates them. Measured, it does not: it carries
+			// neither the creation date, the payment method, the payment method title,
+			// the shipping method nor the status, and it omits six of the ten totals.
+			// Extending it would also delete values this visitor demonstrably already
+			// holds - the order key they supplied in the URL, and the order number the
+			// duplicate guard prints beside this block - and orderData.attributes.order_number
+			// is named in readme.txt as a variable containers read, so removing it
+			// breaks them with no error.
+			//
 			// No is_array() guard: get_raw_order_datalayer() declares an array return,
 			// so a filter handing back a scalar is a TypeError there, not here.
 			if ( $withhold_customer_data ) {

@@ -36,11 +36,21 @@
  * shape, not length, and it costs ~11 KB against the ~1.9 MB of adopting the
  * library.
  *
- * It is used ONLY as a tie-breaker, never as a validator: a number the pattern
- * does not recognise falls through to exactly the previous behaviour. A stale
- * pattern can therefore fail to improve a number but can never reject one, which
- * is what keeps this inside upstream UC-5 ("do not encode the future as a
- * validator").
+ * It is used ONLY as a tie-breaker, never as a validator. A stale pattern can
+ * therefore fail to improve a number but can never REJECT one - measured across
+ * 558,103 inputs, there is no value the pattern column causes to be refused that
+ * the previous code accepted - which is what keeps this inside upstream UC-5
+ * ("do not encode the future as a validator").
+ *
+ * What it is NOT is a no-op when the pattern misses. An unrecognised number falls
+ * through to the positional rules, and those are now applied UNIFORMLY: before
+ * this column existed, a territory with no trunk prefix returned early ("anchor
+ * and stop") and never reached the calling-code test, so for the 101 such
+ * territories the fall-through differs from the older behaviour. The trade was
+ * measured rather than assumed - under a fully stale pattern it is right in 6,060
+ * sampled cases and wrong in 7, because a national number beginning with its own
+ * calling code is far rarer than someone typing that calling code without a "+".
+ * Do not "restore" the old asymmetry on the strength of the 7.
  *
  * WHAT IT STILL DELIBERATELY DOES NOT CARRY
  * -----------------------------------------
@@ -332,10 +342,12 @@ defined( 'ABSPATH' ) || exit;
  *    never match.
  * 3. **General national-number pattern.** What a number of this country looks
  *    like. Used ONLY to choose between "this is a national number" and "this is
- *    the international form with the + left off" - never to reject a number. A
- *    number it does not recognise falls through to the older, purely positional
- *    rules, so a stale pattern can fail to improve a number but cannot refuse
- *    one (upstream UC-5).
+ *    the international form with the + left off" - never to reject a number, so a
+ *    stale pattern can fail to improve a number but cannot refuse one (upstream
+ *    UC-5). A number it does not recognise falls through to the positional rules,
+ *    which are applied uniformly across all territories - not to the behaviour
+ *    that predated this column, which returned early for the ones with no trunk
+ *    prefix. See tools/generate-phone-table.php for the measurement behind that.
  *
  * See tools/generate-phone-table.php for why this is generated rather than
  * written, and what it deliberately does not model.

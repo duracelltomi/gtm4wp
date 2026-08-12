@@ -534,11 +534,18 @@ final class HelpersTest extends TestCase {
 	 * What happens when the numbering plan recognises neither reading.
 	 *
 	 * The pattern column is a tie-breaker, never a validator: a number it does
-	 * not know is not refused, it falls through to the positional rules that
-	 * predate it. This is the branch that makes a stale pattern harmless - it is
+	 * not know is not refused, it falls through to the positional rules. This is
 	 * exactly the path every number would take if our copy of the plan went
-	 * completely out of date - and it is otherwise unreachable from the generated
+	 * completely out of date, and it is otherwise unreachable from the generated
 	 * corpus, whose cases are all numbers the plan recognises by construction.
+	 *
+	 * A stale pattern therefore cannot REJECT a number - but it is not a no-op
+	 * either, and the docblock here used to say "harmless", which overstated it.
+	 * The positional rules are applied uniformly now; before the pattern column
+	 * existed a territory with no trunk prefix returned early and never reached
+	 * the calling-code test. Measured under a fully stale pattern the uniform rule
+	 * is right in 6,060 sampled cases and wrong in 7, so it is the better trade -
+	 * not a free one.
 	 *
 	 * @return void
 	 */
@@ -555,6 +562,28 @@ final class HelpersTest extends TestCase {
 		// recognises: the calling code is prepended, which is the only reading
 		// left.
 		$this->assertSame( '+3412345678', Helpers::normalize_phone_number( '12345678', 'ES' ) );
+
+		// The calling-code leg of the fall-through, which NOTHING else in the suite
+		// reaches - instrumented 2026-08-12, it was executed zero times by all 1952
+		// tests, for trunk and no-trunk territories alike. It is also the one leg
+		// whose behaviour this column changed: before it existed, a territory with
+		// no trunk prefix returned early and prepended the calling code a second
+		// time, so this asserted +34341234567890 and now asserts the code is read
+		// as a country code instead.
+		//
+		// ES is the stable choice for pinning it: exactly one valid national length
+		// (9), so neither the 12-digit whole nor the 10-digit remainder can become
+		// a recognised number on a plan update and quietly move this case into an
+		// earlier branch. IT would not be stable - its valid lengths span 6 to 12.
+		$this->assertSame( '+341234567890', Helpers::normalize_phone_number( '34 1234 567890', 'ES' ) );
+
+		// Same leg, a territory that DOES have a trunk prefix, so the uniformity is
+		// asserted rather than assumed for both halves of the table. Stated plainly
+		// because it matters when reading this file: unlike the ES case above, this
+		// one is GREEN against the pre-column code too (probe-verified). It is a
+		// must-not-break guard, not a regression test, and must not be counted as
+		// evidence that the change is pinned - the ES case is what does that.
+		$this->assertSame( '+361234567890', Helpers::normalize_phone_number( '36 1234 5678 90', 'HU' ) );
 
 		// The guard still refuses what it always refused - falling through is not
 		// the same as accepting anything.

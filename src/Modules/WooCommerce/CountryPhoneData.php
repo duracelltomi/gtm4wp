@@ -32,10 +32,12 @@ defined( 'ABSPATH' ) || exit;
  *    never match.
  * 3. **General national-number pattern.** What a number of this country looks
  *    like. Used ONLY to choose between "this is a national number" and "this is
- *    the international form with the + left off" - never to reject a number. A
- *    number it does not recognise falls through to the older, purely positional
- *    rules, so a stale pattern can fail to improve a number but cannot refuse
- *    one (upstream UC-5).
+ *    the international form with the + left off" - never to reject a number, so a
+ *    stale pattern can fail to improve a number but cannot refuse one (upstream
+ *    UC-5). A number it does not recognise falls through to the positional rules,
+ *    which are applied uniformly across all territories - not to the behaviour
+ *    that predated this column, which returned early for the ones with no trunk
+ *    prefix. See tools/generate-phone-table.php for the measurement behind that.
  *
  * See tools/generate-phone-table.php for why this is generated rather than
  * written, and what it deliberately does not model.

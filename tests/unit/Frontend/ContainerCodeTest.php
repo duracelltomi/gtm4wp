@@ -1178,7 +1178,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	public function test_header_top_returns_markup_when_echo_disabled(): void {
-		// The $echo = false path (used by the AMP integration) returns the
+		// The $echo_output = false path (used by the AMP integration) returns the
 		// markup instead of printing it.
 		$container = $this->make_container( array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' ) );
 
@@ -1186,7 +1186,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$result = $container->header_top( false );
 		$echoed = ob_get_clean();
 
-		$this->assertSame( '', $echoed, 'With $echo = false nothing is printed.' );
+		$this->assertSame( '', $echoed, 'With $echo_output = false nothing is printed.' );
 		$this->assertIsString( $result );
 		$this->assertStringContainsString( 'var customDL = customDL || [];', $result );
 		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $result );

@@ -116,10 +116,12 @@ been reviewed and what hasn't, so runs are cumulative and don't repeat.
    - `vendor/bin/phpunit --order-by=random`, **3–5 times** — a test added this run
      must not depend on execution order either (TS-16). Assertion counts should
      match the declaration-order run.
-   - `vendor/bin/phpcs` (WordPress Coding Standards) on changed test files; fix
-     errors. Pre-existing warnings unrelated to the change (the `$echo` FP-3 in
-     `ContainerCode.php`, unused stub-closure params BE-2) may be left, but note
-     them.
+   - `vendor/bin/phpcs` (WordPress Coding Standards) must exit **0** — warnings
+     fail the build alongside errors (`phpcs.xml` sets that deliberately, and CI
+     runs the bare command), so there is no "pre-existing warnings may be left"
+     allowance to invoke. If a warning is genuinely not yours to fix, the remedy
+     is an `exclude-pattern` in `phpcs.xml` with a reason, not a note in the
+     report.
    - **If a JS test changed:** `npm run test:unit` and `npm run lint:js`. Fix
      formatting with `npx wp-scripts lint-js js --fix` — **never bare
      `npx prettier`**, which uses default config and reformats whole files.

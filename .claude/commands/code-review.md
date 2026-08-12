@@ -145,7 +145,7 @@ the one that reaches production.** Before writing code for a finding:
    - Re-run the suite and record the totals from **that** run, not from the pre-fix baseline.
    - This is the fifth-recurrence rule of the #111 → #115 → #116 → #132 → #155 family. It was written down after #116 — inside the sweep row it applies to, where only somebody already editing that row would read it — and R19 then broke it in that very row. **That is why it is a numbered step here instead.**
 2. After fixing identified issues, run — only after all fixes are applied:
-   - `vendor/bin/phpcs` (WordPress Coding Standards) and fix reported errors. Pre-existing warnings unrelated to the fix (e.g. the `$echo` reserved-word warnings in `ContainerCode.php`) may be left, but note them.
+   - `vendor/bin/phpcs` (WordPress Coding Standards) must exit **0** — warnings fail the build alongside errors (`phpcs.xml` sets that deliberately, and CI runs the bare command), so there is no "pre-existing warnings may be left" allowance to invoke. If a warning is genuinely not yours to fix, the remedy is an `exclude-pattern` in `phpcs.xml` with a reason, not a note in the report.
    - `vendor/bin/phpunit` — the full suite must stay green. Add a regression test for every security fix (see the XSS guard tests in `tests/unit/Frontend/` for the pattern).
    - **If any file under `js/` changed:** run `npm run build` (compiles `js/` → `build/` via `wp-scripts`) and `npm run lint:js`, and commit the regenerated `build/` output.
    - **Skip all of the above when the fix touched only documentation.** Verify with `git diff --name-only` against the pre-fix HEAD; if every changed file is `.md`, do not run phpcs/phpunit/build.
