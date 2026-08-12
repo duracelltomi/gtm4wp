@@ -72,3 +72,40 @@ One shared script, `.claude/hooks/require-changelog.sh`, enforces this:
 
 **One-time setup after cloning** (the git hook lives in a tracked dir, so it must be
 activated once per clone): `git config core.hooksPath .githooks`.
+
+### If you ever check out somebody else's branch
+
+That simple setup executes `.githooks/commit-msg`, which execs
+`.claude/hooks/require-changelog.sh` — **both resolved from the checked-out tree**. So a
+branch you are only *reviewing* supplies the shell code that runs as you on your next
+commit, and on every Claude turn through the `Stop` hook, with no command typed
+(`.security` finding #77, rated D0 → D1).
+
+That matters only if untrusted branches get checked out in a clone. Where they do, run
+the check from a **fixed ref** instead, with the entry point outside the tree:
+
+```bash
+mkdir -p ~/.githooks/gtm4wp
+# ~/.githooks/gtm4wp/gtm4wp-changelog-check  - materialises the script from a fixed ref:
+#   git show master:.claude/hooks/require-changelog.sh > "$TMP" || exit 1   # fail CLOSED
+#   exec bash "$TMP" "$@"
+# ~/.githooks/gtm4wp/commit-msg  - exec .../gtm4wp-changelog-check commitmsg "$1"
+git config core.hooksPath ~/.githooks/gtm4wp
+```
+
+and point the `Stop` hook in `.claude/settings.json` at the same runner. The logic stays
+here, versioned and reviewed; only the copy that *executes* is pinned.
+
+Three things worth knowing before adopting it:
+
+- **Fail closed, deliberately.** The tempting one-liner `bash <(git show "$REF:$SRC")`
+  fails **open** — an unresolvable path yields an empty script, `bash` runs nothing, exits
+  0, and the commit sails through unchecked. Verified by measurement, not assumed.
+- **An edit to `require-changelog.sh` takes effect once it is committed to the ref**, not
+  while it sits uncommitted in your tree.
+- **It is local git config, so it protects one clone and propagates to none.** It is
+  deliberately not wired into a `package.json` `prepare` script: that script comes from
+  the worktree too, so a branch would supply the installer meant to defend against
+  branch-supplied code. An earlier attempt to make this the tracked default was declined
+  because it blocked every commit until an installer had been run — this version changes
+  no tracked file, so nothing breaks for anyone who keeps the simple setup.

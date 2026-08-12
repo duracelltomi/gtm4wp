@@ -737,6 +737,28 @@ Every pattern above rates a risk to the *site*. The maintainer's workstation is 
 
 The four shapes worth checking, none of which a runtime lens prompts for:
 - **Pre-approved tool permissions.** An allowlist entry is an *enforced* boundary; a skill's prose description of what it will do is not. Where the two disagree, only the allowlist counts. A wildcard that admits state-changing verbs turns any successful injection into an unattended write under the maintainer's credentials.
+**The fix shape, with the trap in it (2026-08-12, #77).** When something must execute a
+script the repository owns, do not choose between "run the worktree copy" (unsafe) and
+"keep a second copy outside" (drifts, UC-6). **Read it from a fixed ref**: an entry point
+outside the tree that materialises `git show <ref>:<path>` to a temp file and execs that.
+One definition, still versioned and reviewed, and a branch supplies neither half.
+
+Three properties, each of which cost a measurement to establish:
+
+- **Fail closed.** `bash <(git show "$REF:$SRC")` reads beautifully and **fails open**: an
+  unresolvable path yields an empty script, `bash` runs nothing, exits 0, and the operation
+  proceeds with no enforcement at all. Materialise first, test the file is non-empty, exit
+  non-zero otherwise. *A guard that turns a hostile-code path into a no-enforcement path is
+  not a fix.*
+- **`exec`, don't pipe.** `git show … | bash -s -- stop` consumes stdin, which silently
+  breaks any hook that reads a JSON payload from there.
+- **Do not make the installer worktree-supplied.** Wiring the migration into a
+  `package.json` `prepare` script is circular — that script comes from the branch too. Local
+  config protects one clone and propagates to none; say so rather than implying coverage.
+- **Prefer a fix that changes no tracked file.** An earlier attempt at this same finding was
+  declined for blocking every commit until an installer had run. Enforcement that lands in
+  *local config* breaks nobody who keeps the old setup.
+
 - **Anything that executes a repo-relative path — a hook is only the most obvious case.** A body resolved from the working tree is supplied by whatever branch is checked out, so reviewing a contributor's branch can run that contributor's code. Anything reached from `core.hooksPath` or an agent Stop/SessionStart hook is in this class (#77) — **and so is any pre-approved command that is a *dispatcher* into worktree-supplied code** (#81, 2026-08-04). `npm run <script>` executes what the branch's `package.json` defines; a build CLI executes the branch's `webpack.config.js` as JavaScript; a test runner executes the branch's config and setup files. Two consequences worth stating because both are easy to get wrong: (a) the grep for this class is not "find the hooks" — ask of **every** allowlist entry *whose file does this ultimately run?*; (b) **pinning the command name does not close it** — `Bash(npm run build)` is narrower than `Bash(npm run *)` and still executes an arbitrary branch-supplied body. Only isolation (a container, or not reviewing untrusted branches in a session holding pre-approved execution permissions) actually closes it.
 
   **A tool CONFIG is the same sink, and it does not look like one (2026-08-05, #101).** The examples above are all files a developer already thinks of as code. The everyday case is a *config* file — a linter, formatter, test runner or build tool's own settings — which reads as inert data right up until you notice the format can name code to load: an autoload/bootstrap/plugin/extension/custom-rule entry, a `require` path, a preset resolved from the project directory. Feed the tool a config resolved from the working tree and a checked-out branch chooses what that tool executes. Three parts to keep:

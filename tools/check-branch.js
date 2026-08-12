@@ -116,7 +116,12 @@ const EXECUTED_PATHS = [
 	'jest.config.js', // Executed by the JS test runner when present.
 
 	// Repo tooling that runs on your machine.
-	'.githooks/', // core.hooksPath - runs on commit.
+	// Runs on commit for anyone using the tracked setup (core.hooksPath=.githooks).
+	// Still watched even where core.hooksPath points at a fixed out-of-tree runner
+	// (#77's fix), because this list has to hold for every clone rather than for
+	// the one it was written in - and over-reporting is the safe direction for a
+	// prompt.
+	'.githooks/',
 	'.claude/', // Agent hooks and pre-approved tool permissions (see caveat 3 above).
 	'.github/workflows/', // Runs in CI; read it before it runs with any token.
 	'tools/', // Including this file.
