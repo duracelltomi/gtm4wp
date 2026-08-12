@@ -200,7 +200,13 @@ For each hit, answer the threat model's two questions and record them: **who can
 The plugin's attack surface is the site; the *repository's* attack surface is the maintainer's machine, and the triage workflows connect them by pulling attacker-authored text into a session that holds pre-approved permissions. None of this is in `src/`, so it is invisible to every other lens here. Record the result in the **Toolchain trust** row of the Whole-Repo Sweeps table.
 
 ```bash
-cat .claude/settings.json .claude/settings.local.json          # local file is git-ignored: read it on disk
+# PERMISSIONS — enumerate SCOPES, then files (PA-19). The enforced allowlist is MERGED
+# across scopes, so reading a subset yields a wrong answer that reads as reassurance.
+cat ~/.claude/settings.json                                    # USER scope: applies to every project,
+                                                               # lives OUTSIDE the repo, is in no diff,
+                                                               # and no .gitignore hints at it (#162)
+cat .claude/settings.json .claude/settings.local.json          # PROJECT scope: both git-ignored here
+head -6 .claude/agents/*.md                                    # per-agent `tools:` — RESTRICTS, does not GRANT
 grep -rn "hooksPath\|rev-parse --show-toplevel" .githooks/ .claude/
 grep -rn "on:\|pull_request_target\|secrets\." .github/workflows/
 grep -rln "gh issue\|gh api\|wporg\|forum" .claude/commands/ .claude/skills/
@@ -209,6 +215,8 @@ grep -rln "gh issue\|gh api\|wporg\|forum" .claude/commands/ .claude/skills/
 Pair every **entry point** (a command or skill that ingests third-party text) with every **sink** it can reach, and rate the pair:
 
 - **Permissions.** Is each `permissions.allow` entry pinned to a verb *and* a path? A wildcard admitting state-changing verbs converts any successful injection into an unattended authenticated write. The enforced allowlist must be no wider than the write surface the skill *documents* — where prose and allowlist disagree, only the allowlist is real.
+  - **Read every scope, not every file in one scope (PA-19, #162).** For 21 reviews this playbook named only the two project-scope files, and a pre-approved dispatcher sat unread in **user** scope the whole time. User scope is outside the repository, so no `git` command reaches it and no `.gitignore` entry advertises it the way the project-scope files at least do.
+  - **A pinned command is not a safe command.** Pinning the *name* narrows nothing when the command is a **dispatcher**: `phpcs --standard=phpcs.xml .` names one binary and one ruleset and still executes whatever PHP a branch's ruleset `<autoload>`s. The question is never "is this entry specific?" but **"whose file does this ultimately execute?"** Pinning helps only when it pins the *resolved target* out of the worktree (an absolute path outside any checkout), and removing the pre-approval is the only form that closes it outright.
 - **Hooks.** Does anything reached via `core.hooksPath` or a `.claude` Stop/SessionStart hook execute a script resolved from the **working tree**? Then a checked-out PR branch supplies that code. It must come from a fixed, maintainer-controlled location.
 - **CI.** Does any workflow run with secrets on a trigger a fork can influence?
 - **Prose is not a control.** Injection guards written in a command file share a context window with the attacker's text. Note them as mitigation; never close a finding on them.
