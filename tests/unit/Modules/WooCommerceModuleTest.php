@@ -257,7 +257,7 @@ final class WooCommerceModuleTest extends TestCase {
 			}
 		);
 		Functions\when( 'wp_add_inline_script' )->alias(
-			static function ( $handle, $code = '', $position = 'after' ) use ( &$inline ) {
+			static function ( $handle, $code = '', $position = 'after' ) use ( &$inline ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
 				$inline[ $handle ] = $code;
 			}
 		);

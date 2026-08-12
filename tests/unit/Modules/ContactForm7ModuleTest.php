@@ -42,7 +42,7 @@ final class ContactForm7ModuleTest extends TestCase {
 		$this->inline_scripts        = array();
 		\WPCF7_ContactForm::$current = null;
 
-		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path );
+		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path ); // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real plugins_url() signature
 		Functions\when( 'wp_enqueue_script' )->justReturn( true );
 		Functions\when( 'wp_json_encode' )->alias(
 			static function ( $data, $options = 0, $depth = 512 ) {

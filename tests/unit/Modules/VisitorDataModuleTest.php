@@ -63,9 +63,9 @@ final class VisitorDataModuleTest extends TestCase {
 
 		// Default: no stored options; individual tests override via make_module().
 		Functions\when( 'get_option' )->justReturn( array() );
-		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path );
+		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path ); // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real plugins_url() signature
 		Functions\when( 'wp_enqueue_script' )->alias(
-			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) {
+			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_enqueue_script() signature
 				$this->enqueued[] = $handle;
 				return true;
 			}

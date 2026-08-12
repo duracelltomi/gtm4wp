@@ -59,7 +59,7 @@ abstract class FrontendTestCase extends TestCase {
 		);
 
 		Functions\when( 'wp_kses' )->alias(
-			static function ( $content, $allowed_html ) {
+			static function ( $content, $allowed_html ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_kses() signature
 				return $content;
 			}
 		);
