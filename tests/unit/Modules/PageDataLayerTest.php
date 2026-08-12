@@ -1137,6 +1137,13 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'sha256_email_address', $this->inline_js, 'The Enhanced Conversions user_data block is identity too, and goes with it.' );
 		$this->assertStringNotContainsString( 'Reeling Street', $this->inline_js, 'user_data carries the address in plaintext, so its absence is what proves the block is gone.' );
 
+		// The new/returning signal is derived from the buyer's order history, so it
+		// is identity too. Asserted ABSENT rather than falsy: a GTM trigger may test
+		// for key presence, so an invented 'returning' would be a behaviour change
+		// (RI-13 omit-don't-invent).
+		$this->assertArrayNotHasKey( 'new_customer', $result, 'new_customer describes the buyer, not the order, so it goes with the identity.' );
+		$this->assertArrayNotHasKey( 'customer_type', $result, 'And its sibling, which carries the same fact as a string.' );
+
 		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The guest email check is downstream of the known-shopper gate in WooCommerce, so a known shopper must never reach it.' );
 	}
 
@@ -1154,6 +1161,11 @@ final class PageDataLayerTest extends TestCase {
 		// measures the gate rather than a fixture that never carried them.
 		$this->assertStringContainsString( 'Reeling Street', $this->inline_js, 'user_data.address.street is plaintext.' );
 		$this->assertSame( 'Lovelace', $result['orderData']['customer']['billing']['last_name'] );
+		// The paired positive for the withholding assertions: these keys really are
+		// emitted when nothing is withheld, so their absence there measures the gate
+		// rather than a fixture that never carried them.
+		$this->assertArrayHasKey( 'new_customer', $result, 'The order-history signal ships normally for the buyer.' );
+		$this->assertArrayHasKey( 'customer_type', $result );
 	}
 
 	public function test_order_received_keeps_customer_data_when_the_known_shopper_gate_is_filtered_off(): void {
@@ -1182,6 +1194,9 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'buyer@example.com', wp_json_encode( $result ) );
 		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The purchase event still fires.' );
 		$this->assertStringNotContainsString( 'sha256_email_address', $this->inline_js );
+
+		$this->assertArrayNotHasKey( 'new_customer', $result, 'Same on the guest leg: the order-history signal is withheld with the rest of the identity.' );
+		$this->assertArrayNotHasKey( 'customer_type', $result );
 
 		$this->assertSame(
 			array( array( 1001, null, 'order-received' ) ),
@@ -1226,6 +1241,8 @@ final class PageDataLayerTest extends TestCase {
 		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
 
 		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'A session-resolved order belongs to the browser holding the session.' );
+		$this->assertArrayHasKey( 'new_customer', $result, 'A session-resolved order is the buyer, so nothing is withheld - including this.' );
+
 		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The session path must not consult the request-visitor gates at all.' );
 	}
 

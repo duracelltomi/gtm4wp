@@ -913,7 +913,24 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
+		// new_customer / customer_type are derived from the BUYER's order history,
+		// which makes them a fact about the person rather than about the order -
+		// the same side of the line 'customer' and user_data sit on - so they are
+		// withheld with them. They are the only retained values that were on the
+		// identity side of that line.
+		//
+		// Omitted entirely rather than emitted falsy: a consumer's GTM trigger may
+		// test for key presence, so inventing a 'returning' would be a behaviour
+		// change where an absent key is honest (RI-13's omit-don't-invent, and #121
+		// is the recorded case of emitting both keys with one meaningless).
+		//
+		// The two sibling call sites are deliberately NOT gated. resolve_pending_purchase()
+		// resolves the order from the caller's own WC session, and
+		// PurchaseTracking::on_thankyou() only runs once WooCommerce has already
+		// rendered the order - in both, the visitor is the buyer by construction.
+		if ( ! $withhold_customer_data ) {
+			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
+		}
 
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
 
