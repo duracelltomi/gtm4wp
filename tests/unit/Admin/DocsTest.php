@@ -113,6 +113,28 @@ final class DocsTest extends TestCase {
 			'https://example.com/docs/their-page#their-option',
 			Docs::url( 'https://example.com/docs/their-page', 'their-option' )
 		);
+
+		// An absolute URL that already carries a fragment keeps it: appending the
+		// option key would make two, and a browser resolves the first - so the
+		// link reads as configured and lands on the wrong section. The same
+		// audience that gives a URL where a path was asked for is the audience
+		// that gives one with a fragment on it.
+		$this->assertSame(
+			'https://example.com/docs#section',
+			Docs::url( 'https://example.com/docs#section', 'their-option' )
+		);
+		// Both directions (TS-2): the doubled fragment is gone, not merely rare.
+		$this->assertStringNotContainsString(
+			'#section#',
+			Docs::url( 'https://example.com/docs#section', 'their-option' )
+		);
+		// The leniency is scoped to the absolute form. A relative path containing
+		// a "#" is still resolved against BASE and still gets its anchor, so this
+		// cannot become a second way to skip the option key.
+		$this->assertSame(
+			self::BASE . 'page%23odd#their-option',
+			Docs::url( 'page%23odd', 'their-option' )
+		);
 		// Both directions (TS-2): the doubled form is gone, not merely unlikely.
 		$this->assertStringNotContainsString(
 			self::BASE . 'https://',

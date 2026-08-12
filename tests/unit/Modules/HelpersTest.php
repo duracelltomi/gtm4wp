@@ -467,8 +467,98 @@ final class HelpersTest extends TestCase {
 		$this->assertSame( '+441624756789', Helpers::normalize_phone_number( '01624 756789', 'IM' ) );
 	}
 
+	/**
+	 * The calling code typed without a "+", in BOTH halves of the table.
+	 *
+	 * This case used to assert Germany alone, which is a country that dials a
+	 * trunk prefix - so it pinned the half where the behaviour worked and read as
+	 * pinning all of it. The 101 territories with no trunk prefix returned before
+	 * ever reaching this test and had their calling code prepended a second time:
+	 * well formed, inside the length bounds, and unmatchable.
+	 *
+	 * @return void
+	 */
 	public function test_normalize_phone_number_accepts_the_international_form_without_a_plus(): void {
+		// Countries that dial a trunk prefix.
 		$this->assertSame( '+493012345678', Helpers::normalize_phone_number( '49 30 12345678', 'DE' ) );
+		$this->assertSame( '+442071234567', Helpers::normalize_phone_number( '44 20 7123 4567', 'GB' ) );
+		$this->assertSame( '+33142685300', Helpers::normalize_phone_number( '33 1 42 68 53 00', 'FR' ) );
+
+		// Countries that dial none. Same spelling, and it used to double the code.
+		$this->assertSame( '+34612345678', Helpers::normalize_phone_number( '34 612 345 678', 'ES' ) );
+		$this->assertSame( '+351912345678', Helpers::normalize_phone_number( '351 912 345 678', 'PT' ) );
+		$this->assertSame( '+302109999999', Helpers::normalize_phone_number( '30 21 0999 9999', 'GR' ) );
+		$this->assertSame( '+4532123456', Helpers::normalize_phone_number( '45 32 12 34 56', 'DK' ) );
+		$this->assertSame( '+420212345678', Helpers::normalize_phone_number( '420 212 345 678', 'CZ' ) );
+
+		// Both directions (TS-2): the doubled-calling-code value is gone.
+		$this->assertNotSame( '+3434612345678', Helpers::normalize_phone_number( '34 612 345 678', 'ES' ) );
+	}
+
+	/**
+	 * The other reading of the same shape, which is why the fix is a pattern and
+	 * not a symmetry.
+	 *
+	 * Each of these is a NATIONAL number that legitimately begins with its own
+	 * country's calling code. Simply letting every country try the "international
+	 * form with the + left off" branch would cut a real operator prefix off each
+	 * one - so would a possible-lengths column, for Italy, where both readings
+	 * are possible Italian lengths. Only the national-number pattern separates
+	 * them.
+	 *
+	 * Kazakhstan is here because it was a known, accepted defect: its mobile
+	 * ranges all start with 7 and its calling code is 7, so the bare spelling
+	 * came out one digit short while the trunk-prefixed one was correct.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_keeps_a_national_number_that_starts_with_its_own_calling_code(): void {
+		// Italian mobiles in the 39x ranges, against calling code 39.
+		$this->assertSame( '+393912345678', Helpers::normalize_phone_number( '391 234 5678', 'IT' ) );
+
+		// A Danish subscriber number beginning 45, against calling code 45. Its
+		// international-form sibling three tests above has the same first two
+		// digits and a different length.
+		$this->assertSame( '+4545123456', Helpers::normalize_phone_number( '45 12 34 56', 'DK' ) );
+
+		// Kazakhstan, both spellings, landing on the same number.
+		$this->assertSame( '+77012345678', Helpers::normalize_phone_number( '701 234 5678', 'KZ' ) );
+		$this->assertSame( '+77012345678', Helpers::normalize_phone_number( '8 701 234 5678', 'KZ' ) );
+
+		// Both directions (TS-2): the one-digit-short value the bare spelling used
+		// to produce is gone.
+		$this->assertNotSame( '+7012345678', Helpers::normalize_phone_number( '701 234 5678', 'KZ' ) );
+	}
+
+	/**
+	 * What happens when the numbering plan recognises neither reading.
+	 *
+	 * The pattern column is a tie-breaker, never a validator: a number it does
+	 * not know is not refused, it falls through to the positional rules that
+	 * predate it. This is the branch that makes a stale pattern harmless - it is
+	 * exactly the path every number would take if our copy of the plan went
+	 * completely out of date - and it is otherwise unreachable from the generated
+	 * corpus, whose cases are all numbers the plan recognises by construction.
+	 *
+	 * @return void
+	 */
+	public function test_normalize_phone_number_falls_back_when_the_plan_recognises_neither_reading(): void {
+		// Too long for any British number, so neither reading matches: the trunk
+		// prefix is still stripped positionally, exactly as before the pattern
+		// column existed.
+		$this->assertSame( '+442071234567890', Helpers::normalize_phone_number( '020 7123 4567890', 'GB' ) );
+
+		// Trunk-shaped but too short to be a real Hungarian number.
+		$this->assertSame( '+3612345', Helpers::normalize_phone_number( '06 12345', 'HU' ) );
+
+		// A country with no trunk prefix, and digits that begin with nothing it
+		// recognises: the calling code is prepended, which is the only reading
+		// left.
+		$this->assertSame( '+3412345678', Helpers::normalize_phone_number( '12345678', 'ES' ) );
+
+		// The guard still refuses what it always refused - falling through is not
+		// the same as accepting anything.
+		$this->assertSame( '', Helpers::normalize_phone_number( '1', 'ES' ) );
 	}
 
 	public function test_normalize_phone_number_prepends_the_calling_code_to_a_local_number(): void {

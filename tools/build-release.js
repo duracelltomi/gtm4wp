@@ -94,7 +94,7 @@ function fail( message ) {
  */
 function checkGeneratedData() {
 	const today = new Date();
-	let stamps = new Map();
+	const stamps = new Map();
 
 	GENERATED_DATA.forEach( ( entry ) => {
 		const full = path.join( ROOT, entry.file );

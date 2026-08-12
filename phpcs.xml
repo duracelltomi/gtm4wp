@@ -36,9 +36,11 @@
 				<!--
 				The three legacy globals in the main plugin file are spelled
 				gtp4wp_ - a 1.x typo, not a second namespace. Nothing inside this
-				repo reads them; only third-party 1.x consumers do, so the typo is
-				load-bearing and renaming it would be a public API change for no
-				gain. Accepting the prefix records that it is deliberate.
+				repo reads them; only third-party 1.x consumers do, which is why
+				correcting the typo was never worth a public API change.
+
+				Deprecated in 2.0 and scheduled for removal in 2.1, with no date
+				set. When they go, delete this element and this comment with them.
 				-->
 				<element value="gtp4wp"/>
 			</property>

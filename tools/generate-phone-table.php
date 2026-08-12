@@ -20,16 +20,38 @@
  * So the table is mechanically generated from the same source a phone library
  * would use, and regenerating is a script rather than a research session.
  *
- * WHAT IT DELIBERATELY DOES NOT CARRY
- * -----------------------------------
- * Two columns only. libphonenumber additionally models nationalPrefixForParsing,
+ * THE THIRD COLUMN, AND WHY IT IS NOT THE ONE WE SAID WE WOULD NOT ADD
+ * --------------------------------------------------------------------
+ * Those two facts are enough to take a number apart. They are NOT enough to
+ * decide which way to take it apart, because two readings of the same digits are
+ * often both well-formed: "34 612 345 678" from a Spanish address is the
+ * international form with the "+" left off, while "391 234 5678" from an Italian
+ * one is a national mobile that merely begins with Italy's own calling code.
+ *
+ * The note that used to sit here said telling those apart needs per-country
+ * possible lengths. Measured, that is wrong twice over: lengths do not settle
+ * Italy (both readings are possible Italian lengths), and what does settle it -
+ * the general national-number pattern - is one compact regex per territory,
+ * 32 bytes on average, in the file we already download. So the third column is
+ * shape, not length, and it costs ~11 KB against the ~1.9 MB of adopting the
+ * library.
+ *
+ * It is used ONLY as a tie-breaker, never as a validator: a number the pattern
+ * does not recognise falls through to exactly the previous behaviour. A stale
+ * pattern can therefore fail to improve a number but can never reject one, which
+ * is what keeps this inside upstream UC-5 ("do not encode the future as a
+ * validator").
+ *
+ * WHAT IT STILL DELIBERATELY DOES NOT CARRY
+ * -----------------------------------------
+ * libphonenumber additionally models nationalPrefixForParsing,
  * nationalPrefixTransformRule and per-country international prefixes, which is
  * what it needs to handle Argentina's mobile "9", Brazil's carrier-selection
  * codes, and a caller who dials a foreign number using their own international
- * access code. Those stay unhandled on purpose: adding a third and fourth column
- * is reimplementing that library one field at a time, and the point at which
- * that trade flips is the point to adopt it instead. See the local review report
- * for the measurement behind that call.
+ * access code. Those stay unhandled on purpose, and THEY are the trigger: the
+ * next time this table needs a column, it needs transform RULES rather than
+ * facts, which is reimplementing the library one field at a time. That is the
+ * point to adopt it instead. See the local review report for the measurement.
  *
  * USAGE
  * -----
@@ -104,8 +126,59 @@ if ( false === $doc ) {
 	exit( 1 );
 }
 
+/**
+ * Refuses to continue, naming the territory and the field.
+ *
+ * Every check below is fatal rather than a skip. A generator that quietly drops
+ * a territory writes a smaller table that still looks generated, and the release
+ * gate reads its fresh date stamp as "checked recently" (PA-18).
+ *
+ * @param string $message What is wrong.
+ * @return never
+ */
+function refuse( string $message ) {
+	fwrite( STDERR, "Refusing to write: {$message}\n" );
+	exit( 1 );
+}
+
+/**
+ * Writes a generated file, or refuses.
+ *
+ * file_put_contents() returns false on a read-only target and a short count on a
+ * full disk, and the script used to print "Wrote ..." either way - so a run that
+ * wrote nothing looked exactly like a run that worked, and the previous copy
+ * kept its old date stamp while the operator believed it had been refreshed.
+ *
+ * @param string $path     Destination.
+ * @param string $contents Generated source.
+ * @return void
+ */
+function write_or_refuse( string $path, string $contents ): void {
+	$written = file_put_contents( $path, $contents );
+
+	if ( false === $written || strlen( $contents ) !== $written ) {
+		refuse( "could not write {$path}" );
+	}
+}
+
+/**
+ * The characters a national-number pattern is allowed to contain.
+ *
+ * Measured across all 245 territories: digits, the regex metacharacters of a
+ * digit grammar, and backslash. Anything outside it - a quote, a slash, a
+ * character class we do not expect - would either break the preg delimiter at
+ * runtime or the PHP literal at generation time, so it stops the run here rather
+ * than shipping. This is a floor on the SHAPE of upstream data, not a validator
+ * on phone numbers.
+ */
+const PATTERN_GRAMMAR = '#^[0-9A-Za-z\[\]\(\)\?\:\|\{\}\,\-\\\\]+$#';
+
+/** Below this many territories, assume a truncated fetch rather than a numbering-plan event. */
+const MINIMUM_TERRITORIES = 200;
+
 $countries = array();
 $corpus    = array();
+$ambiguous = array();
 
 foreach ( $doc->xpath( '//territory' ) as $territory ) {
 	$id = (string) $territory['id'];
@@ -123,11 +196,31 @@ foreach ( $doc->xpath( '//territory' ) as $territory ) {
 		continue;
 	}
 
-	$countries[ $id ] = array( $calling_code, $national_prefix );
+	// Both are dialled digits. Anything else is upstream changing shape, which is
+	// a thing to look at rather than to interpolate into a source file.
+	if ( 1 !== preg_match( '/^\d+$/', $calling_code ) ) {
+		refuse( "{$id} has a non-numeric calling code" );
+	}
+	if ( '' !== $national_prefix && 1 !== preg_match( '/^\d+$/', $national_prefix ) ) {
+		refuse( "{$id} has a non-numeric national prefix" );
+	}
 
-	// One corpus case per number type: the country's own example number, spelled
-	// the way somebody there would type it (national prefix, where one exists),
-	// against the E.164 the metadata says it is.
+	$pattern = isset( $territory->generalDesc->nationalNumberPattern )
+		? (string) preg_replace( '/\s+/', '', (string) $territory->generalDesc->nationalNumberPattern )
+		: '';
+
+	if ( '' === $pattern ) {
+		refuse( "{$id} has no general national-number pattern" );
+	}
+	if ( 1 !== preg_match( PATTERN_GRAMMAR, $pattern ) ) {
+		refuse( "{$id}'s pattern contains a character outside the expected digit grammar" );
+	}
+	if ( false === @preg_match( '#^(?:' . $pattern . ')$#', '' ) ) {
+		refuse( "{$id}'s pattern does not compile: " . preg_last_error_msg() );
+	}
+
+	$countries[ $id ] = array( $calling_code, $national_prefix, $pattern );
+
 	foreach ( array( 'fixedLine', 'mobile' ) as $type ) {
 		if ( ! isset( $territory->{$type}->exampleNumber ) ) {
 			continue;
@@ -138,32 +231,71 @@ foreach ( $doc->xpath( '//territory' ) as $territory ) {
 			continue;
 		}
 
+		$e164 = '+' . $calling_code . $nsn;
+
+		// (a) The country's own example number spelled the way somebody there
+		// would type it - national prefix where one exists.
 		$corpus[] = array(
 			'country'  => $id,
 			'type'     => $type,
+			'spelling' => 'national',
 			'typed'    => $national_prefix . $nsn,
-			'expected' => '+' . $calling_code . $nsn,
+			'expected' => $e164,
+		);
+
+		// (b) The same number with the calling code and no "+". This is the
+		// spelling the third column exists for, and it is the one the previous
+		// two-column table got wrong for every territory without a trunk prefix.
+		//
+		// Excluded where the calling code followed by the national number is
+		// ITSELF a valid national number here: both readings are then genuinely
+		// correct, nothing in the metadata prefers one, and a fixture that picked
+		// one would be asserting a guess (upstream UC-3). Counted, not silently
+		// dropped.
+		if ( 1 === preg_match( '#^(?:' . $pattern . ')$#', $calling_code . $nsn ) ) {
+			$ambiguous[] = $id . ' ' . $type;
+			continue;
+		}
+
+		$corpus[] = array(
+			'country'  => $id,
+			'type'     => $type,
+			'spelling' => 'intl-no-plus',
+			'typed'    => $calling_code . $nsn,
+			'expected' => $e164,
 		);
 	}
 }
 
 ksort( $countries );
 
-$with_prefix = count( array_filter( $countries, static fn ( array $row ): bool => '' !== $row[1] ) );
+if ( count( $countries ) < MINIMUM_TERRITORIES ) {
+	refuse( sprintf( 'only %d territories parsed, expected at least %d', count( $countries ), MINIMUM_TERRITORIES ) );
+}
+
+$with_prefix    = count( array_filter( $countries, static fn ( array $row ): bool => '' !== $row[1] ) );
+$without_prefix = count( $countries ) - $with_prefix;
 
 // ---------------------------------------------------------------- table file.
 
+// var_export(), never "'" . $value . "'": this writes PHP source from a file
+// somebody else controls, so an unescaped quote or a trailing backslash in an
+// upstream value would break the literal - or worse, close it (PA-18). The
+// grammar checks above make that unreachable today; this makes it unreachable
+// by construction, which is the difference between a check and a guarantee.
 $rows = '';
-foreach ( $countries as $code => list( $calling_code, $national_prefix ) ) {
+foreach ( $countries as $code => list( $calling_code, $national_prefix, $pattern ) ) {
 	$rows .= sprintf(
-		"\t\t'%s' => array( '%s', %s ),\n",
-		$code,
-		$calling_code,
-		'' === $national_prefix ? 'null' : "'" . $national_prefix . "'"
+		"\t\t%s => array( %s, %s, %s ),\n",
+		var_export( $code, true ),
+		var_export( $calling_code, true ),
+		'' === $national_prefix ? 'null' : var_export( $national_prefix, true ),
+		var_export( $pattern, true )
 	);
 }
 
-$generated_on = gmdate( 'Y-m-d' );
+$generated_on    = gmdate( 'Y-m-d' );
+$total_countries = count( $countries );
 
 $table = <<<PHP
 <?php
@@ -185,13 +317,25 @@ namespace GTM4WP\Modules\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Per-country calling code and national (trunk) prefix, used to turn a locally
- * typed phone number into E.164 before hashing it for Enhanced Conversions.
+ * Per-country dialling facts, used to turn a locally typed phone number into
+ * E.164 before hashing it for Enhanced Conversions.
  *
- * A null prefix is NOT "unknown" - it means the country has no trunk prefix at
- * all, so a leading zero is part of the number and must be kept. Italy is the
- * best-known case; six more behave the same way. Conflating that with "uses 0"
- * is what made every Italian landline hash to a value Google could never match.
+ * Three columns, and the third is the one that decides between two readings of
+ * the same digits:
+ *
+ * 1. **Calling code.** The country's international prefix, without the "+".
+ * 2. **National (trunk) prefix, or null.** Null is NOT "unknown" - it means the
+ *    country has no trunk prefix at all, so a leading zero is part of the number
+ *    and must be kept. {$without_prefix} of the {$total_countries} entries are null; of those, Italy
+ *    is the commercially important one, because conflating "no trunk prefix"
+ *    with "uses 0" made every Italian landline hash to a value Google could
+ *    never match.
+ * 3. **General national-number pattern.** What a number of this country looks
+ *    like. Used ONLY to choose between "this is a national number" and "this is
+ *    the international form with the + left off" - never to reject a number. A
+ *    number it does not recognise falls through to the older, purely positional
+ *    rules, so a stale pattern can fail to improve a number but cannot refuse
+ *    one (upstream UC-5).
  *
  * See tools/generate-phone-table.php for why this is generated rather than
  * written, and what it deliberately does not model.
@@ -199,11 +343,11 @@ defined( 'ABSPATH' ) || exit;
 final class CountryPhoneData {
 
 	/**
-	 * ISO 3166-1 alpha-2 code => array( calling code, national prefix or null ).
+	 * ISO 3166-1 alpha-2 code => array( calling code, national prefix or null, national-number pattern ).
 	 *
-	 * {$with_prefix} of the entries have a trunk prefix; the rest have none.
+	 * {$with_prefix} of the {$total_countries} entries have a trunk prefix; {$without_prefix} have none.
 	 *
-	 * @var array<string, array{0: string, 1: string|null}>
+	 * @var array<string, array{0: string, 1: string|null, 2: string}>
 	 */
 	private const COUNTRIES = array(
 {$rows}	);
@@ -212,8 +356,9 @@ final class CountryPhoneData {
 	 * Looks up a country's dialling facts.
 	 *
 	 * @param string \$country_code ISO 3166-1 alpha-2 code, any case, may be padded.
-	 * @return array{0: string, 1: string|null}|null Calling code and national prefix,
-	 *                                               or null when the country is unknown.
+	 * @return array{0: string, 1: string|null, 2: string}|null Calling code, national prefix
+	 *                                                          and national-number pattern,
+	 *                                                          or null when the country is unknown.
 	 */
 	public static function lookup( string \$country_code ): ?array {
 		\$country_code = strtoupper( trim( \$country_code ) );
@@ -224,7 +369,7 @@ final class CountryPhoneData {
 
 PHP;
 
-file_put_contents( TABLE_FILE, $table );
+write_or_refuse( TABLE_FILE, $table );
 
 // --------------------------------------------------------------- corpus file.
 
@@ -233,21 +378,23 @@ file_put_contents( TABLE_FILE, $table );
 // next person has to decide whether that is their fault.
 $key_width = 0;
 foreach ( $corpus as $case ) {
-	$key_width = max( $key_width, strlen( $case['country'] . ' ' . $case['type'] ) + 2 );
+	$key_width = max( $key_width, strlen( $case['country'] . ' ' . $case['type'] . ' ' . $case['spelling'] ) + 2 );
 }
 
 $cases = '';
 foreach ( $corpus as $case ) {
 	$cases .= sprintf(
-		"\t%s => array( '%s', '%s', '%s' ),\n",
-		str_pad( "'" . $case['country'] . ' ' . $case['type'] . "'", $key_width ),
-		$case['country'],
-		$case['typed'],
-		$case['expected']
+		"\t%s => array( %s, %s, %s ),\n",
+		str_pad( var_export( $case['country'] . ' ' . $case['type'] . ' ' . $case['spelling'], true ), $key_width ),
+		var_export( $case['country'], true ),
+		var_export( $case['typed'], true ),
+		var_export( $case['expected'], true )
 	);
 }
 
-$corpus_count = count( $corpus );
+$corpus_count    = count( $corpus );
+$ambiguous_count = count( $ambiguous );
+$ambiguous_list  = '' === implode( '', $ambiguous ) ? '(none)' : implode( ', ', $ambiguous );
 
 $corpus_file = <<<PHP
 <?php
@@ -258,18 +405,31 @@ $corpus_file = <<<PHP
  * Source: Google libphonenumber, resources/PhoneNumberMetadata.xml
  * Generated: {$generated_on}
  *
- * Every territory's own example number, spelled the way somebody there would
- * type it, against the E.164 the numbering plan says it is. {$corpus_count} cases.
+ * Every territory's own example number in TWO spellings, against the E.164 the
+ * numbering plan says it is. {$corpus_count} cases.
  *
  * This is an ORACLE, not a mirror of our own output: both halves are read out of
- * the metadata (national prefix + example number in, calling code + example
- * number out), so it fails when Helpers::normalize_phone_number() disagrees with
- * the numbering plan rather than when it changes.
+ * the metadata (example number in, calling code + example number out), so it
+ * fails when Helpers::normalize_phone_number() disagrees with the numbering plan
+ * rather than when it changes.
  *
- * A case here is one canonical spelling per country. It therefore proves the
- * per-country table is right and proves nothing about how people actually type -
- * courtesy zeros, extensions and international access codes are covered by the
- * hand-written cases in HelpersTest instead.
+ * The two spellings, because one of them proves nothing about the other:
+ *
+ * - `national`     - the way somebody in that country types it, trunk prefix
+ *                    included where one exists. Proves the calling code and the
+ *                    trunk-prefix column.
+ * - `intl-no-plus` - the calling code with the "+" left off. Proves the pattern
+ *                    column, which is the only thing that can tell this from a
+ *                    national number that happens to start with the same digits.
+ *
+ * {$ambiguous_count} example numbers carry NO `intl-no-plus` case, because for them the
+ * calling code followed by the national number is itself a valid national number
+ * of that country: both readings are correct and the metadata prefers neither,
+ * so a case here would assert a guess rather than the plan. Excluded: {$ambiguous_list}.
+ *
+ * Beyond these two spellings the fixture proves nothing about how people type -
+ * courtesy zeros, extensions, international access codes and the fall-through
+ * are covered by the hand-written cases in HelpersTest instead.
  *
  * @package GTM4WP
  */
@@ -279,13 +439,15 @@ return array(
 
 PHP;
 
-file_put_contents( CORPUS_FILE, $corpus_file );
+write_or_refuse( CORPUS_FILE, $corpus_file );
 
 printf(
-	"Wrote %s (%d countries, %d with a trunk prefix)\nWrote %s (%d cases)\n",
+	"Wrote %s (%d countries, %d with a trunk prefix, %d without)\nWrote %s (%d cases, %d intl-no-plus spellings excluded as ambiguous)\n",
 	realpath( TABLE_FILE ),
-	count( $countries ),
+	$total_countries,
 	$with_prefix,
+	$without_prefix,
 	realpath( CORPUS_FILE ),
-	$corpus_count
+	$corpus_count,
+	$ambiguous_count
 );

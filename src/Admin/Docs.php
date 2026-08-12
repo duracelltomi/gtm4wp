@@ -72,11 +72,25 @@ final class Docs {
 		// ModuleConsistencyTest::test_every_field_declares_a_documentation_page, so
 		// this leniency cannot quietly become a second way to write the domain
 		// down - which is the thing BASE exists to prevent.
-		$url = 1 === preg_match( '#^https?://#i', $path )
+		$absolute = 1 === preg_match( '#^https?://#i', $path );
+
+		$url = $absolute
 			? $path
 			: self::BASE . ltrim( $path, '/' );
 
-		if ( '' !== $anchor ) {
+		// An absolute URL that already carries a fragment keeps it. Appending the
+		// option key would produce ".../docs#section#gtm4wp_option_key", and a
+		// browser resolves the FIRST fragment - so the link would read as
+		// configured, pass esc_url_raw(), and land on the wrong section of the
+		// right page. Silent, and only for third party schemas.
+		//
+		// The contract asks for a path without a fragment, and this branch exists
+		// precisely because that audience supplies a form the contract did not ask
+		// for; it should therefore handle the whole form rather than the part that
+		// was noticed first. The built-in schemas cannot reach either leniency -
+		// ModuleConsistencyTest::test_every_field_declares_a_documentation_page
+		// holds them to the path form.
+		if ( '' !== $anchor && ! ( $absolute && str_contains( $path, '#' ) ) ) {
 			$url .= '#' . rawurlencode( $anchor );
 		}
 

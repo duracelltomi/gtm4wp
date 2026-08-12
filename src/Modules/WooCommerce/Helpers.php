@@ -615,6 +615,34 @@ final class Helpers {
 	private const COURTESY_ZERO_PATTERN = '/\(\s*0\s*\)/';
 
 	/**
+	 * Whether a string of digits is a number this country's numbering plan has.
+	 *
+	 * Used ONLY to choose between two readings of the same digits, never to
+	 * reject one. A number the plan does not recognise is not refused here - the
+	 * caller falls through to positional rules that predate this test - so a
+	 * pattern that has gone stale can fail to improve a number but can never
+	 * throw one away (upstream UC-5).
+	 *
+	 * "#" is the delimiter because a national-number pattern is a digit grammar
+	 * that cannot contain one, and tools/generate-phone-table.php refuses to write
+	 * a pattern outside that grammar rather than leaving it to be discovered here.
+	 * A pattern that somehow fails to compile makes preg_match() return false,
+	 * which is not 1, so the answer is "cannot tell" and the caller falls through
+	 * - the same direction as an unrecognised number.
+	 *
+	 * @param string $digits         Bare digits, no "+" and no separators.
+	 * @param string $number_pattern The country's general national-number pattern.
+	 * @return bool
+	 */
+	private static function is_national_number( string $digits, string $number_pattern ): bool {
+		if ( '' === $digits || '' === $number_pattern ) {
+			return false;
+		}
+
+		return 1 === preg_match( '#^(?:' . $number_pattern . ')$#', $digits );
+	}
+
+	/**
 	 * Assembles a validated E.164 string from bare digits.
 	 *
 	 * @param string $digits The digits of the number, without a leading "+".
@@ -637,36 +665,39 @@ final class Helpers {
 	 * stripped of spaces still fails to match, silently, because a hash either
 	 * matches or does not and nothing reports which.
 	 *
-	 * Order of the branches matters. An explicit international form is taken at
-	 * face value; only a number without one is anchored to the order's country,
-	 * and a number carrying a trunk prefix is resolved before the "looks like it
-	 * already has its calling code" branch, because the trunk prefix is the
-	 * unambiguous signal of the two.
+	 * An explicit international form is taken at face value. Everything else is
+	 * anchored to the order's country using the three columns of
+	 * CountryPhoneData, which is GENERATED from libphonenumber's metadata
+	 * (tools/generate-phone-table.php):
 	 *
-	 * The dialling facts come from CountryPhoneData, which is GENERATED from
-	 * libphonenumber's metadata (tools/generate-phone-table.php). A null national
-	 * prefix there means the country has none at all, so nothing may be stripped
-	 * and a leading zero is part of the number - Italy and six others. Reading
-	 * that as "uses 0" is what a hand-written table of exceptions plus a default
-	 * cannot express, and it made every Italian landline hash to a value Google
-	 * could never match.
+	 * - the **calling code**;
+	 * - the **national (trunk) prefix, or null** - null meaning the country has
+	 *   none at all, so a leading zero is part of the number rather than
+	 *   something to strip. Italy is the commercially important case: reading
+	 *   "no trunk prefix" as "uses 0" made every Italian landline hash to a value
+	 *   Google could never match;
+	 * - the **general national-number pattern**, which is what decides between
+	 *   two readings of the same digits. Positional rules cannot: "34 612 345
+	 *   678" from a Spanish address is the international form with the "+" left
+	 *   off, while "391 234 5678" from an Italian one is a national mobile that
+	 *   happens to begin with Italy's own calling code, and no amount of counting
+	 *   digits separates those two. Neither do possible lengths, which is what an
+	 *   earlier version of this comment claimed was needed - both Italian
+	 *   readings are possible Italian lengths.
+	 *
+	 * The pattern is a tie-breaker, never a validator: a number it does not
+	 * recognise falls through to the positional rules rather than being refused,
+	 * so a pattern that has gone stale can fail to improve a number but cannot
+	 * throw one away (upstream UC-5).
 	 *
 	 * Not modelled, deliberately - each returns a wrong number rather than none,
-	 * and each needs data this two-column table does not carry. See
-	 * tools/generate-phone-table.php for why the line is drawn here.
+	 * and each needs TRANSFORM RULES rather than facts, which is where the line
+	 * is drawn. See tools/generate-phone-table.php.
 	 *
 	 * - Argentina's mobile "9" and Brazil's carrier selection codes, which need
 	 *   libphonenumber's nationalPrefixTransformRule.
 	 * - Dialling a foreign number with a national international-access code other
 	 *   than "00" (US "011", JP "010", AU "0011", RU "810").
-	 * - A national number that legitimately begins with its OWN calling code, so
-	 *   the branch below reads it as an international form with the "+" left off.
-	 *   Kazakhstan is the concrete case: calling code 7, and its mobile ranges all
-	 *   start with 7, so a bare "701 234 5678" comes out one digit short and
-	 *   inside the length bounds. The trunk-prefixed spelling ("8 701 …") is
-	 *   correct, which is what keeps this narrow. Telling the two apart needs
-	 *   per-country possible lengths - a third column, and the point at which
-	 *   adopting the library beats growing this one.
 	 *
 	 * Returns '' whenever the number cannot be placed with confidence. The caller
 	 * decides what to do with that; inventing a country would produce a hash that
@@ -710,27 +741,55 @@ final class Helpers {
 			return '';
 		}
 
-		list( $calling_code, $trunk_prefix ) = $dialling;
+		list( $calling_code, $trunk_prefix, $number_pattern ) = $dialling;
 
-		// No trunk prefix in this country's plan, so there is nothing to strip and
-		// a leading zero is significant. Anchor it and stop.
-		if ( null === $trunk_prefix ) {
-			return self::to_e164( $calling_code . $digits );
-		}
-
-		// A national number: drop the trunk prefix, then prepend the country's
-		// calling code. The length test keeps a prefix-shaped number that is too
-		// short to survive the cut from being mangled into nonsense.
-		if ( str_starts_with( $digits, $trunk_prefix ) && strlen( $digits ) - strlen( $trunk_prefix ) >= 4 ) {
+		// 1. A trunk prefix the plan confirms. Stripping is only right when what
+		// is left is a number this country actually has - which is also what stops
+		// a number that merely begins with the trunk digit from being cut.
+		if ( null !== $trunk_prefix && str_starts_with( $digits, $trunk_prefix )
+			&& self::is_national_number( substr( $digits, strlen( $trunk_prefix ) ), $number_pattern ) ) {
 			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );
 		}
 
-		// International form with the "+" left off.
+		// 2. The international form with the "+" left off, decided the way
+		// libphonenumber decides it: the whole string is NOT a national number
+		// here, and the remainder after the calling code IS. Both halves matter.
+		// Without the first, an Italian mobile in the 39x range - which begins
+		// with Italy's own calling code - would be cut down to a number one
+		// operator short. Without the second, a Spanish number typed as
+		// "34 612 345 678" would have "34" prepended a second time.
+		if ( str_starts_with( $digits, $calling_code )
+			&& ! self::is_national_number( $digits, $number_pattern )
+			&& self::is_national_number( substr( $digits, strlen( $calling_code ) ), $number_pattern ) ) {
+			return self::to_e164( $digits );
+		}
+
+		// 3. A local number the plan recognises exactly as typed.
+		if ( self::is_national_number( $digits, $number_pattern ) ) {
+			return self::to_e164( $calling_code . $digits );
+		}
+
+		// 4. The plan recognises neither reading: a typo, a range it has not
+		// caught up with, or a pattern of ours that has gone stale. Fall back to
+		// the positional rules that predate the pattern column, so the worst this
+		// column can do is fail to improve a number.
+		//
+		// Deliberately uniform across countries, including the ones with no trunk
+		// prefix. The asymmetry that used to live here - anchor and stop, without
+		// trying the calling code - existed only because the trunk column carried
+		// a default that could not say "this country has none"; it is not a rule
+		// anybody chose. For input the plan rejects either way no reading is
+		// defensible, so this applies one set of rules rather than preserving a
+		// historical accident in the one branch nothing tests.
+		if ( null !== $trunk_prefix && str_starts_with( $digits, $trunk_prefix )
+			&& strlen( $digits ) - strlen( $trunk_prefix ) >= 4 ) {
+			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );
+		}
+
 		if ( str_starts_with( $digits, $calling_code ) && strlen( $digits ) - strlen( $calling_code ) >= 4 ) {
 			return self::to_e164( $digits );
 		}
 
-		// A local number with no prefix of any kind.
 		return self::to_e164( $calling_code . $digits );
 	}
 
