@@ -752,60 +752,81 @@ final class PageDataLayer {
 	/**
 	 * Whether WooCommerce itself would refuse to render this order to whoever is
 	 * making the current request, in which case the data layer withholds the
-	 * customer identity blocks (orderData.customer and the purchase event's
-	 * user_data) even though the purchase event still fires.
+	 * customer identity blocks (orderData.customer, new_customer / customer_type
+	 * and the purchase event's user_data) even though the purchase event still
+	 * fires.
 	 *
 	 * WooCommerce grew two gates in WC_Shortcode_Checkout::order_received() that
 	 * run AFTER the order-key check and return before woocommerce_thankyou, so
-	 * nothing on this side observes them:
+	 * nothing on this side observes them; the decision is re-derived instead, and
+	 * the rule is upstream PARITY in both directions. Withholding more than
+	 * upstream is not safety: wherever order_received() renders, the page body is
+	 * already showing this visitor the order, so extra withholding only deletes
+	 * tracking data. Publishing more than upstream is the real failure. Where a
+	 * term of upstream's decision cannot be read from here, the mirror therefore
+	 * drops it in the withhold direction, never the publish one.
 	 *
-	 * 1. A known (non-guest) shopper who is not logged in as that customer gets a
-	 *    login form instead of the order (WooCommerce 8.4.0). There is no grace
-	 *    period, and the site can turn the gate off with the filter read below.
-	 * 2. A guest order past the email-verification grace period gets a "confirm
-	 *    your email" form (WooCommerce 7.9.0, grace period filterable through
-	 *    woocommerce_order_email_verification_grace_period, 10 minutes by default).
+	 * The version surface, measured at the release tags rather than remembered
+	 * (registry rows: .upstream U113):
 	 *
-	 * The second decision is delegated rather than copied: it also weighs the
-	 * WooCommerce session, the read_private_shop_orders capability and two more
-	 * filters, and re-implementing that here would be a second copy free to drift.
-	 * Its home is an Internal namespace with no compatibility promise (UC-2), hence
-	 * the guard.
+	 * - 5.0-7.8.x: NO gates. order_received() renders the full order to any
+	 *   holder of a valid key link, so there is no upstream decision to mirror
+	 *   and nothing is withheld. Decided by probing the symbol both gates
+	 *   arrived with (guest_should_verify_email, 7.9.0, still present on
+	 *   11.0.0), so no version number is compared anywhere.
+	 * - 7.9.0+: a non-guest order requires being logged in as its customer.
+	 *   Unconditional until 8.4.0, which wrapped it in the
+	 *   woocommerce_order_received_verify_known_shoppers filter read below.
+	 * - 7.9.0+: a guest order requires billing-email verification, decided by
+	 *   guest_should_verify_email() in the shortcode through 8.5.x - 7.9.x has
+	 *   no grace period; the 10-minute filterable grace arrived in 8.0.0 - and
+	 *   by Users::should_user_verify_order_email() from 8.6.0, which is asked
+	 *   directly when it exists. That helper lives in an Internal namespace
+	 *   with no compatibility promise (UC-2), hence the guard around the
+	 *   delegation.
 	 *
-	 * What the guard must NOT do is treat "helper unavailable" as "nothing to
-	 * withhold". That reading was written from the gate's @since and is wrong for a
-	 * supported version range: WC_Shortcode_Checkout::order_received() grew
-	 * guest_should_verify_email() in WooCommerce 7.9.0, but the Users helper it
-	 * delegates to did not exist until 8.6.0 (verified absent in 7.9.0, 8.0.0,
-	 * 8.4.0 and 8.5.0). On 7.9.0-8.5.x - inside the declared 5.0 floor - WooCommerce
-	 * hides the order while the helper cannot be asked, so returning false there
-	 * publishes the identity to a visitor WooCommerce refused to render for.
-	 *
-	 * So the fallback re-derives the narrow part of the decision that needs no
-	 * version test at all: a guest order past the grace period. It is deliberately
-	 * more conservative than upstream - it does not model the WooCommerce session or
-	 * read_private_shop_orders - which can only ever withhold MORE, the same trade
-	 * already accepted for the supplied-email escape hatch below. Fail-closed on a
-	 * version number was measured and rejected: this branch runs AFTER the
-	 * known-shopper gate, so "withhold" there withholds from the buyer reading their
-	 * own order too.
-	 *
-	 * The supplied-email escape hatch is deliberately not reproduced: WooCommerce
-	 * lets a guest POST the billing address into the verification form and unlocks
-	 * the render for that one request, which needs its own nonce and field names to
-	 * read. Skipping it means the customer block can stay withheld on a render
-	 * WooCommerce does show - it fails closed, and the purchase event is unaffected.
+	 * Between the two (7.9.0-8.5.x, or any future WooCommerce that moves the
+	 * helper while keeping the gates) the fallback mirrors the shortcode's own
+	 * guest_should_verify_email() term by term, for every order shape that
+	 * reaches it - upstream applies it to a known shopper's order too once the
+	 * site filters the login gate off. Three terms identify the REQUEST rather
+	 * than the order and are deliberately not modelled: the WooCommerce session
+	 * email match, the POSTed-email escape hatch (it needs upstream's own nonce
+	 * and field names), and read_private_shop_orders. Each omission can only
+	 * make the mirror withhold where upstream renders, never publish where
+	 * upstream hides; the purchase event is unaffected either way.
 	 *
 	 * @param \WC_Order $order The order resolved from the request.
 	 * @return bool True when the order data must not be attributed to this visitor.
 	 */
 	private function woocommerce_hides_order_from_visitor( \WC_Order $order ): bool {
+		// Feature-detect the release that introduced both gates: absent means a
+		// WooCommerce (5.0-7.8.x, measured at the 7.8.0 and 7.9.0 tags) that
+		// renders the order to any holder of a valid key link, so publishing
+		// matches upstream exactly. The probe is accurate even before the class
+		// is loaded - method_exists() triggers WC_Autoloader, which has mapped
+		// the wc_shortcode_ prefix to includes/shortcodes/ since before 5.0, and
+		// it sees the member through its private visibility (probed). Residual:
+		// were the class ever unloadable while WooCommerce still served this
+		// page, this publishes - accepted, because that site's order-received
+		// page fatals on its own before this code matters, and U113's Release
+		// Radar watches the symbol so an upstream rename is caught at RC time.
+		if ( ! method_exists( 'WC_Shortcode_Checkout', 'guest_should_verify_email' ) ) {
+			return false;
+		}
+
 		/**
 		 * Indicates if known (non-guest) shoppers need to be logged in before we let
 		 * them access the order received page. Documented and applied by WooCommerce
 		 * itself; read here so the data layer follows the same decision.
 		 *
-		 * @since WooCommerce 8.4.0
+		 * The gate is older than its filter: order_received() requires the login
+		 * unconditionally from 7.9.0 and 8.4.0 only made it filterable. A site
+		 * callback returning false is honoured here on 7.9.0-8.3.x too, where
+		 * upstream ignores it - the callback is the admin asking for the gate to
+		 * be off, and the mirror follows the admin.
+		 *
+		 * @since WooCommerce 8.4.0 (the login requirement itself: 7.9.0)
 		 *
 		 * @param bool $verify_known_shoppers If verification is required.
 		 */
@@ -818,32 +839,92 @@ final class PageDataLayer {
 
 		$users_class = 'Automattic\WooCommerce\Internal\Utilities\Users';
 
-		if ( ! class_exists( $users_class ) || ! method_exists( $users_class, 'should_user_verify_order_email' ) ) {
-			// A known shopper is already covered: the gate above returned for the
-			// verify-on case, and where the site filtered it off the admin has said
-			// out loud that it does not want that check.
-			if ( $order_customer_id > 0 ) {
-				return false;
-			}
-
-			/**
-			 * Documented and applied by WooCommerce itself; read here so the
-			 * fallback uses the site's own grace period rather than a second
-			 * hardcoded one.
-			 *
-			 * @since WooCommerce 7.9.0
-			 *
-			 * @param int $grace_period Seconds an order stays viewable without verification.
-			 */
-			$grace_period = (int) apply_filters( 'woocommerce_order_email_verification_grace_period', 10 * MINUTE_IN_SECONDS );
-			$created      = $order->get_date_created();
-
-			// No date is the "cannot tell" case, and this is the branch where we
-			// cannot ask upstream either - so it withholds rather than guesses.
-			return ! ( $created && ( time() - $created->getTimestamp() ) < $grace_period );
+		if ( class_exists( $users_class ) && method_exists( $users_class, 'should_user_verify_order_email' ) ) {
+			// WooCommerce 8.6.0+: ask the decision's current owner directly. The
+			// supplied email stays null because the POSTed-email escape hatch is
+			// deliberately not reproduced (see the method docblock); a null can
+			// only make the helper withhold more, never less.
+			return (bool) $users_class::should_user_verify_order_email( $order->get_id(), null, 'order-received' );
 		}
 
-		return (bool) $users_class::should_user_verify_order_email( $order->get_id(), null, 'order-received' );
+		// 7.9.0-8.5.x: the decision still lives inline in the shortcode, so what
+		// follows mirrors guest_should_verify_email() as it shipped there (read
+		// at the 7.9.0, 8.0.0 and 8.5.2 tags), term by term, for every order
+		// shape that reaches this point - upstream runs it for a known shopper's
+		// order too when the login gate above is filtered off, and its only
+		// customer-id term is the owner short-circuit below.
+
+		// Upstream renders an order with no billing email on every gated version:
+		// there is nothing to verify a visitor against (an admin-created phone
+		// order is the common shape).
+		if ( empty( $order->get_billing_email() ) ) {
+			return false;
+		}
+
+		// Upstream renders for the logged-in owner. With the known-shopper gate
+		// on, this is the only way a customer order reaches here; with the gate
+		// filtered off, it keeps the buyer reading their own order exempt no
+		// matter what the filter said.
+		if ( $order_customer_id > 0 && get_current_user_id() === $order_customer_id ) {
+			return false;
+		}
+
+		/**
+		 * Documented and applied by WooCommerce itself; read here so the
+		 * fallback uses the site's own grace period rather than a second
+		 * hardcoded one.
+		 *
+		 * All three arguments are passed because WooCommerce passes three, in
+		 * both homes this filter has had - the shortcode on 8.0.0-8.5.x and
+		 * Users::should_user_verify_order_email() from 8.6.0. WP_Hook hands a
+		 * callback exactly the list the caller supplied and never pads it, so
+		 * a site callback written to the documented three-parameter signature
+		 * raises an uncaught ArgumentCountError if we pass fewer. Passing all
+		 * three is safe in the other direction: WP_Hook slices the list down
+		 * to each callback's own accepted_args.
+		 *
+		 * On 7.9.x itself neither this filter nor any grace period exists, so
+		 * within these ten minutes the mirror publishes where 7.9.x would
+		 * already demand verification - the one window where it is laxer than
+		 * upstream. Bounded by the order max-age gate, and it is the exact
+		 * behaviour 8.0.0 (the next release, same summer 2023) adopted.
+		 *
+		 * @since WooCommerce 8.0.0
+		 *
+		 * @param int       $grace_period Seconds an order stays viewable without verification.
+		 * @param \WC_Order $order        The order whose visibility is being decided.
+		 * @param string    $context      The context the check runs in.
+		 */
+		$grace_period = (int) apply_filters( 'woocommerce_order_email_verification_grace_period', 10 * MINUTE_IN_SECONDS, $order, 'order-received' );
+		$created      = $order->get_date_created();
+
+		// <= rather than <: upstream's own comparison, so the boundary second
+		// matches too. No creation date skips this short-circuit exactly like
+		// upstream's is_a() check does, and the decision falls to the filter
+		// below - which withholds unless the site opted out.
+		if ( $created && ( time() - $created->getTimestamp() ) <= $grace_period ) {
+			return false;
+		}
+
+		/**
+		 * The final say upstream gives a site over the verification requirement,
+		 * and its documented opt-out ("the filter primarily exists as a way to
+		 * *remove* the email verification step") - honoured so a store that
+		 * disabled verification keeps a complete data layer. Three arguments for
+		 * the same WP_Hook reason as above (RI-25). Because the request-identity
+		 * terms are not modelled, the value passed in is true in cases where
+		 * upstream would have computed false - so a passthrough callback changes
+		 * nothing, and only an explicit false publishes. Upstream applies it
+		 * after the grace short-circuit, never inside it, which is why it is not
+		 * consulted for a fresh order above.
+		 *
+		 * @since WooCommerce 7.9.0
+		 *
+		 * @param bool      $email_verification_required Whether the visitor must verify the billing email first.
+		 * @param \WC_Order $order                       The order whose visibility is being decided.
+		 * @param string    $context                     The context the check runs in.
+		 */
+		return (bool) apply_filters( 'woocommerce_order_email_verification_required', true, $order, 'order-received' );
 	}
 
 	/**

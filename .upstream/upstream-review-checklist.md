@@ -266,7 +266,7 @@ have none, which is exactly why they are `every-run`.
 | U97 | **The cart-fragments delivery channel** (cache-safe data layer only). Three claims, all silent if wrong: (a) the `woocommerce_add_to_cart_fragments` filter still exists and its selector⇒HTML contract is unchanged — applied in `WC_AJAX::get_refreshed_fragments()`, reached by the `get_refreshed_fragments`, `add_to_cart` and `remove_from_cart` endpoints; (b) WC still re-applies fragments from its own `sessionStorage` cache on a normal page load, which is what delivers the block when no cart mutation happened; (c) **the handle `wc-cart-fragments` is still registered under that name** — we now `wp_enqueue_script()` it ourselves, unguarded, and WP drops an unregistered queued handle with no notice. Covered by the L-1 support policy that `WC_Frontend_Scripts`' own docblock grants third-party enqueueing. **Do not "fix" (c) by adding a `wp_script_is( …, 'registered' )` guard** — our callback and WC's `load_scripts()` share `wp_enqueue_scripts` priority 10, so the guard would be a race that silently skips the enqueue; queue resolution happens at print time | `src/Modules/WooCommerce/PageDataLayer.php` (`add_visitor_cart_fragment`, `output_visitor_cart_placeholder`), `src/Modules/WooCommerce/WooCommerceModule.php` (`enqueue_scripts`), `js/frontend/gtm4wp-visitor-data.js` | WC `includes/class-wc-frontend-scripts.php`, `includes/widgets/class-wc-widget-cart.php`, `includes/class-wc-ajax.php`, `client/legacy/js/frontend/cart-fragments.js` | U77, U70 | silent-missing | on-WC-release | [x] 2026-08-06 read on `trunk` (11.1.0-dev); `cart-fragments.js` byte-identical on tags `11.0.0` and `10.4.0`. **Measured, not assumed:** the handle is registered unconditionally by `load_scripts()` (sole gate `did_action('before_woocommerce_init')`) but WC enqueues it from exactly **one** frontend path, `WC_Widget_Cart::widget()`, which returns early when `woocommerce_widget_cart_is_hidden` is true — **default `is_cart() \|\| is_checkout()`** — and the Mini-Cart *block* never enqueues it (it uses a parallel Store API layer on `localStorage.storeApiCartHash`). That is why (c) was failing in the field. `wc_load_cart_fragments()`, `woocommerce_enqueue_cart_fragments` and `woocommerce_cart_fragments_refresh` **do not exist** — do not look for them. Cost claim behind the changelog wording: the refresh XHR fires once per *tab* (its cache is `sessionStorage`), and on **every** page load when Web Storage is blocked (`cart-fragments.js` has no guard for that) |
 | U99 | **Legacy product grid block container classes → GA4 list identity.** The 8 `wp-block-{block_name}` classes `AbstractProductGrid::get_container_classes()` emits, each mapped to a hardcoded `item_list_name` **and** `item_list_id`, plus the `.wc-block-grid` / `.wc-block-grid__products` wrapper shape the lookup walks. WC's `woocommerce_blocks_product_grid_item_html` carries no block context, so PHP writes a generic placeholder pair and the browser resolves the real identity from the container class. The 8 ids are the same literals `list_identity()` gives those lists on the Product Collection path (U26) — one list, two files, and they must not drift (UC-6) | `js/frontend/gtm4wp-woocommerce.js` (`gtm4wp_product_block_names` + its three `gtm4wp_update_json_in_node` calls); placeholder pair from `src/Modules/WooCommerce/ListTracking.php` | `AbstractProductGrid::get_container_classes()` + each subclass's `$block_name`, via `gh api repos/woocommerce/woocommerce/contents/…` | U77 — **soft-deprecated since WC 9.5: every legacy grid `block.json` carries `"supports": { "inserter": false }` (confirmed at 11.0.0), the blocks stay registered and server-rendered for existing content, and the successor is `woocommerce/product-collection`. Removal, not renaming, is the expected end state; watch WC deprecation notes and the subclass count, and do NOT drop our support — widget areas and saved content still render these** | silent-wrong | on-WC-release | [x] 2026-08-06 measured on the **11.0.0 tag**: `search/code repo:woocommerce/woocommerce "extends AbstractProductGrid"` → `total_count: 8` (`ProductNew, ProductOnSale, ProductTopRated, ProductCategory, ProductTag, HandpickedProducts, ProductBestSellers, ProductsByAttribute`), map keys = `wp-block-` + each `$block_name`, so the map is exactly complete: 8 keys vs 8 subclasses. `get_container_classes()` verified to put `wc-block-grid` and `wp-block-{name}` on the same element. Pinned by the 8-row table in `js/frontend/test/woocommerce-tracker.test.js` |
 
-| U113 | **The visitor checks WooCommerce's `order_received()` applies once it has resolved an order**, which return before `woocommerce_thankyou` and are therefore invisible to this plugin: (a) the filter `woocommerce_order_received_verify_known_shoppers` (default `true`); (b) `Automattic\WooCommerce\Internal\Utilities\Users::should_user_verify_order_email( $order_id, $supplied_email, $context )`, which owns the guest email-verification decision *and* the `woocommerce_order_email_verification_grace_period` default. Read so the data layer includes `orderData.customer` and the purchase event's `user_data` only in the cases WooCommerce itself renders the order. (b) lives in an **`Internal`** namespace with no compatibility promise, so it is guarded with `class_exists` + `method_exists` (UC-2). **The two halves have different `@since` versions and that gap is the whole point of this row:** the gate in `order_received()` ships in **7.9.0**, the helper it delegates to only in **8.6.0** (measured — absent in 7.9.0/8.0.0/8.4.0/8.5.0, present in 8.6.0/8.7.0/9.0.0), so on **7.9.0-8.5.x** upstream hides the order while the helper cannot be asked. Since `.security` #173 the guard's fallback re-derives the guest decision from the order age and the `woocommerce_order_email_verification_grace_period` filter instead of returning "not withheld". **Deliberately not reproduced:** the POSTed-email escape hatch (`check_submission` / nonce `wc_verify_email`), which would add three more literals to own; skipping it only ever withholds more | `src/Modules/WooCommerce/PageDataLayer.php` `woocommerce_hides_order_from_visitor()` | `includes/shortcodes/class-wc-shortcode-checkout.php` `order_received()` + `guest_should_verify_email()`; `src/Internal/Utilities/Users.php` | U77 | silent-wrong | on-WC-release | [x] 2026-08-12 read on `trunk`: both gates present in `order_received()` in the order above; helper signature `( $order_id, $supplied_email = null, $context = 'view' )` — order **id**, not object |
+| U113 | **The visitor checks WooCommerce's `order_received()` applies once it has resolved an order**, which return before `woocommerce_thankyou` and are therefore invisible to this plugin. Read so the data layer includes `orderData.customer`, `new_customer`/`customer_type` and the purchase event's `user_data` exactly when WooCommerce itself renders the order — parity in **both** directions, because wherever upstream renders, the page body is already showing this visitor the order, so withholding more than upstream deletes tracking data without hiding anything. Five couplings, measured at release tags (not trunk): **(a) `WC_Shortcode_Checkout::guest_should_verify_email( WC_Order, string ): bool`, `private static` — the feature-detect symbol.** Both gates and this member shipped together in **7.9.0** (absent at 7.8.0, present 7.9.0→11.0.0); `method_exists()` sees private members and triggers `WC_Autoloader` (`wc_shortcode_` → `shortcodes/`, mapped since ≤5.0.0), so the probe needs no load-order luck. Absent ⇒ a 5.0–7.8.x WooCommerce that renders the order to any valid key holder ⇒ nothing to mirror, **nothing withheld, no version compared anywhere**. **(b)** the known-shopper login gate: **behaviour 7.9.0 (unconditional); its filter `woocommerce_order_received_verify_known_shoppers` (default `true`, 1 arg) only 8.4.0** — one upstream line, two `@since` values; with the filter off upstream still routes a non-owner into the guest email verification, whose only customer-id term is the logged-in-owner short-circuit. **(c)** `Automattic\WooCommerce\Internal\Utilities\Users::should_user_verify_order_email( $order_id, $supplied_email = null, $context = 'view' )` — `public static`, order **id** not object; **the METHOD is 8.6.0+ while the CLASS exists from ≥7.7.0 — re-verify with `method_exists`; `class_exists` alone reports the wrong half**. `Internal` namespace, no compatibility promise (UC-2), hence the guard. **(d)** `woocommerce_order_email_verification_grace_period` — **`@since` 8.0.0, 3 args**, homed in the shortcode 8.0.0–8.5.x and in the helper from 8.6.0; upstream compares elapsed `<=` grace (mirrored exactly); **7.9.x has no grace at all** — the one window where the mirror is laxer than upstream, bounded by the order max-age gate. **(e)** `woocommerce_order_email_verification_required` — **`@since` 7.9.0, 3 args**, upstream's final say and documented opt-out, applied only past the grace short-circuit (both facts mirrored). On 7.9.0–8.5.x (helper absent) the fallback mirrors (b)–(e) term by term for **every order shape reaching it**; the three request-identity terms — session email match, the POSTed-email escape hatch (`check_submission` / nonce `wc_verify_email`), `read_private_shop_orders` — are deliberately not modelled and each fails **closed** | `src/Modules/WooCommerce/PageDataLayer.php` `woocommerce_hides_order_from_visitor()` | `includes/shortcodes/class-wc-shortcode-checkout.php` `order_received()` + `guest_should_verify_email()`; `src/Internal/Utilities/Users.php` | U77 | silent-wrong | on-WC-release | [x] 2026-08-12 read at tags 5.0.0 / 7.8.0 / 7.9.0 / 8.0.0 / 8.4.0 / 8.5.2 / 8.6.0 / 11.0.0; an executable old/new/upstream decision table swept every version window × order shape × filter state with zero unexplained divergences |
 
 **Why U113 is `silent-wrong`, not `silent-missing`:** the two halves fail in opposite
 directions. If the helper is renamed, moved out of `Internal` or dropped, the
@@ -276,24 +276,32 @@ cannot notice upstream moving. The known-shopper half fails the other way: a ren
 filter means we withhold on a site that turned the gate off, which is merely missing
 data. **Re-verify the helper first**, and treat a green suite as no evidence either way.
 
-**What "not available" now does, and why it changed (2026-08-12, `.security` #173).** It
-used to mean "not withheld", justified by "a WooCommerce older than the helper does not
-ask for verification either". That premise was read off the *gate's* `@since` and is
-false for a supported range: the gate is 7.9.0, the helper is 8.6.0. Measured, the
-fallback therefore failed **open** on every 7.9.0-8.5.x install. It now re-derives the
-narrow, version-free part of the decision — a guest order past the site's own grace
-period — which is deliberately more conservative than upstream and can only withhold
-more. **The lesson for this registry, and it generalises past this row:** an entry that
-records only "the symbol exists on trunk" is blind to a version WINDOW in which a
-delegated helper is absent while the behaviour it stands in for is present. **Record the
-introduction version of the thing you delegate to, not just its current existence**, and
-record it for the *gate* and the *helper* separately when they are two symbols.
+**What "not available" now does, and why it changed twice (2026-08-12, `.security` #173
+→ #183).** It originally meant "not withheld", justified by "a WooCommerce older than the
+helper does not ask for verification either" — read off the *gate's* `@since` and false
+for 7.9.0-8.5.x, where the fallback failed **open** (#173). The first fix re-derived a
+guest-only age check and described itself as "deliberately more conservative … can only
+withhold more" — false twice over: on ≤7.8.x upstream has no gate at all, so the
+conservatism withheld data the rendered page was already showing (#183), and on
+8.4.0-8.5.x with the login gate filtered off, upstream still email-verifies a non-owner
+while the guest-only shape published (the leak direction; found and closed in #183's fix
+session). The resolution keeps version numbers out entirely: probe the SYMBOL both gates
+shipped with (coupling (a) in the row), publish when it is absent because there is
+nothing to mirror, and when the helper cannot be asked mirror the shortcode-era guest
+gate term by term for every order shape. **The lessons for this registry:** record the
+introduction version of the *behaviour* and of every *symbol* separately — they differed
+by seven minor releases here, and even one upstream line carried two (`gate 7.9.0, its
+filter 8.4.0`); and when a mirror must span versions, prefer probing a symbol that
+shipped WITH the behaviour over comparing versions (UC-5) — it is the only form that
+stays correct on both sides of the window.
 
-The fail-open branch also carried **zero** test executions across the whole suite until
+The fallback branches carried **zero** test executions across the whole suite until
 #173, because `tests/unit/Modules/wc-users-stub.php` defines the stand-in
-unconditionally — a live case of UC-3 (the double absorbing the coupling). It is now
-reachable through the namespaced `method_exists()` shim in
-`tests/unit/Modules/wc-feature-guard-shim.php`.
+unconditionally — a live case of UC-3 (the double absorbing the coupling). Every branch
+is now reachable through the namespaced `method_exists()` shim in
+`tests/unit/Modules/wc-feature-guard-shim.php` (the gates-absent branch via
+`tests/unit/Modules/wc-shortcode-checkout-stub.php` plus the same shim), and each new
+guard was watched red under mutation before this row was written.
 
 > **Disclosure note (2026-08-12, `.security` #161).** This row is deliberately written
 > to the coupling, not to the consequence: what it names is the upstream symbols, the
@@ -777,26 +785,32 @@ unambiguous — *"Passing `__next40pxDefaultSize` is ignored at runtime."*
 
 ### U113 — the order-received visitor gates ⭐
 
-- **Claim (a):** `WC_Shortcode_Checkout::order_received()` still applies
-  `woocommerce_order_received_verify_known_shoppers` (default `true`) and still
-  returns without rendering the order when a non-guest order is viewed by anyone
-  other than its customer.
-- **Claim (b):** `Automattic\WooCommerce\Internal\Utilities\Users::should_user_verify_order_email()`
-  still exists under that name, still takes the **order id** (not an order object)
-  as its first argument, and still returns "verification required" for a guest order
-  past `woocommerce_order_email_verification_grace_period`.
-- **Claim (b2), and it is the one that was missing:** the helper was introduced in
-  **WooCommerce 8.6.0**, while the gate in claim (a)'s file dates from **7.9.0** — so
-  `7.9.0-8.5.x` is a window where upstream hides the order and the helper cannot be
-  asked. Our fallback must keep covering that window on its own. Re-verify by grepping
-  the helper's file at a tag, not only at `trunk`; existence-on-trunk cannot see a
-  version window (this is what `.security` #173 turned on).
-- **Claim (c):** both gates still run **after** the order-key check and **before**
+- **Claim (a), the feature-detect — check this one FIRST, at every WooCommerce RC:**
+  `WC_Shortcode_Checkout::guest_should_verify_email()` still exists under that name
+  (`private static` is fine — `method_exists()` sees it, probed). It is what tells the
+  plugin "this WooCommerce has visitor gates at all": absent means 5.0-7.8.x behaviour
+  (order rendered to any valid key holder) and the plugin publishes the identity
+  blocks. **If upstream renames or moves it while the `Users` helper is also
+  unavailable, the plugin publishes where upstream hides — silent and in the leak
+  direction.** This is the row's sharpest edge.
+- **Claim (b):** `order_received()` still requires login for a non-guest order viewed
+  by anyone but its customer (behaviour since **7.9.0**), still reads
+  `woocommerce_order_received_verify_known_shoppers` (filter since **8.4.0**, default
+  `true`, **1 arg**), and with the filter off still falls through to the guest email
+  verification (whose only customer-id term is the logged-in-owner short-circuit).
+- **Claim (c):** `Users::should_user_verify_order_email()` still exists, `public
+  static`, still takes the **order id** (not an order object) first, and still applies
+  `woocommerce_order_email_verification_grace_period` (elapsed `<=` grace renders) and
+  `woocommerce_order_email_verification_required` (final say, past grace only) with
+  **3 args** each. **Verify the METHOD, not the class** — the class predates it
+  (≥7.7.0 vs 8.6.0), so `class_exists` alone reports the wrong half.
+- **Claim (d):** both gates still run **after** the order-key check and **before**
   `woocommerce_thankyou`, so nothing on our side can observe their outcome — this is
   the whole reason the decision is re-derived rather than read off a hook.
-- **How to verify:** read the two source files (they are short). A green suite proves
-  nothing here — our tests drive a stand-in class, so upstream moving is invisible to
-  them (UC-3), which is exactly why (b) is the one to check first.
+- **How to verify:** read the two source files at the release **tag** (they are
+  short); existence-on-trunk cannot see a version window (`.security` #173/#183 both
+  turned on exactly that). A green suite proves nothing here — our tests drive
+  stand-in classes, so upstream moving is invisible to them (UC-3).
 
 ### U22 — Store API cart-item extension values must be strings
 

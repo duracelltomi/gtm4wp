@@ -22,6 +22,7 @@ use GTM4WP\Tests\unit\TestCase;
 require_once __DIR__ . '/wc-stubs.php';
 require_once __DIR__ . '/wc-datastore-stub.php';
 require_once __DIR__ . '/wc-users-stub.php';
+require_once __DIR__ . '/wc-shortcode-checkout-stub.php';
 
 /**
  * Covers the page-type branches of PageDataLayer::add_datalayer_data():
@@ -1277,11 +1278,16 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
-	 * A known shopper reaching the fallback means the site filtered the
-	 * known-shopper gate off. The fallback models the GUEST decision only, so it
-	 * must not invent a stricter answer than the admin asked for.
+	 * With the known-shopper gate filtered off on 8.4.0-8.5.x, upstream does NOT
+	 * simply render a registered customer's order to everyone: order_received()
+	 * falls through to the same email verification the guest path gets, whose
+	 * only customer-id term is the logged-in-owner short-circuit (read at the
+	 * 8.4.0 and 8.5.2 tags). So past the grace period that visitor is asked to
+	 * verify the billing email, gate filter or not - and the mirror follows.
+	 * The earlier version of this test asserted the opposite from an unmeasured
+	 * "the fallback models the GUEST decision only" premise.
 	 */
-	public function test_order_received_keeps_customer_data_for_a_known_shopper_when_the_upstream_helper_is_missing(): void {
+	public function test_order_received_withholds_stale_known_shopper_data_when_the_gate_is_off_and_the_helper_is_missing(): void {
 		$this->hide_order_email_verification_helper();
 		Filters\expectApplied( 'woocommerce_order_received_verify_known_shoppers' )->andReturn( false );
 
@@ -1294,7 +1300,26 @@ final class PageDataLayerTest extends TestCase {
 
 		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
 
-		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'The guest-only fallback must not withhold from a known shopper whose gate the site turned off.' );
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'Past the grace period upstream asks this visitor to verify the billing email even with the login gate off, so the identity is withheld.' );
+		$this->assertStringNotContainsString( 'buyer@example.com', wp_json_encode( $result ) );
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The conversion still counts.' );
+	}
+
+	/**
+	 * The same shape inside the grace period publishes: this is a buyer with an
+	 * account coming back sessionless from an off-site gateway on a site that
+	 * relaxed the login gate, and upstream renders for them - the grace
+	 * short-circuit runs before the session terms.
+	 */
+	public function test_order_received_keeps_fresh_known_shopper_data_when_the_gate_is_off_and_the_helper_is_missing(): void {
+		$this->hide_order_email_verification_helper();
+		Filters\expectApplied( 'woocommerce_order_received_verify_known_shoppers' )->andReturn( false );
+
+		$this->stub_order_received_request( array( 'customer_id' => 5 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'Within the grace period upstream renders, so the admin\'s opt-out keeps the buyer\'s data complete.' );
 	}
 
 	/**
@@ -1323,6 +1348,228 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * The filter is WooCommerce's, so its ARGUMENT LIST is WooCommerce's too. Upstream
+	 * applies it with three ( $grace_period, $order, $context ) in both homes it has had
+	 * - the shortcode on 8.0.0-8.5.x and Users::should_user_verify_order_email() from
+	 * 8.6.0 - so a site registers its callback against three parameters.
+	 *
+	 * WP_Hook passes through exactly what apply_filters() was handed: when
+	 * accepted_args >= the number supplied it calls the callback with the supplied list
+	 * and never pads it. Passing fewer than upstream therefore does not degrade, it
+	 * raises an uncaught ArgumentCountError on the order received page.
+	 *
+	 * The stand-in below is a site callback written the documented way - three REQUIRED
+	 * parameters - because a callback with optional ones cannot fail and would assert
+	 * nothing (.testing UC-3).
+	 */
+	public function test_order_received_grace_period_filter_gets_the_three_arguments_woocommerce_passes(): void {
+		$this->hide_order_email_verification_helper();
+
+		$captured = array();
+
+		Filters\expectApplied( 'woocommerce_order_email_verification_grace_period' )
+			->andReturnUsing(
+				static function ( $grace_period, $order, $context ) use ( &$captured ) {
+					$captured = array( $grace_period, $order, $context );
+					return $grace_period;
+				}
+			);
+
+		$order = $this->stub_order_received_request(
+			array(
+				'customer_id'  => 0,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertCount( 3, $captured, 'A site callback written to WooCommerce\'s documented three-parameter signature must not be handed fewer arguments than WooCommerce hands it.' );
+		$this->assertSame( 10 * MINUTE_IN_SECONDS, $captured[0], 'The unfiltered default stays WooCommerce\'s own ten minutes.' );
+		$this->assertSame( $order, $captured[1], 'Upstream passes the order as the second argument, so a callback that varies the grace period per order can read it.' );
+		$this->assertSame( 'order-received', $captured[2], 'Upstream passes the context as the third; this call site is the order received page.' );
+	}
+
+	/**
+	 * Constraint one of this whole feature, pinned on the fallback path: the
+	 * buyer logged in as the order's customer keeps everything however old the
+	 * order is. Upstream's owner short-circuit renders for them on every gated
+	 * version, and the known-shopper gate above the fallback only ever matches
+	 * OTHER visitors.
+	 */
+	public function test_order_received_keeps_customer_data_for_the_logged_in_customer_when_the_upstream_helper_is_missing(): void {
+		$this->hide_order_email_verification_helper();
+		Functions\when( 'get_current_user_id' )->justReturn( 5 );
+
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 5,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'The buyer reading their own order keeps everything on 7.9.0-8.5.x too, however old the order.' );
+		$this->assertStringContainsString( 'sha256_email_address', $this->inline_js, 'Including Enhanced Conversions.' );
+	}
+
+	/**
+	 * An order with no billing email cannot be verified against anyone, and
+	 * upstream renders it - the empty-email short-circuit is identical on 7.9.0
+	 * through current, and an admin-created phone order is the common shape.
+	 * The mirror follows; withholding here would only hide from the data layer
+	 * a name and address the rendered page is already showing.
+	 */
+	public function test_order_received_keeps_customer_data_for_a_stale_guest_order_without_billing_email_when_the_upstream_helper_is_missing(): void {
+		$this->hide_order_email_verification_helper();
+
+		$this->stub_order_received_request(
+			array(
+				'customer_id'   => 0,
+				'billing_email' => '',
+				'date_created'  => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'customer', $result['orderData'], 'Upstream renders an order it cannot verify anyone against, so the identity block ships.' );
+		$this->assertSame( 'Lovelace', $result['orderData']['customer']['billing']['last_name'] );
+	}
+
+	/**
+	 * The woocommerce_order_email_verification_required filter is upstream's
+	 * final say and its documented opt-out ("the filter primarily exists as a
+	 * way to *remove* the email verification step"). A site that removed
+	 * verification renders the order to key holders, so its data layer stays
+	 * complete too.
+	 */
+	public function test_order_received_fallback_honors_the_verification_required_filter_opt_out(): void {
+		$this->hide_order_email_verification_helper();
+
+		Filters\expectApplied( 'woocommerce_order_email_verification_required' )->andReturn( false );
+
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 0,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'The site removed email verification, so upstream renders and the mirror follows.' );
+	}
+
+	/**
+	 * The second WooCommerce-owned hook this method re-applies, held to the same
+	 * RI-25 contract as the grace-period one: upstream passes three arguments in
+	 * both of the filter's homes (the 7.9.0-8.5.x shortcode and the 8.6.0+
+	 * helper), so a site callback written to the documented three-parameter
+	 * signature must not be handed fewer. Required parameters, or the stand-in
+	 * cannot fail (.testing UC-3).
+	 */
+	public function test_order_received_verification_required_filter_gets_the_three_arguments_woocommerce_passes(): void {
+		$this->hide_order_email_verification_helper();
+
+		$captured = array();
+
+		Filters\expectApplied( 'woocommerce_order_email_verification_required' )
+			->andReturnUsing(
+				static function ( $required, $order, $context ) use ( &$captured ) {
+					$captured = array( $required, $order, $context );
+					return $required;
+				}
+			);
+
+		$order = $this->stub_order_received_request(
+			array(
+				'customer_id'  => 0,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertCount( 3, $captured, 'A callback written to WooCommerce\'s documented three-parameter signature must not be handed fewer arguments than WooCommerce hands it (RI-25).' );
+		$this->assertTrue( $captured[0], 'With the request-identity terms unmodelled, the computed requirement handed to the filter is true here.' );
+		$this->assertSame( $order, $captured[1], 'Upstream passes the order second.' );
+		$this->assertSame( 'order-received', $captured[2], 'And the context third; this call site is the order received page.' );
+	}
+
+	/**
+	 * Upstream applies the verification-required filter only PAST the grace
+	 * period - the grace short-circuit returns first, which is why WooCommerce's
+	 * own docblock says the filter cannot force verification in all cases. The
+	 * mirror keeps that ordering, so a fresh order publishes without the filter
+	 * ever being consulted.
+	 */
+	public function test_order_received_grace_period_short_circuits_before_the_verification_required_filter(): void {
+		$this->hide_order_email_verification_helper();
+		Filters\expectApplied( 'woocommerce_order_email_verification_required' )->never();
+
+		$this->stub_order_received_request( array( 'customer_id' => 0 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'Within the grace period upstream renders without asking the filter.' );
+	}
+
+	/**
+	 * WooCommerce below 7.9.0 has NO visitor gate on the order received page:
+	 * order_received() renders the full order to any holder of a valid key link
+	 * (read at the 5.0.0 and 7.8.0 tags). With nothing to mirror, nothing is
+	 * withheld - the data layer must match what the page itself is already
+	 * showing, or three years of supported versions silently lose their
+	 * identity data. The probe is the symbol both gates arrived with
+	 * (guest_should_verify_email, 7.9.0), so no WC_VERSION appears anywhere.
+	 */
+	public function test_order_received_keeps_customer_data_when_woocommerce_has_no_visitor_gates(): void {
+		$this->hide_order_received_visitor_gates();
+
+		// Stale enough that every gated branch would withhold - which is what
+		// makes this prove the gates-absent branch specifically and not pass by
+		// riding the grace period.
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 0,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'No gate exists upstream, so the order the page renders is described in full.' );
+		$this->assertStringContainsString( 'sha256_email_address', $this->inline_js, 'The Enhanced Conversions user_data block ships with it.' );
+		$this->assertArrayHasKey( 'new_customer', $result, 'And the order-history signal.' );
+		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The helper belongs to the gated era and must not be consulted when the gates are absent.' );
+	}
+
+	/**
+	 * The login requirement for known shoppers is also 7.9.0+ (unconditional
+	 * there, filterable from 8.4.0), so below 7.9.0 a registered customer's
+	 * order is likewise rendered to any key holder and the known-shopper mirror
+	 * must not run either. Both mirrors sit behind the same probe because both
+	 * gates arrived in the same release as the probed symbol.
+	 */
+	public function test_order_received_keeps_known_shopper_data_when_woocommerce_has_no_visitor_gates(): void {
+		$this->hide_order_received_visitor_gates();
+
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 5,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'Below 7.9.0 upstream renders a registered customer\'s order to any key holder, so the mirror follows.' );
+		$this->assertStringContainsString( 'sha256_email_address', $this->inline_js );
+	}
+
+	/**
 	 * Hides WooCommerce's Internal email-verification helper from the production
 	 * feature guard, so the "upstream helper unavailable" branch is reachable.
 	 * Cleared in tearDown() - this is process-wide state.
@@ -1331,6 +1578,19 @@ final class PageDataLayerTest extends TestCase {
 	 */
 	private function hide_order_email_verification_helper(): void {
 		$GLOBALS['gtm4wp_test_hidden_members'][] = 'Automattic\WooCommerce\Internal\Utilities\Users::should_user_verify_order_email';
+	}
+
+	/**
+	 * Hides WC_Shortcode_Checkout::guest_should_verify_email() - the symbol the
+	 * production code probes to know whether this WooCommerce has the
+	 * order-received visitor gates at all (both gates and the symbol are 7.9.0)
+	 * - so the "no gates on this WooCommerce" branch is reachable. Cleared in
+	 * tearDown() - this is process-wide state.
+	 *
+	 * @return void
+	 */
+	private function hide_order_received_visitor_gates(): void {
+		$GLOBALS['gtm4wp_test_hidden_members'][] = 'WC_Shortcode_Checkout::guest_should_verify_email';
 	}
 
 	public function test_order_received_keeps_customer_data_for_a_guest_inside_the_grace_period(): void {

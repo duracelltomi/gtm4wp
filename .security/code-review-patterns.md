@@ -47,6 +47,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-20** — a key name the plugin writes for a third-party runtime to read is a contract with only one end in this repo: a wrong name fails **silently**, so the only check is the vendor's documentation. Open the page a docblock cites; prefer the documented name over the merely-observed one.
 - **RI-22** — a `TABLE[$key] ?? DEFAULT` is a claim about **every key not in the table**, and the table is the only half that gets reviewed. Count the domain's categories: if it has three and the code models "listed" plus "everything else", the third silently inherits a rule written for the second. Test the default, not only the entries.
 - **RI-23** — RI-22's sequel: when the model grows the third category, its branch arrives near the top of the function and **returns**, silently opting its inputs out of every test below. Diff the branches, not the values; count the rows that enter the new branch before calling it a special case; and remember a test named for a general property now asserts it for one category only.
+- **RI-25** — ⭐ when you re-apply somebody else's filter, the argument list is theirs too. `WP_Hook` never pads: a callback with N required params reached from a caller supplying fewer raises an uncaught `ArgumentCountError`. Passing *more* is free (it slices down), so pass exactly what upstream passes. A mocked `apply_filters` with an optional-param stand-in cannot see this. Ledger: 11 third-party hook sites, re-derive with the `grep -v gtm4wp` litmus.
 - **RI-18** — sanitizing a request value proves it is *safe to handle*, never that it is *what it claims to be*. For a proxy-chain header, know which end the infrastructure guarantees; a docblock asserting "not spoofable" is a claim to test, not a fact. Name the superglobal behind every value in a gate (a convenience helper may read `$_REQUEST` before the header), then pick the sanitizer for the value's **grammar** — a text sanitizer on a URL rewrites what the gate is judging.
 
 **Project-Specific Anti-Patterns (PA):**
@@ -400,7 +401,8 @@ Confirmed 2026-08-05 (#108). `wp_add_inline_script()` returns `false` both when 
 
 - **A feature-availability guard has the same two-state problem as a falsy return**, and one extra: "absent because too old", "absent because moved", and "absent because it was never the same symbol as the feature". Only the first is safe to treat as "there is nothing here".
 - **When you guard a delegation, compare the `@since` of the BEHAVIOR with the `@since` of the SYMBOL you delegate to.** If they differ, there is a version window where the behavior exists and the symbol does not, and that window is exactly where the guard is wrong. Record both versions in the coupling's registry row (`.upstream` U113 now does).
-- **Prefer re-deriving the narrow, version-free part of the decision to guessing from a version number.** Measured on #173: a `WC_VERSION`-gated fail-closed broke the buyer reading their own order, because the guard sits *after* an earlier gate and "withhold" there withholds from everyone. A conservative local re-derivation that can only ever withhold *more* was the answer.
+- **Prefer re-deriving the narrow, version-free part of the decision to guessing from a version number.** Measured on #173: a `WC_VERSION`-gated fail-closed broke the buyer reading their own order, because the guard sits *after* an earlier gate and "withhold" there withholds from everyone. A conservative local re-derivation was the answer at the time — but #183/#188 killed the comfort it was wrapped in, twice: "can only ever withhold more" was false against the oldest gated version, and a *partial* mirror still published where the full upstream decision hides, because upstream's domain was wider than the mirror's (the login gate's opt-out routes non-owners into the guest check). Conservatism is not a property a mirror gets by modelling less.
+- **When the behaviour and a symbol shipped in the same upstream release, probe THAT symbol instead of any version.** #183's resolution: both order-received gates arrived in the release that added `guest_should_verify_email()` (verified at the tags on both sides), so one `method_exists` scopes the whole mirror — no version constant (UC-5), correct on both sides of the window, and `method_exists` sees private members and triggers the autoloader, so the probe needs no load-order luck. And mirror in BOTH directions: where the vendor renders, the page body is already showing the visitor everything, so withholding "to be safe" protects nothing and silently deletes data.
 - **Litmus:** grep `class_exists(`, `method_exists(`, `function_exists(` used as a *gate on a security or privacy decision* (not merely on an optional enhancement). For each, ask what the else branch asserts about the world, and whether an unavailable symbol really implies it.
 
 ### RI-22: A lookup table with a fallback default asserts the default is right for everything unlisted — enumerate the categories, not the exceptions
@@ -637,6 +639,60 @@ One mechanism serves both — a **trusted-address allow-list**, not a hop count:
 - Treat "the header is present and well-formed" as evidence of nothing. `FILTER_VALIDATE_IP` proves it is an IP, not that it is *this visitor's* IP.
 - **A docblock asserting a security property is a claim to test, not a fact.** `VisitorIp`'s said the function was not spoofable, and the assertion outlived the code being true. This is PA-10's "a `__return_true` gate must be demonstrated, not accepted from a doc block", applied to comments generally: when a comment claims a guarantee, either find the code that enforces it or correct the comment.
 - Where the value only feeds analytics, rate it on integrity (Low/Medium per the threat model). Where any caller could make an authorization decision on it, it is the authorization bug it looks like.
+
+### RI-25: When you apply somebody else's filter, the ARGUMENT LIST is theirs too — and passing fewer is a fatal, not a degradation ⭐
+
+Re-applying an upstream hook to mirror an upstream decision is a legitimate and much-used
+technique here (`woocommerce_cart_item_product`, `the_permalink`, `woocommerce_thankyou_order_id`,
+the two order-received gates). What travels with the hook **name** is the hook's **contract**,
+and the half that gets forgotten is the argument list — because on a default site nothing
+registers a callback, so the mistake is invisible until somebody uses the extension point the
+way its own documentation describes.
+
+`WP_Hook::apply_filters()` does not pad. Its dispatch is:
+
+```php
+if ( $the_['accepted_args'] >= $num_args ) { call_user_func_array( $cb, $args ); }        // as supplied
+else                                       { call_user_func_array( $cb, array_slice( $args, 0, $n ) ); }
+```
+
+So a callback registered `add_filter( $hook, $cb, 10, 3 )` with three **required** parameters,
+reached from a caller that supplied one, gets one argument and raises **`ArgumentCountError`** —
+uncaught, fatal, on whatever page the call site sits on. It does not fall back to a default and
+it does not warn.
+
+Confirmed 2026-08-12 (#182, Medium). The order-received fallback applied
+`woocommerce_order_email_verification_grace_period` with one argument; WooCommerce applies it
+with three (`$grace_period, $order, $context`) in both homes the filter has had — the shortcode
+on 8.0.0–8.5.x and `Users::should_user_verify_order_email()` from 8.6.0. A site callback written
+to the documented signature therefore fatals the thank-you page. Found by the adjudication
+stage as collateral while verifying an unrelated documentation claim about the same three lines.
+
+**Rules:**
+- **The direction is asymmetric, so there is a safe default: pass everything upstream passes.**
+  Too few is a fatal; too many is free, because `WP_Hook` slices the list down to each
+  callback's own `accepted_args`. Measured across all three shapes (3-arg/`accepted_args=3`,
+  1-arg/`1`, 1-arg/`3`) — passing three is correct for every one of them.
+- **Read the arity off the vendor's source at a tag, not off your memory of the hook.** This is
+  RI-20 for argument lists: the only end of the contract in this repo is the call, and a wrong
+  arity fails on somebody else's site, never here.
+- **A mocked `apply_filters` cannot see this, and neither can a green suite.** Brain Monkey
+  intercepts the hook, so a test whose stand-in callback declares *optional* parameters passes
+  either way (UC-3). The discriminating test declares the parameters **required**, exactly as a
+  documented site callback would — that reproduces the real `ArgumentCountError` and goes red on
+  the unfixed source.
+- **Litmus (re-derive, don't read):** `grep -rnoE "(apply_filters|do_action)\( '[a-z_]+'" src/ compat/ | grep -v gtm4wp`
+  — every hook name **without** the `gtm4wp` prefix is somebody else's contract. Counting rule:
+  matching **lines**, so a site is one member. **Ledger, 2026-08-12: 11 sites, 10 correct, 1
+  wrong (#182) — and the wrong one was the newest.** For each, open the vendor's own
+  `apply_filters` and compare the count:
+  `wpml_current_language` 1 · `the_permalink` 2 (WP core passes `$permalink, $post`) ·
+  `woocommerce_cart_item_product` 3 (×3 sites) · `woocommerce_widget_cart_item_visible` 3 ·
+  `woocommerce_thankyou_order_id` 1 · `woocommerce_thankyou_order_key` 1 ·
+  `woocommerce_order_received_verify_known_shoppers` 1 ·
+  `woocommerce_order_email_verification_grace_period` **3**.
+- Related: **UC-2** (`Internal` namespaces carry no compatibility promise) covers the *symbol*;
+  this covers the *signature*. **RI-19** is the guard around the call; this is the call itself.
 
 ---
 
@@ -1186,6 +1242,7 @@ Reference: `PageDataLayer::confirm_pending_purchase_tracked()` (#398) writes the
 
 | Date | Action |
 |---|---|
+| 2026-08-12 (Review 23) | Reviewed `5a1cc42..1165053` (1 commit) — R22's own fix session, the eighth consecutive run where reading the previous review's fixes paid. **1 Medium + 5 Low (#182–#187).** Added **RI-25** (⭐ re-applying somebody else's filter carries their **argument list**, not just their hook name: `WP_Hook` never pads, so a documented-signature callback reached from a short caller raises an uncaught `ArgumentCountError` — fatal, not degraded; passing *more* than upstream is free because the dispatcher slices down to each callback's `accepted_args`). Its ledger is the litmus that matters: **11** third-party hook sites in `src/`+`compat/`, **10** correct, **1** wrong — and the wrong one was the newest, added by the very commit under review. Two things worth keeping about how it was found. First, **the adjudication stage produced it**: a verifier sent to check a documentation claim about the fallback's version window returned a production defect in the same three lines, so for the first time the stage generated the review's highest-severity finding rather than filtering one. Second, **the suite structurally could not see it** — Brain Monkey intercepts `apply_filters`, so a stand-in callback with optional parameters passes either way (UC-3); the regression test declares its parameters **required**, exactly as a documented site callback would, which reproduces the real `ArgumentCountError` and was watched red on the unfixed source with the trace landing on the finding's own line. **All 3 drafted recommendations were refuted**, two of them for shipping something worse than nothing: one would have closed 7 of ~50 uncounted items while stamping its ledger row complete (#109's false-reassurance shape), the other had a demonstrated false negative *and* a false positive across five measured states. |
 | 2026-07-10 (Review 1) | Seeded the patterns file. Added RI-2/RI-3/RI-4 (dataLayer/inline-script escaping: full hex flag set, no blanket `htmlspecialchars_decode`, pre-encoded-value trap) and PA-3/PA-4 (request-sourced dataLayer fields, `esc_js` misuse) from the reflected-XSS review that fixed `?s=` search-term break-out via `print_script_block`. Added core WordPress-plugin RI/PA/FP (ABSPATH guard, i18n, superglobal sanitization, `$wpdb->prepare`, WC CRUD/HPOS, JS rebuild; nonce+capability, option-at-sink validation, module framework; print_script_block + wp_add_inline_script + `$echo` suppressions). |
 | 2026-07-10 (Review 2) | Extended **RI-2** with the script-context matrix (which sink needs which flags; flagged `wc_enqueue_js` as a raw-`<script>` sink and `esc_attr(wp_json_encode)` in attributes as already-safe). Extended **RI-4** with the post-hardening data-corruption consequence (leftover `esc_js` now mangles dataLayer data, not just an XSS trap). Added **PA-7** (data-bearing string as a `preg_replace`/`str_replace` replacement arg). From the first full pass over the previously-unreviewed component groups + all six whole-repo sweeps (report `-1606`). |
 | 2026-07-13 | Migrated the plugin's only `wc_enqueue_js()` call (checkout `window.gtm4wp_checkout_*` globals in `PageDataLayer`) to `wp_add_inline_script( 'gtm4wp-woocommerce', …, 'before' )` per the WC 10.4 deprecation, with the full hex-flag set on that JSON. Promoted the `wc_enqueue_js` note to **PA-8** (deprecated — don't reintroduce; use `wp_add_inline_script`) and updated the RI-2 script-context matrix to match. |
