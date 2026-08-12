@@ -86,6 +86,22 @@ So, after drafting the findings and before writing the report:
      window would have captured another agent's instrumentation. None of that is
      detectable from the verdicts — a cross-contaminated trace reads exactly like a clean
      one. Read-only verifiers may share the tree.
+   - ⛔ **Put the worktree OUTSIDE the repository** — under the session scratchpad, never
+     inside the checkout — create it with **`--detach`**, and remove it with
+     **`git worktree remove --force`**. All three halves are load-bearing (**#187**):
+     - *Outside*, because this command's own Toolchain-trust sweep greps `.claude/`
+       **recursively**, so a worktree at `.claude/worktrees/` is read as repository content by
+       a later sweep — measured at **5 hits → 28**, 23 of them from the scratch copy, one of
+       them a line that exists nowhere in the tracked tree. That is #170's cross-contamination
+       resurrected *across runs*, and git-ignoring the path makes it **invisible rather than
+       absent**. (The `.gitignore` entry stays as a backstop for anyone who ignores this
+       bullet — it is deliberate, not dead config.)
+     - *`--detach`*, because `git worktree add <path>` also creates a **branch**, which
+       `git worktree remove` does **not** delete — so the tree passes a "no extra worktrees"
+       check while still carrying the branch.
+     - *`--force`*, because plain `remove` exits **128** on a worktree with uncommitted
+       changes, which is exactly the state a patching verifier leaves behind and exactly how
+       a leftover arises in the first place.
    - ⛔ **A worktree verifier that runs the suite must `composer install` (or at minimum
      `composer dump-autoload`) INSIDE the worktree first, and confirm the class under test
      resolves there** (`(new ReflectionClass( … ))->getFileName()`). A worktree has no
@@ -98,6 +114,27 @@ So, after drafting the findings and before writing the report:
    - **Before writing the report, re-verify the tree yourself**: `git status --porcelain`
      empty, `HEAD` unchanged, generated files byte-identical, suite and `phpcs` green.
      Record it in the report. A verifier claiming it cleaned up is a claim like any other.
+   - ⛔ **None of those four checks can see a leftover worktree**, so they are not sufficient
+     on their own (**#187**). A worktree carries its **own index**, so `git status` in the main
+     checkout reports **clean** over one holding uncommitted edits — measured, and `HEAD
+     unchanged` plus `generated files identical` pass over it too. Snapshot **before**
+     dispatching the verifiers and diff **after**:
+     ```bash
+     # in the same step that dispatches the stage — a baseline never taken silently never runs
+     git worktree list --porcelain    > "$SNAP/wt.before"
+     git branch --format='%(refname)' > "$SNAP/br.before"
+     git stash list                   > "$SNAP/st.before"
+     # after the stage. prune FIRST: a hand-deleted worktree leaves a stale entry behind
+     git worktree prune
+     diff <( git worktree list --porcelain )    "$SNAP/wt.before"   # each must be empty
+     diff <( git branch --format='%(refname)' ) "$SNAP/br.before"
+     diff <( git stash list )                   "$SNAP/st.before"
+     ```
+     `git worktree list` **alone is not the check** — measured across five states, it passes
+     after a `remove` that left the branch behind (false negative) and fails on a hand-deleted
+     worktree whose entry only `prune` clears (false positive). The branch and stash legs are
+     there because a worktree can leave both: a stash made inside one is visible from the main
+     checkout while `git status` still says clean.
 3. **The verifier may only confirm with an execution trace** — a command and its output, not
    an argument. That rule is the whole mechanism: an independent agent shares your model and
    can be wrong in the same direction, so what buys the independence is not the second mind,
@@ -228,7 +265,22 @@ cat ~/.claude/settings.json                                    # USER scope: app
                                                                # lives OUTSIDE the repo, is in no diff,
                                                                # and no .gitignore hints at it (#162)
 cat .claude/settings.json .claude/settings.local.json          # PROJECT scope: both git-ignored here
-head -6 .claude/agents/*.md                                    # per-agent `tools:` — RESTRICTS, does not GRANT
+# DEFINITIONS — the SAME scope rule, applied to every KIND (PA-19, #186). Note the ABSOLUTE
+# paths: a relative `.claude/agents/*.md` reaches PROJECT scope only, which is how 24 of 28
+# agent definitions went uncounted for 23 reviews while 17 of them declared Write or Edit.
+for kind in agents skills commands hooks; do
+  ls -d "$PWD/.claude/$kind"/*        2>/dev/null   # project scope
+  ls -d ~/.claude/"$kind"/*           2>/dev/null   # USER scope — outside the repo, in no diff
+  ls -d ~/.claude/plugins/cache/*/*/*/"$kind"/* 2>/dev/null   # every ENABLED PLUGIN's scope
+done
+find ~/.claude/agents ~/.claude/skills -type l -exec readlink -f {} \; 2>/dev/null  # symlinks leave ~/.claude
+grep -h '^tools:' .claude/agents/*.md ~/.claude/agents/*.md \
+                  ~/.claude/plugins/cache/*/*/*/agents/*.md 2>/dev/null  # `tools:` RESTRICTS, does not GRANT
+cat ~/.claude/plugins/installed_plugins.json                   # pin each plugin by version +
+                                                               # gitCommitSha, NEVER by its
+                                                               # enabledPlugins name: the name is
+                                                               # stable while the marketplace
+                                                               # re-syncs underneath it
 grep -rn "hooksPath\|rev-parse --show-toplevel" .githooks/ .claude/
 grep -rn "on:\|pull_request_target\|secrets\." .github/workflows/
 grep -rln "gh issue\|gh api\|wporg\|forum" .claude/commands/ .claude/skills/
@@ -239,6 +291,7 @@ Pair every **entry point** (a command or skill that ingests third-party text) wi
 - **Permissions.** Is each `permissions.allow` entry pinned to a verb *and* a path? A wildcard admitting state-changing verbs converts any successful injection into an unattended authenticated write. The enforced allowlist must be no wider than the write surface the skill *documents* — where prose and allowlist disagree, only the allowlist is real.
   - **Read every scope, not every file in one scope (PA-19, #162).** For 21 reviews this playbook named only the two project-scope files, and a pre-approved dispatcher sat unread in **user** scope the whole time. User scope is outside the repository, so no `git` command reaches it and no `.gitignore` entry advertises it the way the project-scope files at least do.
   - **A pinned command is not a safe command.** Pinning the *name* narrows nothing when the command is a **dispatcher**: `phpcs --standard=phpcs.xml .` names one binary and one ruleset and still executes whatever PHP a branch's ruleset `<autoload>`s. The question is never "is this entry specific?" but **"whose file does this ultimately execute?"** Pinning helps only when it pins the *resolved target* out of the worktree (an absolute path outside any checkout), and removing the pre-approval is the only form that closes it outright.
+- **Definitions — agents, skills, commands, hooks (PA-19, #186).** The scope rule above is not about permissions; it is about **anything assembled from more than one scope**, and for 23 reviews it was applied to permissions only. Count **per scope**, and record not just the file count but **how many declare a tool the repo-local set does not** — that is the figure that would have caught this (measured 2026-08-12: project **4** agents declaring **0** `Write`/`Edit`; **user scope 17** declaring **15**; one enabled plugin **7** declaring **2** — a ledger reading "4" against a reality of **28**). An agent's `tools:` **restricts and does not grant**, so this adds no reach by itself; the inventory is the point, because the next finding here will be in something nobody counted. Three counting traps: a **relative** path silently means project scope only; compiled artifacts (`__pycache__/*.pyc`) match these greps and inflate any file count; and a plugin's *content* moves under a *stable* name, so pin `version` + `gitCommitSha` from `installed_plugins.json` rather than the name. Anything under `~/.claude/` is the maintainer's machine, not the project — record **counts and method**, never listings, and never quote what you find there (that tree also holds credential material).
 - **Hooks.** Does anything reached via `core.hooksPath` or a `.claude` Stop/SessionStart hook execute a script resolved from the **working tree**? Then a checked-out PR branch supplies that code. It must come from a fixed, maintainer-controlled location.
 - **CI.** Does any workflow run with secrets on a trigger a fork can influence?
 - **Prose is not a control.** Injection guards written in a command file share a context window with the attacker's text. Note them as mitigation; never close a finding on them.
