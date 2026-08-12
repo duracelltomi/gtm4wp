@@ -651,7 +651,9 @@ final class PageDataLayer {
 	 * plus the GA4 purchase event, queued together with the browser-side
 	 * duplicate-tracking guard. The order is only exposed when its key matches
 	 * the request, it is within the tracking age and it has not been tracked
-	 * yet (see ProductData::is_purchase_already_tracked()).
+	 * yet (see ProductData::is_purchase_already_tracked()); the customer identity
+	 * blocks additionally need this visitor to be one WooCommerce would show the
+	 * order to (see woocommerce_hides_order_from_visitor()).
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -681,13 +683,28 @@ final class PageDataLayer {
 			$order = wc_get_order( $order_id );
 
 			if ( $order instanceof \WC_Order ) {
-				if ( $order->get_order_key() !== $order_key ) {
+				// hash_equals(), not !==: this compares a secret the request supplies
+				// against the stored one, and it guards the very same URL as the check
+				// in WC_Shortcode_Checkout::order_received(), which has always used
+				// hash_equals(). Against a long random key over HTTP the timing channel
+				// is not a practical attack; the two checks simply should not differ in
+				// kind. Both sides are cast because the value reaching the comparison
+				// has passed through a public filter (see above) and hash_equals()
+				// throws on a non-string.
+				if ( ! hash_equals( (string) $order->get_order_key(), (string) $order_key ) ) {
 					$order = null;
 				}
 			} else {
 				$order = null;
 			}
 		}
+
+		// Whether the order was resolved from the REQUEST - the ?order= id plus a
+		// matching ?key=. Anyone holding that URL is "the request", which is what
+		// woocommerce_hides_order_from_visitor() below reasons about; the session
+		// fallback that follows resolves the buyer's own order instead, so it is
+		// deliberately exempt.
+		$from_request = $order instanceof \WC_Order;
 
 		// Custom order-received page: a bespoke thank-you page (selected in the
 		// "Custom order received page" option) carries no order id or key in its
@@ -718,7 +735,78 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		return $this->add_purchase_for_order( $data_layer, $order, (int) $order_id );
+		// A forwarded or otherwise leaked order-received URL still carries a valid
+		// order key, so the checks above cannot tell it apart from the buyer's own
+		// visit - but WooCommerce may already have decided not to show that visitor
+		// the order (see woocommerce_hides_order_from_visitor()). The purchase event
+		// keeps firing on the key alone, since the buyer arriving straight from
+		// checkout is logged in or well inside the verification grace period and
+		// would otherwise lose the conversion; only the customer identity blocks are
+		// withheld, in exactly the cases WooCommerce itself would have declined to
+		// render the order.
+		$withhold_customer_data = $from_request && $this->woocommerce_hides_order_from_visitor( $order );
+
+		return $this->add_purchase_for_order( $data_layer, $order, (int) $order_id, $withhold_customer_data );
+	}
+
+	/**
+	 * Whether WooCommerce itself would refuse to render this order to whoever is
+	 * making the current request, in which case the data layer withholds the
+	 * customer identity blocks (orderData.customer and the purchase event's
+	 * user_data) even though the purchase event still fires.
+	 *
+	 * WooCommerce grew two gates in WC_Shortcode_Checkout::order_received() that
+	 * run AFTER the order-key check and return before woocommerce_thankyou, so
+	 * nothing on this side observes them:
+	 *
+	 * 1. A known (non-guest) shopper who is not logged in as that customer gets a
+	 *    login form instead of the order (WooCommerce 8.4.0). There is no grace
+	 *    period, and the site can turn the gate off with the filter read below.
+	 * 2. A guest order past the email-verification grace period gets a "confirm
+	 *    your email" form (WooCommerce 7.9.0, grace period filterable through
+	 *    woocommerce_order_email_verification_grace_period, 10 minutes by default).
+	 *
+	 * The second decision is delegated rather than copied: it also weighs the
+	 * WooCommerce session, the read_private_shop_orders capability and two more
+	 * filters, and re-implementing that here would be a second copy free to drift.
+	 * Its home is an Internal namespace with no compatibility promise (UC-2), hence
+	 * the guard - on a WooCommerce older than the helper (the floor is 5.0) nothing
+	 * upstream asks for verification either, so "not available" correctly means
+	 * "not withheld".
+	 *
+	 * The supplied-email escape hatch is deliberately not reproduced: WooCommerce
+	 * lets a guest POST the billing address into the verification form and unlocks
+	 * the render for that one request, which needs its own nonce and field names to
+	 * read. Skipping it means the customer block can stay withheld on a render
+	 * WooCommerce does show - it fails closed, and the purchase event is unaffected.
+	 *
+	 * @param \WC_Order $order The order resolved from the request.
+	 * @return bool True when the order data must not be attributed to this visitor.
+	 */
+	private function woocommerce_hides_order_from_visitor( \WC_Order $order ): bool {
+		/**
+		 * Indicates if known (non-guest) shoppers need to be logged in before we let
+		 * them access the order received page. Documented and applied by WooCommerce
+		 * itself; read here so the data layer follows the same decision.
+		 *
+		 * @since WooCommerce 8.4.0
+		 *
+		 * @param bool $verify_known_shoppers If verification is required.
+		 */
+		$verify_known_shoppers = (bool) apply_filters( 'woocommerce_order_received_verify_known_shoppers', true );
+		$order_customer_id     = (int) $order->get_customer_id();
+
+		if ( $verify_known_shoppers && $order_customer_id > 0 && get_current_user_id() !== $order_customer_id ) {
+			return true;
+		}
+
+		$users_class = 'Automattic\WooCommerce\Internal\Utilities\Users';
+
+		if ( ! class_exists( $users_class ) || ! method_exists( $users_class, 'should_user_verify_order_email' ) ) {
+			return false;
+		}
+
+		return (bool) $users_class::should_user_verify_order_email( $order->get_id(), null, 'order-received' );
 	}
 
 	/**
@@ -768,12 +856,14 @@ final class PageDataLayer {
 	 * standard order-received page and the session fallback so both apply the same
 	 * age / already-tracked / trackable-status rules and produce identical output.
 	 *
-	 * @param array<string, mixed> $data_layer The data layer collected so far.
-	 * @param \WC_Order            $order      The resolved order.
-	 * @param int                  $order_id   The order id (for the cookie dedupe check).
+	 * @param array<string, mixed> $data_layer             The data layer collected so far.
+	 * @param \WC_Order            $order                  The resolved order.
+	 * @param int                  $order_id               The order id (for the cookie dedupe check).
+	 * @param bool                 $withhold_customer_data Whether to leave the customer identity
+	 *                                                     blocks out (see the caller).
 	 * @return array<string, mixed>
 	 */
-	private function add_purchase_for_order( array $data_layer, \WC_Order $order, int $order_id ): array {
+	private function add_purchase_for_order( array $data_layer, \WC_Order $order, int $order_id, bool $withhold_customer_data = false ): array {
 		if ( $this->product_data->is_order_older_than_max_age( $order ) ) {
 			return $data_layer;
 		}
@@ -784,6 +874,19 @@ final class PageDataLayer {
 		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERDATA ) ) {
 			$order_items             = $this->product_data->process_order_items( $order );
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
+
+			// Dropped after the GTM4WP_WPFILTER_EEC_ORDER_DATA filter rather than
+			// never built: the filter keeps seeing the shape it has always been
+			// handed, and this stays the last write before the data layer - the
+			// sink - so the gate has the final say. The rest of orderData (totals,
+			// items, payment method) stays: the purchase event already carries the
+			// same figures, so withholding those too would be theatre, while
+			// customer holds the names, addresses, email, phone and their hashes.
+			// No is_array() guard: get_raw_order_datalayer() declares an array return,
+			// so a filter handing back a scalar is a TypeError there, not here.
+			if ( $withhold_customer_data ) {
+				unset( $data_layer['orderData']['customer'] );
+			}
 		}
 
 		// The canonical eligibility gauntlet (age / already-tracked / status).
@@ -796,6 +899,14 @@ final class PageDataLayer {
 		$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
 
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
+
+		// The Enhanced Conversions block is the purchase event's own copy of the
+		// customer identity - hashed email and phone, plus the plaintext address
+		// Google expects - so it is withheld with orderData.customer, and for the
+		// same reason. The event itself (transaction id, value, items) is untouched.
+		if ( $withhold_customer_data ) {
+			unset( $purchase_data_layer['user_data'] );
+		}
 
 		// The browser-side duplicate guard records this order in the
 		// gtm4wp_orderid_tracked cookie / localStorage. When the "Do not flag orders

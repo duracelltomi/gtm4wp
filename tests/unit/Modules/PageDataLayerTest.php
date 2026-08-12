@@ -21,6 +21,7 @@ use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
 require_once __DIR__ . '/wc-datastore-stub.php';
+require_once __DIR__ . '/wc-users-stub.php';
 
 /**
  * Covers the page-type branches of PageDataLayer::add_datalayer_data():
@@ -114,6 +115,14 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'get_term' )->justReturn( null );
 		Functions\when( 'get_term_parents_list' )->justReturn( '' );
 
+		// The order-received visitor check (TS-16: stubbed here, in this file's own
+		// setUp, never borrowed from whichever test file happened to run first).
+		// A logged-out visitor is the default; the guest email-verification helper
+		// is asked for nothing by default.
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+		\Automattic\WooCommerce\Internal\Utilities\Users::$verify_order_email = false;
+		\Automattic\WooCommerce\Internal\Utilities\Users::$calls              = array();
+
 		// Page-type predicates default to false; tests turn one on.
 		Functions\when( 'is_product' )->justReturn( false );
 		Functions\when( 'is_cart' )->justReturn( false );
@@ -183,6 +192,11 @@ final class PageDataLayerTest extends TestCase {
 
 	protected function tearDown(): void {
 		\WC_Customer::$fixtures = array();
+
+		// Process-wide state on the WooCommerce stub: restored here so a test that
+		// switches the verification answer on cannot leak it into the next file.
+		\Automattic\WooCommerce\Internal\Utilities\Users::$verify_order_email = false;
+		\Automattic\WooCommerce\Internal\Utilities\Users::$calls              = array();
 
 		unset(
 			$_SERVER['HTTP_X_REQUESTED_WITH'],
@@ -1042,6 +1056,177 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( 'Marks & Spencer', $result['orderData']['customer']['billing']['company'], 'Order data must reach the data layer raw (no entity escaping).' );
 		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'A tracked order must be flagged.' );
 		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js );
+	}
+
+	/**
+	 * Puts the request on the standard order-received page with a MATCHING order
+	 * key - the state a leaked or forwarded confirmation URL is also in - and
+	 * returns the order it resolves to. The billing block carries values that are
+	 * recognisable in the output, so a test can assert the customer identity
+	 * itself is present or absent rather than only that some key exists.
+	 *
+	 * @param array<string, mixed> $data Order fixture overrides (e.g. customer_id).
+	 * @return \WC_Order
+	 */
+	private function stub_order_received_request( array $data = array() ): \WC_Order {
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+
+		$_GET['order'] = '1001';
+		$_GET['key']   = 'correct-key';
+
+		$order = $this->make_recent_order(
+			array_merge(
+				array(
+					'id'                 => 1001,
+					'order_key'          => 'correct-key',
+					'billing_first_name' => 'Ada',
+					'billing_last_name'  => 'Lovelace',
+					'billing_address_1'  => '12 Reeling Street',
+					'billing_city'       => 'London',
+					'billing_postcode'   => 'W1A 1AA',
+					'billing_country'    => 'GB',
+					'billing_email'      => 'buyer@example.com',
+					'billing_phone'      => '+44 20 7946 0000',
+				),
+				$data
+			)
+		);
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc();
+
+		return $order;
+	}
+
+	/**
+	 * The order-received page with everything that can carry customer identity
+	 * switched on: raw order data (orderData.customer) and customer data, which
+	 * is what attaches the Enhanced Conversions user_data block to the purchase.
+	 *
+	 * @return PageDataLayer
+	 */
+	private function make_order_received_datalayer(): PageDataLayer {
+		return $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA   => true,
+			)
+		);
+	}
+
+	public function test_order_received_withholds_customer_data_when_woocommerce_would_require_login(): void {
+		// WooCommerce 8.4.0: an order that belongs to a registered customer is only
+		// rendered to that customer; anyone else - a forwarded URL, a shared
+		// browser - gets a login form. The order key alone cannot tell the two
+		// apart, so the customer identity is withheld while the sale still counts.
+		$order = $this->stub_order_received_request( array( 'customer_id' => 5 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'orderData', $result, 'The order data block itself still ships.' );
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'The customer identity must not be exposed to a visitor WooCommerce would ask to log in.' );
+		$this->assertArrayHasKey( 'totals', $result['orderData'], 'Only the identity is withheld - the order totals are not identity.' );
+
+		$this->assertStringNotContainsString( 'buyer@example.com', wp_json_encode( $result ), 'The billing email must not survive anywhere in the page data layer.' );
+		$this->assertStringNotContainsString( 'Lovelace', wp_json_encode( $result ), 'Neither must the billing name.' );
+
+		// The other half of the split: the conversion is not lost.
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The purchase event still fires on the order key alone.' );
+		$this->assertStringContainsString( '"transaction_id":"1001"', $this->inline_js );
+		$this->assertStringNotContainsString( 'sha256_email_address', $this->inline_js, 'The Enhanced Conversions user_data block is identity too, and goes with it.' );
+		$this->assertStringNotContainsString( 'Reeling Street', $this->inline_js, 'user_data carries the address in plaintext, so its absence is what proves the block is gone.' );
+
+		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The guest email check is downstream of the known-shopper gate in WooCommerce, so a known shopper must never reach it.' );
+	}
+
+	public function test_order_received_keeps_customer_data_for_the_logged_in_customer(): void {
+		Functions\when( 'get_current_user_id' )->justReturn( 5 );
+
+		$this->stub_order_received_request( array( 'customer_id' => 5 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'The customer viewing their own order must still get the full order data.' );
+		$this->assertStringContainsString( 'sha256_email_address', $this->inline_js, 'And the Enhanced Conversions block with it.' );
+		// The paired positive of the withholding assertions above: these strings are
+		// genuinely in the output when nothing is withheld, so their absence there
+		// measures the gate rather than a fixture that never carried them.
+		$this->assertStringContainsString( 'Reeling Street', $this->inline_js, 'user_data.address.street is plaintext.' );
+		$this->assertSame( 'Lovelace', $result['orderData']['customer']['billing']['last_name'] );
+	}
+
+	public function test_order_received_keeps_customer_data_when_the_known_shopper_gate_is_filtered_off(): void {
+		// A site that turns WooCommerce's gate off with its own filter gets the
+		// pre-8.4 behavior back here too: this plugin follows that decision rather
+		// than making a second, stricter one of its own.
+		Filters\expectApplied( 'woocommerce_order_received_verify_known_shoppers' )->andReturn( false );
+
+		$this->stub_order_received_request( array( 'customer_id' => 5 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'With the gate filtered off, WooCommerce renders the order - so the data layer describes it.' );
+	}
+
+	public function test_order_received_withholds_customer_data_for_a_guest_order_needing_email_verification(): void {
+		// WooCommerce 7.9.0: past the (filterable, 10 minute) grace period, a guest
+		// order is only rendered after the visitor confirms the billing email.
+		\Automattic\WooCommerce\Internal\Utilities\Users::$verify_order_email = true;
+
+		$this->stub_order_received_request( array( 'customer_id' => 0 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'A visitor WooCommerce would ask to verify an email address must not be handed that email address.' );
+		$this->assertStringNotContainsString( 'buyer@example.com', wp_json_encode( $result ) );
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The purchase event still fires.' );
+		$this->assertStringNotContainsString( 'sha256_email_address', $this->inline_js );
+
+		$this->assertSame(
+			array( array( 1001, null, 'order-received' ) ),
+			\Automattic\WooCommerce\Internal\Utilities\Users::$calls,
+			'WooCommerce must be asked about THIS order id, in the order-received context, with no supplied email (the POSTed-email escape hatch is deliberately not reproduced).'
+		);
+	}
+
+	public function test_order_received_keeps_customer_data_for_a_guest_inside_the_grace_period(): void {
+		// The buyer arriving straight from checkout: WooCommerce renders the order,
+		// so nothing is withheld. This is the case that decides the feature costs
+		// nothing in practice, which is why it is asserted rather than assumed.
+		\Automattic\WooCommerce\Internal\Utilities\Users::$verify_order_email = false;
+
+		$this->stub_order_received_request( array( 'customer_id' => 0 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'] );
+		$this->assertStringContainsString( 'sha256_email_address', $this->inline_js );
+	}
+
+	public function test_session_resolved_order_keeps_customer_data_for_a_logged_out_visitor(): void {
+		// The custom order-received page resolves the order from THIS browser's
+		// WooCommerce session, not from a URL anyone can forward, so the visitor
+		// check does not apply to it. A registered customer's order plus a
+		// logged-out visitor is the exact shape that is withheld on the standard
+		// page - here it must survive, or every custom thank-you page silently
+		// loses its customer data.
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+
+		$order = $this->make_recent_order(
+			array(
+				'id'            => 1001,
+				'customer_id'   => 5,
+				'billing_email' => 'buyer@example.com',
+			)
+		);
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'A session-resolved order belongs to the browser holding the session.' );
+		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The session path must not consult the request-visitor gates at all.' );
 	}
 
 	public function test_customer_data_added_raw_when_enabled(): void {

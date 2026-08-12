@@ -45,6 +45,17 @@ final class PurchaseTracking {
 	 * This is a fallback function to output the purchase data layer on customized order received pages where
 	 * the is_order_received_page() template tag returns false for some reason.
 	 *
+	 * No visitor check is needed here, unlike on the standard order-received page
+	 * (PageDataLayer::woocommerce_hides_order_from_visitor()). Verified on
+	 * WooCommerce trunk 2026-08-12: WC_Shortcode_Checkout::order_received() renders
+	 * checkout/thankyou.php with a real order ONLY after its known-shopper and
+	 * guest-email gates pass - each declining branch renders
+	 * checkout/order-received.php and returns - and that template fires
+	 * woocommerce_thankyou inside its own `if ( $order )`. Reaching this hook is
+	 * therefore the evidence the page rendered. That holds for the stock template;
+	 * a theme overriding thankyou.php owns its own decision, as it does for every
+	 * other hook it chooses to fire.
+	 *
 	 * @param int $order_id The ID of the order placed by the user just recently.
 	 * @return void
 	 */

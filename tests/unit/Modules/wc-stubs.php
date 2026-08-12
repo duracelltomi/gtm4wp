@@ -81,6 +81,9 @@ if ( ! class_exists( 'WC_Order' ) ) {
 			return array_key_exists( $key, $this->data ) ? $this->data[ $key ] : $fallback;
 		}
 
+		public function get_id() {
+			return $this->value( 'id', 0 );
+		}
 		public function get_total() {
 			return $this->value( 'total', 0 );
 		}
