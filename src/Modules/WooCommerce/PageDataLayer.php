@@ -764,7 +764,11 @@ final class PageDataLayer {
 	 * already showing this visitor the order, so extra withholding only deletes
 	 * tracking data. Publishing more than upstream is the real failure. Where a
 	 * term of upstream's decision cannot be read from here, the mirror therefore
-	 * drops it in the withhold direction, never the publish one.
+	 * drops it in the withhold direction - a guarantee that holds for every
+	 * monotone callback on the filters below (a passthrough, a constant, or one
+	 * that only ANDs its own conditions onto the value it was handed); the one
+	 * shape it cannot cover is a strictly value-inverting callback on the
+	 * final-say filter, named as the fourth accepted residual at that call.
 	 *
 	 * The version surface, measured at the release tags rather than remembered
 	 * (registry rows: .upstream U113):
@@ -792,9 +796,12 @@ final class PageDataLayer {
 	 * site filters the login gate off. Three terms identify the REQUEST rather
 	 * than the order and are deliberately not modelled: the WooCommerce session
 	 * email match, the POSTed-email escape hatch (it needs upstream's own nonce
-	 * and field names), and read_private_shop_orders. Each omission can only
-	 * make the mirror withhold where upstream renders, never publish where
-	 * upstream hides; the purchase event is unaffected either way.
+	 * and field names), and read_private_shop_orders. Each omission makes the
+	 * mirror withhold where upstream renders, never the reverse - for any
+	 * monotone callback on the final-say filter; only a strictly value-inverting
+	 * callback there can compose with these omissions into publishing where
+	 * upstream hides (see that filter's comment). The purchase event is
+	 * unaffected either way.
 	 *
 	 * @param \WC_Order $order The order resolved from the request.
 	 * @return bool True when the order data must not be attributed to this visitor.
@@ -914,9 +921,15 @@ final class PageDataLayer {
 		 * the same WP_Hook reason as above (RI-25). Because the request-identity
 		 * terms are not modelled, the value passed in is true in cases where
 		 * upstream would have computed false - so a passthrough callback changes
-		 * nothing, and only an explicit false publishes. Upstream applies it
-		 * after the grace short-circuit, never inside it, which is why it is not
-		 * consulted for a fresh order above.
+		 * nothing, and only an explicit false publishes. That approximation is
+		 * fail-closed for every monotone callback; the residual is a strictly
+		 * value-inverting callback (false on true, true on false), which would
+		 * publish here in exactly the request-identity states upstream computed
+		 * false for - states that identify the visitor as the buyer or a
+		 * read_private_shop_orders holder. Accepted as the fourth residual,
+		 * alongside the probe, known-shoppers and 7.9.x-grace laxities above.
+		 * Upstream applies it after the grace short-circuit, never inside it,
+		 * which is why it is not consulted for a fresh order above.
 		 *
 		 * @since WooCommerce 7.9.0
 		 *
