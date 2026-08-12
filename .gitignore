@@ -49,6 +49,13 @@ __pycache__/
 .claude/settings.json
 .claude/settings.local.json
 
+# Scratch git worktrees created by /code-review's adjudication stage, which runs
+# any verifier that patches files in isolation. Ignored because that stage also
+# tells the run to confirm `git status --porcelain` is empty before writing its
+# report - so without this line the isolation mechanism trips its own integrity
+# check every time a verifier is live.
+.claude/worktrees/
+
 # wordpress.org support-forum triage (/wporg-forum-review). The framework lives
 # in .claude/ and is committed; the working data — triage ledger, canonical
 # answers, per-run reports and drafted replies — is local only.

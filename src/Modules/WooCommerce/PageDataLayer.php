@@ -770,9 +770,25 @@ final class PageDataLayer {
 	 * WooCommerce session, the read_private_shop_orders capability and two more
 	 * filters, and re-implementing that here would be a second copy free to drift.
 	 * Its home is an Internal namespace with no compatibility promise (UC-2), hence
-	 * the guard - on a WooCommerce older than the helper (the floor is 5.0) nothing
-	 * upstream asks for verification either, so "not available" correctly means
-	 * "not withheld".
+	 * the guard.
+	 *
+	 * What the guard must NOT do is treat "helper unavailable" as "nothing to
+	 * withhold". That reading was written from the gate's @since and is wrong for a
+	 * supported version range: WC_Shortcode_Checkout::order_received() grew
+	 * guest_should_verify_email() in WooCommerce 7.9.0, but the Users helper it
+	 * delegates to did not exist until 8.6.0 (verified absent in 7.9.0, 8.0.0,
+	 * 8.4.0 and 8.5.0). On 7.9.0-8.5.x - inside the declared 5.0 floor - WooCommerce
+	 * hides the order while the helper cannot be asked, so returning false there
+	 * publishes the identity to a visitor WooCommerce refused to render for.
+	 *
+	 * So the fallback re-derives the narrow part of the decision that needs no
+	 * version test at all: a guest order past the grace period. It is deliberately
+	 * more conservative than upstream - it does not model the WooCommerce session or
+	 * read_private_shop_orders - which can only ever withhold MORE, the same trade
+	 * already accepted for the supplied-email escape hatch below. Fail-closed on a
+	 * version number was measured and rejected: this branch runs AFTER the
+	 * known-shopper gate, so "withhold" there withholds from the buyer reading their
+	 * own order too.
 	 *
 	 * The supplied-email escape hatch is deliberately not reproduced: WooCommerce
 	 * lets a guest POST the billing address into the verification form and unlocks
@@ -803,7 +819,28 @@ final class PageDataLayer {
 		$users_class = 'Automattic\WooCommerce\Internal\Utilities\Users';
 
 		if ( ! class_exists( $users_class ) || ! method_exists( $users_class, 'should_user_verify_order_email' ) ) {
-			return false;
+			// A known shopper is already covered: the gate above returned for the
+			// verify-on case, and where the site filtered it off the admin has said
+			// out loud that it does not want that check.
+			if ( $order_customer_id > 0 ) {
+				return false;
+			}
+
+			/**
+			 * Documented and applied by WooCommerce itself; read here so the
+			 * fallback uses the site's own grace period rather than a second
+			 * hardcoded one.
+			 *
+			 * @since WooCommerce 7.9.0
+			 *
+			 * @param int $grace_period Seconds an order stays viewable without verification.
+			 */
+			$grace_period = (int) apply_filters( 'woocommerce_order_email_verification_grace_period', 10 * MINUTE_IN_SECONDS );
+			$created      = $order->get_date_created();
+
+			// No date is the "cannot tell" case, and this is the branch where we
+			// cannot ask upstream either - so it withholds rather than guesses.
+			return ! ( $created && ( time() - $created->getTimestamp() ) < $grace_period );
 		}
 
 		return (bool) $users_class::should_user_verify_order_email( $order->get_id(), null, 'order-received' );

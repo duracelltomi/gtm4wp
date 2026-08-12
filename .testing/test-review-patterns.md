@@ -412,6 +412,22 @@ process-wide and permanently (TS-16), and Node globals that a browser lacks.
   red. All 7 were watched failing on the unfixed source before being trusted; had the
   harness still been absorbing the coupling, they would have stayed green and said so.
 
+**A second instance, and this one makes the environment test the WRONG TREE
+(2026-08-12, `.security` #177).** `/code-review` now runs verifiers that patch files in
+an isolated `git worktree`. A worktree has no `vendor/`, and Composer's generated
+autoloader hardcodes the **absolute** install path — so with `vendor/` symlinked or
+junctioned in from the main checkout, `vendor/bin/phpunit` run inside the worktree loads
+the **main checkout's** `src/` while reporting the worktree's `phpunit.xml`. Two
+verifiers hit this independently in one run; both got a fully green suite that was
+measuring code they had not edited, and one caught it only by printing
+`(new ReflectionClass( … ))->getFileName()`.
+
+This is TS-17's worst variant because it fails **green in the direction of reassurance**:
+the probe appears to prove a proposed fix safe. The rule is the same shape as the one
+above — interrogate the environment, do not describe it: before believing any suite run
+in a worktree, `composer install` (or `composer dump-autoload`) **there**, and assert the
+class under test resolves to a path inside the worktree.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test

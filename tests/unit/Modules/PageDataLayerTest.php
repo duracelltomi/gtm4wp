@@ -198,6 +198,10 @@ final class PageDataLayerTest extends TestCase {
 		\Automattic\WooCommerce\Internal\Utilities\Users::$verify_order_email = false;
 		\Automattic\WooCommerce\Internal\Utilities\Users::$calls              = array();
 
+		// Same reason, for the feature-guard shim: a hidden member left in place
+		// would make the next file's guards resolve differently.
+		$GLOBALS['gtm4wp_test_hidden_members'] = array();
+
 		unset(
 			$_SERVER['HTTP_X_REQUESTED_WITH'],
 			$_GET['order'],
@@ -1222,6 +1226,111 @@ final class PageDataLayerTest extends TestCase {
 			\Automattic\WooCommerce\Internal\Utilities\Users::$calls,
 			'WooCommerce must be asked about THIS order id, in the order-received context, with no supplied email (the POSTed-email escape hatch is deliberately not reproduced).'
 		);
+	}
+
+	/**
+	 * The upstream helper is unavailable - it moved, was renamed, or (measured, and
+	 * the reason this exists) the site runs a WooCommerce between 7.9.0 and 8.5.x,
+	 * where order_received() already hides guest orders but the Users helper does
+	 * not exist yet. The fallback must not read that as "nothing to withhold".
+	 */
+	public function test_order_received_withholds_customer_data_for_a_stale_guest_order_when_the_upstream_helper_is_missing(): void {
+		$this->hide_order_email_verification_helper();
+
+		// Older than the 10-minute grace period, younger than the 30-minute
+		// tracking max age - so the order still reaches the data layer at all,
+		// which is what makes this an exposure rather than a no-op.
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 0,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'orderData', $result, 'The order itself still reaches the data layer - otherwise this test would pass for the wrong reason.' );
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'With no helper to ask, a stale guest order must fail CLOSED: WooCommerce would be hiding it.' );
+		$this->assertStringNotContainsString( 'buyer@example.com', wp_json_encode( $result ) );
+		$this->assertStringNotContainsString( 'sha256_email_address', $this->inline_js, 'The Enhanced Conversions block goes with it.' );
+		$this->assertArrayNotHasKey( 'new_customer', $result, 'And the order-history signal.' );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The conversion is still counted - only the identity is withheld.' );
+		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The helper is hidden, so it must not have been called - proving the fallback ran and not the delegation.' );
+	}
+
+	/**
+	 * The other half, and the one that keeps the fallback honest: with the helper
+	 * missing, a buyer arriving straight from checkout must keep everything. A
+	 * blanket fail-closed passes the test above and fails this one.
+	 */
+	public function test_order_received_keeps_customer_data_for_a_fresh_guest_order_when_the_upstream_helper_is_missing(): void {
+		$this->hide_order_email_verification_helper();
+
+		$this->stub_order_received_request( array( 'customer_id' => 0 ) );
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'Inside the grace period WooCommerce renders the order, so the buyer keeps their conversion data.' );
+		$this->assertStringContainsString( 'sha256_email_address', $this->inline_js );
+		$this->assertArrayHasKey( 'new_customer', $result );
+	}
+
+	/**
+	 * A known shopper reaching the fallback means the site filtered the
+	 * known-shopper gate off. The fallback models the GUEST decision only, so it
+	 * must not invent a stricter answer than the admin asked for.
+	 */
+	public function test_order_received_keeps_customer_data_for_a_known_shopper_when_the_upstream_helper_is_missing(): void {
+		$this->hide_order_email_verification_helper();
+		Filters\expectApplied( 'woocommerce_order_received_verify_known_shoppers' )->andReturn( false );
+
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 5,
+				'date_created' => '@' . ( time() - ( 20 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 'buyer@example.com', $result['orderData']['customer']['billing']['email'], 'The guest-only fallback must not withhold from a known shopper whose gate the site turned off.' );
+	}
+
+	/**
+	 * The fallback reads the site's own grace period rather than carrying a second
+	 * hardcoded copy of WooCommerce's ten minutes.
+	 */
+	public function test_order_received_fallback_honors_a_filtered_grace_period(): void {
+		$this->hide_order_email_verification_helper();
+
+		// Deliberately the NARROWING direction. Widening it would leave the data in
+		// place, which is also what the pre-fix code did - so that version of this
+		// test would pass without the fix and prove nothing.
+		Filters\expectApplied( 'woocommerce_order_email_verification_grace_period' )->andReturn( 2 * MINUTE_IN_SECONDS );
+
+		// Five minutes old: inside WooCommerce's default ten, past this site's two.
+		$this->stub_order_received_request(
+			array(
+				'customer_id'  => 0,
+				'date_created' => '@' . ( time() - ( 5 * MINUTE_IN_SECONDS ) ),
+			)
+		);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'A site that narrowed the grace period has said this visitor is no longer presumed to be the buyer, and the fallback follows the site rather than a second hardcoded ten minutes.' );
+	}
+
+	/**
+	 * Hides WooCommerce's Internal email-verification helper from the production
+	 * feature guard, so the "upstream helper unavailable" branch is reachable.
+	 * Cleared in tearDown() - this is process-wide state.
+	 *
+	 * @return void
+	 */
+	private function hide_order_email_verification_helper(): void {
+		$GLOBALS['gtm4wp_test_hidden_members'][] = 'Automattic\WooCommerce\Internal\Utilities\Users::should_user_verify_order_email';
 	}
 
 	public function test_order_received_keeps_customer_data_for_a_guest_inside_the_grace_period(): void {

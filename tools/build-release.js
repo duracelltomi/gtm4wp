@@ -32,7 +32,6 @@ const DIST_FILES = [
 	{ source: 'compat', required: true },
 	{ source: 'src', required: true },
 	{ source: 'build', required: true },
-	{ source: 'languages', required: false },
 ];
 
 /**

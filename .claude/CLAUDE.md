@@ -169,9 +169,10 @@ git `commit-msg` hook that will **block** you if production code changed without
 The non-obvious part: while a version is unreleased, a fix to a feature added in
 that *same* version **edits that feature's existing bullet** rather than adding a
 new `* Fixed:` — a `Fixed:` bullet is only for a defect that shipped in a released
-version. The full policy (theme grouping, `readme.txt` mirror, corollaries,
-one-time `git config core.hooksPath .githooks` setup) lives in the **`changelog`
-skill** — invoke it when editing `CHANGELOG.md`/`readme.txt` or when the hook blocks you.
+version. The full policy (theme grouping, `readme.txt` mirror, corollaries, and the
+one-time git-hook setup — which has a security caveat, so take it from there rather
+than from memory) lives in the **`changelog` skill** — invoke it when editing
+`CHANGELOG.md`/`readme.txt` or when the hook blocks you.
 
 ## Testing
 

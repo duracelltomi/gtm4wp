@@ -155,5 +155,16 @@
 	alignment silently drifted that way. Everything the WordPress standard raises here is
 	either auto-fixable by phpcbf or worth a deliberate exclude-pattern above, so there is
 	no standing warning backlog for this to trip over.
+
+	Set explicitly rather than left to PHP_CodeSniffer's default. 2026-08-04 fixed this by
+	DELETING an `ignore_warnings_on_exit value="1"` line, which restored the default and
+	made the behavior correct but unpinned - and the only record of the intent was the
+	paragraph above, which enforces nothing. The `config-set` subcommand writes
+	`ignore_warnings_on_exit` into vendor/squizlabs/php_codesniffer/CodeSniffer.conf, which
+	is git-ignored, so setting it there would silently turn local runs green again and
+	appear in no diff. Measured: with that value set, a ruleset without this line exits 0 on
+	a warnings-only file and a ruleset with it exits 1. A ruleset config element is applied
+	after the config file is read, so this one wins.
 	-->
+	<config name="ignore_warnings_on_exit" value="0"/>
 </ruleset>

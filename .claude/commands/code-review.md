@@ -86,6 +86,15 @@ So, after drafting the findings and before writing the report:
      window would have captured another agent's instrumentation. None of that is
      detectable from the verdicts — a cross-contaminated trace reads exactly like a clean
      one. Read-only verifiers may share the tree.
+   - ⛔ **A worktree verifier that runs the suite must `composer install` (or at minimum
+     `composer dump-autoload`) INSIDE the worktree first, and confirm the class under test
+     resolves there** (`(new ReflectionClass( … ))->getFileName()`). A worktree has no
+     `vendor/`, and Composer's generated autoloader hardcodes the *absolute* install path —
+     so a symlinked or junctioned `vendor/` makes `vendor/bin/phpunit` silently exercise the
+     **main checkout's** `src/` while reporting the worktree's `phpunit.xml`. Measured on
+     **#177**: two verifiers hit this independently in one run and both got a fully green
+     suite that was testing the wrong tree. This is the isolation stage's worst failure mode
+     because it produces **false green** — the probe appears to prove the fix safe.
    - **Before writing the report, re-verify the tree yourself**: `git status --porcelain`
      empty, `HEAD` unchanged, generated files byte-identical, suite and `phpcs` green.
      Record it in the report. A verifier claiming it cleaned up is a claim like any other.
