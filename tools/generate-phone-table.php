@@ -68,6 +68,18 @@
  *     composer generate:phone-table
  *     php tools/generate-phone-table.php [path-or-url-to-PhoneNumberMetadata.xml]
  *
+ * The composer script takes no argument, so it always fetches over the network and
+ * there is no offline path through it. To work from a local copy - on a plane, or
+ * to re-run a generation against the exact bytes a previous one used - pass the
+ * path directly:
+ *
+ *     php tools/generate-phone-table.php /path/to/PhoneNumberMetadata.xml
+ *
+ * Note what that argument is, though: it chooses the source this script turns into
+ * shipped PHP, so a file somebody sent you is a supply-chain decision, not a
+ * convenience (PA-18). The validation below is written on that basis - it checks
+ * the SHAPE of what it read rather than trusting where it came from.
+ *
  * Then run the test suite: tests/unit/Modules/phone-corpus.php is regenerated
  * alongside the table from the same parse, so the two cannot disagree.
  *

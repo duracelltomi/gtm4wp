@@ -1128,6 +1128,25 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'The customer identity must not be exposed to a visitor WooCommerce would ask to log in.' );
 		$this->assertArrayHasKey( 'totals', $result['orderData'], 'Only the identity is withheld - the order totals are not identity.' );
 
+		// #171: pin what the gate KEEPS, not only what it removes. Tightening the
+		// withheld branch (dropping 'attributes', or the whole of orderData) left the
+		// entire suite green before this assertion existed, so the conversion-preserving
+		// half of the design - the half the change argues hardest for - was unenforced.
+		//
+		// The exact key set, not a subset: three of these are values this visitor
+		// demonstrably already holds (order_key came from their own URL, order_number is
+		// printed beside this block by the duplicate guard, coupons is in the purchase
+		// event), and orderData.attributes.order_number is named in readme.txt as a
+		// variable containers read - so a future "tighten this too" would break a
+		// documented consumer silently.
+		$this->assertArrayHasKey( 'attributes', $result['orderData'], 'The order description survives the gate; without this guard the key-set assertion below fails as a TypeError instead of saying what broke.' );
+		$this->assertSame(
+			array( 'date', 'order_number', 'order_key', 'payment_method', 'payment_method_title', 'shipping_method', 'status', 'coupons' ),
+			array_keys( $result['orderData']['attributes'] ),
+			'The withheld branch keeps the full order description; only the buyer identity goes.'
+		);
+		$this->assertArrayHasKey( 'items', $result['orderData'], 'The item list is order data, and the purchase event carries it anyway.' );
+
 		$this->assertStringNotContainsString( 'buyer@example.com', wp_json_encode( $result ), 'The billing email must not survive anywhere in the page data layer.' );
 		$this->assertStringNotContainsString( 'Lovelace', wp_json_encode( $result ), 'Neither must the billing name.' );
 

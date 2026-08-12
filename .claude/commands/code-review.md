@@ -76,6 +76,19 @@ So, after drafting the findings and before writing the report:
    - Cheap pass on **every** finding: a Low finding's mechanism has been wrong before.
    - Anything Medium+ or implying a code change gets the full adversarial treatment,
      including the verifier implementing the recommendation in a throwaway probe.
+   - ⛔ **Any verifier you ask to PATCH gets `isolation: "worktree"`.** This stage runs
+     verifiers concurrently *and* tells them to edit files, so by default several agents
+     mutate one working tree at once. Measured on the run that introduced this stage
+     (**#170**): one verifier read another's in-flight edit and was about to report it as a
+     finding, catching it only by re-running against `HEAD`; a probe patch tripped the
+     `Stop` hook, which cannot tell a scratch edit from a production change; and one
+     verifier made a throwaway **commit on `master`**, so a concurrent commit in that
+     window would have captured another agent's instrumentation. None of that is
+     detectable from the verdicts — a cross-contaminated trace reads exactly like a clean
+     one. Read-only verifiers may share the tree.
+   - **Before writing the report, re-verify the tree yourself**: `git status --porcelain`
+     empty, `HEAD` unchanged, generated files byte-identical, suite and `phpcs` green.
+     Record it in the report. A verifier claiming it cleaned up is a claim like any other.
 3. **The verifier may only confirm with an execution trace** — a command and its output, not
    an argument. That rule is the whole mechanism: an independent agent shares your model and
    can be wrong in the same direction, so what buys the independence is not the second mind,
