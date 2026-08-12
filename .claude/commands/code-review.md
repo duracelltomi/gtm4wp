@@ -55,6 +55,50 @@ This plugin injects a Google Tag Manager container and builds a JavaScript `data
    - Re-verify the **⭐ highest-recurrence patterns** still hold across their known call sites.
    - Treat "no new code" as **the deepest review mode, not the shortest.** Only after a genuine cross-codebase pass turns up nothing may you report a clean result — and say so explicitly.
 
+### Adjudication — run this BEFORE writing the report
+
+Findings in this project have been reliable. **What has not is everything around them**, and
+it failed for a structural reason: the only verification rule was "verify exploitability
+before rating a finding Critical/High", which gates on *severity* and applies to *findings*.
+A fix session does not consume findings — it consumes **recommendations**. Those were
+unverified at every severity, and so were `wontfix` rationales. Review 20 measured it: of the
+items that changed shape after being written, **one was a finding and the rest were
+recommendations, a disposition and a design note.**
+
+So, after drafting the findings and before writing the report:
+
+1. **Split each draft finding into its separable claims** — mechanism, reach,
+   **recommendation**, **disposition**. They fail independently. Most of the value here is in
+   the last two.
+2. **Dispatch one `finding-verifier` subagent per finding**, in parallel. Give it the finding
+   and the repository. Do **not** give it your reasoning or your `Conf.` score — an anchored
+   verifier is a second opinion that agrees with you for your own reasons.
+   - Cheap pass on **every** finding: a Low finding's mechanism has been wrong before.
+   - Anything Medium+ or implying a code change gets the full adversarial treatment,
+     including the verifier implementing the recommendation in a throwaway probe.
+3. **The verifier may only confirm with an execution trace** — a command and its output, not
+   an argument. That rule is the whole mechanism: an independent agent shares your model and
+   can be wrong in the same direction, so what buys the independence is not the second mind,
+   it is **independence of evidence**. Strip the trace requirement and this stage becomes
+   theatre.
+4. **Fold the verdicts into the findings before writing them:**
+   - `REFUTED` mechanism → the finding is dropped, or rewritten to the verifier's corrected
+     statement. Record the drop in the report's verification highlights; a finding that was
+     drafted and killed is a result worth keeping.
+   - `REFUTED` recommendation, confirmed mechanism → **keep the finding, delete the
+     recommendation.** Write "needs design — see report" rather than shipping guidance that
+     breaks something. This is the normal outcome and it is not a failure.
+   - `REFUTED` disposition → a `wontfix` does not stand. Re-rate it with the measured cost.
+   - `PLAUSIBLE` / `UNVERIFIED` → keep it, say so in the Verdict column, and record what
+     would settle it. This is honest and is not a lesser tier.
+   - `rests_on` / `contradicts` → surface it in the finding. A finding resting on a recorded
+     decision whose premise did not survive re-derivation is the highest-value thing this
+     stage produces.
+5. **Carry the verdict into the report** — every findings table gets a `Verdict` column, and
+   the Statistics block records how many drafts were refuted or revised. That number is the
+   evidence that this stage is doing work; if it is persistently zero, the stage is theatre
+   and should be changed rather than defended.
+
 ### Post-review steps
 
 1. **Update the checklist** — after the review:
@@ -72,6 +116,27 @@ This plugin injects a Google Tag Manager container and builds a JavaScript `data
    - **Fix the family, not the sibling — enumerate the call sites at the moment you write the pattern.** A pattern born from one fixed site is only as wide as the search that produced it. Grep for the *sink shape* (and through every helper that forwards to it, not just the module the finding was in), list every site the class touches, and record the count and the paths in the entry as a **ledger to re-derive, not a fact to read**. PA-7 recorded "two injectors" while four existed, because two reached `preg_replace` via a helper one file away (#74). This is the standing lesson of #66/#67/#71/#72 turned into a step: the sibling left behind is this codebase's most common finding shape.
    - **Deduplicate** — do not add patterns already covered; update the existing entry instead.
    - **Update the changelog** — append a row to the Changelog table with the date and a brief description.
+
+### Fix-design gate — run this BEFORE implementing any fix
+
+The report is not the only place a claim gets made. **A fix design is a claim too, and it is
+the one that reaches production.** Before writing code for a finding:
+
+- **Measure the fix before proposing it**, or say in the same breath that you have not.
+  Review 20 produced three proposals in sequence — two of them wrong — and each was corrected
+  only because the maintainer pushed back. That is the maintainer doing the verifier's job.
+- **Re-derive any recorded decision the fix leans on.** The decision that blocked the correct
+  fix for a whole review cycle was a registry trigger naming the wrong requirement and a cost
+  that was wrong by two orders of magnitude. Both had been written once, from one example,
+  and never re-measured.
+- **Enumerate what the fix does not reach** — the sibling call sites, the other half of the
+  table, the prose that names a symbol you moved. This project's most common finding shape is
+  the fix that was correct where it touched.
+- **Probe-verify the new regression tests red against the pre-fix code.** A test that is
+  green on its first run has proved nothing. Where a new assertion is green both before and
+  after by design (a must-not-break guard), say so explicitly rather than counting it.
+- Dispatch a `finding-verifier` at the fix design when the change is non-trivial, giving it
+  the design rather than a finding — claims 3 and 4 are exactly the right questions for it.
 
 ### Post-fix steps
 
@@ -220,17 +285,17 @@ separate below-the-bar section. The maintainer triages — a small item they dis
 a second beats one they never see.
 
 ### Critical (fix immediately)
-| # | Category | Actor | Conf. | File | Line(s) | Finding | Recommendation |
-|---|----------|-------|-------|------|---------|---------|----------------|
+| # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
+|---|----------|-------|-------|---------|------|---------|---------|----------------|
 
 ### High (fix soon)
-| # | Category | Actor | Conf. | File | Line(s) | Finding | Recommendation |
+| # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
 
 ### Medium (plan to fix)
-| # | Category | Actor | Conf. | File | Line(s) | Finding | Recommendation |
+| # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
 
 ### Low (nice to have)
-| # | Category | Actor | Conf. | File | Line(s) | Finding | Recommendation |
+| # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
 
 {Actor/Conf. are `—` for non-security findings: complexity, dead code, and
 improvement findings are rated on their own merits and are NOT subject to the
@@ -243,6 +308,8 @@ Low-confidence / unverified items are **(open)**-marked rows in the tables above
 - Total findings: X (Critical: X, High: X, Medium: X, Low: X)
 - Security: X | Complexity: X | Improvement: X
 - Patterns confirmed clean: {RI/PA ids}
+- **Adjudication: X drafts verified · X mechanisms refuted · X recommendations refuted · X dispositions refuted · X left PLAUSIBLE/UNVERIFIED**
+- **Claims that changed shape after this report was written: X** — filled in at the end of the fix session, counting rule: any mechanism, recommendation, disposition or design note in this report that a later measurement corrected. This is the metric the adjudication stage exists to move; Review 20 scored **4** with no adjudication stage. If it does not fall, the stage is not working and should be changed rather than defended.
 ```
 
 ---
@@ -257,5 +324,7 @@ Low-confidence / unverified items are **(open)**-marked rows in the tables above
 - Prioritize real, reachable risks over theoretical ones. State the concrete input → sink path for every security finding.
 - **Rate by actor, not by sink power** — severity comes from the *lowest actor who can reach the sink* (`.security/threat-model.md`), not from what the sink could theoretically do. An admin-only path an admin can already achieve via GTM is not a vulnerability; say why rather than dropping it silently. Note the multisite `unfiltered_html` caveat before leaning on that argument.
 - **Never silently drop a finding for being small or low-confidence, and never exile one to a separate lesser tier.** Everything the review noticed is a Findings-table row at its appropriate severity (usually Low). Confidence is expressed in the `Conf.` column, not by hiding the item: a below-~0.7 or unverifiable finding is an **(open)**-marked row with its real (low) confidence and a note on what would resolve it. Complexity, dead-code, and improvement findings are not confidence-gated at all — a Low one is a valid result. The maintainer triages; a minor item they dismiss in a second beats one they never see. Report everything the review noticed.
-- Verify exploitability where feasible (a tiny PHP repro, or a failing PHPUnit test) before rating a finding Critical/High. Use a **throwaway** probe (scratchpad dir), not a committed test — adding regression tests is the post-fix step.
+- Verify exploitability where feasible (a tiny PHP repro, or a failing PHPUnit test) before rating a finding Critical/High. Use a **throwaway** probe (scratchpad dir), not a committed test — adding regression tests is the post-fix step. **This rule is necessary and was never sufficient**: it gates on severity and covers only the mechanism, so a Low finding's mechanism and *every* recommendation and disposition sat outside it. That gap is what the **Adjudication** stage above closes — do not read this bullet as the whole of the verification duty.
+- **Never ship an unverified recommendation.** A finding says what is wrong; a recommendation says what somebody should do, and it is the half that reaches production. If the adjudication stage refuted it, or you could not check it, write "needs design" and say what would settle it. A wrong recommendation in a committed ledger is worse than the finding it accompanies, because the next reader inherits it with a review's authority.
+- **A `wontfix` is a cost estimate, so measure it.** Any disposition resting on "that would be too expensive / would need X" states the measured number and how it was measured, or it is not a disposition, it is a guess with a status field.
 - After saving the report, present a summary to the user and ask which findings they want to address.

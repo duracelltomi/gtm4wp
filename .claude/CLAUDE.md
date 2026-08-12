@@ -20,7 +20,14 @@ prove it** (`.testing/`) · **is what we believe about the outside world still t
 - **Security** (`.security/`): `/code-review` runs the review and updates
   `code-review-checklist.md` + `code-review-patterns.md` (*what* to look for) and
   `threat-model.md` (*how bad* — the A0–A4 actor ladder, severity = lowest actor who
-  can reach the sink, scope). Encoded in the `code-reviewer` subagent.
+  can reach the sink, scope). Encoded in the `code-reviewer` subagent. Since
+  2026-08-12 the run has an **adjudication stage**: every drafted finding is split
+  into mechanism / reach / **recommendation** / **disposition** and handed to an
+  independent `finding-verifier` subagent, which may only confirm a claim by
+  producing an execution trace. It exists because findings held up while
+  *recommendations* and `wontfix` rationales did not, and those were unverified by
+  construction — the old rule gated verification on severity. A fix design gets the
+  same treatment before it is implemented.
 - **Testing** (`.testing/`): `/test-review` audits the *suite* (coverage + assertion
   quality, not the code) and updates `test-review-checklist.md` +
   `test-review-patterns.md`. Encoded in the `test-reviewer` subagent. A
