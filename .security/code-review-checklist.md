@@ -410,7 +410,7 @@ Review of the JSON_NUMERIC_CHECK removal, the transaction-ID-prefix option, the 
 
 ### Report 9: `.security/code-review-report-2026-07-22-1433.md`
 
-**Reviewed at:** `1ad1187` · **Base:** `a2b18c7` (range `a2b18c7..1ad1187`, 2 commits, **no production code**) · **Fixes:** all 11 applied in the working tree — **the base for the next review is this fix commit.**
+**Reviewed at:** `1ad1187` · **Base:** `a2b18c7` (range `a2b18c7..1ad1187`, 2 commits, **no production code**) · **Fixes landed:** `599fd7d` — **the base for the next review is `599fd7d`**.
 
 The first **empty-diff escalation** run (pre-review step 9): with nothing new to diff, this became the deep pass — all 7 whole-repo sweeps re-run, the oldest-reviewed `[x]` groups (2026-07-10) and every script-sink / order-data / request-header component re-audited against the current patterns catalog, and the ⭐ patterns re-verified at their call sites. **No Critical/High**, and **no regression** on any prior fix (#34 read-only GET, #35/PA-12 nonce, RI-2 flags, RI-3 no-decode, PA-1/PA-10 gates all hold). 11 findings, all pre-existing; per the disclosure rule these are one-line summaries only — none is reachable by an actor below A4 except #55, which is an exposure/product decision with no payload.
 
