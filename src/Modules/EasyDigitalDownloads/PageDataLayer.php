@@ -417,7 +417,7 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		$data_layer['new_customer'] = $this->download_data->is_new_customer( $order );
+		$data_layer = array_merge( $data_layer, $this->download_data->customer_signals( $order ) );
 
 		$purchase_data_layer = $this->download_data->get_purchase_datalayer( $order, $order_items );
 

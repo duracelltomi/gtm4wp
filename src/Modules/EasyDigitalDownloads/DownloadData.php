@@ -564,7 +564,17 @@ final class DownloadData {
 
 		$email = (string) self::row_prop( $order, 'email' );
 		if ( '' !== $email ) {
-			$user_data['sha256_email_address'] = Helpers::normalize_and_hash_email_address( 'sha256', $email );
+			// Omitted rather than sent empty: the helper returns '' when folding
+			// leaves no address to hash - a gmail.com address whose local part is
+			// nothing but a "+" tag - and a present-but-empty identifier is the
+			// consumer's call to interpret, not ours (RI-13). The guard belongs
+			// here rather than in the helper: '' is the honest answer to "hash
+			// this", and only the caller knows the key is optional. Mirrors the
+			// WooCommerce module's user_data block.
+			$email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $email );
+			if ( '' !== $email_hash ) {
+				$user_data['sha256_email_address'] = $email_hash;
+			}
 		}
 
 		$address_row = $order->get_address();
@@ -737,5 +747,30 @@ final class DownloadData {
 		}
 
 		return (int) self::row_prop( $customer, 'purchase_count', 0 ) <= 1;
+	}
+
+	/**
+	 * Both new/returning customer signals for the purchase event.
+	 *
+	 * Google names the same idea differently on two surfaces: Google Ads
+	 * customer acquisition reads the boolean `new_customer`, while the GA4
+	 * e-commerce reference documents a `customer_type` string of `new` or
+	 * `returning`. Both are sent - they are not alternatives, and dropping
+	 * either breaks one integration while the other keeps working. Mirrors
+	 * the WooCommerce module's ProductData::customer_signals().
+	 *
+	 * @see https://support.google.com/google-ads/answer/12077475 Google Ads: the new_customer parameter.
+	 * @see https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtm GA4: the customer_type parameter on purchase.
+	 *
+	 * @param \EDD\Orders\Order $order The order being tracked.
+	 * @return array<string, bool|string>
+	 */
+	public function customer_signals( \EDD\Orders\Order $order ): array {
+		$is_new_customer = $this->is_new_customer( $order );
+
+		return array(
+			'new_customer'  => $is_new_customer,
+			'customer_type' => $is_new_customer ? 'new' : 'returning',
+		);
 	}
 }

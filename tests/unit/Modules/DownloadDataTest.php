@@ -335,6 +335,51 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( 'HU', $data_layer['user_data']['address']['country'] );
 	}
 
+	public function test_purchase_datalayer_omits_an_email_hash_that_folds_away_to_nothing(): void {
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer(
+			$this->make_order(
+				array(
+					'email'   => '+shopping@gmail.com',
+					'address' => array(
+						'first_name' => 'John',
+						'country'    => 'US',
+					),
+				)
+			)
+		);
+
+		$user_data = $data_layer['user_data'] ?? null;
+
+		$this->assertIsArray( $user_data );
+		// Both directions (TS-2): the key is gone, not merely falsy, and the rest
+		// of the block still ships - an unusable email must not cost the order its
+		// other identifiers.
+		$this->assertArrayNotHasKey( 'sha256_email_address', $user_data );
+		$this->assertNotSame( '', $user_data['sha256_email_address'] ?? 'absent' );
+		$this->assertSame( hash( 'sha256', 'john' ), $user_data['address']['sha256_first_name'] );
+	}
+
+	/**
+	 * The same address at any other domain is a real, separate mailbox and must
+	 * still be hashed - the guard above must not turn into "drop tagged emails".
+	 *
+	 * @return void
+	 */
+	public function test_purchase_datalayer_keeps_a_tagged_email_outside_gmail(): void {
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer(
+			$this->make_order( array( 'email' => '+shopping@example.com' ) )
+		);
+
+		$this->assertSame(
+			hash( 'sha256', '+shopping@example.com' ),
+			$data_layer['user_data']['sha256_email_address']
+		);
+	}
+
 	public function test_raw_order_datalayer_never_exposes_the_payment_key(): void {
 		$download_data = $this->make_download_data();
 		$order         = $this->make_order();
@@ -448,6 +493,30 @@ final class DownloadDataTest extends TestCase {
 
 		Functions\when( 'edd_get_customer' )->justReturn( new \EDD_Customer( array( 'purchase_count' => 3 ) ) );
 		$this->assertFalse( $download_data->is_new_customer( $this->make_order() ) );
+	}
+
+	public function test_customer_signals_carry_both_key_names(): void {
+		$download_data = $this->make_download_data();
+
+		// Google Ads reads the boolean new_customer, GA4 the customer_type
+		// string; both vocabularies must ship on every purchase (WooCommerce
+		// module parity).
+		$this->assertSame(
+			array(
+				'new_customer'  => true,
+				'customer_type' => 'new',
+			),
+			$download_data->customer_signals( $this->make_order( array( 'customer_id' => 0 ) ) )
+		);
+
+		Functions\when( 'edd_get_customer' )->justReturn( new \EDD_Customer( array( 'purchase_count' => 3 ) ) );
+		$this->assertSame(
+			array(
+				'new_customer'  => false,
+				'customer_type' => 'returning',
+			),
+			$download_data->customer_signals( $this->make_order() )
+		);
 	}
 
 	public function test_row_prop_reads_magic_getters_without_isset(): void {
