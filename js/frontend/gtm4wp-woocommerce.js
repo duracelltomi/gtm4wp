@@ -355,8 +355,13 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 			value: sum_value.toFixed( 2 ),
 		} );
 	} else {
+		// The hidden span with the data attribute is the current markup: an input
+		// inside the form would flip WooCommerce's blockified add-to-cart form
+		// into its legacy full-page POST mode (#462). The [name=gtm4wp_product_data]
+		// input is still read as a fallback so a cached page rendered by an older
+		// plugin version keeps tracking.
 		const product_data_el = form.querySelector(
-			'[name=gtm4wp_product_data]'
+			'.gtm4wp_single_productdata,[name=gtm4wp_product_data]'
 		);
 		if ( ! product_data_el ) {
 			return false;
@@ -364,9 +369,12 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 
 		// Keep internal_id from being excluded so #405 can look up the stored list
 		// by product id; it is deleted again before the push below.
-		const productdata = gtm4wp_read_from_json( product_data_el.value, [
-			'productlink',
-		] );
+		const productdata = gtm4wp_read_from_json(
+			( product_data_el.dataset &&
+				product_data_el.dataset.gtm4wp_product_data ) ||
+				product_data_el.value,
+			[ 'productlink' ]
+		);
 		// #69: the previous guard read `isNaN( quantity )` AFTER a lookup that
 		// short-circuits to null, and isNaN( null ) is false - so a product form
 		// with no quantity field emitted quantity: null and value: 0.
@@ -925,8 +933,9 @@ function gtm4wp_woocommerce_process_pages() {
 				return true;
 			}
 
+			// Same span-first, input-fallback pair as the simple product path (#462).
 			const product_data_el = product_form.querySelector(
-				'[name=gtm4wp_product_data]'
+				'.gtm4wp_single_productdata,[name=gtm4wp_product_data]'
 			);
 			if ( ! product_data_el ) {
 				return true;
@@ -935,7 +944,9 @@ function gtm4wp_woocommerce_process_pages() {
 			let current_product_detail_data;
 			try {
 				current_product_detail_data = JSON.parse(
-					product_data_el.value
+					( product_data_el.dataset &&
+						product_data_el.dataset.gtm4wp_product_data ) ||
+						product_data_el.value
 				);
 			} catch ( e ) {
 				console && console.error && console.error( e.message );

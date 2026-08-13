@@ -410,6 +410,145 @@ describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
 	} );
 } );
 
+describe( 'gtm4wp-woocommerce PDP span markup (#462)', () => {
+	// The PDP product data ships in a hidden span, never in a form element:
+	// WooCommerce's blockified Add to Cart + Options block scans the add-to-cart
+	// hook output and renders a legacy full-page POST form when it finds an
+	// input, which disabled the interactive add to cart on block themes. These
+	// cases boot the tracker against the span-only markup; the input-based
+	// fixtures elsewhere in this file stay valid on purpose, because the tracker
+	// still reads [name=gtm4wp_product_data] as a cached-page fallback.
+	let handlers;
+
+	beforeEach( () => {
+		document.body.className = '';
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		global.gtm4wp_remarketing_prod_id_prefix = '';
+		global.gtm4wp_make_sure_is_float = ( v ) => parseFloat( v ) || 0;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_from_json = ( json ) => {
+			const parsed = JSON.parse( json );
+			delete parsed.productlink;
+			delete parsed.internal_id;
+			return parsed;
+		};
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		handlers = {};
+		const jq = {
+			on: ( ...args ) => {
+				const evt = args[ 0 ];
+				const fn = args[ args.length - 1 ];
+				if ( typeof fn === 'function' ) {
+					handlers[ evt ] = fn;
+				}
+				return jq;
+			},
+			trigger: () => jq,
+			ajaxSuccess: () => jq,
+		};
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	} );
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	const boot = () => {
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+		global.gtm4wp_push_ecommerce.mockClear();
+	};
+
+	it( 'fires add_to_cart from the span with no plugin input in the form', () => {
+		document.body.innerHTML =
+			'<form class="cart" method="post" action="https://shop/p42">' +
+			'<span class="gtm4wp_single_productdata" style="display:none"></span>' +
+			'<input type="number" name="quantity" value="3" />' +
+			'<button type="button" class="single_add_to_cart_button">Add</button>' +
+			'</form>';
+		document
+			.querySelector( '.gtm4wp_single_productdata' )
+			.setAttribute(
+				'data-gtm4wp_product_data',
+				JSON.stringify( PRODUCT_DATA )
+			);
+
+		boot();
+		document
+			.querySelector( '.single_add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 42 } )
+		);
+		expect( call[ 1 ][ 0 ].quantity ).toBe( 3 );
+	} );
+
+	it( 'reads the span in the found_variation handler', () => {
+		document.body.innerHTML =
+			'<form class="cart variations_form">' +
+			'<span class="gtm4wp_single_productdata" style="display:none"></span>' +
+			'</form>';
+		document.querySelector( '.gtm4wp_single_productdata' ).setAttribute(
+			'data-gtm4wp_product_data',
+			JSON.stringify( {
+				item_id: 10,
+				id: 10,
+				item_name: 'Parent',
+				price: 5,
+				internal_id: 10,
+			} )
+		);
+
+		boot();
+		handlers.found_variation(
+			{ target: document.querySelector( 'form' ) },
+			{
+				variation_id: 456,
+				sku: 'VAR-SKU',
+				display_price: 9.99,
+				attributes: { attribute_pa_color: 'blue' },
+			}
+		);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'view_item'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ].item_id ).toBe( 456 );
+		expect( call[ 1 ][ 0 ].item_group_id ).toBe( 10 );
+	} );
+} );
+
 describe( 'gtm4wp-woocommerce exposed add_to_cart trackers (#273)', () => {
 	const PRODUCT = { item_id: 77, item_name: 'API Product', price: 12 };
 

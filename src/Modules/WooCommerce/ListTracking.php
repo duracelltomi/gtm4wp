@@ -73,7 +73,16 @@ final class ListTracking {
 
 	/**
 	 * Executed with the woocommerce_after_add_to_cart_button hook.
-	 * Outputs a hidden input element with the product data of the currently shown product.
+	 * Outputs a hidden span element carrying the product data of the currently
+	 * shown product in a data attribute.
+	 *
+	 * A span, never an input or any other form element: WooCommerce's blockified
+	 * Add to Cart + Options block scans the buffered output of this hook with
+	 * has_form_elements() and falls back to a classic full-page POST form when it
+	 * finds one, which disables the interactive add to cart on block themes (#462).
+	 * The class differs from the .gtm4wp_productdata list markup on purpose - that
+	 * class is swept page-wide into view_item_list impressions, which a product
+	 * detail page must not join.
 	 *
 	 * @return void
 	 */
@@ -91,7 +100,7 @@ final class ListTracking {
 			'addtocartsingle'
 		);
 
-		echo '<input type="hidden" name="gtm4wp_product_data" value="' . esc_attr( wp_json_encode( $eec_product_array ) ) . '" />' . "\n";
+		echo '<span class="gtm4wp_single_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_data="' . esc_attr( wp_json_encode( $eec_product_array ) ) . '"></span>' . "\n";
 	}
 
 	/**

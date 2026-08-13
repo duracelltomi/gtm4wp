@@ -650,7 +650,7 @@ final class ListTrackingTest extends TestCase {
 		$this->assertSame( $link, $this->make_list_tracking()->cart_item_remove_link_filter( $link ) );
 	}
 
-	public function test_single_add_to_cart_tracking_outputs_hidden_input_when_enabled(): void {
+	public function test_single_add_to_cart_tracking_outputs_hidden_span_when_enabled(): void {
 		$GLOBALS['product'] = $this->make_product();
 
 		ob_start();
@@ -658,8 +658,49 @@ final class ListTrackingTest extends TestCase {
 			->single_add_to_cart_tracking();
 		$out = ob_get_clean();
 
-		$this->assertStringContainsString( 'name="gtm4wp_product_data"', $out );
+		$this->assertStringContainsString( 'class="gtm4wp_single_productdata"', $out );
+		$this->assertStringContainsString( 'data-gtm4wp_product_data="', $out );
 		$this->assertStringContainsString( '&quot;item_name&quot;', $out );
+	}
+
+	/**
+	 * #462: WooCommerce's blockified Add to Cart + Options block scans the output
+	 * of the add-to-cart hooks and falls back to a legacy full-page POST form when
+	 * it finds any INPUT, TEXTAREA, SELECT, BUTTON or FORM tag, which disables the
+	 * interactive add to cart. The markup this method prints must therefore never
+	 * contain a form element. Both directions of the fix: the span is asserted
+	 * present above, the form elements are asserted absent here.
+	 */
+	public function test_single_add_to_cart_tracking_output_contains_no_form_elements(): void {
+		$GLOBALS['product'] = $this->make_product();
+
+		ob_start();
+		$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->single_add_to_cart_tracking();
+		$out = ob_get_clean();
+
+		$this->assertNotSame( '', $out, 'The tracking markup must still be printed.' );
+		$this->assertDoesNotMatchRegularExpression(
+			'/<\s*(input|textarea|select|button|form)\b/i',
+			$out,
+			'The add-to-cart hook output must not contain a form element, or WooCommerce renders the block in legacy mode.'
+		);
+	}
+
+	/**
+	 * The span class deliberately differs from the .gtm4wp_productdata list markup:
+	 * that class is swept page-wide into view_item_list impressions by the frontend
+	 * tracker, and a product detail page must not join them.
+	 */
+	public function test_single_add_to_cart_tracking_span_does_not_reuse_the_list_markup_class(): void {
+		$GLOBALS['product'] = $this->make_product();
+
+		ob_start();
+		$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->single_add_to_cart_tracking();
+		$out = ob_get_clean();
+
+		$this->assertStringNotContainsString( 'class="gtm4wp_productdata"', $out );
 	}
 
 	public function test_single_add_to_cart_tracking_outputs_nothing_when_disabled(): void {
@@ -669,7 +710,7 @@ final class ListTrackingTest extends TestCase {
 		$this->make_list_tracking()->single_add_to_cart_tracking();
 		$out = ob_get_clean();
 
-		$this->assertSame( '', $out, 'The hidden input must not be printed when e-commerce tracking is off.' );
+		$this->assertSame( '', $out, 'The tracking markup must not be printed when e-commerce tracking is off.' );
 	}
 
 	public function test_grouped_product_list_column_label_appends_hidden_span(): void {
