@@ -307,8 +307,8 @@ function gtm4wp_edd_process_pages() {
 			}
 
 			let datalayer_timeout = 2000;
-			if ( typeof window.gtm4wp_datalayer_max_timeout !== 'undefined' ) {
-				datalayer_timeout = window.gtm4wp_datalayer_max_timeout;
+			if ( 'undefined' !== typeof gtm4wp_datalayer_max_timeout ) {
+				datalayer_timeout = gtm4wp_datalayer_max_timeout;
 			}
 
 			if ( datalayer_timeout > 0 ) {

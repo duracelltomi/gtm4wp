@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\EasyDigitalDownloads;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Options\Field;
 
 defined( 'ABSPATH' ) || exit;
@@ -21,7 +22,30 @@ defined( 'ABSPATH' ) || exit;
  * starts at beta (or experimental) per the option maturity policy: a brand
  * new integration has no field usage yet, so nothing may claim stable.
  */
-final class AdminSchema implements AdminSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+
+	/**
+	 * Documentation hub of this module on gtm4wp.com. The page does not exist
+	 * yet - it ships with the 2.1 release, and tests/network/DocLinksTest.php
+	 * verifies it resolves before that release goes out.
+	 */
+	private const DOC_PAGE = 'google-tag-manager-for-easy-digital-downloads';
+
+	/**
+	 * The per-option reference every field of this module deep links into,
+	 * following the WooCommerce module's convention (an `<a name="…">` anchor
+	 * per option key).
+	 */
+	private const DOC_REFERENCE = self::DOC_PAGE . '/easy-digital-downloads-settings-reference';
+
+	/**
+	 * Module documentation page.
+	 *
+	 * @return string
+	 */
+	public function doc_url(): string {
+		return self::DOC_PAGE;
+	}
 
 	/**
 	 * Module title.
@@ -129,7 +153,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Track e-commerce', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Choose this option if you would like to track Easy Digital Downloads e-commerce data with GA4 ecommerce tracking.', 'duracelltomi-google-tag-manager' ),
 				group: 'general',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION,
@@ -138,7 +163,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Products per impression', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'If you have many downloads shown in your download grids, you could miss pageviews in Google Analytics due to the amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by entering a number here (minimum 10-15 recommended). Leave this value 0 to include product impression data in one single event.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDUSESKU,
@@ -147,7 +173,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Use SKU instead of ID', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this to use the download SKU instead of the ID of the downloads for remarketing and ecommerce tracking. Will fallback to ID if no SKU is set. Note: SKUs need to be enabled in the Easy Digital Downloads settings.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDBRANDTAXONOMY,
@@ -158,9 +185,17 @@ final class AdminSchema implements AdminSchemaInterface {
 				group: 'products',
 				phase: Field::PHASE_BETA,
 				choices: $taxonomy_choices,
+				// Replaces the SELECT default on purpose: the choice list is built
+				// from the taxonomies registered on THIS request, so the default's
+				// allow-list reset would silently blank a stored brand taxonomy
+				// whenever its plugin is momentarily inactive during a save/import.
+				// Field::to_string() keeps the cast warning-free on non-scalar
+				// import values (Field::sanitize() runs a custom sanitizer INSTEAD
+				// of the type-defensive default, never before it).
 				sanitizer: static function ( $value ) {
-					return trim( (string) $value );
-				}
+					return sanitize_text_field( Field::to_string( $value ) );
+				},
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH,
@@ -169,7 +204,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Include full category path.', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Check this to include the full download category path of each download in ecommerce tracking. WARNING! This can lead to performance issues on large sites with lots of traffic!', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL,
@@ -187,7 +223,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				),
 				group: 'products',
 				phase: Field::PHASE_BETA,
-				choices: $business_verticals
+				choices: $business_verticals,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDPRODIDPREFIX,
@@ -197,9 +234,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'Some product feed generator plugins prefix product IDs with a fixed text. You can enter this prefix here so that tags in your website include this prefix as well.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				phase: Field::PHASE_BETA,
-				sanitizer: static function ( $value ) {
-					return trim( (string) $value );
-				}
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL,
@@ -208,7 +243,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this option to include the content of the Easy Digital Downloads cart in the data layer on each page. Especially useful for site personalization tools. Not included on cacheable pages when the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA,
@@ -217,7 +253,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to add data of the logged in customer (name, email and hashed email, total number of orders and order value) into the data layer, and the Enhanced Conversions user_data block onto the purchase event. Not included on cacheable pages when the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDORDERDATA,
@@ -226,7 +263,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to add all order attributes into the data layer on the purchase confirmation page regardless and independently from ecommerce tracking. The payment key of the order is never included, as it authorizes viewing the receipt.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDORDERMAXAGE,
@@ -235,7 +273,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Only track orders younger than', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'To prevent duplicate transaction tracking on the purchase confirmation page, enter the maximum age (in minutes) of the order for the transaction to be measured. Viewing the confirmation page of older orders will be ignored from transaction tracking, as it is considered to be measured in an earlier session.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
-				phase: Field::PHASE_EXPERIMENTAL
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX,
@@ -244,7 +283,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Exclude tax from revenue', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Enable this to exclude tax from the revenue variable while generating the purchase data', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX,
@@ -254,9 +294,7 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'Text to prepend to the transaction_id sent with the purchase event, for example to tell several stores apart in one GA4 property. Leave this empty to send the Easy Digital Downloads order number unchanged. Only the purchase event is affected: the order number in the orderData variable and the duplicate tracking guards of the plugin keep using the raw order number.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
-				sanitizer: static function ( $value ) {
-					return trim( (string) $value );
-				}
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG,
@@ -265,7 +303,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Do not flag orders as being tracked', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Turn this on to prevent the plugin from flagging orders as being already tracked. Leaving this unchecked ensures that no order data will be tracked multiple times in any ad or measurement system. Please only turn this feature on if you really need it!', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES,
@@ -275,7 +314,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				description: esc_html__( 'The purchase event is sent when the buyer reaches the confirmation page with an order in one of these statuses. Offsite gateways like PayPal can land the buyer there while the order is still Pending, which is why Pending is included by default - the duplicate tracking guards ensure the order is not counted again once it completes. Remove Pending and Processing to only ever count completed orders.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
-				choices: $order_status_choices
+				choices: $order_status_choices,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL,
@@ -292,7 +332,8 @@ final class AdminSchema implements AdminSchemaInterface {
 					'</a>'
 				),
 				group: 'advanced',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT,
@@ -301,7 +342,8 @@ final class AdminSchema implements AdminSchemaInterface {
 				label: __( 'Set maximum timeout for select_item event', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'When a user clicks on a download in a download grid, the select_item event uses a callback function with Google Tag Manager (GTM). This ensures that GTM can fire all related tags before the browser navigates to the download detail page. You can customize a timeout period (in milliseconds). Set this to 0 to open the download immediately without waiting for GTM: the select_item event is still pushed to the data layer, but the click is no longer held back.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
-				phase: Field::PHASE_BETA
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_REFERENCE
 			),
 		);
 	}

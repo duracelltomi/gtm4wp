@@ -72,7 +72,12 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		return $module;
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_unavailable_without_edd(): void {
+		// Runs in its own process on purpose: a Brain Monkey stub of EDD() from
+		// any earlier test stays defined process-wide, so in a shared process
+		// this assertion would depend on test order (TS-16's inverse).
 		// No EDD() function exists in this process, so the module must stay off
 		// regardless of anything else.
 		$this->assertFalse( ( new EasyDigitalDownloadsModule() )->is_available() );
