@@ -1,6 +1,6 @@
 {
   "name": "gtm4wp",
-  "version": "2.0.0-beta2",
+  "version": "2.0.0-beta3",
   "description": "The first Google Tag Manager plugin for WordPress with business goals in mind",
   "scripts": {
     "build": "wp-scripts build",
