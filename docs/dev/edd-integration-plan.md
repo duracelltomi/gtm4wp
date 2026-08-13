@@ -364,3 +364,40 @@ per-file fetches; line-level details need a local checkout):
    informs the wording of the purchase-track-statuses field description.
 8. Behavior with EDD's AJAX cart disabled (`edd_is_ajax_enabled()`), and the
    quantity-field setting's effect on the checkout cart markup.
+
+## Post-rebase drift audit (2026-08-13)
+
+The branch was rebased onto master (2.0.0-beta3 + 1) three weeks after it was
+cut; 52 master commits had touched `src/Modules/WooCommerce/` or `js/frontend/`
+in the meantime. Every one was classified for EDD applicability. Outcome:
+
+**Absorbed by the rebase itself** (shared code, nothing EDD-side to do): the
+first-`@`/plus-tag email hashing rules and the `json_literal` purchase dedupe
+guard now live in the re-extracted `GTM4WP\Ecommerce\Helpers`, so EDD calls the
+current implementations by construction; `JSON_NUMERIC_CHECK` removal, phpcs
+sniff activation and the shared `DataLayer`/`ScriptTag` hardening are inherited.
+
+**Ported in follow-up commits on this branch**: `DocumentedSchemaInterface` +
+per-field `doc:` targets; warning-free non-scalar sanitizers; the
+`gtm4wp_datalayer_max_timeout` lexical read in the tracker; the
+order-independent module availability test; user_data omits an email hash that
+folds away to nothing; `customer_signals()` emits `new_customer` +
+`customer_type` on purchase.
+
+**Already aligned at branch time** (verified, no action): stable
+`item_list_id` per list, order-NUMBER-based dedupe (guard + server read),
+RI-13 null-gates on `get_post()`, span-based product data injection (no
+`str_replace_first()` involvement, so the backreference fix does not reach
+EDD), cache-safe mode omits customer/cart data server-side, no `esc_js()` in
+the module.
+
+**WooCommerce-only, does not apply**: cart-fragments loading, the
+reliable-purchase session fallback channel and its arming rules, the
+order-received visitor gates (EDD's confirmation page authorizes through the
+payment-key chain instead), checkout inline-script fallback, block add-to-cart
+span fix, media/CF7/container commits.
+
+**Deliberately deferred** (feature parity work, not drift): list attribution
+cookie + `view_item` merge for the downloads grid; a cache-safe visitor-data
+channel for EDD; phone hashing (EDD collects no phone by default). Revisit
+after the module has real-world usage.
