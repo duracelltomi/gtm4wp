@@ -176,6 +176,37 @@ final class ConsentModeAxeptioTest extends FrontendTestCase {
 		$this->assertStringContainsString( '"wait_for_update":1000', $js );
 	}
 
+	/**
+	 * T40 (#141 at the call site): the encode-failure guard is pinned at
+	 * ScriptTag::json_literal() itself, but reverting THIS call to a bare
+	 * wp_json_encode() left the suite green - and the settings pass through the
+	 * public consent-mode filter, so a third party can hand back a value the
+	 * encoder refuses (NAN is the faithful trigger; bad UTF-8 is repaired). The
+	 * guard must cost the settings object only: `window.axeptioSettings = null;`
+	 * with the SDK loader and the data layer bridge after it intact - never
+	 * `= ;`, a SyntaxError that takes the whole head block down.
+	 */
+	public function test_head_js_falls_back_to_null_when_filtered_settings_cannot_be_encoded(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_AXEPTIO_CONSENT_MODE_DEFAULT )
+			->once()
+			->andReturn( array( 'wait_for_update' => NAN ) );
+
+		$axeptio = $this->make_axeptio(
+			array(
+				GTM4WP_OPTION_INTEGRATE_AXEPTIO           => true,
+				GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID => 'my-project',
+				GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE => true,
+			)
+		);
+
+		$js = $axeptio->add_head_js( '', 'dataLayer' );
+
+		$this->assertStringContainsString( 'window.axeptioSettings = null;', $js, 'The guard costs the settings object, not the block.' );
+		$this->assertStringNotContainsString( 'axeptioSettings = ;', $js, 'An empty literal is a SyntaxError.' );
+		$this->assertStringContainsString( 'https://static.axept.io/sdk.js', $js, 'The SDK loader below the assignment must survive.' );
+		$this->assertStringContainsString( 'axeptio.on("cookies:complete"', $js, 'And so must the data layer bridge.' );
+	}
+
 	public function test_registers_head_js_when_enabled_with_project_id(): void {
 		$axeptio = $this->make_axeptio(
 			array(

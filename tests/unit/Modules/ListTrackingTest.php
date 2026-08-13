@@ -984,12 +984,17 @@ final class ListTrackingTest extends TestCase {
 
 		$this->assertSame( $query, $list_tracking->reset_loop( $query ), 'The query must be returned unchanged.' );
 		$this->assertSame( '', $GLOBALS['woocommerce_loop']['listtype'], 'The list name must not leak into the next loop.' );
+		// T50: the identity key is reset alongside the name. The name-match guard
+		// in after_shop_loop_item() would neutralize a stale identity anyway, but
+		// this is the reset's own contract - both keys, together.
+		$this->assertNull( $GLOBALS['woocommerce_loop']['gtm4wp_list_identity'], 'The resolved list identity must be cleared with the name.' );
 	}
 
 	public function test_reset_loop_without_an_argument_returns_null(): void {
 		// It is hooked as an action too (loop_end passes nothing).
 		$this->assertNull( $this->make_list_tracking()->reset_loop() );
 		$this->assertSame( '', $GLOBALS['woocommerce_loop']['listtype'] );
+		$this->assertNull( $GLOBALS['woocommerce_loop']['gtm4wp_list_identity'] );
 	}
 
 	public function test_widget_title_filter_names_the_list_and_restarts_the_counter(): void {

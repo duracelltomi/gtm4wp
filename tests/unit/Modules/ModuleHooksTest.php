@@ -189,9 +189,11 @@ final class ModuleHooksTest extends TestCase {
 	 * — bypassing is_available() (WooCommerce presence), which is separate wiring.
 	 *
 	 * @param array<string, mixed> $stored Stored option values.
-	 * @return void
+	 * @return WooCommerceModule The module the hooks were registered from, so a
+	 *                           test can assert instance-bound registrations or
+	 *                           drive its public hook callbacks.
 	 */
-	private function register_woocommerce_hooks( array $stored ): void {
+	private function register_woocommerce_hooks( array $stored ): WooCommerceModule {
 		Functions\when( 'get_option' )->justReturn( $stored );
 
 		$options = new Options( ( new WooCommerceModule() )->defaults() );
@@ -211,6 +213,8 @@ final class ModuleHooksTest extends TestCase {
 
 		$method = new \ReflectionMethod( $module, 'register_frontend_hooks' );
 		$method->invoke( $module );
+
+		return $module;
 	}
 
 	public function test_woocommerce_wires_block_and_purchase_hooks_when_tracking_enabled(): void {
@@ -274,5 +278,71 @@ final class ModuleHooksTest extends TestCase {
 		);
 
 		$this->assertFalse( has_filter( 'woocommerce_add_to_cart_fragments' ), 'No cart-fragments delivery unless cache-safe is on.' );
+	}
+
+	/**
+	 * T39 (TS-12, attachment form): the confirm POST beacons' rest_api_init
+	 * wiring is the outermost layer of the permission gate - with it gone, the
+	 * routes (and the option gate inside the registrar) never exist at all.
+	 * The registrar's own args are pinned in PageDataLayerTest; this pair pins
+	 * that the module wires it exactly when the cache-safe mode is on.
+	 */
+	public function test_woocommerce_registers_confirm_beacons_under_cache_safe(): void {
+		$this->register_woocommerce_hooks(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+			)
+		);
+
+		$this->assertNotFalse( has_action( 'rest_api_init' ), 'The confirm POST beacon routes must be registered under cache-safe.' );
+	}
+
+	public function test_woocommerce_does_not_register_confirm_beacons_when_cache_safe_off(): void {
+		$this->register_woocommerce_hooks( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		$this->assertFalse( has_action( 'rest_api_init' ), 'The beacons ride the cache-safe delivery channel; without it there is nothing to confirm.' );
+	}
+
+	/**
+	 * T46: the positive half of the view_item dependency guarantee - its
+	 * negative provider lives in WooCommerceModuleTest, where the early return
+	 * fires before the singleton chain is reached. On a product page with both
+	 * options on, the helper must actually be ordered before the push handle,
+	 * and the wiring must run at priority 20 (after every default-priority
+	 * enqueue, so both handles are registered by then).
+	 */
+	public function test_woocommerce_declares_the_view_item_helper_dependency_on_a_wrapped_product_page(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+
+		$push_script       = new \stdClass();
+		$push_script->deps = array();
+
+		$registry             = new \stdClass();
+		$registry->registered = array( 'gtm4wp-additional-datalayer-pushes' => $push_script );
+
+		Functions\when( 'wp_script_is' )->justReturn( true );
+		Functions\when( 'wp_scripts' )->justReturn( $registry );
+
+		$module = $this->register_woocommerce_hooks(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => true,
+				GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION => true,
+			)
+		);
+
+		$this->assertSame(
+			20,
+			has_action( 'wp_enqueue_scripts', array( $module, 'order_generic_before_pushes' ) ),
+			'Priority 20: the ordering hook must run after every default-priority enqueue callback.'
+		);
+
+		$module->order_generic_before_pushes();
+
+		$this->assertSame(
+			array( 'gtm4wp-ecommerce-generic' ),
+			$push_script->deps,
+			'The wrapped view_item page must order the helper before the push handle.'
+		);
 	}
 }

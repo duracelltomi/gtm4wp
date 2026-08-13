@@ -265,6 +265,39 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			expect( map[ 1 ] ).toBeUndefined();
 		} );
 
+		it( 'measures the limit in encoded bytes, not characters: multibyte names evict too (T50)', () => {
+			// The case above holds only because its ASCII names make
+			// encoded-length and character-length coincide. An accented or CJK
+			// widget title occupies up to nine encoded bytes per character
+			// (encodeURIComponent of a 3-byte UTF-8 sequence), so a
+			// "characters" reading of the budget would blow the real browser
+			// limit while every test stayed green. Pin that the measurement is
+			// post-encoding.
+			const multibyte_name =
+				'Nyári Válogatás – Kézműves Termékek Hölgyeknek És Uraknak 夏のセール';
+			for ( let id = 1; id <= 20; id++ ) {
+				window.gtm4wp_store_item_list_attribution(
+					id,
+					multibyte_name + ' ' + id,
+					'nyari-valogatas-' + id
+				);
+			}
+
+			expect( stored_cookie_bytes() ).toBeGreaterThan( 0 );
+			expect( stored_cookie_bytes() ).toBeLessThanOrEqual( 4096 );
+
+			const map = window.gtm4wp_read_item_list_cookie();
+			// The multibyte names force earlier eviction than their character
+			// count suggests - size in bytes, not entries and not characters,
+			// is what bounds the cookie.
+			expect( Object.keys( map ).length ).toBeLessThan( 20 );
+			expect( Object.keys( map ).length ).toBeGreaterThan( 0 );
+			expect( map[ 20 ] ).toMatchObject( {
+				item_list_name: multibyte_name + ' 20',
+			} );
+			expect( map[ 1 ] ).toBeUndefined();
+		} );
+
 		it( 'leaves the previous cookie intact when one entry cannot fit at all', () => {
 			window.gtm4wp_store_item_list_attribution(
 				42,

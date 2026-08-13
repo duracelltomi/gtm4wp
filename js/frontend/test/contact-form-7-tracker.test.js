@@ -249,6 +249,20 @@ describe( 'gtm4wp-contact-form-7-tracker', () => {
 		expect(
 			window.dataLayer.find( ( entry ) => entry.event === 'form_submit' )
 		).not.toHaveProperty( 'form_status' );
+
+		// T50: the fail-closed consequence, stated as intent rather than left
+		// implicit - generate_lead is derived from the submit's own
+		// detail.status being 'mail_sent', so a submit whose detail carries NO
+		// status produces no lead even if the mail did in fact go out. Missing
+		// evidence is not success. If CF7 (or an extension) ever stops
+		// populating detail.status, leads silently stop counting - this is the
+		// case that goes red first, and the signal to re-check CF7's event
+		// detail contract upstream.
+		expect(
+			window.dataLayer.filter(
+				( entry ) => entry.event === 'generate_lead'
+			)
+		).toHaveLength( 0 );
 	} );
 
 	it( 'does not re-register listeners when the bundle loads twice (regression: double-init)', () => {

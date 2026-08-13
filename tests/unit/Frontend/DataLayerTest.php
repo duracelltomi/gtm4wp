@@ -86,6 +86,25 @@ final class DataLayerTest extends FrontendTestCase {
 	}
 
 	/**
+	 * T48 (#123's mechanism, pinned on the NAME path): datalayer_name() trims
+	 * BEFORE validating, so a stored trailing newline resolves to the trimmed
+	 * identifier - it is neither rejected (the /D anchor never sees the newline)
+	 * nor emitted raw (which would be a broken bare identifier at every sink).
+	 * A non-default name discriminates: trimmed-accept yields 'myLayer' where a
+	 * reject would yield the 'dataLayer' fallback, so this cannot pass by
+	 * falling back.
+	 *
+	 * @return void
+	 */
+	public function test_name_trims_a_trailing_newline_before_validating(): void {
+		$datalayer = new DataLayer(
+			$this->make_options( array( GTM4WP_OPTION_DATALAYER_NAME => "myLayer\n" ) )
+		);
+
+		$this->assertSame( 'myLayer', $datalayer->name() );
+	}
+
+	/**
 	 * The other direction: a name that IS a valid identifier still reaches the
 	 * output untouched, including the two leading characters the old rule
 	 * wrongly excluded. Without this the fallback above could pass by always
@@ -352,8 +371,11 @@ final class DataLayerTest extends FrontendTestCase {
 
 		$datalayer = new DataLayer( $this->make_options() );
 
-		// An invalid UTF-8 byte sequence: wp_json_encode() returns false for it.
-		$datalayer->queue_push( 'view_item', array( 'value' => 42 ), '', '', 'gtm4wp_enrich', array( "\xB1\x31" ) );
+		// NAN, not an invalid UTF-8 sequence: real wp_json_encode() REPAIRS bad
+		// UTF-8 (_wp_json_sanity_check), so that trigger only fails against this
+		// suite's json_encode stub and would prove nothing about production. NAN
+		// fails in both (TS-13; see ScriptTagTest's json_literal cases).
+		$datalayer->queue_push( 'view_item', array( 'value' => 42 ), '', '', 'gtm4wp_enrich', array( NAN ) );
 
 		$datalayer->flush_pushes();
 

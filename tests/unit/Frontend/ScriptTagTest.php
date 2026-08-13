@@ -274,7 +274,7 @@ final class ScriptTagTest extends FrontendTestCase {
 	 * wp_json_encode() REPAIRS bad UTF-8 (_wp_json_sanity_check), so a test built
 	 * on that trigger would pass against the stub and prove nothing about
 	 * production. NAN fails in both, which is what makes this case faithful
-	 * (test-review UC-3 - the double must be no more permissive than the real
+	 * (test-review TS-13 - the double must be no more permissive than the real
 	 * collaborator).
 	 *
 	 * @return void

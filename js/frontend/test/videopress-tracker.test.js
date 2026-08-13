@@ -105,6 +105,36 @@ describe( 'gtm4wp-videopress', () => {
 		} );
 	} );
 
+	it( 'pushes each message exactly once when a re-injected bundle re-attaches (T43)', () => {
+		// Every sibling bundle with a re-injection guard has this case; this
+		// file did not, so neutralizing the removeEventListener in
+		// gtm4wp_attachVideoPressListener left all its tests green. The attach
+		// only runs when an UNWIRED embed is found, so the discriminating shape
+		// is: first load wires the embed, the page is re-rendered with a fresh
+		// embed (its wired marker gone with the old node), and the re-injected
+		// bundle attaches again. Without detaching the previous listener
+		// (remembered on window.gtm4wp_videopress_handler) both remain bound
+		// and EVERY message double-pushes.
+		loadTracker();
+
+		// The page re-renders (AJAX navigation / page builder): the old iframe
+		// - and its wired marker - is gone, a fresh one is in its place.
+		document.body.innerHTML =
+			'<iframe src="https://videopress.com/embed/AbCdEfGh"></iframe>';
+
+		loadTracker();
+
+		dispatch( {
+			event: 'videopress_durationchange',
+			id: 'AbCdEfGh',
+			duration: 120,
+			durationMs: 120000,
+		} );
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+		expect( pushesOf( 'gtm4wp.mediaPlayerReady' ) ).toHaveLength( 1 );
+	} );
+
 	it( 'pushes mediaPlayerReady only once per video, however often the duration is reported', () => {
 		loadTracker();
 

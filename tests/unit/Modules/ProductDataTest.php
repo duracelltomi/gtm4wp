@@ -389,6 +389,42 @@ final class ProductDataTest extends TestCase {
 	}
 
 	/**
+	 * T44: the name fields pass trim_intermediate_spaces = FALSE - Google's
+	 * matching keeps interior spaces in names, unlike phones and emails. Every
+	 * fixture above is single-token, where the flag's value is invisible:
+	 * flipping the call-site argument (or the helper regressing to
+	 * always-collapse) left the suite green while every multi-word name hashed
+	 * to an unmatchable value, silently.
+	 *
+	 * @return void
+	 */
+	public function test_purchase_datalayer_keeps_interior_spaces_in_name_hashes(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true ) );
+
+		$order = new \WC_Order(
+			array(
+				'order_number'       => '1003',
+				'total'              => 100.0,
+				'currency'           => 'EUR',
+				'billing_email'      => 'mary@example.com',
+				'billing_first_name' => 'Mary Ann',
+				'billing_last_name'  => 'van der Berg',
+				'billing_country'    => 'US',
+			)
+		);
+
+		$user_data = $product_data->get_purchase_datalayer( $order, array() )['user_data'] ?? null;
+
+		$this->assertIsArray( $user_data );
+		// TS-2 both directions on each field: the space-keeping hash ships, the
+		// collapsed one (what an always-strip regression produces) does not.
+		$this->assertSame( hash( 'sha256', 'mary ann' ), $user_data['address']['sha256_first_name'] );
+		$this->assertNotSame( hash( 'sha256', 'maryann' ), $user_data['address']['sha256_first_name'] );
+		$this->assertSame( hash( 'sha256', 'van der berg' ), $user_data['address']['sha256_last_name'] );
+		$this->assertNotSame( hash( 'sha256', 'vanderberg' ), $user_data['address']['sha256_last_name'] );
+	}
+
+	/**
 	 * A gmail address whose local part is nothing but a "+" tag folds away to
 	 * nothing, and the helper says so by returning ''. The key must then be
 	 * ABSENT rather than present and empty: this object is Google's user_data,
@@ -566,6 +602,32 @@ final class ProductDataTest extends TestCase {
 		// even though user_data above drops its own.
 		$this->assertArrayHasKey( 'phone_hash', $raw['customer']['billing'] );
 		$this->assertSame( '', $raw['customer']['billing']['phone_hash'] );
+	}
+
+	/**
+	 * T47: the email sibling of the case above. The fold-to-nothing gmail tag
+	 * makes the hash helper return '', and on the raw order path the key stays
+	 * put with '' - the same 1.x path contract as phone_hash, asserted only for
+	 * the phone until now (TS-5 sibling symmetry).
+	 *
+	 * @return void
+	 */
+	public function test_raw_order_datalayer_keeps_the_email_hash_keys_when_the_address_folds_away(): void {
+		$order = new \WC_Order(
+			array(
+				'order_number'  => '1001',
+				'total'         => 100.0,
+				'currency'      => 'EUR',
+				'billing_email' => '+shopping@gmail.com',
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		$this->assertArrayHasKey( 'email_hash', $raw['customer']['billing'] );
+		$this->assertSame( '', $raw['customer']['billing']['email_hash'] );
+		// The deprecated spelling rides along unchanged - it is the same value.
+		$this->assertSame( '', $raw['customer']['billing']['emailhash'] );
 	}
 
 	public function test_order_status_trackable_is_filterable(): void {

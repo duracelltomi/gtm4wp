@@ -165,6 +165,26 @@ describe( 'gtm4wp-spotify', () => {
 		return controller;
 	}
 
+	it( 'chains a pre-existing onSpotifyIframeApiReady instead of clobbering it (T49)', () => {
+		// Another integration - or the site loading the iFrame API for its own
+		// reasons - may have registered the callback first. The tracker's
+		// subscribe() promises to preserve and chain it; nothing asserted that,
+		// so a clobber regression was silent (the third party just stopped
+		// working, with no error on our side).
+		const previous = jest.fn();
+		window.onSpotifyIframeApiReady = previous;
+
+		const bound = loadTracker();
+
+		// The site's callback fired exactly once, with the same IFrameAPI the
+		// tracker received…
+		expect( previous ).toHaveBeenCalledTimes( 1 );
+		expect( previous.mock.calls[ 0 ][ 0 ] ).toBeDefined();
+		// …and the tracker still did its own half: chained, not replaced in
+		// either direction. A wired controller means playback events flow.
+		expect( bound.handlers.playback_update ).toBeDefined();
+	} );
+
 	it( 'creates exactly one controller for a later-inserted embed the SDK replaces', async () => {
 		// Runtime tracking on + an embed inserted after load (popup/AJAX) means the
 		// shared observer is live when the SDK's replaceChild lands. The wired

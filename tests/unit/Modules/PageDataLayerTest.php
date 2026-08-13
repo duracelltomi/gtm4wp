@@ -12,6 +12,7 @@ use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\WooCommerce\Helpers;
+use GTM4WP\Modules\VisitorData\VisitorDataEndpoint;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Modules\WooCommerce\PageDataLayer;
 use GTM4WP\Modules\WooCommerce\ProductData;
@@ -368,6 +369,41 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * T40 (#141 at the call site): the encode-failure guard is pinned at
+	 * ScriptTag::json_literal() itself, but reverting THIS call site to a bare
+	 * wp_json_encode() left the whole suite green - and this is the one checkout
+	 * sink third-party code can actually poison, because every item passes the
+	 * public product-array filter. An unencodable value must cost the value, not
+	 * the block: `= null;`, never `= ;` (a SyntaxError that would take the
+	 * checkout globals and their reader down with it).
+	 */
+	public function test_checkout_products_fall_back_to_null_when_an_item_cannot_be_encoded(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		// A third-party filter callback can hand back any PHP value. NAN is the
+		// faithful unencodable trigger: real wp_json_encode() repairs bad UTF-8
+		// but returns false for NAN (see ScriptTagTest's json_literal cases).
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->andReturnUsing(
+				static function ( $product_array ) {
+					$product_array['broken'] = NAN;
+					return $product_array;
+				}
+			);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' )['code'];
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products = null;', $checkout, 'The guard costs the value, not the block.' );
+		$this->assertStringNotContainsString( 'gtm4wp_checkout_products = ;', $checkout, 'An empty literal is a SyntaxError that kills the whole inline block.' );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value', $checkout, 'The sibling global survives the broken one.' );
+	}
+
+	/**
 	 * The tracker can be filtered into the <head>
 	 * (gtm4wp_integrate-woocommerce-track-enhanced-ecommerce => false), and this
 	 * code runs on wp_head priority 10 - after wp_print_head_scripts() at 9. The
@@ -614,6 +650,42 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertArrayNotHasKey( 'orderData', $result, 'A mismatched order key must not expose order data.' );
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta );
+	}
+
+	/**
+	 * T46: the (string) casts on both hash_equals() arguments exist because the
+	 * request key has passed through a public filter that can hand back any
+	 * type, and hash_equals() throws a TypeError on a non-string. Both prior
+	 * tests fed strings, so removing the casts stayed green - this case is the
+	 * one that fatals without them.
+	 */
+	public function test_order_key_filter_returning_a_non_string_denies_without_a_fatal(): void {
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+
+		$_GET['order'] = '1001';
+		$_GET['key']   = '12345';
+
+		Filters\expectApplied( 'woocommerce_thankyou_order_key' )->once()->andReturn( 12345 );
+
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'order_key'    => 'correct-key',
+				'status'       => 'processing',
+				'items'        => array(),
+			)
+		);
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc();
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $result, 'A non-string filtered key is a mismatch, denied - never a TypeError on the order-received page.' );
 	}
 
 	/**
@@ -1169,6 +1241,40 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'customer_type', $result, 'And its sibling, which carries the same fact as a string.' );
 
 		$this->assertSame( array(), \Automattic\WooCommerce\Internal\Utilities\Users::$calls, 'The guest email check is downstream of the known-shopper gate in WooCommerce, so a known shopper must never reach it.' );
+	}
+
+	/**
+	 * T42: the ordering contract the withhold comment promises - the unset runs
+	 * AFTER the GTM4WP_WPFILTER_EEC_ORDER_DATA filter, is the last write to the
+	 * 'customer' KEY only, and has no say over anything else a third party
+	 * writes. Nothing asserted this before: moving the unset above the filter
+	 * (or never building 'customer' on the withheld path) left the suite green
+	 * while breaking the documented third-party shape in both directions.
+	 */
+	public function test_withheld_customer_is_unset_after_the_order_data_filter_sees_it(): void {
+		$this->stub_order_received_request( array( 'customer_id' => 5 ) );
+
+		$filter_saw_customer = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ORDER_DATA )
+			->once()
+			->andReturnUsing(
+				static function ( $order_data ) use ( &$filter_saw_customer ) {
+					$filter_saw_customer = array_key_exists( 'customer', $order_data );
+
+					// A filter that copies billing details onto a key of its own
+					// must survive the unset - the gate owns 'customer', not
+					// orderData as a whole.
+					$order_data['third_party_copy'] = $order_data['customer']['billing']['email'] ?? '(customer was missing)';
+
+					return $order_data;
+				}
+			);
+
+		$result = $this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertTrue( $filter_saw_customer, 'The filter keeps seeing the shape it has always been handed - customer included.' );
+		$this->assertSame( 'buyer@example.com', $result['orderData']['third_party_copy'], "The third party's own key survives the unset." );
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'The gate still has the final say over the one key it names.' );
 	}
 
 	public function test_order_received_keeps_customer_data_for_the_logged_in_customer(): void {
@@ -2450,6 +2556,12 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( '1001', $payload['orderNumber'], 'The de-dupe key is the order number (shared with the order-received guard).' );
 		$this->assertTrue( $payload['flag'], 'By default the browser guard is written.' );
 
+		// T46: the payload merges customer_signals() the same way the thank-you
+		// path does - this is the THIRD emission site, and it relied on the other
+		// two sites' tests until these keys were pinned here.
+		$this->assertArrayHasKey( 'customer_type', $payload['push'], 'The fallback payload carries the customer signals the thank-you path carries.' );
+		$this->assertArrayHasKey( 'new_customer', $payload['push'], 'Both spellings of the signal ship together (GA4 string + Google Ads boolean).' );
+
 		// Read-only: the GET writes NOTHING to the session and no order meta.
 		$this->assertSame( array(), $session->sets, 'The read-only GET must not write any session state.' );
 		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The endpoint (a public GET) must not write the _ga_tracked order meta.' );
@@ -2472,6 +2584,73 @@ final class PageDataLayerTest extends TestCase {
 		)->resolve_pending_purchase();
 
 		$this->assertNull( $payload, 'No one-shot is resolved when the event cookie is absent.' );
+	}
+
+	/**
+	 * T39 (TS-12, attachment form): the permission gate has two halves - the
+	 * callback and its registration. check_confirm_purchase_permission() is
+	 * asserted at length elsewhere in this file, but nothing executed the
+	 * register_rest_route() calls that BIND it to the two state-changing POST
+	 * routes: swapping either route's permission_callback to __return_true left
+	 * the entire suite green. These two tests pin the registration itself.
+	 */
+	public function test_confirm_route_registration_binds_the_permission_callback_to_both_routes(): void {
+		$routes = array();
+		Functions\when( 'register_rest_route' )->alias(
+			static function ( $ns, $route, $args ) use ( &$routes ) {
+				$routes[ $route ] = array(
+					'namespace' => $ns,
+					'args'      => $args,
+				);
+			}
+		);
+
+		$page_datalayer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true )
+		);
+		$page_datalayer->register_confirm_purchase_route();
+
+		$this->assertSame(
+			array( PageDataLayer::REST_ROUTE_CONFIRM_PURCHASE, PageDataLayer::REST_ROUTE_CONFIRM_READD ),
+			array_keys( $routes ),
+			'With the reliable-purchase option on, both beacon routes are registered.'
+		);
+
+		foreach ( $routes as $route => $registration ) {
+			$this->assertSame( VisitorDataEndpoint::REST_NAMESPACE, $registration['namespace'], $route );
+			$this->assertSame( 'POST', $registration['args']['methods'], $route . ' changes state, so it must be a POST.' );
+			$this->assertSame(
+				array( $page_datalayer, 'check_confirm_purchase_permission' ),
+				$registration['args']['permission_callback'],
+				$route . ': the nonce/origin gate must be bound to the route - a __return_true here re-opens CSRF on a state-changing route.'
+			);
+		}
+
+		$this->assertSame(
+			array( $page_datalayer, 'confirm_pending_purchase_tracked' ),
+			$routes[ PageDataLayer::REST_ROUTE_CONFIRM_PURCHASE ]['args']['callback']
+		);
+		$this->assertSame(
+			array( $page_datalayer, 'confirm_readded_to_cart_tracked' ),
+			$routes[ PageDataLayer::REST_ROUTE_CONFIRM_READD ]['args']['callback']
+		);
+	}
+
+	public function test_confirm_route_registration_gates_the_purchase_route_on_its_option(): void {
+		$routes = array();
+		Functions\when( 'register_rest_route' )->alias(
+			static function ( $ns, $route, $args ) use ( &$routes ) {
+				$routes[ $route ] = $args;
+			}
+		);
+
+		$this->make_page_datalayer( array() )->register_confirm_purchase_route();
+
+		$this->assertSame(
+			array( PageDataLayer::REST_ROUTE_CONFIRM_READD ),
+			array_keys( $routes ),
+			'Without purchase-on-any-page only the re-add beacon ships; its permission gate is unconditional.'
+		);
 	}
 
 	public function test_resolve_pending_purchase_flag_false_under_no_tracked_flag_option(): void {

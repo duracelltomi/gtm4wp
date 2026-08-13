@@ -233,6 +233,35 @@ final class MediaEventsModuleTest extends TestCase {
 	}
 
 	/**
+	 * T49: the 12 per-provider in_footer filters (gtm4wp_youtube, gtm4wp_vimeo,
+	 * ...) are the 1.x placement API and were executed by no test - deleting any
+	 * one of the apply_filters() calls stayed green. One case pins the mechanism
+	 * at a representative provider: filtered false routes the handle into the
+	 * head, the gate (which must print before the tracker it gates) follows the
+	 * same placement, and the defer strategy survives the move.
+	 *
+	 * @return void
+	 */
+	public function test_in_footer_filter_routes_the_tracker_out_of_the_footer(): void {
+		$args_by_handle = array();
+		Functions\when( 'wp_enqueue_script' )->alias(
+			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) use ( &$args_by_handle ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_enqueue_script() signature
+				$this->enqueued[]          = $handle;
+				$args_by_handle[ $handle ] = $args;
+				return true;
+			}
+		);
+
+		Filters\expectApplied( 'gtm4wp_youtube' )->once()->with( true )->andReturn( false );
+
+		$this->make_module( array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) )->enqueue_scripts();
+
+		$this->assertFalse( $args_by_handle['gtm4wp-youtube']['in_footer'], 'A false filter return must place the tracker in the head.' );
+		$this->assertFalse( $args_by_handle[ MediaEventsModule::GATE_HANDLE ]['in_footer'], 'The gate must follow the placement of the tracker it gates.' );
+		$this->assertSame( 'defer', $args_by_handle['gtm4wp-youtube']['strategy'], 'Re-placing the handle must not cost it the defer strategy.' );
+	}
+
+	/**
 	 * The handle list above proves which names were used; this proves where the
 	 * bytes come from. Every enqueued src must be one of our own build files —
 	 * a vendor URL re-added under any handle at all is a third-party request on

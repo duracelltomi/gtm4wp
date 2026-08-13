@@ -1142,8 +1142,12 @@ final class ContainerCodeTest extends FrontendTestCase {
 			->once()
 			->andReturn(
 				array(
-					// A lone continuation byte: not valid UTF-8, so json_encode() fails.
-					'brokenVar' => "\xB1\x31",
+					// NAN, not an invalid UTF-8 sequence: real wp_json_encode()
+					// REPAIRS bad UTF-8 (_wp_json_sanity_check), so that trigger
+					// only fails against this suite's json_encode stub and would
+					// prove nothing about production. NAN fails in both (TS-13;
+					// see ScriptTagTest's json_literal cases).
+					'brokenVar' => NAN,
 					'goodVar'   => 'kept',
 				)
 			);

@@ -102,6 +102,37 @@ describe( 'gtm4wp-html5media', () => {
 		expect( window.dataLayer[ 0 ][ 'gtm.videoTitle' ] ).toBe( 'clip.mp4' );
 	} );
 
+	it( 'derives a stable id from the awkward path shapes too (T49)', () => {
+		// Three edges of the split('/').pop() derivation, pinned so a rewrite
+		// keeps them: a trailing-slash path has no final segment (empty id, not
+		// the directory name), a percent-encoded name stays encoded (stable
+		// across pushes - decoding is presentation, not identity), and an
+		// extensionless file is its bare segment.
+		const cases = [
+			[ 'https://cdn.example.com/media/videos/', '' ],
+			[
+				'https://cdn.example.com/media/v%C3%ADde%C3%B3%201.mp4',
+				'v%C3%ADde%C3%B3%201.mp4',
+			],
+			[ 'https://cdn.example.com/media/clip', 'clip' ],
+		];
+
+		cases.forEach( ( [ currentSrc, expectedId ] ) => {
+			window.dataLayer = [];
+			document.body.innerHTML = '';
+			createMedia( 'video', {
+				readyState: 1,
+				duration: 120,
+				currentSrc,
+			} );
+
+			loadTracker();
+
+			expect( window.dataLayer[ 0 ].mediaData.id ).toBe( expectedId );
+			expect( window.dataLayer[ 0 ].mediaData.title ).toBe( expectedId );
+		} );
+	} );
+
 	it( 'reports an empty id and title while the source is still unresolved', () => {
 		// currentSrc is '' until resource selection settles, and the tracker asks
 		// for the filename on every push. It must not fall back to the page URL.

@@ -54,6 +54,82 @@ final class BlacklistAdminSchemaTest extends TestCase {
 	 *
 	 * @return void
 	 */
+	/**
+	 * Core-faithful sanitize_text_field: strips tags and trims, which is the
+	 * behavior the status sanitizer leans on for a hostile entity id. A
+	 * returnArg identity stub would make the hostile-input cases below vacuous
+	 * (#131's lesson).
+	 *
+	 * @return void
+	 */
+	private function stub_sanitize_text_field(): void {
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => trim( wp_strip_all_tags( (string) $value ) )
+		);
+		Functions\when( 'wp_strip_all_tags' )->alias(
+			static fn ( $value ) => trim( strip_tags( (string) $value ) ) // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- test stub models core.
+		);
+	}
+
+	/**
+	 * T45: the mode sanitizer was only ever executed by the whole-schema
+	 * non-scalar sweep - nothing asserted its clamp, so it could be gutted with
+	 * the suite green. The stored value is defense-in-depth: the frontend
+	 * re-derives the mode, but the stored copy also reaches
+	 * $GLOBALS['gtm4wp_options'] and the admin bootstrap.
+	 *
+	 * @param mixed $raw      Submitted value.
+	 * @param int   $expected Stored result.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_mode_inputs' )]
+	public function test_mode_sanitizer_clamps_to_the_three_valid_modes( $raw, int $expected ): void {
+		$this->assertSame( $expected, $this->field( GTM4WP_OPTION_BLACKLIST_ENABLE )->sanitize( $raw ) );
+	}
+
+	/**
+	 * Out-of-range and junk inputs land on 0 (disabled) - failing closed for a
+	 * restriction feature would mean blocking tags nobody selected.
+	 *
+	 * @return array<string, array{0: mixed, 1: int}>
+	 */
+	public static function provide_mode_inputs(): array {
+		return array(
+			'valid blocklist mode'     => array( '1', 1 ),
+			'valid allowlist mode'     => array( 2, 2 ),
+			'above the range'          => array( 5, 0 ),
+			'below the range'          => array( -1, 0 ),
+			'junk with a valid prefix' => array( '2abc', 2 ),
+			'pure junk'                => array( 'abc', 0 ),
+		);
+	}
+
+	/**
+	 * T45: the status sanitizer's own allow-list filter, exercised with a
+	 * hostile entity id in BOTH accepted input shapes (the REST layer sends a
+	 * comma string; the settings-import path can hand the closure an array).
+	 * Only known entity ids survive, imploded back to the stored comma form.
+	 *
+	 * @return void
+	 */
+	public function test_status_sanitizer_filters_hostile_entities_from_a_comma_string(): void {
+		$this->stub_sanitize_text_field();
+
+		$sanitized = $this->field( GTM4WP_OPTION_BLACKLIST_STATUS )
+			->sanitize( 'html,</script><script>alert(1)</script>,evil,sandboxedScripts' );
+
+		$this->assertSame( 'html,sandboxedScripts', $sanitized, 'Only known entity ids survive; the hostile and unknown ones are dropped.' );
+	}
+
+	public function test_status_sanitizer_filters_the_array_input_shape(): void {
+		$this->stub_sanitize_text_field();
+
+		$sanitized = $this->field( GTM4WP_OPTION_BLACKLIST_STATUS )
+			->sanitize( array( 'html', 'evil', array( 'nested' ), 'gaawe' ) );
+
+		$this->assertSame( 'html,gaawe', $sanitized, 'The array shape filters identically and stores the same comma form.' );
+	}
+
 	public function test_choices_cover_exactly_the_valid_restrictions(): void {
 		$choices = array_keys( $this->field( GTM4WP_OPTION_BLACKLIST_STATUS )->choices );
 		$valid   = BlacklistModule::valid_restrictions();

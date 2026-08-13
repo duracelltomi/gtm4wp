@@ -42,7 +42,9 @@ final class FieldTest extends TestCase {
 			$overrides['sanitizer'] ?? null,
 			$overrides['columns'] ?? array(),
 			$overrides['derive'] ?? null,
-			$overrides['depends_on'] ?? ''
+			$overrides['depends_on'] ?? '',
+			$overrides['rows_locked'] ?? false,
+			$overrides['choice_sections'] ?? array()
 		);
 	}
 
@@ -333,5 +335,37 @@ final class FieldTest extends TestCase {
 
 		$this->assertSame( 'some-page/some-option', $positional->doc );
 		$this->assertArrayNotHasKey( 'doc', $positional->to_ui_array( false ) );
+	}
+
+	/**
+	 * T48: the 'sections' pass-through was asserted nowhere - the Blacklist
+	 * schema declares choice_sections and the admin FieldControl renders them,
+	 * but no test pinned that to_ui_array() actually ships them, so dropping
+	 * the line degraded the Restricted-entities screen to one flat ~100-checkbox
+	 * list with nothing red.
+	 */
+	public function test_to_ui_array_carries_the_choice_sections(): void {
+		$sections = array(
+			array(
+				'label'   => 'Tags',
+				'choices' => array( 'html', 'img' ),
+			),
+			array(
+				'label'   => 'Triggers',
+				'choices' => array( 'evl' ),
+			),
+		);
+
+		$field = $this->make_field(
+			Field::TYPE_MULTISELECT,
+			'',
+			array( 'choice_sections' => $sections )
+		);
+
+		$this->assertSame( $sections, $field->to_ui_array( '' )['sections'], 'The section grouping must reach the admin app unchanged.' );
+
+		// And the default: no sections declared, an empty list under the same key
+		// (the admin app tests for length, not presence).
+		$this->assertSame( array(), $this->make_field( Field::TYPE_MULTISELECT, '' )->to_ui_array( '' )['sections'] );
 	}
 }

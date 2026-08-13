@@ -124,6 +124,27 @@ final class BlacklistModuleTest extends TestCase {
 		$this->assertSame( array( 'html', 'img' ), $data_layer['gtm.blocklist'] );
 	}
 
+	/**
+	 * T45: the stored value can be an ARRAY, not only the comma string - the
+	 * sanitizer accepts both shapes and a third party writing the option row
+	 * directly can store either. The array branch skips the explode and was
+	 * never exercised; it must validate each entry exactly like the string
+	 * branch does.
+	 *
+	 * @return void
+	 */
+	public function test_blocklist_mode_reads_an_array_form_stored_status(): void {
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => array( 'html', 'evil', 'img' ),
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'html', 'img' ), $data_layer['gtm.blocklist'], 'The array shape is validated entry by entry, like the comma string.' );
+		$this->assertArrayNotHasKey( 'gtm.allowlist', $data_layer );
+	}
+
 	public function test_whitelist_mode_populates_gtm_allowlist(): void {
 		$module = $this->make_module(
 			array(

@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
+use GTM4WP\Modules\WooCommerce\CountryPhoneData;
 use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -704,5 +705,95 @@ final class HelpersTest extends TestCase {
 
 	public function test_normalize_and_hash_phone_number_empty_when_not_normalizable(): void {
 		$this->assertSame( '', Helpers::normalize_and_hash_phone_number( 'sha256', '20 123 4567', 'ZZ' ) );
+	}
+
+	/**
+	 * T44: the $trim_intermediate_spaces flag's two behaviors, discriminated by
+	 * a two-token input. Every sink fixture used to be single-token, where the
+	 * flag's value is invisible - a helper regressing to always-collapse (or a
+	 * call site flipping its argument) left the whole suite green while every
+	 * multi-word name hashed to an unmatchable value.
+	 */
+	public function test_normalize_and_hash_keeps_interior_spaces_when_asked_to(): void {
+		$actual = Helpers::normalize_and_hash( 'sha256', '  Mary Ann  ', false );
+
+		// TS-2 both directions: the space-keeping hash ships, the collapsed one
+		// (what an always-strip regression produces) does not.
+		$this->assertSame( hash( 'sha256', 'mary ann' ), $actual );
+		$this->assertNotSame( hash( 'sha256', 'maryann' ), $actual );
+	}
+
+	public function test_normalize_and_hash_strips_interior_spaces_when_asked_to(): void {
+		$actual = Helpers::normalize_and_hash( 'sha256', '  Mary Ann  ', true );
+
+		$this->assertSame( hash( 'sha256', 'maryann' ), $actual );
+		$this->assertNotSame( hash( 'sha256', 'mary ann' ), $actual );
+	}
+
+	/**
+	 * T47: the deliberately UNMODELLED input classes, pinned at their current
+	 * outputs. The docblock on normalize_phone_number() names international
+	 * access codes other than 00 (72 of 245 territories) as out of scope, and
+	 * U110 records the same - but nothing asserted what those inputs currently
+	 * produce, so an accidental change OR a future fix would both be invisible.
+	 *
+	 * These pin BEHAVIOR, not a contract: every value below is a known-wrong or
+	 * known-rejected output. If one of these cases starts producing the correct
+	 * E.164 (+442071234567), that is the fix landing - update the case and the
+	 * docblock/U110 clause together, do not "fix the test".
+	 *
+	 * @param string $typed    The number as dialled with a non-00 access code.
+	 * @param string $country  Billing country.
+	 * @param string $expected What the current implementation produces.
+	 * @return void
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_unmodelled_international_access_codes' )]
+	public function test_normalize_phone_number_unmodelled_access_codes_pinned( string $typed, string $country, string $expected ): void {
+		$this->assertSame( $expected, Helpers::normalize_phone_number( $typed, $country ) );
+	}
+
+	/**
+	 * Access codes the implementation deliberately does not model, with the
+	 * output each currently produces (measured 2026-08-13).
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: string}>
+	 */
+	public static function provide_unmodelled_international_access_codes(): array {
+		return array(
+			// AU dials out with 0011; the leading 00 is read as the international
+			// prefix and the residue misparsed - a well-formed wrong number.
+			'AU 0011 (documented out of scope)' => array( '0011 44 20 7123 4567', 'AU', '+11442071234567' ),
+			// RU dials out with 810; the leading 8 is read as the trunk prefix -
+			// a well-formed wrong number.
+			'RU 810 (documented out of scope)'  => array( '810 44 20 7123 4567', 'RU', '+710442071234567' ),
+			// US dials out with 011; the result fails the NANP shape and is
+			// rejected outright - accidentally safe (no wrong hash ships).
+			'US 011 (rejected, safe)'           => array( '011 44 20 7123 4567', 'US', '' ),
+		);
+	}
+
+	/**
+	 * T47: a multi-'@' input's current output, pinned (it mirrors Google's own
+	 * reference sample). A pin of behavior, not a contract - if the parse ever
+	 * changes, update this deliberately.
+	 */
+	public function test_normalize_and_hash_email_address_multi_at_output_pinned(): void {
+		$this->assertSame(
+			hash( 'sha256', 'a@gmail.com' ),
+			Helpers::normalize_and_hash_email_address( 'sha256', 'a@gmail.com@evil.com' )
+		);
+	}
+
+	/**
+	 * T47: CountryPhoneData::lookup() documents case/padding tolerance for its
+	 * callers; one row pins it (the table itself is guarded by the corpus and
+	 * the generator's validation, so this is the only lookup-shape assertion
+	 * the class needs).
+	 */
+	public function test_country_phone_data_lookup_tolerates_case_and_padding(): void {
+		$canonical = CountryPhoneData::lookup( 'HU' );
+
+		$this->assertNotNull( $canonical );
+		$this->assertSame( $canonical, CountryPhoneData::lookup( ' hu ' ) );
 	}
 }

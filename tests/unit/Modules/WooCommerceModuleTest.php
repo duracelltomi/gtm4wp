@@ -587,6 +587,32 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertContains( 'wc-cart-fragments', $result['scripts'] );
 	}
 
+	/**
+	 * T46: the third WC_STATE_COOKIES entry - woocommerce_cart_hash - opens the
+	 * gate on its own. It was the one untested leg of visitor_has_wc_state():
+	 * WooCommerce writes it beside the items-in-cart cookie but the two are not
+	 * guaranteed to travel together, so dropping the entry would silently gate
+	 * out a visitor whose only surviving cookie is the hash.
+	 *
+	 * @return void
+	 */
+	public function test_cache_safe_mode_loads_cart_fragments_for_the_cart_hash_cookie_alone(): void {
+		$this->stub_ordinary_page();
+		$_COOKIE['woocommerce_cart_hash'] = 'a1b2c3d4e5f6';
+
+		$result = $this->run_enqueue(
+			$this->make_module(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_CACHE_SAFE_DATALAYER     => true,
+					GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA => true,
+				)
+			)
+		);
+
+		$this->assertContains( 'wc-cart-fragments', $result['scripts'], 'The cart-hash cookie is WooCommerce state like the other two.' );
+	}
+
 	public function test_cache_safe_mode_off_does_not_load_the_channel(): void {
 		// The block is server-rendered in this configuration, so neither end is needed —
 		// and GTM4WP must not add WooCommerce's cart-refresh request to a store that

@@ -1352,6 +1352,41 @@ describe( 'gtm4wpObserveMedia SDK loading', () => {
 
 			expect( sdkTags() ).toHaveLength( 1 );
 		} );
+
+		it( 'a gate refusal latches for the page: later consent without a reload fetches nothing (T49)', async () => {
+			// Pinned as a DECISION, not an accident: a refused gate sets
+			// sdkRequested, so a CMP that flips the flags after in-page consent
+			// (no reload) never triggers a fetch - even for an embed inserted
+			// later. This is deliberately fail-closed and request-scoped: the
+			// gate answered once for this page load, and un-refusing it takes
+			// the reload the CMP performs anyway in its ordinary flow. The
+			// embed-blocked path above is the one that resumes without a
+			// reload. If this trade is ever revisited, change this case
+			// deliberately - a fetch appearing here is a behavior change, not
+			// a fix.
+			document.body.innerHTML = '<video></video>';
+			window.gtm4wp_media_observe_dynamic = true;
+			window.gtm4wp_media_gate_expected = true;
+			// The gate never ran: expected + unset flag = refused.
+
+			gtm4wpObserveMedia(
+				'video',
+				() => {},
+				() => false,
+				SDK
+			);
+
+			expect( sdkTags() ).toHaveLength( 0 );
+
+			// The CMP now "opens" the gate in place and new content arrives.
+			window.gtm4wp_media_sdk_allowed = true;
+			const late = document.createElement( 'video' );
+			document.body.appendChild( late );
+
+			await flush();
+
+			expect( sdkTags() ).toHaveLength( 0 );
+		} );
 	} );
 
 	it( 'fetches the SDK once, however many embeds match', () => {
