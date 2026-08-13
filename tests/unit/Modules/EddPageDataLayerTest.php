@@ -367,6 +367,7 @@ final class EddPageDataLayerTest extends TestCase {
 		$data_layer = $this->make_page_datalayer()->add_datalayer_data( array() );
 
 		$this->assertTrue( $data_layer['new_customer'] );
+		$this->assertSame( 'new', $data_layer['customer_type'], 'GA4 reads customer_type alongside the Google Ads new_customer boolean.' );
 
 		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
 		$this->assertStringContainsString( '"event":"purchase"', $pushed );
