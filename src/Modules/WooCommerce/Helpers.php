@@ -544,6 +544,13 @@ final class Helpers {
 	 * and this function was originally ported from that sample (#321), which is
 	 * how the plus rule went missing. Do not "restore" this to match the sample.
 	 *
+	 * The split below deviates from that sample a second time, deliberately:
+	 * everything after the FIRST '@' is the domain (explode limit 2), so a
+	 * string carrying more than one '@' is never treated as a foldable
+	 * mailbox - it is hashed exactly as typed. Ordinary addresses split
+	 * identically either way. Do not "restore" the sample's unlimited split;
+	 * the regression test pins both directions.
+	 *
 	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: the normalization rules, in prose.
 	 *
 	 * @param string $hash_algorithm the hash algorithm to use.
@@ -552,7 +559,7 @@ final class Helpers {
 	 */
 	public static function normalize_and_hash_email_address( string $hash_algorithm, string $email_address ): string {
 		$normalized_email = strtolower( $email_address );
-		$email_parts      = explode( '@', $normalized_email );
+		$email_parts      = explode( '@', $normalized_email, 2 );
 		if (
 			count( $email_parts ) > 1
 			// Anchored at both ends on purpose: an unanchored match also accepts

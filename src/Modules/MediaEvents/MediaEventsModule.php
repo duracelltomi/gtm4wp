@@ -27,24 +27,17 @@ defined( 'ABSPATH' ) || exit;
 final class MediaEventsModule extends AbstractModule {
 
 	/**
-	 * Whether the runtime-observer opt-in flag has been published to the page.
+	 * Memoized result of the gtm4wp_media_sdk_blocked filter.
 	 *
-	 * Published at most once per request (on the first media tracker enqueued),
-	 * so every tracker's shared helper reads a single boolean.
+	 * The DECISION is made once per request - the filter runs a single time,
+	 * so a third-party callback is not consulted once per tracker - while the
+	 * flag it produces is PRINTED per tracker handle. See the note in
+	 * enqueue_media_tracker() on why a page-wide fact must never ride a single
+	 * handle's tag.
 	 *
-	 * @var bool
+	 * @var bool|null
 	 */
-	private bool $dynamic_flag_published = false;
-
-	/**
-	 * Whether the third-party SDK veto has been published to the page.
-	 *
-	 * Same one-shot shape as $dynamic_flag_published: a single boolean the
-	 * shared helper reads, printed at most once per request.
-	 *
-	 * @var bool
-	 */
-	private bool $sdk_blocked_published = false;
+	private ?bool $sdk_blocked = null;
 
 	/**
 	 * Whether the consent gate has been enqueued for this request.
@@ -273,10 +266,9 @@ final class MediaEventsModule extends AbstractModule {
 		// though no gate existed - failing open in the one case the flag exists
 		// for.
 		//
-		// Deliberately per tracker rather than one-shot like the two flags below:
-		// blocking any single tracker must not take the expectation away from the
-		// others. The assignment is idempotent, so repeating it costs a few bytes
-		// and nothing else.
+		// Deliberately per tracker: blocking any single tracker must not take
+		// the expectation away from the others. The assignment is idempotent,
+		// so repeating it costs a few bytes and nothing else.
 		//
 		// It tracks the gate EXACTLY, which is why it sits under the same
 		// condition: announcing an expectation no gate was enqueued for would make
@@ -286,14 +278,24 @@ final class MediaEventsModule extends AbstractModule {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_gate_expected = true;', 'before' );
 		}
 
-		if ( ! $this->dynamic_flag_published && $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
+		// The same one-string mechanism makes these two page-wide flags
+		// per-tracker as well. They used to be printed once, on whichever
+		// tracker happened to enqueue first - so a consent manager blocking
+		// exactly that tracker's handle (a documented per-provider lever)
+		// deleted the flag together with the bundle it was riding on. For the
+		// veto that failed OPEN: the site's server-side "no media SDKs at all"
+		// decision vanished for every remaining tracker the moment one
+		// provider's tag was refused. The observer opt-in is read by every
+		// tracker, so it rides them all; the veto is only consulted on the SDK
+		// fetch path, so it rides the SDK-fetching handles. The filter behind
+		// sdk_blocked() still runs once per request (memoized) - only the
+		// printing is repeated.
+		if ( $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_observe_dynamic = true;', 'before' );
-			$this->dynamic_flag_published = true;
 		}
 
-		if ( ! $this->sdk_blocked_published && $this->sdk_blocked() ) {
+		if ( $fetches_sdk && $this->sdk_blocked() ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_sdk_blocked = true;', 'before' );
-			$this->sdk_blocked_published = true;
 		}
 	}
 
@@ -373,14 +375,18 @@ final class MediaEventsModule extends AbstractModule {
 	 * @return bool
 	 */
 	private function sdk_blocked(): bool {
-		/**
-		 * Filters whether GTM4WP may request a third-party media player SDK.
-		 *
-		 * @since 2.0.0
-		 *
-		 * @param bool $blocked Whether to withhold every media SDK request. Default false.
-		 */
-		return (bool) apply_filters( 'gtm4wp_media_sdk_blocked', false );
+		if ( null === $this->sdk_blocked ) {
+			/**
+			 * Filters whether GTM4WP may request a third-party media player SDK.
+			 *
+			 * @since 2.0.0
+			 *
+			 * @param bool $blocked Whether to withhold every media SDK request. Default false.
+			 */
+			$this->sdk_blocked = (bool) apply_filters( 'gtm4wp_media_sdk_blocked', false );
+		}
+
+		return $this->sdk_blocked;
 	}
 
 	/**

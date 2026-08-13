@@ -773,14 +773,26 @@ final class HelpersTest extends TestCase {
 	}
 
 	/**
-	 * T47: a multi-'@' input's current output, pinned (it mirrors Google's own
-	 * reference sample). A pin of behavior, not a contract - if the parse ever
-	 * changes, update this deliberately.
+	 * A string carrying more than one '@' is hashed exactly as typed: the
+	 * domain part is everything after the FIRST '@' (explode limit 2), so no
+	 * fold ever applies to it. TS-2 both directions - the folded spelling is
+	 * the regression.
 	 */
-	public function test_normalize_and_hash_email_address_multi_at_output_pinned(): void {
+	public function test_normalize_and_hash_email_address_hashes_a_multi_at_input_as_typed(): void {
+		$actual = Helpers::normalize_and_hash_email_address( 'sha256', 'a@gmail.com@evil.com' );
+
+		$this->assertSame( hash( 'sha256', 'a@gmail.com@evil.com' ), $actual, 'Hashed as typed - the domain part is everything after the FIRST @.' );
+		$this->assertNotSame( hash( 'sha256', 'a@gmail.com' ), $actual, 'The folded spelling must not come back.' );
+	}
+
+	/**
+	 * The guard above must not cost the genuine gmail fold: an ordinary
+	 * address splits identically under the explode limit.
+	 */
+	public function test_normalize_and_hash_email_address_gmail_fold_survives_the_split_limit(): void {
 		$this->assertSame(
-			hash( 'sha256', 'a@gmail.com' ),
-			Helpers::normalize_and_hash_email_address( 'sha256', 'a@gmail.com@evil.com' )
+			hash( 'sha256', 'janedoe@gmail.com' ),
+			Helpers::normalize_and_hash_email_address( 'sha256', 'Jane.Doe+tag@gmail.com' )
 		);
 	}
 

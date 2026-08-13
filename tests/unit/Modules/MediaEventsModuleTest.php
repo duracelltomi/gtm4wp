@@ -370,9 +370,14 @@ final class MediaEventsModuleTest extends TestCase {
 		);
 	}
 
-	public function test_dynamic_observer_flag_published_once_when_option_enabled(): void {
-		// Two trackers enabled plus the opt-in: the flag must be published exactly
-		// once (on the first tracker), not once per bundle.
+	public function test_dynamic_observer_flag_rides_every_tracker_handle(): void {
+		// Per tracker, not one-shot. WP_Scripts::do_item() hands a 'before'
+		// inline and the src tag to script_loader_tag as ONE string, so a flag
+		// printed only on the first tracker vanished whenever a consent manager
+		// blocked exactly that handle - and dynamic-embed observation silently
+		// switched off for every other tracker on the page. Each tracker now
+		// carries its own idempotent copy, so no single blocked handle can
+		// remove the page-wide fact.
 		$module = $this->make_module(
 			array(
 				GTM4WP_OPTION_EVENTS_VIMEO         => true,
@@ -383,14 +388,18 @@ final class MediaEventsModuleTest extends TestCase {
 		$module->enqueue_scripts();
 
 		$flag_scripts = $this->flag_inline_scripts();
-		$this->assertCount( 1, $flag_scripts );
+		$this->assertSame(
+			array( 'gtm4wp-vimeo', 'gtm4wp-html5media' ),
+			array_column( $flag_scripts, 0 ),
+			'Every enqueued tracker carries its own copy of the observer flag.'
+		);
 
-		[ $handle, $code, $position ] = $flag_scripts[0];
-		$this->assertSame( 'window.gtm4wp_media_observe_dynamic = true;', $code );
-		// Printed before the tracker bundle so the flag is set when it runs.
-		$this->assertSame( 'before', $position );
-		// Attached to a media tracker handle that was actually enqueued.
-		$this->assertContains( $handle, $this->enqueued );
+		foreach ( $flag_scripts as [ $handle, $code, $position ] ) {
+			$this->assertSame( 'window.gtm4wp_media_observe_dynamic = true;', $code, $handle );
+			// Printed before the tracker bundle so the flag is set when it runs.
+			$this->assertSame( 'before', $position, $handle );
+			$this->assertContains( $handle, $this->enqueued );
+		}
 	}
 
 	/**
@@ -612,29 +621,43 @@ final class MediaEventsModuleTest extends TestCase {
 	 * #125: the gtm4wp_media_sdk_blocked filter is the lever a site gets back for
 	 * the SDK requests that no longer pass through script_loader_tag.
 	 *
-	 * Published exactly once, before the bundle that reads it, on a handle that was
-	 * really enqueued - the same three properties the dynamic-observer flag has.
+	 * Per SDK-fetching tracker, not one-shot. The veto used to be printed once,
+	 * on whichever tracker enqueued first - and because a 'before' inline and
+	 * its src tag reach script_loader_tag as ONE string, a consent manager
+	 * blocking exactly that handle (a documented per-provider lever) deleted
+	 * the site-wide veto with it, and every remaining tracker fetched its SDK:
+	 * the broad server-side decision failed OPEN when a narrower one was
+	 * exercised. Each SDK-fetching handle now carries its own copy; the
+	 * fetch-nothing trackers never consult it, so they carry none. The filter
+	 * itself still runs exactly once per request (memoized), so a third-party
+	 * callback is not consulted once per tracker.
 	 *
 	 * @return void
 	 */
-	public function test_sdk_veto_published_once_when_filtered_on(): void {
-		Filters\expectApplied( 'gtm4wp_media_sdk_blocked' )->andReturn( true );
+	public function test_sdk_veto_rides_every_sdk_fetching_tracker_handle(): void {
+		Filters\expectApplied( 'gtm4wp_media_sdk_blocked' )->once()->andReturn( true );
 
 		$module = $this->make_module(
 			array(
 				GTM4WP_OPTION_EVENTS_VIMEO      => true,
+				GTM4WP_OPTION_EVENTS_YOUTUBE    => true,
 				GTM4WP_OPTION_EVENTS_HTML5MEDIA => true,
 			)
 		);
 		$module->enqueue_scripts();
 
 		$veto_scripts = $this->sdk_blocked_inline_scripts();
-		$this->assertCount( 1, $veto_scripts, 'Published once, not once per bundle.' );
+		$this->assertSame(
+			array( 'gtm4wp-youtube', 'gtm4wp-vimeo' ),
+			array_column( $veto_scripts, 0 ),
+			'Every SDK-fetching tracker carries its own copy of the veto; the fetch-nothing tracker carries none.'
+		);
 
-		[ $handle, $code, $position ] = $veto_scripts[0];
-		$this->assertSame( 'window.gtm4wp_media_sdk_blocked = true;', $code );
-		$this->assertSame( 'before', $position );
-		$this->assertContains( $handle, $this->enqueued );
+		foreach ( $veto_scripts as [ $handle, $code, $position ] ) {
+			$this->assertSame( 'window.gtm4wp_media_sdk_blocked = true;', $code, $handle );
+			$this->assertSame( 'before', $position, $handle );
+			$this->assertContains( $handle, $this->enqueued );
+		}
 	}
 
 	/**
