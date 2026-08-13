@@ -395,6 +395,64 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'A placed, trackable order must be remembered for the next-page fallback.' );
 	}
 
+	/**
+	 * Double-purchase regression: the standard order-received render consumes the
+	 * pending-purchase marker while emitting the purchase inline (wp_head), and
+	 * woocommerce_thankyou fires remember_order() later in the same request (the
+	 * template body). Re-seeding there re-armed the reliable-purchase fallback for
+	 * the very order the page already tracked, and the session endpoint then
+	 * delivered the same purchase a second time after page load whenever the
+	 * "Do not flag orders as being tracked" option had disabled the tracked-order
+	 * suppressors. A request that already pushed the purchase must never seed.
+	 */
+	public function test_remember_order_skips_when_the_purchase_was_already_pushed_this_request(): void {
+		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
+
+		$session = $this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_order() );
+
+		$this->make_tracking()->remember_order( 1001 );
+
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'A request that already emitted the purchase inline must not re-arm the reliable-purchase fallback.' );
+	}
+
+	/**
+	 * The customized-page half of the same regression: on_thankyou() pushes the
+	 * purchase inline, and remember_order() runs on the SAME woocommerce_thankyou
+	 * hook right after it. The push must raise the request-scoped flag so the
+	 * sequence cannot seed the fallback for the order it just tracked.
+	 */
+	public function test_on_thankyou_then_remember_order_does_not_seed_the_fallback(): void {
+		$session = $this->stub_wc_with_session();
+		$order   = $this->make_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$tracking = $this->make_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		ob_start();
+		$tracking->on_thankyou( 1001 );
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '"event":"purchase"', $output, 'Precondition: the thank-you fallback must have pushed the purchase.' );
+
+		$tracking->remember_order( 1001 );
+
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The thank-you render that pushed the purchase must not re-arm the fallback on the same hook.' );
+	}
+
+	/**
+	 * The negative branch: when on_thankyou() bails without pushing (here: the
+	 * eligibility gauntlet rejects an already-tracked order), the flag must stay
+	 * down so the checkout-time seed hooks keep working unchanged.
+	 */
+	public function test_on_thankyou_leaves_the_flag_down_when_nothing_was_pushed(): void {
+		$order = $this->make_order( array( 'meta' => array( '_ga_tracked' => 1 ) ) );
+
+		$this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $order );
+
+		$this->assertArrayNotHasKey( 'gtm4wp_woocommerce_purchase_data_pushed', $GLOBALS, 'A bailed thank-you fallback must not claim the purchase was pushed.' );
+	}
+
 	public function test_remember_order_skips_a_non_trackable_status(): void {
 		$session = $this->stub_wc_with_session();
 		Functions\when( 'wc_get_order' )->justReturn( $this->make_order( array( 'status' => 'pending' ) ) );

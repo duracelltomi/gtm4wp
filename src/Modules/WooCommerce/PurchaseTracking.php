@@ -133,6 +133,13 @@ final class PurchaseTracking {
 			$this->script_tag->print_script_block( $script_tag );
 
 			$this->product_data->flag_order_tracked( $order );
+
+			// Mark the purchase as handled for THIS request, exactly like the
+			// order-received page path does. remember_order() runs on this same
+			// woocommerce_thankyou hook right after this callback, and without the
+			// flag it would re-arm the reliable-purchase fallback for the very
+			// order whose purchase this page already carries.
+			$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
 		}
 	}
 
@@ -151,6 +158,22 @@ final class PurchaseTracking {
 	 * @return void
 	 */
 	public function remember_order( $order_id ): void {
+		/*
+		The render that emits the purchase inline sets this flag (the standard
+		order-received page in PageDataLayer::add_order_received_data(), the
+		on_thankyou fallback above, and the any-page session fallback). Seeding
+		the marker from such a request would re-arm the reliable-purchase
+		fallback for an order whose purchase this very page already carries:
+		the standard order-received render consumes the marker in wp_head and
+		this hook fires later in the template body, so without this guard the
+		session endpoint delivered the same purchase a second time after page
+		load whenever nothing else suppressed it ("Do not flag orders as being
+		tracked" disables every one of those suppressors by design).
+		*/
+		if ( ! empty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ) ) {
+			return;
+		}
+
 		$order_id = absint( $order_id );
 		if ( $order_id <= 0 ) {
 			return;

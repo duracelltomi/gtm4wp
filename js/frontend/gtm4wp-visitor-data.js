@@ -475,8 +475,10 @@ import {
 		// no state change, so this authenticated POST is what performs it. Only when the
 		// browser guard is in use (flag !== false); the "Do not flag orders as being
 		// tracked" case writes no order-tracked state anywhere, so it also sends no
-		// beacon — the server marker then lingers, but its only reader is this same
-		// resolver and the client's per-order guard already stops a re-push.
+		// beacon — the server marker then lingers with NO guard against a re-push
+		// (this branch skips the browser guard too). That is the option's contract:
+		// it asks for purchases to stay re-trackable, and the marker's only reader
+		// is this resolver, reached only while an event cookie is present.
 		if ( useGuard && confirmUrl ) {
 			fireConfirmBeacon( confirmUrl );
 		}
