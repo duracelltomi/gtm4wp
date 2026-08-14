@@ -31,6 +31,21 @@ const gtm4wp_edd_payment_info_fired = [];
 let gtm4wp_edd_gateway_events_seen = 0;
 
 /**
+ * Whether the opt-in GA4 list-attribution persistence (#405) is on. The flag
+ * is printed as a top-level const, so it binds lexically and must be read as
+ * a bare identifier - `window.gtm4wp_list_attribution` is permanently
+ * undefined.
+ *
+ * @return {boolean} Whether list attribution persistence is enabled.
+ */
+function gtm4wp_edd_list_attribution_enabled() {
+	return (
+		'undefined' !== typeof gtm4wp_list_attribution &&
+		!! gtm4wp_list_attribution
+	);
+}
+
+/**
  * Collects one GA4 item per checked price option of a variable-priced
  * purchase form: the option's price becomes the item price and its name the
  * GA4 item_variant.
@@ -118,6 +133,16 @@ function gtm4wp_edd_track_add_to_cart( trigger_element ) {
 		return false;
 	}
 
+	// #405: the buy-button markup is baked into cacheable HTML, so the list
+	// this visitor came from is merged client-side from the first-party
+	// cookie, keyed by the download id (internal_id was excluded above, so
+	// read it separately). Opt-in only.
+	let list_lookup_id = 0;
+	if ( gtm4wp_edd_list_attribution_enabled() ) {
+		const rawdata = gtm4wp_read_from_json( product_data_el.value, [] );
+		list_lookup_id = ( rawdata && rawdata.internal_id ) || 0;
+	}
+
 	let quantity = 1;
 	const qty_el = form.querySelector(
 		'input[name=edd_download_quantity],input.edd-item-quantity'
@@ -153,6 +178,12 @@ function gtm4wp_edd_track_add_to_cart( trigger_element ) {
 		productdata.quantity = quantity;
 		items.push( productdata );
 		sum_value = productdata.price * quantity;
+	}
+
+	if ( list_lookup_id ) {
+		items.forEach( function ( item ) {
+			gtm4wp_apply_stored_item_list( item, list_lookup_id );
+		} );
 	}
 
 	gtm4wp_push_ecommerce( 'add_to_cart', items, {
@@ -216,6 +247,18 @@ function gtm4wp_edd_track_price_option_view( option_input ) {
 
 	if ( 0 === checked.items.length ) {
 		return false;
+	}
+
+	// #405: merge the originating list onto the re-fired view_item from the
+	// first-party cookie, keyed by the download id. Opt-in only.
+	if ( gtm4wp_edd_list_attribution_enabled() ) {
+		const rawdata = gtm4wp_read_from_json( product_data_el.value, [] );
+		const list_lookup_id = ( rawdata && rawdata.internal_id ) || 0;
+		if ( list_lookup_id ) {
+			checked.items.forEach( function ( item ) {
+				gtm4wp_apply_stored_item_list( item, list_lookup_id );
+			} );
+		}
 	}
 
 	gtm4wp_push_ecommerce( 'view_item', checked.items, {
@@ -391,6 +434,28 @@ function gtm4wp_edd_process_pages() {
 				matching_link_element.getAttribute( 'href' )
 			) {
 				return true;
+			}
+
+			// #405: persist this list attribution (keyed by download id) so
+			// the later view_item / add_to_cart / checkout / purchase events
+			// can be attributed back to the originating list. internal_id was
+			// excluded above, so read it straight from the node. Opt-in only.
+			if (
+				gtm4wp_edd_list_attribution_enabled() &&
+				productdata.item_list_name
+			) {
+				const list_source = gtm4wp_read_json_from_node(
+					productdata_el,
+					'gtm4wp_product_data',
+					[]
+				);
+				if ( list_source && list_source.internal_id ) {
+					gtm4wp_store_item_list_attribution(
+						list_source.internal_id,
+						productdata.item_list_name,
+						productdata.item_list_id
+					);
+				}
 			}
 
 			// Look at the first GTM container ID in case there are multiple GTM

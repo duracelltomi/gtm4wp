@@ -101,6 +101,10 @@ describe( 'gtm4wp-edd tracker', () => {
 		delete window.gtm4wp_checkout_products;
 		delete window.gtm4wp_checkout_value;
 		delete window.gtm4wp_edd_variable_view_item;
+		delete global.gtm4wp_list_attribution;
+
+		global.gtm4wp_store_item_list_attribution = jest.fn();
+		global.gtm4wp_apply_stored_item_list = jest.fn( ( item ) => item );
 
 		global.gtm4wp_push_ecommerce = jest.fn();
 		global.gtm4wp_make_sure_is_float = ( value ) => {
@@ -378,6 +382,60 @@ describe( 'gtm4wp-edd tracker', () => {
 			.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
 
 		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'stores and applies list attribution only when the flag is on', () => {
+		global.gtm4wp_list_attribution = 1;
+		document.body.innerHTML =
+			grid_fixture() + purchase_form_fixture( PURCHASE_FORM_ITEM );
+
+		boot_tracker();
+
+		// A select_item list click persists the clicked list, keyed by the
+		// download id read straight from the node (internal_id is excluded
+		// from the event payload itself).
+		document
+			.querySelector( '.edd_download a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+		expect(
+			global.gtm4wp_store_item_list_attribution
+		).toHaveBeenCalledWith( 55, 'Downloads List', undefined );
+
+		// An add_to_cart click merges the stored list onto its items.
+		document
+			.querySelector( '.edd-add-to-cart' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+		expect( global.gtm4wp_apply_stored_item_list ).toHaveBeenCalledWith(
+			expect.objectContaining( { item_id: 55 } ),
+			55
+		);
+	} );
+
+	it( 'never touches list attribution while the flag is off', () => {
+		document.body.innerHTML =
+			grid_fixture() + purchase_form_fixture( PURCHASE_FORM_ITEM );
+
+		boot_tracker();
+
+		document
+			.querySelector( '.edd_download a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+		document
+			.querySelector( '.edd-add-to-cart' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect(
+			global.gtm4wp_store_item_list_attribution
+		).not.toHaveBeenCalled();
+		expect( global.gtm4wp_apply_stored_item_list ).not.toHaveBeenCalled();
 	} );
 
 	it( 'fires remove_from_cart from the checkout cart row data', () => {

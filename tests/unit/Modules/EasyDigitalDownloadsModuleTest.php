@@ -118,10 +118,11 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 	public function test_global_vars_carry_the_edd_settings(): void {
 		Functions\when( 'get_option' )->justReturn(
 			array(
-				GTM4WP_OPTION_INTEGRATE_EDDUSESKU       => true,
+				GTM4WP_OPTION_INTEGRATE_EDDUSESKU          => true,
 				GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION => 25,
 				GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL => true,
-				GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT => 500,
+				GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT    => 500,
+				GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION => true,
 			)
 		);
 		Functions\when( 'edd_get_currency' )->justReturn( 'EUR' );
@@ -137,6 +138,7 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertTrue( $vars['gtm4wp_clear_ecommerce'] );
 		$this->assertSame( 500, $vars['gtm4wp_datalayer_max_timeout'] );
 		$this->assertTrue( $vars['gtm4wp_console_log'] );
+		$this->assertSame( 1, $vars['gtm4wp_list_attribution'] );
 	}
 
 	public function test_enqueues_the_generic_helper_and_the_edd_tracker(): void {

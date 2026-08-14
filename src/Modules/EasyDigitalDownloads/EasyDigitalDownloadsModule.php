@@ -69,6 +69,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX => '',
 			GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES    => array( 'pending', 'processing', 'complete' ),
 			GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE      => false,
+			GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION     => false,
 		);
 	}
 
@@ -142,6 +143,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 	 */
 	public function add_global_vars( $return_vars ) {
 		$return_vars['gtm4wp_use_sku_instead']        = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDUSESKU );
+		$return_vars['gtm4wp_list_attribution']       = (int) ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION ) );
 		$return_vars['gtm4wp_currency']               = function_exists( 'edd_get_currency' ) ? edd_get_currency() : '';
 		$return_vars['gtm4wp_product_per_impression'] = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION );
 		$return_vars['gtm4wp_clear_ecommerce']        = (bool) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL );

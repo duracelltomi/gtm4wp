@@ -76,6 +76,112 @@ final class Helpers {
 	public const ORDER_TRACKED_COOKIE = 'gtm4wp_orderid_tracked';
 
 	/**
+	 * Name of the first-party cookie that carries GA4 list attribution
+	 * (item_list_name / item_list_id keyed by product/download id) across the
+	 * funnel (#405). Written client-side by the store trackers on a
+	 * select_item list click; must match the literal used in
+	 * js/frontend/gtm4wp-ecommerce-generic.js.
+	 */
+	public const LIST_ATTRIBUTION_COOKIE = 'gtm4wp_item_list_attr';
+
+	/**
+	 * Name of the JavaScript function the server-rendered product-detail
+	 * view_item push is wrapped in so the list attribution is merged in the
+	 * browser instead of being baked into cacheable HTML (#405).
+	 *
+	 * PHP writes this identifier into a <script> body and JS has to define it
+	 * under exactly this name: it must match the window export at the bottom of
+	 * js/frontend/gtm4wp-ecommerce-generic.js. A mismatch is silent - the
+	 * emitted call falls back to an identity function, so the event still fires,
+	 * just without the attribution.
+	 */
+	public const LIST_ATTRIBUTION_JS_WRAPPER = 'gtm4wp_apply_stored_item_list_to_event';
+
+	/**
+	 * Hard caps on the list-attribution cookie so a crafted or bloated cookie
+	 * can never make the reader do unbounded work: entries beyond the limit are
+	 * dropped and an oversized cookie is ignored wholesale.
+	 *
+	 * The byte cap is measured on the DECODED value, because PHP URL-decodes
+	 * $_COOKIE before we see it, while the writer's own budget
+	 * (GTM4WP_LIST_ATTR_MAX_BYTES in js/frontend/gtm4wp-ecommerce-generic.js) is
+	 * measured on the encoded bytes a browser counts against its ~4096-byte
+	 * per-cookie limit. The same number therefore means different things on the
+	 * two sides and they are not a pair to keep in sync: anything a browser
+	 * accepted decodes to well under this cap, so this one only ever rejects a
+	 * cookie no browser wrote.
+	 */
+	public const LIST_ATTRIBUTION_MAX_ENTRIES      = 20;
+	public const LIST_ATTRIBUTION_COOKIE_MAX_BYTES = 4096;
+
+	/**
+	 * Reads and validates the first-party list-attribution cookie (#405) into a
+	 * map of product id => array( item_list_name, item_list_id ). The cookie is
+	 * untrusted client input, so every part is sanitized here: the id via absint,
+	 * the list name via sanitize_text_field and the id via sanitize_title. The
+	 * sanitized values are returned RAW (not entity-encoded) so the downstream
+	 * wp_json_encode() dataLayer sink can escape them once and correctly. A
+	 * malformed, non-JSON or oversized cookie yields an empty map, and no more
+	 * than LIST_ATTRIBUTION_MAX_ENTRIES entries are ever ACCEPTED. Note that the
+	 * loop still visits every decoded entry, so the bound on the work done is the
+	 * LIST_ATTRIBUTION_COOKIE_MAX_BYTES cap above (a few hundred entries at most),
+	 * not the entry cap - keep that byte cap if you ever relax the entry cap.
+	 *
+	 * @return array<int, array{item_list_name: string, item_list_id: string}>
+	 */
+	public static function read_item_list_cookie(): array {
+		if ( ! isset( $_COOKIE[ self::LIST_ATTRIBUTION_COOKIE ] ) ) {
+			return array();
+		}
+
+		// The raw value is a JSON container, not a value used at any output sink; it
+		// is json_decode'd below and every extracted field is individually sanitized
+		// (absint on ids, sanitize_text_field on names, sanitize_title on ids). A
+		// blanket sanitizer here would corrupt valid multi-entry JSON, so it is
+		// unslashed only and each field is sanitized after decoding.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$raw = wp_unslash( $_COOKIE[ self::LIST_ATTRIBUTION_COOKIE ] );
+		if ( ! is_string( $raw ) || strlen( $raw ) > self::LIST_ATTRIBUTION_COOKIE_MAX_BYTES ) {
+			return array();
+		}
+
+		$decoded = json_decode( $raw, true );
+		if ( ! is_array( $decoded ) ) {
+			return array();
+		}
+
+		$map   = array();
+		$count = 0;
+		foreach ( $decoded as $product_id => $entry ) {
+			if ( $count >= self::LIST_ATTRIBUTION_MAX_ENTRIES ) {
+				break;
+			}
+
+			$pid = absint( $product_id );
+			if ( $pid <= 0 || ! is_array( $entry ) ) {
+				continue;
+			}
+
+			$name = isset( $entry['item_list_name'] ) ? sanitize_text_field( (string) $entry['item_list_name'] ) : '';
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$id = ( isset( $entry['item_list_id'] ) && '' !== $entry['item_list_id'] )
+				? sanitize_title( (string) $entry['item_list_id'] )
+				: sanitize_title( $name );
+
+			$map[ $pid ] = array(
+				'item_list_name' => $name,
+				'item_list_id'   => $id,
+			);
+			++$count;
+		}
+
+		return $map;
+	}
+
+	/**
 	 * Takes a product ID and returns a string that has a prefix appended.
 	 *
 	 * This is needed in cases where the generated feed has IDs with some sort of constant prefix and
