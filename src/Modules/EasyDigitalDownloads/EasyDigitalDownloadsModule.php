@@ -108,6 +108,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 		// form (add_to_cart) and a span in every checkout cart row
 		// (remove_from_cart). All read client-side by gtm4wp-edd.js.
 		add_action( 'edd_download_after', array( $list_tracking, 'after_download_shortcode_item' ) );
+		add_action( 'edd_blocks_downloads_after_entry_title', array( $list_tracking, 'after_downloads_block_item' ), 10, 0 );
 		add_action( 'edd_purchase_link_end', array( $list_tracking, 'purchase_link_data' ), 10, 2 );
 		add_action( 'edd_checkout_cart_item_title_after', array( $list_tracking, 'checkout_cart_item_data' ), 10, 2 );
 

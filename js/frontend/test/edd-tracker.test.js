@@ -195,6 +195,33 @@ describe( 'gtm4wp-edd tracker', () => {
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'productlink' );
 	} );
 
+	it( 'fires select_item for links in the EDD downloads block grid', () => {
+		document.body.innerHTML =
+			'<article class="edd-blocks__download">' +
+			'<span class="gtm4wp_edd_productdata" data-gtm4wp_product_data=\'' +
+			JSON.stringify( GRID_ITEM ) +
+			"'></span>" +
+			'<a href="https://shop/downloads/my-ebook/">My eBook</a>' +
+			'</article>';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd-blocks__download a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'select_item'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 55 } )
+		);
+	} );
+
 	it( 'fires add_to_cart with the form data on a buy button click', () => {
 		document.body.innerHTML = purchase_form_fixture( PURCHASE_FORM_ITEM );
 
@@ -374,6 +401,46 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'cart_key' );
 		expect( call[ 2 ].value ).toBeCloseTo( 19.98 );
+	} );
+
+	it( 'fires remove_from_cart from the cart block div rows', () => {
+		const cart_item = {
+			item_id: 55,
+			item_name: 'My eBook',
+			price: 9.99,
+			quantity: 1,
+			cart_key: 0,
+		};
+
+		// The cart block renders div rows (not tr) and AJAX remove links
+		// with the edd-remove-from-cart class instead of
+		// edd_cart_remove_item_btn.
+		document.body.innerHTML =
+			'<div class="edd-blocks-cart__row edd-blocks-cart__row-item edd_cart_item">' +
+			'<div class="edd_cart_item_name">My eBook' +
+			'<span class="gtm4wp_edd_cartitemdata" data-gtm4wp_product_data=\'' +
+			JSON.stringify( cart_item ) +
+			"'></span></div>" +
+			'<a class="edd-blocks-cart__action-remove edd-remove-from-cart" href="#">Remove</a>' +
+			'</div>';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd-remove-from-cart' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'remove_from_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 55 } )
+		);
+		expect( call[ 2 ].value ).toBeCloseTo( 9.99 );
 	} );
 
 	it( 'skips the initial gateway load and reports later gateway picks once', () => {

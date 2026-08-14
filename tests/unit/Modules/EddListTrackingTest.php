@@ -97,6 +97,20 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertStringContainsString( '&quot;index&quot;:2', $second, 'Every item gets its running list position.' );
 	}
 
+	public function test_downloads_block_items_emit_the_same_grid_span(): void {
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+
+		$list_tracking = $this->make_list_tracking();
+
+		// The block hook shares the running list position with the shortcode.
+		$first  = $this->capture_output( array( $list_tracking, 'after_downloads_block_item' ) );
+		$second = $this->capture_output( array( $list_tracking, 'after_download_shortcode_item' ) );
+
+		$this->assertStringContainsString( 'class="gtm4wp_edd_productdata"', $first );
+		$this->assertStringContainsString( '&quot;index&quot;:1', $first );
+		$this->assertStringContainsString( '&quot;index&quot;:2', $second );
+	}
+
 	public function test_grid_span_escapes_a_hostile_title_for_the_attribute_context(): void {
 		Functions\when( 'get_the_ID' )->justReturn( 55 );
 		Functions\when( 'edd_get_download' )->alias(

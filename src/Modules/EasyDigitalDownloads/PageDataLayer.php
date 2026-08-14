@@ -80,9 +80,9 @@ final class PageDataLayer {
 
 	/**
 	 * Whether the current request renders a page carrying the [download_cart]
-	 * shortcode - EDD has no dedicated is_cart conditional, so the shortcode
-	 * is the cart page signal. Content-driven, never visitor-driven, so it is
-	 * safe under full-page caching.
+	 * shortcode or a full EDD cart block - EDD has no dedicated is_cart
+	 * conditional, so the page content is the cart page signal. Content-driven,
+	 * never visitor-driven, so it is safe under full-page caching.
 	 *
 	 * @return bool
 	 */
@@ -92,8 +92,54 @@ final class PageDataLayer {
 		}
 
 		$post = get_post();
+		if ( ! ( $post instanceof \WP_Post ) ) {
+			return false;
+		}
 
-		return ( $post instanceof \WP_Post ) && has_shortcode( (string) $post->post_content, 'download_cart' );
+		$content = (string) $post->post_content;
+
+		return has_shortcode( $content, 'download_cart' ) || $this->has_full_cart_block( $content );
+	}
+
+	/**
+	 * Whether the content contains an EDD cart block rendering the full cart.
+	 * The block's mini attribute defaults to true (an icon/total link with no
+	 * cart rows), so only an explicit mini=false marks a cart page.
+	 *
+	 * @param string $content The post content.
+	 * @return bool
+	 */
+	private function has_full_cart_block( string $content ): bool {
+		if ( ! has_block( 'edd/cart', $content ) ) {
+			return false;
+		}
+
+		return $this->blocks_contain_full_cart( parse_blocks( $content ) );
+	}
+
+	/**
+	 * Recursively searches parsed block structures for an edd/cart block with
+	 * the mini attribute explicitly disabled.
+	 *
+	 * @param array<int, mixed> $blocks Parsed block structures.
+	 * @return bool
+	 */
+	private function blocks_contain_full_cart( array $blocks ): bool {
+		foreach ( $blocks as $block ) {
+			if ( ! is_array( $block ) ) {
+				continue;
+			}
+
+			if ( 'edd/cart' === ( $block['blockName'] ?? '' ) && false === ( $block['attrs']['mini'] ?? true ) ) {
+				return true;
+			}
+
+			if ( is_array( $block['innerBlocks'] ?? null ) && $this->blocks_contain_full_cart( $block['innerBlocks'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
