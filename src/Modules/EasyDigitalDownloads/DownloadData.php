@@ -630,6 +630,18 @@ final class DownloadData {
 
 		$address_row = $order->get_address();
 
+		$phone = $this->order_phone( $order );
+		if ( '' !== $phone ) {
+			// Same omission rule as the email above: '' from the normalizer
+			// means the number could not be placed in E.164, and a
+			// present-but-empty identifier is the consumer's call to
+			// interpret, not ours (RI-13).
+			$phone_hash = Helpers::normalize_and_hash_phone_number( 'sha256', $phone, (string) self::row_prop( $address_row, 'country' ) );
+			if ( '' !== $phone_hash ) {
+				$user_data['sha256_phone_number'] = $phone_hash;
+			}
+		}
+
 		$address    = array();
 		$first_name = (string) self::row_prop( $address_row, 'first_name' );
 		if ( '' !== $first_name ) {
@@ -663,6 +675,46 @@ final class DownloadData {
 		}
 
 		return $user_data;
+	}
+
+	/**
+	 * Returns the buyer's phone number for an order, or '' when none is
+	 * stored. EDD core collects no phone number, so this reads the de-facto
+	 * community conventions: EDD 3 order meta under the key 'phone', then the
+	 * 'phone' entry of the legacy payment meta array - the storage EDD's own
+	 * documented checkout-phone-field recipe uses - and finally lets site code
+	 * supply or override the number through the gtm4wp_edd_order_phone filter
+	 * (e.g. mapping a Checkout Fields Manager field).
+	 *
+	 * @param \EDD\Orders\Order $order The order to read the phone number from.
+	 * @return string
+	 */
+	private function order_phone( \EDD\Orders\Order $order ): string {
+		$order_id = (int) self::row_prop( $order, 'id', 0 );
+
+		$phone = '';
+
+		if ( $order_id > 0 && function_exists( 'edd_get_order_meta' ) ) {
+			$phone = (string) edd_get_order_meta( $order_id, 'phone', true );
+		}
+
+		if ( '' === $phone && $order_id > 0 && function_exists( 'edd_get_payment_meta' ) ) {
+			$payment_meta = edd_get_payment_meta( $order_id );
+			if ( is_array( $payment_meta ) && isset( $payment_meta['phone'] ) && is_scalar( $payment_meta['phone'] ) ) {
+				$phone = (string) $payment_meta['phone'];
+			}
+		}
+
+		/**
+		 * Filters the buyer phone number used for the Enhanced Conversions
+		 * user_data block of an EDD purchase. The number is normalized to
+		 * E.164 and SHA-256 hashed before it reaches the data layer; returning
+		 * '' removes the phone from the block.
+		 *
+		 * @param string            $phone The phone number found in order/payment meta, or ''.
+		 * @param \EDD\Orders\Order $order The order being tracked.
+		 */
+		return sanitize_text_field( (string) apply_filters( GTM4WP_WPFILTER_EDD_ORDER_PHONE, $phone, $order ) );
 	}
 
 	/**

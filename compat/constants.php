@@ -322,3 +322,4 @@ define( 'GTM4WP_WPFILTER_EEC_EDD_ORDER_ITEM', 'gtm4wp_eec_edd_order_item' );
 define( 'GTM4WP_WPFILTER_EEC_EDD_ORDER_DATA', 'gtm4wp_eec_edd_order_data' );
 define( 'GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER', 'gtm4wp_edd_purchase_datalayer' );
 define( 'GTM4WP_WPFILTER_EDD_DATALAYER_PAGELOAD', 'gtm4wp_edd_datalayer_on_pageload' );
+define( 'GTM4WP_WPFILTER_EDD_ORDER_PHONE', 'gtm4wp_edd_order_phone' );

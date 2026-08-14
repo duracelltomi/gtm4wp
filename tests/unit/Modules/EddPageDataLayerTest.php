@@ -65,6 +65,7 @@ final class EddPageDataLayerTest extends TestCase {
 		Functions\when( 'edd_get_currency' )->justReturn( 'USD' );
 		Functions\when( 'edd_get_download_sku' )->justReturn( false );
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+		Functions\when( 'edd_get_payment_meta' )->justReturn( null );
 		Functions\when( 'edd_get_download' )->alias(
 			static fn ( $id ) => new \EDD_Download(
 				array(

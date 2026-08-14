@@ -38,6 +38,7 @@ final class DownloadDataTest extends TestCase {
 
 		Functions\when( 'edd_get_download_sku' )->justReturn( false );
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+		Functions\when( 'edd_get_payment_meta' )->justReturn( null );
 		Functions\when( 'edd_get_download' )->alias(
 			static fn ( $id ) => new \EDD_Download(
 				array(
@@ -334,6 +335,60 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( hash( 'sha256', 'buyer@example.com' ), $data_layer['user_data']['sha256_email_address'] );
 		$this->assertSame( hash( 'sha256', 'jane' ), $data_layer['user_data']['address']['sha256_first_name'] );
 		$this->assertSame( 'HU', $data_layer['user_data']['address']['country'] );
+		$this->assertArrayNotHasKey( 'sha256_phone_number', $data_layer['user_data'], 'EDD core collects no phone; without stored meta the key must be absent.' );
+	}
+
+	public function test_purchase_datalayer_hashes_a_phone_stored_by_a_checkout_field_extension(): void {
+		// The de-facto community storage (EDD's own documented checkout-phone
+		// recipe): the 'phone' entry of the legacy payment meta array. The
+		// number is normalized to E.164 against the order country first.
+		Functions\when( 'edd_get_payment_meta' )->justReturn( array( 'phone' => '06 20 123 4567' ) );
+
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer(
+			$this->make_order(
+				array( 'address' => array( 'country' => 'HU' ) )
+			)
+		);
+
+		$this->assertSame(
+			hash( 'sha256', '+36201234567' ),
+			$data_layer['user_data']['sha256_phone_number']
+		);
+	}
+
+	public function test_purchase_datalayer_phone_prefers_order_meta_and_honours_the_filter(): void {
+		Functions\when( 'edd_get_order_meta' )->justReturn( '+49 30 12345678' );
+		Functions\when( 'edd_get_payment_meta' )->justReturn( array( 'phone' => '+1 201 555 0123' ) );
+
+		// Site code gets the last word through the public filter.
+		Filters\expectApplied( GTM4WP_WPFILTER_EDD_ORDER_PHONE )
+			->once()
+			->with( '+49 30 12345678', \Mockery::type( \EDD\Orders\Order::class ) )
+			->andReturn( '+36 20 123 4567' );
+
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer( $this->make_order() );
+
+		$this->assertSame(
+			hash( 'sha256', '+36201234567' ),
+			$data_layer['user_data']['sha256_phone_number']
+		);
+	}
+
+	public function test_purchase_datalayer_omits_a_phone_that_cannot_be_normalized(): void {
+		// Both directions (TS-2): an unplaceable number costs the phone key
+		// only, never the rest of the user_data block.
+		Functions\when( 'edd_get_payment_meta' )->justReturn( array( 'phone' => 'n/a' ) );
+
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer( $this->make_order() );
+
+		$this->assertArrayNotHasKey( 'sha256_phone_number', $data_layer['user_data'] );
+		$this->assertSame( hash( 'sha256', 'buyer@example.com' ), $data_layer['user_data']['sha256_email_address'] );
 	}
 
 	public function test_purchase_datalayer_omits_an_email_hash_that_folds_away_to_nothing(): void {
