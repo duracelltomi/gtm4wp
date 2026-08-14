@@ -125,7 +125,7 @@ dataLayer during `GTM4WP_WPFILTER_COMPILE_DATALAYER`; "Client" = fired by
 
 | Event | Trigger | Side | Implementation |
 |---|---|---|---|
-| `view_item` | `is_singular( 'download' )` | Server | `PageDataLayer`. Variable-price downloads: emit with the lowest price option (`edd_get_lowest_price_option()`), `item_variant` empty; no re-fire on option change in v1 (no EDD equivalent of `found_variation`). |
+| `view_item` | `is_singular( 'download' )` | Server (+ client re-fire) | `PageDataLayer`. Variable-price downloads: emit with the lowest price option (`edd_get_lowest_price_option()`), `item_variant` empty. EDD has no `found_variation` equivalent, so the tracker listens for `change` on `.edd_price_options input` itself and re-fires `view_item` with the picked option's price/name — armed by a `window.gtm4wp_edd_variable_view_item` flag printed only on the download's own page, and skipping forms inside grid items (`.edd_download`, `.edd-blocks__download`). |
 | `view_item_list` | `.gtm4wp_productdata` spans present in DOM | Client (shared logic) | `ListTracking` hooks `edd_download_after` (fires per item inside `templates/shortcode-download.php` for the `[downloads]` grid) to emit the same span markup the generic JS already reads; chunked by product-per-impression. |
 | `select_item` | Delegated click on links inside download-list items | Client | Same eventCallback + max-timeout navigation delay as WC, reusing the shared helper. |
 | `add_to_cart` | Click on `.edd-add-to-cart` (form `.edd_download_purchase_form`) | Client | Item data from a hidden input injected via `edd_purchase_link_end` (`$download_id, $args` — fires just before `</form>`); price/variant read from the checked `edd_options[price_id][]` radio/checkbox (`data-price` attr). Multi-price mode (checkboxes) ⇒ one event with multiple items. Covers AJAX and non-AJAX carts alike since it's click-driven; `edd_cart_item_added` on `document.body` is the AJAX-success signal but carries only totals, so click capture is primary. Buy Now (`edd_action=straight_to_gateway`) buttons fire `add_to_cart` too. |
@@ -136,8 +136,8 @@ dataLayer during `GTM4WP_WPFILTER_COMPILE_DATALAYER`; "Client" = fired by
 | `add_payment_info` | jQuery `edd_gateway_loaded` on `body` (gateway slug arg) + fallback on purchase-button submit | Client | Gateway radios are `input[name="payment-mode"]`. Fire once per selected gateway (dedupe like WC); ignore the initial page-load `edd_gateway_loaded` unless it's the only signal before submit. |
 | `purchase` | `edd_is_success_page()` | Server | See §5. |
 
-WooCommerce-only surfaces with no EDD counterpart (no work planned): variation
-`view_item`, Quick View, cart-quantity add/remove diffing (EDD checkout has
+WooCommerce-only surfaces with no EDD counterpart (no work planned): Quick
+View, cart-quantity add/remove diffing (EDD checkout has
 quantity fields only when a setting enables them — backlog), WC Blocks/Store
 API mirroring (EDD's checkout block needs its own research — open item),
 re-added-to-cart "Undo" session event.
@@ -356,8 +356,12 @@ per-file fetches; line-level details need a local checkout):
    (behavior + session key `edd_purchase` verified via call sites only).
 3. Exact remove-link selectors/classes in `templates/checkout_cart.php` and
    `templates/widget-cart-item.php`.
-4. Whether EDD appends purchase buttons to archive pages via a `the_content`
-   filter (would extend list tracking to archives cheaply).
+4. ~~Whether EDD appends purchase buttons to archive pages via a `the_content`
+   filter (would extend list tracking to archives cheaply).~~ Answered
+   2026-08-14 against EDD 3.3.5.2: it does not — `edd_before/after_download_content`
+   are gated on `is_singular( 'download' ) && is_main_query()`, so archive
+   markup is entirely theme territory and archive list tracking has no EDD-side
+   hook to build on.
 5. `edd_get_customer_by()` / `purchase_count` for the new_customer flag.
 6. EDD checkout block internals (does it render the classic form server-side?).
 7. Order status at success-page arrival per major gateway (Stripe vs PayPal) —

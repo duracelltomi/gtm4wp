@@ -4,7 +4,9 @@
  * Fires the client-side GA4 e-commerce events of the EDD integration:
  * view_item_list (impressions of the [downloads] grid), select_item,
  * add_to_cart (buy button clicks incl. Buy Now), remove_from_cart
- * (checkout cart remove links) and add_payment_info (gateway selection).
+ * (checkout cart remove links), add_payment_info (gateway selection) and
+ * the view_item re-fire when the buyer picks a price option of a
+ * variable-priced download on its detail page.
  *
  * Reads the hidden markup emitted by the ListTracking PHP class:
  * span.gtm4wp_edd_productdata (grid items), input[name=gtm4wp_product_data]
@@ -26,6 +28,50 @@ const gtm4wp_edd_payment_info_fired = [];
 // EDD fires edd_gateway_loaded once while the checkout page initializes;
 // only a later firing means the buyer actively picked a gateway.
 let gtm4wp_edd_gateway_events_seen = 0;
+
+/**
+ * Collects one GA4 item per checked price option of a variable-priced
+ * purchase form: the option's price becomes the item price and its name the
+ * GA4 item_variant.
+ *
+ * @param {Element} form          The purchase form.
+ * @param {Object}  productdata   The base item data (without price_options).
+ * @param {Object}  price_options The price_id => {name, price} option map.
+ * @param {number}  quantity      The quantity to report on every item.
+ * @return {{items: Array, value: number}} The items and their summed value.
+ */
+function gtm4wp_edd_checked_price_option_items(
+	form,
+	productdata,
+	price_options,
+	quantity
+) {
+	const items = [];
+	let sum_value = 0;
+
+	const checked_options = form.querySelectorAll(
+		'.edd_price_options input:checked'
+	);
+
+	checked_options.forEach( function ( option_input ) {
+		const price_option = price_options[ option_input.value ];
+		if ( ! price_option ) {
+			return;
+		}
+
+		const item = Object.assign( {}, productdata );
+		item.price = gtm4wp_make_sure_is_float( price_option.price );
+		if ( price_option.name ) {
+			item.item_variant = price_option.name;
+		}
+		item.quantity = quantity;
+
+		items.push( item );
+		sum_value += item.price * item.quantity;
+	} );
+
+	return { items, value: sum_value };
+}
 
 /**
  * Fires the GA4 add_to_cart event for an EDD purchase (buy button) form.
@@ -85,33 +131,21 @@ function gtm4wp_edd_track_add_to_cart( trigger_element ) {
 	const price_options = productdata.price_options;
 	delete productdata.price_options;
 
-	const items = [];
+	let items = [];
 	let sum_value = 0;
 
 	if ( price_options ) {
 		// Variable prices: one item per checked price option (radio in single
 		// mode, checkboxes in multi mode), carrying the option's price and
 		// name as the GA4 item_variant.
-		const checked_options = form.querySelectorAll(
-			'.edd_price_options input:checked'
+		const checked = gtm4wp_edd_checked_price_option_items(
+			form,
+			productdata,
+			price_options,
+			quantity
 		);
-
-		checked_options.forEach( function ( option_input ) {
-			const price_option = price_options[ option_input.value ];
-			if ( ! price_option ) {
-				return;
-			}
-
-			const item = Object.assign( {}, productdata );
-			item.price = gtm4wp_make_sure_is_float( price_option.price );
-			if ( price_option.name ) {
-				item.item_variant = price_option.name;
-			}
-			item.quantity = quantity;
-
-			items.push( item );
-			sum_value += item.price * item.quantity;
-		} );
+		items = checked.items;
+		sum_value = checked.value;
 	}
 
 	if ( 0 === items.length ) {
@@ -129,6 +163,67 @@ function gtm4wp_edd_track_add_to_cart( trigger_element ) {
 }
 
 window.gtm4wp_edd_track_add_to_cart = gtm4wp_edd_track_add_to_cart;
+
+/**
+ * Re-fires the GA4 view_item event with the picked price option when the
+ * buyer selects an option of a variable-priced download on its own detail
+ * page - the EDD counterpart of the WooCommerce tracker's found_variation
+ * handling. The PHP data layer sets window.gtm4wp_edd_variable_view_item on
+ * singular download pages only, and forms inside grid items (the [downloads]
+ * shortcode or the EDD downloads block) are ignored even there: interacting
+ * with a grid item stays list territory (select_item / add_to_cart).
+ *
+ * @param {Element} option_input The changed price option input.
+ * @return {boolean} Whether a view_item event was tracked.
+ */
+function gtm4wp_edd_track_price_option_view( option_input ) {
+	if ( ! window.gtm4wp_edd_variable_view_item ) {
+		return false;
+	}
+
+	const form = option_input.closest( 'form.edd_download_purchase_form' );
+	if (
+		! form ||
+		form.closest( '.edd_download' ) ||
+		form.closest( '.edd-blocks__download' )
+	) {
+		return false;
+	}
+
+	const product_data_el = form.querySelector(
+		'input[name=gtm4wp_product_data]'
+	);
+	if ( ! product_data_el ) {
+		return false;
+	}
+
+	const productdata = gtm4wp_read_from_json( product_data_el.value );
+	if ( ! productdata || ! productdata.price_options ) {
+		return false;
+	}
+
+	const price_options = productdata.price_options;
+	delete productdata.price_options;
+
+	// The server-side view_item reports quantity 1; the re-fire mirrors it.
+	const checked = gtm4wp_edd_checked_price_option_items(
+		form,
+		productdata,
+		price_options,
+		1
+	);
+
+	if ( 0 === checked.items.length ) {
+		return false;
+	}
+
+	gtm4wp_push_ecommerce( 'view_item', checked.items, {
+		currency: gtm4wp_currency,
+		value: gtm4wp_make_sure_is_float( checked.value ),
+	} );
+
+	return true;
+}
 
 /**
  * Fires the GA4 add_payment_info event for the given gateway once. Uses the
@@ -370,6 +465,23 @@ function gtm4wp_edd_process_pages() {
 				gtm4wp_push_ecommerce( 'select_item', [ productdata ], {
 					currency: gtm4wp_currency,
 				} );
+			}
+		},
+		{ capture: true }
+	);
+
+	// Re-fire view_item with the picked price option of the page's main
+	// download (variable-priced downloads on their own detail page).
+	document.addEventListener(
+		'change',
+		function ( e ) {
+			const option_input =
+				e.target &&
+				e.target.closest &&
+				e.target.closest( '.edd_price_options input' );
+
+			if ( option_input ) {
+				gtm4wp_edd_track_price_option_view( option_input );
 			}
 		},
 		{ capture: true }
