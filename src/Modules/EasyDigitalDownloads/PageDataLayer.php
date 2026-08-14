@@ -63,14 +63,32 @@ final class PageDataLayer {
 			$data_layer = $this->add_cart_content( $data_layer );
 		}
 
+		$is_success_page = function_exists( 'edd_is_success_page' ) && edd_is_success_page();
+
 		if ( is_singular( 'download' ) ) {
 			$data_layer = $this->add_download_view( $data_layer );
-		} elseif ( function_exists( 'edd_is_success_page' ) && edd_is_success_page() ) {
+		} elseif ( $is_success_page ) {
 			$data_layer = $this->add_success_page_data( $data_layer );
 		} elseif ( function_exists( 'edd_is_checkout' ) && edd_is_checkout() ) {
 			$this->add_begin_checkout();
 		} elseif ( $this->is_cart_page() ) {
 			$this->add_cart_view();
+		}
+
+		// Reliable purchase tracking: when the buyer never reached the
+		// confirmation page (an abandoned offsite payment redirect), deliver
+		// the purchase on their next visit instead, resolved from their own
+		// purchase session. Skipped under cache-safe mode (visitor-specific
+		// data must not be baked into cacheable HTML) and while order-tracked
+		// flags are disabled (without the server-side flag the event would
+		// repeat on every page view).
+		if (
+			! $is_success_page
+			&& ! $cache_safe
+			&& $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE )
+			&& ! $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG )
+		) {
+			$data_layer = $this->add_missed_purchase( $data_layer );
 		}
 
 		$this->datalayer->flush_pushes();
@@ -446,15 +464,46 @@ final class PageDataLayer {
 	}
 
 	/**
+	 * Reliable purchase tracking fallback. Resolves the buyer's most recent
+	 * order from their own EDD purchase session and runs it through the same
+	 * eligibility gauntlet as the confirmation page, so an order whose
+	 * confirmation page was never viewed is measured on the buyer's next
+	 * visit instead. The session is the browser's own state - no request
+	 * parameter is trusted - and the raw order data block is left to the
+	 * confirmation page.
+	 *
+	 * @param array<string, mixed> $data_layer The data layer collected so far.
+	 * @return array<string, mixed>
+	 */
+	private function add_missed_purchase( array $data_layer ): array {
+		if ( ! function_exists( 'edd_get_purchase_session' ) || ! function_exists( 'edd_get_order_by' ) ) {
+			return $data_layer;
+		}
+
+		$session = edd_get_purchase_session();
+		if ( ! is_array( $session ) || empty( $session['purchase_key'] ) ) {
+			return $data_layer;
+		}
+
+		$order = edd_get_order_by( 'payment_key', (string) $session['purchase_key'] );
+		if ( ! ( $order instanceof \EDD\Orders\Order ) ) {
+			return $data_layer;
+		}
+
+		return $this->add_purchase_for_order( $data_layer, $order, false );
+	}
+
+	/**
 	 * Runs the purchase eligibility gauntlet on a resolved order and, when it
 	 * passes, adds the raw order data, queues the GA4 purchase event wrapped
 	 * in the browser-side duplicate guard and flags the order as tracked.
 	 *
-	 * @param array<string, mixed> $data_layer The data layer collected so far.
-	 * @param \EDD\Orders\Order    $order      The resolved order.
+	 * @param array<string, mixed> $data_layer          The data layer collected so far.
+	 * @param \EDD\Orders\Order    $order               The resolved order.
+	 * @param bool                 $with_raw_order_data Whether the raw orderData block may be added (confirmation page only).
 	 * @return array<string, mixed>
 	 */
-	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order ): array {
+	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $with_raw_order_data = true ): array {
 		if ( $this->download_data->is_order_older_than_max_age( $order ) ) {
 			return $data_layer;
 		}
@@ -463,7 +512,7 @@ final class PageDataLayer {
 
 		// Raw order data will be output regardless of whether the purchase has been
 		// already tracked previously, since this data is not meant to track using GA.
-		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA ) ) {
+		if ( $with_raw_order_data && $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA ) ) {
 			$order_items             = $this->download_data->process_order_items( $order );
 			$data_layer['orderData'] = $this->download_data->get_raw_order_datalayer( $order, $order_items );
 		}

@@ -68,6 +68,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT        => 2000,
 			GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX => '',
 			GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES    => array( 'pending', 'processing', 'complete' ),
+			GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE      => false,
 		);
 	}
 
