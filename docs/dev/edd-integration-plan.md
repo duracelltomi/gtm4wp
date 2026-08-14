@@ -96,6 +96,7 @@ semantics under an `integrate-edd-*` key; phases follow the
 | do-not-use-order-tracked-flag | `integrate-edd-do-not-use-order-tracked-flag` | `false` | beta | |
 | purchase-track-statuses | `integrate-edd-purchase-track-statuses` | `['pending', 'processing', 'complete']` | beta | Choices from `edd_get_payment_statuses()`. Lenient default (mirrors WooCommerce's processing/on-hold/completed): offsite gateways can land buyers on the success page while the order is still `pending` (EDD ships a `payment-processing.php` holding template for exactly this), and with a strict default those purchases would look "missing". The three dedupe layers (§5) ensure an order tracked at `pending` is not re-tracked after completion. Conservative sites can narrow this to `complete`. |
 | clear-ecommerce-datalayer | `integrate-edd-clear-ecommerce-datalayer` | `false` | beta | Feeds the shared `gtm4wp_clear_ecommerce` JS global. |
+| purchase-track-on-any-page | `integrate-edd-purchase-track-on-any-page` | `false` | experimental | Added 2026-08-14. No status-hook seeding needed: the buyer's own EDD purchase session (`edd_get_purchase_session()`, which persists after checkout) resolves the order on any later visit, and the same eligibility gauntlet applies. Inert under cache-safe mode and when do-not-flag is on (without the server flag it would repeat every page view). Raw orderData stays confirmation-page-only. |
 | datalayer-max-timeout | `integrate-edd-datalayer-max-timeout` | `2000` | beta | `select_item` eventCallback timeout, shared JS. |
 
 `ModuleConsistencyTest` requires every option key to be owned by exactly one
@@ -110,7 +111,7 @@ one sentence in both field descriptions, not extra machinery.
 |---|---|
 | view-item-on-parent-product | No product-variation post type in EDD; variable *prices* are options on one download (see §4). |
 | persist-list-attribution (experimental, #405) | Deferred to backlog; ship the core funnel first. |
-| purchase-track-on-any-page (experimental) | Its WC implementation rides on WC session + status hooks; EDD equivalent needs its own hook research (`edd_transition_order_status`?). Backlog. |
+| ~~purchase-track-on-any-page (experimental)~~ | Mirrored on 2026-08-14 (see the table above) — EDD's persistent purchase session made the WC-style session/status-hook machinery unnecessary. |
 | custom-order-received-page | Unnecessary: EDD's success page is *already* a configurable page option that `edd_is_success_page()` resolves. |
 | checkoutwc compatibility | CheckoutWC is WooCommerce-only. |
 | exclude-shipping | EDD core has no shipping. |
@@ -221,9 +222,10 @@ Flow on `edd_is_success_page()` (mirrors `add_order_received_data` /
 later. With the lenient status default, such an order is tracked on that first
 success-page view while still `pending`, and the dedupe layers keep it from
 being tracked again after completion; narrowing the statuses option to
-`complete` defers tracking to a post-completion visit instead. The WC-style
-status-change session seeding ("reliable purchase tracking") is backlog,
-pending EDD status-transition hook research.
+`complete` defers tracking to a post-completion visit instead. Reliable
+purchase tracking (2026-08-14, experimental): when the buyer never reaches the
+success page at all, the purchase is delivered on their next visit, resolved
+from their own purchase session — no status-transition seeding required.
 
 **Free purchases** flow through checkout normally (EDD forces the `manual`
 gateway at `0.00` total) and produce real orders — purchase tracking works

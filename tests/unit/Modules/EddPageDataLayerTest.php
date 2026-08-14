@@ -492,6 +492,75 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"77" == gtm4wp_orderid_tracked', $pushed );
 	}
 
+	public function test_reliable_purchase_tracking_delivers_a_missed_purchase_from_the_session(): void {
+		// Any regular page: no success-page, checkout or download conditions.
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+
+		Functions\expect( 'edd_get_order_by' )
+			->once()
+			->with( 'payment_key', 'pk_super_secret_key' )
+			->andReturn( $this->make_order() );
+		Functions\expect( 'edd_update_order_meta' )
+			->once()
+			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+
+		$data_layer = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_EDDORDERDATA      => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+		$this->assertStringContainsString( '"event":"purchase"', $pushed );
+		$this->assertArrayNotHasKey(
+			'orderData',
+			$data_layer,
+			'The raw order data block stays exclusive to the confirmation page even with the order-data option on.'
+		);
+	}
+
+	public function test_reliable_purchase_tracking_stays_inert_when_disabled_or_unsafe(): void {
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		// Off by default.
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+		$this->assertStringNotContainsString(
+			'"event":"purchase"',
+			$this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' )
+		);
+
+		// Cache-safe mode: a visitor-specific purchase must not be baked into
+		// cacheable HTML.
+		$this->inline_scripts = array();
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER        => true,
+			)
+		)->add_datalayer_data( array() );
+		$this->assertStringNotContainsString(
+			'"event":"purchase"',
+			$this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' )
+		);
+
+		// Without the server-side tracked flag the event would repeat on
+		// every page view, so the fallback disarms itself.
+		$this->inline_scripts = array();
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG => true,
+			)
+		)->add_datalayer_data( array() );
+		$this->assertStringNotContainsString(
+			'"event":"purchase"',
+			$this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' )
+		);
+	}
+
 	public function test_success_page_resolves_the_order_from_the_purchase_session(): void {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_from_session' ) );

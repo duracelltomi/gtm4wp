@@ -181,6 +181,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL', 'integrate-edd-clear-ecom
 define( 'GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT', 'integrate-edd-datalayer-max-timeout' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX', 'integrate-edd-transaction-id-prefix' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES', 'integrate-edd-purchase-track-statuses' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE', 'integrate-edd-purchase-track-on-any-page' );
 
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
