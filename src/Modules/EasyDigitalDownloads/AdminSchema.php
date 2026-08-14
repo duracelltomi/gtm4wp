@@ -208,6 +208,16 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				doc: self::DOC_REFERENCE
 			),
 			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Persist download list attribution across the funnel', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'When a visitor clicks a download in a list, remember which list it was (item_list_name / item_list_id) in a first-party cookie and carry it onto the later view_item, add_to_cart, begin_checkout, add_payment_info and purchase events, so GA4 can attribute the whole funnel to the originating list. On a download page the list is merged in by the browser rather than by the server, so the attribution also works when the page is served from a full-page cache. Only enable this if you are NOT already doing the same with custom JavaScript in Google Tag Manager, otherwise the attribution would be set twice. If the WooCommerce integration is also active, its setting of the same name shares the browser flag with this one.', 'duracelltomi-google-tag-manager' ),
+				group: 'products',
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
+			),
+			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL,
 				type: Field::TYPE_SELECT,
 				default_value: 'retail',

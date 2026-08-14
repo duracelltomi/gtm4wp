@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
+use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
@@ -275,6 +276,38 @@ final class EddPageDataLayerTest extends TestCase {
 			'gtm4wp_edd_variable_view_item',
 			$this->inline_script_output( 'gtm4wp-edd' ),
 			'A single-price download must not arm the view_item re-fire listener.'
+		);
+
+		$this->assertStringNotContainsString(
+			EcommerceHelpers::LIST_ATTRIBUTION_JS_WRAPPER,
+			$pushed,
+			'With list attribution off (default) the push stays exactly the plain form.'
+		);
+	}
+
+	public function test_view_item_push_is_wrapped_for_client_side_list_attribution(): void {
+		// #405: a download page is full-page cacheable, so the list the
+		// visitor came from is merged in the browser - the wrapped push stays
+		// identical for every visitor and carries the download id the cookie
+		// is keyed by.
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+
+		$this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION => true )
+		)->add_datalayer_data( array() );
+
+		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+		$this->assertStringContainsString( '"event":"view_item"', $pushed );
+		$this->assertStringContainsString(
+			'(window.' . EcommerceHelpers::LIST_ATTRIBUTION_JS_WRAPPER . '||function(d){return d;})(',
+			$pushed,
+			'The push is wrapped in the client-side enrichment helper, with an identity fallback.'
+		);
+		$this->assertStringContainsString(
+			',55));',
+			$pushed,
+			'The wrapper receives the download id the list attribution cookie is keyed by.'
 		);
 	}
 

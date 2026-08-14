@@ -37,6 +37,25 @@ final class DownloadData {
 	public const ORDER_TRACKED_META = '_ga_tracked';
 
 	/**
+	 * The item contexts the server-side list-attribution merge applies to
+	 * (#405). Only never-cached contexts belong here: the cart and checkout
+	 * pages are excluded from full-page caches by the store and the purchase
+	 * data layer renders for a per-order URL. The cacheable download-detail
+	 * page and the purchase-form/list markup are enriched client-side instead,
+	 * so their HTML stays identical for every visitor.
+	 *
+	 * @var string[]
+	 */
+	private const LIST_ATTRIBUTION_CONTEXTS = array( 'cart', 'checkout', 'purchase' );
+
+	/**
+	 * Lazily loaded list-attribution cookie map for this request.
+	 *
+	 * @var array<int, array{item_list_name: string, item_list_id: string}>|null
+	 */
+	private ?array $list_attribution_map = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -178,6 +197,24 @@ final class DownloadData {
 			$_temp_productdata['item_list_id'] = sanitize_title( (string) $_temp_productdata['item_list_name'] );
 		}
 
+		// GA4 list attribution carried across the funnel (#405): when the
+		// opt-in option is on and this item is not already part of a rendered
+		// list, fill item_list_name / item_list_id from the first-party cookie
+		// the tracker wrote on the originating select_item click. Restricted
+		// to the never-cached contexts (see LIST_ATTRIBUTION_CONTEXTS).
+		if (
+			! isset( $_temp_productdata['item_list_name'] )
+			&& in_array( $attributes_used_for, self::LIST_ATTRIBUTION_CONTEXTS, true )
+			&& true === $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION )
+		) {
+			$stored = $this->list_attribution_map()[ $download_id ] ?? null;
+
+			if ( null !== $stored ) {
+				$_temp_productdata['item_list_name'] = $stored['item_list_name'];
+				$_temp_productdata['item_list_id']   = $stored['item_list_id'];
+			}
+		}
+
 		// GA4 item-level affiliation: empty by default and only added when 3rd
 		// party code supplies one, keeping the item payload free of empty
 		// affiliation strings. Shared filter with the WooCommerce module.
@@ -214,6 +251,20 @@ final class DownloadData {
 			$attributes_used_for,
 			$source_item
 		);
+	}
+
+	/**
+	 * Returns the sanitized list-attribution cookie map, read once per request
+	 * (#405).
+	 *
+	 * @return array<int, array{item_list_name: string, item_list_id: string}>
+	 */
+	private function list_attribution_map(): array {
+		if ( null === $this->list_attribution_map ) {
+			$this->list_attribution_map = Helpers::read_item_list_cookie();
+		}
+
+		return $this->list_attribution_map;
 	}
 
 	/**

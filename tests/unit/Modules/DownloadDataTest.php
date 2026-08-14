@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
+use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
 use GTM4WP\Options\Options;
@@ -47,12 +48,12 @@ final class DownloadDataTest extends TestCase {
 			)
 		);
 
-		// Isolate the browser dedupe cookie between tests (TS-7).
-		unset( $_COOKIE['gtm4wp_orderid_tracked'] );
+		// Isolate the browser cookies between tests (TS-7).
+		unset( $_COOKIE['gtm4wp_orderid_tracked'], $_COOKIE[ EcommerceHelpers::LIST_ATTRIBUTION_COOKIE ] );
 	}
 
 	protected function tearDown(): void {
-		unset( $_COOKIE['gtm4wp_orderid_tracked'] );
+		unset( $_COOKIE['gtm4wp_orderid_tracked'], $_COOKIE[ EcommerceHelpers::LIST_ATTRIBUTION_COOKIE ] );
 
 		parent::tearDown();
 	}
@@ -460,6 +461,41 @@ final class DownloadDataTest extends TestCase {
 
 		Functions\expect( 'edd_update_order_meta' )->never();
 		$download_data->flag_order_tracked( $this->make_order() );
+	}
+
+	public function test_list_attribution_merged_from_cookie_in_cart_context(): void {
+		// #405: with the opt-in option on, a cart item picks up the list
+		// attribution the tracker stored (keyed by download id) on the
+		// originating select_item click.
+		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
+		$_COOKIE[ EcommerceHelpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 55 => array( 'item_list_name' => 'Summer Sale', 'item_list_id' => 'summer-sale' ) ) // phpcs:ignore
+		);
+
+		$download_data = $this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION => true ) );
+		$item          = $download_data->process_download( $this->make_download(), array(), 'cart' );
+
+		$this->assertSame( 'Summer Sale', $item['item_list_name'] );
+		$this->assertSame( 'summer-sale', $item['item_list_id'] );
+	}
+
+	public function test_list_attribution_not_merged_when_off_or_in_cacheable_context(): void {
+		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
+		$_COOKIE[ EcommerceHelpers::LIST_ATTRIBUTION_COOKIE ] = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array( 55 => array( 'item_list_name' => 'Summer Sale' ) ) // phpcs:ignore
+		);
+
+		// The feature is opt-in: with the option off (default) the cookie is
+		// ignored, so a store already doing this in GTM is never
+		// double-attributed.
+		$item = $this->make_download_data()->process_download( $this->make_download(), array(), 'cart' );
+		$this->assertArrayNotHasKey( 'item_list_name', $item, 'With the option off the cookie must be ignored.' );
+
+		// The download-detail context is baked into cacheable page HTML, so it
+		// is never enriched server-side; the browser merges it there instead.
+		$item = $this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION => true ) )
+			->process_download( $this->make_download(), array(), 'productdetail' );
+		$this->assertArrayNotHasKey( 'item_list_name', $item, 'Cacheable contexts must stay identical for every visitor.' );
 	}
 
 	public function test_flag_order_tracked_writes_the_meta(): void {

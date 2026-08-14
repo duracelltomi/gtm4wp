@@ -110,7 +110,7 @@ one sentence in both field descriptions, not extra machinery.
 | WooCommerce option/feature | Reason |
 |---|---|
 | view-item-on-parent-product | No product-variation post type in EDD; variable *prices* are options on one download (see §4). |
-| persist-list-attribution (experimental, #405) | Deferred to backlog; ship the core funnel first. |
+| ~~persist-list-attribution (experimental, #405)~~ | Mirrored on 2026-08-14 as `integrate-edd-persist-list-attribution` (experimental): the cookie reader moved to the shared `GTM4WP\Ecommerce\Helpers`, the EDD tracker stores the list on select_item and enriches add_to_cart / the view_item re-fire client-side, the server merges cart/checkout/purchase items, and the server view_item is wrapped for browser-side merge (cache-safe). The `gtm4wp_list_attribution` JS flag is shared with WooCommerce (later-registered module wins). |
 | ~~purchase-track-on-any-page (experimental)~~ | Mirrored on 2026-08-14 (see the table above) — EDD's persistent purchase session made the WC-style session/status-hook machinery unnecessary. |
 | custom-order-received-page | Unnecessary: EDD's success page is *already* a configurable page option that `edd_is_success_page()` resolves. |
 | checkoutwc compatibility | CheckoutWC is WooCommerce-only. |
@@ -410,7 +410,7 @@ order-received visitor gates (EDD's confirmation page authorizes through the
 payment-key chain instead), checkout inline-script fallback, block add-to-cart
 span fix, media/CF7/container commits.
 
-**Deliberately deferred** (feature parity work, not drift): list attribution
-cookie + `view_item` merge for the downloads grid; a cache-safe visitor-data
-channel for EDD; phone hashing (EDD collects no phone by default). Revisit
-after the module has real-world usage.
+**Deliberately deferred** (feature parity work, not drift): a cache-safe
+visitor-data channel for EDD; phone hashing (EDD collects no phone by
+default). List attribution, also recorded here at audit time, was implemented
+on 2026-08-14 (see §2).

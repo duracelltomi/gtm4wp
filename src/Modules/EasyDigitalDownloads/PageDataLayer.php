@@ -321,6 +321,19 @@ final class PageDataLayer {
 		$data_layer['productType']              = (string) $download->get_type();
 		$data_layer['productHasVariablePrices'] = $download->has_variable_prices() ? 1 : 0;
 
+		// GA4 list attribution (#405): a download page is full-page cacheable,
+		// so the list the visitor came from must never be baked into this HTML
+		// server-side. Instead the push is wrapped in a JS call that merges it
+		// from the first-party cookie in the browser - the payload below stays
+		// identical for every visitor. The cookie is keyed by the download id,
+		// which is what internal_id carries here.
+		$list_wrapper      = '';
+		$list_wrapper_args = array();
+		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION ) ) {
+			$list_wrapper      = EcommerceHelpers::LIST_ATTRIBUTION_JS_WRAPPER;
+			$list_wrapper_args = array( (int) ( $eec_product_array['internal_id'] ?? $download->get_ID() ) );
+		}
+
 		unset( $eec_product_array['internal_id'] );
 
 		$this->datalayer->queue_push(
@@ -331,7 +344,11 @@ final class PageDataLayer {
 					'value'    => $eec_product_array['price'],
 					'items'    => array( $eec_product_array ),
 				),
-			)
+			),
+			'',
+			'',
+			$list_wrapper,
+			$list_wrapper_args
 		);
 
 		// The tracker re-fires view_item when the buyer picks a price option;
