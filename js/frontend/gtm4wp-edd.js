@@ -5,9 +5,10 @@
  * view_item_list (impressions of the [downloads] grid and the EDD downloads
  * block), select_item, add_to_cart (buy button clicks incl. Buy Now),
  * remove_from_cart (cart row remove links - classic templates, the checkout
- * block and the full cart block), add_payment_info (gateway selection) and
- * the view_item re-fire when the buyer picks a price option of a
- * variable-priced download on its detail page.
+ * block and the full cart block - plus quantity-edit deltas when EDD's Item
+ * Quantities setting renders quantity fields), add_payment_info (gateway
+ * selection) and the view_item re-fire when the buyer picks a price option
+ * of a variable-priced download on its detail page.
  *
  * Reads the hidden markup emitted by the ListTracking PHP class:
  * span.gtm4wp_edd_productdata (grid items), input[name=gtm4wp_product_data]
@@ -265,6 +266,60 @@ function gtm4wp_edd_track_price_option_view( option_input ) {
 		currency: gtm4wp_currency,
 		value: gtm4wp_make_sure_is_float( checked.value ),
 	} );
+
+	return true;
+}
+
+/**
+ * Fires add_to_cart / remove_from_cart for the quantity delta when the buyer
+ * edits a cart row's quantity field (EDD renders these fields only when its
+ * Item Quantities setting is on). The server-rendered defaultValue is the
+ * previous quantity, and it is advanced after each report so consecutive
+ * edits diff against the quantity already reported - EDD updates the cart
+ * over AJAX without re-rendering the rows.
+ *
+ * @param {Element} qty_el The changed quantity input.
+ * @return {boolean} Whether an event was tracked.
+ */
+function gtm4wp_edd_track_cart_quantity_change( qty_el ) {
+	const cart_row = qty_el.closest( '.edd_cart_item' );
+	const cartdata_el =
+		cart_row && cart_row.querySelector( '.gtm4wp_edd_cartitemdata' );
+
+	const previous_value = parseInt( qty_el.defaultValue, 10 );
+	const current_value = parseInt( qty_el.value, 10 );
+
+	if (
+		isNaN( previous_value ) ||
+		isNaN( current_value ) ||
+		current_value < 1 ||
+		current_value === previous_value
+	) {
+		return false;
+	}
+
+	const productdata = gtm4wp_read_json_from_node(
+		cartdata_el,
+		'gtm4wp_product_data',
+		[ 'productlink', 'internal_id', 'cart_key' ]
+	);
+	if ( ! productdata ) {
+		return false;
+	}
+
+	const delta = current_value - previous_value;
+	productdata.quantity = Math.abs( delta );
+
+	gtm4wp_push_ecommerce(
+		delta > 0 ? 'add_to_cart' : 'remove_from_cart',
+		[ productdata ],
+		{
+			currency: gtm4wp_currency,
+			value: productdata.price * productdata.quantity,
+		}
+	);
+
+	qty_el.defaultValue = String( current_value );
 
 	return true;
 }
@@ -543,18 +598,27 @@ function gtm4wp_edd_process_pages() {
 		{ capture: true }
 	);
 
-	// Re-fire view_item with the picked price option of the page's main
-	// download (variable-priced downloads on their own detail page).
+	// Change events: re-fire view_item with the picked price option of the
+	// page's main download (variable-priced downloads on their own detail
+	// page) and report checkout cart quantity edits as add/remove deltas.
 	document.addEventListener(
 		'change',
 		function ( e ) {
-			const option_input =
-				e.target &&
-				e.target.closest &&
-				e.target.closest( '.edd_price_options input' );
+			if ( ! e.target || ! e.target.closest ) {
+				return;
+			}
 
+			const option_input = e.target.closest( '.edd_price_options input' );
 			if ( option_input ) {
 				gtm4wp_edd_track_price_option_view( option_input );
+				return;
+			}
+
+			const qty_el = e.target.closest(
+				'.edd_cart_item input.edd-item-quantity'
+			);
+			if ( qty_el ) {
+				gtm4wp_edd_track_cart_quantity_change( qty_el );
 			}
 		},
 		{ capture: true }
