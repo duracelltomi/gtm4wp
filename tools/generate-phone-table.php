@@ -90,7 +90,7 @@ declare( strict_types = 1 );
 
 const SOURCE_URL = 'https://raw.githubusercontent.com/google/libphonenumber/master/resources/PhoneNumberMetadata.xml';
 
-const TABLE_FILE  = __DIR__ . '/../src/Modules/WooCommerce/CountryPhoneData.php';
+const TABLE_FILE  = __DIR__ . '/../src/Ecommerce/CountryPhoneData.php';
 const CORPUS_FILE = __DIR__ . '/../tests/unit/Modules/phone-corpus.php';
 
 /**
@@ -334,7 +334,7 @@ $table = <<<PHP
  * @license GNU General Public License, version 3
  */
 
-namespace GTM4WP\Modules\WooCommerce;
+namespace GTM4WP\Ecommerce;
 
 defined( 'ABSPATH' ) || exit;
 

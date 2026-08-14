@@ -276,6 +276,7 @@ one):
 | `GTM4WP_WPFILTER_EEC_EDD_ORDER_DATA` | `gtm4wp_eec_edd_order_data` | `( array, EDD\Orders\Order )` | `gtm4wp_eec_order_data` |
 | `GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER` | `gtm4wp_edd_purchase_datalayer` | `( array, EDD\Orders\Order )` | `gtm4wp_purchase_datalayer` |
 | `GTM4WP_WPFILTER_EDD_DATALAYER_PAGELOAD` | `gtm4wp_edd_datalayer_on_pageload` | `( array )` | `gtm4wp_woocommerce_datalayer_on_pageload` |
+| `GTM4WP_WPFILTER_EDD_ORDER_PHONE` | `gtm4wp_edd_order_phone` | `( string $phone, EDD\Orders\Order )` — supplies/overrides the buyer phone hashed into Enhanced Conversions `user_data` | — (EDD-only; WC reads its native billing phone) |
 
 Reused as-is (already store-agnostic, receive a `$context`/`$source_item`):
 `gtm4wp_eec_item_with_source` (source = `EDD_Download`, cart-details array, or
@@ -412,6 +413,10 @@ payment-key chain instead), checkout inline-script fallback, block add-to-cart
 span fix, media/CF7/container commits.
 
 **Deliberately deferred** (feature parity work, not drift): a cache-safe
-visitor-data channel for EDD; phone hashing (EDD collects no phone by
-default). List attribution, also recorded here at audit time, was implemented
-on 2026-08-14 (see §2).
+visitor-data channel for EDD. The other two items recorded here at audit time
+were implemented on 2026-08-14: list attribution (see §2) and phone hashing —
+EDD core collects no phone, so the number is read from the community-standard
+`phone` order/payment meta (the storage EDD's own documented checkout-phone
+recipe uses) or supplied via the `gtm4wp_edd_order_phone` filter, with the
+E.164 machinery moved from `WooCommerce\Helpers` to the shared
+`GTM4WP\Ecommerce` namespace (`CountryPhoneData` included).

@@ -367,215 +367,17 @@ final class Helpers {
 	}
 
 	/**
-	 * Digit-count bounds of an E.164 number, excluding the leading "+".
-	 *
-	 * The maximum is the standard's own hard limit. The minimum is deliberately
-	 * below the shortest real number (Saint Helena, +290 plus four digits) so it
-	 * only ever rejects junk like "-" or "n/a", never a valid number: a validator
-	 * that encodes today's formats rejects tomorrow's (upstream UC-5).
-	 */
-	private const E164_MAX_DIGITS = 15;
-	private const E164_MIN_DIGITS = 5;
-
-	/**
-	 * Matches a phone extension written after the number itself.
-	 *
-	 * Cut before the digits are harvested, or the extension is absorbed into the
-	 * subscriber number and the result is a well-formed number nobody has. No
-	 * leading \b: "0121 234 5678x22" has no word boundary before the "x".
-	 */
-	private const EXTENSION_PATTERN = '/(?:extension|ext|x|#)\W*\d+\s*$/i';
-
-	/**
-	 * Matches the trunk prefix printed in parentheses inside an international
-	 * number - "+49 (0) 30 12345678".
-	 *
-	 * The convention means "dial this digit only from inside the country", so it
-	 * is exactly the digit E.164 must not carry. Removed unconditionally: the
-	 * pattern is a lone zero in brackets, so an area code in brackets - "(030)"
-	 * - does not match and is left alone. Standard on business stationery across
-	 * the German-speaking countries and the Netherlands, and taking the "+" form
-	 * at face value silently mangled every one of them.
-	 */
-	private const COURTESY_ZERO_PATTERN = '/\(\s*0\s*\)/';
-
-	/**
-	 * Whether a string of digits is a number this country's numbering plan has.
-	 *
-	 * Used ONLY to choose between two readings of the same digits, never to
-	 * reject one. A number the plan does not recognise is not refused here - the
-	 * caller falls through to positional rules that predate this test - so a
-	 * pattern that has gone stale can fail to improve a number but can never
-	 * throw one away (upstream UC-5).
-	 *
-	 * "#" is the delimiter because a national-number pattern is a digit grammar
-	 * that cannot contain one, and tools/generate-phone-table.php refuses to write
-	 * a pattern outside that grammar rather than leaving it to be discovered here.
-	 * A pattern that somehow fails to compile makes preg_match() return false,
-	 * which is not 1, so the answer is "cannot tell" and the caller falls through
-	 * - the same direction as an unrecognised number.
-	 *
-	 * @param string $digits         Bare digits, no "+" and no separators.
-	 * @param string $number_pattern The country's general national-number pattern.
-	 * @return bool
-	 */
-	private static function is_national_number( string $digits, string $number_pattern ): bool {
-		if ( '' === $digits || '' === $number_pattern ) {
-			return false;
-		}
-
-		return 1 === preg_match( '#^(?:' . $number_pattern . ')$#', $digits );
-	}
-
-	/**
-	 * Assembles a validated E.164 string from bare digits.
-	 *
-	 * @param string $digits The digits of the number, without a leading "+".
-	 * @return string The E.164 number, or '' when the digit count is implausible.
-	 */
-	private static function to_e164( string $digits ): string {
-		$length = strlen( $digits );
-		if ( $length < self::E164_MIN_DIGITS || $length > self::E164_MAX_DIGITS ) {
-			return '';
-		}
-
-		return '+' . $digits;
-	}
-
-	/**
-	 * Converts a WooCommerce billing phone number into E.164 format.
-	 *
-	 * Google requires this exact format before hashing: "Format phone numbers
-	 * according to the E164 standard." A number that is merely lowercased and
-	 * stripped of spaces still fails to match, silently, because a hash either
-	 * matches or does not and nothing reports which.
-	 *
-	 * An explicit international form is taken at face value. Everything else is
-	 * anchored to the order's country using the three columns of
-	 * CountryPhoneData, which is GENERATED from libphonenumber's metadata
-	 * (tools/generate-phone-table.php):
-	 *
-	 * - the **calling code**;
-	 * - the **national (trunk) prefix, or null** - null meaning the country has
-	 *   none at all, so a leading zero is part of the number rather than
-	 *   something to strip. Italy is the commercially important case: reading
-	 *   "no trunk prefix" as "uses 0" made every Italian landline hash to a value
-	 *   Google could never match;
-	 * - the **general national-number pattern**, which is what decides between
-	 *   two readings of the same digits. Positional rules cannot: "34 612 345
-	 *   678" from a Spanish address is the international form with the "+" left
-	 *   off, while "391 234 5678" from an Italian one is a national mobile that
-	 *   happens to begin with Italy's own calling code, and no amount of counting
-	 *   digits separates those two. Neither do possible lengths, which is what an
-	 *   earlier version of this comment claimed was needed - both Italian
-	 *   readings are possible Italian lengths.
-	 *
-	 * The pattern is a tie-breaker, never a validator: a number it does not
-	 * recognise falls through to the positional rules rather than being refused,
-	 * so a pattern that has gone stale can fail to improve a number but cannot
-	 * throw one away (upstream UC-5).
-	 *
-	 * Not modelled, deliberately - each returns a wrong number rather than none,
-	 * and each needs TRANSFORM RULES rather than facts, which is where the line
-	 * is drawn. See tools/generate-phone-table.php.
-	 *
-	 * - Argentina's mobile "9" and Brazil's carrier selection codes, which need
-	 *   libphonenumber's nationalPrefixTransformRule.
-	 * - Dialling a foreign number with a national international-access code other
-	 *   than "00" (US "011", JP "010", AU "0011", RU "810").
-	 *
-	 * Returns '' whenever the number cannot be placed with confidence. The caller
-	 * decides what to do with that; inventing a country would produce a hash that
-	 * can never match, which is worse than sending nothing.
-	 *
-	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: normalization rules before hashing.
+	 * Converts a billing phone number into E.164 format. Delegates to the
+	 * shared store-agnostic implementation - the E.164 anchoring rules,
+	 * CountryPhoneData columns and their deliberate limits are documented on
+	 * \GTM4WP\Ecommerce\Helpers::normalize_phone_number().
 	 *
 	 * @param string $phone_number The phone number as the customer typed it.
 	 * @param string $country_code ISO 3166-1 alpha-2 country code of the billing address.
 	 * @return string The number in E.164 format, or '' if it cannot be normalized.
 	 */
 	public static function normalize_phone_number( string $phone_number, string $country_code = '' ): string {
-		$phone_number = trim( $phone_number );
-		if ( '' === $phone_number ) {
-			return '';
-		}
-
-		// Both run BEFORE the digits are harvested: an extension and a courtesy
-		// zero are digits, and once they are in the string nothing downstream can
-		// tell them from the number.
-		$phone_number = (string) preg_replace( self::EXTENSION_PATTERN, '', $phone_number );
-		$phone_number = (string) preg_replace( self::COURTESY_ZERO_PATTERN, '', $phone_number );
-
-		$has_plus = str_starts_with( ltrim( $phone_number ), '+' );
-		$digits   = (string) preg_replace( '/\D+/', '', $phone_number );
-		if ( '' === $digits ) {
-			return '';
-		}
-
-		// Already international: a leading "+", or the "00" call prefix.
-		if ( $has_plus ) {
-			return self::to_e164( $digits );
-		}
-
-		if ( str_starts_with( $digits, '00' ) ) {
-			return self::to_e164( substr( $digits, 2 ) );
-		}
-
-		$dialling = CountryPhoneData::lookup( $country_code );
-		if ( null === $dialling ) {
-			return '';
-		}
-
-		list( $calling_code, $trunk_prefix, $number_pattern ) = $dialling;
-
-		// 1. A trunk prefix the plan confirms. Stripping is only right when what
-		// is left is a number this country actually has - which is also what stops
-		// a number that merely begins with the trunk digit from being cut.
-		if ( null !== $trunk_prefix && str_starts_with( $digits, $trunk_prefix )
-			&& self::is_national_number( substr( $digits, strlen( $trunk_prefix ) ), $number_pattern ) ) {
-			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );
-		}
-
-		// 2. The international form with the "+" left off, decided the way
-		// libphonenumber decides it: the whole string is NOT a national number
-		// here, and the remainder after the calling code IS. Both halves matter.
-		// Without the first, an Italian mobile in the 39x range - which begins
-		// with Italy's own calling code - would be cut down to a number one
-		// operator short. Without the second, a Spanish number typed as
-		// "34 612 345 678" would have "34" prepended a second time.
-		if ( str_starts_with( $digits, $calling_code )
-			&& ! self::is_national_number( $digits, $number_pattern )
-			&& self::is_national_number( substr( $digits, strlen( $calling_code ) ), $number_pattern ) ) {
-			return self::to_e164( $digits );
-		}
-
-		// 3. A local number the plan recognises exactly as typed.
-		if ( self::is_national_number( $digits, $number_pattern ) ) {
-			return self::to_e164( $calling_code . $digits );
-		}
-
-		// 4. The plan recognises neither reading: a typo, a range it has not
-		// caught up with, or a pattern of ours that has gone stale. Fall back to
-		// the positional rules that predate the pattern column, so the worst this
-		// column can do is fail to improve a number.
-		//
-		// Deliberately uniform across countries, including the ones with no trunk
-		// prefix. The asymmetry that used to live here - anchor and stop, without
-		// trying the calling code - existed only because the trunk column carried
-		// a default that could not say "this country has none"; it is not a rule
-		// anybody chose. For input the plan rejects either way no reading is
-		// defensible, so this applies one set of rules rather than preserving a
-		// historical accident in the one branch nothing tests.
-		if ( null !== $trunk_prefix && str_starts_with( $digits, $trunk_prefix )
-			&& strlen( $digits ) - strlen( $trunk_prefix ) >= 4 ) {
-			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );
-		}
-
-		if ( str_starts_with( $digits, $calling_code ) && strlen( $digits ) - strlen( $calling_code ) >= 4 ) {
-			return self::to_e164( $digits );
-		}
-
-		return self::to_e164( $calling_code . $digits );
+		return EcommerceHelpers::normalize_phone_number( $phone_number, $country_code );
 	}
 
 	/**
@@ -587,11 +389,6 @@ final class Helpers {
 	 * @return string The hashed E.164 number, or '' if it cannot be normalized.
 	 */
 	public static function normalize_and_hash_phone_number( string $hash_algorithm, string $phone_number, string $country_code = '' ): string {
-		$normalized = self::normalize_phone_number( $phone_number, $country_code );
-		if ( '' === $normalized ) {
-			return '';
-		}
-
-		return hash( $hash_algorithm, $normalized );
+		return EcommerceHelpers::normalize_and_hash_phone_number( $hash_algorithm, $phone_number, $country_code );
 	}
 }

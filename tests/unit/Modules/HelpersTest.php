@@ -8,7 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
-use GTM4WP\Modules\WooCommerce\CountryPhoneData;
+use GTM4WP\Ecommerce\CountryPhoneData;
 use GTM4WP\Modules\WooCommerce\Helpers;
 use GTM4WP\Tests\unit\TestCase;
 
