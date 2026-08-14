@@ -91,6 +91,19 @@ final class ListTracking {
 	}
 
 	/**
+	 * Executed during edd_blocks_downloads_after_entry_title, the per-item
+	 * hook of the EDD downloads block - the block renders its own grid markup
+	 * (article.edd-blocks__download) instead of the [downloads] shortcode's
+	 * .edd_download items, but runs inside a regular WP loop, so the same
+	 * span emission applies.
+	 *
+	 * @return void
+	 */
+	public function after_downloads_block_item(): void {
+		$this->after_download_shortcode_item();
+	}
+
+	/**
 	 * Executed during edd_purchase_link_end, which fires just before the
 	 * closing form tag of every EDD purchase (buy button) form. Emits a hidden
 	 * input with the GA4 item data so the tracker can fire add_to_cart on the

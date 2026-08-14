@@ -333,6 +333,86 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"value":19.98', $pushed );
 	}
 
+	public function test_view_cart_fires_on_the_full_cart_block_page(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '<!-- wp:edd/cart {"mini":false} /-->' ) );
+		Functions\when( 'has_shortcode' )->justReturn( false );
+		Functions\when( 'has_block' )->alias(
+			static fn ( $block, $content ) => str_contains( (string) $content, 'wp:' . $block )
+		);
+		// The full cart block sits nested in a group to exercise the
+		// recursive walk; mini is explicitly disabled.
+		Functions\when( 'parse_blocks' )->justReturn(
+			array(
+				array(
+					'blockName'   => 'core/group',
+					'attrs'       => array(),
+					'innerBlocks' => array(
+						array(
+							'blockName'   => 'edd/cart',
+							'attrs'       => array( 'mini' => false ),
+							'innerBlocks' => array(),
+						),
+					),
+				),
+			)
+		);
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 2,
+					'price'    => 19.98,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+		$this->assertStringContainsString( '"event":"view_cart"', $pushed );
+	}
+
+	public function test_mini_cart_block_does_not_mark_a_cart_page(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '<!-- wp:edd/cart /-->' ) );
+		Functions\when( 'has_shortcode' )->justReturn( false );
+		Functions\when( 'has_block' )->alias(
+			static fn ( $block, $content ) => str_contains( (string) $content, 'wp:' . $block )
+		);
+		// A bare edd/cart block defaults to mini=true (icon + total link, no
+		// cart rows), so it must not fire view_cart.
+		Functions\when( 'parse_blocks' )->justReturn(
+			array(
+				array(
+					'blockName'   => 'edd/cart',
+					'attrs'       => array(),
+					'innerBlocks' => array(),
+				),
+			)
+		);
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString(
+			'"event":"view_cart"',
+			$this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' )
+		);
+	}
+
 	public function test_begin_checkout_encodes_hostile_product_names_at_the_script_sink(): void {
 		Functions\when( 'edd_is_checkout' )->justReturn( true );
 		Functions\when( 'edd_get_cart_content_details' )->justReturn(

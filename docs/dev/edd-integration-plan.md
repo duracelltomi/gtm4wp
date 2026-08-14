@@ -328,12 +328,19 @@ theme heading (2.0 is unreleased — one bullet, edited as phases land).
 6. **Phase 5 — hardening:** `/code-review` + `/test-review` passes, readme.txt
    mirror bullet, field descriptions final, maturity phases confirmed.
 
-**Backlog (explicitly out of v1):** EDD checkout **block** support
-(`src/Blocks/Checkout` exists in EDD core — needs markup research), cache-safe
-one-shot purchase parity, list-attribution persistence, status-change purchase
-seeding ("reliable purchase tracking"), checkout quantity-field cart diffing,
-archive/taxonomy list tracking beyond the `[downloads]` grid, and EDD
-extension ecosystems (Recurring Payments, Software Licensing, Free Downloads).
+**Backlog (explicitly out of v1):** cache-safe one-shot purchase parity, and
+EDD extension ecosystems (Recurring Payments, Software Licensing, Free
+Downloads). Archive/taxonomy list tracking was researched and dropped: EDD
+core renders no purchase-button/grid markup on archives (see open item 4), so
+there is no EDD-side contract to build on. EDD **block** support (2026-08-14,
+verified against EDD 3.3.5.2): the checkout block reuses the classic
+`edd_purchase_form` action chain, `payment-mode`/`edd-gateway` inputs,
+`#edd-purchase-button` and the `edd_checkout_cart_item_title_after` row hook,
+so most tracking worked as-is; the deltas shipped are the `.edd_cart_item` row
+lookup (block rows are divs), the `a.edd-remove-from-cart` selector (full cart
+block), the `edd/cart` block (mini=false) as a `view_cart` page signal and the
+downloads block's `edd_blocks_downloads_after_entry_title` hook +
+`.edd-blocks__download` wrapper for list/select tracking.
 
 ## Decision log
 

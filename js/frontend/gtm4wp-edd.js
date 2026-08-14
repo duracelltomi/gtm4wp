@@ -2,9 +2,10 @@
  * GTM4WP Easy Digital Downloads frontend tracker.
  *
  * Fires the client-side GA4 e-commerce events of the EDD integration:
- * view_item_list (impressions of the [downloads] grid), select_item,
- * add_to_cart (buy button clicks incl. Buy Now), remove_from_cart
- * (checkout cart remove links), add_payment_info (gateway selection) and
+ * view_item_list (impressions of the [downloads] grid and the EDD downloads
+ * block), select_item, add_to_cart (buy button clicks incl. Buy Now),
+ * remove_from_cart (cart row remove links - classic templates, the checkout
+ * block and the full cart block), add_payment_info (gateway selection) and
  * the view_item re-fire when the buyer picks a price option of a
  * variable-priced download on its detail page.
  *
@@ -321,12 +322,16 @@ function gtm4wp_edd_process_pages() {
 				return true;
 			}
 
-			// Track remove links in the checkout cart.
+			// Track remove links in cart rows. The classic checkout cart and
+			// the EDD checkout block both render edd_cart_remove_item_btn
+			// links; the cart block's full cart renders AJAX
+			// edd-remove-from-cart links instead. Classic rows are tr
+			// elements, block rows are divs - both carry .edd_cart_item.
 			const remove_link = event_target_element.closest(
-				'a.edd_cart_remove_item_btn'
+				'a.edd_cart_remove_item_btn, a.edd-remove-from-cart'
 			);
 			if ( remove_link ) {
-				const cart_row = remove_link.closest( 'tr' );
+				const cart_row = remove_link.closest( '.edd_cart_item' );
 				const cartdata_el =
 					cart_row &&
 					cart_row.querySelector( '.gtm4wp_edd_cartitemdata' );
@@ -348,9 +353,11 @@ function gtm4wp_edd_process_pages() {
 				return true;
 			}
 
-			// Track clicks in download grids (select_item).
+			// Track clicks in download grids (select_item): the [downloads]
+			// shortcode wraps items in .edd_download, the EDD downloads block
+			// in article.edd-blocks__download.
 			const matching_link_element = event_target_element.closest(
-				'.edd_download a:not(.edd-add-to-cart)'
+				'.edd_download a:not(.edd-add-to-cart), .edd-blocks__download a:not(.edd-add-to-cart)'
 			);
 			if ( ! matching_link_element ) {
 				return true;
@@ -362,8 +369,9 @@ function gtm4wp_edd_process_pages() {
 				return true;
 			}
 
-			const download_el =
-				matching_link_element.closest( '.edd_download' );
+			const download_el = matching_link_element.closest(
+				'.edd_download, .edd-blocks__download'
+			);
 			const productdata_el =
 				download_el &&
 				download_el.querySelector( '.gtm4wp_edd_productdata' );

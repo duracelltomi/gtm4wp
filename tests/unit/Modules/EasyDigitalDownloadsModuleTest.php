@@ -97,6 +97,7 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER ) );
 		$this->assertFalse( has_action( 'edd_download_after' ) );
+		$this->assertFalse( has_action( 'edd_blocks_downloads_after_entry_title' ) );
 		$this->assertFalse( has_action( 'edd_purchase_link_end' ) );
 		$this->assertFalse( has_action( 'edd_checkout_cart_item_title_after' ) );
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY ) );
@@ -107,6 +108,7 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 
 		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER ), 'The page data layer must be compiled.' );
 		$this->assertNotFalse( has_action( 'edd_download_after' ), 'The [downloads] grid markup must be injected.' );
+		$this->assertNotFalse( has_action( 'edd_blocks_downloads_after_entry_title' ), 'The downloads block grid markup must be injected.' );
 		$this->assertNotFalse( has_action( 'edd_purchase_link_end' ), 'The purchase form data input must be injected.' );
 		$this->assertNotFalse( has_action( 'edd_checkout_cart_item_title_after' ), 'The checkout cart row data must be injected.' );
 		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $module, 'enqueue_scripts' ) ) );
