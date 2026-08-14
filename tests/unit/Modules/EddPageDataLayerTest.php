@@ -270,6 +270,42 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"value":9.99', $pushed );
 		$this->assertStringContainsString( '"item_name":"My eBook"', $pushed );
 		$this->assertStringNotContainsString( 'internal_id', $pushed, 'The internal id must never reach the data layer.' );
+
+		$this->assertStringNotContainsString(
+			'gtm4wp_edd_variable_view_item',
+			$this->inline_script_output( 'gtm4wp-edd' ),
+			'A single-price download must not arm the view_item re-fire listener.'
+		);
+	}
+
+	public function test_variable_price_download_arms_the_view_item_refire(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+		Functions\when( 'edd_get_lowest_price_option' )->justReturn( 5.0 );
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => new \EDD_Download(
+				array(
+					'id'                  => (int) $id,
+					'name'                => 'My eBook',
+					'price'               => 9.99,
+					'has_variable_prices' => true,
+				)
+			)
+		);
+
+		$data_layer = $this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 1, $data_layer['productHasVariablePrices'] );
+
+		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+		$this->assertStringContainsString( '"event":"view_item"', $pushed );
+		$this->assertStringContainsString( '"value":5', $pushed, 'The lowest price option is reported before the buyer picks one.' );
+
+		$this->assertStringContainsString(
+			'window.gtm4wp_edd_variable_view_item = true;',
+			$this->inline_script_output( 'gtm4wp-edd' ),
+			'A variable-priced download page must arm the client-side view_item re-fire.'
+		);
 	}
 
 	public function test_view_cart_fires_on_the_cart_shortcode_page(): void {

@@ -229,7 +229,9 @@ final class PageDataLayer {
 	/**
 	 * Builds the download-detail (view_item) data layer content and fires the
 	 * view_item event. A variable-priced download is reported with its lowest
-	 * price option and no item_variant, since no option is selected yet.
+	 * price option and no item_variant, since no option is selected yet; the
+	 * frontend tracker re-fires view_item with the picked option once the
+	 * buyer selects one, scoped to this page by the flag printed here.
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -267,6 +269,17 @@ final class PageDataLayer {
 				),
 			)
 		);
+
+		// The tracker re-fires view_item when the buyer picks a price option;
+		// this flag scopes its change listener to the download's own detail
+		// page, so option clicks inside download grids stay list events.
+		if ( $download->has_variable_prices() ) {
+			wp_add_inline_script(
+				'gtm4wp-edd',
+				'window.gtm4wp_edd_variable_view_item = true;',
+				'before'
+			);
+		}
 
 		return $data_layer;
 	}

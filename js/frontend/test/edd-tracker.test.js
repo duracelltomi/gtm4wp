@@ -100,6 +100,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		window.google_tag_manager = { 'GTM-TEST': {} };
 		delete window.gtm4wp_checkout_products;
 		delete window.gtm4wp_checkout_value;
+		delete window.gtm4wp_edd_variable_view_item;
 
 		global.gtm4wp_push_ecommerce = jest.fn();
 		global.gtm4wp_make_sure_is_float = ( value ) => {
@@ -254,6 +255,102 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'price_options' );
 		expect( call[ 2 ].value ).toBe( 20 );
+	} );
+
+	it( 're-fires view_item with the picked price options on the download page', () => {
+		window.gtm4wp_edd_variable_view_item = true;
+		document.body.innerHTML = purchase_form_fixture( PURCHASE_FORM_ITEM, {
+			1: { name: 'Personal', price: 5 },
+			2: { name: 'Professional', price: 15 },
+			3: { name: 'Agency', price: 50 },
+		} );
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_price_options input' )
+			.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'view_item'
+		);
+		expect( call ).toBeDefined();
+		// Both CHECKED options are reported, each with quantity 1, the option
+		// name as item_variant and without the price_options map.
+		expect( call[ 1 ] ).toHaveLength( 2 );
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( {
+				item_variant: 'Personal',
+				price: 5,
+				quantity: 1,
+			} )
+		);
+		expect( call[ 1 ][ 1 ] ).toEqual(
+			expect.objectContaining( {
+				item_variant: 'Professional',
+				price: 15,
+				quantity: 1,
+			} )
+		);
+		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'price_options' );
+		expect( call[ 2 ].value ).toBe( 20 );
+	} );
+
+	it( 'does not re-fire view_item without the download page flag', () => {
+		document.body.innerHTML = purchase_form_fixture( PURCHASE_FORM_ITEM, {
+			1: { name: 'Personal', price: 5 },
+		} );
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_price_options input' )
+			.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'does not re-fire view_item for forms inside download grid items', () => {
+		window.gtm4wp_edd_variable_view_item = true;
+		document.body.innerHTML =
+			'<div class="edd_download">' +
+			purchase_form_fixture( PURCHASE_FORM_ITEM, {
+				1: { name: 'Personal', price: 5 },
+			} ) +
+			'</div>';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_price_options input' )
+			.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'does not re-fire view_item when no price option is checked', () => {
+		window.gtm4wp_edd_variable_view_item = true;
+		document.body.innerHTML = purchase_form_fixture( PURCHASE_FORM_ITEM, {
+			1: { name: 'Personal', price: 5 },
+			2: { name: 'Professional', price: 15 },
+		} );
+		document
+			.querySelectorAll( '.edd_price_options input' )
+			.forEach( ( input ) => {
+				input.checked = false;
+			} );
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_price_options input' )
+			.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 	} );
 
 	it( 'fires remove_from_cart from the checkout cart row data', () => {
