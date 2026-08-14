@@ -547,6 +547,83 @@ describe( 'gtm4wp-woocommerce PDP span markup (#462)', () => {
 		expect( call[ 1 ][ 0 ].item_id ).toBe( 456 );
 		expect( call[ 1 ][ 0 ].item_group_id ).toBe( 10 );
 	} );
+
+	// #190: the server prints data-gtm4wp_product_data="" when wp_json_encode()
+	// refuses the payload (a site filter supplying INF/NAN or over-deep nesting)
+	// and "null" when such a filter returns null. Both single-product paths must
+	// treat that as "no product data", exactly like the eight guarded
+	// gtm4wp_read_json_from_node call sites do - not push [false]/NaN or throw.
+	it( 'skips add_to_cart and returns false on an unencodable span payload (#190)', () => {
+		document.body.innerHTML =
+			'<form class="cart" method="post" action="https://shop/p42">' +
+			'<span class="gtm4wp_single_productdata" style="display:none"></span>' +
+			'<input type="number" name="quantity" value="3" />' +
+			'<button type="button" class="single_add_to_cart_button">Add</button>' +
+			'</form>';
+		document
+			.querySelector( '.gtm4wp_single_productdata' )
+			.setAttribute( 'data-gtm4wp_product_data', '' );
+
+		// The describe-level stub throws on invalid JSON; the REAL helper
+		// (gtm4wp-ecommerce-generic.js) wraps JSON.parse and returns false for
+		// a throw AND for a falsy parse. Model the real collaborator here, or
+		// this case tests the stub instead of the tracker (TC-15 / UC-3).
+		global.gtm4wp_read_from_json = ( json ) => {
+			try {
+				const parsed = JSON.parse( json );
+				if ( parsed ) {
+					delete parsed.productlink;
+					return parsed;
+				}
+			} catch ( e ) {}
+			return false;
+		};
+
+		boot();
+		const tracked = window.gtm4wp_track_single_add_to_cart(
+			document.querySelector( '.single_add_to_cart_button' ),
+			document.querySelector( 'form.cart' )
+		);
+
+		expect( tracked ).toBe( false );
+		expect(
+			global.gtm4wp_push_ecommerce.mock.calls.find(
+				( c ) => c[ 0 ] === 'add_to_cart'
+			)
+		).toBeUndefined();
+	} );
+
+	it( 'ignores a "null" span payload in the found_variation handler (#190)', () => {
+		document.body.innerHTML =
+			'<form class="cart variations_form">' +
+			'<span class="gtm4wp_single_productdata" style="display:none"></span>' +
+			'</form>';
+		document
+			.querySelector( '.gtm4wp_single_productdata' )
+			.setAttribute( 'data-gtm4wp_product_data', 'null' );
+
+		boot();
+		// Pre-#190 this threw: JSON.parse('null') passes the catch (it does not
+		// throw) and the first property access on null raised a TypeError inside
+		// the jQuery handler.
+		expect( () =>
+			handlers.found_variation(
+				{ target: document.querySelector( 'form' ) },
+				{
+					variation_id: 456,
+					sku: 'VAR-SKU',
+					display_price: 9.99,
+					attributes: { attribute_pa_color: 'blue' },
+				}
+			)
+		).not.toThrow();
+
+		expect(
+			global.gtm4wp_push_ecommerce.mock.calls.find(
+				( c ) => c[ 0 ] === 'view_item'
+			)
+		).toBeUndefined();
+	} );
 } );
 
 describe( 'gtm4wp-woocommerce exposed add_to_cart trackers (#273)', () => {

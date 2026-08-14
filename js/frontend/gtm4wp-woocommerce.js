@@ -375,6 +375,15 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 				product_data_el.value,
 			[ 'productlink' ]
 		);
+		// #190: the helper returns false when the payload cannot be parsed - the
+		// server prints an empty attribute when wp_json_encode() refuses the
+		// product array (a site filter supplying INF/NAN or over-deep nesting)
+		// and "null" when such a filter returns null. Same guard as the eight
+		// gtm4wp_read_json_from_node call sites; without it this path pushed
+		// add_to_cart with items: [false] and value: NaN.
+		if ( ! productdata ) {
+			return false;
+		}
 		// #69: the previous guard read `isNaN( quantity )` AFTER a lookup that
 		// short-circuits to null, and isNaN( null ) is false - so a product form
 		// with no quantity field emitted quantity: null and value: 0.
@@ -950,6 +959,15 @@ function gtm4wp_woocommerce_process_pages() {
 				);
 			} catch ( e ) {
 				console && console.error && console.error( e.message );
+				return true;
+			}
+
+			// #190: a parse can SUCCEED with null - the attribute is the literal
+			// string "null" when a site filter returns null and the server
+			// wp_json_encode()s it - which passes the catch above and then threw
+			// on the first property access below. Treat it as "no product data",
+			// like the catch does.
+			if ( ! current_product_detail_data ) {
 				return true;
 			}
 
