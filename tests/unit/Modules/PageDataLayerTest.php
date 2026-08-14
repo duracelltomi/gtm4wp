@@ -16,6 +16,7 @@ use GTM4WP\Modules\VisitorData\VisitorDataEndpoint;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Modules\WooCommerce\PageDataLayer;
 use GTM4WP\Modules\WooCommerce\ProductData;
+use GTM4WP\Modules\WooCommerce\PurchaseTracking;
 use GTM4WP\Modules\WooCommerce\WooCommerceModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
@@ -950,6 +951,100 @@ final class PageDataLayerTest extends TestCase {
 			->add_datalayer_data( array() );
 
 		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'The fallback must not fire unless the reliable-tracking option is on.' );
+	}
+
+	/**
+	 * T51 (test-review Run 8): every test that needed the request-scoped
+	 * purchase-pushed flag set it by hand, so the line that raises it in the
+	 * standard order-received render was deletable with the whole suite green -
+	 * and without it PurchaseTracking::remember_order(), firing later on the same
+	 * woocommerce_thankyou request, re-arms the reliable-purchase fallback for
+	 * the very order whose purchase this page already carries (the double-purchase
+	 * scenario the 2026-08-13 fix closed for the customized-page path).
+	 */
+	public function test_order_received_render_raises_the_request_purchase_pushed_flag(): void {
+		$this->stub_order_received_request();
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'Precondition: the order-received render must have emitted the purchase.' );
+		$this->assertNotEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ?? null, 'The render that emits the purchase inline must mark the purchase as handled for this request.' );
+	}
+
+	/**
+	 * The raise is deliberate even when NO order resolves (the comment above the
+	 * assignment says so): once the request is the standard order-received page,
+	 * anything the later woocommerce_thankyou hooks could push or seed belongs to
+	 * this render, whether or not it produced a purchase.
+	 */
+	public function test_order_received_render_raises_the_flag_even_when_no_order_resolves(): void {
+		// is_order_received_page() true, but no ?order/?key in the request and
+		// nothing pending in the session: the render pushes no purchase.
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+		$this->stub_wc();
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'No resolvable order means no purchase event.' );
+		$this->assertNotEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ?? null, 'The flag must be raised even when the render pushed nothing.' );
+	}
+
+	/**
+	 * The fallback's own half of the same contract: when this request already
+	 * pushed the purchase, maybe_add_pending_purchase() must stay quiet and leave
+	 * the pending marker alone - the marker's owner (the render that pushed) is
+	 * the one that consumes it. Load-bearing under "Do not flag orders as being
+	 * tracked", where the _ga_tracked suppressor is off by design and this guard
+	 * is the only thing between the render and a second purchase for the same
+	 * order.
+	 */
+	public function test_pending_purchase_fallback_stays_quiet_when_this_request_already_pushed(): void {
+		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
+
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'A request that already pushed the purchase must not emit it again.' );
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The pending marker must be left untouched by the suppressed fallback.' );
+	}
+
+	/**
+	 * The cross-class chain the double-purchase fix rides on, end to end with no
+	 * hand-set state: the standard order-received render raises the flag, and a
+	 * real PurchaseTracking::remember_order() - fired later on the same request -
+	 * must consequently refuse to re-seed the marker the render just consumed.
+	 * remember_order() checks only the order STATUS after the flag guard (never
+	 * _ga_tracked - "Do not flag orders as being tracked" disables that suppressor
+	 * by design), so without the raise this seed goes through and the session
+	 * endpoint delivers the same purchase a second time after page load.
+	 */
+	public function test_order_received_render_then_remember_order_does_not_re_arm_the_fallback(): void {
+		$this->stub_order_received_request();
+		// Swap in the recording session AFTER the order-received stubs: the order
+		// still resolves from the request; the session records what is seeded.
+		$session = $this->stub_wc_pending( 0 );
+
+		$service_options = $this->make_options( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$product_data    = new ProductData( $service_options );
+
+		$page_datalayer = new PageDataLayer( $service_options, $product_data, new DataLayer( $service_options ), new ScriptTag( $service_options ) );
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'Precondition: the render must have emitted the purchase.' );
+
+		$tracking = new PurchaseTracking( $service_options, $product_data, new DataLayer( $service_options ), new ScriptTag( $service_options ) );
+		$tracking->remember_order( 1001 );
+
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'remember_order() on the request that pushed the purchase must not re-seed the marker the render consumed.' );
 	}
 
 	public function test_pending_purchase_fallback_skips_an_already_tracked_order(): void {
