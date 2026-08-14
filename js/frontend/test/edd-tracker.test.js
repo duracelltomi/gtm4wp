@@ -501,6 +501,67 @@ describe( 'gtm4wp-edd tracker', () => {
 		expect( call[ 2 ].value ).toBeCloseTo( 9.99 );
 	} );
 
+	it( 'reports checkout quantity edits as add/remove deltas', () => {
+		const cart_item = {
+			item_id: 55,
+			item_name: 'My eBook',
+			price: 9.99,
+			quantity: 2,
+			cart_key: 0,
+		};
+
+		document.body.innerHTML =
+			'<table><tbody>' +
+			'<tr class="edd_cart_item">' +
+			'<td>My eBook' +
+			'<span class="gtm4wp_edd_cartitemdata" data-gtm4wp_product_data=\'' +
+			JSON.stringify( cart_item ) +
+			"'></span>" +
+			'<input type="number" class="edd-input edd-item-quantity" value="2" /></td>' +
+			'</tr>' +
+			'</tbody></table>';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		const qty_el = document.querySelector( '.edd-item-quantity' );
+
+		// 2 -> 5: three units added.
+		qty_el.value = '5';
+		qty_el.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		const add_call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( add_call ).toBeDefined();
+		expect( add_call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 55, quantity: 3 } )
+		);
+		expect( add_call[ 2 ].value ).toBeCloseTo( 29.97 );
+
+		// 5 -> 4: the next edit diffs against the already-reported 5, not the
+		// server-rendered 2.
+		global.gtm4wp_push_ecommerce.mockClear();
+		qty_el.value = '4';
+		qty_el.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		const remove_call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'remove_from_cart'
+		);
+		expect( remove_call ).toBeDefined();
+		expect( remove_call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 55, quantity: 1 } )
+		);
+		expect( remove_call[ 2 ].value ).toBeCloseTo( 9.99 );
+
+		// An unchanged or invalid value reports nothing.
+		global.gtm4wp_push_ecommerce.mockClear();
+		qty_el.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+		qty_el.value = '0';
+		qty_el.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
 	it( 'skips the initial gateway load and reports later gateway picks once', () => {
 		window.gtm4wp_checkout_products = [ { item_id: 55 } ];
 		window.gtm4wp_checkout_value = 9.99;

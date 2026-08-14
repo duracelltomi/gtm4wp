@@ -138,10 +138,11 @@ dataLayer during `GTM4WP_WPFILTER_COMPILE_DATALAYER`; "Client" = fired by
 | `purchase` | `edd_is_success_page()` | Server | See §5. |
 
 WooCommerce-only surfaces with no EDD counterpart (no work planned): Quick
-View, cart-quantity add/remove diffing (EDD checkout has
-quantity fields only when a setting enables them — backlog), WC Blocks/Store
-API mirroring (EDD's checkout block needs its own research — open item),
-re-added-to-cart "Undo" session event.
+View, WC Blocks/Store API mirroring (EDD's blocks are server-rendered and are
+covered — see the backlog note), and the re-added-to-cart "Undo" session
+event. Cart-quantity add/remove diffing was implemented 2026-08-14: quantity
+edits in cart rows (rendered only when EDD's Item Quantities setting is on)
+report their delta, diffed against the input's server-rendered defaultValue.
 
 ---
 
