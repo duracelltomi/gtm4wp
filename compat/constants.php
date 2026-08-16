@@ -187,6 +187,11 @@ define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS', 'integrate-consent-mode
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO', 'integrate-consent-mode-perso' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC', 'integrate-consent-mode-func' );
 define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY', 'integrate-consent-mode-security' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_REGIONS', 'integrate-consent-mode-regions' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_REGIONS_CUSTOM', 'integrate-consent-mode-regions-custom' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_WAITFORUPDATE', 'integrate-consent-mode-wait-for-update' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADSREDACTION', 'integrate-consent-mode-ads-data-redaction' );
+define( 'GTM4WP_OPTION_INTEGRATE_CONSENTMODE_URLPASSTHROUGH', 'integrate-consent-mode-url-passthrough' );
 
 define( 'GTM4WP_PLACEMENT_FOOTER', 0 );
 define( 'GTM4WP_PLACEMENT_BODYOPEN', 1 );
@@ -248,6 +253,16 @@ define( 'GTM4WP_WPFILTER_GET_CSP_NONCE', 'gtm4wp_get_csp_nonce' );
  * Constant that can be used to overwrite the stored default value of a consent mode flag.
  */
 define( 'GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG', 'gtm4wp_overwrite_consent_mode_flag' );
+
+/**
+ * Constant that can be used to filter the whole Google Consent Mode "default"
+ * command payload (the seven consent signals plus the optional region and
+ * wait_for_update keys) right before it is written into the consent default
+ * script block. Runs after the per-flag GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG
+ * filter, so an integration can e.g. set its own region list without GTM4WP
+ * shipping an option for it.
+ */
+define( 'GTM4WP_WPFILTER_CONSENT_DEFAULT_PAYLOAD', 'gtm4wp_consent_mode_default_payload' );
 
 /**
  * Constant used by the Axeptio integration to filter the Google Consent Mode v2

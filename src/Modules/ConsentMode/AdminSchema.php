@@ -168,6 +168,64 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				doc: self::DOC_CONSENT
 			),
 			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_REGIONS,
+				type: Field::TYPE_SELECT,
+				default_value: '',
+				label: __( 'Apply the defaults in', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the "region" parameter to the consent default command so the default consent state above only applies to visitors from the selected regions - visitors from everywhere else are not affected by it. "All regions" applies the defaults worldwide (the previous behavior): with everything denied for GDPR, that also denies consent for every visitor outside the EEA, where no law requires it. The EEA preset covers the 27 EU member states plus Iceland, Liechtenstein and Norway, the United Kingdom and Switzerland - the same region list Google\'s own WordPress plugins ship.', 'duracelltomi-google-tag-manager' ),
+				group: 'consent-mode',
+				phase: Field::PHASE_BETA,
+				choices: array(
+					''       => __( 'All regions (worldwide)', 'duracelltomi-google-tag-manager' ),
+					'eea'    => __( 'EEA, United Kingdom and Switzerland', 'duracelltomi-google-tag-manager' ),
+					'custom' => __( 'Custom region list', 'duracelltomi-google-tag-manager' ),
+				),
+				doc: self::DOC_CONSENT
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_REGIONS_CUSTOM,
+				type: Field::TYPE_TEXT,
+				default_value: '',
+				label: __( 'Custom region codes', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Comma separated list of region codes the consent defaults apply to: an ISO 3166-1 alpha-2 country code, optionally with an ISO 3166-2 subdivision (e.g. "DK, DE-BY, US-CA"). Entries that are not valid region codes are dropped when the settings are saved. Only used when "Custom region list" is selected above.', 'duracelltomi-google-tag-manager' ),
+				group: 'consent-mode',
+				phase: Field::PHASE_BETA,
+				sanitizer: array( \GTM4WP\Frontend\ConsentDefaults::class, 'sanitize_region_codes' ),
+				depends_on: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_REGIONS,
+				doc: self::DOC_CONSENT
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_WAITFORUPDATE,
+				type: Field::TYPE_INTEGER,
+				default_value: 0,
+				label: __( 'Wait for consent update (milliseconds)', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the "wait_for_update" parameter to the consent default command: how many milliseconds tags wait for your consent management tool to deliver the visitor\'s stored consent choice before they proceed with the default state above. Without it, a consent tool that loads slowly can lose the race and the visit is measured with the default (usually denied) state. 0 disables the parameter; 500 is the value Google\'s own WordPress plugins use.', 'duracelltomi-google-tag-manager' ),
+				group: 'consent-mode',
+				phase: Field::PHASE_BETA,
+				sanitizer: static fn ( $value ) => max( 0, is_scalar( $value ) ? (int) $value : 0 ),
+				doc: self::DOC_CONSENT
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADSREDACTION,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Redact ads data without ad storage consent', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Emits gtag("set", "ads_data_redaction", true) after the consent default command. While the ad_storage signal is denied, ad click identifiers (like gclid) are redacted from Google\'s network requests, further reducing what is sent about non-consenting visitors.', 'duracelltomi-google-tag-manager' ),
+				group: 'consent-mode',
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_CONSENT
+			),
+			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_CONSENTMODE_URLPASSTHROUGH,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Pass ad click information through URLs', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Emits gtag("set", "url_passthrough", true) after the consent default command. While ad_storage is denied, ad click information (gclid, dclid and similar URL parameters) is passed along internal navigation via the URL instead of cookies, so ad click measurement keeps working for non-consenting visitors without storing anything in the browser.', 'duracelltomi-google-tag-manager' ),
+				group: 'consent-mode',
+				phase: Field::PHASE_BETA,
+				doc: self::DOC_CONSENT
+			),
+			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_COOKIEBOT,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
