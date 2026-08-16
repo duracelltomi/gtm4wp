@@ -301,7 +301,7 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		}
 	}
 
-	public function test_set_commands_are_emitted_after_the_default_block(): void {
+	public function test_set_commands_are_emitted_before_the_default_block(): void {
 		$options = $this->make_options(
 			array(
 				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
@@ -318,13 +318,12 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 
 		// Pins OUR chosen order, not a Google requirement - the docs impose no
 		// ordering between the set commands and the consent default (see the
-		// reasoning in ConsentDefaults::script_block()). Asserted because the
-		// consent default must stay the first command in the block, not because
-		// the set commands could not legally precede it.
+		// reasoning in ConsentDefaults::script_block()). Asserted so the order
+		// cannot drift silently, not because the other order would be invalid.
 		$default_pos = strpos( $block, 'gtag("consent", "default"' );
 		$this->assertNotFalse( $default_pos );
-		$this->assertGreaterThan( $default_pos, strpos( $block, 'gtag("set", "ads_data_redaction"' ) );
-		$this->assertGreaterThan( $default_pos, strpos( $block, 'gtag("set", "url_passthrough"' ) );
+		$this->assertLessThan( $default_pos, strpos( $block, 'gtag("set", "ads_data_redaction"' ) );
+		$this->assertLessThan( $default_pos, strpos( $block, 'gtag("set", "url_passthrough"' ) );
 	}
 
 	public function test_set_commands_are_absent_by_default(): void {

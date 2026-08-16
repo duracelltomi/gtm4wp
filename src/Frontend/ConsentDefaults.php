@@ -325,19 +325,18 @@ final class ConsentDefaults {
 			' . $encoded_key . ': ' . $encoded_value . ',';
 		}
 
-		// The two "set" commands are emitted after the "consent default"
+		// The two "set" commands are emitted before the "consent default"
 		// command, and only when their option is on, so the default output
 		// stays byte-identical to 1.x.
 		//
-		// Placing them after is OUR choice, not a documented requirement:
-		// Google states no ordering between these and the consent default
-		// (verified 2026-08-16). The one placement rule it does give is that
-		// url_passthrough must precede any `config` commands, which this
-		// plugin never emits - it loads a GTM container, not gtag configs.
-		// Implementations in the wild are split - some emit these before the
-		// default command, some after - so do not "correct" this toward
-		// whichever one you read last. Keeping the default block first keeps
-		// the one command that MUST precede tag loading at the top.
+		// Google imposes no ordering between these and the consent default
+		// (verified 2026-08-16); the only placement rule it gives is that
+		// url_passthrough precede any `config` commands, which this plugin
+		// never emits - it loads a GTM container, not gtag configs. So this is
+		// a choice, and it goes with the majority of the implementations
+		// surveyed: emitting the set commands first satisfies that one stated
+		// rule most defensively and leaves nothing for a later reader to
+		// "fix". Both orders work - do not churn this back and forth.
 		//
 		// ads_data_redaction is a static `true` rather than something that
 		// tracks consent updates because Google scopes the redaction itself:
@@ -363,10 +362,10 @@ final class ConsentDefaults {
 ' . $script_tag->opening_tag() . '
 		if (typeof gtag == "undefined") {
 			function gtag(){dataLayer.push(arguments);}
-		}
+		}' . $set_commands . '
 
 		gtag("consent", "default", {' . $payload_lines . '
-		});' . $set_commands . '
+		});
 </script>';
 	}
 }
