@@ -161,6 +161,15 @@ entry whenever this sweep settles a question that will recur**. That file is the
 compounding asset of both support systems: every sweep should either reuse an answer
 from it or add one.
 
+**Purchase-loss issues get the public article.** Any issue whose complaint is "orders exist in
+WooCommerce but GA4 shows fewer purchases" links
+`https://gtm4wp.com/google-tag-manager/missing-purchase-event-in-ga4.html`, deep-linked to the
+one section that matches the issue rather than to the article as a whole. The
+`missing-purchase-article` entry in `.support/forum-answers.md` carries the anchor table and
+the rules that matter: it is context alongside a diagnosis and never the answer on its own, it
+does not go on an issue already labelled `bug`, and a reporter on 1.x has to be told which of
+the settings it names only arrive with 2.0. Never link its old redirecting URLs.
+
 `.support/product-knowledge.md` compounds the same way on the platform side. When a comment
 needed a fact about GTM, GA4, consent mode or another plugin that had no card, add one in the
 same run — with its `Provenance`, and a `Source` + `Verified` + `Sentinel` if it came from

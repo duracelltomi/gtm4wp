@@ -217,6 +217,15 @@ edited text goes back through `humanizer` and the voice sample before being pres
 Text written straight into an already-humanized draft is where the AI register returns,
 because the rest of the file having passed once makes it look finished.
 
+**Purchase-loss topics get the public article.** Any thread whose complaint is "orders exist in
+WooCommerce but GA4 shows fewer purchases" links
+`https://gtm4wp.com/google-tag-manager/missing-purchase-event-in-ga4.html`, deep-linked to the
+one section that matches the thread rather than to the article as a whole. The
+`missing-purchase-article` entry in `.support/forum-answers.md` carries the anchor table and
+the rules that matter: it is context alongside a diagnosis and never the answer on its own, it
+does not go on a confirmed-bug thread or on a review, and a reporter on 1.x has to be told
+which of the settings it names only arrive with 2.0. Never link its old redirecting URLs.
+
 Verify concrete claims against the source before writing them — settings labels against the
 `1.x` branch (the released line reporters actually run; `master` is the 2.0 rewrite), filter
 and meta-key names against the code, and plugin behavior against the code path rather than
