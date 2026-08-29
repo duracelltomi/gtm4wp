@@ -55,6 +55,7 @@ final class PageVariablesModule extends AbstractModule {
 			GTM4WP_OPTION_INCLUDE_POSTFORMAT         => false,
 			GTM4WP_OPTION_INCLUDE_POSTTERMLIST       => false,
 			GTM4WP_OPTION_INCLUDE_POSTMETA           => false,
+			GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS      => '',
 			GTM4WP_OPTION_INCLUDE_SEARCHDATA         => false,
 			GTM4WP_OPTION_INCLUDE_LOGGEDIN           => false,
 			GTM4WP_OPTION_INCLUDE_USERROLE           => false,
@@ -378,35 +379,71 @@ final class PageVariablesModule extends AbstractModule {
 				}
 
 				if ( $include_post_meta ) {
+					// get_post_meta() WITHOUT a key is the one branch of the core
+					// meta API that does NOT unserialize: get_metadata_raw() returns
+					// the meta cache verbatim as soon as $meta_key is empty, and
+					// update_meta_cache() stores the raw DB column. Every value that
+					// was stored as an array therefore arrives here as a serialized
+					// PHP string - see the is_serialized() skip below.
 					$post_meta = get_post_meta( $post->ID );
 					if ( is_array( $post_meta ) ) {
+						$allowed_meta_keys = self::parse_meta_key_list( (string) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS ) );
+
 						$data_layer['pagePostTerms']['meta'] = array();
 						foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
-							if ( '_' !== substr( $post_meta_key, 0, 1 ) ) {
-
-								/**
-								 * Applies a filter to determine if post meta should be included in the data layer.
-								 * This allows other plugins or themes to modify whether post meta should be included
-								 * in the data layer.
-								 *
-								 * @since 1.17
-								 *
-								 * @param bool $true_false_default The default value (true).
-								 * @param string $post_meta_key The name of the post meta key to be included in the data layer.
-								 *
-								 * @return bool Whether to include this post meta in the data layer.
-								 */
-								$include_post_meta_in_datalayer = (bool) apply_filters( 'gtm4wp_post_meta_in_datalayer', true, $post_meta_key );
-
-								if ( $include_post_meta_in_datalayer ) {
-									if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
-										$post_meta_dl_value = $post_meta_value[0];
-									} else {
-										$post_meta_dl_value = $post_meta_value;
-									}
-									$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
-								}
+							// An allow-list, once filled in, is the whole rule: nothing
+							// outside it is published, whatever the key looks like.
+							// Empty (the default) keeps the 1.x "everything that is not
+							// protected" behaviour so an upgraded site is unaffected.
+							if ( array() !== $allowed_meta_keys && ! in_array( $post_meta_key, $allowed_meta_keys, true ) ) {
+								continue;
 							}
+
+							// is_protected_meta() rather than a literal underscore test:
+							// same default rule, but it also honours the plugins and
+							// sites that declare their own keys protected through the
+							// core filter. The underscore convention alone is a UI
+							// convention, not a privacy boundary - Yoast writes
+							// _yoast_wpseo_* and is excluded by it while Rank Math
+							// writes rank_math_* and is not.
+							if ( is_protected_meta( $post_meta_key, 'post' ) ) {
+								continue;
+							}
+
+							/**
+							 * Applies a filter to determine if post meta should be included in the data layer.
+							 * This allows other plugins or themes to modify whether post meta should be included
+							 * in the data layer.
+							 *
+							 * @since 1.17
+							 *
+							 * @param bool $true_false_default The default value (true).
+							 * @param string $post_meta_key The name of the post meta key to be included in the data layer.
+							 *
+							 * @return bool Whether to include this post meta in the data layer.
+							 */
+							$include_post_meta_in_datalayer = (bool) apply_filters( 'gtm4wp_post_meta_in_datalayer', true, $post_meta_key );
+
+							if ( ! $include_post_meta_in_datalayer ) {
+								continue;
+							}
+
+							if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
+								$post_meta_dl_value = $post_meta_value[0];
+							} else {
+								$post_meta_dl_value = $post_meta_value;
+							}
+
+							$post_meta_dl_value = self::drop_serialized_meta_values( $post_meta_dl_value );
+
+							// Nothing usable left: OMIT the key rather than emit null
+							// or an empty array, since a GTM trigger may test for key
+							// presence (RI-13).
+							if ( null === $post_meta_dl_value ) {
+								continue;
+							}
+
+							$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
 						}
 					}
 				}
@@ -971,6 +1008,69 @@ final class PageVariablesModule extends AbstractModule {
 		$user_id = get_current_user_id();
 
 		return $user_id > 0 ? $user_id : null;
+	}
+
+	/**
+	 * Parses the post-meta allow-list option into a list of meta keys.
+	 *
+	 * Accepts one key per line or a comma separated list, in any mix. Shared by
+	 * the AdminSchema sanitizer and the frontend read above so that what is
+	 * stored is exactly what the reader honours - two copies of the same parsing
+	 * rule is a divergence waiting for the next tightening (PA-2, the pattern the
+	 * trusted-proxy list already follows).
+	 *
+	 * @param string $value Raw option value.
+	 * @return array<int, string> De-duplicated meta keys, empty when the option is blank.
+	 */
+	public static function parse_meta_key_list( string $value ): array {
+		$entries = preg_split( '/[\r\n,]+/', $value, -1, PREG_SPLIT_NO_EMPTY );
+		if ( ! is_array( $entries ) ) {
+			return array();
+		}
+
+		$keys = array();
+		foreach ( $entries as $one_entry ) {
+			$one_key = trim( $one_entry );
+			if ( '' !== $one_key ) {
+				$keys[] = $one_key;
+			}
+		}
+
+		return array_values( array_unique( $keys ) );
+	}
+
+	/**
+	 * Removes serialized values from a post meta value before it reaches the
+	 * data layer.
+	 *
+	 * A serialized string is a plugin's internal storage format by definition -
+	 * it reaches the browser as an opaque a:8:{...} blob that no Google Tag
+	 * Manager variable can read, while publishing the whole nested structure the
+	 * plugin keeps behind that key. Skipping is deliberate rather than
+	 * unserializing: no working GTM setup can be consuming such a value today,
+	 * and unserializing would run object instantiation over every custom field
+	 * on the post for data nobody asked for.
+	 *
+	 * @param mixed $value Single meta value, or the list of values for a multi-value key.
+	 * @return mixed The value with serialized entries removed, or null when nothing usable is left.
+	 */
+	private static function drop_serialized_meta_values( $value ) {
+		if ( is_array( $value ) ) {
+			$kept = array();
+			foreach ( $value as $one_value ) {
+				if ( ! ( is_string( $one_value ) && is_serialized( $one_value ) ) ) {
+					$kept[] = $one_value;
+				}
+			}
+
+			return array() === $kept ? null : $kept;
+		}
+
+		if ( is_string( $value ) && is_serialized( $value ) ) {
+			return null;
+		}
+
+		return $value;
 	}
 
 	/**

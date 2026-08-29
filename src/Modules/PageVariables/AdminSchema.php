@@ -207,8 +207,29 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Post custom fields (meta)', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the custom fields (post meta) of the current post in the pagePostTerms.meta data layer variable. Read this before enabling it: this publishes EVERY custom field whose name does not start with an underscore, together with its value, into the data layer of the public page, where any visitor can read it. That includes fields created by other plugins and themes - Advanced Custom Fields stores its values this way - so it may expose internal notes, ids, prices or contact details you did not intend to make public. Review your custom fields first, and use the gtm4wp_post_meta_in_datalayer filter to exclude individual keys. Until 2.0 this data was sent as part of the "Post Terms" option above; if you had that enabled, this option was turned on for you during the upgrade so your Google Tag Manager setup keeps working.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the custom fields (post meta) of the current post in the pagePostTerms.meta data layer variable. Read this before enabling it: this publishes EVERY custom field whose name does not start with an underscore, together with its value, into the data layer of the public page, where any visitor can read it. That includes fields created by other plugins and themes - Advanced Custom Fields stores its values this way - so it may expose internal notes, ids, prices or contact details you did not intend to make public. Review your custom fields first, and use the key list below to name only the ones you need (or the gtm4wp_post_meta_in_datalayer filter to exclude individual keys in code). Custom fields that hold a structured value rather than plain text are skipped: plugins store those in a packed internal format that no Google Tag Manager variable can read. Until 2.0 this data was sent as part of the "Post Terms" option above; if you had that enabled, this option was turned on for you during the upgrade so your Google Tag Manager setup keeps working.', 'duracelltomi-google-tag-manager' ),
 				group: 'post',
+				doc: self::DOC_POST
+			),
+			new Field(
+				key: GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS,
+				type: Field::TYPE_TEXTAREA,
+				default_value: '',
+				label: __( 'Post custom fields - publish only these keys', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The names of the custom fields you actually want in the data layer - one per line, or comma separated. Leave it empty to keep publishing every custom field whose name does not start with an underscore, which is what the option above does on its own. Filling it in is the safer way to use that option: your Google Tag Manager container only ever needs a handful of keys, and naming them means a field added later by a plugin, a theme or an editor cannot start appearing on your public pages without you deciding it. Protected fields and the gtm4wp_post_meta_in_datalayer filter still apply on top of this list.', 'duracelltomi-google-tag-manager' ),
+				group: 'post',
+				depends_on: GTM4WP_OPTION_INCLUDE_POSTMETA,
+				sanitizer: static function ( $value ) {
+					// Type-defensive: a custom sanitizer REPLACES Field::sanitize()'s
+					// type-based branches, so it never sits behind to_string() (RI-6).
+					$value = Field::to_string( $value );
+
+					// Normalized with the READER's own parser, so what is stored is
+					// exactly the list PageVariablesModule will honour - one rule, one
+					// place (PA-2). Stored one key per line, which is how the textarea
+					// renders it back.
+					return implode( "\n", PageVariablesModule::parse_meta_key_list( $value ) );
+				},
 				doc: self::DOC_POST
 			),
 			new Field(

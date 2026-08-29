@@ -29,12 +29,67 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	private array $server_backup = array();
 
+	/**
+	 * A real serialized post meta value, as get_post_meta( $id ) hands it over:
+	 * the array an SEO plugin stored, still packed, because the no-key branch of
+	 * get_metadata_raw() is the one that never unserializes.
+	 *
+	 * @var string
+	 */
+	private const SERIALIZED_META_VALUE = 'a:2:{s:5:"@type";s:19:"SoftwareApplication";s:4:"name";s:11:"%seo_title%";}';
+
 	protected function setUp(): void {
 		parent::setUp();
 
 		$this->server_backup = $_SERVER;
 
 		Functions\stubEscapeFunctions();
+
+		// Faithful port of the core predicate rather than a justReturn() double:
+		// a stand-in that answered "never serialized" would make the suite green
+		// BECAUSE the skip is untested (UC-3). Stubbed here in setUp, not in a
+		// single test, so no test depends on another having defined it (TS-16).
+		Functions\when( 'is_serialized' )->alias(
+			static function ( $data ): bool {
+				if ( ! is_string( $data ) ) {
+					return false;
+				}
+				$data = trim( $data );
+				if ( 'N;' === $data ) {
+					return true;
+				}
+				if ( strlen( $data ) < 4 || ':' !== $data[1] ) {
+					return false;
+				}
+				$lastc = substr( $data, -1 );
+				if ( ';' !== $lastc && '}' !== $lastc ) {
+					return false;
+				}
+				$token = $data[0];
+				switch ( $token ) {
+					case 's':
+						if ( '"' !== substr( $data, -2, 1 ) ) {
+							return false;
+						}
+						// Falls through, as in core.
+					case 'a':
+					case 'O':
+					case 'E':
+						return 1 === preg_match( "/^{$token}:[0-9]+:/s", $data );
+					case 'b':
+					case 'i':
+					case 'd':
+						return 1 === preg_match( "/^{$token}:[0-9.E+-]+;\$/", $data );
+				}
+				return false;
+			}
+		);
+
+		// Core's default rule (underscore prefix). Individual tests override it
+		// to exercise the plugin-declared-protected branch the filter enables.
+		Functions\when( 'is_protected_meta' )->alias(
+			static fn ( $meta_key ): bool => str_starts_with( (string) $meta_key, '_' )
+		);
 
 		// All conditional tags default to false; individual tests override.
 		foreach ( array(
@@ -803,6 +858,188 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * The no-key form of get_post_meta( $id ) is the single branch of the core
+	 * meta API that skips maybe_unserialize(): get_metadata_raw() returns the
+	 * meta cache as soon as $meta_key is empty, and update_meta_cache() fills it
+	 * with the raw DB column. Every array-valued custom field therefore reached the
+	 * public data layer as an opaque serialized blob - unreadable by any GTM
+	 * variable, and publishing the whole nested structure the plugin keeps
+	 * behind that key. Observed in production as an SEO plugin's schema
+	 * template. Fails against the pre-fix code.
+	 */
+	public function test_serialized_post_meta_value_is_omitted(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey(
+			'schema_blob',
+			$data_layer['pagePostTerms']['meta'],
+			'A serialized meta value must be omitted, not published as an a:2:{...} string.'
+		);
+
+		// Both directions: the key is gone AND the packed payload is nowhere in
+		// the encoded output, including the placeholders it carries.
+		$encoded = wp_json_encode( $data_layer );
+		$this->assertStringNotContainsString( 'a:2:{', $encoded );
+		$this->assertStringNotContainsString( '%seo_title%', $encoded );
+
+		// The ordinary values are untouched.
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+	}
+
+	/**
+	 * A multi-value key loses only its serialized entries; the real values stay,
+	 * so the skip cannot be implemented as "drop the whole key on sight".
+	 */
+	public function test_multi_value_meta_keeps_its_unserialized_entries(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame(
+			array( 'plain-value' ),
+			$data_layer['pagePostTerms']['meta']['mixed_key'],
+			'The serialized entry must be dropped while the real value survives.'
+		);
+	}
+
+	/**
+	 * The underscore prefix is a UI convention, not a privacy boundary: Yoast
+	 * writes _yoast_wpseo_* and is excluded by it, Rank Math writes rank_math_*
+	 * and is not. Going through is_protected_meta() means a plugin or site that
+	 * declares its own keys protected through the core filter is honoured.
+	 */
+	public function test_plugin_declared_protected_meta_is_excluded(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		// What the core is_protected_meta filter lets a plugin do: protect a key
+		// that carries no underscore prefix at all.
+		Functions\when( 'is_protected_meta' )->alias(
+			static fn ( $meta_key ): bool => str_starts_with( (string) $meta_key, '_' ) || 'plugin_secret' === $meta_key
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'plugin_secret', $data_layer['pagePostTerms']['meta'] );
+		$this->assertStringNotContainsString( 'declared-protected', wp_json_encode( $data_layer ) );
+		// The gate must not have swallowed the unprotected sibling.
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+	}
+
+	/**
+	 * The allow-list, once filled in, is the whole rule - the grant half.
+	 */
+	public function test_post_meta_allow_list_publishes_only_the_named_keys(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => 'internal_note',
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		// Grant.
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+		// Deny: every other publishable key is gone, including the ones that were
+		// published a moment ago with the list empty.
+		$this->assertSame(
+			array( 'internal_note' ),
+			array_keys( $data_layer['pagePostTerms']['meta'] ),
+			'With a list configured, nothing outside it may be published.'
+		);
+		$this->assertStringNotContainsString( 'plain-value', wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * An empty allow-list is the default and must keep the pre-2.0 behaviour:
+	 * every non-protected key is published, so the migration seeding cannot
+	 * change what an upgraded site already sends.
+	 */
+	public function test_empty_post_meta_allow_list_publishes_every_public_key(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => '',
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+		$this->assertSame( 'declared-protected', $data_layer['pagePostTerms']['meta']['plugin_secret'] );
+		$this->assertSame( array( 'plain-value' ), $data_layer['pagePostTerms']['meta']['mixed_key'] );
+	}
+
+	/**
+	 * The list parser accepts the shapes the field description promises, and is
+	 * the single rule the AdminSchema sanitizer normalizes with.
+	 */
+	public function test_meta_key_list_parser_accepts_lines_and_commas(): void {
+		$this->assertSame(
+			array( 'alpha', 'beta', 'gamma' ),
+			PageVariablesModule::parse_meta_key_list( "alpha\n beta ,gamma\n\n" ),
+			'Newlines and commas mix freely; entries are trimmed and blanks dropped.'
+		);
+
+		$this->assertSame(
+			array( 'alpha' ),
+			PageVariablesModule::parse_meta_key_list( "alpha\nalpha" ),
+			'Duplicates collapse so the stored list is what the reader honours.'
+		);
+
+		$this->assertSame( array(), PageVariablesModule::parse_meta_key_list( "  \n , \n" ) );
+	}
+
+	/**
 	 * Shared fixture for the taxonomy/meta split tests: a singular post carrying
 	 * one taxonomy term, one public custom field and one protected one.
 	 *
@@ -819,6 +1056,16 @@ final class PageVariablesModuleTest extends TestCase {
 			array(
 				'internal_note' => array( 'secret-internal-note' ),
 				'_hidden'       => array( 'protected' ),
+				// UC-3: the real collaborator is NOT more permissive than this.
+				// get_post_meta() without a key returns the meta cache verbatim,
+				// so a value stored as an array arrives serialized - the exact
+				// shape observed in production (an SEO plugin's schema template).
+				'schema_blob'   => array( self::SERIALIZED_META_VALUE ),
+				// Multi-value key mixing a real value with a serialized one.
+				'mixed_key'     => array( 'plain-value', self::SERIALIZED_META_VALUE ),
+				// Not underscore prefixed, but declared protected by a plugin
+				// through the core is_protected_meta filter.
+				'plugin_secret' => array( 'declared-protected' ),
 			)
 		);
 	}

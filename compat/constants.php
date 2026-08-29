@@ -67,6 +67,13 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTTERMLIST', 'include-postterms' );
  * from the legacy option so an upgrading site keeps the data it was already sending.
  */
 define( 'GTM4WP_OPTION_INCLUDE_POSTMETA', 'include-postmeta' );
+/**
+ * Optional allow-list for the option above: a newline separated list of meta keys.
+ * While it is empty (the default) every non-protected key is published, exactly as
+ * in 1.x - so neither the 2.0 split nor its migration seeding can change what an
+ * upgrading site already sends. Filling it in narrows the dump to the named keys.
+ */
+define( 'GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS', 'include-postmeta-keys' );
 define( 'GTM4WP_OPTION_INCLUDE_SEARCHDATA', 'include-searchdata' );
 define( 'GTM4WP_OPTION_INCLUDE_BROWSERDATA', 'include-browserdata' );
 define( 'GTM4WP_OPTION_INCLUDE_OSDATA', 'include-osdata' );

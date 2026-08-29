@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Modules\PageVariables\AdminSchema;
+use GTM4WP\Modules\PageVariables\PageVariablesModule;
 use GTM4WP\Options\Field;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -104,6 +105,44 @@ final class PageVariablesAdminSchemaTest extends TestCase {
 		// Type-defensive: a custom sanitizer replaces Field::sanitize()'s type branches
 		// rather than sitting behind them, so it sees raw import values (RI-6).
 		$this->assertSame( '', ( $sanitize )( array( '10.0.0.0/8' ) ) );
+	}
+
+	/**
+	 * The post-meta allow-list normalizes through the READER's own parser, so a
+	 * stored list is exactly the list PageVariablesModule will honour - the same
+	 * one-rule-one-place shape #94 anchored for the visitor IP header. Asserting
+	 * agreement rather than a hardcoded expectation is the point.
+	 */
+	public function test_post_meta_key_list_sanitizer_agrees_with_the_reader(): void {
+		$sanitize = $this->field( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS )->sanitizer;
+
+		$raw = "  rank_math_title\n, my_field ,\n\nmy_field\n";
+
+		$this->assertSame( "rank_math_title\nmy_field", ( $sanitize )( $raw ) );
+
+		// What is stored round-trips through the reader unchanged: no entry the
+		// reader would silently skip, and none it would split differently.
+		$this->assertSame(
+			PageVariablesModule::parse_meta_key_list( $raw ),
+			PageVariablesModule::parse_meta_key_list( ( $sanitize )( $raw ) )
+		);
+
+		$this->assertSame( '', ( $sanitize )( '' ) );
+		$this->assertSame( '', ( $sanitize )( " \n , \n" ) );
+
+		// Type-defensive: a custom sanitizer replaces Field::sanitize()'s type branches
+		// rather than sitting behind them, so it sees raw import values (RI-6).
+		$this->assertSame( '', ( $sanitize )( array( 'my_field' ) ) );
+	}
+
+	/**
+	 * The list is inert unless the custom-field option it narrows is on.
+	 */
+	public function test_post_meta_key_list_field_depends_on_the_post_meta_option(): void {
+		$this->assertSame(
+			GTM4WP_OPTION_INCLUDE_POSTMETA,
+			$this->field( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS )->depends_on
+		);
 	}
 
 	public function test_trusted_proxy_field_depends_on_the_visitor_ip_option(): void {
