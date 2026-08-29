@@ -56,6 +56,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **PA-5** — options read via `Options::get()` with `GTM4WP_OPTION_*` constants and sanitized on save in the module's admin schema; the stored value is not assumed safe at output.
 - **PA-6** — a new module registers through the `src/Module/` framework (AbstractModule + Registry + AdminSchema), not ad-hoc `add_action` scattered in the bootstrap.
 - **PA-14** — the repo's own toolchain is attack surface: a pre-approved tool permission, **a committed agent/subagent definition carrying its own tool patterns** (`.claude/agents/` had no Coverage Matrix row and no place in the inventory grep for the two reviews after a finding was found inside it — #135) — **and check the frontmatter KEY, not just its contents: an agent's restriction key is `tools:`, and `allowed-tools:` is the slash-command key, which an agent file accepts silently and ignores, so all three reviewer agents ran with every tool while their files declared read-only (#140)**, a hook that executes a repo-relative path, **a tool CONFIG resolved from the working tree that can name code to load** (watch every filename the tool accepts, not the one in the tree — the dotfile variant usually wins), a CI trigger, or **what the history already published** (removing it from HEAD does not retract it; no diff-scoped review will ever see it; and a finding of that shape belongs in the local report, never in a committed file), reached by third-party text an agent run ingests — **and a hook that merely READS a worktree file into the session context is an entry point too**, which the "does it execute?" question cannot select (#118). Enforced allowlist must match the write surface its skill documents.
+- **RI-26** — a core predicate that ends in `return apply_filters( … )` is not "core's rule", it is *this site's* rule; borrowed as a privacy gate it can be moved in **both** directions, so keep your own test as the floor and OR the helper in (#M1: `is_protected_meta()` can be filtered to UNprotect an underscore key, publishing it to an A0 dataLayer).
 - **PA-19** — a ledger is only as wide as the SCOPES it enumerates, and permissions are not the only thing assembled from several: agents, skills, commands and hooks merge project + user + each enabled plugin's scope too (#186 — a **relative** inventory path counted 4 agent definitions where 28 resolve, 17 of the 24 uncounted declaring `Write`/`Edit`). Fix a scope gap in one ledger and the same edit is owed to every ledger of that shape. The enforced allowlist is merged from user / project / local scope (plus per-agent frontmatter, which *restricts* rather than *grants*); this system read only the two project-scope files for 21 reviews while a user-scope dispatcher sat unread outside the repository (#162). Enumerate scopes, then files.
 - **PA-16** — moving a request out of `wp_enqueue_script` into runtime JS takes it out of `script_loader_tag`, `wp_dequeue_script` and the served HTML, so every control the SITE had over it disappears silently. Give the runtime fetch a lever, check it at the request rather than at the scan, and name the handle that still gates it. **Then verify each lever against WordPress's own code**: a handle everything depends on cannot be dequeued, and an inline `before` script is inside the `script_loader_tag` string rather than beside it — the pattern's own reference implementation shipped with two of its three levers broken, both failing open (#133/#134).
 - **PA-15** — never relax a host security control (a `wp_kses`/`safe_*`/allowed-list filter) globally to make your own markup survive it: scope the filter to your own sanitizer call and remove it after, or change the markup so it is not needed. A filter that only appends to the array it receives is a filter that loosens — and it loosens for every unrelated sanitizer call in the same request, including the block editor's save path (a REST request is not `is_admin()`).
@@ -173,7 +174,7 @@ applied to this system's own bookkeeping:
   one point at the other rather than restate it.
 - **Record the counting rule beside the number, always.** FP-1's 16 was a *grep-hit* count
   presented as a *call-site* count, and nothing in the entry said which — so it could not
-  be reproduced, only re-guessed. The raw grep returns 18 and the answer is 12. The one
+  be reproduced, only re-guessed. The raw grep returned 18 and the answer was 12 when this was written; re-derived 2026-08-29 (R26) the raw grep returns **22** and the answer is still **12** — the drift is prose mentions accumulating, which is exactly why the rule and not the figure is the durable part. The one
   row that has reproduced across runs (Dead JS) is the one that wrote its rule down.
 
 **Three shapes of ledger failure, all found in one sweep row across two reviews
@@ -241,6 +242,19 @@ The `#398` cache-safe data-layer work (2026-07-16, `813e882` "omit server PII") 
 - **A gate is only half the rule — check the else branch too (R9, #59).** The mechanical litmus above finds *ungated* reads, so a site written as `isset( $authordata->ID ) ? $authordata->ID : 0` passes it while still violating the pattern: it emits a `0` placeholder where the rule says **omit the key**. R8 fixed exactly this for the singular blocks (#47) and the post counts (#51) and the author-*archive* sibling was left behind, because the sweep as written could not see it. So run the litmus in two passes: (1) is every property read gated, and (2) **does each gate's negative branch omit the key, or invent a value?** A `? … : 0` / `: ''` / `: false` on a global-derived dataLayer value is the second-pass finding.
 
 - **The omit-don't-invent half travels beyond globals, and beyond the value's own branch (2026-08-11, #146).** #121 already generalized it off-global (a module emitting both of its keys with one always empty). #146 is the next step: the *helper* gained an "unencodable → return `''`" path, and the **call site** kept assigning unconditionally, so the key is present and empty in a payload whose own docblock promises empty fields are omitted — three lines above a sibling identifier that omits its key for exactly this case and cites this pattern while doing it. **When a helper gains an empty-return path, its callers are the change, not the helper.** Grep every caller in the same commit that adds the `return ''`; the litmus above cannot select any of them, because none of them touches a global.
+
+**The rule applies to the CONTAINER, not just the leaf — and the two sit lines apart
+(2026-08-29, R26/L6).** The post-meta block assigned `pagePostTerms['meta'] = array()` up
+front and filled it in a loop, so when every key was filtered out the payload carried a
+present-and-empty container. Three lines below, the per-key branch cites this very rule by
+name to omit an unusable *value*. Both halves were written by the same hand in the same
+method. Measured, the container's failure is worse than a leaf's: `wp_json_encode( array() )`
+emits `[]`, which is **truthy in JavaScript** and a *different type* from the `{…}` the
+populated form produces — so a consumer testing presence sees a value, and one reading a
+property sees a type flip. A newly added allow-list turned this from a rare case into the
+routine one, because any post lacking the named keys now reaches it.
+**Litmus:** for every `$x['k'] = array();` that a loop later fills, ask what ships when the
+loop adds nothing. Buffer into a local and assign only when non-empty.
 
 This is the request-state sibling of **PA-11** (`WC()->session` is null on REST routes): the real collaborator can be in a state the reviewer's mental model — and a well-formed test fixture (test-review **TS-13**/**TC-14**) — never represents. The failure class is correctness/log-noise (no actor, no sink), which is exactly why the injection/exposure lenses never prompted for it; the mechanical sweep in the checklist is what applies it.
 
@@ -328,6 +342,17 @@ The admin's only view of what a feature publishes is the field label and descrip
 Confirmed 2026-07-22 (#55): the option labelled **"Post Terms"** and described as *"include taxonomy values associated with a given post"* also copies **every** post meta key without a `_` prefix — with its value — into the public data layer. Unprotected meta is where ACF stores field values and where SEO/CRM/form/membership plugins keep notes, ids and contact details, so the real payload is site-dependent and unbounded.
 
 **The contract covers three things, and the quiet two are the variable name and the value form (2026-08-04, #84).** #55 was the loud case — an option emitting a whole extra category of data. The everyday case is an option that emits exactly what it promises but never says *where* it lands or *what shape* the values take, and an admin cannot build a GTM variable from that. Confirmed on the tag option: its description says only "include the tags of the current post" while the code writes tag **slugs** (not display names) into a variable called **`pageAttributes`** (not `pageTags`) — both facts an admin has to discover by reading a data layer dump. The tell is that its direct sibling, the category option eleven lines away in the same method, had *both* omissions corrected in the very commit that left this one alone. **When you correct one description, diff every option in the same group against its emitter in the same pass** — descriptions drift as a set, because they were written as a set.
+
+**The ORDER of two value transforms is itself part of the contract (2026-08-29, R26/L3).**
+A meta value was collapsed from a one-element list to a scalar *before* serialized entries
+were dropped, so a key left with a single usable value emitted a one-element **array** while a
+natively single-valued key emitted a **scalar** — the JSON type depending on whether a hidden
+sibling happened to be filtered out. Nothing about either transform is wrong in isolation;
+only their order is. Note also that the obvious repair (swap them) was **measurably worse** —
+it republished packed data for a single value that is itself an array — so the correct form
+was filter → collapse → re-filter. **Litmus:** when two transforms both touch a value's
+shape, enumerate the output type for each input shape rather than reasoning about the
+transforms; a small table finds this in minutes and argument never does.
 
 **Rules:**
 - When adding or reviewing a data-emitting option, read its description and diff it against what the code actually emits. A "and also everything matching X" loop under an option named for one specific thing is the tell.
@@ -546,6 +571,23 @@ needed. The commit was already pushed.
   read what is left. If a competent reader could build a reproduction from the remainder, it
   is too specific. Then check whether the remainder also exists in `readme.txt`, in any
   `.security`/`.upstream`/`.testing` registry row, and in the commit message.
+- **The litmus has no DENOMINATOR, and without one it recommends redaction that buys nothing
+  (2026-08-29, R26).** This entry's load-bearing premise — *a changelog bullet reaches a far
+  wider audience than a commit diff* — was written from #161, where the mechanism was novel.
+  Re-derived on a post-meta exposure bullet it does **not** hold: the sink, the gate rule and
+  the trigger had already been published by the project in the bullet three lines above, and
+  in **`1.x:CHANGELOG.md:141` since 2022-12-09** — inside the ZIP of the very release that is
+  still vulnerable. Incremental reach of the new bullet: nil. Meanwhile the pushed commit
+  message carried 7/7 mechanism tokens against the bullet's 1/7 and named the unfixed line by
+  `file:line`, so the redaction ceiling was not merely low, it was **zero**.
+  - **Added step, run it BEFORE proposing redaction:** grep the **released** branch's own
+    `CHANGELOG.md`/`readme.txt` for the ingredients (`git grep -n "<phrase>" 1.x`). If the
+    feature was advertised there with its gate rule, redaction changes nothing a reader could
+    not already read in the file that ships, and proposing it spends the maintainer's trust
+    on a no-op while the real remedy — shipping the fix to the other line — goes unstated.
+  - This does not soften the rule for a **novel** mechanism, which is still #161's case. It
+    supplies the measurement that tells the two apart, which the entry previously left to
+    intuition.
 
 ### RI-21: An encoder that can fail returns a value PHP will happily concatenate — and `false` concatenates as `''` ⭐
 
@@ -602,8 +644,13 @@ but rate the *blast radius*, which is the whole block rather than the value.
 - Attribute-context sites (`esc_attr( wp_json_encode( … ) )`) are **not** in this class here:
   `esc_attr( false )` yields `value=""`, and the JS reader wraps `JSON.parse` in a
   `try`/`catch` that returns `false`. Verified, not assumed — check the reader before
-  dismissing one. Re-verified 2026-08-11: all 12 `JSON.parse` call sites in `js/frontend/`
-  are inside a `try`/`catch`.
+  dismissing one. Re-verified 2026-08-11: all `JSON.parse` call sites in `js/frontend/`
+  are inside a `try`/`catch`. **The count in this sentence was 12 and was wrong (R26):** the
+  grep returns 12 *hits* but one of them (`gtm4wp-visitor-data.js:794`) is prose inside a
+  docblock, so there are **11** real call sites. Counting rule: `grep -rn "JSON\.parse" js/frontend
+  --include=*.js | grep -v "/test/"`, then subtract comment lines. A ledger used for
+  re-verification reproduces its own wrong number forever unless the rule travels with it —
+  this entry's own lesson, applied to this entry.
   - **The try/catch is only half the reader check (2026-08-14, #190).** A wrapped parse
     guards the *throw* path; the class also needs the *result* path guarded, twice over:
     the helper's `false` return must be checked by every **consumer** (grep the consumers,
@@ -614,6 +661,19 @@ but rate the *blast radius*, which is the whole block rather than the value.
     throws only at the first property access. "All parse sites are inside try/catch" was this
     entry's own recorded verdict and it was true while #190's two paths were live — a verdict
     about the wrapper says nothing about the consumer.
+  - **And a verdict about the consumer's PRESENCE says nothing about its PREDICATE (2026-08-29,
+    R26).** #190 was closed by adding guards that "match the guarded siblings", and this entry
+    recorded the sibling ledger as a binary — 8 guarding, 1 not. Re-measured, **9 of the 10
+    consumers guard on falsiness alone**, so matching them proved consistency, never
+    sufficiency: `gtm4wp_read_from_json()` returns any *truthy* parse result with no type
+    check, and `true`, `5`, `"abc"` and `[]` all sail through. `[]` is the important one — it
+    is what a PHP filter callback returns when it means "nothing", so it is the likeliest bad
+    value in the class, and an `'object' !== typeof x` guard **admits it**. The predicate that
+    holds is the one already shipping in `gtm4wp-visitor-data.js` (`parseWoo`):
+    `! x || 'object' !== typeof x || Array.isArray( x )`. Worst site is
+    `gtm4wp-woocommerce.js:611`, which `push`es into `view_item_list` with no property write,
+    so it cannot even throw. **Rate the guard, not its existence** — and when a ledger says
+    "N sites guard", record *what they guard on*.
 - **"Cannot fail" is a fine answer — write it down where the sink is.** The ledger reached
   **eleven** sites, not ten (#147): one more builds its literal in a separate statement, and
   its value is a `(string)`-cast scalar, so the encoder genuinely cannot fail on it. That is a
@@ -727,6 +787,49 @@ stage as collateral while verifying an unrelated documentation claim about the s
 ---
 
 ## Project-Specific Anti-Patterns
+
+### RI-26: A filterable predicate borrowed as a privacy gate can be moved by the site — in BOTH directions ⭐
+Reaching for a core helper instead of a hand-rolled test is normally the right instinct: it is
+better specified, better maintained, and it honours conventions the plugin does not know
+about. The trap is that many WordPress predicates end in `apply_filters()` and **return the
+filter's value verbatim**, so what looks like "core's rule" is really "whatever this site last
+said". When such a predicate decides whether something is *withheld from public output*, a
+callback written for an entirely different purpose silently becomes a publication decision.
+
+**Confirmed 2026-08-29 (#M1, R26).** The post-meta publish gate was changed from a literal
+leading-underscore test to `is_protected_meta()`. Core's default rule is the same underscore
+test, so the change reads as pure hardening — and the commit message, the CHANGELOG bullet and
+the option's own admin copy all described only the direction that narrows. But
+`is_protected_meta()` ends in `apply_filters( 'is_protected_meta', … )`, and that filter's
+established ecosystem use is **admin-UI visibility** — making a key editable in the Custom
+Fields metabox — not public-output privacy. A site carrying such a callback would have started
+publishing an underscore-prefixed field's value into the A0-readable dataLayer. Verified by
+probe: an unprotected `_customer_email` reached `pagePostTerms.meta` where the replaced rule
+withheld it.
+
+**Rules:**
+- **A borrowed predicate may only ever ADD to your own floor, never replace it.** Keep the
+  local rule as the floor and OR the helper in:
+  `if ( $own_rule || core_predicate( … ) ) { withhold(); }`. You then inherit the helper's
+  additional exclusions and its own hardening (core sanitizes the key before testing, so it is
+  *stricter* than the literal test for control characters) while no site callback can widen
+  what you publish.
+- **Ask what the filter is FOR, not just what it returns.** A predicate whose ecosystem purpose
+  is display, editability or admin UX is not a privacy boundary, however well it happens to
+  correlate with one today.
+- **Read the direction words in your own release note.** "…is respected", "…is honoured",
+  "…is now also checked" all describe the narrowing half. If the mechanism can move both ways
+  and the note names one, the note is wrong and so, usually, is the code.
+- **Litmus (mechanical):** for every core predicate used in a withhold/publish/redact
+  decision, open its source and check whether the last statement is `return apply_filters( … )`.
+  If it is, the site owns that answer. Candidates in this codebase's neighbourhood:
+  `is_protected_meta()`, `is_protected_endpoint()`, `map_meta_cap()`, and anything reached
+  through `current_user_can()` with a custom capability.
+- **Likelihood cuts both ways, so measure it and say so.** A corpus grep found **zero**
+  `is_protected_meta` filter registrations across 121,728 local PHP files — which bounds the
+  risk *and* bounds the benefit the change was made for, equally. That symmetry is the honest
+  framing, and it is what puts "revert to the local rule outright" on the table as a real
+  option rather than a straw man.
 
 ### PA-1: Admin/AJAX/REST mutation without nonce AND capability ⭐
 Every admin form submit, `wp_ajax_*` handler, and REST route that changes state must verify a nonce (`check_admin_referer()` / `wp_verify_nonce()` / REST `permission_callback`) **and** a capability (`current_user_can('manage_options')` or narrower). A nonce alone (no authorization) or a capability alone (no CSRF token) is a finding. Example reviewed: `src/Admin/Notices.php` dismiss handler. **Exception (guest frontend mutations):** a *frontend* route acting on an anonymous visitor may substitute strict session-ownership-scoping for the capability check under the **FP-5** conditions — do not force a capability gate that would break guest checkout.
@@ -935,12 +1038,31 @@ Three properties, each of which cost a measurement to establish:
 > every other ledger of the same shape — that is #66/#67/#71/#74's "fix the family, not the
 > sibling" applied to this system's own bookkeeping.
 >
-> Three counting traps measured alongside it: a relative path silently means project scope;
+> Four counting traps measured alongside it: a relative path silently means project scope;
 > compiled artifacts (`__pycache__/*.pyc`) match the inventory greps and inflate any file
-> count; and an installed plugin's *content* moves under a *stable* name, so pin `version` +
-> `gitCommitSha` from `installed_plugins.json`, never the `enabledPlugins` key. Record **counts
-> and method only** — everything under `~/.claude/` is the maintainer's machine rather than
-> the project, and that tree also holds credential material.
+> count; an installed plugin's *content* moves under a *stable* name; and **a glob over the
+> plugin cache spans VERSIONS, not plugins** — `~/.claude/plugins/cache/*/*/*/` has the
+> version as its third `*`, and cached versions accumulate, so the figure grows with the
+> cache while the surface stands still (measured 2026-08-29: **4** cached versions, each
+> 7/1/0/3, glob reports **28/4/0/12**). Resolve `installPath` for the *enabled* plugins
+> instead — and merge `enabledPlugins` across scopes too, because installed ≠ enabled and
+> that key is itself scope-merged. Record **counts and method only** — everything under
+> `~/.claude/` is the maintainer's machine rather than the project, and that tree also holds
+> credential material.
+>
+> **The pin this entry prescribed does not pin (2026-08-29, R26).** PA-19 told reviewers to
+> record `version` + `gitCommitSha` from `installed_plugins.json`. Re-derived: the enabled
+> plugin moved through **three** updates (0.10.0 → 0.10.2.3) with **32 file differences**
+> across agents, skills and executable scripts, and `gitCommitSha` did **not change once**.
+> It refers to no repository present on the machine and is install-time provenance. The
+> headline claim survives — content really does move under a stable name — but the instrument
+> was chosen when only one version had ever been installed, i.e. at the one moment a stale
+> field and a tracking field are indistinguishable. **Compute a digest instead**, and exclude
+> the churn: `find . -type f -not -path './.in_use/*' | LC_ALL=C sort | xargs sha256sum |
+> sha256sum`. `.in_use/` holds files named after live PIDs, so including it yields a hash that
+> is stable within a session and different in the next — false drift, which is UD-1's "noise
+> or silence" failure. Keep `gitCommitSha` in the ledger if you like, labelled as provenance,
+> never as a content pin.
 
 PA-14 asks *which files hand code to an executable*. It never asks **which permission scopes
 the enforced allowlist is assembled from**, and for 21 reviews this system's inventory
@@ -1330,3 +1452,4 @@ Reference: `PageDataLayer::confirm_pending_purchase_tracked()` (#398) writes the
 | 2026-08-12 (Review 22) | Reviewed `bdf4b70..5a1cc42` (8 commits) — R21's fix session plus a contributor commit that landed mid-run, read deliberately per the standing rule, and the Medium came out of it. **1 Medium + 8 Low (#173–#181).** Extended **RI-19** with its second confirmation and a new sub-shape: a **feature-availability guard** (`class_exists`/`method_exists`) has the same merged-states problem as a falsy return, plus one more — "absent because too old" vs "absent because moved" vs "**absent because the symbol and the behaviour have different `@since` versions**". #173 was the third: the gate ships in WC 7.9.0, the helper it delegates to in 8.6.0, so a supported version window failed open and published customer identity to an A0 visitor. New rules: compare the `@since` of the behaviour with the `@since` of the symbol, and prefer re-deriving the narrow version-free part to guessing from a version number (a `WC_VERSION` fail-closed was implemented and **measured breaking the buyer's own order view**). Extended **RI-4** with the **counting rule its ledger never carried** (#174) — `esc_js(` over `src/`+`compat/`, counting lines, 28/13/15; the bare `esc_js` spelling gives 33/18/15 over a byte-identical corpus, so two runs recording different numbers were **both right** and neither needs correcting. Extended **PA-14** with #175: a control that is only *described* — `phpcs.xml` asserted "warnings fail the build" in a comment with no directive, because the earlier fix **deleted** a line instead of setting its inverse, leaving the behaviour to the tool's default and its override point in a git-ignored `vendor/` config. **Adjudication refuted 2 of 5 drafted mechanisms**, both cases of a reviewer reading a correct record as an error. |
 | 2026-07-22 (forum-reported bug, no review run) | Added **RI-13** (a conditional tag does not guarantee its companion global — `is_singular()` true with `$GLOBALS['post']` null raised PHP warnings on five unguarded PageVariables reads; resolve once via `get_post()`, null-gate, omit the dataLayer keys when null). Not found by any review: the defect has no actor and no sink, so the injection/exposure lenses never prompted for it; it needs an environment state (a plugin resetting the global) that static reading and well-formed fixtures never represent (the PA-11/TS-13 class); and it sat in an `[x]` component ported byte-faithfully from decade-old 1.x code — Review 7 even fixed #43 *inside the same author block* while inheriting the `$GLOBALS['post']` assumption. Surfaced instead by wp.org forum triage (production `php_errorlog` volume). Countermeasures: RI-13 + a mechanical **Unguarded WP-global reads** Whole-Repo Sweep in the checklist + test-review **TC-14** (tag-true/global-null fixture) + pre-flight bullets on both sides. Fixed in `f38d860` with a warning-promoting regression test. |
 | 2026-08-06 (bug report, no review run) | Extended **RI-14** with **the two ends must agree on the BINDING, not only the name and the value** — the one shape its existing litmus (grep the key, count construction expressions) cannot see, because there was exactly one name, one value and one definition. `ContainerCode::header_top()` prints every `GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY` entry as a top-level `const` in a **classic** inline `<script>`, which binds lexically and never becomes a `window` property, while three trackers read `window.<name>`: `gtm4wp_list_attribution` (#405, 5 sites), `gtm4wp_datalayer_max_timeout` (2 sites, **inherited from released 1.x** and previously claimed fixed in 1.22.3 — `.upstream` UD-18) and `gtm4wp_checkoutwc` (#385). All three features shipped dead with no error and no red test, which is **UD-11 on a contract wholly inside the repo**. Two method notes worth keeping: (a) **`no-undef` cannot see this** — `window.x` is a member expression, so the `globals` list protects the bare spelling only, and two of the three broken names were absent from `.eslintrc.js` entirely because nothing ever demanded a declaration; RI-10 covers undeclared *assignment*, not a wrong *access form*. (b) The control shipped as a **lint rule, not a checklist line** (UD-2): one `inlineConstGlobals` list used twice, declaring the names and feeding `no-restricted-properties` against the `window.` spelling, so it fails `npm run build` rather than waiting to be remembered. Presented as two unrelated bugs — the cookie was never written client-side, so the *server*-side merge found an empty map and `view_cart`/`begin_checkout`/`purchase` were bare too. Test half: `.testing` **TS-17** / **TC-16**. |
+| 2026-08-29 (Review 26) | Reviewed `612122e..a33a9cc` (6 commits — the post-meta allow-list and serialized skip, the `#190` JS parse guards, the 2.0.0-rc1 bump). **1 Medium + 19 Low.** Added **RI-26** (a core predicate ending in `return apply_filters( … )` is the *site's* rule, not core's; borrowed as a privacy gate it moves in **both** directions — keep the local test as the floor and OR the helper in). Extended **RI-13** with the *container* half of omit-don't-invent (a present-and-empty container encodes as a truthy `[]` whose type differs from the populated `{…}`; the leaf rule was cited by name three lines away), and **RI-15** with *the ORDER of two value transforms is part of the contract* (collapse-then-filter made the emitted JSON type depend on a dropped sibling — and the obvious swap was measurably worse). **Two recorded decisions failed re-derivation and were corrected:** **RI-24**'s "a bullet reaches a far wider audience than a diff" premise, which has no denominator — re-derived on a post-meta bullet whose every ingredient the project had already published in `1.x:CHANGELOG.md:141` **since 2022-12-09**, inside the vulnerable ZIP, making the redaction ceiling zero (new step: grep the *released* branch before proposing redaction); and **PA-19**'s prescribed pin, `gitCommitSha`, which did **not move** across three plugin updates and 32 changed files and refers to no repository on the machine (replaced with a computed tree digest that must exclude `.in_use/`, whose PID-named files otherwise produce per-session false drift). Added PA-19's **fourth counting trap**: the plugin-cache glob's third `*` is the VERSION, so it multiplies the surface by the number of cached updates (4 versions → 28/4/0/12 for a real 7/1/0/3). Corrected two stale ledgers: **RI-21**'s "12 `JSON.parse` call sites" counts a docblock line (**11** real, counting rule now recorded) and **FP-1**'s raw-grep illustration (18 → **22**; the answer is still 12). Extended **RI-21** with the half it never had — *a verdict about a consumer's PRESENCE says nothing about its PREDICATE*: **9 of 10** guards are falsiness-only, so `#190`'s "matches the guarded siblings" proved consistency and never sufficiency, and `[]` (what a PHP filter returns for "nothing") defeats the obvious `typeof` fix. |

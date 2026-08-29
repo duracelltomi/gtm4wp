@@ -155,10 +155,16 @@ final class VisitorIp {
 	 * published range list unedited. Invalid entries are dropped rather than failing the
 	 * whole list, which matches how the sanitizer stores it.
 	 *
+	 * Public for the same reason as normalize_header_name() and is_valid_range(): the
+	 * option's sanitizer must store exactly what this reader will honour. The two ends
+	 * used to share only the VALIDATOR while each kept its own copy of the SPLIT rule,
+	 * three files apart - and a tightening applied to one copy left the other behind
+	 * with nothing going red (PA-2). One rule, one place.
+	 *
 	 * @param string $raw The raw option value.
 	 * @return string[] Validated IP addresses and CIDR ranges.
 	 */
-	private static function parse_trusted_proxies( string $raw ): array {
+	public static function parse_trusted_proxies( string $raw ): array {
 		if ( '' === trim( $raw ) ) {
 			return array();
 		}

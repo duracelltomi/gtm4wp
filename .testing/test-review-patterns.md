@@ -463,6 +463,26 @@ above — interrogate the environment, do not describe it: before believing any 
 in a worktree, `composer install` (or `composer dump-autoload`) **there**, and assert the
 class under test resolves to a path inside the worktree.
 
+**Third variant, and this one is the JS realm's STRICTNESS (2026-08-29, R26/L18).** The two
+above are about what the environment *provides*; this is about what it *enforces*. Jest
+transforms test modules as ESM, so they execute in **strict mode**. The shipped bundle does
+not: `js/frontend/gtm4wp-woocommerce.js` has no `import`/`export`, so webpack emits a plain
+script and `build/gtm4wp-woocommerce.js` contains **zero** `"use strict"` (measured — sibling
+`build/gtm4wp-ecommerce-generic.js` contains one, so this is per-bundle, not global). The
+consequence is that a property write onto a primitive — the exact thing a hostile parse
+result produces — **throws a TypeError under jest and silently no-ops in production**, where
+the payload then continues into the dataLayer as `items: [5], value: NaN`.
+
+- **Rule:** for a tracker bundle, a hostile-input test asserts **the absence of the push**,
+  never the absence of a throw. `expect( () => … ).not.toThrow()` is measuring the harness's
+  strictness, not the shipped behaviour, and it passes for a bundle that is pushing garbage.
+- **Litmus:** `grep -c '"use strict"' build/<bundle>.js`. If it is `0`, every `toThrow` /
+  `not.toThrow` assertion against that file is testing a different language mode from the one
+  users run.
+- **It can flip under you.** Adding a single `import` to such a source file makes webpack emit
+  a module, and production silently changes from "garbage push" to "uncaught TypeError" — a
+  behaviour change no test would report, in either direction.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test

@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\PageVariables;
 
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AbstractModule;
+use GTM4WP\Options\Field;
 use GTM4WP\Modules\VisitorData\VisitorDataModule;
 use GTM4WP\Modules\VisitorData\VisitorField;
 
@@ -387,26 +388,39 @@ final class PageVariablesModule extends AbstractModule {
 					// PHP string - see the is_serialized() skip below.
 					$post_meta = get_post_meta( $post->ID );
 					if ( is_array( $post_meta ) ) {
-						$allowed_meta_keys = self::parse_meta_key_list( (string) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS ) );
+						$allowed_meta_keys = self::parse_meta_key_list( Field::to_string( $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS ) ) );
 
-						$data_layer['pagePostTerms']['meta'] = array();
+						$meta_values = array();
 						foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
-							// An allow-list, once filled in, is the whole rule: nothing
-							// outside it is published, whatever the key looks like.
+							// An allow-list, once filled in, is the whole rule for what
+							// may be CONSIDERED - nothing outside it is published,
+							// whatever the key looks like. It is NOT a grant: the
+							// protected gate and the filter below still decide what is
+							// actually published, which is what the field description
+							// promises ("Protected fields and the
+							// gtm4wp_post_meta_in_datalayer filter still apply on top of
+							// this list"). Only the order of these three guards enforces
+							// that, so both interactions are pinned by tests.
 							// Empty (the default) keeps the 1.x "everything that is not
 							// protected" behaviour so an upgraded site is unaffected.
 							if ( array() !== $allowed_meta_keys && ! in_array( $post_meta_key, $allowed_meta_keys, true ) ) {
 								continue;
 							}
 
-							// is_protected_meta() rather than a literal underscore test:
-							// same default rule, but it also honours the plugins and
-							// sites that declare their own keys protected through the
-							// core filter. The underscore convention alone is a UI
-							// convention, not a privacy boundary - Yoast writes
-							// _yoast_wpseo_* and is excluded by it while Rank Math
-							// writes rank_math_* and is not.
-							if ( is_protected_meta( $post_meta_key, 'post' ) ) {
+							// The underscore test is the FLOOR and is_protected_meta()
+							// only ever adds to it. Both halves are load-bearing:
+							// is_protected_meta() honours a plugin or site that declares
+							// a non-underscore key protected through the core filter, but
+							// that filter's return value IS the function's return value,
+							// so on its own it also lets a callback UNPROTECT an
+							// underscore key - and that key would then be published to
+							// the public page. The filter's ecosystem purpose is admin-UI
+							// visibility, not public-output privacy, so it may only widen
+							// what we withhold, never narrow it.
+							if (
+								'_' === substr( $post_meta_key, 0, 1 )
+								|| is_protected_meta( $post_meta_key, 'post' )
+							) {
 								continue;
 							}
 
@@ -428,13 +442,20 @@ final class PageVariablesModule extends AbstractModule {
 								continue;
 							}
 
-							if ( is_array( $post_meta_value ) && ( 1 === count( $post_meta_value ) ) ) {
-								$post_meta_dl_value = $post_meta_value[0];
-							} else {
-								$post_meta_dl_value = $post_meta_value;
-							}
+							// Filter FIRST, then collapse a surviving single value to a
+							// scalar. The other order makes the emitted JSON type depend
+							// on whether a serialized sibling happened to be dropped -
+							// a key left with one value would emit a one-element array
+							// while a natively single-valued key emits a bare string,
+							// and a GTM Custom JS variable sees a different type for the
+							// same key. The second call covers the one case the collapse
+							// can expose: a single value that is itself an array still
+							// carrying packed entries.
+							$post_meta_dl_value = self::drop_serialized_meta_values( $post_meta_value );
 
-							$post_meta_dl_value = self::drop_serialized_meta_values( $post_meta_dl_value );
+							if ( is_array( $post_meta_dl_value ) && ( 1 === count( $post_meta_dl_value ) ) ) {
+								$post_meta_dl_value = self::drop_serialized_meta_values( array_values( $post_meta_dl_value )[0] );
+							}
 
 							// Nothing usable left: OMIT the key rather than emit null
 							// or an empty array, since a GTM trigger may test for key
@@ -443,7 +464,18 @@ final class PageVariablesModule extends AbstractModule {
 								continue;
 							}
 
-							$data_layer['pagePostTerms']['meta'][ $post_meta_key ] = $post_meta_dl_value;
+							$meta_values[ $post_meta_key ] = $post_meta_dl_value;
+						}
+
+						// Omit the container rather than ship an empty one. PHP's
+						// array() encodes as a JSON [], which is TRUTHY in JavaScript
+						// and a different type from the object the populated form
+						// produces - so a GTM variable reading pagePostTerms.meta sees
+						// the type flip depending on whether anything survived. This is
+						// the same omit-don't-invent rule the per-key branch above
+						// already follows (RI-13/RI-20), applied to the container.
+						if ( array() !== $meta_values ) {
+							$data_layer['pagePostTerms']['meta'] = $meta_values;
 						}
 					}
 				}

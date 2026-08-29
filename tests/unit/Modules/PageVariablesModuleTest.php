@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\PageVariables\PageVariablesModule;
 use GTM4WP\Modules\VisitorData\VisitorDataModule;
@@ -919,11 +920,93 @@ final class PageVariablesModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
+		// The serialized entry is dropped and the ONE surviving value is then
+		// collapsed to a scalar - the same shape a natively single-valued key
+		// emits, so the JSON type does not depend on whether a hidden sibling
+		// happened to be dropped.
 		$this->assertSame(
-			array( 'plain-value' ),
+			'plain-value',
 			$data_layer['pagePostTerms']['meta']['mixed_key'],
-			'The serialized entry must be dropped while the real value survives.'
+			'The serialized entry must be dropped while the real value survives, as a scalar.'
 		);
+	}
+
+	/**
+	 * The filter runs BEFORE the single-value collapse, and again on whatever the
+	 * collapse exposes. Both halves are pinned here because the obvious
+	 * simplification - one filter call after the collapse - silently republishes
+	 * packed data: a single value that is itself an array keeps its serialized
+	 * entries, and a key whose every entry is packed becomes emitted instead of
+	 * omitted. These shapes are not reachable through the native meta path (core
+	 * returns raw string columns), so only this test stands between that
+	 * simplification and a regression.
+	 */
+	public function test_nested_serialized_meta_values_are_dropped_at_every_depth(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		Functions\when( 'get_post_meta' )->justReturn(
+			array(
+				// One value, itself an array mixing a real entry with a packed one.
+				'nested_mixed' => array( array( 'keep-me', self::SERIALIZED_META_VALUE ) ),
+				// One value, itself an array of nothing but packed entries.
+				'nested_all'   => array( array( self::SERIALIZED_META_VALUE ) ),
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame(
+			array( 'keep-me' ),
+			$data_layer['pagePostTerms']['meta']['nested_mixed'],
+			'A packed entry one level down must be dropped, not published.'
+		);
+		$this->assertArrayNotHasKey(
+			'nested_all',
+			$data_layer['pagePostTerms']['meta'],
+			'A key with nothing but packed entries must be omitted, not emitted.'
+		);
+		// TS-2, the other direction: no packed payload anywhere in the output.
+		$this->assertStringNotContainsString( 'a:2:{', wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * Nothing survives the gates, so the container itself must be OMITTED rather
+	 * than emitted empty: PHP's array() encodes as a JSON [], which is truthy in
+	 * JavaScript and a different type from the object the populated form
+	 * produces. The allow-list makes this the routine case, not a rare one - any
+	 * post that does not carry the named keys reaches it.
+	 */
+	public function test_meta_container_is_omitted_when_no_key_survives(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				// Names a key this post does not carry.
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => 'a_key_this_post_does_not_have',
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'meta', $data_layer['pagePostTerms'] );
+		$this->assertStringNotContainsString( '"meta":[]', wp_json_encode( $data_layer ) );
 	}
 
 	/**
@@ -961,6 +1044,51 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * The underscore test is the FLOOR; is_protected_meta() may only ever ADD
+	 * exclusions on top of it. Core returns the is_protected_meta filter's value
+	 * verbatim, so a site callback can report an underscore-prefixed key as NOT
+	 * protected - the ecosystem uses that filter for admin-UI visibility (making
+	 * a key editable in the Custom Fields metabox), not for public-output
+	 * privacy. Such a key must still never reach the public page's data layer.
+	 */
+	public function test_underscore_meta_stays_withheld_when_a_site_filter_unprotects_it(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		// A site callback that unprotects one underscore-prefixed key while
+		// leaving core's default rule in place for every other key.
+		Functions\when( 'is_protected_meta' )->alias(
+			static fn ( $meta_key ): bool => '_hidden' !== $meta_key && str_starts_with( (string) $meta_key, '_' )
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( '_hidden', $data_layer['pagePostTerms']['meta'] );
+		// TS-2, the other direction: the key name must not survive anywhere in
+		// the encoded payload either.
+		$this->assertStringNotContainsString( '"_hidden"', wp_json_encode( $data_layer ) );
+		// The floor must not have swallowed anything it should not: the
+		// filter-added exclusion is still honoured for a non-underscore key
+		// elsewhere (test_plugin_declared_protected_meta_is_excluded), and the
+		// publishable siblings are untouched here.
+		$this->assertSame(
+			array( 'internal_note', 'mixed_key', 'plugin_secret' ),
+			array_keys( $data_layer['pagePostTerms']['meta'] ),
+			'Only the unprotected key may be withheld by the underscore floor.'
+		);
+	}
+
+	/**
 	 * The allow-list, once filled in, is the whole rule - the grant half.
 	 */
 	public function test_post_meta_allow_list_publishes_only_the_named_keys(): void {
@@ -993,6 +1121,76 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * The allow-list is a filter on what may be considered, never a grant. The
+	 * field description promises "Protected fields and the
+	 * gtm4wp_post_meta_in_datalayer filter still apply on top of this list", and
+	 * only the ORDER of the three guards enforces it - so a refactor that makes
+	 * the list authoritative would break a promise printed in the settings screen
+	 * with nothing going red. These two cases are that promise's only anchor.
+	 */
+	public function test_allow_listed_key_is_still_withheld_when_protected(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		Functions\when( 'is_protected_meta' )->alias(
+			static fn ( $meta_key ): bool => str_starts_with( (string) $meta_key, '_' ) || 'plugin_secret' === $meta_key
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				// The admin names the protected key explicitly. The list must not
+				// override the protection.
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => "plugin_secret\ninternal_note",
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'plugin_secret', $data_layer['pagePostTerms']['meta'] );
+		$this->assertStringNotContainsString( 'declared-protected', wp_json_encode( $data_layer ) );
+		// The other named key is unaffected, so the gate withheld one key rather
+		// than emptying the list.
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+	}
+
+	/**
+	 * Sibling of the case above for the other gate the description names.
+	 */
+	public function test_allow_listed_key_is_still_withheld_when_the_filter_rejects_it(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		Filters\expectApplied( 'gtm4wp_post_meta_in_datalayer' )
+			->andReturnUsing(
+				static fn ( $default_value, $meta_key ) => 'internal_note' !== $meta_key
+			);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => "internal_note\nmixed_key",
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'internal_note', $data_layer['pagePostTerms']['meta'] );
+		$this->assertStringNotContainsString( 'secret-internal-note', wp_json_encode( $data_layer ) );
+		// The sibling the filter accepted is still published, so the filter
+		// rejected one key rather than the whole list.
+		$this->assertSame( 'plain-value', $data_layer['pagePostTerms']['meta']['mixed_key'] );
+	}
+
+	/**
 	 * An empty allow-list is the default and must keep the pre-2.0 behaviour:
 	 * every non-protected key is published, so the migration seeding cannot
 	 * change what an upgraded site already sends.
@@ -1016,7 +1214,7 @@ final class PageVariablesModuleTest extends TestCase {
 
 		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
 		$this->assertSame( 'declared-protected', $data_layer['pagePostTerms']['meta']['plugin_secret'] );
-		$this->assertSame( array( 'plain-value' ), $data_layer['pagePostTerms']['meta']['mixed_key'] );
+		$this->assertSame( 'plain-value', $data_layer['pagePostTerms']['meta']['mixed_key'] );
 	}
 
 	/**

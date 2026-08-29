@@ -207,7 +207,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Post custom fields (meta)', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the custom fields (post meta) of the current post in the pagePostTerms.meta data layer variable. Read this before enabling it: this publishes EVERY custom field whose name does not start with an underscore, together with its value, into the data layer of the public page, where any visitor can read it. That includes fields created by other plugins and themes - Advanced Custom Fields stores its values this way - so it may expose internal notes, ids, prices or contact details you did not intend to make public. Review your custom fields first, and use the key list below to name only the ones you need (or the gtm4wp_post_meta_in_datalayer filter to exclude individual keys in code). Custom fields that hold a structured value rather than plain text are skipped: plugins store those in a packed internal format that no Google Tag Manager variable can read. Until 2.0 this data was sent as part of the "Post Terms" option above; if you had that enabled, this option was turned on for you during the upgrade so your Google Tag Manager setup keeps working.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the custom fields (post meta) of the current post in the pagePostTerms.meta data layer variable. Read this before enabling it: this publishes EVERY custom field whose name does not start with an underscore, together with its value, into the data layer of the public page, where any visitor can read it. That includes fields created by other plugins and themes - Advanced Custom Fields stores its values this way - so it may expose internal notes, ids, prices or contact details you did not intend to make public. Review your custom fields first, and use the key list below to name only the ones you need (or the gtm4wp_post_meta_in_datalayer filter to exclude individual keys in code). Custom fields that hold a structured value rather than plain text are skipped: plugins store those in a packed internal format that no Google Tag Manager variable can read. Fields that a plugin or your own site marks as protected are skipped too. Until 2.0 this data was sent as part of the "Post Terms" option above; if you had that enabled, this option was turned on for you during the upgrade so your Google Tag Manager setup keeps working.', 'duracelltomi-google-tag-manager' ),
 				group: 'post',
 				doc: self::DOC_POST
 			),
@@ -216,7 +216,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_TEXTAREA,
 				default_value: '',
 				label: __( 'Post custom fields - publish only these keys', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'The names of the custom fields you actually want in the data layer - one per line, or comma separated. Leave it empty to keep publishing every custom field whose name does not start with an underscore, which is what the option above does on its own. Filling it in is the safer way to use that option: your Google Tag Manager container only ever needs a handful of keys, and naming them means a field added later by a plugin, a theme or an editor cannot start appearing on your public pages without you deciding it. Protected fields and the gtm4wp_post_meta_in_datalayer filter still apply on top of this list.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The names of the custom fields you actually want in the data layer - one per line, or comma separated. Leave it empty to keep publishing every custom field whose name does not start with an underscore and is not otherwise protected or skipped, which is what the option above does on its own. Filling it in is the safer way to use that option: your Google Tag Manager container only ever needs a handful of keys, and naming them means a field added later by a plugin, a theme or an editor cannot start appearing on your public pages without you deciding it. Protected fields and the gtm4wp_post_meta_in_datalayer filter still apply on top of this list, so naming a field here cannot publish one that is held back for those reasons - a name starting with an underscore is never published however you list it. A field name that contains a comma cannot be listed at all, because commas separate the entries.', 'duracelltomi-google-tag-manager' ),
 				group: 'post',
 				depends_on: GTM4WP_OPTION_INCLUDE_POSTMETA,
 				sanitizer: static function ( $value ) {
@@ -228,6 +228,16 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					// exactly the list PageVariablesModule will honour - one rule, one
 					// place (PA-2). Stored one key per line, which is how the textarea
 					// renders it back.
+					//
+					// There is deliberately NO per-entry validator here, unlike the two
+					// sanitizers below: a WordPress meta key has no grammar to validate
+					// against - core's add_metadata()/update_metadata() only unslash it,
+					// never sanitize it - so any pattern would be inventing one (UC-5).
+					// sanitize_textarea_field() is not the missing piece either: it
+					// keeps control characters and STRIPS %xx sequences, so a legitimate
+					// key such as my%2ffield would be stored as myfield and then match
+					// nothing. The value reaches no output sink; it is only ever
+					// compared with in_array().
 					return implode( "\n", PageVariablesModule::parse_meta_key_list( $value ) );
 				},
 				doc: self::DOC_POST
@@ -438,18 +448,14 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					// type-based branches, so it never sits behind to_string() (RI-6).
 					$value = Field::to_string( $value );
 
-					$entries = preg_split( '/[\s,]+/', $value, -1, PREG_SPLIT_NO_EMPTY );
-					if ( ! is_array( $entries ) ) {
-						return '';
-					}
-
-					// Validated with the reader's own rule (VisitorIp::is_valid_range),
-					// so what is stored is exactly what will be honored. An entry the
-					// reader would quietly skip is worse than a rejected one: the admin
-					// believes that proxy is covered when it is not.
-					$valid = array_values( array_filter( $entries, array( VisitorIp::class, 'is_valid_range' ) ) );
-
-					return implode( "\n", $valid );
+					// Parsed AND validated with the reader's own method, so what is
+					// stored is exactly what VisitorIp::get() will honor - splitting
+					// rule included. An entry the reader would quietly skip is worse
+					// than a rejected one: the admin believes that proxy is covered
+					// when it is not. This used to keep its own copy of the split
+					// while sharing only the validator, which is the divergence PA-2
+					// is about.
+					return implode( "\n", VisitorIp::parse_trusted_proxies( $value ) );
 				},
 				doc: self::DOC_VISITOR
 			),

@@ -102,6 +102,18 @@ So, after drafting the findings and before writing the report:
      - *`--force`*, because plain `remove` exits **128** on a worktree with uncommitted
        changes, which is exactly the state a patching verifier leaves behind and exactly how
        a leftover arises in the first place.
+   - ⛔ **NAMESPACE the worktree path per verifier, and never prune a tree you did not
+     create.** The bullets above put the worktree outside the repo; they do not stop two
+     concurrent verifiers landing on the *same* outside path. Measured on **R26/#L15**, in a
+     run where all three repository snapshot legs came back clean: one verifier took a
+     "baseline" suite reading of **2076 tests with stray debug output** against **another
+     agent's patched worktree**, caught it only because `git status` inside that tree changed
+     under it mid-run, and rebuilt isolated; two other verifiers reported a worktree they
+     could not attribute and correctly declined to touch it. A `git worktree prune` from one
+     agent can also deregister a sibling's live tree. So: `<scratchpad>/fv-<finding-id>/wt`,
+     one per dispatched verifier, and the cleanup verbs act **only** on that path. The
+     dispatch prompt must say so — the snapshot in the parent session cannot see this class
+     of collision, because it is agents colliding with each other, not with the checkout.
    - ⛔ **A worktree verifier that runs the suite must `composer install` (or at minimum
      `composer dump-autoload`) INSIDE the worktree first, and confirm the class under test
      resolves there** (`(new ReflectionClass( … ))->getFileName()`). A worktree has no
@@ -268,17 +280,51 @@ cat .claude/settings.json .claude/settings.local.json          # PROJECT scope: 
 # DEFINITIONS — the SAME scope rule, applied to every KIND (PA-19, #186). Note the ABSOLUTE
 # paths: a relative `.claude/agents/*.md` reaches PROJECT scope only, which is how 24 of 28
 # agent definitions went uncounted for 23 reviews while 17 of them declared Write or Edit.
+# PLUGIN SCOPE: resolve the ACTIVE version, never a glob. The third `*` in
+# `cache/*/*/*/` is the VERSION, and cached versions ACCUMULATE — 4 of them on 2026-08-29 —
+# so the old glob multiplied the plugin surface by the number of updates ever installed
+# (it reports 28/4/0/12 for a real surface of 7/1/0/3). `jq` is NOT installed on this
+# machine: anything reaching for it fails silently under 2>/dev/null and reports zero,
+# which reads as "nothing there" (R26).
+python3 - <<'ACTIVE' > /tmp/gtm4wp-plugin-roots.txt
+import json, os, sys
+def load(p):
+    try: return json.load(open(os.path.expanduser(p), encoding='utf-8'))
+    except Exception: return {}
+enabled = {}
+for f in ('~/.claude/settings.json', '.claude/settings.json', '.claude/settings.local.json'):
+    enabled.update(load(f).get('enabledPlugins') or {})   # enablement is scope-merged too
+for key, v in (load('~/.claude/plugins/installed_plugins.json').get('plugins') or {}).items():
+    if not enabled.get(key):        # installed != enabled
+        continue
+    for e in (v if isinstance(v, list) else [v]):
+        if e.get('installPath'):
+            sys.stdout.write(e['installPath'].replace(chr(92), '/') + '\n')
+ACTIVE
+mapfile -t PLUGIN_ROOTS < <( tr -d '\r' < /tmp/gtm4wp-plugin-roots.txt )  # Windows python emits CRLF
 for kind in agents skills commands hooks; do
   ls -d "$PWD/.claude/$kind"/*        2>/dev/null   # project scope
   ls -d ~/.claude/"$kind"/*           2>/dev/null   # USER scope — outside the repo, in no diff
-  ls -d ~/.claude/plugins/cache/*/*/*/"$kind"/* 2>/dev/null   # every ENABLED PLUGIN's scope
+  for r in "${PLUGIN_ROOTS[@]}"; do ls -d "$r/$kind"/* 2>/dev/null; done  # ACTIVE version only
 done
 find ~/.claude/agents ~/.claude/skills -type l -exec readlink -f {} \; 2>/dev/null  # symlinks leave ~/.claude
 grep -h '^tools:' .claude/agents/*.md ~/.claude/agents/*.md \
-                  ~/.claude/plugins/cache/*/*/*/agents/*.md 2>/dev/null  # `tools:` RESTRICTS, does not GRANT
-cat ~/.claude/plugins/installed_plugins.json                   # pin each plugin by version +
-                                                               # gitCommitSha, NEVER by its
-                                                               # enabledPlugins name: the name is
+                  2>/dev/null                          # `tools:` RESTRICTS, does not GRANT
+for r in "${PLUGIN_ROOTS[@]}"; do grep -h '^tools:' "$r"/agents/*.md 2>/dev/null; done
+# CONTENT PIN — COMPUTE one, do not read one. `gitCommitSha` in installed_plugins.json did
+# NOT move across three updates and 32 changed files (measured R26), refers to no repository
+# present on this machine, and is install-time provenance only. Record version + this digest.
+# `.in_use/` MUST be excluded: it holds per-process marker files named after live PIDs, so
+# including it yields a digest that is stable within a session and different in the next one
+# — constant false drift, which is the "noise or silence" failure UD-1 warns about. Measured
+# R26: with `.in_use` the same unchanged version hashed differently in two sessions; without
+# it the digest reproduced across runs.
+for r in "${PLUGIN_ROOTS[@]}"; do
+  ( cd "$r" && find . -type f -not -path './.in_use/*' | LC_ALL=C sort \
+      | xargs sha256sum | sha256sum | cut -c1-16 )
+done
+cat ~/.claude/plugins/installed_plugins.json                   # version + installPath. NEVER pin by
+                                                               # the enabledPlugins name: the name is
                                                                # stable while the marketplace
                                                                # re-syncs underneath it
 grep -rn "hooksPath\|rev-parse --show-toplevel" .githooks/ .claude/

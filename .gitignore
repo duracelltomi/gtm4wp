@@ -56,6 +56,9 @@ __pycache__/
 # check every time a verifier is live.
 .claude/worktrees/
 
+# Output of the claude-security plugin
+CLAUDE-SECURITY-*/
+
 # wordpress.org support-forum triage (/wporg-forum-review). The framework lives
 # in .claude/ and is committed; the working data — triage ledger, canonical
 # answers, per-run reports and drafted replies — is local only.
