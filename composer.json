@@ -19,7 +19,8 @@
         "phpcompatibility/php-compatibility": "^9.3",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "phpunit/phpunit": "^11.0",
-        "brain/monkey": "^2.6"
+        "brain/monkey": "^2.6",
+        "mralaminahamed/easy-digital-downloads-stubs": "3.7.0"
     },
     "autoload": {
         "psr-4": {

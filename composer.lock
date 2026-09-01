@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "18c9f302e12e6bcf035b7102c5ffec55",
+    "content-hash": "b731cd8238d93d3b94dc7e097320f582",
     "packages": [],
     "packages-dev": [
         {
@@ -356,6 +356,62 @@
             "time": "2024-05-16T03:13:13+00:00"
         },
         {
+            "name": "mralaminahamed/easy-digital-downloads-stubs",
+            "version": "v3.7.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mralaminahamed/phpstan-easy-digital-downloads-stubs.git",
+                "reference": "3077a102d09911d2f6556032d5249e7408a108ae"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mralaminahamed/phpstan-easy-digital-downloads-stubs/zipball/3077a102d09911d2f6556032d5249e7408a108ae",
+                "reference": "3077a102d09911d2f6556032d5249e7408a108ae",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4",
+                "php-stubs/wordpress-stubs": "^5.3 || ^6.0"
+            },
+            "require-dev": {
+                "php-stubs/generator": "^0.8.0",
+                "phpstan/phpstan": "^2.0",
+                "phpunit/phpunit": "^7.5 || ^8.5 || ^9.5",
+                "squizlabs/php_codesniffer": "^3.7"
+            },
+            "suggest": {
+                "mralaminahamed/easy-digital-downloads-pro-stubs": "PHPStan stubs for EDD Pro",
+                "szepeviktor/phpstan-wordpress": "WordPress extensions for PHPStan"
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Al Amin Ahamed",
+                    "homepage": "https://github.com/mralaminahamed"
+                }
+            ],
+            "description": "Easy Digital Downloads function and class declaration stubs for static analysis.",
+            "homepage": "https://github.com/mralaminahamed/phpstan-easy-digital-downloads-stubs",
+            "keywords": [
+                "PHPStan",
+                "easy-digital-downloads",
+                "edd",
+                "static analysis",
+                "stubs",
+                "wordpress",
+                "wordpress-plugin"
+            ],
+            "support": {
+                "issues": "https://github.com/mralaminahamed/phpstan-easy-digital-downloads-stubs/issues",
+                "source": "https://github.com/mralaminahamed/phpstan-easy-digital-downloads-stubs"
+            },
+            "time": "2026-08-16T06:57:56+00:00"
+        },
+        {
             "name": "myclabs/deep-copy",
             "version": "1.13.4",
             "source": {
@@ -589,6 +645,58 @@
                 "source": "https://github.com/phar-io/version/tree/3.2.1"
             },
             "time": "2022-02-21T01:04:05+00:00"
+        },
+        {
+            "name": "php-stubs/wordpress-stubs",
+            "version": "v6.9.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-stubs/wordpress-stubs.git",
+                "reference": "90a9412826b9944f93b10bf41d795b5fe68abcd5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-stubs/wordpress-stubs/zipball/90a9412826b9944f93b10bf41d795b5fe68abcd5",
+                "reference": "90a9412826b9944f93b10bf41d795b5fe68abcd5",
+                "shasum": ""
+            },
+            "conflict": {
+                "phpdocumentor/reflection-docblock": "5.6.1"
+            },
+            "require-dev": {
+                "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+                "nikic/php-parser": "^5.5",
+                "php": "^7.4 || ^8.0",
+                "php-stubs/generator": "^0.8.6",
+                "phpdocumentor/reflection-docblock": "^6.0",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^9.5",
+                "symfony/polyfill-php80": "*",
+                "szepeviktor/phpcs-psr-12-neutron-hybrid-ruleset": "^1.1.1",
+                "wp-coding-standards/wpcs": "3.1.0 as 2.3.0"
+            },
+            "suggest": {
+                "paragonie/sodium_compat": "Pure PHP implementation of libsodium",
+                "symfony/polyfill-php80": "Symfony polyfill backporting some PHP 8.0+ features to lower PHP versions",
+                "szepeviktor/phpstan-wordpress": "WordPress extensions for PHPStan"
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "WordPress function and class declaration stubs for static analysis.",
+            "homepage": "https://github.com/php-stubs/wordpress-stubs",
+            "keywords": [
+                "PHPStan",
+                "static analysis",
+                "wordpress"
+            ],
+            "support": {
+                "issues": "https://github.com/php-stubs/wordpress-stubs/issues",
+                "source": "https://github.com/php-stubs/wordpress-stubs/tree/v6.9.4"
+            },
+            "time": "2026-05-01T20:36:01+00:00"
         },
         {
             "name": "phpcompatibility/php-compatibility",
@@ -2504,12 +2612,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.0"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.3.0"
 }
