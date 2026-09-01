@@ -679,12 +679,15 @@ final class DownloadData {
 
 	/**
 	 * Returns the buyer's phone number for an order, or '' when none is
-	 * stored. EDD core collects no phone number, so this reads the de-facto
-	 * community conventions: EDD 3 order meta under the key 'phone', then the
-	 * 'phone' entry of the legacy payment meta array - the storage EDD's own
-	 * documented checkout-phone-field recipe uses - and finally lets site code
-	 * supply or override the number through the gtm4wp_edd_order_phone filter
-	 * (e.g. mapping a Checkout Fields Manager field).
+	 * stored. EDD core's own opt-in checkout Phone field (since EDD 3.3.8,
+	 * enabled via the checkout address fields setting) stores the number as
+	 * order meta '_edd_phone', so that is read first. After it come the
+	 * de-facto community conventions: EDD 3 order meta under the key 'phone',
+	 * then the 'phone' entry of the legacy payment meta array - the storage
+	 * EDD's own documented checkout-phone-field recipe uses - and finally
+	 * site code can supply or override the number through the
+	 * gtm4wp_edd_order_phone filter (e.g. mapping a Checkout Fields Manager
+	 * field).
 	 *
 	 * @param \EDD\Orders\Order $order The order to read the phone number from.
 	 * @return string
@@ -695,7 +698,11 @@ final class DownloadData {
 		$phone = '';
 
 		if ( $order_id > 0 && function_exists( 'edd_get_order_meta' ) ) {
-			$phone = (string) edd_get_order_meta( $order_id, 'phone', true );
+			$phone = (string) edd_get_order_meta( $order_id, '_edd_phone', true );
+
+			if ( '' === $phone ) {
+				$phone = (string) edd_get_order_meta( $order_id, 'phone', true );
+			}
 		}
 
 		if ( '' === $phone && $order_id > 0 && function_exists( 'edd_get_payment_meta' ) ) {

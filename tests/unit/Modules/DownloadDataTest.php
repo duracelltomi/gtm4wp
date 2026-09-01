@@ -335,7 +335,7 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( hash( 'sha256', 'buyer@example.com' ), $data_layer['user_data']['sha256_email_address'] );
 		$this->assertSame( hash( 'sha256', 'jane' ), $data_layer['user_data']['address']['sha256_first_name'] );
 		$this->assertSame( 'HU', $data_layer['user_data']['address']['country'] );
-		$this->assertArrayNotHasKey( 'sha256_phone_number', $data_layer['user_data'], 'EDD core collects no phone; without stored meta the key must be absent.' );
+		$this->assertArrayNotHasKey( 'sha256_phone_number', $data_layer['user_data'], 'Without stored phone meta the key must be absent.' );
 	}
 
 	public function test_purchase_datalayer_hashes_a_phone_stored_by_a_checkout_field_extension(): void {
@@ -343,6 +343,58 @@ final class DownloadDataTest extends TestCase {
 		// recipe): the 'phone' entry of the legacy payment meta array. The
 		// number is normalized to E.164 against the order country first.
 		Functions\when( 'edd_get_payment_meta' )->justReturn( array( 'phone' => '06 20 123 4567' ) );
+
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer(
+			$this->make_order(
+				array( 'address' => array( 'country' => 'HU' ) )
+			)
+		);
+
+		$this->assertSame(
+			hash( 'sha256', '+36201234567' ),
+			$data_layer['user_data']['sha256_phone_number']
+		);
+	}
+
+	/**
+	 * U117 drift (found 2026-09-01 against EDD 3.7.0): EDD core has shipped an
+	 * opt-in checkout Phone field since 3.3.8 that stores the number as order
+	 * meta '_edd_phone' - a key this module never read, so on such stores the
+	 * hashed phone silently vanished from Enhanced Conversions. Pins the read
+	 * priority with a key-aware stub: EDD's own storage first, the community
+	 * 'phone' order meta second.
+	 */
+	public function test_purchase_datalayer_phone_reads_edd_cores_own_field_first(): void {
+		Functions\when( 'edd_get_order_meta' )->alias(
+			static fn ( $order_id, $key ) => '_edd_phone' === $key ? '06 30 999 8877' : '+49 30 12345678'
+		);
+		Functions\when( 'edd_get_payment_meta' )->justReturn( array( 'phone' => '+1 201 555 0123' ) );
+
+		$data_layer = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->get_purchase_datalayer(
+			$this->make_order(
+				array( 'address' => array( 'country' => 'HU' ) )
+			)
+		);
+
+		$this->assertSame(
+			hash( 'sha256', '+36309998877' ),
+			$data_layer['user_data']['sha256_phone_number'],
+			'EDD core\'s own _edd_phone storage must win over the community conventions.'
+		);
+	}
+
+	/**
+	 * The community 'phone' order meta stays reachable when EDD core's own
+	 * field is absent (the pre-3.3.8 recipe sites).
+	 */
+	public function test_purchase_datalayer_phone_falls_back_to_the_community_order_meta(): void {
+		Functions\when( 'edd_get_order_meta' )->alias(
+			static fn ( $order_id, $key ) => '_edd_phone' === $key ? '' : '06 20 123 4567'
+		);
 
 		$data_layer = $this->make_download_data(
 			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
