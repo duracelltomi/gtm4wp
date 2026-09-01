@@ -141,13 +141,17 @@ recorded rather than assumed good.
 
 Run the skill's [fix-status resolver](../skills/wporg-forum-triage/SKILL.md) **once per
 sweep**, not once per topic: pull the published version from the wordpress.org API, read
-`git show 1.x:CHANGELOG.md` for the released 1.x fixes, and `git show
-master:CHANGELOG.md` for the `## 2.0` section. Hold both lists in mind while classifying.
+`git show 2.0:CHANGELOG.md` for the released 2.0.x fixes, and `git show
+1.x:CHANGELOG.md` for what the frozen 1.x line ever received. Hold both lists in mind
+while classifying.
 
-The trap worth repeating: `CHANGELOG.md` on the checked-out `master` branch (the 2.0 line)
-has **no 1.22.x section** — it jumps from `## 2.0` straight to `## 1.21.1`. The released 1.x
-fixes live on the `1.x` branch. Reading fix status off the current branch will tell a
-reporter to wait for 2.0 when the fix is already downloadable.
+The trap worth repeating (re-cut 2026-09-01, when 2.0.0 became the wp.org stable):
+released fix status comes from the **`2.0` branch**, not from the checked-out `master` —
+master's top changelog section accumulates unreleased 2.1 work, so reading it off the
+current branch tells a reporter a fix is downloadable when it is not. And the 1.x line is
+**unmaintained** (a reported security issue is the only thing that still gets a 1.x fix),
+so no draft ever promises a 1.x bugfix: a reporter pinned to 1.22.5 by old WP/PHP is
+told, kindly, that the fix lives in 2.0 and what 2.0 requires.
 
 ### 3. Assign a lane
 
@@ -157,8 +161,8 @@ reporter or a bystander.
 | Lane | Detection | Action |
 |---|---|---|
 | **Suspected security** | STOP-gate signals | ✋ private-redirect draft only, zero detail |
-| **Fixed in released version** | resolver hit on `master`'s released section | ✋ "update to {version}" — draft these first, they close the most threads for the least work |
-| **Fixed, 2.0 only** | resolver hit on the `## 2.0` section | ✋ fixed in the rewrite, no date, give a workaround if one exists |
+| **Fixed in released version** | resolver hit on the `2.0` branch's released section | ✋ "update to {version}" — draft these first, they close the most threads for the least work |
+| **Fixed, reporter pinned to 1.x** | fix released in 2.0.x but the reporter is stuck on 1.22.5 (WP < 6.3 / PHP < 8.0) | ✋ fix exists in 2.0, name the requirements, give a workaround if one exists; never promise a 1.x fix |
 | **Closing window** | `closing_window: true`, still unanswered | ✋ **last chance** — top of the batch regardless of lane |
 | **New / never answered** | no post by `duracelltomi`, `last_author_login != duracelltomi` | ✋ first reply (apology opener if `opened_age_days > 14`) |
 | **Ball back in our court** | maintainer posted, then the reporter posted again | ✋ follow-up reply |
@@ -226,8 +230,9 @@ the rules that matter: it is context alongside a diagnosis and never the answer 
 does not go on a confirmed-bug thread or on a review, and a reporter on 1.x has to be told
 which of the settings it names only arrive with 2.0. Never link its old redirecting URLs.
 
-Verify concrete claims against the source before writing them — settings labels against the
-`1.x` branch (the released line reporters actually run; `master` is the 2.0 rewrite), filter
+Verify concrete claims against the source before writing them — settings labels against
+the `2.0` branch (the released line since 2026-09-01; `master` carries unreleased 2.1
+work, and `1.x` is only for reporters who say they run 1.22.x), filter
 and meta-key names against the code, and plugin behavior against the code path rather than
 the changelog. Platform claims about GTM, GA4, consent mode or another plugin are not
 verifiable this way: those come from `.support/product-knowledge.md`, never from memory. See
