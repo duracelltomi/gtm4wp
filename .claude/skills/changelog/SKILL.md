@@ -8,8 +8,11 @@ license: GPL-2.0-or-later
 
 ## What requires an entry
 
-Every change to **production code** ships a matching bullet under the top `## 2.0`
-heading in `CHANGELOG.md` (`* Added:` / `* Changed:` / `* Updated:` / `* Fixed:`).
+Every change to **production code** ships a matching bullet under the top **unreleased**
+heading in `CHANGELOG.md` (`* Added:` / `* Changed:` / `* Updated:` / `* Fixed:`). The
+heading is `## <development target>` per `.claude/RELEASE-STATE.md`; when the top heading
+is a *released* version (right after a release, before any new production change), the
+change that needs a bullet **opens the new heading above it** in the same edit.
 
 "Production code" = `src/**.php`, `compat/**.php`, `js/frontend/**.js`, `js/admin/**.js`,
 the main plugin file and `uninstall.php`. Tests, docs and `.security/`/`.testing/`
@@ -18,9 +21,9 @@ housekeeping are exempt.
 ## The baseline is always the last released stable version
 
 Every bullet in the unreleased block describes a delta against the **last
-released stable version** — check `Stable tag:` in `readme.txt` on the `1.x`
-branch, not against the previous major or against last week's working tree. Two
-consequences:
+released stable version** — named in `.claude/RELEASE-STATE.md`, verifiable as
+`Stable tag:` in `readme.txt` on the released stable branch. Not against the
+previous major, and not against last week's working tree. Two consequences:
 
 - A fix **back-ported** to that stable release gets **no bullet** in the
   unreleased block. It is not a delta any more; the reader sees it in the
@@ -29,10 +32,10 @@ consequences:
   Admins upgrading from further back read the intervening blocks, which sit
   right below the unreleased one, so they stay informed either way.
 
-Before writing "previously…", "1.x did…", or "no longer…", confirm the claim
-against the released code (`git grep <symbol> 1.x`). A bullet whose "previously"
-only ever existed on the development branch describes nothing the reader lived
-through.
+Before writing "previously…", "the last version did…", or "no longer…", confirm the
+claim against the released code (`git grep <symbol> 2.0` <!-- release-coupled: the
+released stable branch -->). A bullet whose "previously" only ever existed on the
+development branch describes nothing the reader lived through.
 
 ## Write for the upgrading user, not for the development history
 
@@ -52,13 +55,15 @@ Corollaries:
   Use `[skip changelog]` in the commit message instead.
 - Editing an existing bullet **satisfies both hooks** — they check that
   `CHANGELOG.md` changed, not that a bullet was added.
-- The 2.0 section is grouped under `###` theme headings (Architecture, Settings
-  screen, Container, Page variables, WooCommerce, Media events, Consent, Contact
-  Form 7, AMP, Removed). Put a new bullet in its theme group rather than at the
-  top of the section.
-- `readme.txt`'s `= 2.0.0 =` block **mirrors** the `## 2.0` section (flattened
-  for WordPress.org: no nested lists, `**bold**` lead-ins instead of `###`).
-  A user-visible change updates both files together.
+- A large release section is grouped under `###` theme headings (the `## 2.0`
+  section used: Architecture, Settings screen, Container, Page variables,
+  WooCommerce, Media events, Consent, Contact Form 7, AMP, Removed). Where the
+  unreleased section has theme groups, put a new bullet in its group rather than
+  at the top of the section.
+- `readme.txt`'s matching `= <version> =` block **mirrors** the unreleased
+  section (flattened for WordPress.org: no nested lists, `**bold**` lead-ins
+  instead of `###`). A user-visible change updates both files together, opening
+  the readme block alongside the changelog heading when it does not exist yet.
 
 ## Enforcement
 

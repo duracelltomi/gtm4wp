@@ -48,8 +48,11 @@ prove it** (`.testing/`) · **is what we believe about the outside world still t
 
 ## Architecture
 
-Version 2.0 is a full OOP rewrite (this `master` branch; the released 1.x line
-lives on the `1.x` branch). The public 1.x integration surface — hooks, template functions, wp-config constants and the
+Version 2.x is a full OOP rewrite of the 1.x line. **Which version lives on which
+branch — released stable, frozen 1.x, development target — is defined in
+`.claude/RELEASE-STATE.md`; read it before making any claim about versions or
+branches** (`master` is always the development branch). The public 1.x integration
+surface — hooks, template functions, wp-config constants and the
 `gtm4wp-options` key — is kept backward compatible through the `compat/` layer.
 
 - **Namespaced OOP PHP** — PSR-4 `GTM4WP\` → `src/`, one class per file, autoloaded via `src/Autoloader.php` (Composer autoloader used for tests). No global procedural code except the `compat/` shims.
@@ -112,6 +115,7 @@ back — use the `Options`/`Frontend` services instead.
 
 ## Requirements
 
+<!-- release-coupled: canonical values in .claude/RELEASE-STATE.md, pinned by ReleaseStateConsistencyTest -->
 - PHP >= 8.0
 - WordPress >= 6.3 (tested up to 7.1)
 - WooCommerce >= 5.0 (tested up to 11.0.0)
@@ -160,7 +164,7 @@ it on purpose):
 
 ## Changelog policy
 
-Every **production-code** change ships a matching bullet under the top `## 2.0`
+Every **production-code** change ships a matching bullet under the top **unreleased**
 heading in `CHANGELOG.md` (and usually a mirrored `readme.txt` block). This is
 enforced by `.claude/hooks/require-changelog.sh` — a Claude Code `Stop` hook and a
 git `commit-msg` hook that will **block** you if production code changed without a
