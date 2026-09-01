@@ -647,13 +647,13 @@ final class ProductDataTest extends TestCase {
 		$item         = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 123, $item['internal_id'] );
-		$this->assertSame( 123, $item['item_id'], 'ID is used when SKU mode is off.' );
+		$this->assertSame( '123', $item['item_id'], 'ID is used when SKU mode is off.' );
 		$this->assertSame( 'Test Product', $item['item_name'] );
 		$this->assertSame( 'SKU-1', $item['sku'] );
 		$this->assertSame( 20.0, $item['price'], 'Price must be rounded to 2 decimals.' );
 		$this->assertSame( 'Shoes', $item['item_category'] );
 		$this->assertSame( 'retail', $item['google_business_vertical'] );
-		$this->assertSame( 123, $item['id'], 'Retail vertical uses the id field name.' );
+		$this->assertSame( '123', $item['id'], 'Retail vertical uses the id field name.' );
 		$this->assertArrayNotHasKey( 'item_group_id', $item );
 		$this->assertArrayNotHasKey( 'item_variant', $item );
 	}
@@ -675,7 +675,7 @@ final class ProductDataTest extends TestCase {
 
 		$item = $product_data->process_product( $this->make_product( array( 'sku' => '' ) ), array(), 'productdetail' );
 
-		$this->assertSame( 123, $item['item_id'] );
+		$this->assertSame( '123', $item['item_id'] );
 		$this->assertSame( 123, $item['sku'], 'sku field falls back to the product ID.' );
 	}
 
@@ -687,7 +687,7 @@ final class ProductDataTest extends TestCase {
 		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 'woocommerce_gpf_123', $item['id'] );
-		$this->assertSame( 123, $item['item_id'], 'item_id itself stays unprefixed.' );
+		$this->assertSame( '123', $item['item_id'], 'item_id itself stays unprefixed.' );
 	}
 
 	public function test_variation_product_mapping(): void {
@@ -790,7 +790,7 @@ final class ProductDataTest extends TestCase {
 		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 'travel', $item['google_business_vertical'] );
-		$this->assertSame( 123, $item['destination'] );
+		$this->assertSame( '123', $item['destination'] );
 		$this->assertArrayNotHasKey( 'id', $item );
 	}
 
@@ -1552,7 +1552,7 @@ final class ProductDataTest extends TestCase {
 
 		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
 
-		$this->assertSame( 123, $item['item_id'], 'With the option off the current product id is kept.' );
+		$this->assertSame( '123', $item['item_id'], 'With the option off the current product id is kept.' );
 		$this->assertSame( 'Test Product', $item['item_name'] );
 		$this->assertSame( 'Current Cat', $item['item_category'] );
 	}
@@ -1594,7 +1594,7 @@ final class ProductDataTest extends TestCase {
 		$item         = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 123, $item['internal_id'], 'internal_id stays the current product id for client-side list matching.' );
-		$this->assertSame( 100, $item['item_id'], 'item_id is the master product id so GA4 merges the translations.' );
+		$this->assertSame( '100', $item['item_id'], 'item_id is the master product id so GA4 merges the translations.' );
 		$this->assertSame( 'Master Product', $item['item_name'] );
 		$this->assertSame( 'SKU-MASTER', $item['sku'] );
 		$this->assertSame( 'Master Cat', $item['item_category'] );
@@ -1643,7 +1643,7 @@ final class ProductDataTest extends TestCase {
 			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
 		)->process_product( $variation, array(), 'productdetail' );
 
-		$this->assertSame( 400, $item['item_id'] );
+		$this->assertSame( '400', $item['item_id'] );
 		$this->assertSame( 'Master Variation', $item['item_name'] );
 		$this->assertSame( 300, $item['item_group_id'], 'The variation parent resolves to the master parent id.' );
 		$this->assertSame( 'red', $item['item_variant'], 'The variant attributes come from the master variation.' );
@@ -1663,7 +1663,7 @@ final class ProductDataTest extends TestCase {
 			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
 		)->process_product( $this->make_product(), array(), 'productdetail' );
 
-		$this->assertSame( 123, $item['item_id'] );
+		$this->assertSame( '123', $item['item_id'] );
 		$this->assertSame( 'Test Product', $item['item_name'] );
 		$this->assertSame( 'Current Cat', $item['item_category'] );
 	}
@@ -1693,7 +1693,7 @@ final class ProductDataTest extends TestCase {
 			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
 		)->process_product( $this->make_product(), array(), 'productdetail' );
 
-		$this->assertSame( 100, $item['item_id'] );
+		$this->assertSame( '100', $item['item_id'] );
 		$this->assertSame( 'Master Product', $item['item_name'] );
 		$this->assertSame( 'Master Cat', $item['item_category'] );
 	}

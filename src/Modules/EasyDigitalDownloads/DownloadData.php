@@ -176,7 +176,9 @@ final class DownloadData {
 
 		$_temp_productdata = array(
 			'internal_id'              => $download_id,
-			'item_id'                  => $remarketing_id,
+			// Always a string, matching the WooCommerce module: Merchant Center
+			// feed ids are strings and GA4 matches item_id against them.
+			'item_id'                  => (string) $remarketing_id,
 			'item_name'                => $data_download->get_name(),
 			'sku'                      => ( '' !== $download_sku ) ? $download_sku : $data_download_id,
 			'price'                    => round( $display_price, 2 ),

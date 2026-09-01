@@ -152,12 +152,12 @@ final class DownloadDataTest extends TestCase {
 		$item = $this->make_download_data()->process_download( $this->make_download(), array(), 'productdetail' );
 
 		$this->assertSame( 55, $item['internal_id'] );
-		$this->assertSame( 55, $item['item_id'], 'Without the use-SKU option the id stays the download id.' );
+		$this->assertSame( '55', $item['item_id'], 'Without the use-SKU option the id stays the download id.' );
 		$this->assertSame( 'EBOOK-1', $item['sku'] );
 		$this->assertSame( 'My eBook', $item['item_name'] );
 		$this->assertSame( 9.99, $item['price'] );
 		$this->assertSame( 'retail', $item['google_business_vertical'] );
-		$this->assertSame( 55, $item['id'], 'The Google Ads remarketing id field defaults to "id" carrying the item id.' );
+		$this->assertSame( '55', $item['id'], 'The Google Ads remarketing id field defaults to "id" carrying the item id.' );
 		$this->assertArrayNotHasKey( 'item_variant', $item, 'A fixed-price download has no variant.' );
 	}
 
@@ -183,7 +183,7 @@ final class DownloadDataTest extends TestCase {
 			array( GTM4WP_OPTION_INTEGRATE_EDDUSESKU => true )
 		)->process_download( $this->make_download(), array(), 'productdetail' );
 
-		$this->assertSame( 55, $item['item_id'] );
+		$this->assertSame( '55', $item['item_id'] );
 		$this->assertSame( 55, $item['sku'] );
 	}
 
@@ -257,7 +257,7 @@ final class DownloadDataTest extends TestCase {
 
 		$item = $this->make_download_data()->process_download( $this->make_download(), array(), 'productdetail' );
 
-		$this->assertSame( 55, $item['item_id'] );
+		$this->assertSame( '55', $item['item_id'] );
 		$this->assertSame( 'My eBook', $item['item_name'] );
 	}
 
@@ -287,7 +287,7 @@ final class DownloadDataTest extends TestCase {
 			array( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE => true )
 		)->process_download( $this->make_download(), array(), 'productdetail' );
 
-		$this->assertSame( 100, $item['item_id'], 'GA4 groups items by item_id, so the id must resolve to the master download.' );
+		$this->assertSame( '100', $item['item_id'], 'GA4 groups items by item_id, so the id must resolve to the master download.' );
 		$this->assertSame( 'Master eBook', $item['item_name'] );
 		$this->assertSame( 'EBOOK-MASTER', $item['sku'] );
 		$this->assertSame( 'Master Cat', $item['item_category'] );

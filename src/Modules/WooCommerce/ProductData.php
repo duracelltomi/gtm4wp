@@ -220,7 +220,11 @@ final class ProductData {
 
 		$_temp_productdata = array(
 			'internal_id'              => $product_id,
-			'item_id'                  => $remarketing_id,
+			// Always a string: Merchant Center feed ids are strings, and GA4
+			// matches item_id against them - a product without a SKU used to
+			// serialize its numeric id as a JSON number here while a SKU'd
+			// sibling was a string, so the same feed matched only half a store.
+			'item_id'                  => (string) $remarketing_id,
 			'item_name'                => $data_product->get_title(),
 			'sku'                      => $data_product_sku ? $data_product_sku : $data_product_id,
 			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
