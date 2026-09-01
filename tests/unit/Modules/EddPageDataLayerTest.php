@@ -595,6 +595,78 @@ final class EddPageDataLayerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * T40's EDD call site: the encode-failure guard is pinned at
+	 * ScriptTag::json_literal() itself, but this checkout sink is the one EDD
+	 * sink third-party code can poison, because every item passes the public
+	 * item-with-source filter. An unencodable value must cost the value, not
+	 * the block: `= null;`, never `= ;` (a SyntaxError that would take the
+	 * checkout globals and their reader down with it).
+	 */
+	public function test_checkout_products_fall_back_to_null_when_an_item_cannot_be_encoded(): void {
+		Functions\when( 'edd_is_checkout' )->justReturn( true );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		// A third-party filter callback can hand back any PHP value. NAN is the
+		// faithful unencodable trigger: real wp_json_encode() repairs bad UTF-8
+		// but returns false for NAN (see ScriptTagTest's json_literal cases).
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['broken'] = NAN;
+					return $item;
+				}
+			);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$checkout = $this->inline_script_output( 'gtm4wp-edd' );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products = null;', $checkout, 'The guard costs the value, not the block.' );
+		$this->assertStringNotContainsString( 'gtm4wp_checkout_products = ;', $checkout, 'An empty literal is a SyntaxError that kills the whole inline block.' );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value', $checkout, 'The sibling global survives the broken one.' );
+	}
+
+	/**
+	 * T51's EDD counterpart: the confirmation-page render and the reliable
+	 * fallback both funnel into add_purchase_for_order(), and only the
+	 * `! $is_success_page` leg keeps them exclusive within one request - the
+	 * server-side tracked-meta guard cannot help here, because within a single
+	 * render the fallback would re-resolve the order before any meta write is
+	 * visible to a stubbed (or object-cached) reader. Deleting that leg left
+	 * the whole suite green, so this pins it: the confirmation page with the
+	 * reliable option on emits exactly one purchase and one tracked flag.
+	 */
+	public function test_success_page_render_keeps_the_reliable_fallback_quiet(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+
+		// The buyer's purchase session is still live (EDD keeps it after
+		// checkout), so an unguarded fallback would resolve the same order.
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+
+		Functions\expect( 'edd_update_order_meta' )
+			->once()
+			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+
+		$this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true )
+		)->add_datalayer_data( array() );
+
+		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+		$this->assertSame( 1, substr_count( $pushed, '"event":"purchase"' ), 'The confirmation page must deliver the purchase exactly once; the fallback stays quiet on the same request.' );
+	}
+
 	public function test_success_page_resolves_the_order_from_the_purchase_session(): void {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_from_session' ) );

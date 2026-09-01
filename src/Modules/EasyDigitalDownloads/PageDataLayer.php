@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\EasyDigitalDownloads;
 
 use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -414,7 +415,7 @@ final class PageDataLayer {
 		wp_add_inline_script(
 			'gtm4wp-edd',
 			'
-			window.gtm4wp_checkout_products = ' . wp_json_encode( $cart['items'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
+			window.gtm4wp_checkout_products = ' . ScriptTag::json_literal( $cart['items'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
 			window.gtm4wp_checkout_value    = ' . (float) $cart['value'] . ';',
 			'before'
 		);
