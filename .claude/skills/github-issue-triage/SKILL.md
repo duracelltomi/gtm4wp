@@ -95,18 +95,20 @@ gh issue list --state all --search "<key terms>" --limit 20 \
 ```
 
 - Search `CHANGELOG.md` and recent commits for the symptom — many open issues filed
-  against 1.x are fixed in the released 2.0 line. "Released" means the `2.0` branch
-  (`git show 2.0:CHANGELOG.md`); `master` carries unreleased 2.1 work. Use
-  `git log --oneline --all --grep=<term>` and `Grep` over `CHANGELOG.md`.
+  against an older line are fixed in the released stable. "Released" means the released
+  stable branch per `.claude/RELEASE-STATE.md`
+  (`git show 2.0:CHANGELOG.md` <!-- release-coupled -->); `master` carries unreleased
+  work. Use `git log --oneline --all --grep=<term>` and `Grep` over `CHANGELOG.md`.
 - If it duplicates another issue → outcome **duplicate** (link the canonical one).
 - If it's fixed but unreleased → draft a comment naming the fixing commit/PR and
   the version it lands in; propose `waiting for reply` (confirm the fix) rather
   than closing.
 
-Since 2026-09-01 the released stable is the 2.0 line and **1.x is unmaintained: only a
-reported security issue still gets a 1.x fix**. An issue about a 1.x-only defect is
-answered with the 2.0 fix or upgrade path (2.0 needs WP 6.3 / PHP 8.0) — never with a
-promised 1.x patch.
+`.claude/RELEASE-STATE.md` names the released stable, the frozen line and its policy: a
+frozen line only ever receives a fix for a reported security issue. An issue about a
+frozen-line-only defect is therefore answered with the stable fix or the upgrade path
+(the WP/PHP floors are in the same file) — never with a promised patch on the frozen
+line.
 
 ### 2. Security screen (STOP gate)
 
@@ -162,10 +164,11 @@ wrong hook name or setting label here is both more likely to be believed and mor
 be quoted back. Before a claim goes into a comment:
 
 - **Naming a setting?** Confirm the exact label exists in the branch the reporter runs. An
-  issue filed against the current released version means the `2.0` branch
-  (`git show 2.0:<path>`); one filed against 1.22.x means the `1.x` branch — **not**
-  `master`, which carries unreleased 2.1 work, and not whatever is checked out. The settings
-  screen was reorganised in 2.0, so the *location* differs even where the label does not.
+  issue filed against the current released version means the released stable branch per
+  `.claude/RELEASE-STATE.md` (`git show 2.0:<path>` <!-- release-coupled -->); one filed
+  against the frozen line means that line's branch — **not** `master`, which carries
+  unreleased work, and not whatever is checked out. The settings screen was reorganised
+  in 2.0, so the *location* differs even where the label does not.
 - **Naming a filter, hook, constant or meta key?** Confirm the string in the source.
 - **Describing what the plugin does?** Read the code path. Changelog wording is a summary and
   regularly hides the detail that matters, e.g. that a hook is a *fallback* rather than the
@@ -321,7 +324,7 @@ comment asks for.
 
 ## Quick reference
 
-- Repo: `duracelltomi/gtm4wp` · default branch `master` (2.1 development) · released stable on `2.0` (2.0.x; a bugfix lands on both `master` and `2.0`) · `1.x` frozen (unmaintained; reported-security-fixes only)
+- Repo: `duracelltomi/gtm4wp` · default branch `master` = development. Branch map, released/frozen versions and the bugfix flow: `.claude/RELEASE-STATE.md`
 - **Read `.support/forum-answers.md` before drafting** — the FAQ of canonical answers,
   shared with the wordpress.org forum system, carrying the traps a previous run already
   fell into. Reuse an entry or add one, every run. Git-ignored, so it is a safe place
