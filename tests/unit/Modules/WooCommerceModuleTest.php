@@ -277,7 +277,13 @@ final class WooCommerceModuleTest extends TestCase {
 		);
 	}
 
-	public function test_block_cart_page_loads_block_tracker_in_cartcheckout_context(): void {
+	/**
+	 * #463: the Cart page must receive its own context, not the merged
+	 * "cartcheckout" one - the tracker used to tell Cart and Checkout apart by the
+	 * presence of the wc/store/payment store, which WooCommerce registers on the
+	 * Cart page too, so the merged context fired the checkout-step events there.
+	 */
+	public function test_block_cart_page_loads_block_tracker_in_cart_context(): void {
 		CartCheckoutUtils::$cart_block = true;
 		Functions\when( 'is_checkout' )->justReturn( false );
 		Functions\when( 'is_cart' )->justReturn( true );
@@ -287,8 +293,23 @@ final class WooCommerceModuleTest extends TestCase {
 
 		$this->assertContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
 		$this->assertNotContains( 'gtm4wp-woocommerce', $result['scripts'], 'The classic tracker is skipped on a block Cart page (no double counting).' );
-		$this->assertStringContainsString( 'cartcheckout', $result['inline']['gtm4wp-woocommerce-blocks'] );
+		$this->assertStringContainsString( '"cart"', $result['inline']['gtm4wp-woocommerce-blocks'] );
+		$this->assertStringNotContainsString( 'cartcheckout', $result['inline']['gtm4wp-woocommerce-blocks'], 'The merged 2.0.0 context value must not come back (#463).' );
 		$this->assertStringNotContainsString( 'minicart', $result['inline']['gtm4wp-woocommerce-blocks'] );
+	}
+
+	public function test_block_checkout_page_loads_block_tracker_in_checkout_context(): void {
+		CartCheckoutUtils::$checkout_block = true;
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$result = $this->run_enqueue( $this->make_module() );
+
+		$this->assertContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
+		$this->assertNotContains( 'gtm4wp-woocommerce', $result['scripts'], 'The classic tracker is skipped on a block Checkout page (no double counting).' );
+		$this->assertStringContainsString( '"checkout"', $result['inline']['gtm4wp-woocommerce-blocks'] );
+		$this->assertStringNotContainsString( 'cartcheckout', $result['inline']['gtm4wp-woocommerce-blocks'], 'The merged 2.0.0 context value must not come back (#463).' );
 	}
 
 	public function test_block_store_ordinary_page_loads_classic_and_minicart_tracker(): void {

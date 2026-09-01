@@ -1,5 +1,9 @@
 # Full changelog for GTM4WP
 
+## 2.1
+
+* Fixed: on a block-based store, opening the Cart page pushed `add_shipping_info` and `add_payment_info` into the data layer with no interaction, and both events then fired again on the Checkout page. The block tracker told the two pages apart by the presence of the WooCommerce payment data store, which WooCommerce registers on the Cart page as well; the Cart and Checkout pages now each receive their own context and the checkout-step events fire only on the Checkout page. (#463)
+
 ## 2.0
 
 Major rewrite of the plugin - please read the announcement post on gtm4wp.com before upgrading.

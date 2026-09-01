@@ -16,15 +16,23 @@
  * from extensions.gtm4wp.item (registered by StoreApiData) as a proper float
  * price, so no minor-unit math is needed.
  *
- * The tracker runs in one of two contexts, set by the PHP side
+ * The tracker runs in one of three contexts, set by the PHP side
  * (window.gtm4wp_blocks_context):
  *
- *   - "cartcheckout" (block Cart/Checkout page): the classic tracker is skipped,
- *     so this one owns every event above.
+ *   - "cart" (block Cart page): the classic tracker is skipped, so this one owns
+ *     the cart and cross-sell events above, but never the checkout steps. The
+ *     wc/store/payment store is registered on the Cart page too, so its presence
+ *     must not decide them (#463).
+ *   - "checkout" (block Checkout page): owns every event above, including
+ *     add_shipping_info / add_payment_info.
  *   - "minicart" (any other page on a block store, where the Mini-Cart block is
  *     usually in the header): it fires remove_from_cart only. The classic tracker
  *     runs alongside and keeps sole ownership of add_to_cart, so an item added on
  *     a product page is never counted twice.
+ *
+ * "cartcheckout", the merged value 2.0.0 sent for both block pages, is still
+ * honored so a cached page whose inline context predates the split keeps
+ * tracking; it retains the old payment-store heuristic for the checkout steps.
  */
 
 import { select, subscribe } from '@wordpress/data';
@@ -201,14 +209,19 @@ function gtm4wp_blocks_init() {
 		return;
 	}
 
-	// "cartcheckout" (block Cart/Checkout page, classic tracker skipped) owns every
-	// event; "minicart" (Mini-Cart on an ordinary page, classic tracker present)
-	// fires remove_from_cart only. Default to cartcheckout for back compatibility.
+	// Which surface the PHP side says this is (the contexts are described in the
+	// header comment). The merged "cartcheckout" value is also the default, for
+	// back compatibility.
 	const context =
 		typeof window.gtm4wp_blocks_context === 'string'
 			? window.gtm4wp_blocks_context
 			: 'cartcheckout';
-	const is_cartcheckout = 'cartcheckout' === context;
+	// #463: only the explicit checkout context may fire the checkout steps; the
+	// payment store exists on the Cart page too, so its presence does not identify
+	// the Checkout block. The legacy merged value keeps its old heuristic.
+	const is_checkout_context =
+		'checkout' === context || 'cartcheckout' === context;
+	const is_cartcheckout = is_checkout_context || 'cart' === context;
 
 	// Baseline of the last seen cart, so the first resolved snapshot does not
 	// report already-present items as additions.
@@ -292,10 +305,12 @@ function gtm4wp_blocks_init() {
 			}
 		}
 
-		// Checkout steps only fire when the payment store is present (i.e. on the
-		// Checkout block), each once per checkout.
+		// Checkout steps fire only in the checkout context, each once per checkout.
+		// The payment store is still required: the active payment method is read
+		// from it, and the legacy merged context has nothing else to tell the two
+		// block pages apart.
 		const payment_store = gtm4wp_safe_select( PAYMENT_STORE );
-		if ( ! is_cartcheckout || ! payment_store || ! current.length ) {
+		if ( ! is_checkout_context || ! payment_store || ! current.length ) {
 			return;
 		}
 

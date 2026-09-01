@@ -313,12 +313,13 @@ final class WooCommerceModule extends AbstractModule {
 			$this->wraps_product_view_item() ? '' : 'defer'
 		);
 
-		if ( $this->is_block_cart_or_checkout() ) {
+		$block_context = $this->block_cart_or_checkout_context();
+		if ( '' !== $block_context ) {
 			// The Cart & Checkout blocks are React-based and never fire the classic
 			// jQuery events the gtm4wp-woocommerce tracker listens for. On those
 			// pages load the block tracker (which reads the WooCommerce data stores)
 			// and skip the classic one so cart/checkout events are not tracked twice.
-			$this->enqueue_blocks_tracker( 'cartcheckout', $in_footer );
+			$this->enqueue_blocks_tracker( $block_context, $in_footer );
 		} else {
 			$this->enqueue_script( 'gtm4wp-woocommerce', 'gtm4wp-woocommerce.js', array( 'jquery' ), $in_footer, '' );
 
@@ -450,11 +451,11 @@ final class WooCommerceModule extends AbstractModule {
 	 * Enqueues the WooCommerce block tracker and tells it which surface it runs on.
 	 *
 	 * The context decides which events the tracker owns (see gtm4wp-woocommerce-blocks.js):
-	 * "cartcheckout" fires the full add/remove/checkout/cross-sell set, "minicart"
-	 * fires remove_from_cart only so it can coexist with the classic tracker without
-	 * double counting.
+	 * "cart" fires the add/remove/cross-sell set, "checkout" additionally owns the
+	 * add_shipping_info / add_payment_info steps, "minicart" fires remove_from_cart
+	 * only so it can coexist with the classic tracker without double counting.
 	 *
-	 * @param string $context   Either 'cartcheckout' or 'minicart'.
+	 * @param string $context   One of 'cart', 'checkout' or 'minicart'.
 	 * @param bool   $in_footer Whether to print the script in the footer.
 	 * @return void
 	 */
@@ -500,25 +501,40 @@ final class WooCommerceModule extends AbstractModule {
 
 	/**
 	 * Whether the current page is the Cart or Checkout page rendered with the
-	 * WooCommerce block (as opposed to the classic shortcode). Detection is
-	 * content-driven, never visitor-driven, so it is safe under full-page caching.
-	 * The order-received endpoint is excluded (its purchase event is server-side).
+	 * WooCommerce block (as opposed to the classic shortcode).
 	 *
 	 * @return bool
 	 */
 	public function is_block_cart_or_checkout(): bool {
+		return '' !== $this->block_cart_or_checkout_context();
+	}
+
+	/**
+	 * Which block surface the current page is: 'checkout' (block Checkout page),
+	 * 'cart' (block Cart page) or '' (neither). Detection is content-driven, never
+	 * visitor-driven, so it is safe under full-page caching. The order-received
+	 * endpoint is excluded (its purchase event is server-side).
+	 *
+	 * The two pages must stay distinct here: the tracker used to receive one merged
+	 * context and told the pages apart by the presence of the wc/store/payment data
+	 * store, but WooCommerce registers that store on the Cart page too, which made
+	 * add_shipping_info / add_payment_info fire there with no interaction (#463).
+	 *
+	 * @return string
+	 */
+	private function block_cart_or_checkout_context(): string {
 		if (
 			function_exists( 'is_checkout' ) && is_checkout()
 			&& ! ( function_exists( 'is_order_received_page' ) && is_order_received_page() )
 		) {
-			return $this->page_uses_block( 'woocommerce/checkout' );
+			return $this->page_uses_block( 'woocommerce/checkout' ) ? 'checkout' : '';
 		}
 
 		if ( function_exists( 'is_cart' ) && is_cart() ) {
-			return $this->page_uses_block( 'woocommerce/cart' );
+			return $this->page_uses_block( 'woocommerce/cart' ) ? 'cart' : '';
 		}
 
-		return false;
+		return '';
 	}
 
 	/**

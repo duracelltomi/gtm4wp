@@ -148,7 +148,7 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 	} );
 
-	it( 'does not fire checkout events when the payment store is absent (cart page)', () => {
+	it( 'legacy cartcheckout default: does not fire checkout events when the payment store is absent', () => {
 		mockHasPaymentStore = false;
 		mockCartData = {
 			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
@@ -167,7 +167,7 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		expect( events ).not.toContain( 'add_payment_info' );
 	} );
 
-	it( 'fires add_shipping_info and add_payment_info once on the checkout block', () => {
+	it( 'legacy cartcheckout default: fires add_shipping_info and add_payment_info once when the payment store is present', () => {
 		mockHasPaymentStore = true;
 		mockActivePaymentMethod = 'stripe';
 		mockCartData = {
@@ -205,6 +205,77 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		);
 		expect( repeated ).not.toContain( 'add_shipping_info' );
 		expect( repeated ).not.toContain( 'add_payment_info' );
+	} );
+
+	// #463 regression. WooCommerce registers wc/store/payment on the Cart block
+	// page too, so the store's presence must not decide the checkout steps: the
+	// old merged context did exactly that, and every Cart page view with a
+	// preselected shipping rate pushed add_shipping_info (and add_payment_info)
+	// with no interaction, then again on Checkout. The earlier cart-page test
+	// mocked the store as ABSENT, which is why the suite never caught it (UC-3:
+	// the double was more permissive than the real collaborator).
+	it( 'cart context: does not fire checkout events even when the payment store is registered (#463)', () => {
+		window.gtm4wp_blocks_context = 'cart';
+		mockHasPaymentStore = true;
+		mockActivePaymentMethod = 'stripe';
+		mockCartData = {
+			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+			shippingRates: [
+				{ shipping_rates: [ { name: 'Flat rate', selected: true } ] },
+			],
+		};
+		const subscriber = loadTracker();
+		subscriber();
+
+		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
+			( call ) => call[ 0 ]
+		);
+		expect( events ).not.toContain( 'add_shipping_info' );
+		expect( events ).not.toContain( 'add_payment_info' );
+	} );
+
+	// The positive half of the #463 split (TS-2 both directions): the same store
+	// state that must stay silent on the Cart page fires both steps on Checkout.
+	it( 'checkout context: fires add_shipping_info and add_payment_info', () => {
+		window.gtm4wp_blocks_context = 'checkout';
+		mockHasPaymentStore = true;
+		mockActivePaymentMethod = 'stripe';
+		mockCartData = {
+			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+			shippingRates: [
+				{ shipping_rates: [ { name: 'Flat rate', selected: true } ] },
+			],
+		};
+		const subscriber = loadTracker();
+		subscriber();
+
+		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
+			( call ) => call[ 0 ]
+		);
+		expect( events ).toContain( 'add_shipping_info' );
+		expect( events ).toContain( 'add_payment_info' );
+	} );
+
+	// The cart context must keep owning the cart events after the split - losing
+	// add_to_cart on the Cart page would be the silent cost of over-gating.
+	it( 'cart context: still owns add_to_cart from the cart diff', () => {
+		window.gtm4wp_blocks_context = 'cart';
+		const subscriber = loadTracker();
+		subscriber(); // baseline: empty cart
+
+		mockCartData = {
+			items: [ cartLine( 'A', 2, { item_id: 7, price: 10 } ) ],
+			totals: { currency_code: 'EUR' },
+		};
+		subscriber();
+
+		expect( window.gtm4wp_push_ecommerce ).toHaveBeenCalledWith(
+			'add_to_cart',
+			[ expect.objectContaining( { item_id: 7, quantity: 2 } ) ],
+			expect.objectContaining( { currency: 'EUR', value: 20 } )
+		);
 	} );
 
 	it( 'in minicart context fires remove_from_cart but never add_to_cart', () => {
