@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\EasyDigitalDownloads;
 
 use GTM4WP\Ecommerce\Helpers;
+use GTM4WP\Frontend\DefaultLanguage;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -127,11 +128,35 @@ final class DownloadData {
 
 		$use_full_category_path = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH );
 
-		$download_id    = (int) $download->get_ID();
-		$remarketing_id = $download_id;
+		$download_id = (int) $download->get_ID();
+
+		// Master-language reporting (#145): with the option on, the GA4 item
+		// identity/text (item_id, item_name, sku, categories, brand,
+		// item_variant) is built from the download's default-language
+		// equivalent, so a download sold in several languages reports as one
+		// GA4 item. The price and the internal list-attribution id stay per
+		// language, mirroring the WooCommerce module's behavior.
+		$data_download    = $download;
+		$data_download_id = $download_id;
+
+		if (
+			true === $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE )
+			&& DefaultLanguage::is_active()
+		) {
+			$master_id = DefaultLanguage::post_id( $download_id, 'download' );
+			if ( $master_id !== $download_id ) {
+				$master_download = edd_get_download( $master_id );
+				if ( $master_download instanceof \EDD_Download ) {
+					$data_download    = $master_download;
+					$data_download_id = $master_id;
+				}
+			}
+		}
+
+		$remarketing_id = $data_download_id;
 
 		// edd_get_download_sku() returns false/'-' when SKUs are disabled or unset.
-		$download_sku = (string) edd_get_download_sku( $download_id );
+		$download_sku = (string) edd_get_download_sku( $data_download_id );
 		if ( '-' === $download_sku ) {
 			$download_sku = '';
 		}
@@ -140,7 +165,7 @@ final class DownloadData {
 			$remarketing_id = $download_sku;
 		}
 
-		$download_cat       = Helpers::get_product_category( $download_id, $use_full_category_path, self::CATEGORY_TAXONOMY );
+		$download_cat       = Helpers::get_product_category( $data_download_id, $use_full_category_path, self::CATEGORY_TAXONOMY );
 		$download_cat_parts = explode( '/', $download_cat );
 
 		if ( array_key_exists( 'price', $additional_product_attributes ) ) {
@@ -152,16 +177,22 @@ final class DownloadData {
 		$_temp_productdata = array(
 			'internal_id'              => $download_id,
 			'item_id'                  => $remarketing_id,
-			'item_name'                => $download->get_name(),
-			'sku'                      => ( '' !== $download_sku ) ? $download_sku : $download_id,
+			'item_name'                => $data_download->get_name(),
+			'sku'                      => ( '' !== $download_sku ) ? $download_sku : $data_download_id,
 			'price'                    => round( $display_price, 2 ),
 			'google_business_vertical' => $this->business_vertical(),
 		);
 
 		// EDD variable prices are options on the same download, not separate
 		// products, so the option's name becomes the GA4 item_variant while the
-		// item_id stays the download id (or SKU).
-		$variant_name = $this->price_option_name( $download_id, $price_id );
+		// item_id stays the download id (or SKU). Under master-language
+		// reporting the option name is read from the master download at the
+		// same price id, falling back to the current download's name when the
+		// master has no option there (translations can differ in option count).
+		$variant_name = $this->price_option_name( $data_download_id, $price_id );
+		if ( '' === $variant_name && $data_download_id !== $download_id ) {
+			$variant_name = $this->price_option_name( $download_id, $price_id );
+		}
 		if ( '' !== $variant_name ) {
 			$_temp_productdata['item_variant'] = $variant_name;
 		}
@@ -181,7 +212,7 @@ final class DownloadData {
 
 		$brand_taxonomy = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDBRANDTAXONOMY );
 		if ( '' !== $brand_taxonomy ) {
-			$_temp_productdata['item_brand'] = Helpers::get_product_term( $download_id, $brand_taxonomy );
+			$_temp_productdata['item_brand'] = Helpers::get_product_term( $data_download_id, $brand_taxonomy );
 		}
 
 		$_temp_productdata = array_merge( $_temp_productdata, $additional_product_attributes );

@@ -181,6 +181,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_EDDBRANDTAXONOMY', 'integrate-edd-brand-taxonom
 define( 'GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL', 'integrate-edd-business-vertical' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDUSESKU', 'integrate-edd-use-sku' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH', 'integrate-edd-use-full-category-path' );
+define( 'GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE', 'integrate-edd-master-language' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDPRODIDPREFIX', 'integrate-edd-product-id-prefix' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA', 'integrate-edd-customer-data' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDORDERDATA', 'integrate-edd-order-data' );

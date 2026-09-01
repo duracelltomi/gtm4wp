@@ -223,6 +223,104 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( 'Professional', $item['item_variant'], 'The price option name becomes the GA4 item_variant.' );
 	}
 
+	// ------------------------------------------------------------------
+	// Master-language download consolidation (#145), mirroring the
+	// WooCommerce ProductData tests: with the option on, the GA4 item
+	// identity/text is built from the download's default-language
+	// equivalent. WPML only here: a Brain Monkey stub of pll_* defines the
+	// function process-wide (TS-16), and the resolver's Polylang branch is
+	// already pinned in DefaultLanguageTest.
+	// ------------------------------------------------------------------
+
+	/**
+	 * Activates WPML for a test: registers the wpml_current_language filter
+	 * (DefaultLanguage::is_active() detection) and maps wpml_object_id /
+	 * wpml_default_language.
+	 *
+	 * @param array<int, int> $map Current-language id => default-language id.
+	 * @return void
+	 */
+	private function activate_wpml( array $map ): void {
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static function ( $id ) use ( $map ) {
+				return $map[ (int) $id ] ?? $id;
+			}
+		);
+	}
+
+	public function test_master_language_off_keeps_the_current_download_values(): void {
+		// Opt-in gate: with the option OFF, even with WPML active and a master
+		// translation available, the current (translated) download is reported.
+		$this->activate_wpml( array( 55 => 100 ) );
+
+		$item = $this->make_download_data()->process_download( $this->make_download(), array(), 'productdetail' );
+
+		$this->assertSame( 55, $item['item_id'] );
+		$this->assertSame( 'My eBook', $item['item_name'] );
+	}
+
+	public function test_master_language_resolves_the_item_identity_via_wpml(): void {
+		$this->activate_wpml( array( 55 => 100 ) );
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? new \EDD_Download(
+					array(
+						'id'    => 100,
+						'name'  => 'Master eBook',
+						'price' => 9.99,
+					)
+				)
+				: null
+		);
+		Functions\when( 'edd_get_download_sku' )->alias(
+			static fn ( $id ) => 100 === (int) $id ? 'EBOOK-MASTER' : 'EBOOK-DE'
+		);
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? array( (object) array( 'name' => 'Master Cat', 'term_id' => 5 ) ) // phpcs:ignore
+				: array()
+		);
+
+		$item = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE => true )
+		)->process_download( $this->make_download(), array(), 'productdetail' );
+
+		$this->assertSame( 100, $item['item_id'], 'GA4 groups items by item_id, so the id must resolve to the master download.' );
+		$this->assertSame( 'Master eBook', $item['item_name'] );
+		$this->assertSame( 'EBOOK-MASTER', $item['sku'] );
+		$this->assertSame( 'Master Cat', $item['item_category'] );
+		$this->assertSame( 55, $item['internal_id'], 'The internal bookkeeping id stays the rendered (current-language) download.' );
+		$this->assertSame( 9.99, $item['price'], 'The price stays per language.' );
+	}
+
+	public function test_master_language_variant_reads_the_master_price_option_with_fallback(): void {
+		$this->activate_wpml( array( 55 => 100 ) );
+		Functions\when( 'edd_get_price_option_amount' )->justReturn( 15.0 );
+		Functions\when( 'edd_get_variable_prices' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? array( 2 => array( 'name' => 'Master option', 'amount' => 15.0 ) ) // phpcs:ignore
+				: array(
+					2 => array( 'name' => 'Current option', 'amount' => 15.0 ), // phpcs:ignore
+					3 => array( 'name' => 'Current only', 'amount' => 20.0 ), // phpcs:ignore
+				)
+		);
+
+		$download_data = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE => true )
+		);
+		$download      = $this->make_download( array( 'has_variable_prices' => true ) );
+
+		$item = $download_data->process_download( $download, array(), 'cart', null, 2 );
+		$this->assertSame( 'Master option', $item['item_variant'], 'The variant name comes from the master download at the same price id.' );
+
+		// The master download has no option 3, so the current-language name
+		// survives (translations can differ in option count).
+		$item = $download_data->process_download( $download, array(), 'cart', null, 3 );
+		$this->assertSame( 'Current only', $item['item_variant'] );
+	}
+
 	public function test_flights_vertical_uses_the_destination_id_field(): void {
 		$item = $this->make_download_data(
 			array( GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL => 'flights' )

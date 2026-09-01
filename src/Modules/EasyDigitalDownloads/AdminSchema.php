@@ -208,6 +208,16 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				doc: self::DOC_REFERENCE
 			),
 			new Field(
+				key: GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Report downloads in the default language', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'On multilingual stores (WPML or Polylang), report every GA4 ecommerce item - item_id, item_name, item_category, item_brand and item_variant - in the store\'s default (master) language instead of the translated one. Because Google Analytics groups items by item_id, this is what actually combines a download sold in several languages into a single item in your reports (rather than one row per translation). It resolves each download to its default-language equivalent, so the item_id changes on translated pages - review any product feed or dynamic remarketing setup that keys on the translated id. Requires WPML or Polylang; on a single-language store or an untranslated download nothing changes. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
+				group: 'products',
+				phase: Field::PHASE_EXPERIMENTAL,
+				doc: self::DOC_REFERENCE
+			),
+			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
