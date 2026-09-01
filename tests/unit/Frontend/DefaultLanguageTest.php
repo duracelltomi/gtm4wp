@@ -17,17 +17,21 @@ use GTM4WP\Tests\unit\TestCase;
  * features (issue #145). Pure static helper, so it extends the base TestCase
  * (TC-3).
  *
- * ORDERING NOTE: the Polylang cases define pll_* through Brain Monkey, which
- * leaves function_exists() reporting them process-wide thereafter, so they are
- * kept LAST - the "no plugin" identity and is_active() cases (which require
- * pll_* to be undefined) and the WPML cases all run first.
+ * A Brain Monkey stub of pll_* (here or in ANY other test file) defines the
+ * function process-wide, so every case whose expectation is "Polylang is not
+ * installed" runs in its own process (TS-16) - in-file ordering cannot protect
+ * them under --order-by=random or from another file's Polylang cases.
  */
 final class DefaultLanguageTest extends TestCase {
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_is_active_false_without_multilingual_plugin(): void {
 		$this->assertFalse( DefaultLanguage::is_active() );
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_ids_unchanged_without_multilingual_plugin(): void {
 		$this->assertSame( 42, DefaultLanguage::post_id( 42, 'post' ) );
 		$this->assertSame( 30, DefaultLanguage::term_id( 30, 'category' ) );
@@ -61,6 +65,8 @@ final class DefaultLanguageTest extends TestCase {
 		$this->assertSame( 30, DefaultLanguage::term_id( 30, 'category' ) );
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_post_id_is_filterable(): void {
 		// With no plugin active a third party can still drive resolution through
 		// the filter alone (e.g. to support another multilingual plugin).
@@ -71,6 +77,8 @@ final class DefaultLanguageTest extends TestCase {
 		$this->assertSame( 99, DefaultLanguage::post_id( 42, 'post' ) );
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_term_id_is_filterable(): void {
 		Filters\expectApplied( 'gtm4wp_master_language_term_id' )->zeroOrMoreTimes()->andReturnUsing(
 			static fn ( $resolved, $id ) => 30 === (int) $id ? 7 : $resolved

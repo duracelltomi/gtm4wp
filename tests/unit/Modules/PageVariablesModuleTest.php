@@ -1571,6 +1571,9 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	private function stub_master_language_singular(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		// The singular sinks are null-gated on get_post() since the RI-13 pass
+		// (setUp aliases get_post() to this global; tearDown unsets it).
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'get_post_type' )->justReturn( 'post' );
 		Functions\when( 'wp_title' )->justReturn( 'CURRENT_TITLE' );
@@ -1740,6 +1743,8 @@ final class PageVariablesModuleTest extends TestCase {
 	 */
 	public function test_master_language_resolves_primary_category(): void {
 		Functions\when( 'is_singular' )->justReturn( true );
+		// The primary-category sink is null-gated on get_post() (RI-13).
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
 		Functions\when( 'get_post_meta' )->alias(
 			static fn ( $id, $key ) => '_yoast_wpseo_primary_category' === $key ? '30' : ''
