@@ -24,7 +24,7 @@ for one topic or an ad-hoc handful.
 | Write access | `gh issue comment/close/edit` | **None.** No API; replying requires a logged-in session |
 | Labels / state | real labels | **none** — state lives in the local `.support/` ledger |
 | Reply window | forever | **~6 months of inactivity, then the topic is closed to replies** |
-| Who the reporter is | usually a developer | usually a site owner on the **released 1.x**, not on the `master` 2.0 rewrite |
+| Who the reporter is | usually a developer | usually a site owner on the **released 2.0.x** — or pinned to 1.22.5 because their site is below WP 6.3 / PHP 8.0 |
 | Automated replies | fine | **prohibited** — the forum guidelines ban "unvetted AI-generated responses" |
 
 The hard rules:
@@ -61,9 +61,13 @@ The hard rules:
    Produce the text; the maintainer reads it and submits it. This is what keeps the
    plugin on the right side of the guidelines — a human vets every word.
 
-3. **Answer for the version the reporter is actually running.** Almost every forum
-   reporter is on the released 1.x line. "Fixed on `master` (2.0)" is not an answer to
-   someone whose site is broken today. Always run the
+3. **Answer for the version the reporter is actually running.** Since 2026-09-01 the
+   wordpress.org stable is the 2.0 line (first release 2.0.0), so that is the default
+   assumption — but a site below WP 6.3 / PHP 8.0 is never offered the update and stays
+   on 1.22.5, and the 1.x line is **unmaintained: it only ever receives a fix for a
+   reported security issue**. Never promise a 1.x bugfix; for a 1.x reporter the path is
+   updating WP/PHP and then the plugin. "Fixed on `master`" is not an answer either —
+   master carries unreleased 2.1 work. Always run the
    [fix-status resolver](#2-fix-status-resolver) before drafting.
 
 Always be courteous: thank the reporter, assume good faith, and never imply they are at
@@ -109,14 +113,17 @@ reply itself is public the moment it is posted.
 ### 2. Fix-status resolver
 
 The highest-value reply on this forum is "that's already fixed — update." Getting it
-right needs both branches, because **the branch you are checked out on does not have the
-whole story**:
+right needs the right branch, because **the branch you are checked out on does not have
+the whole story** (branch map updated 2026-09-01, the day 2.0.0 became the wp.org stable):
 
-- `1.x` — the released 1.x line (final release **1.22.4**). Its `CHANGELOG.md` holds
-  the `## 1.22.4` and earlier sections.
-- `master` — the 2.0 rewrite. Its `CHANGELOG.md` has a `## 2.0` section and then jumps
-  straight to `## 1.21.1`; **there is no 1.22.x section on this branch at all.** Fixes
-  backported to 1.22.4 are invisible from here.
+- `2.0` — the **released stable line** (2.0.0 and future 2.0.x bugfix releases). Its
+  `CHANGELOG.md` `## 2.0` section is what shipped.
+- `1.x` — the frozen 1.x line (last release **1.22.5**). **Unmaintained since 2.0.0:
+  only a reported security issue still gets a fix here.** Its `CHANGELOG.md` holds the
+  `## 1.22.x` sections, which no other branch has.
+- `master` — development toward 2.1. Its changelog top section accumulates
+  **unreleased** work; reading fix status from it tells a reporter something is
+  downloadable when it is not.
 
 Resolve in order and stop at the first hit:
 
@@ -125,22 +132,22 @@ Resolve in order and stop at the first hit:
 curl -s "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request\[slug\]=duracelltomi-google-tag-manager" \
   | python -c "import sys,json; d=json.load(sys.stdin); print(d['version'], d['last_updated'])"
 
-# 2. Fixed in a released 1.x version?  (authoritative — read the 1.x branch, not the current branch)
-git show 1.x:CHANGELOG.md | sed -n '/^## 1.22.4/,/^## 1.21.1/p'
-git show 1.x:readme.txt | grep -i "stable tag"
+# 2. Fixed in the released 2.0 line?  (authoritative — read the 2.0 branch, not master, not the working tree)
+git show 2.0:CHANGELOG.md | sed -n '/^## 2.0/,/^## 1.21.1/p'
+git show 2.0:readme.txt | grep -i "stable tag"
 
-# 3. Fixed on the 1.x branch but not yet released?
-git log 1.x --oneline --grep=<term>
+# 3. Reporter pinned to 1.x (site below WP 6.3 / PHP 8.0)? Check what their line ever received:
+git show 1.x:CHANGELOG.md | sed -n '/^## 1.22.5/,/^## 1.21.1/p'
 
-# 4. Fixed only in the rewrite?
-git show master:CHANGELOG.md | sed -n '/^## 2.0/,/^## 1.21.1/p'
+# 4. Fixed on master but not yet released?  (ships in a future 2.x — no date)
+git log master --oneline --grep=<term>
 ```
 
 | Outcome | What the reply says |
 |---|---|
-| Fixed in the published version | "This is fixed in **1.22.4** — please update." Name the symptom, not the file. |
-| Fixed on `master`, unreleased | "Fixed, and it ships in the next 1.x release." No date. |
-| Fixed only in 2.0 | "Fixed in the upcoming 2.0 rewrite." Say it is a major rewrite. See the date rule below. |
+| Fixed in the published version | "This is fixed in **{2.0.x}** — please update." Name the symptom, not the file. |
+| Fixed in 2.0.x, reporter pinned to 1.22.5 | The fix exists in the released 2.0 line, which needs WP 6.3 / PHP 8.0. Say kindly that 1.x no longer receives bugfixes (security fixes only), so the path is updating WP/PHP and then the plugin. Give a workaround if one exists. |
+| Fixed on `master`, unreleased | "Fixed, and it ships in the next release." No date. |
 | Not fixed anywhere | A genuine open report — continue to classification. |
 
 **⚠️ Dates: check what has already been announced publicly.** The old rule here was a flat
@@ -180,8 +187,8 @@ plus the reply intent:
 
 | Outcome | Lane | Reply intent |
 |---|---|---|
-| Fixed in the published version | `fixed-released` | "Update to 1.22.4" — highest value, draft first |
-| Fixed only in 2.0 | `fixed-2.0` | Fixed in the rewrite; no timeline |
+| Fixed in the published version | `fixed-released` | "Update to {2.0.x}" — highest value, draft first |
+| Fixed in 2.0.x, reporter pinned to 1.22.5 | `fixed-2.0` | Fix exists but needs WP 6.3 / PHP 8.0; 1.x gets security fixes only — never promise a 1.x bugfix. (Ledger entries from before 2026-09-01 used this lane to mean "wait for the rewrite".) |
 | Confirmed, reproducible bug | `bug` | Acknowledge; mention the GitHub issue if one exists |
 | Bug report, can't reproduce | `needs-repro` | Ask for the [repro-intake block](#repro-intake-block) |
 | Usage / GTM-config question | `question` | Answer briefly, or point at the docs |
@@ -240,13 +247,15 @@ work, and a confirmation of a *reporter's* false premise about the plugin's hist
 So, before a claim goes into a draft:
 
 - **Naming a setting?** Confirm the exact label exists in the branch the reporter runs
-  (usually the released line, i.e. the `1.x` branch — **not** `master`, which is the 2.0
-  rewrite, and not whatever is checked out). `git show 1.x:<path>` rather than a working-tree
-  read. Never describe a toggle from memory or by analogy.
+  (default since 2026-09-01: the released `2.0` branch — **not** `master`, which carries
+  unreleased 2.1 work, and not whatever is checked out). `git show 2.0:<path>` rather than
+  a working-tree read; `git show 1.x:<path>` when the reporter says they are on 1.22.x.
+  Never describe a toggle from memory or by analogy.
 - **Naming where a setting lives?** The settings screen was reorganised in 2.0, so the
-  *location* differs even when the label does not. A 1.x reporter has an **Integration**
-  tab with a WooCommerce section; "WooCommerce → Advanced" is 2.0 wording and means nothing
-  to them. Give 1.x navigation unless the reporter is on 2.0.
+  *location* differs even when the label does not. Give 2.0 navigation by default. A
+  reporter still on 1.x has an **Integration** tab with a WooCommerce section, so switch
+  to 1.x navigation when their version says so; when the version is unknown and the
+  location matters, ask, or give both marked by version.
 - **Naming a filter, hook or meta key?** Confirm the string in the source.
 - **Describing what the plugin does?** Read the code path. Changelog wording is a summary
   and regularly hides the detail that matters, e.g. that a hook is a *fallback* rather than
@@ -328,13 +337,14 @@ Scaffolds, not fixed text — rewrite every time. `{…}` are fill-ins.
 > symptom in their words.} Updating the plugin should solve it. If it does not, please let
 > me know and I will look into it.
 
-**Fixed only in 2.0:**
+**Fixed in 2.0.x, reporter pinned to 1.x (old WP/PHP):**
 > Hi @{reporter},
 >
-> This is fixed in the upcoming GTM4WP 2.0, which is a full rewrite of the plugin. {Date:
-> quote a publicly announced target with the hedge it was published with, otherwise say
-> there is no date yet. See the date rule in step 2.} {If a workaround exists, give it
-> here, since that is the part they need today.}
+> This is fixed in GTM4WP {2.0.x}, which is already released. The 2.0 line requires
+> WordPress 6.3 and PHP 8.0, so your site needs those updates first to receive it. The
+> 1.x line does not receive bugfixes anymore, only security fixes, so I cannot offer a
+> fix for {their 1.22.x version} itself. {If a workaround exists, give it here, since
+> that is the part they need today.}
 
 **Confirmed bug:**
 > Hi @{reporter},
@@ -395,7 +405,7 @@ Trim to what is actually missing:
 - Plugin slug: `duracelltomi-google-tag-manager` · forum: `https://wordpress.org/support/plugin/duracelltomi-google-tag-manager/`
 - Maintainer login: `duracelltomi` (the only contributor listed on wordpress.org). Anyone
   else in a thread is a reporter or a bystander.
-- Branches: `1.x` = released 1.x line (1.22.4, final 1.x) · `master` = the 2.0 rewrite (default branch)
+- Branches: `2.0` = released stable line (2.0.0, wp.org stable since 2026-09-01) · `1.x` = frozen 1.x line (1.22.5; unmaintained, reported-security-fixes only) · `master` = 2.1 development (default branch)
 - Reply window: ~6 months of inactivity, then closed. `age_days > 150` = answer it now.
 - Apology threshold: 14 days with no maintainer reply
 - Security channel: `security@gtm4wp.com` / GitHub private advisories (`SECURITY.md`)
