@@ -65,7 +65,6 @@ final class ListTrackingTest extends TestCase {
 			$GLOBALS['woocommerce_loop'],
 			$GLOBALS['gtm4wp_cart_item_proddata'],
 			$GLOBALS['gtm4wp_grouped_product_ix'],
-			$GLOBALS['gtm4wp_last_widget_title'],
 			$GLOBALS['gtm4wp_product_counter'],
 			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ]
 		);
@@ -734,39 +733,6 @@ final class ListTrackingTest extends TestCase {
 		);
 	}
 
-	public function test_after_template_part_injects_product_data_into_widget_product(): void {
-		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
-
-		// gtm4wp_product_counter (0) and gtm4wp_last_widget_title are seeded by the
-		// constructor; stage the current product AFTER building.
-		$list_tracking      = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
-		$GLOBALS['product'] = $this->make_product();
-
-		// after_template_part() consumes the current output buffer (the rendered
-		// template item) and re-echoes it with the data attribute injected; capture
-		// that echo in an outer buffer.
-		ob_start();                                       // Outer: capture the echo.
-		ob_start();                                       // Inner: the "template" output.
-		echo '<a href="https://example.com/p/">Item</a>';
-		$list_tracking->after_template_part( 'content-widget-product.php' );
-		$out = (string) ob_get_clean();                   // Outer buffer.
-
-		$this->assertStringContainsString( 'data-gtm4wp_product_data="', $out );
-		$this->assertSame( 1, $GLOBALS['gtm4wp_product_counter'], 'The widget product counter must advance.' );
-	}
-
-	public function test_after_template_part_passes_non_widget_template_unchanged(): void {
-		$GLOBALS['product'] = $this->make_product();
-
-		ob_start();
-		ob_start();
-		echo '<a href="https://example.com/p/">Item</a>';
-		$this->make_list_tracking()->after_template_part( 'content-product.php' );
-		$out = (string) ob_get_clean();
-
-		$this->assertSame( '<a href="https://example.com/p/">Item</a>', $out, 'A non-widget template must pass through unmodified.' );
-	}
-
 	/**
 	 * The list-name setters are what give every impression and click its
 	 * `item_list_name`, so a wrong or missing one silently mislabels a whole
@@ -988,31 +954,6 @@ final class ListTrackingTest extends TestCase {
 		$this->assertNotSame( 'sale-products', $item['item_list_id'] );
 	}
 
-	/**
-	 * A widget title is authored by the site owner, so there is no stable literal
-	 * to pair it with and its id keeps being derived from the title.
-	 *
-	 * @return void
-	 */
-	public function test_widget_list_id_is_still_derived_from_the_widget_title(): void {
-		$list_tracking = $this->make_list_tracking();
-		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/product/' );
-		$GLOBALS['product']                  = $this->make_product();
-		$GLOBALS['gtm4wp_last_widget_title'] = 'Summer Picks (widget)';
-		$GLOBALS['gtm4wp_product_counter']   = 1;
-
-		ob_start();
-		$list_tracking->before_template_part();
-		echo '<a href="https://example.com/p/">Item</a>';
-		$list_tracking->after_template_part( 'content-widget-product.php' );
-		$markup = (string) ob_get_clean();
-
-		$item = $this->decode_product_data( $markup );
-
-		$this->assertSame( 'Summer Picks (widget)', $item['item_list_name'] );
-		$this->assertSame( 'summer-picks-widget', $item['item_list_id'] );
-	}
-
 	public function test_reset_loop_clears_the_list_name_and_returns_the_query(): void {
 		// Hooked to loop_end / the shortcode after-hooks: without the reset, the
 		// NEXT loop on the page inherits the previous loop's list name and every
@@ -1036,43 +977,5 @@ final class ListTrackingTest extends TestCase {
 		$this->assertNull( $this->make_list_tracking()->reset_loop() );
 		$this->assertSame( '', $GLOBALS['woocommerce_loop']['listtype'] );
 		$this->assertNull( $GLOBALS['woocommerce_loop']['gtm4wp_list_identity'] );
-	}
-
-	public function test_widget_title_filter_names_the_list_and_restarts_the_counter(): void {
-		// The widget title becomes the list name for the products inside it, and
-		// the per-widget counter restarts so item_index counts from 1 within each
-		// widget rather than continuing across the page.
-		$list_tracking                     = $this->make_list_tracking();
-		$GLOBALS['gtm4wp_product_counter'] = 17;
-
-		$this->assertSame(
-			'On Sale',
-			$list_tracking->widget_title_filter( 'On Sale' ),
-			'The widget title itself must pass through unmodified - other plugins render it.'
-		);
-
-		$this->assertSame( 'On Sale (widget)', $GLOBALS['gtm4wp_last_widget_title'], 'The list name marks the source as a widget.' );
-		$this->assertSame( 1, $GLOBALS['gtm4wp_product_counter'], 'The item counter restarts inside each widget.' );
-	}
-
-	public function test_before_template_part_opens_a_buffer_that_after_template_part_consumes(): void {
-		// The pair is what lets after_template_part() inject the data attribute
-		// into the widget product link. An unbalanced before_ would swallow page
-		// output, so assert the nesting level returns to where it started.
-		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
-
-		$list_tracking      = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
-		$GLOBALS['product'] = $this->make_product();
-
-		$level = ob_get_level();
-
-		ob_start(); // Outer: capture what after_template_part() re-echoes.
-		$list_tracking->before_template_part();
-		echo '<a href="https://example.com/p/">Item</a>';
-		$list_tracking->after_template_part( 'content-widget-product.php' );
-		$out = (string) ob_get_clean();
-
-		$this->assertSame( $level, ob_get_level(), 'The buffer opened by before_template_part() must be consumed.' );
-		$this->assertStringContainsString( 'data-gtm4wp_product_data="', $out );
 	}
 }

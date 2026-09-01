@@ -182,9 +182,6 @@ final class WooCommerceModule extends AbstractModule {
 			add_filter( 'woocommerce_is_order_received_page', array( $this, 'filter_is_order_received_page' ) );
 		}
 
-		add_action( 'woocommerce_before_template_part', array( $list_tracking, 'before_template_part' ) );
-		add_action( 'woocommerce_after_template_part', array( $list_tracking, 'after_template_part' ) );
-		add_filter( 'widget_title', array( $list_tracking, 'widget_title_filter' ) );
 		add_action( 'wc_quick_view_before_single_product', array( $list_tracking, 'quick_view_before_single_product' ) );
 		add_filter( 'woocommerce_grouped_product_list_column_label', array( $list_tracking, 'grouped_product_list_column_label' ), 10, 2 );
 

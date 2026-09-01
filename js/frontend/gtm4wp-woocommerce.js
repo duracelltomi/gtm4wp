@@ -599,14 +599,11 @@ function gtm4wp_woocommerce_process_pages() {
 		} );
 
 	// track impressions of products in product lists
-	if (
-		document.querySelectorAll( '.gtm4wp_productdata,.widget-product-item' )
-			.length > 0
-	) {
+	if ( document.querySelectorAll( '.gtm4wp_productdata' ).length > 0 ) {
 		const products = [];
 
 		document
-			.querySelectorAll( '.gtm4wp_productdata,.widget-product-item' )
+			.querySelectorAll( '.gtm4wp_productdata' )
 			.forEach( function ( productdata_el ) {
 				const productdata = gtm4wp_read_json_from_node(
 					productdata_el,
@@ -739,7 +736,6 @@ function gtm4wp_woocommerce_process_pages() {
 					'.wc-block-grid__products li:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),' +
 					'.wc-block-product-template li.wc-block-product a:not(.add_to_cart_button):not(.quick-view-button),' +
 					'.products>div:not(.product-category) a:not(.add_to_cart_button):not(.quick-view-button),' +
-					'.widget-product-item,' +
 					'.woocommerce-grouped-product-list-item__label a'
 			);
 			if ( matching_link_element ) {

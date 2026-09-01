@@ -327,7 +327,6 @@ final class ProductData {
 		 * productdetail: product detail page
 		 * readdedtocart: user clicked on the "Undo" link on the cart page after removing an item
 		 * addtocartsingle: product added to cart
-		 * widgetproduct: product shown in a sidebar widget
 		 * productlist: product shown in a product list (category page or special product list like 'New products')
 		 * groupedproductlist: product shown on a product detail page of a grouped product
 		 *

@@ -22,8 +22,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * Port of the product list related functions of integration/woocommerce.php
  * from 1.x. The list state globals ($gtm4wp_product_counter,
- * $gtm4wp_last_widget_title, $gtm4wp_grouped_product_ix,
- * $gtm4wp_cart_item_proddata) are kept for third party compatibility.
+ * $gtm4wp_grouped_product_ix, $gtm4wp_cart_item_proddata) are kept for
+ * third party compatibility.
  */
 final class ListTracking {
 
@@ -66,7 +66,6 @@ final class ListTracking {
 		private ProductData $product_data
 	) {
 		$GLOBALS['gtm4wp_product_counter']    = 0;
-		$GLOBALS['gtm4wp_last_widget_title']  = 'Sidebar Products';
 		$GLOBALS['gtm4wp_grouped_product_ix'] = 1;
 		$GLOBALS['gtm4wp_cart_item_proddata'] = '';
 	}
@@ -409,20 +408,6 @@ final class ListTracking {
 	}
 
 	/**
-	 * Executed during widget_title.
-	 * The widget title will be used to report a custom product list name into Google Analytics.
-	 *
-	 * @param string $widget_title The title of the widget being rendered.
-	 * @return string The unchanged widget title.
-	 */
-	public function widget_title_filter( $widget_title ) {
-		$GLOBALS['gtm4wp_product_counter']   = 1;
-		$GLOBALS['gtm4wp_last_widget_title'] = $widget_title . __( ' (widget)', 'duracelltomi-google-tag-manager' );
-
-		return $widget_title;
-	}
-
-	/**
 	 * Shortcode loop list name setters, executed during the
 	 * woocommerce_shortcode_before_*_loop hooks.
 	 */
@@ -479,65 +464,6 @@ final class ListTracking {
 	 */
 	public function before_related_products_loop(): void {
 		$this->set_list_type( self::LIST_RELATED );
-	}
-
-	/**
-	 * Executed during woocommerce_before_template_part.
-	 * Starts output buffering in order to be able to add product data attributes to the link element
-	 * of a product list (classic) widget.
-	 *
-	 * @return void
-	 */
-	public function before_template_part(): void {
-		ob_start();
-	}
-
-	/**
-	 * Executed during woocommerce_after_template_part.
-	 * Stops output buffering and adds data attributes into the product link of
-	 * content-widget-product.php to be able to track product list impression and click actions.
-	 *
-	 * @param string $template_name The template part that is being rendered.
-	 * @return void
-	 */
-	public function after_template_part( $template_name ): void {
-		global $product;
-
-		$productitem = ob_get_contents();
-		ob_end_clean();
-
-		if ( 'content-widget-product.php' === $template_name ) {
-			$eec_product_array = $this->product_data->process_product(
-				$product,
-				array(
-					'productlink'    => apply_filters( 'the_permalink', get_permalink(), 0 ),
-					'item_list_name' => $GLOBALS['gtm4wp_last_widget_title'],
-					'index'          => $GLOBALS['gtm4wp_product_counter'],
-				),
-				'widgetproduct'
-			);
-
-			if ( ! isset( $eec_product_array['item_brand'] ) ) {
-				$eec_product_array['item_brand'] = '';
-			}
-
-			$productlink_with_data = sprintf(
-				'data-gtm4wp_product_data="%s" href="',
-				esc_attr( wp_json_encode( $eec_product_array ) )
-			);
-
-			++$GLOBALS['gtm4wp_product_counter'];
-
-			$productitem = str_replace( 'href="', $productlink_with_data, $productitem );
-		}
-
-		/*
-		$productitem is initialized as the template itself outputs a product item.
-		Therefore this can not be passed to wp_kses() as it can include eventually any HTML.
-		This filter function only adds additional attributes to the link element that points
-		to a product detail page. Attribute values are escaped above.
-		*/
-		echo $productitem; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	/**
