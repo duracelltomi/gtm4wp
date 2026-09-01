@@ -25,7 +25,7 @@ breakage · Blessed Couplings (**UB**) — deliberate, do **not** flag.
 
 Each row is `ID — one-line litmus`.
 
-**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UC-1, UC-3
+**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3
 
 **Upstream Drift (UD):**
 
@@ -50,6 +50,7 @@ Each row is `ID — one-line litmus`.
 | UD-17 | A gatekeeper's ruleset is an upstream dependency; its *additions* are the drift. Read its release notes for what is newly forbidden — our code can be frozen and still start failing. Prefer a construction that cannot acquire the violation over a check that catches it afterwards. |
 | UD-18 ⭐ | A shipped `Fixed:` bullet is a claim about the past, not evidence. It records what someone believed at the time, and a silent defect never contradicts it — 1.22.3 claimed the select_item timeout was fixed and it was not, through every release since. When triaging "already fixed?", confirm in the released code (`git show <tag>:<path>`), never in the changelog. |
 | UD-19 ⭐ | A vendor's **sample code is not the vendor's spec**, and porting the sample inherits whatever it omits. Google's enhanced-conversions page states the gmail plus-suffix rule in prose and leaves it out of the PHP sample on the same page; our helper was ported from the sample, so it was wrong from the day it was written and stayed wrong through a review that cited that URL. Port from the prose; if you port from a sample, diff it against the prose in the same change and say in the docblock which one you followed. |
+| UD-20 ⭐ | Code that branches on the **existence** of an upstream object (a data store, class, DOM node) to decide **where it is running** depends on an exclusivity claim — "X exists only on page Y" — that no `silent-missing` row watches: the coupling breaks when X **appears somewhere new**, not when it vanishes. Register the exclusivity claim itself, or better, remove the inference and pass the identity explicitly from the side that knows it. |
 
 **Upstream Coupling anti-patterns (UC):**
 
@@ -398,6 +399,41 @@ page is the specification, and did I port from that one?**
   lint compares a port against its source; only reading both does. So the registry row's
   claim must name the *rules*, never "matches Google's PHP sample".
 
+### UD-20: A presence check used as a location signal is an exclusivity claim — and the registry only watched the disappearance direction ⭐
+
+**Confirmed in the field 2026-09-01 (GH #463), shipped in 2.0.0 and reported the day of
+release.** The blocks tracker fired `add_shipping_info` / `add_payment_info` whenever the
+`wc/store/payment` data store was present, on the theory that the store exists only on the
+Checkout block page. WooCommerce (observed on 11.0.1) registers it on the Cart block page
+too, so both events fired there with no interaction and then repeated on Checkout.
+
+What makes this a registry pattern rather than only a code bug: **U23 existed, was
+verified, and looked exactly right.** The row registered the store names, the selectors
+and the payload shape, with failure type `silent-missing`, and the 2026-08-06 sweep
+confirmed all of it — correctly. The code's actual dependency was a stronger claim the
+row never carried: *presence implies the Checkout page*. That claim lived in a code
+comment ("i.e. on the Checkout block" — UD-2, a comment is not a control) and in the unit
+test's double, which mocked the store as absent on the cart case (UC-3's mirror: the
+stand-in encoded our assumption instead of pinning upstream's behavior). Every drift type
+in the rubric watches the **vanish** direction — a store, hook or selector disappearing.
+An exclusivity inference breaks in the **appear** direction, which nothing watched.
+
+**Rules:**
+- **When code infers location or identity from presence, the registered claim is the
+  exclusivity statement**, and its probe is "search upstream for every place this thing
+  is registered", not "confirm it exists".
+- **Prefer deleting the inference over registering it.** The side that knows the identity
+  should say so explicitly — the #463 fix has PHP send distinct `cart`/`checkout`
+  contexts from `is_cart()`/`is_checkout()` instead of letting JS guess from the store. A
+  registered claim needs a sweep to save you; an explicit signal cannot break this way.
+- **Capability guards are not this pattern.** `class_exists`/`method_exists` gating
+  whether a call can be made degrades cleanly and is blessed (UB-3). The trap is presence
+  deciding *where you are* or *which mode to run in* — a claim upstream never made and
+  can falsify by registering the thing more widely.
+- **Sweep question for existing rows:** for each `silent-missing` row, ask whether the
+  code also misbehaves if the dependency shows up in MORE places. If yes, the row is
+  understating its claim.
+
 ---
 
 ## Upstream Coupling anti-patterns
@@ -600,4 +636,5 @@ and that is what the registry row tracks.
 | 2026-08-05 | Added **UD-14** (⭐ a truncated fetch of an ordered page reads as deletion) after Sweep 1 produced exactly that false positive on U54: five core GA4 e-commerce events reported undocumented because the alphabetical page truncated mid-`refund`. Caught by the maintainer. Countermeasure: every long-page probe carries a sentinel (the known-last item); no sentinel in the extraction → `fetch-failed`. |
 | 2026-08-05 | Added UD-11 (⭐ "it evidently works" is not evidence — from `.security/` #121, filed Low @0.5 and re-rated High after ten minutes of measurement), UD-12 (a 200 proves the host is up, nothing more), UD-13 (a copied number is already wrong — this file's own seeding produced 69/94 where the source said 71/97). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UC-1, UC-3. |
 | 2026-08-06 | Added **UD-18** (⭐ a shipped `Fixed:` bullet is a claim about the past, not evidence) after finding that `CHANGELOG.md`'s 1.22.3 entry *"properly reading timeout for select_item eventCallback"* did not fix it: 1.x read `window.gtm4wp_datalayer_max_timeout` while 1.x PHP emitted it as a `const`, so the option never took effect in any released version and the hardcoded 2000 ms default always applied. Same shape as UD-10 (a published claim read as an observation) pointed at our own history; strongest exactly where the defect is silent, since a loud bug gets re-reported and a wrong bullet is then self-correcting. Extended **UD-11** with *it is not only upstream couplings* — the same "it evidently works" inference failed on a PHP↔JS contract entirely inside this repo, disabling three shipped features; `silent-*` is a property of the failure mode, not of who owns the other end. Companion security entry: `.security/` **RI-14** (binding vs. name/value). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UC-1, UC-3. |
+| 2026-09-01 | Added **UD-20** (⭐ a presence check used as a location signal is an exclusivity claim, and the registry only watched the disappearance direction) after GH #463: 2.0.0 shipped the blocks tracker firing `add_shipping_info`/`add_payment_info` on the block Cart page because it inferred "Checkout page" from the presence of `wc/store/payment`, which WooCommerce registers on Cart too. **U23 was registered and verified and the break sailed through anyway** — the row carried the store names/selectors/payload (all still true), not the presence-implies-page inference the code depended on; that inference existed only as a code comment (UD-2) and as the unit-test double's assumption (UC-3's mirror: the cart case mocked the store as absent). Fixed same day on both branches (`ee49e95`/`df82acd`) by deleting the inference: PHP now passes distinct `cart`/`checkout` contexts. U23 rewritten to record the residual legacy-value coupling. ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3. |
 | 2026-08-10 | Added **UD-19** (⭐ a vendor's sample code is not the vendor's spec) after fixing two enhanced-conversions normalization gaps in one session. Google's page states the gmail **plus-suffix** rule in prose and omits it from the PHP sample on the same page; `normalize_and_hash_email_address()` was ported from that sample under #321 and inherited the omission, so every `+tag` gmail address had produced an unmatchable hash since the feature shipped. The sibling gap was **E.164** on phone numbers — an explicitly deferred TODO on #321, closed here by delegating the calling-code table to `WC_Countries::get_country_calling_code()` (new **U111**) plus a 5-entry trunk-prefix mirror (new **U110**), which avoids the libphonenumber dependency that blocked it in 2024. Both fixes ship regression tests proven to fail against the old behavior. UD-19 is the case RI-20's "open the page a docblock cites" does **not** catch: the citation was accurate about the artifact it named, and the artifact was the wrong one. ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UC-1, UC-3. |
