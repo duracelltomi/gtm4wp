@@ -56,7 +56,7 @@ const BUILD_SANITY_FILES = [
  */
 const GENERATED_DATA = [
 	{
-		file: 'src/Modules/WooCommerce/CountryPhoneData.php',
+		file: 'src/Ecommerce/CountryPhoneData.php',
 		command: 'composer generate:phone-table',
 		what: 'per-country phone dialling rules (national numbering plans)',
 	},
