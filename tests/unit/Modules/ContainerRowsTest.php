@@ -167,6 +167,27 @@ final class ContainerRowsTest extends TestCase {
 		$this->assertSame( 'authtoken', $rows[1]['gtm_auth'] );
 	}
 
+	/**
+	 * Pins the /D modifier on every validation pattern (review #223): without
+	 * it PCRE lets $ match before one trailing newline, so "value\n" passes a
+	 * pattern that reads as though it could not - the trap the
+	 * JS_IDENTIFIER_PATTERN docblock records. Both directions per pattern: the
+	 * legitimate spelling stays accepted, its newline-suffixed twin is not.
+	 */
+	public function test_validation_patterns_reject_a_trailing_newline(): void {
+		$samples = array(
+			'GTM_ID_PATTERN'  => array( ContainerRows::GTM_ID_PATTERN, 'GTM-ABC123' ),
+			'AUTH_PATTERN'    => array( ContainerRows::AUTH_PATTERN, 'auth-token_1' ),
+			'PREVIEW_PATTERN' => array( ContainerRows::PREVIEW_PATTERN, 'env-42' ),
+			'PATH_PATTERN'    => array( ContainerRows::PATH_PATTERN, 'sub/dir/gtm.js' ),
+		);
+
+		foreach ( $samples as $name => list( $pattern, $valid ) ) {
+			$this->assertSame( 1, preg_match( $pattern, $valid ), "$name accepts its legitimate spelling." );
+			$this->assertSame( 0, preg_match( $pattern, $valid . "\n" ), "$name rejects the newline-suffixed twin." );
+		}
+	}
+
 	public function test_for_hardcoded_ids_without_stored_rows_creates_blank_rows(): void {
 		$rows = ContainerRows::for_hardcoded_ids( array( 'GTM-NEW333' ), array() );
 

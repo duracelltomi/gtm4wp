@@ -182,6 +182,38 @@ final class HardcodedContainersTest extends TestCase {
 	}
 
 	/**
+	 * A trailing newline - e.g. an untrimmed file_get_contents() feeding a
+	 * define() in wp-config.php - must be rejected, not silently accepted.
+	 * Without the /D modifier on the validation patterns PCRE lets $ match
+	 * before a final newline, and the untrimmed auth/preview values then reach
+	 * the container loader snippet, where the raw newline breaks the whole
+	 * <script> block with a SyntaxError (review #223). Rejection follows the
+	 * class's own contract: a rejected constant overrides nothing, locks
+	 * nothing, and the admin notice names it.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_constants_with_a_trailing_newline_are_rejected(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', "GTM-AAA111\n" );
+		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', "hard-auth\n" );
+		define( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', "env-42\n" );
+
+		list( $rows, $errors ) = HardcodedContainers::apply( $this->stored_rows() );
+
+		$this->assertSame( $this->stored_rows(), $rows, 'The stored container setup keeps loading, with no newline reaching any row.' );
+		$this->assertSame(
+			array(
+				'GTM4WP_HARDCODED_GTM_ID',
+				'GTM4WP_HARDCODED_GTM_ENV_AUTH',
+				'GTM4WP_HARDCODED_GTM_ENV_PREVIEW',
+			),
+			$errors,
+			'Every newline-carrying constant is named to the admin instead of being half-applied.'
+		);
+		$this->assertFalse( HardcodedContainers::is_active(), 'Nothing is overridden, so nothing is locked.' );
+	}
+
+	/**
 	 * PHP allows an array constant, so wp-config.php can hand a non-scalar to
 	 * every one of these constants. It must be rejected like any other malformed
 	 * value instead of reaching explode()/preg_match() and fataling on a
