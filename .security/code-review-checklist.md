@@ -301,7 +301,7 @@ Every externally-reachable entry point, the **lowest actor** who can reach it (t
 | **Module Admin Schemas** (`src/Modules/*/AdminSchema.php` — **12** since 2026-09-02 (EasyDigitalDownloads added), all carrying `doc_url()` + per-field `doc:` paths) | [x] 2026-07-15 | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [-] | [x] 2026-07-10 |
 | **Frontend JS** (`js/frontend/` — **21** bundles + 3 libs, re-derived 2026-09-02 (R28); counting rule: `js/frontend/*.js`. Was 20 until `gtm4wp-edd.js` landed with the EDD module) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [x] 2026-07-15 | [-] |
 | **Admin JS** (`js/admin/` — **11** non-test files, re-derived 2026-08-11 (R19); counting rule: `js/admin/**/*.js` excluding `test/` and `test-support/`. Was 9 until `components/MobileNav.js` landed in R16's range, 10 until `components/DocLink.js` landed in R19's) | [x] 2026-08-10 (R16) | [x] 2026-08-10 (R16) | [x] 2026-08-11 (R19) | [-] | [x] 2026-08-11 (R19) | [x] 2026-07-10 | [-] |
-| **EasyDigitalDownloads Module** (`src/Modules/EasyDigitalDownloads/` — EasyDigitalDownloadsModule, DownloadData, PageDataLayer, ListTracking, AdminSchema; JS: `gtm4wp-edd.js`. Added 2026-09-02 (R28) — landed 2026-09-01 with the EDD integration merge, row added by R28's inventory step in the same run it was first reviewed. No REST route/AJAX; its externally-facing gate is the success-page order resolution, **#217 (open)**) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) |
+| **EasyDigitalDownloads Module** (`src/Modules/EasyDigitalDownloads/` — EasyDigitalDownloadsModule, DownloadData, PageDataLayer, ListTracking, AdminSchema; JS: `gtm4wp-edd.js`. Added 2026-09-02 (R28) — landed 2026-09-01 with the EDD integration merge, row added by R28's inventory step in the same run it was first reviewed. No REST route/AJAX; its externally-facing gate is the success-page order resolution, **#217 fixed `5e03941`**) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) |
 | **Ecommerce shared helpers** (`src/Ecommerce/` — store-agnostic `Helpers` (verticals, category readers, EC hashing, phone E.164, list-attribution cookie, purchase dedupe guard) + the **GENERATED** `CountryPhoneData` relocated from the WooCommerce module. Added 2026-09-02 (R28); mostly code moved verbatim from `Modules/WooCommerce/Helpers`, whose class now delegates) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) |
 | **Published container template** (`.gtm-container-template/` — the GTM container export offered on gtm4wp.com, added 2026-08-11 with **no row**, backfilled the same run as **#150**). Not plugin code and never in the release ZIP (`tools/build-release.js` `DIST_FILES` is an allow-list), but it is an artifact users import into their **own** GTM account, so it has two questions no other lens here asks — hence *Output XSS* = **does the export contain `jsm` (Custom JavaScript) or `html` (Custom HTML) entities**, and *Input San.* = **are the exporter's `accountId`/`containerId`/`publicId`/`tagIds` anonymized** | [-] | [x] 2026-08-11 (R19) | [x] 2026-08-11 (R19) | [-] | [-] | [-] | [-] |
 | **External scan output** (`CLAUDE-SECURITY-*/` — 3 timestamped directories at the repo ROOT holding scan findings, a results JSONL and 6 patch files; added 2026-08-29 (R26) with **no row**, the same absent-not-`[ ]` failure as VisitorData. Not plugin code, but this is a public repo where committed == published, and until R26 they were kept out of git **only** by a `.gitignore` each directory ships, written by third-party tooling. `.gitignore:60` is now the repo's own backstop. Review question is disclosure, not behaviour) | [-] | [-] | [-] | [-] | [x] 2026-08-29 (R26) | [-] | [-] |
@@ -1148,12 +1148,12 @@ sweep partial (permission scopes + range's toolchain diffs only; R26's full ledg
 
 | # | Sev | Status | Actor | Area | Summary |
 |---|---|---|---|---|---|
-| 217 | High | open | A0 | `src/Modules/EasyDigitalDownloads/PageDataLayer.php` | A success-page order-resolution check is incomplete relative to the upstream chain it ports; confirmed by execution trace. Detail withheld — local report only. **Unreleased: master-only code, no shipped version affected.** |
-| 218 | Medium | open | — | `js/frontend/gtm4wp-edd.js` | New tracker bundle lacks the PA-9 double-init guard every sibling carries (third recurrence of the #71/#83 family); probe-confirmed double-push on re-injection. Fix shape corrected by the verifier: first-statement guard (CF7 reference shape), NOT the boot-entry counter-example shape |
-| 219 | Low | open | A0 (with key) | `src/Modules/EasyDigitalDownloads/PageDataLayer.php` | Success-page authorization posture is weaker than upstream EDD's for one visitor class; the recorded WC-parity rationale failed re-derivation (WC as implemented withholds more). Needs design; detail in local report |
-| 220 | Low | open | — | `tests/unit/Modules/EddPageDataLayerTest.php` | The branch carrying #217 is completely untested; grant+deny tests ship with the fix |
+| 217 | High | fixed | A0 | `src/Modules/EasyDigitalDownloads/PageDataLayer.php` | A success-page order-resolution check was incomplete relative to the upstream chain it ports; confirmed by execution trace. **Fixed `5e03941`**: branch 2 now hash_equals-verifies the receipt hash as EDD core does. Detail withheld — local report only. **Unreleased: master-only code, no shipped version affected.** |
+| 218 | Medium | fixed | — | `js/frontend/gtm4wp-edd.js` | New tracker bundle lacked the PA-9 double-init guard every sibling carries (third recurrence of the #71/#83 family); probe-confirmed double-push on re-injection. **Fixed `ef3d226`** with the first-statement whole-module guard (form-move-tracker reference shape), NOT the boot-entry counter-example shape the draft used |
+| 219 | Low | fixed | A0 (with key) | `src/Modules/EasyDigitalDownloads/PageDataLayer.php` | Success-page authorization posture was weaker than upstream EDD's for one visitor class; the recorded WC-parity rationale failed re-derivation (WC as implemented withholds more). **Fixed `5e03941`** (maintainer chose "withhold like WC"): customer identity blocks withheld unless `edd_can_view_receipt()`, purchase event still fires |
+| 220 | Low | fixed | — | `tests/unit/Modules/EddPageDataLayerTest.php` | The branch carrying #217 was untested; **grant+deny+withholding regression tests shipped `5e03941`**, verified red pre-fix |
 | 221 | Low | wontfix | — | `src/Modules/WooCommerce/Helpers.php` | 10 forwarding wrappers + delegating constants created by the `Ecommerce\Helpers` extraction — deliberate 2.0 public-API stability; recorded in the Over-abstraction sweep row so they are not "tidied" away |
-| 222 | Low | open | — | `js/frontend/gtm4wp-edd.js:24` | `window.gtm4wp_first_container_id` init uses the `x = x \|\| ''` idiom the WC bundle's own #82 comment rejects for this same key; fold into #218's fix |
+| 222 | Low | fixed | — | `js/frontend/gtm4wp-edd.js:24` | `window.gtm4wp_first_container_id` init used the `x = x \|\| ''` idiom the WC bundle's own #82 comment rejects for this same key; **fixed `ef3d226`** (switched to the typeof guard) alongside #218 |
 
 **Adjudication: 6 drafts verified by 3 read-only verifiers · 0 mechanisms refuted · 2
 recommendations refuted (#218 guard placement mirrored PA-9's recorded counter-example;
@@ -1171,8 +1171,18 @@ applications added, arities verified against WPML docs; one site removed with #2
 **Baseline: PHP 2114 tests / 5304 assertions, JS 745 / 36 suites, `phpcs` exit 0.**
 Adjudication-stage tree check: `git worktree prune` then all three snapshot legs diffed
 empty; `git status` clean; HEAD unchanged; verifiers read-only in namespaced scratch dirs.
-**No fixes applied this session** — the maintainer triages; the base for the next review
-is `7eba61f` unless a fix commit lands, in which case record it here.
+**Fix session (2026-09-02, commits `5e03941` + `ef3d226`):** all five open findings
+resolved (#221 stays the recorded `wontfix`). #217 branch-2 hash verification, #219
+`edd_can_view_receipt()`-gated PII withholding (maintainer chose "withhold like WC" over
+keeping the posture), #218 first-statement double-init guard, #222 typeof-guard init,
+#220 the regression tests. **Ledgers re-derived after staging:** RI-25 still 13,
+`wp_json_encode`/`json_literal`/`esc_js`/script-sink counts unchanged (the fix adds no
+encoder call), `global $…` still 7. **Suite totals from the post-fix run: PHP 2118 tests
+/ 5322 assertions (+4 tests), JS 746 / 36 suites (+1 test)**, `phpcs` exit 0, `npm run
+build` + `lint:js` clean. **Claims that changed shape after this report was written: 0** —
+the adjudication stage caught both bad recommendations (#218 shape, #219 disposition)
+before the report was finalized, so nothing needed correcting during the fix session. The
+base for the next review is `ef3d226`.
 
 ### Report 27: `.security/code-review-report-2026-08-29-2039.md`
 
