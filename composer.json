@@ -20,7 +20,8 @@
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "phpunit/phpunit": "^11.0",
         "brain/monkey": "^2.6",
-        "mralaminahamed/easy-digital-downloads-stubs": "3.7.0"
+        "mralaminahamed/easy-digital-downloads-stubs": "3.7.0",
+        "infection/infection": "^0.35.4"
     },
     "autoload": {
         "psr-4": {
@@ -34,7 +35,8 @@
     },
     "config": {
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "infection/extension-installer": true
         }
     },
     "scripts": {

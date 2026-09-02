@@ -1,0 +1,30 @@
+{
+    // Mutation testing (the mechanical form of .testing TS-15/TS-1): run
+    // TARGETED at a changed component, not whole-suite - e.g.
+    //   vendor/bin/infection src/Modules/EasyDigitalDownloads/ --threads=max
+    // Needs a coverage driver; no PCOV/Xdebug is loaded in php.ini on the
+    // maintainer machine, so load it via the scan dir (the env var reaches
+    // PHPUnit's RunInSeparateProcess children, unlike a -d flag):
+    //   PHP_INI_SCAN_DIR=';C:/Users/DuracellTomi/.php-ext/ini'
+    // KNOWN LIMITATION (2026-09-02): on that machine's PHP 8.4.15 ZTS Windows
+    // build, Infection 0.34/0.35 exits silently (code 0, no error) during
+    // "Processing source code files" - mutant generation never completes. The
+    // initial coverage run works (PCOV fine; composer test:coverage works).
+    // Suspected ZTS/Windows environment issue, not config: reproduced with
+    // default tmpDir, single file, --dry-run, one thread. Expected to work on
+    // an NTS build or Linux CI; re-test after the next PHP or Infection bump.
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [ "src" ]
+    },
+    "timeout": 30,
+    "logs": {
+        // build/ is git-ignored; mutation logs never belong in the public repo
+        // (a surviving mutant on a security sink is unfixed-gap detail).
+        "text": "build/infection-logs/infection.log",
+        "summary": "build/infection-logs/summary.log"
+    },
+    "mutators": {
+        "@default": true
+    }
+}
