@@ -556,9 +556,20 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			foreach ( $containers as $one_container ) {
 				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
 
+				// esc_attr() per PART below, at the point of injection (#225). Each part
+				// is already allow-list validated - the id by the pattern one line down,
+				// the domain by container_domain()'s FILTER_VALIDATE_DOMAIN fallback, the
+				// environment values inside container_environment() - so esc_attr() is
+				// the identity function on everything the validators pass today and
+				// exists for the day a pattern is widened. NOT esc_attr()/esc_url() over
+				// the whole src: the environment fragment joins with raw '&' on purpose
+				// (wp_kses encodes it to &amp; at output, the 1.x byte form), and
+				// gtm4wp_get_the_gtm_tag() returns this string as public 1.x API -
+				// pre-encoding it would change those bytes and hand third-party
+				// consumers an already-escaped value to double-escape (RI-4).
 				if ( preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
 					$_gtm_tag .= '
-				<noscript><iframe src="https://' . $this->container_domain( $one_container ) . '/ns.html?id=' . $one_gtm_id . $this->container_environment( $one_container ) . '"
+				<noscript><iframe src="https://' . esc_attr( $this->container_domain( $one_container ) ) . '/ns.html?id=' . esc_attr( $one_gtm_id ) . $this->container_environment( $one_container ) . '"
 				height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe></noscript>';
 				}
 			}
