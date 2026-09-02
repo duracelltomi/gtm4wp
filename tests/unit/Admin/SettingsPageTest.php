@@ -46,6 +46,13 @@ final class SettingsPageTest extends TestCase {
 	private array $enqueued_scripts = array();
 
 	/**
+	 * Every wp_add_inline_style() call recorded during the test.
+	 *
+	 * @var array<int, array{handle: string, data: string}>
+	 */
+	private array $inline_styles = array();
+
+	/**
 	 * Every wp_set_script_translations() call recorded during the test.
 	 *
 	 * @var array<int, array{handle: string, domain: string, path: string|null}>
@@ -127,6 +134,17 @@ final class SettingsPageTest extends TestCase {
 					'handle'   => $handle,
 					'code'     => $code,
 					'position' => $position,
+				);
+				return true;
+			}
+		);
+
+		$this->inline_styles = array();
+		Functions\when( 'wp_add_inline_style' )->alias(
+			function ( $handle, $data ) {
+				$this->inline_styles[] = array(
+					'handle' => $handle,
+					'data'   => $data,
 				);
 				return true;
 			}
@@ -295,6 +313,55 @@ final class SettingsPageTest extends TestCase {
 		$page->enqueue_assets( 'plugins.php' );
 
 		$this->assertCount( 0, $this->inline_scripts, 'The app is loaded on the settings page only.' );
+		$this->assertCount( 0, $this->inline_styles, 'The fallback reveal CSS is registered on the settings page only.' );
+	}
+
+	/**
+	 * The boot-failure notice must be server-rendered INSIDE the app container:
+	 * React clears the container's children on the app's first render (U117), so
+	 * placement inside is what makes the notice disappear when the app works and
+	 * survive when build/admin.js is blocked (EasyPrivacy blocks the whole plugin
+	 * folder), missing or broken. A notice outside the container would show on
+	 * every load; no notice would restore the silent blank page this exists to
+	 * replace.
+	 */
+	public function test_render_prints_the_boot_fallback_inside_the_app_container(): void {
+		$page = $this->make_settings_page( array() );
+
+		ob_start();
+		$page->render();
+		$output = (string) ob_get_clean();
+
+		$container_open = strpos( $output, 'id="gtm4wp-admin-app"' );
+		$fallback       = strpos( $output, SettingsPage::BOOT_FALLBACK_CLASS );
+
+		$this->assertNotFalse( $container_open, 'The app container is rendered.' );
+		$this->assertNotFalse( $fallback, 'The boot-failure notice is rendered.' );
+		$this->assertGreaterThan( $container_open, $fallback, 'The notice sits inside the app container, where React replaces it on boot.' );
+		$this->assertStringContainsString( 'build/admin.js', $output, 'The notice names the file that did not run.' );
+	}
+
+	/**
+	 * The reveal CSS must ride a CORE style handle, never the plugin's own
+	 * stylesheet: the notice exists for the case where everything under the
+	 * plugin folder is blocked, so styling loaded from that folder would be
+	 * blocked with it. The recorder pins the handle and that the selector is
+	 * built from the same class constant render() prints (UC-6), with the
+	 * visibility flip delayed rather than immediate.
+	 */
+	public function test_fallback_reveal_css_is_attached_to_a_core_handle(): void {
+		$page = $this->make_settings_page( array() );
+
+		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
+
+		$this->assertCount( 1, $this->inline_styles, 'The reveal CSS is registered once.' );
+		$style = $this->inline_styles[0];
+
+		$this->assertSame( 'wp-components', $style['handle'], 'A core handle carries the CSS, out of any blocker rule for the plugin folder.' );
+		$this->assertStringContainsString( '.' . SettingsPage::BOOT_FALLBACK_CLASS, $style['data'] );
+		$this->assertStringContainsString( 'visibility:hidden', $style['data'] );
+		$this->assertStringContainsString( SettingsPage::BOOT_FALLBACK_REVEAL_DELAY . 's', $style['data'], 'The notice is revealed after the delay, not immediately.' );
+		$this->assertStringContainsString( 'visibility:visible', $style['data'] );
 	}
 
 	/**

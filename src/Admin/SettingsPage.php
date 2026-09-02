@@ -33,6 +33,23 @@ final class SettingsPage {
 	public const FOCUS_QUERY_ARG = 'gtm4wp-focus';
 
 	/**
+	 * Class of the static boot-failure notice printed inside the app container.
+	 *
+	 * Written into the markup by render() and into the reveal CSS by
+	 * enqueue_assets(); defined once so the two ends cannot drift apart (UC-6).
+	 */
+	public const BOOT_FALLBACK_CLASS = 'gtm4wp-admin-app-fallback';
+
+	/**
+	 * Seconds before the boot-failure notice becomes visible.
+	 *
+	 * Long enough for build/admin.js to load and boot on a slow connection
+	 * (which removes the notice before it is ever seen), short enough that an
+	 * admin staring at a blank screen gets an answer.
+	 */
+	public const BOOT_FALLBACK_REVEAL_DELAY = 3;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Registry       $registry The module registry.
@@ -98,14 +115,30 @@ final class SettingsPage {
 	}
 
 	/**
-	 * Renders the React app container.
+	 * Renders the React app container, with a static boot-failure notice inside.
+	 *
+	 * The screen is drawn by build/admin.js, and the EasyPrivacy filter list
+	 * blocks everything under the plugin folder, so an admin running a content
+	 * blocker gets no script and, before this notice existed, a silently blank
+	 * page. The notice is plain server-rendered HTML that no blocker can touch:
+	 * React clears the container's children on the app's first render (U117),
+	 * so it is only ever seen when the app did not boot - the script blocked,
+	 * missing, failed, or JavaScript off entirely. The reveal CSS added in
+	 * enqueue_assets() keeps it invisible for the first few seconds so it does
+	 * not flash while the app loads normally.
 	 *
 	 * @return void
 	 */
 	public function render(): void {
 		echo '<div class="wrap">';
 		echo '<h1 class="screen-reader-text">' . esc_html__( 'Google Tag Manager for WordPress options', 'duracelltomi-google-tag-manager' ) . '</h1>';
-		echo '<div id="gtm4wp-admin-app"></div>';
+		echo '<div id="gtm4wp-admin-app">';
+		echo '<div class="' . esc_attr( self::BOOT_FALLBACK_CLASS ) . ' notice notice-warning inline">';
+		echo '<p><strong>' . esc_html__( 'The GTM4WP settings screen could not start.', 'duracelltomi-google-tag-manager' ) . '</strong></p>';
+		echo '<p>' . esc_html__( 'This screen is built in the browser by a JavaScript file loaded from the plugin folder (build/admin.js), and that file did not run. The most likely cause is an ad or privacy blocker: some filter lists block everything under the folder of this plugin, and that also blocks the file this screen is built from.', 'duracelltomi-google-tag-manager' ) . '</p>';
+		echo '<p>' . esc_html__( 'Please pause the blocker for the admin area of this site, or add an exception for it, and reload this page. If the screen still stays empty, please check the browser console for errors, check on the Network tab whether admin.js loads from the plugin folder, and verify that all plugin files were uploaded completely.', 'duracelltomi-google-tag-manager' ) . '</p>';
+		echo '</div>';
+		echo '</div>';
 		echo '</div>';
 	}
 
@@ -139,6 +172,18 @@ final class SettingsPage {
 		wp_set_script_translations( 'gtm4wp-admin-app', 'duracelltomi-google-tag-manager' );
 
 		wp_enqueue_style( 'wp-components' );
+
+		// Reveal CSS for the boot-failure notice printed by render(). Attached to
+		// the core wp-components handle, never to the plugin's own stylesheet:
+		// the notice exists for the case where everything under the plugin folder
+		// is blocked, so its styling must not load from there. A zero-duration
+		// delayed animation flips the visibility with no JavaScript involved,
+		// which keeps the notice working when scripts are blocked or off.
+		wp_add_inline_style(
+			'wp-components',
+			'#gtm4wp-admin-app .' . self::BOOT_FALLBACK_CLASS . '{visibility:hidden;animation:gtm4wp-admin-app-fallback-reveal 0s ' . self::BOOT_FALLBACK_REVEAL_DELAY . 's forwards}'
+			. '@keyframes gtm4wp-admin-app-fallback-reveal{to{visibility:visible}}'
+		);
 
 		// wp-scripts emits CSS imported from the entry point as style-<entry>.css.
 		if ( is_file( GTM4WP_PATH . 'build/style-admin.css' ) ) {
