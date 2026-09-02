@@ -1153,7 +1153,7 @@ same distribution. **Full toolchain-trust sweep** (R28 was partial): scopes unch
 |---|---|---|---|---|---|
 | 223 | Low | fixed | A4 | `src/Modules/Container/ContainerRows.php:38-41` | The four container validation patterns missed the `/D` modifier their sibling on line 69 documents as load-bearing: a trailing-newline `GTM4WP_HARDCODED_*` env value passed validation untrimmed and broke the whole container loader block with a SyntaxError (robustness — verifier-confirmed not an escape at any actor; A4 wp-config values only). **Fixed `443a652`**: `/D` on all four patterns + pattern-pin and end-to-end constant-rejection regression tests, both verified red pre-fix; changelog + readme bullets disclose the ID-repair → rejected-with-notice flip. |
 | 224 | Low | fixed | D0→D1 (bounded) | Toolchain-trust sweep row | Plugin-scope ledger went stale the same morning R28 inherited it: claude-security 0.10.2.3 → 0.11.0 (2026-09-02 05:45Z) changed real surface (agents 7→8, hooks banner-only → banner + PostToolUse/PostToolUseFailure) while R28's partial sweep followed the repo-keyed staleness rule, which cannot see out-of-repo updates. Content verified benign. **Fixed in this run:** sweep row now keys plugin staleness on `installed_plugins.json` `version`/`lastUpdated` + the 0.106s active-tree digest; new pin recorded; PA-19 amended; playbook digest excludes `.orphaned_at`. |
-| 225 | Low | open | A4 | `src/Frontend/ContainerCode.php:561-562` | Noscript iframe `src` assembled by bare concatenation with no outer escape — currently safe (three upstream validators + `wp_kses`), flagged as absent defense-in-depth only; needs a maintainer pick between `esc_url()` at the sink or a PA-2-style comment naming the validators. |
+| 225 | Low | fixed | A4 | `src/Frontend/ContainerCode.php` | Noscript iframe `src` was assembled by bare concatenation with no escape of its own — safe only via three upstream validators + `wp_kses`. **Fixed `91ece19`** (maintainer chose the esc_attr safety net): `esc_attr()` per PART (domain + id; environment values were already escaped inside their builder), measured as the identity on every validator-passing charset so zero bytes change — deliberately NOT whole-src, which would have pre-encoded `gtm4wp_get_the_gtm_tag()`'s public 1.x-parity return value (RI-4). No red-able regression test exists by construction (validators make hostile input unreachable); the existing byte-exact assertions are the must-not-break guard, green before and after by design. |
 
 **Adjudication: 2 drafts verified (1 finding-verifier each, both read-only, namespaced
 scratch dirs) · 0 mechanisms refuted · 1 reach claim refuted-and-strengthened (#223's
@@ -1166,15 +1166,24 @@ HEAD unchanged. **Baseline: PHP 2118 tests / 5322 assertions, `phpcs` exit 0** (
 to R28 post-fix, as expected on an identical tree). Sweep spot-checks reproduce: 181
 constants, 7 `global $`, 12 `print_script_block` callers.
 
-**Fix session (2026-09-02, commit `443a652`):** #223 fixed per the maintainer's
-"fix what is straightforward" call — `/D` on all four patterns, both regression tests
-verified red pre-fix, changelog/readme bullets carry the disclosed behavior flip
-(trailing-newline hardcoded ID: silently-repaired → rejected-with-notice). #225 held for
-the maintainer's pick (esc_url vs PA-2 comment). **Suite totals from the post-fix run:
-PHP 2120 tests / 5333 assertions (+2 tests), `phpcs` exit 0** (no JS changed, no build
-needed). No ledger figure this fix touches (no encoder call, no global, no caller added).
-**Claims that changed shape after the report was written: 0.** The base for the next
-review is `443a652` (the ledger commits after it are `.md`-only).
+**Fix session (2026-09-02, commits `443a652` + `91ece19`):** all three findings closed.
+#223 fixed per the maintainer's "fix what is straightforward" call — `/D` on all four
+patterns, both regression tests verified red pre-fix, changelog/readme bullets carry the
+disclosed behavior flip (trailing-newline hardcoded ID: silently-repaired →
+rejected-with-notice). #225 fixed per the maintainer's pick (esc_attr safety net):
+per-part `esc_attr()` measured byte-identical on all valid configs; the drafted
+whole-src form was rejected during the fix-design measure pass because
+`gtm4wp_get_the_gtm_tag()` returns the string as public 1.x-parity API and 1.x also
+built it with a raw `&` — pre-encoding it would have changed public bytes and created
+RI-4's pre-encoded-value trap for third-party consumers. #224 was fixed in the review
+session itself (ledger + playbook). **Suite totals from the post-fix run: PHP 2120
+tests / 5333 assertions (+2 tests), `phpcs` exit 0** (no JS changed, no build needed).
+No ledger figure these fixes touch (no encoder call, no global, no `print_*_block`
+caller added). **Claims that changed shape after the report was written: 1** — #225's
+report Recommendation cell named `esc_url()`/whole-src wrapping as the leading option;
+the fix-design measure pass (1.x byte check + compat API trace) corrected it to
+per-part `esc_attr()` before anything shipped. The base for the next review is
+`91ece19` (the ledger commits after it are `.md`-only).
 
 ### Report 28: `.security/code-review-report-2026-09-02-1845.md`
 
