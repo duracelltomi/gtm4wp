@@ -189,4 +189,134 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertSame( '', $this->capture_output( fn () => $list_tracking->purchase_link_data( 0 ) ) );
 		$this->assertSame( '', $this->capture_output( fn () => $list_tracking->checkout_cart_item_data( array(), 0 ) ) );
 	}
+
+	public function test_purchase_form_input_escapes_a_hostile_title_and_price_option_name(): void {
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => new \EDD_Download(
+				array(
+					'id'    => (int) $id,
+					'name'  => '"><script>alert(1)</script>',
+					'price' => 9.99,
+				)
+			)
+		);
+		Functions\when( 'edd_has_variable_prices' )->justReturn( true );
+		Functions\when( 'edd_get_lowest_price_option' )->justReturn( 5.0 );
+		Functions\when( 'edd_get_variable_prices' )->justReturn(
+			array(
+				1 => array(
+					'name'   => '"><img src=x onerror=alert(2)>',
+					'amount' => 5.0,
+				),
+			)
+		);
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->purchase_link_data( 55, array() )
+		);
+
+		// Both directions (TS-2), mirroring the grid-span sibling: the escaped
+		// forms are present and no raw break-out sequence survives inside the
+		// value="..." attribute — neither from the download title nor from a
+		// variable price-option name.
+		$this->assertStringContainsString( '&lt;script&gt;', $markup );
+		$this->assertStringContainsString( '&lt;img', $markup );
+		$this->assertStringContainsString( '&quot;', $markup );
+		$this->assertStringNotContainsString( '<script', $markup );
+		$this->assertStringNotContainsString( '<img', $markup );
+		$this->assertStringNotContainsString( '"><script>alert(1)</script>', $markup );
+	}
+
+	public function test_checkout_cart_row_span_escapes_a_hostile_title_for_the_attribute_context(): void {
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => new \EDD_Download(
+				array(
+					'id'    => (int) $id,
+					'name'  => '"><script>alert(1)</script>',
+					'price' => 9.99,
+				)
+			)
+		);
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->checkout_cart_item_data(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+				0
+			)
+		);
+
+		// Both directions (TS-2), completing the sibling symmetry: the grid
+		// span and the purchase form carry this case, so the cart row does too.
+		$this->assertStringContainsString( '&lt;script&gt;', $markup );
+		$this->assertStringContainsString( '&quot;', $markup );
+		$this->assertStringNotContainsString( '<script', $markup );
+		$this->assertStringNotContainsString( '"><script>alert(1)</script>', $markup );
+	}
+
+	public function test_search_results_use_their_own_list_name(): void {
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+		Functions\when( 'is_search' )->justReturn( true );
+
+		$markup = $this->capture_output(
+			array( $this->make_list_tracking(), 'after_download_shortcode_item' )
+		);
+
+		$this->assertStringContainsString( 'Search Results', $markup );
+		$this->assertStringNotContainsString( 'Downloads List', $markup );
+	}
+
+	public function test_fixed_price_purchase_form_omits_the_price_options_key(): void {
+		Functions\when( 'edd_has_variable_prices' )->justReturn( false );
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->purchase_link_data( 55, array() )
+		);
+
+		$this->assertStringContainsString( '<input type="hidden" name="gtm4wp_product_data"', $markup );
+		// Omission, not an empty placeholder: the tracker treats key presence
+		// as "this download has variable prices".
+		$this->assertStringNotContainsString( 'price_options', $markup );
+	}
+
+	public function test_malformed_variable_price_data_degrades_to_no_price_options(): void {
+		Functions\when( 'edd_has_variable_prices' )->justReturn( true );
+		Functions\when( 'edd_get_lowest_price_option' )->justReturn( 5.0 );
+		// EDD returning a non-array (corrupt meta) must not warn or emit a key.
+		Functions\when( 'edd_get_variable_prices' )->justReturn( false );
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->purchase_link_data( 55, array() )
+		);
+
+		$this->assertStringContainsString( 'name="gtm4wp_product_data"', $markup );
+		$this->assertStringNotContainsString( 'price_options', $markup );
+	}
+
+	public function test_non_array_price_option_rows_are_skipped(): void {
+		Functions\when( 'edd_has_variable_prices' )->justReturn( true );
+		Functions\when( 'edd_get_lowest_price_option' )->justReturn( 5.0 );
+		Functions\when( 'edd_get_variable_prices' )->justReturn(
+			array(
+				1 => 'corrupt-row',
+				2 => array(
+					'name'   => 'Professional',
+					'amount' => 15.0,
+				),
+			)
+		);
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->purchase_link_data( 55, array() )
+		);
+
+		// The corrupt row is dropped, the valid sibling survives.
+		$this->assertStringContainsString( 'Professional', $markup );
+		$this->assertStringNotContainsString( 'corrupt-row', $markup );
+	}
 }

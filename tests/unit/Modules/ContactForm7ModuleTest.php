@@ -205,6 +205,36 @@ final class ContactForm7ModuleTest extends TestCase {
 	}
 
 	/**
+	 * TS-11 sibling of the raw-passthrough case above, on the MASTER path: the
+	 * master form's title comes from get_the_title() instead of the CF7 object,
+	 * and it must leave the module just as raw - CF7's own esc_attr downstream
+	 * is the single escaper for this attribute.
+	 */
+	public function test_add_form_name_attribute_passes_the_master_title_through_raw(): void {
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $id ) => 12 === (int) $id ? 5 : $id
+		);
+
+		$hostile = '"><script>alert(1)</script>';
+		Functions\when( 'get_the_title' )->alias( static fn ( $id ) => 5 === (int) $id ? $hostile : 'WRONG' );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WPCF7 => true,
+				GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE => true,
+			)
+		);
+
+		\WPCF7_ContactForm::$current = new \WPCF7_ContactForm( 'Devis', 12 );
+
+		$atts = $module->add_form_name_attribute( array() );
+
+		$this->assertSame( $hostile, $atts['data-gtm4wp-form-name'] );
+	}
+
+	/**
 	 * Opt-in gate: with the option off (default), even with WPML active and a
 	 * master form available, the current-language form title is reported.
 	 */

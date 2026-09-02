@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Frontend\Frontend;
@@ -92,6 +93,19 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertTrue( ( new EasyDigitalDownloadsModule() )->is_available() );
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_unavailable_below_the_edd_version_floor(): void {
+		// Own process for the same reason as the no-EDD deny above: EDD_VERSION
+		// is a constant and therefore process-sticky, so this is the only way
+		// to model "EDD active, but the 2.x line" (TS-5 - the module's docblock
+		// says everything it reads is the 3.0+ orders API).
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		define( 'EDD_VERSION', '2.9.4' );
+
+		$this->assertFalse( ( new EasyDigitalDownloadsModule() )->is_available() );
+	}
+
 	public function test_wires_nothing_when_tracking_disabled(): void {
 		$this->register_edd_hooks( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE => false ) );
 
@@ -139,6 +153,52 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertSame( 500, $vars['gtm4wp_datalayer_max_timeout'] );
 		$this->assertTrue( $vars['gtm4wp_console_log'] );
 		$this->assertSame( 1, $vars['gtm4wp_list_attribution'] );
+	}
+
+	public function test_global_vars_honor_noconsolelog_and_the_off_defaults(): void {
+		// The inverse legs of the settings test above: console logging mirrors
+		// the site-wide "no console.log" option, and the flags the tracker
+		// reads as numbers stay 0 when their options are off/default.
+		Functions\when( 'get_option' )->justReturn(
+			array( GTM4WP_OPTION_NOCONSOLELOG => true )
+		);
+		Functions\when( 'edd_get_currency' )->justReturn( 'USD' );
+
+		$module = new EasyDigitalDownloadsModule();
+		$this->set_private( $module, 'options', new Options( $module->defaults() ) );
+
+		$vars = $module->add_global_vars( array() );
+
+		$this->assertFalse( $vars['gtm4wp_console_log'] );
+		$this->assertSame( 0, $vars['gtm4wp_list_attribution'] );
+		$this->assertSame( 0, $vars['gtm4wp_use_sku_instead'] );
+		$this->assertFalse( $vars['gtm4wp_clear_ecommerce'] );
+	}
+
+	public function test_in_footer_filter_moves_the_scripts_to_the_head(): void {
+		Functions\when( 'get_option' )->justReturn( array() );
+		Functions\when( 'plugins_url' )->justReturn( 'https://example.com/build/file.js' );
+		Filters\expectApplied( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE )
+			->once()
+			->with( true )
+			->andReturn( false );
+
+		$enqueue_args = array();
+		Functions\when( 'wp_enqueue_script' )->alias(
+			function ( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) use ( &$enqueue_args ) {
+				$enqueue_args[ $handle ] = $args;
+			}
+		);
+
+		$module = new EasyDigitalDownloadsModule();
+		$this->set_private( $module, 'options', new Options( $module->defaults() ) );
+
+		$module->enqueue_scripts();
+
+		$this->assertFalse( $enqueue_args['gtm4wp-ecommerce-generic']['in_footer'], 'The filter must move the helper to the head.' );
+		$this->assertFalse( $enqueue_args['gtm4wp-edd']['in_footer'], 'The filter must move the tracker to the head.' );
+		$this->assertSame( 'defer', $enqueue_args['gtm4wp-ecommerce-generic']['strategy'] );
+		$this->assertArrayNotHasKey( 'strategy', $enqueue_args['gtm4wp-edd'], 'The EDD tracker deliberately loads without defer (jQuery-event dependency).' );
 	}
 
 	public function test_enqueues_the_generic_helper_and_the_edd_tracker(): void {

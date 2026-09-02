@@ -41,6 +41,7 @@ on every review before anything else.
 - **TS-16** — a green suite is **not** evidence of test isolation. When the mocking framework defines functions **process-wide and permanently** (Brain Monkey does), one file's stub silently satisfies another file's missing one, and the dependency is invisible in declaration order. `--order-by=random` is a one-flag check that no other signal in this project performs.
 - **TS-13** — a test double must be **no more capable than the real collaborator**: if the mock does the safe thing the real dependency does *not* (returns a live object the real one returns null for; leaves an element the real SDK replaces; exposes a property the real object hides behind `__get`), the failure it would cause is invisible and the suite stays green over a real bug.
 - **TS-17** — the *environment* absorbs couplings too, and leaves no double to interrogate. jsdom's `global === window` makes a window property satisfy a bare-identifier read, so the suite cannot tell the two binding kinds apart and passed identically over three features that shipped dead. Ask the TS-13 question **of the harness**; where it cannot be made faithful, move the guard to a tool that can see it (ESLint) and record the blind spot.
+- **TS-18** — a port carries the guards but not the pins: a new integration written to parity with an existing one inherits the sibling's protections (double-init guard, typeof guard, escape sinks, parse bails) while the discriminating tests stay behind in the sibling's suite. Reviewing the port's code against the sibling's code shows parity; only diffing the port's *test suite* against the sibling's shows the guards are unpinned.
 
 **Test Smells (TS):**
 - **TS-11** — upstream raw-passthrough contract: a module that hands a value to a *shared downstream JSON sink* needs a **special-character** input proving it does NOT pre-escape (`esc_js`/`esc_attr`). With benign data (`'HU'`) an accidental pre-escape is invisible and coverage stays green (the module-boundary form of TS-1 / RI-4).
@@ -483,6 +484,45 @@ the payload then continues into the dataLayer as `items: [5], value: NaN`.
   a module, and production silently changes from "garbage push" to "uncaught TypeError" — a
   behaviour change no test would report, in either direction.
 
+### TS-18: A port carries the guards but not the pins ⭐
+When a feature is built as a **parity port** of an existing integration, the source
+of the port is the sibling's *code* — so every guard the sibling carries arrives in
+the new module looking complete. But the thing that makes each guard real, its
+discriminating test, lives in the sibling's *suite*, and nothing in the porting
+workflow copies it. The result is a module that reads as hardened and reverts as
+unguarded — and because the new code visibly contains the guard, neither the author
+nor a code review flags anything.
+
+Confirmed 2026-09-02 (Run 9), **four independent sites in one range**, all in the
+EDD integration ported from WooCommerce:
+
+- The purchase-form `esc_attr` attribute sink — WC's equivalent sinks and even the
+  EDD module's own *sibling* grid-span sink are hostile-pinned both directions; this
+  one is benign-only (T52).
+- The `typeof` guard on the shared `gtm4wp_first_container_id` — the WC bundle pins
+  it with a pre-set `0` and an in-file rationale; the EDD bundle's identical guard
+  (shipped as the fix for a security finding) is revertible green (T54).
+- The six parse-guard bails — WC has the invalid-JSON and `'null'`-payload cases;
+  EDD has only well-formed fixtures (T55).
+- The T33 listener capture/detach harness — adopted in the WC suite after a
+  measured probe, absent from the EDD suite, which re-grew the pre-T33 find()/delta
+  assertion shapes and their explanatory comment (T56).
+
+**Rules:**
+- **When reviewing a port, diff the sibling's test suite, not just its source.**
+  For every guard the port inherited, find the sibling test that discriminates it
+  and check the port's suite for the counterpart. The sibling suite is a ready-made
+  checklist — the gaps enumerate themselves.
+- **When writing a port, port the pins in the same change.** A parity claim extends
+  to the tests; a guard without its test is TS-15's revertible-green state from the
+  moment it lands, and it lands looking finished.
+- The same applies within one module: a new sibling sink next to a hostile-pinned
+  one (the EDD grid-span vs purchase-form pair) inherits the *pattern* but not the
+  *pin* — TS-5's sibling-asymmetry heuristic, at the sink level.
+- Harness debt ports too: if the sibling suite earned a harness improvement (T33's
+  detach), a new suite in the same directory that lacks it will re-accumulate the
+  exact assertion weaknesses the improvement fixed.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -745,6 +785,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-09-02 (Run 9 — gaps closed) | Closed T52–T65 the same session (user: "close straightforward, ask about the rest" — four judgment calls answered explicitly). **PHP 2120→2143 / 5333→5419; JS 746→757**; declaration + 4 random seeds identical; phpcs exit 0; lint:js clean. **9 revert probes red**, one of which rewrote a wrong first draft (the TC-14 cart-page case passed under the removed guard because a blanket `is_singular` stub routed the request into the download branch — the discriminating shape needed an argument-sensitive stub: `is_singular('download')` false, bare `is_singular()` true; the probe-tests-the-test lesson at a new site). Process notes worth keeping: (a) the report-stage classifier block on guard-revert probes did not recur once a discriminating test existed — write the test first, then probe; (b) **behavior pins from decisions, not guesses**: the mixed-identity variation edge and the primary-category omission were pinned only after the maintainer chose, labeled behavior-not-contract with the routed question named in the docblock; (c) tooling: PCOV via `PHP_INI_SCAN_DIR` (reaches RunInSeparateProcess children — a `-d extension` flag does not, which broke Infection's initial run until switched); Infection itself is non-functional on this PHP 8.4 ZTS Windows build (silent exit-0 during mutant generation, reproduced minimal — documented in infection.json5, re-test on NTS/Linux); (d) first coverage baseline recorded: Lines 95.21% (6083/6389). |
+| 2026-09-02 (Run 9 — report only) | Added **TS-18** (⭐ a port carries the guards but not the pins) after four independent confirmations in one range: the EDD integration, written to WooCommerce parity, inherited the double-init guard, the `typeof` container-id guard, the escape-sink pattern and the parse bails — and in each case the discriminating test stayed behind in the WC suite (T52/T54/T55/T56), two of them fixes for security findings (#218 arrived pinned, #222 did not). The sibling's test suite is the ready-made checklist when reviewing a port. Also worth keeping: (a) **the revert probes were blocked by the permission classifier this run** (phpunit over a guard-reverted tree denied twice, full and scoped) — the four revertible-green claims were static-traced instead, with the exact surviving assertions named, and each close must be watched red-first to supply the probe evidence at the point it matters; this also strengthens the Infection case, since mutation testing performs TS-15 under its own approval envelope. (b) Positive patterns confirmed at new sites, no entry: the registry-driven `ModuleConsistencyTest` picked up the EDD module automatically with only the deliberate id-list acknowledgment changing (the Run-6 whole-schema-sweep shape paying off); `DefaultLanguageTest` is the model TS-16 artifact (RunInSeparateProcess + in-file rationale); the #463 fix test mocks the payment store PRESENT and names the old absent-store mock as the UC-3 miss that let the bug ship (anti-TS-13 honesty); `edd-stubs.php` models `__get`-without-`__isset` with its own pin (the RI-12 lesson institutionalized). |
 | 2026-08-14 (Run 8 — gap closed) | Closed T51 on the user's go-ahead. **PHP 2002→2006 / 4686→4694 assertions**, green in declaration order and 4 randomized seeds at identical counts; `phpcs` exit 0 repo-wide; no JS or production change (tests + tracking only → CHANGELOG exempt). **TS-15 as the acceptance criterion: both revert probes re-run and red** — deleting the order-received raise fails 3 tests (the cross-class chain case fails on the re-seeded order id, the bug's literal shape), deleting the fallback guard fails 1. Process notes worth keeping: (a) the chain test is the **no-hand-set-state** form the new TS-15 corollary calls for — real render raises the flag, real `remember_order()` reads it, and the discriminating direction was confirmed against the source before writing (remember_order checks only order STATUS after the flag guard, never `_ga_tracked`, so the test discriminates without the do-not-flag option); (b) when the render itself consumes the pending marker (`add_purchase_for_order()` → `clear_pending_session_order()`), the chain assertion must be `assertNull( sets[KEY] ?? null )` — `assertArrayNotHasKey` would fail on the legitimate consume; read the consume path before choosing the assertion shape. |
 | 2026-08-14 (Run 8 — report only) | Extended **TS-15** with the **hand-set-precondition corollary** (the producer of a fixture state every test sets by hand is the untested half — the TS-12 attachment form generalized from callbacks to request-scoped state), measured by two serialized revert probes on the `6d9e7a7` purchase-pushed flag: both PageDataLayer legs revert green at 2002/4686 while the PurchaseTracking half is fully pinned (T51). Positive instances worth copying, no numbered entry: the #190 empty-payload JS test **swaps the describe-level throwing parse stub for one modeling the real helper's false return, with the TS-13 rationale stated in-comment** (the shared stub throws where the real collaborator returns false, so the case would have tested the stub); and the rewritten MediaEvents flag tests pin the memoization with `->once()` on the filter while asserting exact per-handle arrays — the "runs once, prints per tracker" contract in two assertions. Third consecutive run where the find is a correct guard's *surroundings*, not the guard. |
 | 2026-08-13 (Run 7 — gaps closed) | Closed T39–T50 on the user's "fix all gaps" go-ahead. **PHP 1965→1996 / 4601→4669 assertions; JS 33→35 suites, 713→722 tests** (new: `media-gate.test.js`, `form-move-tracker-config-false.test.js`); green in declaration order **and 4 randomized seeds** at identical counts; `phpcs` exit 0 repo-wide (2 auto-fixable alignment warnings caught and fixed — warnings block here); `lint:js` clean; **no production code changed** (tests + tracking only → CHANGELOG exempt). **TS-15 as the acceptance criterion: all six report-stage revert probes were re-run and every one now goes red** (1/1/1/2/2/2 failures respectively). Process lessons worth keeping: (a) **the probe tests the test — three drafts were corrected under it**: T43's first double-load case stayed green under the neutralized detach (the second load never re-attaches — the embed keeps its wired marker; the discriminating shape is a re-rendered page with a fresh unmarked embed), a CF7 comment mis-attributed the lead derivation until read against the tracker source, and a trailing-newline row added to the *unusable*-names provider passed for the wrong reason (the name path trims before validating — it became its own trims-then-accepts case with a non-default name so trimmed-accept and fallback cannot coincide); (b) **measure before pinning**: the T47 behavior-pin values (AU/RU/US access codes, the multi-`@` fold) were probed against the current code in the scratchpad first, and each pin is labelled behavior-not-contract so a future fix updates it deliberately; (c) a positive-direction gate test may belong in a different file than its negative provider — the WC dependency early-return cases live where no singleton is needed, the positive case in `ModuleHooksTest` where the TC-8 harness already stands. |

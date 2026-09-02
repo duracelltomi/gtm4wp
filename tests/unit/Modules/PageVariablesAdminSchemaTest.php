@@ -94,9 +94,20 @@ final class PageVariablesAdminSchemaTest extends TestCase {
 	public function test_trusted_proxy_sanitizer_keeps_only_valid_entries(): void {
 		$sanitize = $this->field( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )->sanitizer;
 
+		$raw = "10.0.0.0/8, not-an-ip\n2001:db8::/32\n999.1.1.1\n198.51.100.7\n10.0.0.0/99";
+
 		$this->assertSame(
 			"10.0.0.0/8\n2001:db8::/32\n198.51.100.7",
-			( $sanitize )( "10.0.0.0/8, not-an-ip\n2001:db8::/32\n999.1.1.1\n198.51.100.7\n10.0.0.0/99" )
+			( $sanitize )( $raw )
+		);
+
+		// Sanitizer and reader share one split/validate rule: what the reader
+		// would accept from the raw input is exactly what it reads back from
+		// the stored value - the same agreement oracle the post-meta list test
+		// uses. A re-diverged copy of the rule on either end goes red here.
+		$this->assertSame(
+			VisitorIp::parse_trusted_proxies( $raw ),
+			VisitorIp::parse_trusted_proxies( ( $sanitize )( $raw ) )
 		);
 
 		$this->assertSame( '', ( $sanitize )( 'nonsense' ) );

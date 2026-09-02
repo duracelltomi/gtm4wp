@@ -65,6 +65,12 @@ final class EddPageDataLayerTest extends TestCase {
 		// The buyer viewing their own confirmation page is the default: EDD would
 		// show them the receipt, so nothing is withheld. Individual tests override
 		// this to false to exercise the leaked/shared-URL withholding (#219).
+		// NOTE: the sibling withhold direction - `! function_exists(
+		// 'edd_can_view_receipt' )` in add_success_page_data() - cannot be
+		// exercised in-process: Brain Monkey defines a stubbed function
+		// permanently, so once this stub exists the function does too. Documented
+		// untestable leg (same status as the NOTE in PageVariablesModuleTest),
+		// not a gap; the withhold-on-unreadable direction is the safe one.
 		Functions\when( 'edd_can_view_receipt' )->justReturn( true );
 
 		Functions\when( 'edd_get_currency' )->justReturn( 'USD' );
@@ -799,6 +805,107 @@ final class EddPageDataLayerTest extends TestCase {
 
 		$this->assertArrayNotHasKey( 'orderData', $data_layer, 'A forged receipt hash must expose no order data at all.' );
 		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * A present-but-wrong ?payment_key= (the key lookup finds no order) must
+	 * emit nothing and write nothing - the silent-return guard on the request
+	 * input, exercised with the lookup actually missing instead of a stubbed
+	 * live order.
+	 */
+	public function test_success_page_is_silent_when_the_payment_key_matches_no_order(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_no_such_order';
+
+		Functions\when( 'edd_get_order_by' )->justReturn( false );
+		Functions\expect( 'edd_update_order_meta' )->never();
+
+		$data_layer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true )
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $data_layer );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * A bogus ?id= (edd_get_order() finds nothing) must stop resolution before
+	 * the hash comparison and before any key lookup.
+	 */
+	public function test_success_page_is_silent_when_the_order_id_matches_no_order(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+
+		$_GET['id']    = '999999';
+		$_GET['order'] = 'deadbeefdeadbeefdeadbeefdeadbeef';
+
+		Functions\when( 'edd_get_order' )->justReturn( null );
+		Functions\expect( 'edd_get_order_by' )->never();
+		Functions\expect( 'edd_update_order_meta' )->never();
+
+		$data_layer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true )
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $data_layer );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * ?id= without the accompanying ?order= verification hash is not the
+	 * receipt-link shape at all: the branch must not run (no order lookup from
+	 * the bare id) and resolution falls through to the purchase session.
+	 */
+	public function test_success_page_ignores_a_bare_order_id_without_the_hash(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+
+		$_GET['id'] = '77';
+
+		Functions\expect( 'edd_get_order' )->never();
+		Functions\expect( 'edd_get_order_by' )->never();
+		Functions\expect( 'edd_update_order_meta' )->never();
+		// Stubbed in this test's own setUp scope (TS-16): the session fallback is
+		// reached and must find nothing.
+		Functions\when( 'edd_get_purchase_session' )->justReturn( false );
+
+		$data_layer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true )
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $data_layer );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * TC-14: is_singular() true with a null get_post() - the state a conflicting
+	 * plugin or unusual template routing produces. The cart-page detection must
+	 * decide "not a cart page" without raising a warning.
+	 */
+	public function test_singular_request_without_a_post_is_not_a_cart_page_and_raises_no_warning(): void {
+		// Argument-sensitive: is_singular( 'download' ) stays false (this is not
+		// a download page), while the bare is_singular() inside is_cart_page()
+		// reports true - the exact tag-true/global-null routing under test.
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( null );
+
+		// Promote warnings to failures: assertions alone pass straight over a
+		// warning-raising read (warnings are not failures by default).
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only warning trap.
+		set_error_handler(
+			static function ( $errno, $errstr ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only.
+				throw new \RuntimeException( $errstr );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $this->make_page_datalayer()->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertStringNotContainsString( '"event":"view_cart"', $this->inline_script_output() );
+		$this->assertIsArray( $data_layer );
 	}
 
 	/**

@@ -9,8 +9,39 @@
  * select_item takes the no-redirect branch (jsdom cannot navigate).
  */
 
+// Every document-level listener the tracker attaches is captured file-wide and
+// detached after each test (the T33 shape from woocommerce-tracker.test.js):
+// the shared jsdom document never resets between tests, so without this the
+// listeners accumulate, exact counts become order-dependent and an intra-boot
+// duplicate push would be invisible behind find()/delta assertions.
+let capturedDocListeners = [];
+let originalDocAdd = null;
+
+beforeEach( () => {
+	capturedDocListeners = [];
+	originalDocAdd = document.addEventListener;
+	document.addEventListener = function ( type, fn, opts ) {
+		capturedDocListeners.push( { type, fn, opts } );
+		return originalDocAdd.call( this, type, fn, opts );
+	};
+} );
+
+afterEach( () => {
+	if ( originalDocAdd ) {
+		document.addEventListener = originalDocAdd;
+		originalDocAdd = null;
+	}
+
+	capturedDocListeners.forEach( ( { type, fn, opts } ) =>
+		document.removeEventListener( type, fn, opts )
+	);
+	capturedDocListeners = [];
+} );
+
+// item_id mirrors production markup: the PHP side always emits it as a STRING
+// (commit 8023129); internal_id stays numeric, exactly as DownloadData builds it.
 const GRID_ITEM = {
-	item_id: 55,
+	item_id: '55',
 	item_name: 'My eBook',
 	price: 9.99,
 	productlink: 'https://shop/downloads/my-ebook/',
@@ -20,7 +51,7 @@ const GRID_ITEM = {
 };
 
 const PURCHASE_FORM_ITEM = {
-	item_id: 55,
+	item_id: '55',
 	item_name: 'My eBook',
 	price: 9.99,
 	internal_id: 55,
@@ -62,7 +93,7 @@ function purchase_form_fixture( item, price_options ) {
 
 function checkout_cart_fixture() {
 	const cart_item = {
-		item_id: 55,
+		item_id: '55',
 		item_name: 'My eBook',
 		price: 9.99,
 		quantity: 2,
@@ -106,6 +137,9 @@ describe( 'gtm4wp-edd tracker', () => {
 		// in the shared jsdom document; clear it so every boot_tracker() actually
 		// boots (TS-8) - otherwise every test after the first no-ops.
 		delete window.gtm4wp_edd_inited;
+		// The shared cross-bundle container id is window state too (#222); clear
+		// it so the init-guard tests see a fresh realm.
+		delete window.gtm4wp_first_container_id;
 
 		global.gtm4wp_store_item_list_attribution = jest.fn();
 		global.gtm4wp_apply_stored_item_list = jest.fn( ( item ) => item );
@@ -177,7 +211,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( impression_calls ).toHaveLength( 2 );
 		expect( impression_calls[ 0 ][ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55, index: 1 } )
+			expect.objectContaining( { item_id: '55', index: 1 } )
 		);
 	} );
 
@@ -198,7 +232,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call ).toBeDefined();
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55 } )
+			expect.objectContaining( { item_id: '55' } )
 		);
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'productlink' );
 	} );
@@ -226,7 +260,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call ).toBeDefined();
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55 } )
+			expect.objectContaining( { item_id: '55' } )
 		);
 	} );
 
@@ -248,7 +282,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		expect( call ).toBeDefined();
 		expect( call[ 1 ] ).toHaveLength( 1 );
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55, quantity: 1 } )
+			expect.objectContaining( { item_id: '55', quantity: 1 } )
 		);
 		expect( call[ 2 ].value ).toBe( 9.99 );
 	} );
@@ -446,7 +480,7 @@ describe( 'gtm4wp-edd tracker', () => {
 				new window.MouseEvent( 'click', { bubbles: true } )
 			);
 		expect( global.gtm4wp_apply_stored_item_list ).toHaveBeenCalledWith(
-			expect.objectContaining( { item_id: 55 } ),
+			expect.objectContaining( { item_id: '55' } ),
 			55
 		);
 	} );
@@ -491,7 +525,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call ).toBeDefined();
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55, quantity: 2 } )
+			expect.objectContaining( { item_id: '55', quantity: 2 } )
 		);
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'cart_key' );
 		expect( call[ 2 ].value ).toBeCloseTo( 19.98 );
@@ -499,7 +533,7 @@ describe( 'gtm4wp-edd tracker', () => {
 
 	it( 'fires remove_from_cart from the cart block div rows', () => {
 		const cart_item = {
-			item_id: 55,
+			item_id: '55',
 			item_name: 'My eBook',
 			price: 9.99,
 			quantity: 1,
@@ -532,14 +566,14 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call ).toBeDefined();
 		expect( call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55 } )
+			expect.objectContaining( { item_id: '55' } )
 		);
 		expect( call[ 2 ].value ).toBeCloseTo( 9.99 );
 	} );
 
 	it( 'reports checkout quantity edits as add/remove deltas', () => {
 		const cart_item = {
-			item_id: 55,
+			item_id: '55',
 			item_name: 'My eBook',
 			price: 9.99,
 			quantity: 2,
@@ -571,7 +605,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( add_call ).toBeDefined();
 		expect( add_call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55, quantity: 3 } )
+			expect.objectContaining( { item_id: '55', quantity: 3 } )
 		);
 		expect( add_call[ 2 ].value ).toBeCloseTo( 29.97 );
 
@@ -586,7 +620,7 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( remove_call ).toBeDefined();
 		expect( remove_call[ 1 ][ 0 ] ).toEqual(
-			expect.objectContaining( { item_id: 55, quantity: 1 } )
+			expect.objectContaining( { item_id: '55', quantity: 1 } )
 		);
 		expect( remove_call[ 2 ].value ).toBeCloseTo( 9.99 );
 
@@ -599,7 +633,7 @@ describe( 'gtm4wp-edd tracker', () => {
 	} );
 
 	it( 'skips the initial gateway load and reports later gateway picks once', () => {
-		window.gtm4wp_checkout_products = [ { item_id: 55 } ];
+		window.gtm4wp_checkout_products = [ { item_id: '55' } ];
 		window.gtm4wp_checkout_value = 9.99;
 
 		boot_tracker();
@@ -626,7 +660,7 @@ describe( 'gtm4wp-edd tracker', () => {
 	} );
 
 	it( 'reports the payment info at the latest on purchase submit', () => {
-		window.gtm4wp_checkout_products = [ { item_id: 55 } ];
+		window.gtm4wp_checkout_products = [ { item_id: '55' } ];
 		window.gtm4wp_checkout_value = 9.99;
 		document.body.innerHTML =
 			'<label class="edd-gateway-option">' +
@@ -650,5 +684,232 @@ describe( 'gtm4wp-edd tracker', () => {
 		expect( call[ 2 ] ).toEqual(
 			expect.objectContaining( { payment_type: 'stripe' } )
 		);
+	} );
+
+	it( 'keeps a container index of 0 set by another bundle (regression: #222)', () => {
+		// gtm4wp_first_container_id is shared across the WC and EDD bundles, and
+		// 0 is a legitimate container index. The typeof guard must leave a
+		// defined falsy value alone - the x = x || '' idiom this replaces would
+		// clobber it (the same pin the WC bundle carries).
+		window.gtm4wp_first_container_id = 0;
+
+		boot_tracker();
+
+		expect( window.gtm4wp_first_container_id ).toBe( 0 );
+	} );
+
+	it( 'initializes the shared container id to an empty string when undefined', () => {
+		boot_tracker();
+
+		expect( window.gtm4wp_first_container_id ).toBe( '' );
+	} );
+
+	it( 'skips a grid span with malformed JSON and still reports its valid sibling', () => {
+		// Hostile-input shape: the assertion is the ABSENCE/PRESENCE of pushes,
+		// never not.toThrow() - the shipped bundle is a non-strict classic
+		// script, so a throw-shaped assertion would measure jest's language
+		// mode, not production (R26/L18).
+		document.body.innerHTML =
+			'<div class="edd_download">' +
+			'<span class="gtm4wp_edd_productdata" data-gtm4wp_product_data=\'{not json\'></span>' +
+			'</div>' +
+			grid_fixture();
+
+		boot_tracker();
+
+		const impression_calls = global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === 'view_item_list'
+		);
+		expect( impression_calls ).toHaveLength( 1 );
+		expect( impression_calls[ 0 ][ 1 ] ).toHaveLength( 1 );
+		expect( impression_calls[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: '55' } )
+		);
+	} );
+
+	it( 'pushes nothing for a purchase form whose payload parses to null', () => {
+		// JSON.parse('null') succeeds but yields a falsy non-object; the parse
+		// guard must swallow it (the #190/#193 parse-result family).
+		document.body.innerHTML = purchase_form_fixture(
+			PURCHASE_FORM_ITEM
+		).replace(
+			"value='" + JSON.stringify( PURCHASE_FORM_ITEM ) + "'",
+			"value='null'"
+		);
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd-add-to-cart-label' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'pushes nothing for a cart row without its data span', () => {
+		document.body.innerHTML =
+			'<table><tbody>' +
+			'<tr class="edd_cart_item">' +
+			'<td class="edd_cart_item_name">My eBook</td>' +
+			'<td><a class="edd_cart_remove_item_btn" href="#">Remove</a></td>' +
+			'</tr>' +
+			'</tbody></table>';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_cart_remove_item_btn' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'exposes gtm4wp_edd_track_add_to_cart for themes and guards its inputs', () => {
+		document.body.innerHTML = purchase_form_fixture( PURCHASE_FORM_ITEM );
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		// The public API tracks when handed the button (or a descendant)...
+		const tracked = window.gtm4wp_edd_track_add_to_cart(
+			document.querySelector( '.edd-add-to-cart-label' )
+		);
+		expect( tracked ).toBe( true );
+		expect(
+			global.gtm4wp_push_ecommerce.mock.calls.filter(
+				( c ) => c[ 0 ] === 'add_to_cart'
+			)
+		).toHaveLength( 1 );
+
+		// ...and refuses garbage and disabled buttons without pushing.
+		global.gtm4wp_push_ecommerce.mockClear();
+		expect( window.gtm4wp_edd_track_add_to_cart( null ) ).toBe( false );
+
+		document
+			.querySelector( '.edd-add-to-cart' )
+			.classList.add( 'disabled' );
+		expect(
+			window.gtm4wp_edd_track_add_to_cart(
+				document.querySelector( '.edd-add-to-cart-label' )
+			)
+		).toBe( false );
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'clamps an invalid purchase-form quantity to 1', () => {
+		document.body.innerHTML = purchase_form_fixture(
+			PURCHASE_FORM_ITEM
+		).replace(
+			'</form>',
+			'<input type="number" name="edd_download_quantity" value="0" /></form>'
+		);
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd-add-to-cart-label' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { quantity: 1 } )
+		);
+	} );
+
+	it( 'sends one unchunked view_item_list when the chunk size is 0', () => {
+		document.body.innerHTML = grid_fixture() + grid_fixture();
+		global.gtm4wp_product_per_impression = 0;
+
+		boot_tracker();
+
+		const impression_calls = global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === 'view_item_list'
+		);
+		expect( impression_calls ).toHaveLength( 1 );
+		expect( impression_calls[ 0 ][ 1 ] ).toHaveLength( 2 );
+	} );
+
+	it( 'ignores grid link clicks whose href is not the download page', () => {
+		document.body.innerHTML =
+			'<div class="edd_download">' +
+			'<span class="gtm4wp_edd_productdata" data-gtm4wp_product_data=\'' +
+			JSON.stringify( GRID_ITEM ) +
+			"'></span>" +
+			'<a href="https://elsewhere.example/">Author site</a>' +
+			'</div>';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_download a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'labels a submit without any gateway as payment type not found', () => {
+		window.gtm4wp_checkout_products = [ { item_id: '55' } ];
+		window.gtm4wp_checkout_value = 9.99;
+		document.body.innerHTML =
+			'<input type="submit" id="edd-purchase-button" value="Purchase" />';
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '#edd-purchase-button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_payment_info'
+		);
+		expect( call ).toBeDefined();
+		expect( call[ 2 ].payment_type ).toBe( '(payment type not found)' );
+	} );
+
+	it( 'runs the select_item redirect callback only for the first container', () => {
+		document.body.innerHTML = grid_fixture();
+		// Take the redirect branch, but never invoke the callback with the
+		// matching container - jsdom cannot navigate.
+		window.gtm4wp_datalayer_max_timeout = 2000;
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.edd_download a' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'select_item'
+		);
+		expect( call ).toBeDefined();
+		expect( window.gtm4wp_first_container_id ).toBe( 'GTM-TEST' );
+
+		// A second container's eventCallback firing must return early without
+		// touching the location (the redirect runs once per click, not once per
+		// container).
+		const event_callback = call[ 3 ];
+		expect( typeof event_callback ).toBe( 'function' );
+		expect( event_callback( 'GTM-OTHER' ) ).toBe( true );
 	} );
 } );

@@ -604,6 +604,61 @@ final class DownloadDataTest extends TestCase {
 		$this->assertStringNotContainsString( 'payment_key', $serialized );
 	}
 
+	public function test_raw_order_datalayer_passes_customer_and_coupon_values_raw(): void {
+		// TS-11 raw-passthrough contract: these values feed the shared
+		// hex-flag wp_json_encode() sink, which escapes once and correctly for
+		// the inline-script context. With the escape stubs installed (real
+		// htmlspecialchars), a re-introduced esc_js()/esc_attr() pre-escape
+		// (the finding-#12 / RI-4 corruption class) fails the assertSame.
+		Functions\stubEscapeFunctions();
+
+		// Break-out characters via \xNN so no literal <, " or & appears in the
+		// test source (TC-2 corollary): A&"<B and SAVE&"<10.
+		$hostile_name   = "A\x26\x22\x3CB";
+		$hostile_coupon = "SAVE\x26\x22\x3C10";
+
+		$download_data = $this->make_download_data();
+		$order         = $this->make_order(
+			array(
+				'address'     => array(
+					'first_name' => $hostile_name,
+					'city'       => $hostile_name,
+				),
+				'adjustments' => array(
+					new \EDD\Orders\Order_Adjustment(
+						array(
+							'type'        => 'discount',
+							'description' => $hostile_coupon,
+						)
+					),
+				),
+			)
+		);
+
+		$order_data = $download_data->get_raw_order_datalayer( $order, $download_data->process_order_items( $order ) );
+
+		$this->assertSame( $hostile_name, $order_data['customer']['first_name'] );
+		$this->assertSame( $hostile_name, $order_data['customer']['city'] );
+		$this->assertSame( $hostile_coupon, $order_data['attributes']['coupons'] );
+
+		foreach ( array( $order_data['customer']['first_name'], $order_data['attributes']['coupons'] ) as $value ) {
+			$this->assertStringNotContainsString( '&amp;', $value );
+			$this->assertStringNotContainsString( '&quot;', $value );
+			$this->assertStringNotContainsString( '&lt;', $value );
+		}
+	}
+
+	public function test_business_vertical_falls_back_to_retail_for_an_invalid_stored_value(): void {
+		// TS-5 sibling of the valid-value cases: an unknown stored vertical
+		// (a typo, or a value removed from the upstream list) must degrade to
+		// the GA4 default instead of leaking an invalid vertical into items.
+		$item = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL => 'not-a-vertical' )
+		)->process_download( $this->make_download(), array(), 'productdetail' );
+
+		$this->assertSame( 'retail', $item['google_business_vertical'] );
+	}
+
 	public function test_status_gate_defaults_include_pending_arrivals(): void {
 		$download_data = $this->make_download_data();
 

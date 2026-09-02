@@ -338,6 +338,17 @@ final class SettingsPageTest extends TestCase {
 		$this->assertNotFalse( $container_open, 'The app container is rendered.' );
 		$this->assertNotFalse( $fallback, 'The boot-failure notice is rendered.' );
 		$this->assertGreaterThan( $container_open, $fallback, 'The notice sits inside the app container, where React replaces it on boot.' );
+		// Ordering alone would also pass with the notice AFTER the container's
+		// closing tag - the plausible "fix" for a disappearing notice that would
+		// break the U117 clear-on-first-render mechanism and show the warning on
+		// every load. Containment is pinned byte-exact (BE-1 spirit: the render
+		// output is deterministic): the notice opens IMMEDIATELY inside the app
+		// container.
+		$this->assertStringContainsString(
+			'id="gtm4wp-admin-app"><div class="' . SettingsPage::BOOT_FALLBACK_CLASS,
+			$output,
+			'The notice must be the app container\'s first child.'
+		);
 		$this->assertStringContainsString( 'build/admin.js', $output, 'The notice names the file that did not run.' );
 	}
 

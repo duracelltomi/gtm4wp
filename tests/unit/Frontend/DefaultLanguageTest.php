@@ -87,6 +87,45 @@ final class DefaultLanguageTest extends TestCase {
 		$this->assertSame( 7, DefaultLanguage::term_id( 30, 'category' ) );
 	}
 
+	public function test_wpml_null_resolution_keeps_the_original_id(): void {
+		// Real WPML's wpml_object_id returns NULL for an element type it does
+		// not know as translatable (a custom post type or taxonomy WPML is not
+		// configured for) - despite the `true` original-fallback argument. The
+		// numeric guard must keep the original id; without it the caller would
+		// receive 0 and, e.g., a variation's item_group_id would become 0.
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturn( null );
+
+		$this->assertSame( 42, DefaultLanguage::post_id( 42, 'my_custom_type' ) );
+		$this->assertSame( 30, DefaultLanguage::term_id( 30, 'my_custom_tax' ) );
+	}
+
+	public function test_wpml_without_a_default_language_skips_resolution(): void {
+		// A broken/half-configured WPML answering the wpml_default_language
+		// filter with null must short-circuit: wpml_object_id is never even
+		// consulted and the ids pass through unchanged.
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( null );
+		Filters\expectApplied( 'wpml_object_id' )->never();
+
+		$this->assertSame( 42, DefaultLanguage::post_id( 42, 'post' ) );
+		$this->assertSame( 30, DefaultLanguage::term_id( 30, 'category' ) );
+	}
+
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_polylang_resolvers_without_pll_default_language_skip_resolution(): void {
+		// Half-present Polylang (pll_get_post/pll_get_term defined,
+		// pll_default_language not) - own process, because only there can the
+		// function genuinely NOT exist (Brain Monkey stubs are process-sticky).
+		Functions\when( 'pll_get_post' )->justReturn( 8 );
+		Functions\when( 'pll_get_term' )->justReturn( 3 );
+
+		$this->assertSame( 42, DefaultLanguage::post_id( 42, 'post' ) );
+		$this->assertSame( 30, DefaultLanguage::term_id( 30, 'category' ) );
+	}
+
 	public function test_polylang_resolves_post_and_term_ids_to_the_default_language(): void {
 		Functions\when( 'pll_default_language' )->justReturn( 'en' );
 		Functions\when( 'pll_get_post' )->alias( static fn ( $id ): int => 42 === (int) $id ? 8 : 0 );

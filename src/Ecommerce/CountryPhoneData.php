@@ -8,7 +8,7 @@
  *
  * @package GTM4WP
  * @author Thomas Geiger
- * @copyright 2013- Geiger TamĂˇs e.v. (Thomas Geiger s.e.)
+ * @copyright 2013- Geiger Tamás e.v. (Thomas Geiger s.e.)
  * @license GNU General Public License, version 3
  */
 

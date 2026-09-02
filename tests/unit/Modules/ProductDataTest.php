@@ -1509,8 +1509,13 @@ final class ProductDataTest extends TestCase {
 	// the GA4 item identity/text (item_id, item_name, sku, item_category*,
 	// item_brand, item_variant) is built from the product's default-language
 	// equivalent so a product sold in several languages reports as one GA4
-	// item. Off by default, WPML AND Polylang. The Polylang case is LAST
-	// because defining pll_* leaks function_exists() process-wide.
+	// item. Off by default, WPML AND Polylang. The Polylang case sits last as
+	// a courtesy, but correctness does not depend on ordering: defining pll_*
+	// leaks function_exists() process-wide (TS-16), and no other case in this
+	// group can reach the Polylang branch - the off-gate short-circuits before
+	// DefaultLanguage::is_active() and the WPML cases are routed by the
+	// wpml_current_language filter check first. Verified under
+	// --order-by=random.
 	// ---------------------------------------------------------------------
 
 	/**
@@ -1666,6 +1671,72 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( '123', $item['item_id'] );
 		$this->assertSame( 'Test Product', $item['item_name'] );
 		$this->assertSame( 'Current Cat', $item['item_category'] );
+	}
+
+	public function test_master_language_keeps_the_current_product_when_the_master_is_gone(): void {
+		// The mapping resolves to a DIFFERENT id, but the master product no
+		// longer exists (trashed/deleted, or a stale WPML mapping):
+		// wc_get_product() returns null and the item keeps the current
+		// product's identity - never a blank or id-0 item.
+		$this->activate_wpml( array( 123 => 100 ) );
+		Functions\when( 'wc_get_product' )->justReturn( null );
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Current Cat', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
+		)->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( '123', $item['item_id'] );
+		$this->assertSame( 'Test Product', $item['item_name'] );
+		$this->assertSame( 'Current Cat', $item['item_category'] );
+	}
+
+	/**
+	 * BEHAVIOR PIN, NOT A CONTRACT: for a variation whose master VARIATION is
+	 * gone (product swap fails) while the master PARENT still resolves, the
+	 * current code keeps the current variation's identity/text but reports the
+	 * master parent's item_group_id and category - a mixed-identity item. This
+	 * pins what ships today so any change to it is deliberate; whether the
+	 * parent should also fall back to the current one is an open design
+	 * question routed to /code-review.
+	 */
+	public function test_master_language_variation_with_master_gone_reports_the_master_parent(): void {
+		$this->activate_wpml(
+			array(
+				456 => 400,
+				99  => 300,
+			)
+		);
+
+		// The master variation 400 does not exist; only the parent mapping holds.
+		Functions\when( 'wc_get_product' )->justReturn( null );
+		Functions\when( 'wp_get_post_terms' )->alias(
+			static fn ( $product_id ) => 300 === (int) $product_id
+				? array( (object) array( 'name' => 'Master Cat', 'term_id' => 5 ) ) // phpcs:ignore
+				: array()
+		);
+
+		$variation = new \WC_Product_Variation(
+			array(
+				'id'                   => 456,
+				'type'                 => 'variation',
+				'parent_id'            => 99,
+				'title'                => 'Current Variation',
+				'variation_attributes' => array( 'attribute_pa_color' => 'rouge' ),
+			)
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
+		)->process_product( $variation, array(), 'productdetail' );
+
+		$this->assertSame( '456', $item['item_id'], 'The identity stays on the current variation.' );
+		$this->assertSame( 'Current Variation', $item['item_name'] );
+		$this->assertSame( 'rouge', $item['item_variant'] );
+		$this->assertSame( 300, $item['item_group_id'], 'Measured current behavior: the parent still resolves to the master.' );
+		$this->assertSame( 'Master Cat', $item['item_category'], 'Measured current behavior: category follows the master parent.' );
 	}
 
 	public function test_master_language_resolves_full_item_via_polylang(): void {

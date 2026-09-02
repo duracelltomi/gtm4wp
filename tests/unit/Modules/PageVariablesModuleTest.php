@@ -1121,6 +1121,51 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * #203 regression: the allow-list reader casts the stored option through
+	 * Field::to_string(), so a non-scalar stored value (a corrupt import, a
+	 * filter mistake) collapses to the empty-list default - every public key
+	 * still publishes - instead of warning "Array to string conversion" and
+	 * silently suppressing the whole feature behind an 'Array' allow-list.
+	 */
+	public function test_non_scalar_post_meta_allow_list_behaves_like_the_empty_default_without_warning(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => array( 'internal_note' ),
+			)
+		);
+
+		// The throwing handler is the load-bearing half: a bare (string) cast
+		// warns, and warnings are not failures by default (TC-14 recipe).
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only warning trap.
+		set_error_handler(
+			static function ( $errno, $errstr ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only.
+				throw new \RuntimeException( $errstr );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $module->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		// The public keys still publish (empty-list behaviour), and no literal
+		// 'Array' allow-list suppressed them.
+		$this->assertSame( 'secret-internal-note', $data_layer['pagePostTerms']['meta']['internal_note'] );
+		$this->assertSame( 'plain-value', $data_layer['pagePostTerms']['meta']['mixed_key'] );
+	}
+
+	/**
 	 * The allow-list is a filter on what may be considered, never a grant. The
 	 * field description promises "Protected fields and the
 	 * gtm4wp_post_meta_in_datalayer filter still apply on top of this list", and
@@ -1791,6 +1836,64 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * When the master-language resolution lands on a term that no longer exists
+	 * (deleted master category, or a stale WPML mapping), get_term() returns
+	 * null and the pagePrimaryCategory* keys are OMITTED - the house RI-13
+	 * shape: omission, never ''/null placeholders, and no warning. Pinned as
+	 * the intended behavior (a GTM trigger may test key presence); note the
+	 * sibling localized_term_field() falls back to the current-language value
+	 * instead - that asymmetry is deliberate-until-decided and routed to
+	 * /code-review as an observation.
+	 */
+	public function test_master_language_primary_category_is_omitted_when_the_master_term_is_gone(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		Functions\when( 'get_post_meta' )->alias(
+			static fn ( $id, $key ) => '_yoast_wpseo_primary_category' === $key ? '30' : ''
+		);
+
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $id ) => 30 === (int) $id ? 3 : $id
+		);
+		Functions\when( 'get_term' )->justReturn( null );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE  => true,
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => true,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		);
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only warning trap.
+		set_error_handler(
+			static function ( $errno, $errstr ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only.
+				throw new \RuntimeException( $errstr );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $module->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertArrayNotHasKey( 'pagePrimaryCategory', $data_layer );
+		$this->assertArrayNotHasKey( 'pagePrimaryCategoryName', $data_layer );
+		// The gate is scoped: the global-independent keys still emit.
+		$this->assertSame( 'post', $data_layer['pagePostType'] );
+	}
+
+	/**
 	 * The resolved id is filterable so integrators can support other
 	 * multilingual plugins. With no plugin active, a third party using the
 	 * gtm4wp_master_language_term_id filter alone drives the category to its
@@ -1826,8 +1929,13 @@ final class PageVariablesModuleTest extends TestCase {
 	/**
 	 * Polylang active + option ON: the post (pll_get_post), category and tag
 	 * (pll_get_term) and a CUSTOM taxonomy term are resolved to the default
-	 * language returned by pll_default_language(). Kept LAST because defining
-	 * pll_* leaks function_exists() into later tests (see the group note).
+	 * language returned by pll_default_language(). Placed last as a courtesy,
+	 * but correctness does NOT depend on ordering: defining pll_* does leak
+	 * function_exists() process-wide (TS-16), and every case that could be
+	 * affected defends itself - the off-gates short-circuit before the branch,
+	 * the WPML-active cases never reach the Polylang leg, and the no-plugin
+	 * case stubs pll_default_language to false explicitly. Verified under
+	 * --order-by=random.
 	 */
 	public function test_master_language_outputs_polylang_default_language_values(): void {
 		$this->stub_master_language_singular();
