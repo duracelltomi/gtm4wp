@@ -62,6 +62,11 @@ final class EddPageDataLayerTest extends TestCase {
 		Functions\when( 'edd_is_checkout' )->justReturn( false );
 		Functions\when( 'get_current_user_id' )->justReturn( 0 );
 
+		// The buyer viewing their own confirmation page is the default: EDD would
+		// show them the receipt, so nothing is withheld. Individual tests override
+		// this to false to exercise the leaked/shared-URL withholding (#219).
+		Functions\when( 'edd_can_view_receipt' )->justReturn( true );
+
 		Functions\when( 'edd_get_currency' )->justReturn( 'USD' );
 		Functions\when( 'edd_get_download_sku' )->justReturn( false );
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
@@ -735,6 +740,122 @@ final class EddPageDataLayerTest extends TestCase {
 		$pushed = $this->inline_script_output();
 		$this->assertStringContainsString( '"event":"purchase"', $pushed );
 		$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $pushed, 'No browser guard when the admin disabled all tracked flags.' );
+	}
+
+	/**
+	 * #217/#220: the ?order= + ?id= branch of resolve_payment_key() must verify
+	 * the receipt hash. The genuine EDD receipt link carries
+	 * order = md5( id . payment_key . email ), so a matching hash resolves the
+	 * order and the purchase fires as normal.
+	 */
+	public function test_success_page_order_id_branch_resolves_when_the_receipt_hash_matches(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+
+		$order         = $this->make_order();
+		$_GET['id']    = '77';
+		$_GET['order'] = md5( '77pk_super_secret_keybuyer@example.com' );
+
+		Functions\expect( 'edd_get_order' )
+			->once()
+			->with( 77 )
+			->andReturn( $order );
+		Functions\expect( 'edd_get_order_by' )
+			->once()
+			->with( 'payment_key', 'pk_super_secret_key' )
+			->andReturn( $order );
+		Functions\expect( 'edd_update_order_meta' )
+			->once()
+			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * #217: a guessable order id with a WRONG (or absent) ?order= hash must
+	 * resolve nothing - otherwise an unauthenticated visitor could map a
+	 * sequential order id to that order's data. edd_get_order_by must never be
+	 * reached and no purchase or tracked flag is written.
+	 */
+	public function test_success_page_order_id_branch_is_silent_when_the_receipt_hash_is_wrong(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+
+		$_GET['id']    = '77';
+		$_GET['order'] = 'deadbeefdeadbeefdeadbeefdeadbeef';
+
+		Functions\when( 'edd_get_order' )->justReturn( $this->make_order() );
+		// The vulnerable pre-fix branch resolved the key straight from the id via
+		// edd_get_payment_key(); stub it to the real key so this test goes red if
+		// the hash check is removed or that branch is ever restored.
+		Functions\when( 'edd_get_payment_key' )->justReturn( 'pk_super_secret_key' );
+		// The forged hash must stop resolution before the key lookup.
+		Functions\expect( 'edd_get_order_by' )->never();
+		Functions\expect( 'edd_update_order_meta' )->never();
+
+		$data_layer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true )
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $data_layer, 'A forged receipt hash must expose no order data at all.' );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * #219: when EDD itself would not show the visitor the receipt (a leaked or
+	 * shared success URL - edd_can_view_receipt() false), the customer identity
+	 * blocks are withheld while the purchase EVENT still fires (WC parity).
+	 */
+	public function test_success_page_withholds_customer_identity_when_the_receipt_is_not_viewable(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		Functions\when( 'edd_can_view_receipt' )->justReturn( false );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		$data_layer = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_EDDORDERDATA    => true,
+				GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true,
+			)
+		)->add_datalayer_data( array() );
+
+		// The purchase event and the order/totals still ship.
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output() );
+		$this->assertArrayHasKey( 'orderData', $data_layer );
+
+		// The identity blocks do not.
+		$this->assertArrayNotHasKey( 'customer', $data_layer['orderData'], 'orderData.customer is withheld from a non-viewer.' );
+		$this->assertArrayNotHasKey( 'new_customer', $data_layer, 'Buyer-history signals are withheld with the identity block.' );
+		$this->assertArrayNotHasKey( 'customer_type', $data_layer );
+		$this->assertStringNotContainsString( 'user_data', $this->inline_script_output(), 'The Enhanced Conversions block is withheld from a non-viewer.' );
+		$this->assertStringNotContainsString( 'buyer@example.com', (string) wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * #219 counterpart: the buyer viewing their own receipt (edd_can_view_receipt()
+	 * true) gets the full identity blocks. Pins that the withholding gate does not
+	 * fire for the legitimate case.
+	 */
+	public function test_success_page_includes_customer_identity_for_the_buyer(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		Functions\when( 'edd_can_view_receipt' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		$data_layer = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_EDDORDERDATA    => true,
+				GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'customer', $data_layer['orderData'], 'The buyer sees their own customer block.' );
+		$this->assertTrue( $data_layer['new_customer'] );
+		$this->assertStringContainsString( 'user_data', $this->inline_script_output() );
 	}
 
 	/**
