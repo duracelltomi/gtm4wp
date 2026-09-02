@@ -102,6 +102,10 @@ describe( 'gtm4wp-edd tracker', () => {
 		delete window.gtm4wp_checkout_value;
 		delete window.gtm4wp_edd_variable_view_item;
 		delete global.gtm4wp_list_attribution;
+		// The double-init guard (#218) lives on window and persists across tests
+		// in the shared jsdom document; clear it so every boot_tracker() actually
+		// boots (TS-8) - otherwise every test after the first no-ops.
+		delete window.gtm4wp_edd_inited;
 
 		global.gtm4wp_store_item_list_attribution = jest.fn();
 		global.gtm4wp_apply_stored_item_list = jest.fn( ( item ) => item );
@@ -247,6 +251,38 @@ describe( 'gtm4wp-edd tracker', () => {
 			expect.objectContaining( { item_id: 55, quantity: 1 } )
 		);
 		expect( call[ 2 ].value ).toBe( 9.99 );
+	} );
+
+	it( 'does not re-register listeners when the bundle loads twice (regression: double-init #218)', () => {
+		document.body.innerHTML = purchase_form_fixture( PURCHASE_FORM_ITEM );
+
+		const add_to_cart_count = () => {
+			document
+				.querySelector( '.edd-add-to-cart-label' )
+				.dispatchEvent(
+					new window.MouseEvent( 'click', { bubbles: true } )
+				);
+			return global.gtm4wp_push_ecommerce.mock.calls.filter(
+				( c ) => c[ 0 ] === 'add_to_cart'
+			).length;
+		};
+
+		// A re-injected bundle (AJAX navigation, a page builder duplicating the
+		// handle) re-executes the module against the same document. Measured as a
+		// delta so the count is robust to document listeners the shared jsdom has
+		// accumulated from earlier tests: the SECOND boot must add no new
+		// listener, so one click pushes the same number after two boots as after
+		// one. Without the window.gtm4wp_edd_inited guard the second boot adds a
+		// duplicate listener and the second click count is higher.
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+		const after_one_boot = add_to_cart_count();
+
+		global.gtm4wp_push_ecommerce.mockClear();
+		boot_tracker();
+		const after_two_boots = add_to_cart_count();
+
+		expect( after_two_boots ).toBe( after_one_boot );
 	} );
 
 	it( 'fires one add_to_cart item per checked variable price option', () => {
