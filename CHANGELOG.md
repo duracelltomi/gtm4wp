@@ -3,6 +3,7 @@
 ## 2.0.1
 
 * Fixed: on a block-based store, opening the Cart page pushed `add_shipping_info` and `add_payment_info` into the data layer with no interaction, and both events then fired again on the Checkout page. The block tracker told the two pages apart by the presence of the WooCommerce payment data store, which WooCommerce registers on the Cart page as well; the Cart and Checkout pages now each receive their own context and the checkout-step events fire only on the Checkout page. (#463)
+* Fixed: a blank settings screen no longer stays silent about why it is blank. The screen is built in the browser by a JavaScript file loaded from the plugin folder (`build/admin.js`), and the EasyPrivacy filter list blocks everything under that folder, so an administrator running an ad or privacy blocker with that list opened the settings page and found it empty, with nothing anywhere saying why. The page now carries a static, server-rendered notice that no blocker can remove: it stays invisible while the settings app starts normally and appears after a few seconds only when the app never started, naming the most likely cause and the way out (pause the blocker for the admin area of the site, or add an exception for it). The notice also covers every other reason the script fails to run, an incomplete upload or disabled JavaScript included.
 
 ## 2.0
 
