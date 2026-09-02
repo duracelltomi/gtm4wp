@@ -286,7 +286,7 @@ Every externally-reachable entry point, the **lowest actor** who can reach it (t
 | **Frontend Core** (`src/Frontend/` — DataLayer, ScriptTag, ContainerCode, ConsentDefaults, VisitorIp, Frontend, **`DefaultLanguage` — added 2026-09-02 (R28)**, the WPML/Polylang master-language resolver) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [x] 2026-07-10 | [x] 2026-09-02 (R28) |
 | **Module Framework** (`src/Module/` — incl. `DocumentedSchemaInterface`, added 2026-08-11) | [-] | [-] | [-] | [-] | [x] 2026-09-02 (R28 — range change is one `Registry::BUILTIN_MODULES` line) | [-] | [x] 2026-08-11 (R19) |
 | **PageVariables Module** (`src/Modules/PageVariables/`) | [-] | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [-] | [x] 2026-09-02 (R28) | [x] 2026-07-10 | [x] 2026-09-02 (R28) |
-| **Container Module** (`src/Modules/Container/` — incl. `HardcodedContainers`) | [x] 2026-09-02 (R29) | [x] 2026-09-02 (R29) | [x] 2026-09-02 (R29 — #223 open: `/D` anchor hygiene on the four patterns, robustness not escape) | [-] | [x] 2026-09-02 (R29) | [x] 2026-07-10 | [x] 2026-09-02 (R29) |
+| **Container Module** (`src/Modules/Container/` — incl. `HardcodedContainers`) | [x] 2026-09-02 (R29) | [x] 2026-09-02 (R29) | [x] 2026-09-02 (R29 — #223 `/D` anchor hygiene, fixed `443a652`) | [-] | [x] 2026-09-02 (R29) | [x] 2026-07-10 | [x] 2026-09-02 (R29) |
 | **WooCommerce Module** (`src/Modules/WooCommerce/` — PurchaseTracking, ProductData, PageDataLayer, ListTracking, Helpers, StoreApiData, **`CountryPhoneData` — GENERATED, added 2026-08-11, label backfilled the same run as #157; a hand edit there is itself the finding — **moved to `src/Ecommerce/` 2026-09-02**) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R28) | [x] 2026-09-02 (R29 — clean by absence: 0 `$wpdb` in `src/`+`compat/`+`uninstall.php`) | [x] 2026-09-02 (R28) | [x] 2026-08-12 (R23) | [x] 2026-09-02 (R28) |
 | **ConsentMode Module** (`src/Modules/ConsentMode/` — incl. Axeptio handler, CookieYes bridge) | [x] 2026-08-29 (R27) | [x] 2026-08-29 (R27) | [x] 2026-09-02 (R29) | [-] | [x] 2026-09-02 (R29) | [x] 2026-07-14 | [x] 2026-07-14 |
 | **UserEvents Module** (`src/Modules/UserEvents/`) | [-] | [x] 2026-09-02 (R29) | [x] 2026-09-02 (R29) | [-] | [x] 2026-08-29 (R27) | [x] 2026-07-10 | [x] 2026-07-22 |
@@ -1151,7 +1151,7 @@ same distribution. **Full toolchain-trust sweep** (R28 was partial): scopes unch
 
 | # | Sev | Status | Actor | Area | Summary |
 |---|---|---|---|---|---|
-| 223 | Low | open | A4 | `src/Modules/Container/ContainerRows.php:38-41` | The four container validation patterns miss a PCRE anchor hygiene modifier their sibling on line 69 documents as load-bearing; one malformed-whitespace variant of a wp-config constant value passes validation and silently breaks the container loader block (robustness — verifier-confirmed not an escape at any actor; A4 wp-config values only). Detail + tested one-character fix in the local report. |
+| 223 | Low | fixed | A4 | `src/Modules/Container/ContainerRows.php:38-41` | The four container validation patterns missed the `/D` modifier their sibling on line 69 documents as load-bearing: a trailing-newline `GTM4WP_HARDCODED_*` env value passed validation untrimmed and broke the whole container loader block with a SyntaxError (robustness — verifier-confirmed not an escape at any actor; A4 wp-config values only). **Fixed `443a652`**: `/D` on all four patterns + pattern-pin and end-to-end constant-rejection regression tests, both verified red pre-fix; changelog + readme bullets disclose the ID-repair → rejected-with-notice flip. |
 | 224 | Low | fixed | D0→D1 (bounded) | Toolchain-trust sweep row | Plugin-scope ledger went stale the same morning R28 inherited it: claude-security 0.10.2.3 → 0.11.0 (2026-09-02 05:45Z) changed real surface (agents 7→8, hooks banner-only → banner + PostToolUse/PostToolUseFailure) while R28's partial sweep followed the repo-keyed staleness rule, which cannot see out-of-repo updates. Content verified benign. **Fixed in this run:** sweep row now keys plugin staleness on `installed_plugins.json` `version`/`lastUpdated` + the 0.106s active-tree digest; new pin recorded; PA-19 amended; playbook digest excludes `.orphaned_at`. |
 | 225 | Low | open | A4 | `src/Frontend/ContainerCode.php:561-562` | Noscript iframe `src` assembled by bare concatenation with no outer escape — currently safe (three upstream validators + `wp_kses`), flagged as absent defense-in-depth only; needs a maintainer pick between `esc_url()` at the sink or a PA-2-style comment naming the validators. |
 
@@ -1166,7 +1166,15 @@ HEAD unchanged. **Baseline: PHP 2118 tests / 5322 assertions, `phpcs` exit 0** (
 to R28 post-fix, as expected on an identical tree). Sweep spot-checks reproduce: 181
 constants, 7 `global $`, 12 `print_script_block` callers.
 
-**Fixes: pending** — if this line is never filled in, the base for the next review is `4b4026a`.
+**Fix session (2026-09-02, commit `443a652`):** #223 fixed per the maintainer's
+"fix what is straightforward" call — `/D` on all four patterns, both regression tests
+verified red pre-fix, changelog/readme bullets carry the disclosed behavior flip
+(trailing-newline hardcoded ID: silently-repaired → rejected-with-notice). #225 held for
+the maintainer's pick (esc_url vs PA-2 comment). **Suite totals from the post-fix run:
+PHP 2120 tests / 5333 assertions (+2 tests), `phpcs` exit 0** (no JS changed, no build
+needed). No ledger figure this fix touches (no encoder call, no global, no caller added).
+**Claims that changed shape after the report was written: 0.** The base for the next
+review is `443a652` (the ledger commits after it are `.md`-only).
 
 ### Report 28: `.security/code-review-report-2026-09-02-1845.md`
 
