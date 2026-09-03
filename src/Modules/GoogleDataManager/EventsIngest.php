@@ -142,7 +142,10 @@ final class EventsIngest {
 	 * Uses the standard Google error envelope (`error.status` and
 	 * `error.message`) when present. Both are Google's own text about our
 	 * request; the summary is sanitized and capped so a raw body fragment
-	 * cannot ride along into a notice or a health record.
+	 * cannot ride along into a notice or a health record. A status the
+	 * settings screen can act on gets a plain-words explanation in front,
+	 * with Google's own sentence kept in parentheses - "NOT_FOUND: Requested
+	 * entity was not found." alone told the admin nothing to do.
 	 *
 	 * @param array{status: int, body: array|null} $response The transport response.
 	 * @return string
@@ -161,7 +164,39 @@ final class EventsIngest {
 		}
 
 		$summary = ( '' === $status ) ? $message : trim( $status . ': ' . $message );
+		$summary = mb_substr( sanitize_text_field( $summary ), 0, 200 );
 
-		return mb_substr( sanitize_text_field( $summary ), 0, 200 );
+		$hint = self::status_hint( $status );
+
+		return ( '' === $hint ) ? $summary : $hint . ' (' . $summary . ')';
+	}
+
+	/**
+	 * Actionable wording for the google.rpc.Code names this probe commonly
+	 * comes back with (U126 in .upstream/upstream-review-checklist.md). An
+	 * unmapped or renamed status degrades to the raw summary alone, never to
+	 * silence.
+	 *
+	 * NOT_FOUND deliberately points at access as well as the IDs: like most
+	 * Google APIs, an entity the caller is not allowed to see is reported as
+	 * not found rather than confirmed to exist, so "check the IDs" alone
+	 * would send an admin with a missing property grant down the wrong path.
+	 *
+	 * @param string $status The `error.status` name.
+	 * @return string Explanation, or '' for a status with no mapped wording.
+	 */
+	private static function status_hint( string $status ): string {
+		switch ( $status ) {
+			case 'NOT_FOUND':
+				return __( 'Google Analytics could not find this destination. Please double-check both the GA4 property ID and the measurement ID - and check that the service account was added to the property, because a property the account is not allowed to see is also reported as not found.', 'duracelltomi-google-tag-manager' );
+			case 'PERMISSION_DENIED':
+				return __( 'The service account is not allowed to send to this destination. Add it to the GA4 property with the Editor role, and make sure the Data Manager API is enabled in the Google Cloud project the account belongs to.', 'duracelltomi-google-tag-manager' );
+			case 'UNAUTHENTICATED':
+				return __( 'Google did not accept the sign-in of the service account. Use the Test button in the Google service accounts section to check it; if it fails there too, upload its key file again.', 'duracelltomi-google-tag-manager' );
+			case 'INVALID_ARGUMENT':
+				return __( 'Google refused the request as invalid. Please double-check the GA4 property ID and the measurement ID.', 'duracelltomi-google-tag-manager' );
+			default:
+				return '';
+		}
 	}
 }

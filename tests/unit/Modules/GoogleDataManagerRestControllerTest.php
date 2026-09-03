@@ -339,7 +339,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 
 	// ---- Google-side refusals ----------------------------------------------
 
-	public function test_a_google_refusal_reports_the_summarized_reason(): void {
+	public function test_a_google_refusal_explains_the_status_and_keeps_the_original_reason(): void {
 		$id = $this->store_account();
 		$this->queue_token();
 		$this->transport->will_respond_json(
@@ -358,7 +358,58 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertInstanceOf( \WP_REST_Response::class, $response );
 		$data = $response->get_data();
 		$this->assertFalse( $data['ok'] );
-		$this->assertSame( 'PERMISSION_DENIED: The caller does not have permission on the property.', $data['message'] );
+		// Plain-words explanation first, Google's own sentence kept for support.
+		$this->assertStringContainsString( 'Editor role', $data['message'] );
+		$this->assertStringContainsString( 'Data Manager API', $data['message'] );
+		$this->assertStringContainsString( '(PERMISSION_DENIED: The caller does not have permission on the property.)', $data['message'] );
+	}
+
+	/**
+	 * The reported case: a well-formed but non-existing property ID answers
+	 * "NOT_FOUND: Requested entity was not found." - true and useless. The
+	 * explanation must say what to double-check, including the access angle:
+	 * Google reports a property the account may not see as not found too.
+	 */
+	public function test_a_not_found_refusal_says_what_to_double_check(): void {
+		$id = $this->store_account();
+		$this->queue_token();
+		$this->transport->will_respond_json(
+			404,
+			array(
+				'error' => array(
+					'code'    => 404,
+					'status'  => 'NOT_FOUND',
+					'message' => 'Requested entity was not found.',
+				),
+			)
+		);
+
+		$data = $this->make_controller()->test_destination( self::request( $id ) )->get_data();
+
+		$this->assertFalse( $data['ok'] );
+		$this->assertStringContainsString( 'double-check both the GA4 property ID and the measurement ID', $data['message'] );
+		$this->assertStringContainsString( 'service account was added to the property', $data['message'] );
+		$this->assertStringContainsString( '(NOT_FOUND: Requested entity was not found.)', $data['message'] );
+	}
+
+	public function test_an_unmapped_status_still_reports_the_raw_summary(): void {
+		$id = $this->store_account();
+		$this->queue_token();
+		$this->transport->will_respond_json(
+			409,
+			array(
+				'error' => array(
+					'code'    => 409,
+					'status'  => 'ABORTED',
+					'message' => 'Concurrency conflict.',
+				),
+			)
+		);
+
+		$data = $this->make_controller()->test_destination( self::request( $id ) )->get_data();
+
+		$this->assertFalse( $data['ok'] );
+		$this->assertSame( 'ABORTED: Concurrency conflict.', $data['message'], 'A status with no mapped wording degrades to the raw summary, never to silence.' );
 	}
 
 	/**
@@ -387,7 +438,11 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertFalse( $data['ok'] );
 		$this->assertStringNotContainsString( "\x3Cscript", $data['message'], 'The tag is stripped, not passed through.' );
 		$this->assertStringContainsString( 'PERMISSION_DENIED: alert(1)stopped', $data['message'], 'The surviving text still reads as the refusal reason.' );
-		$this->assertLessThanOrEqual( 200, mb_strlen( $data['message'] ), 'A raw body fragment cannot ride along past the cap.' );
+		// The 200-char cap governs the RAW portion (Google's text); the
+		// translated explanation in front is the plugin's own. The raw part is
+		// 34 chars of status+prefix, so at most 166 of the 500 padding
+		// characters may survive into the message.
+		$this->assertStringNotContainsString( str_repeat( 'x', 167 ), $data['message'], 'A raw body fragment cannot ride along past the cap.' );
 	}
 
 	public function test_a_refusal_without_an_error_envelope_reports_the_http_status(): void {
