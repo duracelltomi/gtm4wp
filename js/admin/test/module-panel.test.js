@@ -546,6 +546,17 @@ describe( 'ModulePanel custom panels', () => {
 		expect(
 			screen.getByRole( 'button', { name: 'Test Prod' } )
 		).toBeInTheDocument();
+
+		// And in the order the test name claims: the panel sits BELOW the
+		// fields in the document (T80). The two nodes are disjoint, so the
+		// bitmask is exactly FOLLOWING - no bitwise test needed.
+		expect(
+			screen
+				.getByLabelText( 'Field A' )
+				.compareDocumentPosition(
+					screen.getByRole( 'button', { name: 'Test Prod' } )
+				)
+		).toBe( document.DOCUMENT_POSITION_FOLLOWING );
 	} );
 
 	it( 'falls back to the fields when the module names a panel this bundle does not know', () => {

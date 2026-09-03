@@ -112,6 +112,11 @@ export default function DestinationsPanel( { data, values } ) {
 		setBusyIndex( index );
 		setResults( ( current ) => ( { ...current, [ index ]: null } ) );
 
+		const fallbackText = __(
+			'The destination could not be tested.',
+			'duracelltomi-google-tag-manager'
+		);
+
 		try {
 			const response = await apiFetch( {
 				path: testPath,
@@ -119,27 +124,29 @@ export default function DestinationsPanel( { data, values } ) {
 				data: payload,
 			} );
 
+			// Built before setResults so a malformed response (no envelope
+			// from a proxy or an exhausted worker) is a failure verdict here,
+			// not a TypeError inside React's render.
+			const verdict = {
+				ok: Boolean( response && response.ok ),
+				text: ( response && response.message ) || fallbackText,
+				fingerprint,
+			};
+
 			setResults( ( current ) => ( {
 				...current,
-				[ index ]: {
-					ok: Boolean( response.ok ),
-					text: response.message,
-					fingerprint,
-				},
+				[ index ]: verdict,
 			} ) );
 		} catch ( error ) {
+			const verdict = {
+				ok: false,
+				text: ( error && error.message ) || fallbackText,
+				fingerprint,
+			};
+
 			setResults( ( current ) => ( {
 				...current,
-				[ index ]: {
-					ok: false,
-					text:
-						( error && error.message ) ||
-						__(
-							'The destination could not be tested.',
-							'duracelltomi-google-tag-manager'
-						),
-					fingerprint,
-				},
+				[ index ]: verdict,
 			} ) );
 		} finally {
 			setBusyIndex( null );

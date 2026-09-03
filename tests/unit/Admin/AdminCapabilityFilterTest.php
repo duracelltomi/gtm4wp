@@ -212,6 +212,10 @@ final class AdminCapabilityFilterTest extends TestCase {
 			has_action( 'admin_notices', 'GTM4WP\Modules\GoogleAuth\KeyNotice->show_notice()' ),
 			'Admin::boot() attaches the unreadable-key notice; its own tests drive a hand-built instance, so only this boot asserts the attachment (TS-15).'
 		);
+		$this->assertNotFalse(
+			has_action( 'admin_notices', 'GTM4WP\Modules\GoogleDataManager\HealthNotice->show_notice()' ),
+			'Admin::boot() attaches the destination-health notice; its own tests drive a hand-built instance, so only this boot asserts the attachment (TS-15, T75).'
+		);
 	}
 
 	public function test_admin_boot_loads_for_a_user_holding_the_filtered_capability(): void {

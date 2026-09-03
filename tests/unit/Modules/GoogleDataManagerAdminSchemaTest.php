@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Modules\GoogleDataManager\AdminSchema;
+use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Options\Field;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
@@ -114,6 +115,18 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertSame( array(), $account_column['choices'], 'The service-account choices arrive through panel_data(), not fields().' );
 	}
 
+	/**
+	 * The literal, not the constant, on purpose: the React panel registry in
+	 * js/admin/components/panels/index.js keys on this exact string with its
+	 * own literal, so a renamed PANEL constant would leave both suites green
+	 * while the settings panel silently disappears (T78, sibling pin at
+	 * GoogleAuthCustodyTest::test_the_module_descriptor_names_its_panel_and_boot_data).
+	 */
+	public function test_the_panel_names_the_react_component_the_registry_keys_on(): void {
+		$this->assertSame( 'gdm-destinations', ( new AdminSchema() )->panel() );
+		$this->assertSame( 'gdm-destinations', AdminSchema::PANEL );
+	}
+
 	public function test_panel_data_carries_the_account_choices_for_the_select_column(): void {
 		$data = ( new AdminSchema() )->panel_data();
 
@@ -125,6 +138,44 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $data['optionKey'] );
 		$this->assertArrayHasKey( 'health', $data );
 		$this->assertArrayHasKey( 'threshold', $data );
+	}
+
+	/**
+	 * The health payload is the stored records, cleaned, not a hardcoded
+	 * array (T78): a seeded record must come back through panel_data() with
+	 * the threshold the React warning compares it against.
+	 */
+	public function test_panel_data_carries_the_stored_health_records_and_the_threshold(): void {
+		$this->stub_option_store(
+			array(
+				KeyVault::OPTION_NAME          => array(
+					self::ACCOUNT_ID => array( 'label' => 'Production SA' ),
+				),
+				DestinationHealth::OPTION_NAME => array(
+					'G-ABC123' => array(
+						'last_success'         => 1_800_000_000,
+						'last_failure'         => 1_800_000_100,
+						'consecutive_failures' => 4,
+						'last_error'           => 'PERMISSION_DENIED: no access.',
+					),
+				),
+			)
+		);
+
+		$data = ( new AdminSchema() )->panel_data();
+
+		$this->assertSame(
+			array(
+				'G-ABC123' => array(
+					'last_success'         => 1_800_000_000,
+					'last_failure'         => 1_800_000_100,
+					'consecutive_failures' => 4,
+					'last_error'           => 'PERMISSION_DENIED: no access.',
+				),
+			),
+			$data['health']
+		);
+		$this->assertSame( DestinationHealth::FAILURE_THRESHOLD, $data['threshold'] );
 	}
 
 	// ---- Sanitizer: acceptance --------------------------------------------

@@ -170,6 +170,33 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertSame( RestController::REST_ROUTE, $captured[0]['route'] );
 		$this->assertSame( array( $controller, 'can_manage' ), $captured[0]['args']['permission_callback'] );
 		$this->assertSame( 'POST', $captured[0]['args']['methods'] );
+		$this->assertSame( array( $controller, 'test_destination' ), $captured[0]['args']['callback'] );
+
+		// The args schema is defense-in-depth (the handler re-validates every
+		// param itself - see invalid_requests()), but a dropped `required` or a
+		// widened type would change what WordPress hands the handler, so the
+		// whole block is pinned exactly, like the sibling's upload args (T77).
+		$this->assertSame(
+			array(
+				DestinationRows::COLUMN_ACCOUNT     => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+				DestinationRows::COLUMN_TYPE        => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+				DestinationRows::COLUMN_PROPERTY    => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+				DestinationRows::COLUMN_MEASUREMENT => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+			),
+			$captured[0]['args']['args']
+		);
 	}
 
 	// ---- Contract ----------------------------------------------------------
@@ -299,6 +326,35 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$data = $response->get_data();
 		$this->assertFalse( $data['ok'] );
 		$this->assertSame( 'PERMISSION_DENIED: The caller does not have permission on the property.', $data['message'] );
+	}
+
+	/**
+	 * The error summary's sanitize + 200-char cap, driven hostile (T79): its
+	 * sibling cap in DestinationHealth::record_failure() is hostile-pinned, and
+	 * this sink feeds the same notice/health surfaces. The tag is written with
+	 * \xNN escapes per TC-2 so no literal break-out chars sit in the source.
+	 */
+	public function test_a_hostile_oversized_error_message_is_stripped_and_capped(): void {
+		$id = $this->store_account();
+		$this->queue_token();
+		$this->transport->will_respond_json(
+			403,
+			array(
+				'error' => array(
+					'code'    => 403,
+					'status'  => 'PERMISSION_DENIED',
+					'message' => "\x3Cscript\x3Ealert(1)\x3C/script\x3Estopped" . str_repeat( 'x', 500 ),
+				),
+			)
+		);
+
+		$response = $this->make_controller()->test_destination( self::request( $id ) );
+
+		$data = $response->get_data();
+		$this->assertFalse( $data['ok'] );
+		$this->assertStringNotContainsString( "\x3Cscript", $data['message'], 'The tag is stripped, not passed through.' );
+		$this->assertStringContainsString( 'PERMISSION_DENIED: alert(1)stopped', $data['message'], 'The surviving text still reads as the refusal reason.' );
+		$this->assertLessThanOrEqual( 200, mb_strlen( $data['message'] ), 'A raw body fragment cannot ride along past the cap.' );
 	}
 
 	public function test_a_refusal_without_an_error_envelope_reports_the_http_status(): void {
