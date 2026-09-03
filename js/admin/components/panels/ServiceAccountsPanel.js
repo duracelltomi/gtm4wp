@@ -693,8 +693,11 @@ function RowActions( {
 			>
 				{ __( 'Rename', 'duracelltomi-google-tag-manager' ) }
 			</Button>
+			{ /* Icon-only, matching the remove-row button every TableControl
+			     table (containers, Data Manager destinations) renders. The
+			     accessible name stays "Delete <label>" via the label prop. */ }
 			<Button
-				variant="tertiary"
+				icon="trash"
 				isDestructive
 				disabled={ isBusy }
 				label={ sprintf(
@@ -703,9 +706,7 @@ function RowActions( {
 					account.label
 				) }
 				onClick={ () => onDeleteRequest( account.id ) }
-			>
-				{ __( 'Delete', 'duracelltomi-google-tag-manager' ) }
-			</Button>
+			/>
 		</>
 	);
 }

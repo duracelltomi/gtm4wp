@@ -704,9 +704,15 @@ describe( 'ServiceAccountsPanel delete', () => {
 	it( 'asks for confirmation before sending anything', async () => {
 		await renderLoaded( [ PRODUCTION, STAGING ] );
 
-		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Delete Production' } )
-		);
+		// The delete control is the same destructive trash-icon button the
+		// container and destination tables render, named for screen readers.
+		const deleteButton = screen.getByRole( 'button', {
+			name: 'Delete Production',
+		} );
+		expect( deleteButton ).toHaveAttribute( 'data-icon', 'trash' );
+		expect( deleteButton ).toHaveAttribute( 'data-destructive', 'true' );
+
+		fireEvent.click( deleteButton );
 
 		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
 		expect(
