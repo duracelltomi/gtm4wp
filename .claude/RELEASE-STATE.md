@@ -26,9 +26,9 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Key | Value |
 |---|---|
-| Released stable version | 2.0.0 |
+| Released stable version | 2.0.1 |
 | Released stable branch | `2.0` |
-| wordpress.org Stable tag | 2.0.0 |
+| wordpress.org Stable tag | 2.0.1 |
 | Development branch | `master` |
 | Development target | 2.1 |
 | Frozen line | `1.x` (last release 1.22.5) |
@@ -62,6 +62,7 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Date | Event |
 |---|---|
+| 2026-09-03 | 2.0.1 patch released (GitHub + wordpress.org), cut from `2.0`; both fixes also on `master` |
 | 2026-09-01 | 2.0.0 stable released (GitHub + wordpress.org); `2.0` branch created; `1.x` declared frozen (reported-security-fixes only) |
 | 2026-08-17 | 2.0.0-rc1 (GitHub pre-release; feature freeze) |
 | 2026-08-04 | 1.22.5 (1.x security release) |
