@@ -92,8 +92,21 @@ final class TokenService {
 
 		$key = $this->vault->open( $account_id );
 		if ( $key instanceof \WP_Error ) {
-			// open() already recorded the account's status; recording a token
-			// failure on top would overwrite "re-upload required" with "error".
+			// The unreadable-key path records its own "re-upload required"
+			// status inside open(); recording a token failure on top would
+			// overwrite it with the weaker "error". Any other open() failure
+			// (stored metadata that no longer passes the key parser - DB-level
+			// damage, no plugin write path produces it) is recorded here, so
+			// the account does not keep showing its last status while every
+			// mint fails. An unknown id records nothing by design.
+			if ( 'gtm4wp_google_key_unreadable' !== $key->get_error_code() ) {
+				$this->vault->record_token_result(
+					$account_id,
+					false,
+					__( 'The stored data of this service account is damaged and cannot be used to sign a request. Please upload its key file again.', 'duracelltomi-google-tag-manager' )
+				);
+			}
+
 			return $key;
 		}
 
@@ -126,7 +139,7 @@ final class TokenService {
 			return new \WP_Error( 'gtm4wp_google_token_refused', $message );
 		}
 
-		$this->vault->record_token_result( $account_id, true );
+		$this->vault->record_token_result( $account_id, true, '', $scope );
 
 		$ttl = $expires_in - self::EARLY_EXPIRY;
 		if ( $ttl > 0 ) {

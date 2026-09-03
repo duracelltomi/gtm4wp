@@ -268,6 +268,21 @@ final class TokenServiceTest extends TestCase {
 		$this->assertStringNotContainsString( 'ya29.secret-token', serialize( $this->options ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- flattening the option table to search it.
 	}
 
+	/**
+	 * A successful mint records its scope on the account so the vault can
+	 * purge that scope's cached token at delete time (#226).
+	 */
+	public function test_a_successful_mint_records_its_scope_for_the_delete_time_purge(): void {
+		$this->transport->will_respond( self::token_response() );
+
+		$this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+		$this->assertSame(
+			array( self::SCOPE ),
+			$this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['scopes']
+		);
+	}
+
 	// ---- Failure branches --------------------------------------------------
 
 	public function test_a_refused_exchange_returns_an_error_records_googles_reason_and_caches_nothing(): void {
@@ -358,6 +373,31 @@ final class TokenServiceTest extends TestCase {
 		$this->assertSame( array(), $this->transport->requests, 'No request leaves the site.' );
 		$this->assertSame( KeyVault::STATUS_REUPLOAD, $unreadable_vault->get( $this->account_id )['status'] );
 		$this->assertSame( array(), $this->transients );
+	}
+
+	/**
+	 * The re-parse failure path is the other way open() can fail: the
+	 * ciphertext still decrypts but the stored metadata no longer passes the
+	 * key parser. No plugin write path can produce that state (the upload
+	 * validates every field), so the trigger is DB-level damage - and the
+	 * account must flip to "error" rather than keep showing its last status
+	 * while every mint fails (#227). Unlike the unreadable-key path above,
+	 * there is no better status to protect here.
+	 */
+	public function test_a_stored_row_that_no_longer_parses_records_the_failure_on_the_account(): void {
+		$this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['client_email'] = '';
+		$this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['status']       = KeyVault::STATUS_OK;
+
+		$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_key_invalid', $result->get_error_code() );
+		$this->assertSame( array(), $this->transport->requests, 'No request leaves the site.' );
+		$this->assertSame( array(), $this->transients );
+
+		$account = $this->vault->get( $this->account_id );
+		$this->assertSame( KeyVault::STATUS_ERROR, $account['status'], 'The panel must not keep reporting the last status while every mint fails.' );
+		$this->assertNotSame( '', $account['last_error'], 'The stored reason tells the admin what to do.' );
 	}
 
 	public function test_an_unknown_account_sends_nothing(): void {

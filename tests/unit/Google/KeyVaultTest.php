@@ -39,8 +39,24 @@ final class KeyVaultTest extends TestCase {
 
 	private const SECRET = 'unit-test-site-secret-do-not-reuse';
 
+	/**
+	 * Names passed to delete_transient() - the vault purges cached tokens on
+	 * delete (#226), which is only observable through these calls.
+	 *
+	 * @var string[]
+	 */
+	private array $deleted_transients = array();
+
 	protected function setUp(): void {
 		parent::setUp();
+
+		$this->deleted_transients = array();
+		Functions\when( 'delete_transient' )->alias(
+			function ( $name ) {
+				$this->deleted_transients[] = $name;
+				return true;
+			}
+		);
 
 		Functions\stubTranslationFunctions();
 		// Modelled on core, not returnArg(): sanitize_text_field() strips tags
@@ -149,6 +165,34 @@ final class KeyVaultTest extends TestCase {
 			'First write creates the row with autoload off (only add_option() can set it); later writes update.'
 		);
 		$this->assertCount( 2, $this->options[ KeyVault::OPTION_NAME ], 'The second add is an update of the same row, not a second row.' );
+	}
+
+	/**
+	 * A refused database write must surface as an error, not as a 201 with a
+	 * phantom account the next read cannot find (#228). Covered on both write()
+	 * branches. The "update_option returns false for an unchanged value" case
+	 * cannot occur on the add path - every call stores a fresh random id and a
+	 * fresh IV - so false here genuinely means the store refused the write.
+	 */
+	public function test_add_reports_a_failed_first_write_instead_of_a_phantom_id(): void {
+		Functions\when( 'add_option' )->justReturn( false );
+
+		$result = $this->make_vault()->add( $this->fixture_key(), 'Production' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_key_store_failed', $result->get_error_code() );
+	}
+
+	public function test_add_reports_a_failed_update_write_instead_of_a_phantom_id(): void {
+		$vault = $this->make_vault();
+		$kept  = $this->add_fixture( $vault, 'Kept' );
+
+		Functions\when( 'update_option' )->justReturn( false );
+		$result = $vault->add( $this->fixture_key(), 'Refused' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_key_store_failed', $result->get_error_code() );
+		$this->assertNotNull( $vault->get( $kept ), 'The account stored before the failure is untouched.' );
 	}
 
 	public function test_a_vault_row_that_is_not_an_array_is_treated_as_empty(): void {
@@ -351,6 +395,37 @@ final class KeyVaultTest extends TestCase {
 		$this->assertSame( array( $keep ), array_keys( $this->options[ KeyVault::OPTION_NAME ] ) );
 		$this->assertFalse( $vault->has( $drop ) );
 		$this->assertTrue( $vault->has( $keep ) );
+	}
+
+	/**
+	 * The vault owns the delete-time token purge (#226): every scope the
+	 * account ever minted for is forgotten inside delete(), so any deletion
+	 * path - not only the REST route - drops the cached tokens, and a scope
+	 * added later is covered without another hardcoded forget call.
+	 */
+	public function test_delete_forgets_the_cached_token_of_every_minted_scope(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+
+		$vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a' );
+		$vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-b' );
+
+		$this->assertTrue( $vault->delete( $id ) );
+
+		$this->assertCount( 2, $this->deleted_transients, 'One purge per minted scope.' );
+		$this->assertCount( 2, array_unique( $this->deleted_transients ), 'The two scopes cache under different names.' );
+		foreach ( $this->deleted_transients as $name ) {
+			$this->assertStringStartsWith( 'gtm4wp_google_token_' . $id . '_', $name );
+		}
+	}
+
+	public function test_delete_of_a_never_minted_account_purges_nothing(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+
+		$this->assertTrue( $vault->delete( $id ) );
+
+		$this->assertSame( array(), $this->deleted_transients, 'No mint ever happened, so no token can be cached.' );
 	}
 
 	public function test_delete_of_an_unknown_id_is_an_error_and_writes_nothing(): void {

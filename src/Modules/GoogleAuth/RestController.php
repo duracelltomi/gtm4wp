@@ -195,9 +195,8 @@ final class RestController {
 			return new \WP_Error( $deleted->get_error_code(), $deleted->get_error_message(), array( 'status' => $status ) );
 		}
 
-		// A token minted before the deletion must not outlive the key.
-		TokenService::forget( $id, TokenService::SCOPE_DATA_MANAGER );
-
+		// The cached tokens of the deleted key are purged inside
+		// KeyVault::delete(), per minted scope (#226).
 		return new \WP_REST_Response( array( 'accounts' => $this->vault->all() ) );
 	}
 

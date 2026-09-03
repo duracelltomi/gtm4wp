@@ -135,10 +135,22 @@ final class KeyVault {
 			'status'         => self::STATUS_UNVERIFIED,
 			'last_checked'   => 0,
 			'last_error'     => '',
+			'scopes'         => array(),
 			'key'            => $sealed,
 		);
 
-		$this->write( $accounts );
+		// A refused write must not produce a phantom id the next read cannot
+		// find. Only this path treats false as fatal: the array always carries
+		// a fresh random id and a fresh IV, so update_option()'s "unchanged
+		// value" false cannot occur here - false genuinely means the store
+		// refused the write. On the status/delete paths it can mean either,
+		// which is why they do not check.
+		if ( ! $this->write( $accounts ) ) {
+			return new \WP_Error(
+				'gtm4wp_google_key_store_failed',
+				__( 'The service account could not be saved to the database. Please try again.', 'duracelltomi-google-tag-manager' )
+			);
+		}
 
 		return $id;
 	}
@@ -178,6 +190,16 @@ final class KeyVault {
 				'gtm4wp_google_account_in_use',
 				__( 'This service account is still used by a configured destination. Remove or reassign that destination first.', 'duracelltomi-google-tag-manager' )
 			);
+		}
+
+		// A token minted from this key must not outlive it on this site. The
+		// purge lives here rather than in the REST controller so that every
+		// deletion path drops the cached token of every scope the account was
+		// actually minted for - a scope added later is covered without anyone
+		// remembering another forget call. Deleting the transient cannot
+		// revoke the token at Google; it stops this site reusing it.
+		foreach ( self::minted_scopes( $accounts[ $id ] ) as $scope ) {
+			TokenService::forget( $id, $scope );
 		}
 
 		unset( $accounts[ $id ] );
@@ -297,9 +319,11 @@ final class KeyVault {
 	 * @param string $id      Account id.
 	 * @param bool   $ok      Whether Google issued a token.
 	 * @param string $message Error summary from Google when it did not; ignored on success.
+	 * @param string $scope   OAuth scope the mint was for; remembered on success so
+	 *                        delete() can purge that scope's cached token (#226).
 	 * @return void
 	 */
-	public function record_token_result( string $id, bool $ok, string $message = '' ): void {
+	public function record_token_result( string $id, bool $ok, string $message = '', string $scope = '' ): void {
 		$accounts = $this->read();
 
 		if ( ! isset( $accounts[ $id ] ) ) {
@@ -312,7 +336,26 @@ final class KeyVault {
 			? ''
 			: mb_substr( sanitize_text_field( $message ), 0, self::ERROR_MAX_LENGTH );
 
+		if ( $ok && ( '' !== $scope ) ) {
+			$scopes = self::minted_scopes( $accounts[ $id ] );
+			if ( ! in_array( $scope, $scopes, true ) ) {
+				$scopes[] = $scope;
+			}
+			$accounts[ $id ]['scopes'] = $scopes;
+		}
+
 		$this->write( $accounts );
+	}
+
+	/**
+	 * The scopes an account has successfully minted a token for. Tolerates a
+	 * row written before the field existed.
+	 *
+	 * @param array<string, mixed> $account Stored account.
+	 * @return string[]
+	 */
+	private static function minted_scopes( array $account ): array {
+		return array_values( array_filter( (array) ( $account['scopes'] ?? array() ), 'is_string' ) );
 	}
 
 	/**
@@ -463,17 +506,17 @@ final class KeyVault {
 	 * screen and at send time, never on a frontend pageview.
 	 *
 	 * @param array<string, array<string, mixed>> $accounts Every account.
-	 * @return void
+	 * @return bool Whether the store accepted the write. Only add() treats
+	 *              false as fatal - see the note there.
 	 */
-	private function write( array $accounts ): void {
+	private function write( array $accounts ): bool {
 		// update_option() only applies the autoload flag when the row is created,
 		// so the very first write goes through add_option() to set it. A row that
 		// already exists keeps whatever autoload it has, which is this one.
 		if ( false === get_option( self::OPTION_NAME, false ) ) {
-			add_option( self::OPTION_NAME, $accounts, '', false );
-			return;
+			return add_option( self::OPTION_NAME, $accounts, '', false );
 		}
 
-		update_option( self::OPTION_NAME, $accounts, false );
+		return update_option( self::OPTION_NAME, $accounts, false );
 	}
 }

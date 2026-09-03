@@ -304,7 +304,7 @@ final class GoogleAuthRestControllerTest extends TestCase {
 
 	// ---- Delete ------------------------------------------------------------
 
-	public function test_delete_removes_the_account_forgets_its_cached_token_and_answers_the_listing(): void {
+	public function test_delete_removes_the_account_and_answers_the_listing(): void {
 		$keep = $this->upload_fixture( 'Keep' );
 		$drop = $this->upload_fixture( 'Drop' );
 
@@ -315,9 +315,30 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$this->assertSame( array( $keep ), array_column( $response->get_data()['accounts'], 'id' ) );
 		$this->assertFalse( $this->vault->has( $drop ) );
 
-		$this->assertCount( 1, $this->deleted_transients, 'The cached token of the removed key is dropped.' );
-		$this->assertStringStartsWith( 'gtm4wp_google_token_' . $drop . '_', $this->deleted_transients[0] );
+		$this->assertSame( array(), $this->deleted_transients, 'Never minted, so no token can be cached - the vault purges by minted scope (#226).' );
 		$this->assert_no_secret_in( $response->get_data() );
+	}
+
+	/**
+	 * The purge lives in KeyVault::delete() (#226), keyed on the scopes the
+	 * account actually minted for, so it covers every deletion path and every
+	 * future scope without another hardcoded forget call here.
+	 */
+	public function test_delete_of_a_minted_account_forgets_its_cached_token(): void {
+		$id = $this->upload_fixture();
+		$this->transport->will_respond_json(
+			200,
+			array(
+				'access_token' => 'ya29.short-lived',
+				'expires_in'   => 3599,
+			)
+		);
+		$this->make_controller()->test_account( new \WP_REST_Request( array( 'id' => $id ) ) );
+
+		$this->make_controller()->delete_account( new \WP_REST_Request( array( 'id' => $id ) ) );
+
+		$this->assertCount( 1, $this->deleted_transients, 'The cached token of the removed key is dropped.' );
+		$this->assertStringStartsWith( 'gtm4wp_google_token_' . $id . '_', $this->deleted_transients[0] );
 	}
 
 	public function test_delete_of_an_unknown_account_is_404(): void {
