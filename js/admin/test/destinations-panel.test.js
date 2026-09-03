@@ -169,6 +169,132 @@ describe( 'DestinationsPanel probing', () => {
 	} );
 } );
 
+describe( 'DestinationsPanel result identity', () => {
+	// A probe result is fingerprinted with the tested cells and shown only
+	// while the row at its index still matches, so an edited or re-indexed
+	// row never wears another probe's verdict.
+
+	it( 'clears the banner when a tested cell of the row is edited', async () => {
+		apiFetch.mockResolvedValue( { ok: true, message: 'Accepted.' } );
+
+		const { rerender } = renderPanel();
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		);
+		await waitFor( () =>
+			expect( screen.getByText( 'Accepted.' ) ).toBeInTheDocument()
+		);
+
+		rerender(
+			<DestinationsPanel
+				data={ panelData() }
+				values={ {
+					[ OPTION_KEY ]: [ { ...ROW, property_id: '987654321' } ],
+				} }
+			/>
+		);
+
+		expect( screen.queryByText( 'Accepted.' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'keeps the banner across a label-only edit', async () => {
+		// Green by design before and after the fingerprint fix: the label is
+		// display-only and deliberately not part of the result identity.
+		apiFetch.mockResolvedValue( { ok: true, message: 'Accepted.' } );
+
+		const { rerender } = renderPanel();
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		);
+		await waitFor( () =>
+			expect( screen.getByText( 'Accepted.' ) ).toBeInTheDocument()
+		);
+
+		rerender(
+			<DestinationsPanel
+				data={ panelData() }
+				values={ {
+					[ OPTION_KEY ]: [ { ...ROW, label: 'Renamed' } ],
+				} }
+			/>
+		);
+
+		expect( screen.getByText( 'Accepted.' ) ).toBeInTheDocument();
+	} );
+
+	it( 'does not migrate the banner onto the row shifted into the index by a removal above', async () => {
+		apiFetch.mockResolvedValue( {
+			ok: false,
+			message: 'DENIED-FOR-B',
+		} );
+
+		const rowB = { ...ROW, label: 'B', measurement_id: 'G-SECOND1' };
+		const rowC = { ...ROW, label: 'C', measurement_id: 'G-THIRD11' };
+		const { rerender } = renderPanel( { rows: [ ROW, rowB, rowC ] } );
+
+		fireEvent.click( screen.getByRole( 'button', { name: 'Test B' } ) );
+		await waitFor( () =>
+			expect( screen.getByText( 'DENIED-FOR-B' ) ).toBeInTheDocument()
+		);
+
+		// Remove row A: B and C shift down one index each.
+		rerender(
+			<DestinationsPanel
+				data={ panelData() }
+				values={ { [ OPTION_KEY ]: [ rowB, rowC ] } }
+			/>
+		);
+
+		expect( screen.queryByText( 'DENIED-FOR-B' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'no longer hides a failing-health warning behind a stale migrated banner', async () => {
+		apiFetch.mockResolvedValue( { ok: true, message: 'Accepted.' } );
+
+		const rowB = { ...ROW, label: 'B', measurement_id: 'G-SECOND1' };
+		const data = panelData( {
+			health: {
+				'G-SECOND1': {
+					last_success: 0,
+					last_failure: 1800000000,
+					consecutive_failures: 4,
+					last_error: 'PERMISSION_DENIED',
+				},
+			},
+		} );
+
+		const { rerender } = render(
+			<DestinationsPanel
+				data={ data }
+				values={ { [ OPTION_KEY ]: [ ROW, rowB ] } }
+			/>
+		);
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		);
+		await waitFor( () =>
+			expect( screen.getByText( 'Accepted.' ) ).toBeInTheDocument()
+		);
+
+		// Remove row A: B shifts into the tested index. Its own failing
+		// record must show instead of A's stale success banner.
+		rerender(
+			<DestinationsPanel
+				data={ data }
+				values={ { [ OPTION_KEY ]: [ rowB ] } }
+			/>
+		);
+
+		expect( screen.queryByText( 'Accepted.' ) ).not.toBeInTheDocument();
+		expect(
+			screen.getByText( /The last 4 sends to this destination failed/ )
+		).toBeInTheDocument();
+	} );
+} );
+
 describe( 'DestinationsPanel stored health', () => {
 	it( 'shows the failing record of a destination past the threshold', () => {
 		renderPanel( {

@@ -168,8 +168,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 *
 	 * Rejecting, not repairing (the container-table discipline): a row that
 	 * cannot send is named with the reason instead of being stored broken or
-	 * silently dropped. Rows with every cell empty are dropped silently - that
-	 * is the untouched "Add row" state.
+	 * silently dropped. Rows where every cell the user fills is empty are
+	 * dropped silently - that is the untouched "Add row" state, which arrives
+	 * with the type select's seeded default and nothing else (RI-28), so the
+	 * emptiness test must ignore the type column. Error messages number rows
+	 * as the screen shows them, dropped rows included.
 	 *
 	 * @param mixed $value Raw submitted value.
 	 * @return array<int, array<string, string>>|\WP_Error
@@ -191,11 +194,14 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 
 			$row = DestinationRows::normalize_row( $raw_row );
 
-			if ( '' === implode( '', $row ) ) {
+			++$row_index;
+
+			$user_cells = $row;
+			unset( $user_cells[ DestinationRows::COLUMN_TYPE ] );
+
+			if ( '' === implode( '', $user_cells ) ) {
 				continue;
 			}
-
-			++$row_index;
 
 			$row[ DestinationRows::COLUMN_LABEL ] = mb_substr(
 				sanitize_text_field( $row[ DestinationRows::COLUMN_LABEL ] ),

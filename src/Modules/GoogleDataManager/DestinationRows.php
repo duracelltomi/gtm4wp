@@ -121,10 +121,12 @@ final class DestinationRows {
 	 * The runtime destination list: the stored rows through the public filter,
 	 * every surviving row re-validated.
 	 *
-	 * Consumers (the send paths, the capture script's measurement ids) read
-	 * destinations only through this method, so a third party sees one
-	 * extension point and an invalid filtered row is dropped here instead of
-	 * reaching a request body.
+	 * Consumers of the runtime list (the send paths, the capture script's
+	 * measurement ids) read destinations only through this method, so a third
+	 * party sees one extension point and an invalid filtered row is dropped
+	 * here instead of reaching a request body. The two deliberate exceptions
+	 * read the STORED rows instead, for the reason each documents: the delete
+	 * veto (references_account() below) and the health notice's join.
 	 *
 	 * @param Options $options The plugin options service.
 	 * @return array<int, array<string, string>>

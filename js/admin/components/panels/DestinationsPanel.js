@@ -59,6 +59,26 @@ function rowName( row ) {
 	return cell( row, COLUMN_LABEL ) || cell( row, COLUMN_MEASUREMENT );
 }
 
+/**
+ * The request body of a probe for one row. Its JSON form doubles as the
+ * result's identity: a stored result is shown only while the row at that
+ * index still probes the same values, so an edited row - or a different
+ * row shifted into the index by a removal above - never wears another
+ * probe's verdict, and never has its own failing-health warning hidden
+ * behind one. The label is display-only and deliberately not part of it.
+ *
+ * @param {Object} row Destination row.
+ * @return {Object} Probe payload.
+ */
+function probePayload( row ) {
+	return {
+		[ COLUMN_ACCOUNT ]: cell( row, COLUMN_ACCOUNT ),
+		[ COLUMN_TYPE ]: cell( row, COLUMN_TYPE ) || 'ga4',
+		[ COLUMN_PROPERTY ]: cell( row, COLUMN_PROPERTY ),
+		[ COLUMN_MEASUREMENT ]: cell( row, COLUMN_MEASUREMENT ),
+	};
+}
+
 export default function DestinationsPanel( { data, values } ) {
 	const { testPath, optionKey, health, threshold } = data;
 
@@ -84,6 +104,11 @@ export default function DestinationsPanel( { data, values } ) {
 			return;
 		}
 
+		// Captured at request time: the table stays editable while a probe is
+		// in flight, and the fingerprint decides which row may show the result.
+		const payload = probePayload( row );
+		const fingerprint = JSON.stringify( payload );
+
 		setBusyIndex( index );
 		setResults( ( current ) => ( { ...current, [ index ]: null } ) );
 
@@ -91,12 +116,7 @@ export default function DestinationsPanel( { data, values } ) {
 			const response = await apiFetch( {
 				path: testPath,
 				method: 'POST',
-				data: {
-					[ COLUMN_ACCOUNT ]: cell( row, COLUMN_ACCOUNT ),
-					[ COLUMN_TYPE ]: cell( row, COLUMN_TYPE ) || 'ga4',
-					[ COLUMN_PROPERTY ]: cell( row, COLUMN_PROPERTY ),
-					[ COLUMN_MEASUREMENT ]: cell( row, COLUMN_MEASUREMENT ),
-				},
+				data: payload,
 			} );
 
 			setResults( ( current ) => ( {
@@ -104,6 +124,7 @@ export default function DestinationsPanel( { data, values } ) {
 				[ index ]: {
 					ok: Boolean( response.ok ),
 					text: response.message,
+					fingerprint,
 				},
 			} ) );
 		} catch ( error ) {
@@ -117,6 +138,7 @@ export default function DestinationsPanel( { data, values } ) {
 							'The destination could not be tested.',
 							'duracelltomi-google-tag-manager'
 						),
+					fingerprint,
 				},
 			} ) );
 		} finally {
@@ -162,7 +184,13 @@ export default function DestinationsPanel( { data, values } ) {
 						healthRecords[ cell( row, COLUMN_MEASUREMENT ) ];
 					const failing =
 						record && record.consecutive_failures >= threshold;
-					const result = results[ index ];
+					const stored = results[ index ];
+					const result =
+						stored &&
+						stored.fingerprint ===
+							JSON.stringify( probePayload( row ) )
+							? stored
+							: null;
 
 					return (
 						<li key={ index } className="gtm4wp-destinations__row">

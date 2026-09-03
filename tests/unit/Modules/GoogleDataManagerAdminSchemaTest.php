@@ -160,6 +160,53 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		);
 	}
 
+	/**
+	 * The table UI seeds the type select's default into a fresh row, so the
+	 * untouched "Add row" state is NOT all-empty: it carries type=ga4 with
+	 * every user-filled cell blank. It must be dropped silently all the same
+	 * (RI-28) - the emptiness test judges the cells the user fills, not the
+	 * seeded default.
+	 */
+	public function test_an_untouched_seeded_row_is_dropped_silently(): void {
+		$this->assertSame(
+			array( self::row() ),
+			$this->field()->sanitize(
+				array(
+					array(
+						DestinationRows::COLUMN_LABEL    => '',
+						DestinationRows::COLUMN_ACCOUNT  => '',
+						DestinationRows::COLUMN_TYPE     => DestinationRows::TYPE_GA4,
+						DestinationRows::COLUMN_PROPERTY => '',
+						DestinationRows::COLUMN_MEASUREMENT => '',
+					),
+					self::row(),
+				)
+			)
+		);
+	}
+
+	/**
+	 * Error messages number rows as the screen shows them: a dropped (empty
+	 * or untouched) row above still counts, so "row 2" in the error is row 2
+	 * in the table.
+	 */
+	public function test_error_messages_number_rows_as_the_screen_shows_them(): void {
+		$result = $this->field()->sanitize(
+			array(
+				array(),
+				self::row(
+					array(
+						DestinationRows::COLUMN_LABEL    => '',
+						DestinationRows::COLUMN_PROPERTY => 'not-numeric',
+					)
+				),
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertStringContainsString( 'destination row 2', $result->get_error_message() );
+	}
+
 	public function test_a_non_array_value_stores_the_empty_table(): void {
 		$this->assertSame( array(), $this->field()->sanitize( 'broken' ) );
 		$this->assertSame( array(), $this->field()->sanitize( null ) );
