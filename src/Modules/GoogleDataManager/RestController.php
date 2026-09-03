@@ -103,10 +103,11 @@ final class RestController {
 			)
 		);
 
-		if ( ! DestinationRows::is_valid_row( $row ) ) {
+		$problems = self::row_problems( $row );
+		if ( array() !== $problems ) {
 			return new \WP_Error(
 				'gtm4wp_gdm_destination_invalid',
-				__( 'This destination is not complete or not valid. Pick a service account, and enter the numeric GA4 property ID and the G-XXXXXXX measurement ID of its web data stream.', 'duracelltomi-google-tag-manager' ),
+				implode( ' ', $problems ),
 				array( 'status' => 400 )
 			);
 		}
@@ -130,5 +131,40 @@ final class RestController {
 					: $result->get_error_message(),
 			)
 		);
+	}
+
+	/**
+	 * Every reason a submitted destination cannot be probed, one sentence per
+	 * failing field so the panel can say which cell to fix - the lump "not
+	 * complete or not valid" wording answered every mistake identically.
+	 *
+	 * The rules are DestinationRows' own (the single is_valid_row() predicate
+	 * uses the same patterns); only the wording lives here, because
+	 * DestinationRows is loaded on frontend requests and must stay free of
+	 * translated strings.
+	 *
+	 * @param array<string, string> $row Normalized row.
+	 * @return string[] Problem sentences; empty when the row is valid.
+	 */
+	private static function row_problems( array $row ): array {
+		$problems = array();
+
+		if ( 1 !== preg_match( DestinationRows::ACCOUNT_PATTERN, $row[ DestinationRows::COLUMN_ACCOUNT ] ?? '' ) ) {
+			$problems[] = __( 'Pick the service account the destination sends with.', 'duracelltomi-google-tag-manager' );
+		}
+
+		if ( ! in_array( $row[ DestinationRows::COLUMN_TYPE ] ?? '', DestinationRows::TYPES, true ) ) {
+			$problems[] = __( 'Unknown destination type.', 'duracelltomi-google-tag-manager' );
+		}
+
+		if ( 1 !== preg_match( DestinationRows::PROPERTY_PATTERN, $row[ DestinationRows::COLUMN_PROPERTY ] ?? '' ) ) {
+			$problems[] = __( 'The GA4 property ID must be the all-numeric ID shown in the Google Analytics admin - not the G-XXXXXXX measurement ID.', 'duracelltomi-google-tag-manager' );
+		}
+
+		if ( 1 !== preg_match( DestinationRows::MEASUREMENT_PATTERN, $row[ DestinationRows::COLUMN_MEASUREMENT ] ?? '' ) ) {
+			$problems[] = __( 'The measurement ID must have the format G-XXXXXXX, as shown for the web data stream in the Google Analytics admin.', 'duracelltomi-google-tag-manager' );
+		}
+
+		return $problems;
 	}
 }

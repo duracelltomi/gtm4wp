@@ -473,6 +473,19 @@ $gtm4wp-mobile: 782px;
 		cursor: not-allowed;
 	}
 
+	// A cell whose value breaks its column's pattern: the input and the
+	// inline message (the control's help text) both turn to the danger color.
+	&__cell--invalid {
+
+		input {
+			border-color: var(--gtm4wp-danger);
+		}
+
+		.components-base-control__help {
+			color: var(--gtm4wp-danger);
+		}
+	}
+
 	// Repeats the column header next to the cell itself. Redundant while the
 	// header row is on screen; the mobile layout at the bottom of this file
 	// drops that row and shows these instead.

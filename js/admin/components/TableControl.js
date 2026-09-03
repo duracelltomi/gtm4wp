@@ -32,6 +32,29 @@ function CellLabel( { column } ) {
 	);
 }
 
+// Whether a text cell breaks its column's `pattern` - an anchored regex source
+// string the PHP schema builds from the same constant its save-time sanitizer
+// enforces, so this marks a value while typing without a second copy of the
+// rule. Matching is trimmed and case-insensitive because the sanitizers
+// normalize whitespace and letter case before validating: everything accepted
+// here is exactly what a save would accept. An empty cell is never marked
+// (emptiness is the sanitizer's call - it may drop the row or refuse the
+// save), and a pattern the browser cannot compile disables the hint rather
+// than break the table - the server still validates.
+function violatesPattern( column, value ) {
+	const trimmed = value.trim();
+
+	if ( ! column.pattern || '' === trimmed ) {
+		return false;
+	}
+
+	try {
+		return ! new RegExp( column.pattern, 'i' ).test( trimmed );
+	} catch ( error ) {
+		return false;
+	}
+}
+
 function emptyRow( columns ) {
 	const row = {};
 
@@ -239,6 +262,22 @@ export default function TableControl( {
 										);
 									}
 
+									const cellValue = String(
+										row[ column.key ] ?? ''
+									);
+									const invalid =
+										! locked &&
+										violatesPattern( column, cellValue );
+
+									let cellClass;
+									if ( locked ) {
+										cellClass =
+											'gtm4wp-table__cell--locked';
+									} else if ( invalid ) {
+										cellClass =
+											'gtm4wp-table__cell--invalid';
+									}
+
 									return (
 										<td key={ column.key }>
 											<CellLabel column={ column } />
@@ -247,19 +286,22 @@ export default function TableControl( {
 												__nextHasNoMarginBottom
 												hideLabelFromVision
 												label={ cellLabel }
-												className={
-													locked
-														? 'gtm4wp-table__cell--locked'
-														: undefined
-												}
+												className={ cellClass }
 												disabled={ disabled }
 												readOnly={ locked }
 												placeholder={
 													column.placeholder
 												}
-												value={ String(
-													row[ column.key ] ?? ''
-												) }
+												help={
+													invalid
+														? column.invalid_message ||
+														  __(
+																'This value is not valid.',
+																'duracelltomi-google-tag-manager'
+														  )
+														: undefined
+												}
+												value={ cellValue }
 												onChange={ ( next ) =>
 													updateCell(
 														rowIndex,

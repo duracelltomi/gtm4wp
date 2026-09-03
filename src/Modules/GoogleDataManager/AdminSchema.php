@@ -133,14 +133,20 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 						'choices' => self::type_choices(),
 					),
 					array(
-						'key'         => DestinationRows::COLUMN_PROPERTY,
-						'label'       => __( 'GA4 property ID', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => '123456789',
+						'key'             => DestinationRows::COLUMN_PROPERTY,
+						'label'           => __( 'GA4 property ID', 'duracelltomi-google-tag-manager' ),
+						'placeholder'     => '123456789',
+						// The save-time rule (PROPERTY_PATTERN), handed to the
+						// table so a wrong value is marked while typing.
+						'pattern'         => '^' . DestinationRows::PROPERTY_PATTERN_BODY . '$',
+						'invalid_message' => __( 'The property ID is the all-numeric ID shown in the Google Analytics admin - not the G-XXXXXXX measurement ID.', 'duracelltomi-google-tag-manager' ),
 					),
 					array(
-						'key'         => DestinationRows::COLUMN_MEASUREMENT,
-						'label'       => __( 'Measurement ID', 'duracelltomi-google-tag-manager' ),
-						'placeholder' => 'G-XXXXXXX',
+						'key'             => DestinationRows::COLUMN_MEASUREMENT,
+						'label'           => __( 'Measurement ID', 'duracelltomi-google-tag-manager' ),
+						'placeholder'     => 'G-XXXXXXX',
+						'pattern'         => '^' . DestinationRows::MEASUREMENT_PATTERN_BODY . '$',
+						'invalid_message' => __( 'The measurement ID starts with G-, as shown for the web data stream in the Google Analytics admin.', 'duracelltomi-google-tag-manager' ),
 					),
 				),
 				sanitizer: static function ( $value ) {

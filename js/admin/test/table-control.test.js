@@ -494,3 +494,144 @@ describe( 'TableControl checkbox columns', () => {
 		expect( screen.getByRole( 'checkbox' ) ).toBeEnabled();
 	} );
 } );
+
+describe( 'TableControl pattern validation', () => {
+	// Mirrors the Data Manager destinations columns: the pattern string is
+	// what the PHP schema builds from its own save-time constants.
+	const PATTERN_COLUMNS = [
+		{
+			key: 'property_id',
+			label: 'GA4 property ID',
+			pattern: '^[0-9]{1,20}$',
+			invalid_message: 'Numbers only.',
+		},
+		{
+			key: 'measurement_id',
+			label: 'Measurement ID',
+			pattern: '^G-[A-Z0-9]{1,30}$',
+			invalid_message: 'G-XXXXXXX expected.',
+		},
+	];
+
+	it( 'marks a value that breaks its column pattern with that column message', () => {
+		renderTable( {
+			field: { columns: PATTERN_COLUMNS },
+			value: [ { property_id: '654987lll', measurement_id: 'G-ABC123' } ],
+		} );
+
+		expect( screen.getByText( 'Numbers only.' ) ).toBeInTheDocument();
+		// The valid cell of the same row is not marked.
+		expect(
+			screen.queryByText( 'G-XXXXXXX expected.' )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'marks each failing cell independently', () => {
+		renderTable( {
+			field: { columns: PATTERN_COLUMNS },
+			value: [
+				{ property_id: 'UA-1', measurement_id: 'Partner / Agency' },
+			],
+		} );
+
+		expect( screen.getByText( 'Numbers only.' ) ).toBeInTheDocument();
+		expect( screen.getByText( 'G-XXXXXXX expected.' ) ).toBeInTheDocument();
+	} );
+
+	it( 'does not mark an empty cell - emptiness is the save-time sanitizer call', () => {
+		renderTable( {
+			field: { columns: PATTERN_COLUMNS },
+			value: [ { property_id: '', measurement_id: '   ' } ],
+		} );
+
+		expect( screen.queryByText( 'Numbers only.' ) ).not.toBeInTheDocument();
+		expect(
+			screen.queryByText( 'G-XXXXXXX expected.' )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'accepts what the sanitizer would accept after normalizing: whitespace and case', () => {
+		// normalize_row() trims every cell and uppercases the measurement ID,
+		// so ' g-abc123 ' saves fine and must not be marked here.
+		renderTable( {
+			field: { columns: PATTERN_COLUMNS },
+			value: [
+				{ property_id: ' 654987 ', measurement_id: ' g-abc123 ' },
+			],
+		} );
+
+		expect( screen.queryByText( 'Numbers only.' ) ).not.toBeInTheDocument();
+		expect(
+			screen.queryByText( 'G-XXXXXXX expected.' )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'falls back to a generic message when the column names none', () => {
+		renderTable( {
+			field: {
+				columns: [ { key: 'id', label: 'ID', pattern: '^[0-9]+$' } ],
+			},
+			value: [ { id: 'abc' } ],
+		} );
+
+		expect(
+			screen.getByText( 'This value is not valid.' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'never marks a locked cell - the lock explains the value, not the admin', () => {
+		renderTable( {
+			field: {
+				columns: [
+					{
+						key: 'id',
+						label: 'ID',
+						readonly: true,
+						pattern: '^[0-9]+$',
+						invalid_message: 'Numbers only.',
+					},
+				],
+			},
+			value: [ { id: 'from-wp-config' } ],
+		} );
+
+		expect( screen.queryByText( 'Numbers only.' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'disables the hint instead of throwing when a pattern does not compile', () => {
+		expect( () =>
+			renderTable( {
+				field: {
+					columns: [
+						{
+							key: 'id',
+							label: 'ID',
+							pattern: '^[0-9+$',
+							invalid_message: 'Numbers only.',
+						},
+					],
+				},
+				value: [ { id: 'abc' } ],
+			} )
+		).not.toThrow();
+
+		expect( screen.queryByText( 'Numbers only.' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'clears the mark as soon as the value is corrected', () => {
+		// Stateful wrapper: the control is controlled, so the parent must
+		// round-trip onChange for the mark to react to typing.
+		const { onChange } = renderTable( {
+			field: { columns: PATTERN_COLUMNS },
+			value: [ { property_id: '654987lll', measurement_id: '' } ],
+		} );
+
+		fireEvent.change( screen.getByDisplayValue( '654987lll' ), {
+			target: { value: '654987' },
+		} );
+
+		expect( onChange ).toHaveBeenCalledWith( [
+			{ property_id: '654987', measurement_id: '' },
+		] );
+	} );
+} );

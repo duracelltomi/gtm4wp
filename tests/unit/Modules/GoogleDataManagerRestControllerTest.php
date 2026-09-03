@@ -264,27 +264,31 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 
 	/**
 	 * Invalid parameters never reach the network - the fake would throw on an
-	 * unexpected request, so the empty request log is a real assertion.
+	 * unexpected request, so the empty request log is a real assertion. Each
+	 * case names the field its refusal message must mention: the message is
+	 * the panel's only diagnostic, so "not valid" without the field would be
+	 * a regression to the lump wording.
 	 *
-	 * @return array<string, array{0: array<string, mixed>}>
+	 * @return array<string, array{0: array<string, mixed>, 1: string}>
 	 */
 	public static function invalid_requests(): array {
 		return array(
-			'malformed account'    => array( array( DestinationRows::COLUMN_ACCOUNT => '../etc/passwd' ) ),
-			'unknown type'         => array( array( DestinationRows::COLUMN_TYPE => 'google-ads' ) ),
-			'non-numeric property' => array( array( DestinationRows::COLUMN_PROPERTY => 'UA-1' ) ),
-			'hostile measurement'  => array( array( DestinationRows::COLUMN_MEASUREMENT => 'G-"</script>' ) ),
-			'non-string values'    => array( array( DestinationRows::COLUMN_PROPERTY => array( 'nested' ) ) ),
+			'malformed account'    => array( array( DestinationRows::COLUMN_ACCOUNT => '../etc/passwd' ), 'service account' ),
+			'unknown type'         => array( array( DestinationRows::COLUMN_TYPE => 'google-ads' ), 'destination type' ),
+			'non-numeric property' => array( array( DestinationRows::COLUMN_PROPERTY => 'UA-1' ), 'property ID' ),
+			'hostile measurement'  => array( array( DestinationRows::COLUMN_MEASUREMENT => 'G-"</script>' ), 'measurement ID' ),
+			'non-string values'    => array( array( DestinationRows::COLUMN_PROPERTY => array( 'nested' ) ), 'property ID' ),
 		);
 	}
 
 	/**
-	 * One invalid parameter at a time.
+	 * One invalid parameter at a time, each named in the refusal.
 	 *
-	 * @param array<string, mixed> $overrides Parameter overrides.
+	 * @param array<string, mixed> $overrides      Parameter overrides.
+	 * @param string               $named_field    Wording the message must carry for the failing field.
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'invalid_requests' )]
-	public function test_an_invalid_destination_is_refused_with_400_and_no_request( array $overrides ): void {
+	public function test_an_invalid_destination_is_refused_with_400_naming_the_field_and_no_request( array $overrides, string $named_field ): void {
 		$id = $this->store_account();
 
 		$result = $this->make_controller()->test_destination( self::request( $id, $overrides ) );
@@ -292,7 +296,36 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_gdm_destination_invalid', $result->get_error_code() );
 		$this->assertSame( array( 'status' => 400 ), $result->get_error_data() );
+		$this->assertStringContainsString( $named_field, $result->get_error_message() );
 		$this->assertSame( array(), $this->transport->requests, 'Nothing left the site.' );
+	}
+
+	/**
+	 * Several mistakes at once are all named in one answer, and a field that
+	 * is fine is not blamed - the pre-fix wording listed every field on every
+	 * mistake, which is what made it useless as a diagnostic.
+	 */
+	public function test_a_destination_with_several_invalid_fields_names_each_and_only_them(): void {
+		$id = $this->store_account();
+
+		$result = $this->make_controller()->test_destination(
+			self::request(
+				$id,
+				array(
+					DestinationRows::COLUMN_PROPERTY    => '654987lll',
+					DestinationRows::COLUMN_MEASUREMENT => 'Partner / Agency',
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$message = $result->get_error_message();
+		$this->assertStringContainsString( 'property ID', $message );
+		// The property sentence also says "not the ... measurement ID", so the
+		// measurement problem is pinned by its own unique wording.
+		$this->assertStringContainsString( 'format G-XXXXXXX', $message );
+		$this->assertStringNotContainsString( 'service account', $message, 'The valid account is not blamed.' );
+		$this->assertStringNotContainsString( 'destination type', $message, 'The valid type is not blamed.' );
 	}
 
 	public function test_a_well_formed_but_unknown_account_is_refused_with_404_and_no_request(): void {

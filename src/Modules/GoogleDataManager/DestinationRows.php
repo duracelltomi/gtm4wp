@@ -71,10 +71,19 @@ final class DestinationRows {
 	 * measurement id grammar (G- plus uppercase alphanumerics) is Google's -
 	 * both registered as U124 in .upstream/upstream-review-checklist.md, with
 	 * generous length caps so a longer future id is not refused as user error.
+	 *
+	 * The *_BODY constants are the delimiter-free middles, shared with the
+	 * settings table's inline cell validation: the admin schema hands
+	 * '^<body>$' to the client as the column's `pattern`, so the rule the
+	 * table marks while typing and the rule this class enforces are one
+	 * definition, never a JS copy that can drift (PA-2/UC-6).
 	 */
+	public const PROPERTY_PATTERN_BODY    = '[0-9]{1,20}';
+	public const MEASUREMENT_PATTERN_BODY = 'G-[A-Z0-9]{1,30}';
+
 	public const ACCOUNT_PATTERN     = '/^' . KeyVault::ID_PATTERN . '$/D';
-	public const PROPERTY_PATTERN    = '/^[0-9]{1,20}$/D';
-	public const MEASUREMENT_PATTERN = '/^G-[A-Z0-9]{1,30}$/D';
+	public const PROPERTY_PATTERN    = '/^' . self::PROPERTY_PATTERN_BODY . '$/D';
+	public const MEASUREMENT_PATTERN = '/^' . self::MEASUREMENT_PATTERN_BODY . '$/D';
 
 	/**
 	 * Returns one row with every column present as a trimmed string. The

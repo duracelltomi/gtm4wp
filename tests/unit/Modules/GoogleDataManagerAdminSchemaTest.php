@@ -116,6 +116,28 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 	}
 
 	/**
+	 * The inline cell validation of the two ID columns is the save-time rule:
+	 * each column's `pattern` is '^<body>$' built from the same DestinationRows
+	 * constant the sanitizer's pattern is built from, so the table marks while
+	 * typing exactly what a save would refuse - one definition, not a JS copy
+	 * that can drift.
+	 */
+	public function test_the_id_columns_carry_the_sanitizers_rule_as_their_inline_pattern(): void {
+		$columns = array();
+		foreach ( ( new AdminSchema() )->fields()[0]->columns as $column ) {
+			$columns[ $column['key'] ] = $column;
+		}
+
+		$this->assertSame( '^' . DestinationRows::PROPERTY_PATTERN_BODY . '$', $columns[ DestinationRows::COLUMN_PROPERTY ]['pattern'] );
+		$this->assertSame( '^' . DestinationRows::MEASUREMENT_PATTERN_BODY . '$', $columns[ DestinationRows::COLUMN_MEASUREMENT ]['pattern'] );
+
+		// And the message an invalid cell shows is written, not the generic
+		// client-side fallback.
+		$this->assertNotSame( '', $columns[ DestinationRows::COLUMN_PROPERTY ]['invalid_message'] );
+		$this->assertNotSame( '', $columns[ DestinationRows::COLUMN_MEASUREMENT ]['invalid_message'] );
+	}
+
+	/**
 	 * The literal, not the constant, on purpose: the React panel registry in
 	 * js/admin/components/panels/index.js keys on this exact string with its
 	 * own literal, so a renamed PANEL constant would leave both suites green
