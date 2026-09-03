@@ -28,6 +28,31 @@ structural risks follow from that job and never go away:
 
 Every judgment below exists to rate those two.
 
+### The stored credential (since 2026-09-03)
+
+The google-auth module added a third asset unlike the first two: a **Google
+service-account private key**, stored encrypted (AES-256-GCM, key HKDF-derived from
+the wp-config salts, account id as AAD) in its own non-autoloaded option row
+(`GTM4WP\Google\KeyVault`). Its compromise pivots **off-site** — whatever Google
+products the account was granted — which no A-ladder rung and neither D-actor
+expresses. Rate findings against it like this:
+
+- **The custody invariant is the finding shape to watch:** the key is write-only —
+  nothing but `KeyVault::open()` (called at signing time) may return key material,
+  and no serialized payload (settings GET/export, React bootstrap, REST listing, a
+  log, an error message) may carry the PEM, the ciphertext, or the sealed blob.
+  Any new path that breaks that is rated by the lowest actor who can read the
+  payload, and reaching **A0–A3 is at least High** even though the value is "just"
+  ciphertext to most of them.
+- **The encryption's honest boundary:** a database-only leak (SQLi, a stray backup)
+  yields ciphertext; an attacker with the database **and** the files (wp-config
+  salts) gets the key — that boundary is by design and documented to the admin, so
+  "DB+files defeats it" is not a finding. **Caveat:** on sites where `wp_salt()`
+  falls back to DB-*stored* salts, the DB-only protection is void; guidance leaning
+  on the boundary must carry that caveat.
+- **A4 uploading/deleting/testing their own key is A4 → A4** — not a vulnerability,
+  same as the container-ID rule.
+
 ---
 
 ## Actors
@@ -132,8 +157,10 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 - **Site-operator misconfiguration** — a wrong GTM container ID, a GTM tag doing
   something unsafe with a correctly-pushed dataLayer value. Escaping what a GTM tag
   writes to the DOM is the tag's job (PA-9).
-- **Secrets on disk / in the repo** as a review category — the plugin stores no
-  credentials; a committed secret is a separate process concern.
+- **Secrets committed to the repo** as a review category — a committed secret is a
+  separate process concern. (This bullet used to say "the plugin stores no
+  credentials"; that premise expired 2026-09-03 — see **The stored credential**
+  above. Secrets the plugin *stores at runtime* are firmly in scope.)
 - **Rate limiting** as a general expectation on public routes.
 
 ---
@@ -143,4 +170,5 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | Date | Action |
 |---|---|
 | 2026-07-17 | Seeded. Actor ladder A0–A4, the lowest-actor severity rule (+ multisite `unfiltered_html` caveat), the two new-surface questions, and the in/out-of-scope list. Codifies the calls previously re-derived ad hoc per review (#30 `wontfix`, #32 Low, #31 exposure, Review 5's "DoS-bounded"). |
+| 2026-09-03 | Added **The stored credential** (R30, #230): the google-auth module made the old out-of-scope line "the plugin stores no credentials" false, and the off-site pivot a compromised service-account key enables had no rating vocabulary. Custody invariant, the encryption's honest boundary (with the DB-stored-salts caveat), and the A4→A4 rule for the key's own management routes. |
 | 2026-07-29 | Added the **development-time actors D0/D1** and brought the repository's own toolchain into scope (PA-14). A0–A4 rate risk to a *site*; they have no way to express third-party text or branch content causing code to run on the *maintainer's machine*, so findings #76/#77 had no severity vocabulary and, before that, no lens that would prompt for them. Same lowest-actor rule: D0 → D1 is the finding, rated on what the execution reaches, with enforced boundaries distinguished from described ones. |
