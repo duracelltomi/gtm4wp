@@ -23,6 +23,12 @@ use GTM4WP\Tests\unit\TestCase;
  * parse" - because they carry different admin guidance. A PHP warning during
  * parsing is promoted to a failure: the parser silences OpenSSL on purpose and
  * must stay silent on hostile input that reaches a REST response buffer.
+ *
+ * NOTE (untestable branch): the no-OpenSSL bail cannot be exercised
+ * in-process - function_exists() on a loaded extension cannot be made false
+ * and patchwork.json redefines no openssl internals (the TS-16
+ * documented-limitation class; KeyVaultTest carries the same note for
+ * seal()/unseal()). The leg fails closed to a WP_Error by reading the source.
  */
 final class ServiceAccountKeyTest extends TestCase {
 
@@ -93,6 +99,17 @@ final class ServiceAccountKeyTest extends TestCase {
 
 	public function test_a_missing_key_id_is_accepted_as_empty(): void {
 		$key = ServiceAccountKey::from_json( KeyFileFixture::key_file( array( 'private_key_id' => null ) ) );
+
+		$this->assertInstanceOf( ServiceAccountKey::class, $key );
+		$this->assertSame( '', $key->private_key_id );
+	}
+
+	public function test_a_non_string_key_id_is_accepted_as_empty(): void {
+		// Deliberate asymmetry with the required fields, where a non-string
+		// rejects: the key id is optional metadata (it only feeds the JWT kid
+		// header), so a malformed one degrades to "absent" instead of failing
+		// the whole upload.
+		$key = ServiceAccountKey::from_json( KeyFileFixture::key_file( array( 'private_key_id' => array( 'x' ) ) ) );
 
 		$this->assertInstanceOf( ServiceAccountKey::class, $key );
 		$this->assertSame( '', $key->private_key_id );

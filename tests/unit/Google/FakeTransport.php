@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Google;
 
 use GTM4WP\Google\Transport;
+use GTM4WP\Google\WpTransport;
 
 /**
  * Records every request and answers from a queue of canned responses.
@@ -16,6 +17,13 @@ use GTM4WP\Google\Transport;
  * can pin the request shape the way the token endpoint expects it. A stand-in
  * that swallowed those arguments would keep the suite green while the wire
  * format drifted (UC-3).
+ *
+ * It is also no more permissive than the real transport (TS-13): a URL the
+ * real WpTransport would refuse throws here instead of being answered, so a
+ * caller with a dynamic URL cannot pass over the fake what production would
+ * refuse. The check is the real WpTransport::is_allowed_url() - one
+ * definition - which reads wp_parse_url(), so a test whose flow reaches the
+ * fake must stub that in its own setUp (TS-16).
  */
 final class FakeTransport implements Transport {
 
@@ -92,9 +100,15 @@ final class FakeTransport implements Transport {
 	 * @param array|null $body    JSON body.
 	 * @param array      $headers Headers.
 	 * @return array|\WP_Error
-	 * @throws \LogicException When the test queued no response for this request.
+	 * @throws \LogicException When the test queued no response for this request,
+	 *                         or the real transport would have refused the URL.
 	 */
 	private function record( string $method, string $url, ?array $fields, ?array $body, array $headers ) {
+		if ( ! WpTransport::is_allowed_url( $url ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception reported by PHPUnit.
+			throw new \LogicException( 'FakeTransport received a URL the real transport would refuse: ' . $method . ' ' . $url );
+		}
+
 		$this->requests[] = array(
 			'method'  => $method,
 			'url'     => $url,

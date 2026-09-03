@@ -131,7 +131,13 @@ final class GoogleAuthCustodyTest extends TestCase {
 	public function test_the_react_bootstrap_does_not_carry_the_key(): void {
 		list( $page ) = $this->make_settings_stack();
 
-		$flat = (string) json_encode( $page->bootstrap_data(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$data = $page->bootstrap_data();
+		$flat = (string) json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+
+		// Positive anchor first: an empty payload would pass the absence
+		// assertions vacuously.
+		$this->assertArrayHasKey( 'modules', $data );
+		$this->assertNotEmpty( $data['modules'] );
 
 		$this->assert_key_absent_from( $flat, 'React bootstrap' );
 	}

@@ -17,6 +17,7 @@ use GTM4WP\Modules\Amp\AmpModule;
 use GTM4WP\Modules\ClientDeviceData\ClientDeviceDataModule;
 use GTM4WP\Modules\ConsentMode\ConsentModeModule;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
+use GTM4WP\Modules\GoogleAuth\GoogleAuthModule;
 use GTM4WP\Modules\MediaEvents\MediaEventsModule;
 use GTM4WP\Modules\UserEvents\UserEventsModule;
 use GTM4WP\Modules\VisitorData\VisitorDataModule;
@@ -122,6 +123,21 @@ final class ModuleHooksTest extends TestCase {
 		$disabled = $this->boot( new AmpModule() );
 		$this->assertFalse( has_filter( 'amp_analytics_entries', array( $disabled, 'add_amp_analytics_entries' ) ) );
 		$this->assertFalse( has_filter( ContainerCode::FILTER_AMP_RUNNING, array( $disabled, 'is_amp_request' ) ) );
+	}
+
+	/**
+	 * The google-auth module is admin-only by design ("Nothing here runs on a
+	 * frontend pageview" - its class doc): a frontend boot must register not
+	 * one hook. Pinned as an absence because a future edit that quietly adds
+	 * frontend work to the credentials module should have to change a test.
+	 */
+	public function test_google_auth_registers_nothing_on_the_frontend(): void {
+		Functions\expect( 'add_action' )->never();
+		Functions\expect( 'add_filter' )->never();
+
+		$this->boot( new GoogleAuthModule() );
+
+		$this->addToAssertionCount( 1 );
 	}
 
 	public function test_client_device_data_enqueues_when_any_signal_enabled(): void {

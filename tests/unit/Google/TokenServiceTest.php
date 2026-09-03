@@ -58,6 +58,8 @@ final class TokenServiceTest extends TestCase {
 		parent::setUp();
 
 		Functions\stubTranslationFunctions();
+		// FakeTransport enforces the real allow-list via WpTransport::is_allowed_url().
+		Functions\when( 'wp_parse_url' )->alias( static fn ( $url, $component = -1 ) => parse_url( $url, $component ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- the stand-in for wp_parse_url().
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) $value ) );
 		Functions\when( 'wp_json_encode' )->alias(
 			static function ( $data, $options = 0, $depth = 512 ) {
@@ -86,7 +88,7 @@ final class TokenServiceTest extends TestCase {
 
 		$this->stub_option_store();
 
-		$this->vault     = new KeyVault( self::SECRET );
+		$this->vault     = new KeyVault( self::SECRET, static fn () => self::NOW );
 		$this->transport = new FakeTransport();
 
 		$key = ServiceAccountKey::from_json( KeyFileFixture::key_file() );
@@ -188,8 +190,6 @@ final class TokenServiceTest extends TestCase {
 	 * to one and not the other fails here rather than at the first real mint.
 	 */
 	public function test_the_token_endpoint_is_on_the_transport_allow_list(): void {
-		Functions\when( 'wp_parse_url' )->alias( static fn ( $url, $component = -1 ) => parse_url( $url, $component ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- the stand-in for wp_parse_url().
-
 		$this->assertTrue( WpTransport::is_allowed_url( TokenService::TOKEN_ENDPOINT ) );
 	}
 
@@ -262,7 +262,7 @@ final class TokenServiceTest extends TestCase {
 
 		$account = $this->vault->get( $this->account_id );
 		$this->assertSame( KeyVault::STATUS_OK, $account['status'] );
-		$this->assertEqualsWithDelta( time(), $account['last_checked'], 5 );
+		$this->assertSame( self::NOW, $account['last_checked'] );
 		$this->assertSame( '', $account['last_error'] );
 
 		$this->assertStringNotContainsString( 'ya29.secret-token', serialize( $this->options ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- flattening the option table to search it.
@@ -319,6 +319,18 @@ final class TokenServiceTest extends TestCase {
 			'token that is not a string'       => array( 200, array( 'access_token' => array( 'x' ) ), 'Google did not issue a token (HTTP 200).' ),
 			'HTTP 500, no JSON'                => array( 500, null, 'Google did not issue a token (HTTP 500).' ),
 			'HTTP 403 with a non-string error' => array( 403, array( 'error' => array( 'code' => 403 ) ), 'Google did not issue a token (HTTP 403).' ),
+			// A well-formed token in a non-200 body is still refused: this is
+			// the one row where ONLY the status check discriminates, so it pins
+			// the check the other rows cannot.
+			'HTTP 400 carrying a token'        => array(
+				400,
+				array(
+					'access_token' => 'ya29.should-not-be-accepted',
+					'expires_in'   => 3599,
+					'token_type'   => 'Bearer',
+				),
+				'Google did not issue a token (HTTP 400).',
+			),
 		);
 	}
 
@@ -353,6 +365,47 @@ final class TokenServiceTest extends TestCase {
 		$account = $this->vault->get( $this->account_id );
 		$this->assertSame( KeyVault::STATUS_ERROR, $account['status'] );
 		$this->assertSame( 'cURL error 28: Connection timed out', $account['last_error'] );
+	}
+
+	public function test_a_corrupt_cached_value_is_ignored_and_a_fresh_token_is_minted(): void {
+		$this->transport->will_respond( self::token_response( 'ya29.first' ) );
+		$service = $this->make_service();
+		$this->assertSame( 'ya29.first', $service->access_token( $this->account_id, self::SCOPE ) );
+
+		$name = array_key_first( $this->transients );
+		$this->assertIsString( $name );
+
+		// Both shapes the cache guard filters: an empty string and a non-string.
+		foreach ( array( '', array( 'not' => 'a token' ) ) as $corrupt ) {
+			$this->transients[ $name ][0] = $corrupt;
+			$this->transport->will_respond( self::token_response( 'ya29.reminted' ) );
+			$this->assertSame( 'ya29.reminted', $service->access_token( $this->account_id, self::SCOPE ) );
+		}
+
+		$this->assertCount( 3, $this->transport->requests, 'Each corrupt cached value forces a fresh mint.' );
+	}
+
+	/**
+	 * The openssl_sign() failure leg. The namespaced shadow intercepts the
+	 * unqualified call inside TokenService; once defined it lasts for the
+	 * whole process and would break every real-signing test after it (TS-16),
+	 * so this case runs isolated, like DefaultLanguageTest's.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_signing_failure_is_a_recorded_refusal_that_sends_nothing(): void {
+		Functions\when( 'GTM4WP\Google\openssl_sign' )->justReturn( false );
+
+		$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_token_sign_failed', $result->get_error_code() );
+		$this->assertSame( array(), $this->transport->requests, 'Nothing leaves the site when signing fails.' );
+		$this->assertSame( array(), $this->transients, 'A failure is never cached.' );
+
+		$account = $this->vault->get( $this->account_id );
+		$this->assertSame( KeyVault::STATUS_ERROR, $account['status'] );
+		$this->assertSame( 'The request to Google could not be signed with the stored key.', $account['last_error'] );
 	}
 
 	/**

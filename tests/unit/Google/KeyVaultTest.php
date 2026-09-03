@@ -32,12 +32,24 @@ use GTM4WP\Tests\unit\TestCase;
  * A fixed secret is injected; wp_salt() is never reached in this suite, so
  * the derivation from the WordPress salts is a one-line property of
  * storage_key() covered by reading the source, not by a test (BE-3).
+ *
+ * NOTE (untestable branches): the no-OpenSSL bail in seal()/unseal() and the
+ * openssl_encrypt()-returns-false leg cannot be exercised in-process -
+ * patchwork.json redefines no openssl internals, and function_exists() on a
+ * loaded extension cannot be made false (the TS-16 documented-limitation
+ * class; same note in ServiceAccountKeyTest for its no-OpenSSL bail). Both
+ * legs fail closed to a WP_Error by reading the source.
  */
 final class KeyVaultTest extends TestCase {
 
 	use OptionStoreTrait;
 
 	private const SECRET = 'unit-test-site-secret-do-not-reuse';
+
+	/**
+	 * The fixed clock every vault under test runs on.
+	 */
+	private const NOW = 1_800_000_000;
 
 	/**
 	 * Names passed to delete_transient() - the vault purges cached tokens on
@@ -72,13 +84,14 @@ final class KeyVaultTest extends TestCase {
 	}
 
 	/**
-	 * A vault over the in-memory store with the fixed secret.
+	 * A vault over the in-memory store with the fixed secret and a fixed
+	 * clock, so stored timestamps are exact-assertable.
 	 *
 	 * @param string $secret Input keying material.
 	 * @return KeyVault
 	 */
 	private function make_vault( string $secret = self::SECRET ): KeyVault {
-		return new KeyVault( $secret );
+		return new KeyVault( $secret, static fn () => self::NOW );
 	}
 
 	/**
@@ -220,7 +233,7 @@ final class KeyVaultTest extends TestCase {
 
 		$this->assertSame( $id, $listed[0]['id'] );
 		$this->assertSame( KeyVault::STATUS_UNVERIFIED, $listed[0]['status'] );
-		$this->assertEqualsWithDelta( time(), $listed[0]['uploaded_at'], 5 );
+		$this->assertSame( self::NOW, $listed[0]['uploaded_at'] );
 
 		// Neither the PEM nor the ciphertext of it: a blob an admin can copy out
 		// is a blob that ends up in a support thread.
@@ -419,6 +432,18 @@ final class KeyVaultTest extends TestCase {
 		}
 	}
 
+	public function test_a_scope_minted_twice_is_remembered_once_and_purged_once(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+
+		$vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a' );
+		$vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a' );
+
+		$this->assertTrue( $vault->delete( $id ) );
+
+		$this->assertCount( 1, $this->deleted_transients, 'The scope list is deduplicated, so one purge.' );
+	}
+
 	public function test_delete_of_a_never_minted_account_purges_nothing(): void {
 		$vault = $this->make_vault();
 		$id    = $this->add_fixture( $vault );
@@ -485,7 +510,7 @@ final class KeyVaultTest extends TestCase {
 
 		$account = $vault->get( $id );
 		$this->assertSame( KeyVault::STATUS_ERROR, $account['status'] );
-		$this->assertEqualsWithDelta( time(), $account['last_checked'], 5 );
+		$this->assertSame( self::NOW, $account['last_checked'] );
 		$this->assertStringStartsWith( 'invalid_grant: Invalid JWT signature. ', $account['last_error'], 'Tags and line breaks are stripped before storage.' );
 		$this->assertSame( 200, mb_strlen( $account['last_error'] ), 'The stored error is capped.' );
 

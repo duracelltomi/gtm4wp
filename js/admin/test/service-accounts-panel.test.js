@@ -101,7 +101,11 @@ function chooseFile( payload, size = payload.length ) {
 }
 
 beforeEach( () => {
-	apiFetch.mockReset();
+	// mockClear, not mockReset: reset would erase the stand-in's default
+	// "unconfigured call rejects loudly" implementation for the rest of the
+	// file (see the test-support header), silently downgrading every
+	// unexpected call to a resolved undefined.
+	apiFetch.mockClear();
 } );
 
 describe( 'ServiceAccountsPanel listing', () => {
@@ -145,6 +149,23 @@ describe( 'ServiceAccountsPanel listing', () => {
 		expect(
 			screen.getByText( 'Key unreadable, upload the key file again' )
 		).toBeInTheDocument();
+	} );
+
+	it( 'shows an unknown server status verbatim instead of hiding it', async () => {
+		// The statusText() doc block declares this forward-compat behavior: a
+		// status this map has not learned yet must stay visible.
+		await renderLoaded( [ { ...PRODUCTION, status: 'quota-exceeded' } ] );
+
+		expect( screen.getByText( 'quota-exceeded' ) ).toBeInTheDocument();
+	} );
+
+	it( 'renders a dash for a never-set date and a missing key id', async () => {
+		await renderLoaded( [
+			{ ...PRODUCTION, uploaded_at: 0, private_key_id: '' },
+		] );
+
+		const row = screen.getAllByRole( 'row' )[ 1 ];
+		expect( row.textContent.match( /—/g ) ).toHaveLength( 2 );
 	} );
 
 	it( 'reports a failed load instead of spinning forever', async () => {
@@ -234,6 +255,20 @@ describe( 'ServiceAccountsPanel upload', () => {
 		expect( document.body.innerHTML ).not.toContain( 'private_key' );
 	} );
 
+	it( 'confirms an upload even when the response carries no account', async () => {
+		await renderLoaded( [] );
+		apiFetch.mockResolvedValueOnce( { accounts: [ PRODUCTION ] } );
+
+		chooseFile( KEY_FILE );
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'Service account added. Use Test to check that it can reach Google.'
+			)
+		);
+		expect( screen.getAllByRole( 'row' ).slice( 1 ) ).toHaveLength( 1 );
+	} );
+
 	it( 'refuses a file over the server cap before it is read or sent', async () => {
 		await renderLoaded( [] );
 
@@ -294,6 +329,29 @@ describe( 'ServiceAccountsPanel upload', () => {
 		);
 	} );
 
+	it( 'reports an unreadable file without sending anything', async () => {
+		await renderLoaded( [] );
+
+		const input = document.querySelector( 'input[type="file"]' );
+		const file = new File( [ KEY_FILE ], 'project-key.json', {
+			type: 'application/json',
+		} );
+		file.text = () => Promise.reject( new Error( '' ) );
+		Object.defineProperty( input, 'files', {
+			value: [ file ],
+			writable: true,
+		} );
+		fireEvent.change( input );
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'The key file could not be uploaded.'
+			)
+		);
+		// A read failure must never post a partial body.
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+	} );
+
 	it( 'does nothing when the file dialog is dismissed without a selection', async () => {
 		await renderLoaded( [] );
 
@@ -316,8 +374,8 @@ describe( 'ServiceAccountsPanel upload', () => {
 } );
 
 describe( 'ServiceAccountsPanel test action', () => {
-	it( 'posts to the account test route and adopts the returned account', async () => {
-		await renderLoaded( [ PRODUCTION ] );
+	it( 'posts to the account test route and adopts the returned account into its row only', async () => {
+		await renderLoaded( [ PRODUCTION, STAGING ] );
 		apiFetch.mockResolvedValueOnce( {
 			ok: true,
 			message: 'Google accepted the key.',
@@ -341,7 +399,65 @@ describe( 'ServiceAccountsPanel test action', () => {
 			'data-status',
 			'success'
 		);
-		expect( screen.getByText( 'Working' ) ).toBeInTheDocument();
+		// Only the tested row adopts the response; an implementation mapping
+		// every row onto response.account would show 'Working' twice.
+		expect( screen.getAllByText( 'Working' ) ).toHaveLength( 1 );
+		expect( screen.getByText( 'Not tested yet' ) ).toBeInTheDocument();
+		expect( screen.getByText( STAGING.client_email ) ).toBeInTheDocument();
+	} );
+
+	it( 'keeps the list as it was when the response carries no account', async () => {
+		await renderLoaded( [ PRODUCTION ] );
+		apiFetch.mockResolvedValueOnce( {
+			ok: true,
+			message: 'Google accepted the key.',
+		} );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		);
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'Google accepted the key.'
+			)
+		);
+		expect( screen.getByText( 'Not tested yet' ) ).toBeInTheDocument();
+	} );
+
+	it( 'ignores further actions while a request is in flight', async () => {
+		await renderLoaded( [ PRODUCTION, STAGING ] );
+
+		let finishTest;
+		apiFetch.mockImplementationOnce(
+			() =>
+				new Promise( ( resolve ) => {
+					finishTest = resolve;
+				} )
+		);
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		);
+		// In flight: a second Test must not open a second request - the
+		// handlers re-check isBusy because the rendered disabled prop cannot
+		// be trusted across the supported WP range (TC-15).
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Staging' } )
+		);
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 2 );
+
+		finishTest( {
+			ok: true,
+			message: 'Google accepted the key.',
+			account: { ...PRODUCTION, status: 'ok' },
+		} );
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'Google accepted the key.'
+			)
+		);
 	} );
 
 	it( 'shows a refusal as an error and the account as failed', async () => {

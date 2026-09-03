@@ -99,13 +99,33 @@ final class KeyVault {
 	private ?string $secret;
 
 	/**
+	 * Returns the current Unix time. Injectable so tests can pin the stored
+	 * uploaded_at / last_checked values exactly; mirrors TokenService's seam.
+	 *
+	 * @var callable|null
+	 */
+	private $clock;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param string|null $secret Input keying material; null derives it from the
-	 *                            wp-config.php salts. Injected by tests only.
+	 * @param string|null   $secret Input keying material; null derives it from the
+	 *                              wp-config.php salts. Injected by tests only.
+	 * @param callable|null $clock  Returns the current Unix time; null uses time().
+	 *                              Injected by tests.
 	 */
-	public function __construct( ?string $secret = null ) {
+	public function __construct( ?string $secret = null, $clock = null ) {
 		$this->secret = $secret;
+		$this->clock  = $clock;
+	}
+
+	/**
+	 * The current Unix time through the injectable clock.
+	 *
+	 * @return int
+	 */
+	private function now(): int {
+		return is_callable( $this->clock ) ? (int) call_user_func( $this->clock ) : time();
 	}
 
 	/**
@@ -131,7 +151,7 @@ final class KeyVault {
 			'client_email'   => $key->client_email,
 			'private_key_id' => $key->private_key_id,
 			'token_uri'      => $key->token_uri,
-			'uploaded_at'    => time(),
+			'uploaded_at'    => $this->now(),
 			'status'         => self::STATUS_UNVERIFIED,
 			'last_checked'   => 0,
 			'last_error'     => '',
@@ -331,7 +351,7 @@ final class KeyVault {
 		}
 
 		$accounts[ $id ]['status']       = $ok ? self::STATUS_OK : self::STATUS_ERROR;
-		$accounts[ $id ]['last_checked'] = time();
+		$accounts[ $id ]['last_checked'] = $this->now();
 		$accounts[ $id ]['last_error']   = $ok
 			? ''
 			: mb_substr( sanitize_text_field( $message ), 0, self::ERROR_MAX_LENGTH );

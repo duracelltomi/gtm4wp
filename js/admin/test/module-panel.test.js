@@ -463,7 +463,10 @@ describe( 'ModulePanel custom panels', () => {
 	};
 
 	beforeEach( () => {
-		apiFetch.mockReset();
+		// mockClear, not mockReset: reset would erase the stand-in's default
+		// "unconfigured call rejects loudly" implementation for the rest of
+		// the file (see the test-support header).
+		apiFetch.mockClear();
 	} );
 
 	it( 'renders the registered panel in place of the fields, fed with the module panel data', async () => {
@@ -500,6 +503,20 @@ describe( 'ModulePanel custom panels', () => {
 	it( 'falls back to the fields when the module names a panel this bundle does not know', () => {
 		renderPanel( {
 			panel: 'from-a-newer-plugin',
+			panelData: {},
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [ field( 'a', 'g', 'Field A' ) ],
+		} );
+
+		expect( screen.getByLabelText( 'Field A' ) ).toBeInTheDocument();
+		expect( apiFetch ).not.toHaveBeenCalled();
+	} );
+
+	it( 'falls back to the fields for a prototype-key panel name instead of rendering Object', () => {
+		// The hasOwnProperty guard in panelComponent(): a bare panels[ name ]
+		// lookup would resolve 'constructor' to Object and crash the render.
+		renderPanel( {
+			panel: 'constructor',
 			panelData: {},
 			groups: [ { id: 'g', label: 'General' } ],
 			fields: [ field( 'a', 'g', 'Field A' ) ],

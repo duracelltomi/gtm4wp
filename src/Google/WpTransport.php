@@ -104,8 +104,9 @@ final class WpTransport implements Transport {
 	}
 
 	/**
-	 * Whether a URL is one the transport will send to: https and an
-	 * allow-listed host.
+	 * Whether a URL is one the transport will send to: https, an allow-listed
+	 * host, and no explicit port (the fixed Google endpoints are all on 443,
+	 * so a port suffix is never a URL our own callers construct).
 	 *
 	 * @param string $url Absolute URL.
 	 * @return bool
@@ -115,6 +116,7 @@ final class WpTransport implements Transport {
 
 		return is_array( $parts )
 			&& ( 'https' === ( $parts['scheme'] ?? '' ) )
+			&& ! isset( $parts['port'] )
 			&& in_array( $parts['host'] ?? '', self::ALLOWED_HOSTS, true );
 	}
 

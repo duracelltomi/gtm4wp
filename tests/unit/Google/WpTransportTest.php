@@ -12,11 +12,12 @@ use GTM4WP\Google\WpTransport;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
- * WpTransport is the SSRF guard of the Google integration: whatever a caller
- * asks for, only https requests to the allow-listed Google hosts leave the
- * site. The deny direction is asserted BEFORE the HTTP function is reached -
- * wp_remote_post() is set to fail the test if called - so a refused URL is
- * refused by the seam, not by a mocked network (TS-12).
+ * WpTransport is the SSRF egress guard of the Google integration: whatever a
+ * caller asks for, only https requests to the allow-listed Google hosts leave
+ * the site. The deny direction is asserted BEFORE the HTTP function is
+ * reached - every wp_remote_get()/wp_remote_post() call is recorded and the
+ * deny tests assert the record stayed empty - so a refused URL is refused by
+ * the seam, not by a mocked network.
  *
  * The request arguments are pinned exactly: a redirect that is followed, a
  * missing timeout or a dropped Content-Type are silent regressions.
@@ -122,18 +123,31 @@ final class WpTransportTest extends TestCase {
 	 */
 	public static function refused_urls(): array {
 		return array(
-			'another host'                => array( 'https://example.com/token' ),
-			'http, not https'             => array( 'http://oauth2.googleapis.com/token' ),
-			'allowed host as a subdomain' => array( 'https://oauth2.googleapis.com.evil.example/token' ),
-			'allowed host as a prefix'    => array( 'https://oauth2.googleapis.com-evil.example/token' ),
-			'allowed host in userinfo'    => array( 'https://oauth2.googleapis.com@evil.example/token' ),
-			'allowed host in the path'    => array( 'https://evil.example/oauth2.googleapis.com/token' ),
-			'a sibling google host'       => array( 'https://www.googleapis.com/oauth2/v4/token' ),
-			'the bare host'               => array( 'https://googleapis.com/token' ),
-			'loopback'                    => array( 'https://127.0.0.1/token' ),
-			'a relative path'             => array( '/token' ),
-			'garbage'                     => array( 'not a url' ),
-			'empty'                       => array( '' ),
+			'another host'                     => array( 'https://example.com/token' ),
+			'http, not https'                  => array( 'http://oauth2.googleapis.com/token' ),
+			'allowed host as a subdomain'      => array( 'https://oauth2.googleapis.com.evil.example/token' ),
+			'allowed host as a prefix'         => array( 'https://oauth2.googleapis.com-evil.example/token' ),
+			'allowed host in userinfo'         => array( 'https://oauth2.googleapis.com@evil.example/token' ),
+			'allowed host in the path'         => array( 'https://evil.example/oauth2.googleapis.com/token' ),
+			'a sibling google host'            => array( 'https://www.googleapis.com/oauth2/v4/token' ),
+			'the bare host'                    => array( 'https://googleapis.com/token' ),
+			'loopback'                         => array( 'https://127.0.0.1/token' ),
+			'a relative path'                  => array( '/token' ),
+			'garbage'                          => array( 'not a url' ),
+			'empty'                            => array( '' ),
+			// The allowed host as the SUFFIX of a longer first label: no other row
+			// ends with the allowed host string, so this is the one shape that
+			// discriminates a str_ends_with()-style regression of the exact match.
+			'allowed host as a label suffix'   => array( 'https://evil-oauth2.googleapis.com/token' ),
+			// An explicit port is refused even on an allowed host: the fixed
+			// endpoints are all on 443, and a port suffix is exactly the kind of
+			// URL variation nothing on our side ever constructs.
+			'explicit port on an allowed host' => array( 'https://oauth2.googleapis.com:8443/token' ),
+			// Scheme and host comparison is case-sensitive and therefore
+			// fail-closed on case variants; pinned so a future "normalize before
+			// compare" rewrite has to bring these rows along consciously.
+			'uppercase scheme'                 => array( 'HTTPS://oauth2.googleapis.com/token' ),
+			'uppercase host'                   => array( 'https://OAUTH2.GOOGLEAPIS.COM/token' ),
 		);
 	}
 
@@ -196,7 +210,7 @@ final class WpTransportTest extends TestCase {
 		$this->assertSame(
 			array(
 				'method'      => 'POST',
-				'timeout'     => WpTransport::TIMEOUT,
+				'timeout'     => 15,
 				'redirection' => 0,
 				'headers'     => array(
 					'Accept'       => 'application/json',
@@ -268,6 +282,17 @@ final class WpTransportTest extends TestCase {
 		$this->http_response = self::http_ok( '"just a string"', 200 );
 
 		$this->assertNull( ( new WpTransport() )->get( 'https://datamanager.googleapis.com/v1/x' )['body'] );
+	}
+
+	public function test_a_body_nested_deeper_than_the_decoder_bound_decodes_to_null(): void {
+		// 20 levels of nesting: over the JSON_MAX_DEPTH of 16, so json_decode()
+		// bails and the caller sees null rather than a partially decoded body.
+		$this->http_response = self::http_ok( str_repeat( '[', 20 ) . str_repeat( ']', 20 ), 200 );
+
+		$result = ( new WpTransport() )->get( 'https://datamanager.googleapis.com/v1/x' );
+
+		$this->assertSame( 200, $result['status'] );
+		$this->assertNull( $result['body'], 'An over-deep body fails closed to null, like a non-JSON one.' );
 	}
 
 	public function test_a_wp_error_from_the_http_api_is_passed_through(): void {

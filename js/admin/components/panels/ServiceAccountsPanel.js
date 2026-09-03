@@ -113,7 +113,11 @@ export default function ServiceAccountsPanel( { data } ) {
 		// Reset the input so choosing the same file again still fires change.
 		event.target.value = '';
 
-		if ( ! file ) {
+		// The disabled={isBusy} prop reaches the controls through the component
+		// library's pass-through and cannot be trusted across the supported WP
+		// range, so every mutation handler re-checks - the TableControl
+		// isCellLocked() pattern. One request at a time.
+		if ( ! file || isBusy ) {
 			return;
 		}
 
@@ -171,6 +175,11 @@ export default function ServiceAccountsPanel( { data } ) {
 	};
 
 	const onTest = async ( account ) => {
+		// Handler-level twin of disabled={isBusy} - see onFileChange.
+		if ( isBusy ) {
+			return;
+		}
+
 		setIsBusy( true );
 		setNotice( null );
 
@@ -211,6 +220,11 @@ export default function ServiceAccountsPanel( { data } ) {
 	};
 
 	const onDelete = async ( account ) => {
+		// Handler-level twin of disabled={isBusy} - see onFileChange.
+		if ( isBusy ) {
+			return;
+		}
+
 		setIsBusy( true );
 		setNotice( null );
 		setPendingDeleteId( null );

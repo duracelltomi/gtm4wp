@@ -208,6 +208,10 @@ final class AdminCapabilityFilterTest extends TestCase {
 		$this->boot_admin_request();
 
 		$this->assertTrue( $this->admin_path_loaded(), 'An administrator loads the admin code path.' );
+		$this->assertNotFalse(
+			has_action( 'admin_notices', 'GTM4WP\Modules\GoogleAuth\KeyNotice->show_notice()' ),
+			'Admin::boot() attaches the unreadable-key notice; its own tests drive a hand-built instance, so only this boot asserts the attachment (TS-15).'
+		);
 	}
 
 	public function test_admin_boot_loads_for_a_user_holding_the_filtered_capability(): void {
@@ -247,6 +251,7 @@ final class AdminCapabilityFilterTest extends TestCase {
 			'Without the capability no admin hook is registered at all - the settings page, the notices and the AJAX dismiss handler are all absent.'
 		);
 		$this->assertFalse( has_action( 'wp_ajax_gtm4wp_dismiss_notice' ), 'The AJAX dismiss handler is not even wired up.' );
+		$this->assertFalse( has_action( 'admin_notices' ), 'The unreadable-key notice is gated with the rest of the admin path.' );
 	}
 
 	public function test_admin_boot_never_registers_the_frontend_path(): void {

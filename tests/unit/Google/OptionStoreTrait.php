@@ -15,9 +15,12 @@ use Brain\Monkey\Functions;
  * autoload argument - the vault's "never autoload the key row" property is
  * only observable through that argument.
  *
- * As in WordPress, add_option() refuses an existing key and update_option()
- * creates a missing one; a stand-in more permissive than the real functions
- * would hide the vault's create-vs-update distinction (UC-3).
+ * As in WordPress, add_option() refuses an existing key, update_option()
+ * creates a missing one, and update_option() returns false when the new value
+ * equals the stored one - a stand-in more permissive than the real functions
+ * would hide the vault's create-vs-update distinction (UC-3) and would let a
+ * consumer that checks update_option()'s return be tested over behavior core
+ * does not have (TS-13).
  */
 trait OptionStoreTrait {
 
@@ -69,6 +72,10 @@ trait OptionStoreTrait {
 					'key'      => $key,
 					'autoload' => $autoload,
 				);
+				// Core returns false on an unchanged value (no query is run).
+				if ( array_key_exists( $key, $this->options ) && $this->options[ $key ] === $value ) {
+					return false;
+				}
 				$this->options[ $key ] = $value;
 				return true;
 			}

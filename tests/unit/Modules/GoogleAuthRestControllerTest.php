@@ -55,6 +55,8 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		parent::setUp();
 
 		Functions\stubTranslationFunctions();
+		// FakeTransport enforces the real allow-list via WpTransport::is_allowed_url().
+		Functions\when( 'wp_parse_url' )->alias( static fn ( $url, $component = -1 ) => parse_url( $url, $component ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- the stand-in for wp_parse_url().
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) );
 		Functions\when( 'wp_json_encode' )->alias(
 			static function ( $data, $options = 0, $depth = 512 ) {
@@ -280,6 +282,23 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$this->assertSame( $code, $response->get_error_code() );
 		$this->assertSame( array(), $this->option_writes, 'Nothing is written for a refused upload.' );
 		$this->assertStringNotContainsString( 'BEGIN', $response->get_error_message() );
+	}
+
+	/**
+	 * The vault half of #228 pins add() returning a WP_Error on a refused
+	 * write; this is the REST half - the handler must translate that error
+	 * into a 500 instead of answering 201 with a phantom account.
+	 */
+	public function test_upload_answers_500_when_the_store_refuses_the_write(): void {
+		Functions\when( 'add_option' )->justReturn( false );
+		Functions\when( 'update_option' )->justReturn( false );
+
+		$response = $this->make_controller()->upload_account( new \WP_REST_Request( array( 'key_file' => KeyFileFixture::key_file() ) ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 'gtm4wp_google_key_store_failed', $response->get_error_code() );
+		$this->assertSame( 500, $response->get_error_data()['status'] );
+		$this->assertSame( array(), $this->vault->all(), 'No phantom account exists after the refused write.' );
 	}
 
 	/**
