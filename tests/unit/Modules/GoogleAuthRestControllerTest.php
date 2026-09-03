@@ -19,7 +19,7 @@ use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
- * The four routes of the service-accounts panel. Three lenses:
+ * The five routes of the service-accounts panel. Three lenses:
  *
  * - Access control (TS-12/TC-13): every route is registered with can_manage()
  *   as its permission_callback, and can_manage() is proven in the grant, deny
@@ -188,6 +188,7 @@ final class GoogleAuthRestControllerTest extends TestCase {
 			array(
 				'GET ' . RestController::REST_ROUTE,
 				'POST ' . RestController::REST_ROUTE,
+				'POST, PUT, PATCH ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')',
 				'DELETE ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')',
 				'POST ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')/test',
 			),
@@ -198,6 +199,10 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$upload = $registered[0][2][1];
 		$this->assertTrue( $upload['args']['key_file']['required'] );
 		$this->assertSame( 'string', $upload['args']['key_file']['type'] );
+
+		$relabel = $registered[1][2][0];
+		$this->assertTrue( $relabel['args']['label']['required'] );
+		$this->assertSame( 'string', $relabel['args']['label']['type'] );
 	}
 
 	// ---- List --------------------------------------------------------------
@@ -319,6 +324,114 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$over = $this->make_controller()->upload_account( new \WP_REST_Request( array( 'key_file' => $one_over ) ) );
 		$this->assertInstanceOf( \WP_Error::class, $over );
 		$this->assertSame( 'gtm4wp_google_key_too_large', $over->get_error_code() );
+	}
+
+	// ---- Relabel -----------------------------------------------------------
+
+	public function test_relabel_changes_the_label_and_answers_the_listing(): void {
+		$id = $this->upload_fixture( 'Production' );
+
+		$response = $this->make_controller()->relabel_account(
+			new \WP_REST_Request(
+				array(
+					'id'    => $id,
+					'label' => 'Live site',
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $response );
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertSame( 'Live site', $data['account']['label'] );
+		$this->assertSame( array( $data['account'] ), $data['accounts'], 'The full listing rides along so the panel can re-render without a second request.' );
+		$this->assertSame( 'Live site', $this->vault->get( $id )['label'] );
+		$this->assert_no_secret_in( $data );
+	}
+
+	public function test_relabel_changes_nothing_but_the_label(): void {
+		$id     = $this->upload_fixture( 'Production' );
+		$before = $this->vault->get( $id );
+
+		$this->make_controller()->relabel_account(
+			new \WP_REST_Request(
+				array(
+					'id'    => $id,
+					'label' => 'Live site',
+				)
+			)
+		);
+
+		$after = $this->vault->get( $id );
+		unset( $before['label'], $after['label'] );
+		$this->assertSame( $before, $after, 'The id, key metadata, status and timestamps survive a relabel untouched.' );
+		$this->assertSame( array(), $this->deleted_transients, 'A relabel never drops a cached token - consumers reference the id, not the label.' );
+	}
+
+	public function test_relabel_sanitizes_a_hostile_label(): void {
+		$id = $this->upload_fixture();
+
+		$response = $this->make_controller()->relabel_account(
+			new \WP_REST_Request(
+				array(
+					'id'    => $id,
+					'label' => '  <script>alert(1)</script>Prod  ',
+				)
+			)
+		);
+
+		$label = $response->get_data()['account']['label'];
+		$this->assertStringNotContainsString( '<', $label );
+		$this->assertSame( 'alert(1)Prod', $label );
+	}
+
+	public function test_relabel_to_an_empty_label_falls_back_to_the_account_email(): void {
+		$id = $this->upload_fixture( 'Production' );
+
+		$response = $this->make_controller()->relabel_account(
+			new \WP_REST_Request(
+				array(
+					'id'    => $id,
+					'label' => '   ',
+				)
+			)
+		);
+
+		$this->assertSame( KeyFileFixture::CLIENT_EMAIL, $response->get_data()['account']['label'] );
+	}
+
+	public function test_relabel_treats_a_non_string_label_as_empty(): void {
+		$id = $this->upload_fixture( 'Production' );
+
+		$response = $this->make_controller()->relabel_account(
+			new \WP_REST_Request(
+				array(
+					'id'    => $id,
+					'label' => array( 'nested' => 'value' ),
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $response );
+		$this->assertSame( KeyFileFixture::CLIENT_EMAIL, $response->get_data()['account']['label'] );
+	}
+
+	public function test_relabel_of_an_unknown_account_is_404(): void {
+		$this->upload_fixture();
+
+		$response = $this->make_controller()->relabel_account(
+			new \WP_REST_Request(
+				array(
+					'id'    => 'sa_ffffffffffff',
+					'label' => 'Anything',
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 'gtm4wp_google_account_unknown', $response->get_error_code() );
+		$this->assertSame( 404, $response->get_error_data()['status'] );
 	}
 
 	// ---- Delete ------------------------------------------------------------

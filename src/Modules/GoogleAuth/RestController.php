@@ -22,6 +22,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * - GET    service-accounts           list (metadata and status only)
  * - POST   service-accounts           upload a key file
+ * - POST   service-accounts/<id>      change the label (PUT/PATCH accepted too)
  * - DELETE service-accounts/<id>      remove (refused while a consumer references it)
  * - POST   service-accounts/<id>/test mint a token now and report the outcome
  *
@@ -92,9 +93,24 @@ final class RestController {
 			RestCors::REST_NAMESPACE,
 			self::REST_ROUTE_ONE,
 			array(
-				'methods'             => 'DELETE',
-				'callback'            => array( $this, 'delete_account' ),
-				'permission_callback' => array( $this, 'can_manage' ),
+				array(
+					// POST alongside PUT/PATCH (core's EDITABLE set) because some
+					// hosts refuse the two verbs at the proxy; the panel sends POST.
+					'methods'             => 'POST, PUT, PATCH',
+					'callback'            => array( $this, 'relabel_account' ),
+					'permission_callback' => array( $this, 'can_manage' ),
+					'args'                => array(
+						'label' => array(
+							'type'     => 'string',
+							'required' => true,
+						),
+					),
+				),
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'delete_account' ),
+					'permission_callback' => array( $this, 'can_manage' ),
+				),
 			)
 		);
 
@@ -176,6 +192,32 @@ final class RestController {
 				'accounts' => $this->vault->all(),
 			),
 			201
+		);
+	}
+
+	/**
+	 * Relabel handler: changes an account's label, the one stored field that is
+	 * plain admin-chosen text. Everything else - the key, the e-mail, the id a
+	 * destination references - is immutable per upload.
+	 *
+	 * @param \WP_REST_Request $request The request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function relabel_account( \WP_REST_Request $request ) {
+		$id    = (string) $request->get_param( 'id' );
+		$label = $request->get_param( 'label' );
+
+		$account = $this->vault->relabel( $id, is_string( $label ) ? $label : '' );
+
+		if ( $account instanceof \WP_Error ) {
+			return new \WP_Error( $account->get_error_code(), $account->get_error_message(), array( 'status' => 404 ) );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'account'  => $account,
+				'accounts' => $this->vault->all(),
+			)
 		);
 	}
 

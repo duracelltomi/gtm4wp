@@ -617,6 +617,24 @@ $gtm4wp-mobile: 782px;
 			margin-bottom: var(--gtm4wp-s3);
 		}
 	}
+
+	&__upload-file {
+		align-items: center;
+		display: flex;
+		gap: var(--gtm4wp-s2);
+	}
+
+	&__upload-filename {
+		color: var(--gtm4wp-text-3);
+		font-size: var(--gtm4wp-fs-help);
+		word-break: break-all;
+	}
+
+	&__upload-actions {
+		display: flex;
+		gap: var(--gtm4wp-s2);
+		margin-top: var(--gtm4wp-s3);
+	}
 }
 
 // Data Manager destinations panel: the per-row test section below the table.

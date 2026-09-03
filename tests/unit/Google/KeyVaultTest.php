@@ -551,6 +551,56 @@ final class KeyVaultTest extends TestCase {
 		$this->assertSame( 'x' . str_repeat( 'é', KeyVault::LABEL_MAX_LENGTH - 1 ), $label, 'A multibyte character is never cut in half.' );
 	}
 
+	public function test_relabel_changes_the_label_and_nothing_else(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault, 'Production' );
+
+		$row_before = $this->stored_row( $id );
+		$result     = $vault->relabel( $id, 'Live site' );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'Live site', $result['label'], 'The refreshed public view answers the new label.' );
+		$this->assertSame( 'Live site', $vault->get( $id )['label'] );
+		$this->assertArrayNotHasKey( 'key', $result, 'The public view stays key-free on this path too.' );
+
+		$row_after = $this->stored_row( $id );
+		unset( $row_before['label'], $row_after['label'] );
+		$this->assertSame( $row_before, $row_after, 'The sealed key, status and timestamps are untouched - a relabel is never a re-seal.' );
+		$this->assertSame( array(), $this->deleted_transients, 'No cached token is dropped: consumers reference the id, not the label.' );
+	}
+
+	public function test_relabel_runs_the_new_label_through_the_same_cleaning_as_add(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault, 'Production' );
+
+		$vault->relabel( $id, '<script>x</script>' . str_repeat( 'é', 150 ) );
+
+		$label = $vault->get( $id )['label'];
+		$this->assertStringNotContainsString( '<', $label );
+		$this->assertSame( 'x' . str_repeat( 'é', KeyVault::LABEL_MAX_LENGTH - 1 ), $label );
+	}
+
+	public function test_relabel_to_an_empty_label_falls_back_to_the_account_email(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault, 'Production' );
+
+		$vault->relabel( $id, "  \n " );
+
+		$this->assertSame( KeyFileFixture::CLIENT_EMAIL, $vault->get( $id )['label'] );
+	}
+
+	public function test_relabel_of_an_unknown_id_is_an_error_and_writes_nothing(): void {
+		$vault = $this->make_vault();
+		$this->add_fixture( $vault );
+		$writes_before = count( $this->option_writes );
+
+		$result = $vault->relabel( 'sa_ffffffffffff', 'Anything' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_account_unknown', $result->get_error_code() );
+		$this->assertCount( $writes_before, $this->option_writes );
+	}
+
 	/**
 	 * Stand-in for what sanitize_text_field() does in core: strip tags,
 	 * collapse whitespace, trim. Enough for the label/last-error assertions.

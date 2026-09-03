@@ -1,11 +1,13 @@
 /**
  * Google service accounts panel: the custody UI of the google-auth module.
  *
- * Lists the stored accounts, uploads a key file, tests an account against
- * Google's token endpoint and deletes one. The key file is read here only to be
- * posted; the server parses and encrypts it and answers with the public view of
- * the account, which is all this panel ever renders. There is deliberately no
- * way to read a key back, so nothing here shows, stores or logs one.
+ * Lists the stored accounts, uploads a key file, renames an account, tests one
+ * against Google's token endpoint and deletes one. The key file is read here
+ * only to be posted; the server parses and encrypts it and answers with the
+ * public view of the account, which is all this panel ever renders. There is
+ * deliberately no way to read a key back, so nothing here shows, stores or
+ * logs one - and the label is the only stored field that can be edited, since
+ * everything else describes the immutable uploaded key.
  */
 
 import apiFetch from '@wordpress/api-fetch';
@@ -73,9 +75,12 @@ export default function ServiceAccountsPanel( { data } ) {
 	const fileInputRef = useRef( null );
 	const [ accounts, setAccounts ] = useState( null );
 	const [ label, setLabel ] = useState( '' );
+	const [ pendingFile, setPendingFile ] = useState( null );
 	const [ isBusy, setIsBusy ] = useState( false );
 	const [ notice, setNotice ] = useState( null );
 	const [ pendingDeleteId, setPendingDeleteId ] = useState( null );
+	const [ editingId, setEditingId ] = useState( null );
+	const [ editingLabel, setEditingLabel ] = useState( '' );
 
 	useEffect( () => {
 		let cancelled = false;
@@ -107,17 +112,15 @@ export default function ServiceAccountsPanel( { data } ) {
 		};
 	}, [ restPath ] );
 
-	const onFileChange = async ( event ) => {
+	// Selecting a file only keeps it for the Add button: nothing is sent yet,
+	// so the label stays editable in either order (file first or label first).
+	const onFileChange = ( event ) => {
 		const file = event.target.files && event.target.files[ 0 ];
 
 		// Reset the input so choosing the same file again still fires change.
 		event.target.value = '';
 
-		// The disabled={isBusy} prop reaches the controls through the component
-		// library's pass-through and cannot be trusted across the supported WP
-		// range, so every mutation handler re-checks - the TableControl
-		// isCellLocked() pattern. One request at a time.
-		if ( ! file || isBusy ) {
+		if ( ! file ) {
 			return;
 		}
 
@@ -134,11 +137,24 @@ export default function ServiceAccountsPanel( { data } ) {
 			return;
 		}
 
+		setPendingFile( file );
+		setNotice( null );
+	};
+
+	const onUpload = async () => {
+		// The disabled={isBusy} prop reaches the controls through the component
+		// library's pass-through and cannot be trusted across the supported WP
+		// range, so every mutation handler re-checks - the TableControl
+		// isCellLocked() pattern. One request at a time.
+		if ( ! pendingFile || isBusy ) {
+			return;
+		}
+
 		setIsBusy( true );
 		setNotice( null );
 
 		try {
-			const keyFile = await file.text();
+			const keyFile = await pendingFile.text();
 			const response = await apiFetch( {
 				path: restPath,
 				method: 'POST',
@@ -147,6 +163,7 @@ export default function ServiceAccountsPanel( { data } ) {
 
 			setAccounts( response.accounts || [] );
 			setLabel( '' );
+			setPendingFile( null );
 			setNotice( {
 				status: 'success',
 				text: sprintf(
@@ -165,6 +182,67 @@ export default function ServiceAccountsPanel( { data } ) {
 					error,
 					__(
 						'The key file could not be uploaded.',
+						'duracelltomi-google-tag-manager'
+					)
+				),
+			} );
+		} finally {
+			setIsBusy( false );
+		}
+	};
+
+	const onResetForm = () => {
+		if ( isBusy ) {
+			return;
+		}
+
+		setLabel( '' );
+		setPendingFile( null );
+	};
+
+	const onRenameStart = ( account ) => {
+		setEditingId( account.id );
+		setEditingLabel( account.label );
+		setPendingDeleteId( null );
+	};
+
+	const onRename = async ( account ) => {
+		// Handler-level twin of disabled={isBusy} - see onUpload.
+		if ( isBusy ) {
+			return;
+		}
+
+		setIsBusy( true );
+		setNotice( null );
+
+		try {
+			const response = await apiFetch( {
+				path: `${ restPath }/${ account.id }`,
+				method: 'POST',
+				data: { label: editingLabel },
+			} );
+
+			setAccounts( response.accounts || [] );
+			setEditingId( null );
+			setNotice( {
+				status: 'success',
+				text: sprintf(
+					/* translators: %s: new label of the service account. */
+					__(
+						'Service account renamed to %s.',
+						'duracelltomi-google-tag-manager'
+					),
+					response.account ? response.account.label : ''
+				),
+			} );
+		} catch ( error ) {
+			// The row stays in edit mode so the admin can correct and retry.
+			setNotice( {
+				status: 'error',
+				text: errorText(
+					error,
+					__(
+						'The service account could not be renamed.',
 						'duracelltomi-google-tag-manager'
 					)
 				),
@@ -282,6 +360,12 @@ export default function ServiceAccountsPanel( { data } ) {
 					accounts={ accounts }
 					isBusy={ isBusy }
 					pendingDeleteId={ pendingDeleteId }
+					editingId={ editingId }
+					editingLabel={ editingLabel }
+					onEditLabel={ setEditingLabel }
+					onRenameStart={ onRenameStart }
+					onRenameCancel={ () => setEditingId( null ) }
+					onRename={ onRename }
 					onTest={ onTest }
 					onDeleteRequest={ setPendingDeleteId }
 					onDelete={ onDelete }
@@ -317,19 +401,28 @@ export default function ServiceAccountsPanel( { data } ) {
 					disabled={ isBusy }
 					onChange={ setLabel }
 				/>
-				<Button
-					variant="secondary"
-					disabled={ isBusy }
-					isBusy={ isBusy }
-					onClick={ () =>
-						fileInputRef.current && fileInputRef.current.click()
-					}
-				>
-					{ __(
-						'Upload key file',
-						'duracelltomi-google-tag-manager'
-					) }
-				</Button>
+				<div className="gtm4wp-accounts__upload-file">
+					<Button
+						variant="secondary"
+						disabled={ isBusy }
+						onClick={ () =>
+							fileInputRef.current && fileInputRef.current.click()
+						}
+					>
+						{ __(
+							'Choose key file',
+							'duracelltomi-google-tag-manager'
+						) }
+					</Button>
+					<span className="gtm4wp-accounts__upload-filename">
+						{ pendingFile
+							? pendingFile.name
+							: __(
+									'No file selected yet.',
+									'duracelltomi-google-tag-manager'
+							  ) }
+					</span>
+				</div>
 				<input
 					ref={ fileInputRef }
 					type="file"
@@ -337,6 +430,26 @@ export default function ServiceAccountsPanel( { data } ) {
 					className="gtm4wp-app__file-input"
 					onChange={ onFileChange }
 				/>
+				<div className="gtm4wp-accounts__upload-actions">
+					<Button
+						variant="primary"
+						disabled={ isBusy || ! pendingFile }
+						isBusy={ isBusy }
+						onClick={ onUpload }
+					>
+						{ __(
+							'Add service account',
+							'duracelltomi-google-tag-manager'
+						) }
+					</Button>
+					<Button
+						variant="tertiary"
+						disabled={ isBusy || ( ! pendingFile && '' === label ) }
+						onClick={ onResetForm }
+					>
+						{ __( 'Reset', 'duracelltomi-google-tag-manager' ) }
+					</Button>
+				</div>
 			</div>
 		</div>
 	);
@@ -346,6 +459,12 @@ function AccountsTable( {
 	accounts,
 	isBusy,
 	pendingDeleteId,
+	editingId,
+	editingLabel,
+	onEditLabel,
+	onRenameStart,
+	onRenameCancel,
+	onRename,
 	onTest,
 	onDeleteRequest,
 	onDelete,
@@ -406,7 +525,28 @@ function AccountsTable( {
 				<tbody>
 					{ accounts.map( ( account ) => (
 						<tr key={ account.id }>
-							<td>{ account.label }</td>
+							<td>
+								{ editingId === account.id ? (
+									<TextControl
+										__next40pxDefaultSize
+										__nextHasNoMarginBottom
+										label={ sprintf(
+											/* translators: %s: e-mail of the service account. */
+											__(
+												'New label for %s',
+												'duracelltomi-google-tag-manager'
+											),
+											account.client_email
+										) }
+										hideLabelFromVision
+										value={ editingLabel }
+										disabled={ isBusy }
+										onChange={ onEditLabel }
+									/>
+								) : (
+									account.label
+								) }
+							</td>
 							<td>
 								<code>{ account.client_email }</code>
 							</td>
@@ -427,90 +567,145 @@ function AccountsTable( {
 								) }
 							</td>
 							<td className="gtm4wp-accounts__actions">
-								{ pendingDeleteId === account.id ? (
-									<>
-										<Button
-											variant="primary"
-											isDestructive
-											disabled={ isBusy }
-											label={ sprintf(
-												/* translators: %s: label of the service account. */
-												__(
-													'Confirm deleting %s',
-													'duracelltomi-google-tag-manager'
-												),
-												account.label
-											) }
-											onClick={ () =>
-												onDelete( account )
-											}
-										>
-											{ __(
-												'Confirm delete',
-												'duracelltomi-google-tag-manager'
-											) }
-										</Button>
-										<Button
-											variant="tertiary"
-											disabled={ isBusy }
-											onClick={ () =>
-												onDeleteRequest( null )
-											}
-										>
-											{ __(
-												'Cancel',
-												'duracelltomi-google-tag-manager'
-											) }
-										</Button>
-									</>
-								) : (
-									<>
-										<Button
-											variant="secondary"
-											disabled={ isBusy }
-											label={ sprintf(
-												/* translators: %s: label of the service account. */
-												__(
-													'Test %s',
-													'duracelltomi-google-tag-manager'
-												),
-												account.label
-											) }
-											onClick={ () => onTest( account ) }
-										>
-											{ __(
-												'Test',
-												'duracelltomi-google-tag-manager'
-											) }
-										</Button>
-										<Button
-											variant="tertiary"
-											isDestructive
-											disabled={ isBusy }
-											label={ sprintf(
-												/* translators: %s: label of the service account. */
-												__(
-													'Delete %s',
-													'duracelltomi-google-tag-manager'
-												),
-												account.label
-											) }
-											onClick={ () =>
-												onDeleteRequest( account.id )
-											}
-										>
-											{ __(
-												'Delete',
-												'duracelltomi-google-tag-manager'
-											) }
-										</Button>
-									</>
-								) }
+								<RowActions
+									account={ account }
+									isBusy={ isBusy }
+									isEditing={ editingId === account.id }
+									isDeleting={
+										pendingDeleteId === account.id
+									}
+									onRenameStart={ onRenameStart }
+									onRenameCancel={ onRenameCancel }
+									onRename={ onRename }
+									onTest={ onTest }
+									onDeleteRequest={ onDeleteRequest }
+									onDelete={ onDelete }
+								/>
 							</td>
 						</tr>
 					) ) }
 				</tbody>
 			</table>
 		</div>
+	);
+}
+
+// The action buttons of one account row, in one of three mutually exclusive
+// states: editing the label, confirming a delete, or the resting set.
+function RowActions( {
+	account,
+	isBusy,
+	isEditing,
+	isDeleting,
+	onRenameStart,
+	onRenameCancel,
+	onRename,
+	onTest,
+	onDeleteRequest,
+	onDelete,
+} ) {
+	if ( isEditing ) {
+		return (
+			<>
+				<Button
+					variant="primary"
+					disabled={ isBusy }
+					isBusy={ isBusy }
+					label={ sprintf(
+						/* translators: %s: label of the service account. */
+						__(
+							'Save the new label of %s',
+							'duracelltomi-google-tag-manager'
+						),
+						account.label
+					) }
+					onClick={ () => onRename( account ) }
+				>
+					{ __( 'Save', 'duracelltomi-google-tag-manager' ) }
+				</Button>
+				<Button
+					variant="tertiary"
+					disabled={ isBusy }
+					onClick={ onRenameCancel }
+				>
+					{ __( 'Cancel', 'duracelltomi-google-tag-manager' ) }
+				</Button>
+			</>
+		);
+	}
+
+	if ( isDeleting ) {
+		return (
+			<>
+				<Button
+					variant="primary"
+					isDestructive
+					disabled={ isBusy }
+					label={ sprintf(
+						/* translators: %s: label of the service account. */
+						__(
+							'Confirm deleting %s',
+							'duracelltomi-google-tag-manager'
+						),
+						account.label
+					) }
+					onClick={ () => onDelete( account ) }
+				>
+					{ __(
+						'Confirm delete',
+						'duracelltomi-google-tag-manager'
+					) }
+				</Button>
+				<Button
+					variant="tertiary"
+					disabled={ isBusy }
+					onClick={ () => onDeleteRequest( null ) }
+				>
+					{ __( 'Cancel', 'duracelltomi-google-tag-manager' ) }
+				</Button>
+			</>
+		);
+	}
+
+	return (
+		<>
+			<Button
+				variant="secondary"
+				disabled={ isBusy }
+				label={ sprintf(
+					/* translators: %s: label of the service account. */
+					__( 'Test %s', 'duracelltomi-google-tag-manager' ),
+					account.label
+				) }
+				onClick={ () => onTest( account ) }
+			>
+				{ __( 'Test', 'duracelltomi-google-tag-manager' ) }
+			</Button>
+			<Button
+				variant="tertiary"
+				disabled={ isBusy }
+				label={ sprintf(
+					/* translators: %s: label of the service account. */
+					__( 'Rename %s', 'duracelltomi-google-tag-manager' ),
+					account.label
+				) }
+				onClick={ () => onRenameStart( account ) }
+			>
+				{ __( 'Rename', 'duracelltomi-google-tag-manager' ) }
+			</Button>
+			<Button
+				variant="tertiary"
+				isDestructive
+				disabled={ isBusy }
+				label={ sprintf(
+					/* translators: %s: label of the service account. */
+					__( 'Delete %s', 'duracelltomi-google-tag-manager' ),
+					account.label
+				) }
+				onClick={ () => onDeleteRequest( account.id ) }
+			>
+				{ __( 'Delete', 'duracelltomi-google-tag-manager' ) }
+			</Button>
+		</>
 	);
 }

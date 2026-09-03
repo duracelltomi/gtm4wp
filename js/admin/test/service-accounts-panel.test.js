@@ -3,10 +3,12 @@
  *
  * The server owns the parsing, encryption and every refusal (covered by
  * GoogleAuthRestControllerTest); what this component owns is the wire shape of
- * the four calls, the client-side size pre-check that mirrors the server cap,
- * the two-step delete, and the one property the whole custody design rests on:
- * nothing the panel renders can be the key. The uploaded file is posted and
- * forgotten - after an upload the DOM holds only what the server answered.
+ * the five calls, the client-side size pre-check that mirrors the server cap,
+ * the explicit two-step upload (choose, then Add - never submit-on-select),
+ * the inline rename, the two-step delete, and the one property the whole
+ * custody design rests on: nothing the panel renders can be the key. The
+ * uploaded file is posted and forgotten - after an upload the DOM holds only
+ * what the server answered.
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -100,6 +102,15 @@ function chooseFile( payload, size = payload.length ) {
 	return input;
 }
 
+/**
+ * Clicks the explicit submit button of the add form.
+ */
+function submitUpload() {
+	fireEvent.click(
+		screen.getByRole( 'button', { name: 'Add service account' } )
+	);
+}
+
 beforeEach( () => {
 	// mockClear, not mockReset: reset would erase the stand-in's default
 	// "unconfigured call rejects loudly" implementation for the rest of the
@@ -184,12 +195,82 @@ describe( 'ServiceAccountsPanel listing', () => {
 		// The upload form is still there: a failed load must not lock the
 		// admin out of adding the first account.
 		expect(
-			screen.getByRole( 'button', { name: 'Upload key file' } )
+			screen.getByRole( 'button', { name: 'Choose key file' } )
 		).toBeInTheDocument();
 	} );
 } );
 
 describe( 'ServiceAccountsPanel upload', () => {
+	it( 'does not send anything when a file is merely chosen', async () => {
+		await renderLoaded( [] );
+
+		chooseFile( KEY_FILE );
+
+		// Selecting the file only arms the Add button; the label stays
+		// editable and nothing is posted until the admin submits.
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+		expect( screen.getByText( 'project-key.json' ) ).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Add service account' } )
+		).toBeEnabled();
+	} );
+
+	it( 'sends a label typed after the file was chosen', async () => {
+		await renderLoaded( [] );
+		apiFetch.mockResolvedValueOnce( {
+			account: PRODUCTION,
+			accounts: [ PRODUCTION ],
+		} );
+
+		// File first, label second - the order the report called out.
+		chooseFile( KEY_FILE );
+		fireEvent.change( screen.getByLabelText( 'Label' ), {
+			target: { value: 'Production' },
+		} );
+		submitUpload();
+
+		await waitFor( () =>
+			expect( apiFetch ).toHaveBeenLastCalledWith( {
+				path: REST_PATH,
+				method: 'POST',
+				data: { label: 'Production', key_file: KEY_FILE },
+			} )
+		);
+	} );
+
+	it( 'refuses to submit without a chosen file', async () => {
+		await renderLoaded( [] );
+
+		expect(
+			screen.getByRole( 'button', { name: 'Add service account' } )
+		).toBeDisabled();
+		submitUpload();
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+	} );
+
+	it( 'resets the label and the chosen file without sending anything', async () => {
+		await renderLoaded( [] );
+
+		fireEvent.change( screen.getByLabelText( 'Label' ), {
+			target: { value: 'Production' },
+		} );
+		chooseFile( KEY_FILE );
+		fireEvent.click( screen.getByRole( 'button', { name: 'Reset' } ) );
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+		expect( screen.getByLabelText( 'Label' ) ).toHaveValue( '' );
+		expect(
+			screen.queryByText( 'project-key.json' )
+		).not.toBeInTheDocument();
+		expect(
+			screen.getByText( 'No file selected yet.' )
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Add service account' } )
+		).toBeDisabled();
+	} );
+
 	it( 'posts the label and the raw file text to the collection route', async () => {
 		await renderLoaded( [] );
 		apiFetch.mockResolvedValueOnce( {
@@ -201,6 +282,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 			target: { value: 'Production' },
 		} );
 		chooseFile( KEY_FILE );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( apiFetch ).toHaveBeenLastCalledWith( {
@@ -211,7 +293,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		);
 	} );
 
-	it( 'adopts the returned list, clears the label and confirms the upload', async () => {
+	it( 'adopts the returned list, clears the form and confirms the upload', async () => {
 		await renderLoaded( [] );
 		apiFetch.mockResolvedValueOnce( {
 			account: PRODUCTION,
@@ -222,6 +304,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 			target: { value: 'Production' },
 		} );
 		chooseFile( KEY_FILE );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
@@ -233,6 +316,9 @@ describe( 'ServiceAccountsPanel upload', () => {
 			'success'
 		);
 		expect( screen.getByLabelText( 'Label' ) ).toHaveValue( '' );
+		expect(
+			screen.getByText( 'No file selected yet.' )
+		).toBeInTheDocument();
 		expect( screen.getAllByRole( 'row' ).slice( 1 ) ).toHaveLength( 1 );
 	} );
 
@@ -244,6 +330,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		} );
 
 		chooseFile( KEY_FILE );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( screen.getAllByRole( 'row' ).slice( 1 ) ).toHaveLength( 1 )
@@ -260,6 +347,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		apiFetch.mockResolvedValueOnce( { accounts: [ PRODUCTION ] } );
 
 		chooseFile( KEY_FILE );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
@@ -269,7 +357,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		expect( screen.getAllByRole( 'row' ).slice( 1 ) ).toHaveLength( 1 );
 	} );
 
-	it( 'refuses a file over the server cap before it is read or sent', async () => {
+	it( 'refuses a file over the server cap at selection, before it is read or sent', async () => {
 		await renderLoaded( [] );
 
 		const file = chooseFile( KEY_FILE, KEY_FILE_MAX_BYTES + 1 );
@@ -277,9 +365,13 @@ describe( 'ServiceAccountsPanel upload', () => {
 		expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
 			'That file is too large to be a service account key file.'
 		);
-		// Only the initial listing call happened.
+		// Only the initial listing call happened, and the refused file was
+		// never kept: the submit button stays unarmed.
 		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
 		expect( file.value ).toBe( '' );
+		expect(
+			screen.getByRole( 'button', { name: 'Add service account' } )
+		).toBeDisabled();
 	} );
 
 	it( 'accepts a file exactly at the cap', async () => {
@@ -290,6 +382,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		} );
 
 		chooseFile( KEY_FILE, KEY_FILE_MAX_BYTES );
+		submitUpload();
 
 		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 2 ) );
 	} );
@@ -302,6 +395,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		} );
 
 		chooseFile( '{"type":"authorized_user"}' );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
@@ -321,6 +415,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 		apiFetch.mockRejectedValueOnce( new Error( '' ) );
 
 		chooseFile( KEY_FILE );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
@@ -342,6 +437,7 @@ describe( 'ServiceAccountsPanel upload', () => {
 			writable: true,
 		} );
 		fireEvent.change( input );
+		submitUpload();
 
 		await waitFor( () =>
 			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
@@ -499,6 +595,108 @@ describe( 'ServiceAccountsPanel test action', () => {
 			)
 		);
 		expect( screen.getByText( 'Not tested yet' ) ).toBeInTheDocument();
+	} );
+} );
+
+describe( 'ServiceAccountsPanel rename', () => {
+	const EDIT_FIELD = `New label for ${ PRODUCTION.client_email }`;
+
+	it( 'opens the editor prefilled with the current label without sending anything', async () => {
+		await renderLoaded( [ PRODUCTION, STAGING ] );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Rename Production' } )
+		);
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+		expect( screen.getByLabelText( EDIT_FIELD ) ).toHaveValue(
+			'Production'
+		);
+		// Only the edited row swaps its actions; the other row keeps its own.
+		expect(
+			screen.getByRole( 'button', { name: 'Rename Staging' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'posts the new label to the account route and adopts the answer', async () => {
+		await renderLoaded( [ PRODUCTION, STAGING ] );
+		const renamed = { ...PRODUCTION, label: 'Live site' };
+		apiFetch.mockResolvedValueOnce( {
+			account: renamed,
+			accounts: [ renamed, STAGING ],
+		} );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Rename Production' } )
+		);
+		fireEvent.change( screen.getByLabelText( EDIT_FIELD ), {
+			target: { value: 'Live site' },
+		} );
+		fireEvent.click(
+			screen.getByRole( 'button', {
+				name: 'Save the new label of Production',
+			} )
+		);
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'Service account renamed to Live site.'
+			)
+		);
+		expect( apiFetch ).toHaveBeenLastCalledWith( {
+			path: `${ REST_PATH }/${ PRODUCTION.id }`,
+			method: 'POST',
+			data: { label: 'Live site' },
+		} );
+		expect( screen.getByText( 'Live site' ) ).toBeInTheDocument();
+		expect( screen.queryByText( 'Production' ) ).not.toBeInTheDocument();
+		// The editor is closed again.
+		expect( screen.queryByLabelText( EDIT_FIELD ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'can be cancelled without a request and keeps the stored label', async () => {
+		await renderLoaded( [ PRODUCTION ] );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Rename Production' } )
+		);
+		fireEvent.change( screen.getByLabelText( EDIT_FIELD ), {
+			target: { value: 'Scrapped edit' },
+		} );
+		fireEvent.click( screen.getByRole( 'button', { name: 'Cancel' } ) );
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+		expect( screen.getByText( 'Production' ) ).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Rename Production' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'keeps the editor open with the typed label when the rename fails', async () => {
+		await renderLoaded( [ PRODUCTION ] );
+		apiFetch.mockRejectedValueOnce( new Error( '' ) );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Rename Production' } )
+		);
+		fireEvent.change( screen.getByLabelText( EDIT_FIELD ), {
+			target: { value: 'Live site' },
+		} );
+		fireEvent.click(
+			screen.getByRole( 'button', {
+				name: 'Save the new label of Production',
+			} )
+		);
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'The service account could not be renamed.'
+			)
+		);
+		// Still editable, so the admin can correct and retry.
+		expect( screen.getByLabelText( EDIT_FIELD ) ).toHaveValue(
+			'Live site'
+		);
 	} );
 } );
 

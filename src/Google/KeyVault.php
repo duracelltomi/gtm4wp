@@ -229,6 +229,35 @@ final class KeyVault {
 	}
 
 	/**
+	 * Changes an account's label and nothing else.
+	 *
+	 * Safe by construction: consumers reference an account by its id (see
+	 * ID_PREFIX), so a relabel never invalidates a destination or a cached
+	 * token, and the sealed key is not touched.
+	 *
+	 * @param string $id    Account id.
+	 * @param string $label New label; the account e-mail when empty, as on add().
+	 * @return array<string, mixed>|\WP_Error The account's refreshed public view.
+	 */
+	public function relabel( string $id, string $label ) {
+		$accounts = $this->read();
+
+		if ( ! isset( $accounts[ $id ] ) ) {
+			return new \WP_Error(
+				'gtm4wp_google_account_unknown',
+				__( 'This service account no longer exists.', 'duracelltomi-google-tag-manager' )
+			);
+		}
+
+		$label = self::clean_label( $label );
+
+		$accounts[ $id ]['label'] = ( '' === $label ) ? (string) ( $accounts[ $id ]['client_email'] ?? '' ) : $label;
+		$this->write( $accounts );
+
+		return self::public_view( $id, $accounts[ $id ] );
+	}
+
+	/**
 	 * Every stored account with its metadata and status - never key material,
 	 * not even the ciphertext.
 	 *

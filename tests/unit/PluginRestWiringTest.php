@@ -169,16 +169,16 @@ final class PluginRestWiringTest extends TestCase {
 		$settings_callbacks = $this->callbacks_of_controller( \GTM4WP\Admin\RestController::class );
 		$this->assertNotEmpty( $settings_callbacks, 'The settings routes must be attached.' );
 
-		// The four google/service-accounts endpoints land (list+upload share a
-		// route, delete and test have their own), every one gated by the
+		// The five google/service-accounts endpoints land (list+upload share a
+		// route, relabel+delete another, test its own), every one gated by the
 		// GoogleAuth controller's can_manage.
 		$google_routes = array_values(
 			array_filter( $this->routes, static fn ( array $call ) => str_contains( $call['route'], 'google/service-accounts' ) )
 		);
-		$this->assertCount( 3, $google_routes, 'Listing+upload, delete and test-connection registrations must all be attached.' );
+		$this->assertCount( 3, $google_routes, 'Listing+upload, relabel+delete and test-connection registrations must all be attached.' );
 
 		$google_callbacks = array_merge( ...array_map( static fn ( array $call ) => self::permission_callbacks( $call['args'] ), $google_routes ) );
-		$this->assertCount( 4, $google_callbacks, 'All four endpoints carry a permission callback.' );
+		$this->assertCount( 5, $google_callbacks, 'All five endpoints carry a permission callback.' );
 		foreach ( $google_callbacks as $callback ) {
 			$this->assertIsArray( $callback );
 			$this->assertInstanceOf( \GTM4WP\Modules\GoogleAuth\RestController::class, $callback[0] );
