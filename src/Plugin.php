@@ -99,8 +99,29 @@ final class Plugin {
 				// reason as the settings routes: they must exist on REST requests,
 				// where no admin code path is taken. Registering them is cheap (no
 				// option read until a route actually runs), so there is no gate.
-				$vault = new Google\KeyVault();
-				( new Modules\GoogleAuth\RestController( $vault, new Google\TokenService( $vault, new Google\WpTransport() ) ) )->register_routes();
+				$vault     = new Google\KeyVault();
+				$transport = new Google\WpTransport();
+				$tokens    = new Google\TokenService( $vault, $transport );
+				( new Modules\GoogleAuth\RestController( $vault, $tokens ) )->register_routes();
+
+				// The destinations test route rides the same registration; its
+				// probe reuses the token service and transport above, so the
+				// endpoint and scope keep their single definitions.
+				( new Modules\GoogleDataManager\RestController(
+					$vault,
+					new Modules\GoogleDataManager\EventsIngest( $tokens, $transport )
+				) )->register_routes();
+
+				// A service account a destination row still references must not
+				// be deletable: the delete route runs over REST, so the veto is
+				// wired here, next to the routes it protects.
+				add_filter(
+					GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE,
+					fn ( $in_use, $account_id ) => ( true === $in_use )
+						|| Modules\GoogleDataManager\DestinationRows::references_account( $this->options, (string) $account_id ),
+					10,
+					2
+				);
 			}
 		);
 

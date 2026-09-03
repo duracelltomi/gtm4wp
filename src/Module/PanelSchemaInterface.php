@@ -37,6 +37,15 @@ interface PanelSchemaInterface {
 	 * Data the panel component needs at boot: REST paths, limits, labels.
 	 * Scalars and arrays only - it travels as JSON.
 	 *
+	 * Called only when the settings page itself is rendered - unlike fields(),
+	 * which the settings REST controller walks on every REST request - so this
+	 * is the one place a schema may afford a database read.
+	 *
+	 * Reserved key `columnChoices`: a map of option key => column key =>
+	 * choices that SettingsPage merges into the matching table columns of this
+	 * module's fields, for select columns whose choices only exist at
+	 * page-render time (the Data Manager destinations' service-account list).
+	 *
 	 * @return array<string, mixed>
 	 */
 	public function panel_data(): array;

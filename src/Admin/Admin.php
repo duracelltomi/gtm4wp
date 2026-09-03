@@ -13,6 +13,8 @@ namespace GTM4WP\Admin;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Module\Registry;
 use GTM4WP\Modules\GoogleAuth\KeyNotice;
+use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
+use GTM4WP\Modules\GoogleDataManager\HealthNotice;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -44,6 +46,7 @@ final class Admin {
 		( new SettingsPage( $this->registry, $rest ) )->register_hooks();
 		( new Notices( $this->options ) )->register_hooks();
 		( new KeyNotice( new KeyVault() ) )->register_hooks();
+		( new HealthNotice( $this->options, new DestinationHealth() ) )->register_hooks();
 		( new PluginRow() )->register_hooks();
 	}
 }

@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit;
 
 use Brain\Monkey\Actions;
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Plugin;
 
@@ -51,14 +52,17 @@ final class PluginRestWiringTest extends TestCase {
 	 * rest_api_init wiring precedes the admin/frontend split, so neither code
 	 * path needs to load) and returns the captured rest_api_init closure.
 	 *
+	 * @param array<string, mixed> $stored_options The gtm4wp-options row boot() reads.
 	 * @return callable|null
 	 */
-	private function boot_and_capture_rest_api_init(): ?callable {
+	private function boot_and_capture_rest_api_init( array $stored_options = array() ): ?callable {
 		Functions\stubTranslationFunctions();
 		Functions\stubEscapeFunctions();
 		Functions\when( 'is_admin' )->justReturn( true );
 		Functions\when( 'current_user_can' )->justReturn( false );
-		Functions\when( 'get_option' )->justReturn( array() );
+		Functions\when( 'get_option' )->alias(
+			static fn ( $key, $default_value = false ) => ( GTM4WP_OPTIONS === $key ) ? $stored_options : $default_value
+		);
 		Functions\when( 'update_option' )->justReturn( true );
 		Functions\when( 'plugin_basename' )->alias( static fn ( $file ) => basename( (string) $file ) );
 
@@ -180,6 +184,64 @@ final class PluginRestWiringTest extends TestCase {
 			$this->assertInstanceOf( \GTM4WP\Modules\GoogleAuth\RestController::class, $callback[0] );
 			$this->assertSame( 'can_manage', $callback[1] );
 		}
+
+		// The destinations test endpoint lands, gated by the GoogleDataManager
+		// controller's can_manage.
+		$test_routes = array_values(
+			array_filter( $this->routes, static fn ( array $call ) => str_contains( $call['route'], 'google/destinations/test' ) )
+		);
+		$this->assertCount( 1, $test_routes, 'The destinations test registration must be attached.' );
+
+		$test_callbacks = self::permission_callbacks( $test_routes[0]['args'] );
+		$this->assertCount( 1, $test_callbacks );
+		$this->assertIsArray( $test_callbacks[0] );
+		$this->assertInstanceOf( \GTM4WP\Modules\GoogleDataManager\RestController::class, $test_callbacks[0][0] );
+		$this->assertSame( 'can_manage', $test_callbacks[0][1] );
+	}
+
+	/**
+	 * The deletion veto is the other half of the destinations wiring: without
+	 * it the delete route removes a key that stored destination rows still
+	 * reference. Attachment AND effect are asserted - the captured callback
+	 * must resolve a stored reference through the live Options service
+	 * (Brain Monkey's apply_filters() does not run attached callbacks, so the
+	 * callback is invoked directly).
+	 */
+	public function test_the_rest_closure_wires_the_service_account_in_use_veto(): void {
+		$account_id = 'sa_0123456789ab';
+
+		$veto = null;
+		Filters\expectAdded( GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE )
+			->once()
+			->whenHappen(
+				static function ( $callback ) use ( &$veto ) {
+					$veto = $callback;
+				}
+			);
+
+		// The stored destination row must be in place BEFORE boot():
+		// Plugin::boot() constructs the Options service the veto reads.
+		$closure = $this->boot_and_capture_rest_api_init(
+			array(
+				GTM4WP_OPTION_GDM_DESTINATIONS => array(
+					array(
+						'label'           => 'Production',
+						'service_account' => $account_id,
+						'type'            => 'ga4',
+						'property_id'     => '123456789',
+						'measurement_id'  => 'G-ABC123',
+					),
+				),
+			)
+		);
+		$this->assertNotNull( $closure );
+
+		$this->run_rest_api_init( $closure );
+
+		$this->assertNotNull( $veto, 'The veto filter must be attached by the same closure.' );
+		$this->assertTrue( $veto( false, $account_id ), 'An account a stored destination references is reported in use.' );
+		$this->assertFalse( $veto( false, 'sa_ffffffffffff' ), 'An unreferenced account stays deletable.' );
+		$this->assertTrue( $veto( true, 'sa_ffffffffffff' ), 'A veto another consumer already raised is never overturned.' );
 	}
 
 	/**

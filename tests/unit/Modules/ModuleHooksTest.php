@@ -18,6 +18,7 @@ use GTM4WP\Modules\ClientDeviceData\ClientDeviceDataModule;
 use GTM4WP\Modules\ConsentMode\ConsentModeModule;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
 use GTM4WP\Modules\GoogleAuth\GoogleAuthModule;
+use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
 use GTM4WP\Modules\MediaEvents\MediaEventsModule;
 use GTM4WP\Modules\UserEvents\UserEventsModule;
 use GTM4WP\Modules\VisitorData\VisitorDataModule;
@@ -136,6 +137,21 @@ final class ModuleHooksTest extends TestCase {
 		Functions\expect( 'add_filter' )->never();
 
 		$this->boot( new GoogleAuthModule() );
+
+		$this->addToAssertionCount( 1 );
+	}
+
+	/**
+	 * Same absence pin for the google-data-manager module in this phase:
+	 * destinations are read at send time and on the settings screen only.
+	 * The attribution-capture work of a later phase must flip this test into
+	 * an enabled/disabled pair rather than delete it.
+	 */
+	public function test_google_data_manager_registers_nothing_on_the_frontend(): void {
+		Functions\expect( 'add_action' )->never();
+		Functions\expect( 'add_filter' )->never();
+
+		$this->boot( new GoogleDataManagerModule() );
 
 		$this->addToAssertionCount( 1 );
 	}

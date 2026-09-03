@@ -71,7 +71,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'The private key inside the file is stored encrypted, using the security keys defined in your wp-config.php file, and is never shown again or included in a settings export. The encryption only helps while your wp-config.php stays private: define the AUTH_KEY, SECURE_AUTH_KEY, AUTH_SALT and SECURE_AUTH_SALT constants there rather than letting WordPress keep generated values in the database. Changing those constants makes every stored key unreadable; you will be asked to upload the key files again.',
 			'duracelltomi-google-tag-manager'
 		) . '</p><p>' . esc_html__(
-			'This section is experimental: nothing in this version uses a stored account yet, and the features that will are still being validated.',
+			'This section is experimental. Stored accounts are used by the Google Data Manager section, where each destination picks the account it sends with; nothing is sent anywhere until a feature there is turned on.',
 			'duracelltomi-google-tag-manager'
 		) . '</p>';
 	}

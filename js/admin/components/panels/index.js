@@ -6,10 +6,12 @@
  * empty panel rather than a blank screen.
  */
 
+import DestinationsPanel from './DestinationsPanel';
 import ServiceAccountsPanel from './ServiceAccountsPanel';
 
 const panels = {
 	'google-service-accounts': ServiceAccountsPanel,
+	'gdm-destinations': DestinationsPanel,
 };
 
 /**

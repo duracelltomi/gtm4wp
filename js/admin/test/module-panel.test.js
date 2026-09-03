@@ -469,7 +469,7 @@ describe( 'ModulePanel custom panels', () => {
 		apiFetch.mockClear();
 	} );
 
-	it( 'renders the registered panel in place of the fields, fed with the module panel data', async () => {
+	it( 'renders the registered panel in place of the fields when the module has none', async () => {
 		apiFetch.mockResolvedValue( { accounts: [] } );
 
 		renderPanel( {
@@ -479,15 +479,14 @@ describe( 'ModulePanel custom panels', () => {
 			panel: 'google-service-accounts',
 			panelData: PANEL_DATA,
 			groups: [],
-			fields: [ field( 'ghost', 'g' ) ],
+			fields: [],
 		} );
 
-		// The head still frames the panel; the field is not rendered.
+		// The head still frames the panel.
 		expect(
 			screen.getByRole( 'heading', { name: 'Google service accounts' } )
 		).toBeInTheDocument();
 		expect( screen.getByText( 'Intro text' ) ).toBeInTheDocument();
-		expect( screen.queryByLabelText( 'ghost' ) ).not.toBeInTheDocument();
 
 		// The panel reached the REST path the module descriptor named.
 		await waitFor( () =>
@@ -498,6 +497,55 @@ describe( 'ModulePanel custom panels', () => {
 		expect( apiFetch ).toHaveBeenCalledWith( {
 			path: PANEL_DATA.restPath,
 		} );
+	} );
+
+	it( 'renders the panel BELOW the fields when the module has both', () => {
+		// The google-data-manager shape: the destinations table is a regular
+		// Field, the test section a custom panel fed the same editor values.
+		renderPanel(
+			{
+				id: 'google-data-manager',
+				title: 'Google Data Manager',
+				panel: 'gdm-destinations',
+				panelData: {
+					testPath: 'gtm4wp/v2/google/destinations/test',
+					optionKey: 'gdm-destinations',
+					health: {},
+					threshold: 3,
+					columnChoices: {
+						'gdm-destinations': {
+							service_account: {
+								sa_0123456789ab: 'Production SA',
+							},
+						},
+					},
+				},
+				groups: [ { id: 'destinations', label: 'Destinations' } ],
+				fields: [ field( 'other-option', 'destinations', 'Field A' ) ],
+			},
+			{
+				values: {
+					'other-option': '',
+					'gdm-destinations': [
+						{
+							label: 'Prod',
+							service_account: 'sa_0123456789ab',
+							type: 'ga4',
+							property_id: '123456789',
+							measurement_id: 'G-ABC123',
+						},
+					],
+				},
+			}
+		);
+
+		// Both halves are on the page: the regular field AND the custom
+		// panel, which received the unsaved editor values (the row's Test
+		// button proves it - the panel lists rows from `values`).
+		expect( screen.getByLabelText( 'Field A' ) ).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
 	} );
 
 	it( 'falls back to the fields when the module names a panel this bundle does not know', () => {

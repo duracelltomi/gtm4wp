@@ -442,6 +442,43 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	/**
+	 * The one place a table column whose choices exist only at page-render
+	 * time gets them: bootstrap_data() merges a panel's reserved columnChoices
+	 * into the matching columns. This is what lets the Data Manager schema
+	 * keep its fields() database-free while the settings screen still shows
+	 * the uploaded service accounts in the select cell - if the merge is
+	 * dropped, the select renders permanently empty and saving any
+	 * destination becomes impossible.
+	 */
+	public function test_bootstrap_data_merges_panel_column_choices_into_table_columns(): void {
+		$page = $this->make_settings_page( array() );
+
+		// Re-stub AFTER construction (ui_values() reads lazily): the settings
+		// row stays empty while the vault row holds one account.
+		Functions\when( 'get_option' )->alias(
+			static fn ( $key, $default_value = false ) => ( \GTM4WP\Google\KeyVault::OPTION_NAME === $key )
+				? array( 'sa_0123456789ab' => array( 'label' => 'Production SA' ) )
+				: ( ( GTM4WP_OPTIONS === $key ) ? array() : $default_value )
+		);
+
+		$modules = $page->bootstrap_data()['modules'];
+		$by_id   = array_column( $modules, null, 'id' );
+		$this->assertArrayHasKey( 'google-data-manager', $by_id );
+
+		$columns = array_column( $by_id['google-data-manager']['fields'][0]['columns'], null, 'key' );
+		$this->assertSame(
+			array( 'sa_0123456789ab' => 'Production SA' ),
+			$columns['service_account']['choices'],
+			'The select cell shows the stored service accounts.'
+		);
+		$this->assertArrayNotHasKey(
+			'choices',
+			$columns['label'],
+			'Only the columns the panel names receive choices; the rest are untouched.'
+		);
+	}
+
+	/**
 	 * The bootstrap payload is where the documentation paths declared by the
 	 * schemas become the absolute URLs the settings app renders as an href. Each
 	 * field's fragment is its own option key, which is what makes a help icon

@@ -300,6 +300,142 @@ describe( 'TableControl cell labels', () => {
 	} );
 } );
 
+describe( 'TableControl select columns', () => {
+	const SELECT_COLUMNS = [
+		{ key: 'label', label: 'Label' },
+		{
+			key: 'service_account',
+			label: 'Service account',
+			type: 'select',
+			choices: {
+				sa_0123456789ab: 'Production SA',
+				sa_ba9876543210: 'Staging SA',
+			},
+		},
+	];
+
+	it( 'renders the choices behind a leading empty option', () => {
+		renderTable( {
+			field: { columns: SELECT_COLUMNS },
+			value: [ { label: 'Prod', service_account: '' } ],
+		} );
+
+		const options = Array.from(
+			screen
+				.getByRole( 'combobox', { name: 'Service account, row 1' } )
+				.querySelectorAll( 'option' )
+		);
+
+		// The empty option first, so an unset cell reads as "pick one" instead
+		// of silently showing (and saving) the first stored account.
+		expect( options.map( ( option ) => option.value ) ).toEqual( [
+			'',
+			'sa_0123456789ab',
+			'sa_ba9876543210',
+		] );
+		expect( options[ 1 ].textContent ).toBe( 'Production SA' );
+	} );
+
+	it( 'shows the stored value as selected', () => {
+		renderTable( {
+			field: { columns: SELECT_COLUMNS },
+			value: [ { label: 'Prod', service_account: 'sa_ba9876543210' } ],
+		} );
+
+		expect(
+			screen.getByRole( 'combobox', { name: 'Service account, row 1' } )
+		).toHaveValue( 'sa_ba9876543210' );
+	} );
+
+	it( 'updates only the edited select cell of the edited row', () => {
+		const { onChange } = renderTable( {
+			field: { columns: SELECT_COLUMNS },
+			value: [
+				{ label: 'Prod', service_account: '' },
+				{ label: 'Stage', service_account: '' },
+			],
+		} );
+
+		fireEvent.change(
+			screen.getByRole( 'combobox', { name: 'Service account, row 2' } ),
+			{ target: { value: 'sa_0123456789ab' } }
+		);
+
+		expect( onChange ).toHaveBeenCalledWith( [
+			{ label: 'Prod', service_account: '' },
+			{ label: 'Stage', service_account: 'sa_0123456789ab' },
+		] );
+	} );
+
+	it( 'renders an empty choice map as just the empty option rather than throwing', () => {
+		expect( () =>
+			renderTable( {
+				field: {
+					columns: [
+						{
+							key: 'service_account',
+							label: 'Service account',
+							type: 'select',
+						},
+					],
+				},
+				value: [ { service_account: '' } ],
+			} )
+		).not.toThrow();
+
+		expect(
+			screen.getByRole( 'combobox' ).querySelectorAll( 'option' )
+		).toHaveLength( 1 );
+	} );
+
+	it( 'rejects an edit to a locked select cell in the handler, not only the prop', () => {
+		const { onChange } = renderTable( {
+			field: {
+				columns: [
+					{
+						key: 'service_account',
+						label: 'Service account',
+						type: 'select',
+						readonly: true,
+						choices: { sa_0123456789ab: 'Production SA' },
+					},
+				],
+			},
+			value: [ { service_account: '' } ],
+		} );
+
+		fireEvent.change( screen.getByRole( 'combobox' ), {
+			target: { value: 'sa_0123456789ab' },
+		} );
+
+		expect( onChange ).not.toHaveBeenCalled();
+	} );
+
+	it( 'starts a fresh row with a select column default where one is declared', () => {
+		const { onChange } = renderTable( {
+			field: {
+				columns: [
+					{ key: 'label', label: 'Label' },
+					{
+						key: 'type',
+						label: 'Type',
+						type: 'select',
+						default: 'ga4',
+						choices: { ga4: 'Google Analytics 4' },
+					},
+				],
+			},
+			value: [],
+		} );
+
+		fireEvent.click( screen.getByRole( 'button', { name: 'Add row' } ) );
+
+		expect( onChange ).toHaveBeenCalledWith( [
+			{ label: '', type: 'ga4' },
+		] );
+	} );
+} );
+
 describe( 'TableControl checkbox columns', () => {
 	const CHECKBOX_COLUMNS = [
 		{ key: 'path', label: 'Custom path' },

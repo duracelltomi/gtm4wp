@@ -192,8 +192,12 @@ final class GoogleAuthCustodyTest extends TestCase {
 	public function test_modules_without_a_panel_get_the_empty_descriptor(): void {
 		list( $page ) = $this->make_settings_stack();
 
+		// The two Google modules declare panels of their own (google-data-manager
+		// mixes a panel WITH fields); every other module gets the empty descriptor.
+		$panelled = array( 'google-auth', 'google-data-manager' );
+
 		foreach ( $page->bootstrap_data()['modules'] as $module ) {
-			if ( 'google-auth' === $module['id'] ) {
+			if ( in_array( $module['id'], $panelled, true ) ) {
 				continue;
 			}
 			$this->assertSame( '', $module['panel'], $module['id'] );

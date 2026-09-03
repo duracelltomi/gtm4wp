@@ -51,6 +51,7 @@ final class Registry {
 		\GTM4WP\Modules\Amp\AmpModule::class,
 		\GTM4WP\Modules\Blacklist\BlacklistModule::class,
 		\GTM4WP\Modules\GoogleAuth\GoogleAuthModule::class,
+		\GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule::class,
 	);
 
 	/**

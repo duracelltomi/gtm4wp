@@ -226,6 +226,17 @@ final class SettingsPage {
 
 			$schema = new $schema_class();
 
+			$panel_data = $schema instanceof PanelSchemaInterface ? $schema->panel_data() : array();
+
+			// A table column whose choices only exist at page-render time (they
+			// come from outside the settings row - the service-account list of
+			// the Data Manager destinations) receives them here through the
+			// panel data's reserved columnChoices key, keyed by option key and
+			// column key. fields() itself must stay database-free: the settings
+			// REST controller walks it for the value schema on every REST
+			// request site-wide.
+			$column_choices = is_array( $panel_data['columnChoices'] ?? null ) ? $panel_data['columnChoices'] : array();
+
 			$fields = array();
 			foreach ( $schema->fields() as $field ) {
 				$ui = $field->to_ui_array( $values[ $field->key ] ?? $field->default_value );
@@ -234,6 +245,15 @@ final class SettingsPage {
 				// belongs to the options layer, never learns the documentation domain.
 				// The anchor is the option key itself - see the Docs class docblock.
 				$ui['doc'] = Docs::url( $field->doc, $field->key );
+
+				if ( isset( $column_choices[ $field->key ] ) && is_array( $column_choices[ $field->key ] ) ) {
+					foreach ( $ui['columns'] as $index => $column ) {
+						$key = $column['key'] ?? '';
+						if ( isset( $column_choices[ $field->key ][ $key ] ) ) {
+							$ui['columns'][ $index ]['choices'] = (array) $column_choices[ $field->key ][ $key ];
+						}
+					}
+				}
 
 				$fields[] = $ui;
 			}
@@ -262,7 +282,7 @@ final class SettingsPage {
 				// A custom React panel with its own REST routes (the service
 				// accounts manager). Same instanceof opt-in as the doc link.
 				'panel'              => $schema instanceof PanelSchemaInterface ? $schema->panel() : '',
-				'panelData'          => $schema instanceof PanelSchemaInterface ? (object) $schema->panel_data() : (object) array(),
+				'panelData'          => (object) $panel_data,
 			);
 		}
 

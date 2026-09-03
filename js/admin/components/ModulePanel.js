@@ -212,23 +212,34 @@ export default function ModulePanel( {
 		</div>
 	);
 
-	// A module with a custom panel (a UI that is not a list of options, such as
-	// the service-account custody screen) renders that in place of its fields.
+	// A module with a custom panel (a UI that is not a list of options, such
+	// as the service-account custody screen) renders it in place of its
+	// fields when it has none, and below them when it has both (the Data
+	// Manager destinations table with its test panel).
 	const CustomPanel = module.panel ? panelComponent( module.panel ) : null;
+	const hasFields =
+		Array.isArray( module.fields ) && 0 < module.fields.length;
 
-	if ( CustomPanel ) {
+	const customPanel = CustomPanel ? (
+		<div className="gtm4wp-panel__body">
+			<CustomPanel
+				// Remount per module so a panel's own state (its
+				// loaded list, a pending confirmation) never carries
+				// over to another module using the same component.
+				key={ module.id }
+				data={ module.panelData || {} }
+				// The current editor state of this module's options, so a
+				// panel can act on unsaved rows (the per-row Test button).
+				values={ values }
+			/>
+		</div>
+	) : null;
+
+	if ( CustomPanel && ! hasFields ) {
 		return (
 			<div className="gtm4wp-panel">
 				{ head }
-				<div className="gtm4wp-panel__body">
-					<CustomPanel
-						// Remount per module so a panel's own state (its
-						// loaded list, a pending confirmation) never carries
-						// over to another module using the same component.
-						key={ module.id }
-						data={ module.panelData || {} }
-					/>
-				</div>
+				{ customPanel }
 			</div>
 		);
 	}
@@ -321,6 +332,8 @@ export default function ModulePanel( {
 					/>
 				</div>
 			) }
+
+			{ customPanel }
 		</div>
 	);
 }

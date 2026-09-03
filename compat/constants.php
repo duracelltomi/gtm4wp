@@ -195,6 +195,9 @@ define( 'GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES', 'integrate-edd-purchase-t
 define( 'GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE', 'integrate-edd-purchase-track-on-any-page' );
 define( 'GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION', 'integrate-edd-persist-list-attribution' );
 
+// Google Data Manager API integration (new in 2.1).
+define( 'GTM4WP_OPTION_GDM_DESTINATIONS', 'gdm-destinations' );
+
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
 
@@ -334,3 +337,11 @@ define( 'GTM4WP_WPFILTER_EDD_ORDER_PHONE', 'gtm4wp_edd_order_phone' );
  * the account id passed as the second argument is still in use.
  */
 define( 'GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE', 'gtm4wp_google_service_account_in_use' );
+
+/**
+ * Filter (since 2.1) over the runtime list of Google Data Manager destinations:
+ * the validated rows of the gdm-destinations option, each an array with the
+ * DestinationRows column keys. Rows added or changed here are re-validated
+ * before use; an invalid row is dropped, never sent.
+ */
+define( 'GTM4WP_WPFILTER_GDM_DESTINATIONS', 'gtm4wp_gdm_destinations' );

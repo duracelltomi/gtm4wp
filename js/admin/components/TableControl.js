@@ -3,7 +3,12 @@
  * one text input per schema-defined column, with add/remove row actions.
  */
 
-import { Button, CheckboxControl, TextControl } from '@wordpress/components';
+import {
+	Button,
+	CheckboxControl,
+	SelectControl,
+	TextControl,
+} from '@wordpress/components';
 import { sprintf, __ } from '@wordpress/i18n';
 
 import { isCellLocked } from '../utils';
@@ -31,10 +36,31 @@ function emptyRow( columns ) {
 	const row = {};
 
 	columns.forEach( ( column ) => {
-		row[ column.key ] = '';
+		// A select column may name the value a fresh row starts with (a type
+		// column with one meaningful choice); everything else starts empty.
+		row[ column.key ] =
+			'string' === typeof column.default ? column.default : '';
 	} );
 
 	return row;
+}
+
+// Options of a select column: its choices map plus a leading empty choice so
+// an unset cell shows as "pick one" instead of silently displaying (and then
+// saving) the first choice.
+function selectOptions( column ) {
+	const choices = column.choices || {};
+
+	return [
+		{
+			value: '',
+			label: __( '— Select —', 'duracelltomi-google-tag-manager' ),
+		},
+		...Object.keys( choices ).map( ( value ) => ( {
+			value,
+			label: String( choices[ value ] ),
+		} ) ),
+	];
 }
 
 export default function TableControl( {
@@ -176,6 +202,36 @@ export default function TableControl( {
 															rowIndex,
 															column,
 															next ? '1' : ''
+														)
+													}
+												/>
+											</td>
+										);
+									}
+
+									if ( 'select' === column.type ) {
+										return (
+											<td key={ column.key }>
+												<CellLabel column={ column } />
+												<SelectControl
+													__next40pxDefaultSize
+													__nextHasNoMarginBottom
+													hideLabelFromVision
+													label={ cellLabel }
+													disabled={
+														disabled || locked
+													}
+													options={ selectOptions(
+														column
+													) }
+													value={ String(
+														row[ column.key ] ?? ''
+													) }
+													onChange={ ( next ) =>
+														updateCell(
+															rowIndex,
+															column,
+															next
 														)
 													}
 												/>
