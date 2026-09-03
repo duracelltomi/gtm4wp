@@ -9,6 +9,7 @@ import { __, sprintf } from '@wordpress/i18n';
 
 import DocLink from './DocLink';
 import FieldControl from './FieldControl';
+import { panelComponent } from './panels';
 import { groupsWithFields } from '../utils';
 
 /**
@@ -197,6 +198,41 @@ export default function ModulePanel( {
 		);
 	}
 
+	const head = (
+		<div className="gtm4wp-panel__head">
+			<div className="gtm4wp-panel__heading">
+				<h2>{ module.title }</h2>
+				{ moduleDoc }
+			</div>
+			{ module.intro && (
+				<RawHTML className="gtm4wp-panel__intro">
+					{ module.intro }
+				</RawHTML>
+			) }
+		</div>
+	);
+
+	// A module with a custom panel (a UI that is not a list of options, such as
+	// the service-account custody screen) renders that in place of its fields.
+	const CustomPanel = module.panel ? panelComponent( module.panel ) : null;
+
+	if ( CustomPanel ) {
+		return (
+			<div className="gtm4wp-panel">
+				{ head }
+				<div className="gtm4wp-panel__body">
+					<CustomPanel
+						// Remount per module so a panel's own state (its
+						// loaded list, a pending confirmation) never carries
+						// over to another module using the same component.
+						key={ module.id }
+						data={ module.panelData || {} }
+					/>
+				</div>
+			</div>
+		);
+	}
+
 	const groups = groupsWithFields( module );
 	const hasTabs = groups.length > 1;
 
@@ -214,17 +250,7 @@ export default function ModulePanel( {
 
 	return (
 		<div className="gtm4wp-panel">
-			<div className="gtm4wp-panel__head">
-				<div className="gtm4wp-panel__heading">
-					<h2>{ module.title }</h2>
-					{ moduleDoc }
-				</div>
-				{ module.intro && (
-					<RawHTML className="gtm4wp-panel__intro">
-						{ module.intro }
-					</RawHTML>
-				) }
-			</div>
+			{ head }
 
 			{ hasTabs ? (
 				<div ref={ tabStrip }>

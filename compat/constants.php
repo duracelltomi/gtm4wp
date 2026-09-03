@@ -327,3 +327,10 @@ define( 'GTM4WP_WPFILTER_EEC_EDD_ORDER_DATA', 'gtm4wp_eec_edd_order_data' );
 define( 'GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER', 'gtm4wp_edd_purchase_datalayer' );
 define( 'GTM4WP_WPFILTER_EDD_DATALAYER_PAGELOAD', 'gtm4wp_edd_datalayer_on_pageload' );
 define( 'GTM4WP_WPFILTER_EDD_ORDER_PHONE', 'gtm4wp_edd_order_phone' );
+
+/**
+ * Filter (since 2.1) that lets any feature holding a reference to a Google
+ * service account veto its deletion on the settings screen: return true while
+ * the account id passed as the second argument is still in use.
+ */
+define( 'GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE', 'gtm4wp_google_service_account_in_use' );

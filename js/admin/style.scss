@@ -521,6 +521,104 @@ $gtm4wp-mobile: 782px;
 	}
 }
 
+// Google service accounts panel: a read-only listing plus an upload form.
+.gtm4wp-accounts {
+
+	&__notice {
+		margin: 0 0 var(--gtm4wp-s4);
+	}
+
+	&__scroll {
+		// The email and key id columns are long opaque strings; on a narrow
+		// panel the table scrolls inside itself rather than pushing the panel.
+		overflow-x: auto;
+	}
+
+	&__table {
+		border: 1px solid var(--gtm4wp-border);
+		border-collapse: collapse;
+		border-radius: var(--gtm4wp-radius);
+		width: 100%;
+
+		th {
+			background: var(--gtm4wp-surface-2);
+			border-bottom: 1px solid var(--gtm4wp-border);
+			color: var(--gtm4wp-text-2);
+			font-size: var(--gtm4wp-fs-micro);
+			font-weight: 600;
+			letter-spacing: .04em;
+			padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
+			text-align: left;
+			text-transform: uppercase;
+			vertical-align: bottom;
+			white-space: nowrap;
+		}
+
+		td {
+			border-bottom: 1px solid var(--gtm4wp-border);
+			padding: var(--gtm4wp-s2) var(--gtm4wp-s3);
+			vertical-align: top;
+		}
+
+		tbody tr:last-child td {
+			border-bottom: none;
+		}
+
+		code {
+			background: none;
+			font-size: var(--gtm4wp-fs-help);
+			padding: 0;
+			word-break: break-all;
+		}
+	}
+
+	&__status {
+		display: block;
+		white-space: nowrap;
+	}
+
+	&__status--ok {
+		color: #007017;
+	}
+
+	&__status--error,
+	&__status--reupload-required {
+		color: var(--gtm4wp-danger);
+	}
+
+	&__error {
+		color: var(--gtm4wp-text-3);
+		display: block;
+		font-size: var(--gtm4wp-fs-help);
+		margin-top: var(--gtm4wp-s1);
+	}
+
+	&__actions {
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	&__empty {
+		color: var(--gtm4wp-text-3);
+	}
+
+	&__upload {
+		border-top: 1px solid var(--gtm4wp-border);
+		margin-top: var(--gtm4wp-s5);
+		max-width: 48em;
+		padding-top: var(--gtm4wp-s4);
+
+		h3 {
+			font-size: var(--gtm4wp-fs-section);
+			margin: 0 0 var(--gtm4wp-s2);
+		}
+
+		.components-base-control {
+			margin-bottom: var(--gtm4wp-s3);
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Small screens.
 //

@@ -8,7 +8,9 @@
  * renders. That "nothing is silently dropped" property is what these pin.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+import apiFetch from '@wordpress/api-fetch';
 
 import ModulePanel from '../components/ModulePanel';
 
@@ -450,5 +452,71 @@ describe( 'ModulePanel documentation links', () => {
 		);
 
 		expect( screen.getByRole( 'textbox' ) ).toHaveFocus();
+	} );
+} );
+
+describe( 'ModulePanel custom panels', () => {
+	const PANEL_DATA = {
+		restPath: 'gtm4wp/v2/google/service-accounts',
+		keyFileMaxBytes: 16384,
+		labelMaxLength: 100,
+	};
+
+	beforeEach( () => {
+		apiFetch.mockReset();
+	} );
+
+	it( 'renders the registered panel in place of the fields, fed with the module panel data', async () => {
+		apiFetch.mockResolvedValue( { accounts: [] } );
+
+		renderPanel( {
+			id: 'google-auth',
+			title: 'Google service accounts',
+			intro: '<p>Intro text</p>',
+			panel: 'google-service-accounts',
+			panelData: PANEL_DATA,
+			groups: [],
+			fields: [ field( 'ghost', 'g' ) ],
+		} );
+
+		// The head still frames the panel; the field is not rendered.
+		expect(
+			screen.getByRole( 'heading', { name: 'Google service accounts' } )
+		).toBeInTheDocument();
+		expect( screen.getByText( 'Intro text' ) ).toBeInTheDocument();
+		expect( screen.queryByLabelText( 'ghost' ) ).not.toBeInTheDocument();
+
+		// The panel reached the REST path the module descriptor named.
+		await waitFor( () =>
+			expect(
+				screen.getByText( 'No service accounts stored yet.' )
+			).toBeInTheDocument()
+		);
+		expect( apiFetch ).toHaveBeenCalledWith( {
+			path: PANEL_DATA.restPath,
+		} );
+	} );
+
+	it( 'falls back to the fields when the module names a panel this bundle does not know', () => {
+		renderPanel( {
+			panel: 'from-a-newer-plugin',
+			panelData: {},
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [ field( 'a', 'g', 'Field A' ) ],
+		} );
+
+		expect( screen.getByLabelText( 'Field A' ) ).toBeInTheDocument();
+		expect( apiFetch ).not.toHaveBeenCalled();
+	} );
+
+	it( 'renders the fields when the module declares no panel', () => {
+		renderPanel( {
+			panel: '',
+			panelData: {},
+			groups: [ { id: 'g', label: 'General' } ],
+			fields: [ field( 'a', 'g', 'Field A' ) ],
+		} );
+
+		expect( screen.getByLabelText( 'Field A' ) ).toBeInTheDocument();
 	} );
 } );

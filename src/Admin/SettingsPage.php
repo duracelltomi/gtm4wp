@@ -12,6 +12,7 @@ namespace GTM4WP\Admin;
 
 use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\PanelSchemaInterface;
 use GTM4WP\Module\Registry;
 
 defined( 'ABSPATH' ) || exit;
@@ -258,6 +259,10 @@ final class SettingsPage {
 				'docUrl'             => $schema instanceof DocumentedSchemaInterface
 					? Docs::url( $schema->doc_url() )
 					: '',
+				// A custom React panel with its own REST routes (the service
+				// accounts manager). Same instanceof opt-in as the doc link.
+				'panel'              => $schema instanceof PanelSchemaInterface ? $schema->panel() : '',
+				'panelData'          => $schema instanceof PanelSchemaInterface ? (object) $schema->panel_data() : (object) array(),
 			);
 		}
 

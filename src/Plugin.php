@@ -94,6 +94,13 @@ final class Plugin {
 				RestCors::register();
 
 				( new Admin\RestController( $this->registry ) )->register_routes();
+
+				// The service-accounts routes are registered here for the same
+				// reason as the settings routes: they must exist on REST requests,
+				// where no admin code path is taken. Registering them is cheap (no
+				// option read until a route actually runs), so there is no gate.
+				$vault = new Google\KeyVault();
+				( new Modules\GoogleAuth\RestController( $vault, new Google\TokenService( $vault, new Google\WpTransport() ) ) )->register_routes();
 			}
 		);
 
