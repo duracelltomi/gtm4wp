@@ -8,7 +8,7 @@ body:
         Thank you for taking the time to report a bug. A few pointers before you file:
 
         - The [feature setup guides](https://gtm4wp.com/setup-gtm4wp-features), the [developer documentation](https://gtm4wp.com/gtm4wp-for-developers) and the [missing purchase events article](https://gtm4wp.com/google-tag-manager/missing-purchase-event-in-ga4.html) answer the most common questions.
-        - If you are not sure whether you found a bug, the [support forum](https://wordpress.org/support/plugin/duracelltomi-google-tag-manager/) is the right place to ask first.
+        - General questions are welcome on the [support forum](https://wordpress.org/support/plugin/duracelltomi-google-tag-manager/) as well; this tracker works best for bug reports and feature requests.
         - Support is provided on a best effort basis. Reports that include the details below usually get answered much faster, because no extra round trip is needed to collect them.
 
         Please do not report security vulnerabilities here. Use the [private advisory form](https://github.com/duracelltomi/gtm4wp/security/advisories/new) or security@gtm4wp.com instead.
