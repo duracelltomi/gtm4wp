@@ -12,7 +12,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import FieldControl from '../components/FieldControl';
 
-function renderField( field, { value, values = {}, error } = {} ) {
+function renderField(
+	field,
+	{ value, values = {}, error, allFields = [] } = {}
+) {
 	const onChange = jest.fn();
 
 	const { container } = render(
@@ -21,6 +24,7 @@ function renderField( field, { value, values = {}, error } = {} ) {
 			value={ value }
 			values={ values }
 			error={ error }
+			allFields={ allFields }
 			onChange={ onChange }
 		/>
 	);
@@ -315,6 +319,117 @@ describe( 'FieldControl dependencies and annotations', () => {
 		);
 
 		expect( screen.getByRole( 'switch' ) ).toBeEnabled();
+	} );
+
+	/**
+	 * A setting saved as ON that cannot run looks exactly like one that is
+	 * running: the toggle reads on, and greying it out communicates "active,
+	 * you just cannot change it here" - the opposite of the truth. Forcing the
+	 * control off instead would misrepresent what is stored and make the
+	 * setting appear to switch itself on when the dependency comes back, so the
+	 * state is explained rather than hidden.
+	 */
+	it( 'says a setting stored as on is not in effect, naming what it needs', () => {
+		renderField(
+			{
+				key: 'gdm-capture-attribution',
+				type: 'checkbox',
+				label: 'Store attribution data with each order',
+				depends_on: 'gdm-destinations',
+			},
+			{
+				value: true,
+				values: { 'gdm-destinations': [] },
+				allFields: [
+					{
+						key: 'gdm-destinations',
+						label: 'Data Manager destinations',
+					},
+				],
+			}
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeDisabled();
+		expect( screen.getByRole( 'switch' ) ).toBeChecked();
+		expect(
+			screen.getByText(
+				'Saved as on, but not in effect: it needs Data Manager destinations.'
+			)
+		).toBeInTheDocument();
+	} );
+
+	it( 'tells an off setting what to set first', () => {
+		renderField(
+			{
+				key: 'gdm-capture-attribution',
+				type: 'checkbox',
+				label: 'Store attribution data with each order',
+				depends_on: 'gdm-destinations',
+			},
+			{
+				value: false,
+				values: { 'gdm-destinations': [] },
+				allFields: [
+					{
+						key: 'gdm-destinations',
+						label: 'Data Manager destinations',
+					},
+				],
+			}
+		);
+
+		expect(
+			screen.getByText(
+				'Available once Data Manager destinations is set.'
+			)
+		).toBeInTheDocument();
+	} );
+
+	it( 'explains nothing while the dependency is satisfied', () => {
+		renderField(
+			{
+				key: 'gdm-capture-attribution',
+				type: 'checkbox',
+				label: 'Store attribution data with each order',
+				depends_on: 'gdm-destinations',
+			},
+			{
+				value: true,
+				values: { 'gdm-destinations': [ { measurement_id: 'G-A' } ] },
+				allFields: [
+					{
+						key: 'gdm-destinations',
+						label: 'Data Manager destinations',
+					},
+				],
+			}
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeEnabled();
+		expect( screen.queryByText( /not in effect/ ) ).not.toBeInTheDocument();
+		expect(
+			screen.queryByText( /Available once/ )
+		).not.toBeInTheDocument();
+	} );
+
+	/**
+	 * The note names the dependency, so with no way to resolve its label there
+	 * is nothing useful to say - and a sentence with a blank in it would be
+	 * worse than the plain greying.
+	 */
+	it( 'stays silent when the dependency label cannot be resolved', () => {
+		renderField(
+			{
+				key: 'child',
+				type: 'checkbox',
+				label: 'Child',
+				depends_on: 'a-field-from-another-module',
+			},
+			{ value: true, values: {} }
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeDisabled();
+		expect( screen.queryByText( /not in effect/ ) ).not.toBeInTheDocument();
 	} );
 
 	it( 'shows the stored value of a disabled field rather than forcing it off', () => {

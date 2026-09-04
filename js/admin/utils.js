@@ -198,6 +198,29 @@ export function isFieldDisabled( field, values ) {
 }
 
 /**
+ * The label of the field a field depends on, for explaining why a control is
+ * disabled. A dependency often lives in another tab, so naming it is the only
+ * way the message can point anywhere useful.
+ *
+ * @param {Object}   field     Field description from the bootstrap data.
+ * @param {Object[]} allFields Every field of the module, across its groups.
+ * @return {string} The dependency's label, or '' when it cannot be resolved.
+ */
+export function dependencyLabel( field, allFields ) {
+	const dependency = field && field.depends_on;
+
+	if ( ! dependency || ! Array.isArray( allFields ) ) {
+		return '';
+	}
+
+	const target = allFields.find(
+		( candidate ) => candidate && candidate.key === dependency
+	);
+
+	return target && target.label ? target.label : '';
+}
+
+/**
  * Whether a table cell is read-only because its value is controlled outside the
  * settings screen — a `GTM4WP_HARDCODED_*` constant in wp-config.php fixing part
  * of the container setup. A locked row set locks every cell of the table: with

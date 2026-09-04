@@ -9,6 +9,7 @@ import {
 	choiceSections,
 	coerceValue,
 	defaultGroupId,
+	dependencyLabel,
 	exportFilename,
 	focusTarget,
 	groupsWithFields,
@@ -315,6 +316,50 @@ describe( 'isFieldDisabled', () => {
 	it( 'survives a values map it was handed nothing for', () => {
 		expect( isFieldDisabled( dependent, undefined ) ).toBe( true );
 		expect( isFieldDisabled( dependent, null ) ).toBe( true );
+	} );
+} );
+
+describe( 'dependencyLabel', () => {
+	const FIELDS = [
+		{ key: 'gdm-destinations', label: 'Data Manager destinations' },
+		{ key: 'gdm-capture-attribution', label: 'Store attribution data' },
+	];
+
+	/**
+	 * A dependency commonly lives in a different tab from the field that
+	 * declares it, which is exactly why the note names it - the admin cannot
+	 * see it from where they are standing.
+	 */
+	it( 'resolves the label of a dependency in another group', () => {
+		expect(
+			dependencyLabel(
+				{
+					key: 'gdm-capture-attribution',
+					depends_on: 'gdm-destinations',
+				},
+				FIELDS
+			)
+		).toBe( 'Data Manager destinations' );
+	} );
+
+	it( 'returns nothing for a field with no dependency', () => {
+		expect( dependencyLabel( { key: 'lonely' }, FIELDS ) ).toBe( '' );
+	} );
+
+	it( 'returns nothing when the dependency is not among the fields', () => {
+		expect(
+			dependencyLabel( { key: 'k', depends_on: 'elsewhere' }, FIELDS )
+		).toBe( '' );
+	} );
+
+	it( 'survives a missing or malformed field list', () => {
+		const field = { key: 'k', depends_on: 'gdm-destinations' };
+
+		expect( dependencyLabel( field, undefined ) ).toBe( '' );
+		expect( dependencyLabel( field, [ null, undefined ] ) ).toBe( '' );
+		expect(
+			dependencyLabel( field, [ { key: 'gdm-destinations' } ] )
+		).toBe( '' );
 	} );
 } );
 

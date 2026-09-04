@@ -14,7 +14,7 @@ import { __, sprintf } from '@wordpress/i18n';
 
 import AxeptioVersionControl from './AxeptioVersionControl';
 import TableControl from './TableControl';
-import { choiceSections, isFieldDisabled } from '../utils';
+import { choiceSections, dependencyLabel, isFieldDisabled } from '../utils';
 
 const PHASE_LABELS = {
 	beta: __( 'Beta', 'duracelltomi-google-tag-manager' ),
@@ -37,10 +37,60 @@ function FieldLabel( { field } ) {
 	);
 }
 
-function FieldHelp( { field, error } ) {
+/**
+ * Explains a control that is greyed out because of `depends_on`.
+ *
+ * The stored value is always shown as it is, so a setting saved as ON but
+ * unable to run appears as a greyed-on control - which on its own reads as
+ * "active, you just cannot change it here", the opposite of what is true. The
+ * two states therefore get different sentences: one says the setting is not in
+ * effect despite being on, the other says what to do first.
+ *
+ * @param {Object}  props           Component props.
+ * @param {boolean} props.disabled  Whether the control is disabled by a dependency.
+ * @param {*}       props.value     The stored value of the dependent field.
+ * @param {string}  props.dependsOn Label of the field it depends on.
+ * @return {JSX.Element|null} The note, or null when there is nothing to explain.
+ */
+function DependencyNote( { disabled, value, dependsOn } ) {
+	if ( ! disabled || ! dependsOn ) {
+		return null;
+	}
+
+	const isOn = Array.isArray( value ) ? 0 < value.length : Boolean( value );
+
+	return (
+		<span className="gtm4wp-field-dependency">
+			{ isOn
+				? sprintf(
+						/* translators: %s: label of the setting this one depends on. */
+						__(
+							'Saved as on, but not in effect: it needs %s.',
+							'duracelltomi-google-tag-manager'
+						),
+						dependsOn
+				  )
+				: sprintf(
+						/* translators: %s: label of the setting this one depends on. */
+						__(
+							'Available once %s is set.',
+							'duracelltomi-google-tag-manager'
+						),
+						dependsOn
+				  ) }
+		</span>
+	);
+}
+
+function FieldHelp( { field, error, disabled, value, dependsOn } ) {
 	return (
 		<>
 			{ error && <span className="gtm4wp-field-error">{ error }</span> }
+			<DependencyNote
+				disabled={ disabled }
+				value={ value }
+				dependsOn={ dependsOn }
+			/>
 			{ /*
 			   Descriptions carry markup (links, <code>, <br />), so they go in as
 			   HTML - trusted because every dynamic part is esc_html()'d in the
@@ -64,17 +114,32 @@ export default function FieldControl( {
 	value,
 	values,
 	error,
+	allFields,
 	onChange,
 } ) {
-	const help = <FieldHelp field={ field } error={ error } />;
-	const label = <FieldLabel field={ field } />;
-
 	// When a field declares `depends_on`, its control is disabled while the
 	// field it points at is off/empty (e.g. "Include parent categories"
 	// depends on "Category list"). The stored value is shown as-is (greyed),
 	// never forced off, so the display never disagrees with what would be
-	// saved. The frontend module still guards the value independently.
+	// saved, and re-satisfying the dependency does not appear to flip the
+	// setting on by itself. The frontend module still guards the value
+	// independently.
+	//
+	// Greying alone is not enough to be honest about it, though: a setting
+	// saved as ON that cannot run looks identical to one that is running, so
+	// the note below says which of the two it is.
 	const disabled = isFieldDisabled( field, values );
+
+	const help = (
+		<FieldHelp
+			field={ field }
+			error={ error }
+			disabled={ disabled }
+			value={ value }
+			dependsOn={ dependencyLabel( field, allFields ) }
+		/>
+	);
+	const label = <FieldLabel field={ field } />;
 
 	switch ( field.type ) {
 		case 'axeptio-version':

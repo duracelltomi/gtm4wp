@@ -355,6 +355,18 @@ $gtm4wp-mobile: 782px;
 	}
 }
 
+// Why a control is greyed out. Deliberately quieter than an error - nothing is
+// wrong, the setting simply has a prerequisite - but louder than the help text,
+// because on a setting stored as ON it is correcting an impression the greyed
+// control gives on its own.
+.gtm4wp-field-dependency {
+	color: var(--gtm4wp-text-2);
+	display: block;
+	font-size: var(--gtm4wp-fs-help);
+	font-style: italic;
+	margin-top: var(--gtm4wp-s1);
+}
+
 .gtm4wp-field-error {
 	background: var(--gtm4wp-danger-bg);
 	border-inline-start: 3px solid var(--gtm4wp-danger);

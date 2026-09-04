@@ -33,6 +33,7 @@ function docLabel( name ) {
 
 function GroupFields( {
 	fields,
+	allFields,
 	values,
 	errors,
 	focusFieldKey,
@@ -70,6 +71,7 @@ function GroupFields( {
 								value={ values[ field.key ] }
 								values={ values }
 								error={ errors[ field.key ] }
+								allFields={ allFields }
 								onChange={ ( next ) =>
 									onChange( field.key, next )
 								}
@@ -324,6 +326,7 @@ export default function ModulePanel( {
 									<div className="gtm4wp-panel__body">
 										<GroupFields
 											fields={ group ? group.fields : [] }
+											allFields={ module.fields }
 											values={ values }
 											errors={ errors }
 											focusFieldKey={ focusFieldKey }
@@ -343,6 +346,7 @@ export default function ModulePanel( {
 				<div className="gtm4wp-panel__body">
 					<GroupFields
 						fields={ flatFields }
+						allFields={ module.fields }
 						values={ values }
 						errors={ errors }
 						focusFieldKey={ focusFieldKey }
