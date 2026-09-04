@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Support forum on wordpress.org
+    url: https://wordpress.org/support/plugin/duracelltomi-google-tag-manager/
+    about: For general questions, or when you are not sure yet whether you found a bug.
+  - name: Documentation
+    url: https://gtm4wp.com/setup-gtm4wp-features
+    about: Feature setup guides, developer documentation and troubleshooting articles.
+  - name: Security vulnerability (private)
+    url: https://github.com/duracelltomi/gtm4wp/security/advisories/new
+    about: Please never report security issues publicly. Use the private advisory form, or email security@gtm4wp.com.
+  - name: Private contact
+    url: https://gtm4wp.com/contact
+    about: Only for requests that require sharing information that does not belong to the public.

@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an improvement or a new capability for GTM4WP.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation where you miss this capability, rather than only the solution you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: How do you imagine it working?
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do today instead?
+      description: A workaround in your GTM container, a code snippet, another plugin, or nothing.

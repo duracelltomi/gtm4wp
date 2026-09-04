@@ -1,0 +1,75 @@
+name: Bug report
+description: Something in GTM4WP does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug. A few pointers before you file:
+
+        - The [feature setup guides](https://gtm4wp.com/setup-gtm4wp-features), the [developer documentation](https://gtm4wp.com/gtm4wp-for-developers) and the [missing purchase events article](https://gtm4wp.com/google-tag-manager/missing-purchase-event-in-ga4.html) answer the most common questions.
+        - If you are not sure whether you found a bug, the [support forum](https://wordpress.org/support/plugin/duracelltomi-google-tag-manager/) is the right place to ask first.
+        - Support is provided on a best effort basis. Reports that include the details below usually get answered much faster, because no extra round trip is needed to collect them.
+
+        Please do not report security vulnerabilities here. Use the [private advisory form](https://github.com/duracelltomi/gtm4wp/security/advisories/new) or security@gtm4wp.com instead.
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched the existing open and closed issues and did not find this bug already reported.
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: input
+    id: gtm4wp-version
+    attributes:
+      label: GTM4WP version
+    validations:
+      required: true
+  - type: input
+    id: wp-version
+    attributes:
+      label: WordPress version
+    validations:
+      required: true
+  - type: input
+    id: wc-version
+    attributes:
+      label: WooCommerce version
+      description: Only for shop related reports. If you report a PHP error, please add your PHP version here too.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Theme and other plugins
+      description: Your active theme, and any caching or optimization plugins (WP Rocket, LiteSpeed, Autoptimize and similar).
+    validations:
+      required: true
+  - type: textarea
+    id: datalayer
+    attributes:
+      label: dataLayer output and console errors
+      description: For tracking issues, paste the dataLayer content for the affected event, taken from GTM Preview mode or from typing window.dataLayer into the browser console, plus any errors shown in the console. This is usually the single most useful detail in a report.
+  - type: checkboxes
+    id: isolation
+    attributes:
+      label: Isolation tests (optional, but they save a round trip)
+      description: Deactivating GTM4WP also removes your GTM container, and with it every tag and script running inside the container, so "it stops when I deactivate the plugin" cannot tell the plugin and the container apart. Keeping the plugin active while temporarily saving a dummy container ID such as GTM-XXXXX can.
+      options:
+        - label: The problem persists with a dummy container ID (GTM-XXXXX), so it is not caused by a tag in my container.
+        - label: The problem persists with other plugins deactivated and a default theme active.

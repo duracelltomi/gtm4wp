@@ -457,7 +457,7 @@ final class DownloadDataTest extends TestCase {
 	}
 
 	/**
-	 * U117 drift (found 2026-09-01 against EDD 3.7.0): EDD core has shipped an
+	 * U119 drift (found 2026-09-01 against EDD 3.7.0): EDD core has shipped an
 	 * opt-in checkout Phone field since 3.3.8 that stores the number as order
 	 * meta '_edd_phone' - a key this module never read, so on such stores the
 	 * hashed phone silently vanished from Enhanced Conversions. Pins the read
