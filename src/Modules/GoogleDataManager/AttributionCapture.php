@@ -140,7 +140,12 @@ final class AttributionCapture {
 			return null;
 		}
 
-		$decoded = json_decode( rawurldecode( $raw ), true, AttributionCookies::MAX_DEPTH );
+		// No URL decoding here: the capture script percent-encodes the payload
+		// on the way out (a JSON body contains characters a cookie value may
+		// not carry raw), and PHP has already decoded it on the way in. Doing
+		// it again would be a second decode, which silently rewrites any value
+		// that legitimately contains a percent sign.
+		$decoded = json_decode( $raw, true, AttributionCookies::MAX_DEPTH );
 
 		if ( ! is_array( $decoded ) ) {
 			return null;

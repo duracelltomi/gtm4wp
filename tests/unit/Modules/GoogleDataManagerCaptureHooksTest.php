@@ -62,28 +62,27 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 	 * @return void
 	 */
 	private function set_captured_cookies(): void {
-		$_COOKIE[ AttributionCookies::IDS_COOKIE ] = rawurlencode(
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
-			(string) json_encode(
-				array(
-					'v'         => AttributionCookies::FORMAT_VERSION,
-					'client_id' => '111.222',
-					'sessions'  => array( 'G-ABC123' => '1788522496' ),
-					'gclid'     => 'abc123',
-				)
+		// The plain JSON, not the percent-encoded form: the script encodes on
+		// the way out and PHP has already decoded by the time a value reaches
+		// $_COOKIE.
+		// phpcs:disable WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
+		$_COOKIE[ AttributionCookies::IDS_COOKIE ] = (string) json_encode(
+			array(
+				'v'         => AttributionCookies::FORMAT_VERSION,
+				'client_id' => '111.222',
+				'sessions'  => array( 'G-ABC123' => '1788522496' ),
+				'gclid'     => 'abc123',
 			)
 		);
 
-		$_COOKIE[ AttributionCookies::CONSENT_COOKIE ] = rawurlencode(
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
-			(string) json_encode(
-				array(
-					'v'           => AttributionCookies::FORMAT_VERSION,
-					'signals'     => array( 'analytics_storage' => 'granted' ),
-					'captured_at' => 1_800_000_000,
-				)
+		$_COOKIE[ AttributionCookies::CONSENT_COOKIE ] = (string) json_encode(
+			array(
+				'v'           => AttributionCookies::FORMAT_VERSION,
+				'signals'     => array( 'analytics_storage' => 'granted' ),
+				'captured_at' => 1_800_000_000,
 			)
 		);
+		// phpcs:enable WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	}
 
 	/**
@@ -339,13 +338,10 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 	 * read as healthy on a store where no Analytics tag fires at all.
 	 */
 	public function test_an_order_with_only_a_click_id_does_not_count_as_captured(): void {
-		$_COOKIE[ AttributionCookies::IDS_COOKIE ] = rawurlencode(
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
-			(string) json_encode(
-				array(
-					'v'     => AttributionCookies::FORMAT_VERSION,
-					'gclid' => 'abc123',
-				)
+		$_COOKIE[ AttributionCookies::IDS_COOKIE ] = (string) json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
+			array(
+				'v'     => AttributionCookies::FORMAT_VERSION,
+				'gclid' => 'abc123',
 			)
 		);
 

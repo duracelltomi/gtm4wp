@@ -45,7 +45,13 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 	}
 
 	/**
-	 * Stores a payload the way the capture script does: JSON, URL encoded.
+	 * Stores a payload the way PHP presents it.
+	 *
+	 * The capture script percent-encodes the JSON on the way out, and PHP has
+	 * already decoded it by the time it reaches $_COOKIE - so the fixture is
+	 * the plain JSON, not the encoded form. Seeding the encoded form instead
+	 * would test a string production never sees, and would keep passing over a
+	 * parser that decoded a second time.
 	 *
 	 * @param string               $cookie  Cookie name.
 	 * @param array<string, mixed> $payload Payload, version added unless present.
@@ -56,7 +62,7 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 			$payload['v'] = AttributionCookies::FORMAT_VERSION;
 		}
 
-		$_COOKIE[ $cookie ] = rawurlencode( (string) json_encode( $payload ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$_COOKIE[ $cookie ] = (string) json_encode( $payload ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	}
 
 	/**
@@ -225,9 +231,31 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 	}
 
 	public function test_a_payload_without_a_version_is_refused(): void {
-		$_COOKIE[ AttributionCookies::IDS_COOKIE ] = rawurlencode( '{"client_id":"111.222"}' );
+		$_COOKIE[ AttributionCookies::IDS_COOKIE ] = '{"client_id":"111.222"}';
 
 		$this->assertSame( array(), AttributionCapture::parse_ids() );
+	}
+
+	/**
+	 * The value must be read exactly as PHP hands it over - decoded once, by
+	 * PHP, and not again here.
+	 *
+	 * A second decode looks harmless because normal JSON carries no percent
+	 * signs, so every other test in this file passes with or without it. It is
+	 * not harmless, and the reason is sharper than "a value changes": the
+	 * grammars reject a percent sign, so `a%41b` is a value this parser is
+	 * supposed to refuse - and an extra decode pass turns it into `aAb`, which
+	 * the grammar then accepts. The bug did not corrupt a valid value, it
+	 * promoted an invalid one into a valid-looking different one. The parser
+	 * did decode twice until this was measured.
+	 */
+	public function test_a_value_is_not_decoded_a_second_time_into_something_the_grammar_accepts(): void {
+		$this->set_cookie( AttributionCookies::IDS_COOKIE, array( 'gclid' => 'a%41b' ) );
+
+		$parsed = AttributionCapture::parse_ids();
+
+		$this->assertArrayNotHasKey( 'gclid', $parsed, 'A percent sign is outside the grammar, so the value is refused.' );
+		$this->assertNotContains( 'aAb', $parsed, 'And it is certainly not decoded into a different, acceptable value.' );
 	}
 
 	/**
