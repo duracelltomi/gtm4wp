@@ -682,6 +682,46 @@ describe( 'gtm4wp-attribution', () => {
 			} );
 		} );
 
+		/**
+		 * Once the engine exists it outranks anything on the data layer, and
+		 * that is deliberate rather than an accident of precedence: the engine
+		 * holds what the Google tag ACTUALLY APPLIED, while the queue holds
+		 * what was pushed at it. Those differ - a plain array push does not
+		 * move GTM's consent state, only a gtag() call (which pushes an
+		 * arguments object) or an in-container template API does. Honouring
+		 * the queue over the engine would mean acting on a consent update that
+		 * never took effect for any tag on the page.
+		 */
+		it( 'keeps the engine as the authority over a later data layer push', () => {
+			setTagConsent( {
+				analytics_storage: { def: false, update: true },
+				ad_storage: { def: false, update: true },
+			} );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
+
+			// Pushed at the data layer, applied by nothing.
+			window.dataLayer.push( [
+				'consent',
+				'update',
+				{ analytics_storage: 'denied', ad_storage: 'denied' },
+			] );
+
+			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
+
+			// The same withdrawal, once it has actually reached the engine.
+			setTagConsent( {
+				analytics_storage: { def: false, update: false },
+				ad_storage: { def: false, update: false },
+			} );
+			window.dataLayer.push( { event: 'anything' } );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+		} );
+
 		it( 'ignores an engine that is missing, empty or malformed', () => {
 			window.dataLayer.push( [
 				'consent',
