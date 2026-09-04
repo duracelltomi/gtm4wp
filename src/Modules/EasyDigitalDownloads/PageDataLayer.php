@@ -442,7 +442,7 @@ final class PageDataLayer {
 	 * @return array<string, mixed>
 	 */
 	private function add_success_page_data( array $data_layer ): array {
-		$payment_key = $this->resolve_payment_key();
+		$payment_key = self::resolve_payment_key();
 		if ( '' === $payment_key ) {
 			return $data_layer;
 		}
@@ -478,9 +478,15 @@ final class PageDataLayer {
 	 * buyer's identity is a separate decision made by the caller via
 	 * edd_can_view_receipt().
 	 *
+	 * Static and shared rather than copied: the Data Manager module's receipt
+	 * detection needs the same chain, and this is exactly the kind of
+	 * resolution logic that must not exist twice - the hash check below was
+	 * added once, and a second copy would be the version that silently lacks
+	 * it.
+	 *
 	 * @return string The payment key, or an empty string when none is present or the hash does not match.
 	 */
-	private function resolve_payment_key(): string {
+	public static function resolve_payment_key(): string {
 		// Suppressing 'Processing form data without nonce verification.' - these are
 		// the query args EDD itself places on the success page redirect; the payment
 		// key is the authorization.

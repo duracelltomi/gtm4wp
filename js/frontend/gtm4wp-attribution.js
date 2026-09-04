@@ -80,6 +80,22 @@ import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
 	 */
 	let consentSignals = null;
 
+	/**
+	 * Whether the confirmation-page backfill has already been posted. One
+	 * attempt per pageview: the route writes only into fields that are still
+	 * empty, so a second POST could not add anything a first one did not.
+	 *
+	 * @type {boolean}
+	 */
+	let backfillSent = false;
+
+	/**
+	 * Whether a backfill POST is already queued for the end of this task.
+	 *
+	 * @type {boolean}
+	 */
+	let backfillScheduled = false;
+
 	window[ datalayerName ] = window[ datalayerName ] || [];
 
 	/**
@@ -245,6 +261,10 @@ import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
 		}
 
 		writeCookie( config.idsCookie, ids );
+
+		// The same values the cookie just took, offered to the order that was
+		// created before they resolved.
+		scheduleBackfill();
 	}
 
 	/**
@@ -399,6 +419,101 @@ import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
 				pending.clickIds[ name ] = stored[ name ];
 			}
 		} );
+	}
+
+	/**
+	 * Schedules the backfill POST for the end of the current task.
+	 *
+	 * The Google tag core services the whole queued batch back to back, so the
+	 * client id and the session ids resolve in the same task. Sending straight
+	 * from the first callback would post the client id alone and, since only
+	 * one POST is ever made, silently drop the session ids. A microtask waits
+	 * for the batch to finish without introducing a timer or a retry loop.
+	 *
+	 * @return {void}
+	 */
+	function scheduleBackfill() {
+		if ( ! config.backfill || backfillSent || backfillScheduled ) {
+			return;
+		}
+
+		backfillScheduled = true;
+
+		Promise.resolve().then( function () {
+			backfillScheduled = false;
+			sendBackfill();
+		} );
+	}
+
+	/**
+	 * Posts the captured values to the backfill route.
+	 *
+	 * Only runs on a confirmation page the server flagged as still missing its
+	 * attribution - the client cannot read order meta, so that flag is the only
+	 * way it could know. Sent once, and only what consent allows storing, so the
+	 * POST never carries more than the cookie would have.
+	 *
+	 * @return {void}
+	 */
+	function sendBackfill() {
+		if ( ! config.backfill || backfillSent ) {
+			return;
+		}
+
+		const values = {};
+		let hasValues = false;
+
+		if ( isGranted( SIGNAL_ANALYTICS ) ) {
+			if ( pending.clientId ) {
+				values.client_id = pending.clientId;
+				hasValues = true;
+			}
+
+			if ( Object.keys( pending.sessions ).length ) {
+				values.sessions = pending.sessions;
+				hasValues = true;
+			}
+		}
+
+		if ( isGranted( SIGNAL_ADS ) ) {
+			Object.keys( pending.clickIds ).forEach( function ( name ) {
+				values[ name ] = pending.clickIds[ name ];
+				hasValues = true;
+			} );
+		}
+
+		if ( ! hasValues ) {
+			return;
+		}
+
+		backfillSent = true;
+
+		const body = {
+			platform: config.backfill.platform,
+			order: config.backfill.order,
+			token: config.backfill.token,
+			values,
+			consent: {
+				signals: consentSignals || {},
+				captured_at: Math.floor( Date.now() / 1000 ),
+			},
+		};
+
+		try {
+			window.fetch( config.backfill.url, {
+				method: 'POST',
+				keepalive: true,
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-WP-Nonce': config.backfill.nonce,
+				},
+				body: JSON.stringify( body ),
+			} );
+		} catch ( e ) {
+			// A failed backfill costs the attribution of one order, which is
+			// the same outcome as not trying; it must never break the page.
+		}
 	}
 
 	consentSignals = scanConsent();

@@ -112,6 +112,16 @@ final class Plugin {
 					new Modules\GoogleDataManager\EventsIngest( $tokens, $transport )
 				) )->register_routes();
 
+				// The attribution backfill is guest-facing, so it registers only
+				// while capture is on: an endpoint nobody needs should not
+				// exist. It is gated on the option alone, not on a commerce
+				// platform - the callback resolves the order through whichever
+				// platform the request names and refuses when that platform is
+				// absent.
+				if ( $this->options->get( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION ) ) {
+					( new Modules\GoogleDataManager\BackfillEndpoint() )->register_routes();
+				}
+
 				// A service account a destination row still references must not
 				// be deletable: the delete route runs over REST, so the veto is
 				// wired here, next to the routes it protects.

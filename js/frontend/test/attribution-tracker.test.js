@@ -457,6 +457,140 @@ describe( 'gtm4wp-attribution', () => {
 		} );
 	} );
 
+	describe( 'the confirmation-page backfill', () => {
+		const backfill = {
+			url: 'https://example.com/wp-json/gtm4wp/v2/google/attribution-backfill',
+			nonce: 'a-rest-nonce',
+			platform: 'wc',
+			order: '42',
+			token: 'wc_order_aBcDeF123456',
+		};
+
+		/**
+		 * Lets the queued microtask that batches the POST run.
+		 *
+		 * @return {Promise<void>}
+		 */
+		const settle = () => Promise.resolve().then( () => {} );
+
+		beforeEach( () => {
+			window.fetch = jest.fn();
+		} );
+
+		afterEach( () => {
+			delete window.fetch;
+		} );
+
+		it( 'posts nothing when the server did not flag this page', async () => {
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+			await settle();
+
+			expect( window.fetch ).not.toHaveBeenCalled();
+		} );
+
+		it( 'posts the resolved values when the page is flagged', async () => {
+			window.gtm4wp_gdm_attribution_config.backfill = backfill;
+
+			loadTracker();
+			await settle();
+
+			// Nothing has resolved yet, so there is nothing worth posting.
+			expect( window.fetch ).not.toHaveBeenCalled();
+
+			serviceQueuedGets( {
+				client_id: '111.222',
+				sessions: { 'G-AAAA1111': '1788522496' },
+			} );
+			await settle();
+
+			// One POST carrying everything that batch resolved, not one per
+			// value: the core services the whole queue back to back.
+			expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+
+			const [ url, options ] = window.fetch.mock.calls[ 0 ];
+
+			expect( url ).toBe( backfill.url );
+			expect( options.method ).toBe( 'POST' );
+			expect( options.headers[ 'X-WP-Nonce' ] ).toBe( backfill.nonce );
+
+			expect( JSON.parse( options.body ) ).toEqual( {
+				platform: 'wc',
+				order: '42',
+				token: backfill.token,
+				values: {
+					client_id: '111.222',
+					sessions: { 'G-AAAA1111': '1788522496' },
+				},
+				consent: {
+					signals: {},
+					captured_at: expect.any( Number ),
+				},
+			} );
+		} );
+
+		it( 'posts at most once per pageview', async () => {
+			window.gtm4wp_gdm_attribution_config.backfill = backfill;
+
+			loadTracker();
+			serviceQueuedGets( {
+				client_id: '111.222',
+				sessions: { 'G-AAAA1111': '1788522496' },
+			} );
+			await settle();
+
+			// A later consent change re-runs persistence; the route only ever
+			// fills empty fields, so a second POST could add nothing.
+			window.dataLayer.push( [
+				'consent',
+				'update',
+				{ analytics_storage: 'granted', ad_storage: 'granted' },
+			] );
+			await settle();
+
+			expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+		} );
+
+		it( 'posts nothing that consent does not allow storing', async () => {
+			setSearch( '?gclid=abc123' );
+			window.gtm4wp_gdm_attribution_config.backfill = backfill;
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'granted', ad_storage: 'denied' },
+			] );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+			await settle();
+
+			const body = JSON.parse( window.fetch.mock.calls[ 0 ][ 1 ].body );
+
+			expect( body.values.client_id ).toBe( '111.222' );
+			expect( body.values.gclid ).toBeUndefined();
+			expect( body.consent.signals ).toEqual( {
+				analytics_storage: 'granted',
+				ad_storage: 'denied',
+			} );
+		} );
+
+		it( 'does not break the page when the request fails', async () => {
+			window.gtm4wp_gdm_attribution_config.backfill = backfill;
+			window.fetch = jest.fn( () => {
+				throw new Error( 'offline' );
+			} );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			await expect( settle() ).resolves.toBeUndefined();
+
+			// The cookie was still written: a failed backfill costs the
+			// attribution of one order, nothing else.
+			expect( readPayload( IDS_COOKIE ).client_id ).toBe( '111.222' );
+		} );
+	} );
+
 	describe( 'hostile and malformed input', () => {
 		it( 'keeps a click id verbatim and leaves the cookie parseable', () => {
 			// The value is Google's to define, so it is stored as it came; what

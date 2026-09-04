@@ -176,6 +176,20 @@ final class AttributionCapture {
 			return array();
 		}
 
+		return self::validate_ids( $decoded );
+	}
+
+	/**
+	 * Validates an ID payload however it arrived.
+	 *
+	 * Shared by the cookie parser and the backfill route on purpose: values
+	 * posted by a visitor and values stored by a visitor deserve exactly the
+	 * same scrutiny, and one grammar cannot drift against itself (UC-6).
+	 *
+	 * @param array<string, mixed> $decoded The raw payload.
+	 * @return array<string, mixed> Only the members that passed validation.
+	 */
+	private static function validate_ids( array $decoded ): array {
 		$parsed = array();
 
 		if ( isset( $decoded[ AttributionCookies::KEY_CLIENT_ID ] )
@@ -228,11 +242,21 @@ final class AttributionCapture {
 	public static function parse_consent(): ?array {
 		$decoded = self::decode( AttributionCookies::CONSENT_COOKIE );
 
-		if ( null === $decoded || ! isset( $decoded[ AttributionCookies::KEY_SIGNALS ] ) ) {
+		if ( null === $decoded ) {
 			return null;
 		}
 
-		if ( ! is_array( $decoded[ AttributionCookies::KEY_SIGNALS ] ) ) {
+		return self::validate_consent( $decoded );
+	}
+
+	/**
+	 * Validates a consent payload however it arrived.
+	 *
+	 * @param array<string, mixed> $decoded The raw payload.
+	 * @return array<string, mixed>|null The map with its timestamp, or null when unusable.
+	 */
+	private static function validate_consent( array $decoded ): ?array {
+		if ( ! isset( $decoded[ AttributionCookies::KEY_SIGNALS ] ) || ! is_array( $decoded[ AttributionCookies::KEY_SIGNALS ] ) ) {
 			return null;
 		}
 
@@ -263,6 +287,47 @@ final class AttributionCapture {
 			AttributionCookies::KEY_SIGNALS     => $signals,
 			AttributionCookies::KEY_CAPTURED_AT => $captured_at,
 		);
+	}
+
+	/**
+	 * Validates values posted to the backfill route, keyed by meta key.
+	 *
+	 * The same grammar as the cookie, then mapped straight onto the meta keys,
+	 * so the route can only ever write the fields capture itself writes - a
+	 * caller cannot introduce a key of their own choosing into order meta.
+	 *
+	 * @param array<string, mixed> $payload The posted values.
+	 * @return array<string, mixed> Meta key to value.
+	 */
+	public static function parse_payload( array $payload ): array {
+		$ids  = self::validate_ids( $payload );
+		$meta = array();
+
+		if ( isset( $ids[ AttributionCookies::KEY_CLIENT_ID ] ) ) {
+			$meta[ self::META_CLIENT_ID ] = $ids[ AttributionCookies::KEY_CLIENT_ID ];
+		}
+
+		if ( isset( $ids[ AttributionCookies::KEY_SESSIONS ] ) ) {
+			$meta[ self::META_SESSION_IDS ] = $ids[ AttributionCookies::KEY_SESSIONS ];
+		}
+
+		foreach ( AttributionCookies::CLICK_ID_PARAMS as $param ) {
+			if ( isset( $ids[ $param ] ) ) {
+				$meta[ self::META_CLICK_ID_PREFIX . $param ] = $ids[ $param ];
+			}
+		}
+
+		return $meta;
+	}
+
+	/**
+	 * Validates a consent map posted to the backfill route.
+	 *
+	 * @param array<string, mixed> $payload The posted consent state.
+	 * @return array<string, mixed>|null The validated state, or null when unusable.
+	 */
+	public static function parse_consent_payload( array $payload ): ?array {
+		return self::validate_consent( $payload );
 	}
 
 	/**

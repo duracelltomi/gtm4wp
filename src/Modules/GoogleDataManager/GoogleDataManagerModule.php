@@ -124,6 +124,12 @@ final class GoogleDataManagerModule extends AbstractModule {
 			array( 'measurementIds' => $measurement_ids )
 		);
 
+		$backfill = ReceiptPage::backfill_config();
+
+		if ( null !== $backfill ) {
+			$config['backfill'] = $backfill;
+		}
+
 		wp_add_inline_script(
 			'gtm4wp-attribution',
 			'var gtm4wp_gdm_attribution_config = ' . ScriptTag::json_literal( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',

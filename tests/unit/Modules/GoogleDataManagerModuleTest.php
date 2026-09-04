@@ -80,6 +80,12 @@ final class GoogleDataManagerModuleTest extends TestCase {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- The stand-in for the function under stub; calling it here would recurse.
 			static fn ( $value, $flags = 0 ) => json_encode( $value, $flags )
 		);
+
+		// Not a confirmation page: the backfill flag has its own suite, and
+		// leaving these unstubbed would make this one fail on whichever
+		// receipt helper the module happens to reach first.
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+		Functions\when( 'edd_is_success_page' )->justReturn( false );
 	}
 
 	protected function tearDown(): void {
