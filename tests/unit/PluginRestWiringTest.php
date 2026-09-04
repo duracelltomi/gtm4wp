@@ -245,6 +245,64 @@ final class PluginRestWiringTest extends TestCase {
 	}
 
 	/**
+	 * The attribution backfill is the plugin's only guest-facing route that is
+	 * registered conditionally, so both directions of that condition are
+	 * pinned here: an endpoint nobody needs should not exist, and one the
+	 * feature needs must.
+	 */
+	public function test_the_backfill_route_is_registered_only_while_capture_is_on(): void {
+		$this->run_rest_api_init(
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true ) )
+		);
+
+		$this->assertNotSame(
+			array(),
+			$this->callbacks_of_controller( \GTM4WP\Modules\GoogleDataManager\BackfillEndpoint::class ),
+			'With capture on the route exists, behind its own permission callback.'
+		);
+	}
+
+	public function test_no_backfill_route_while_capture_is_off(): void {
+		$this->run_rest_api_init( $this->boot_and_capture_rest_api_init() );
+
+		$this->assertSame(
+			array(),
+			$this->callbacks_of_controller( \GTM4WP\Modules\GoogleDataManager\BackfillEndpoint::class )
+		);
+	}
+
+	/**
+	 * Personal-data requests run from wp-admin, from cron and from WP-CLI, so
+	 * the exporter and eraser are attached in boot() rather than in either
+	 * branch below it. Without this assertion that line can be deleted and the
+	 * suite stays green while every real site loses the removal path for data
+	 * uninstalling deliberately leaves behind.
+	 */
+	public function test_boot_registers_the_privacy_exporter_and_eraser(): void {
+		$this->boot_and_capture_rest_api_init();
+
+		$this->assertNotFalse(
+			has_filter( 'wp_privacy_personal_data_exporters', 'GTM4WP\Modules\GoogleDataManager\PrivacyData->register_exporter()' )
+		);
+		$this->assertNotFalse(
+			has_filter( 'wp_privacy_personal_data_erasers', 'GTM4WP\Modules\GoogleDataManager\PrivacyData->register_eraser()' )
+		);
+	}
+
+	/**
+	 * And they are attached whatever the capture setting says: a request has to
+	 * find data captured while the feature was on, including after it has been
+	 * turned off again.
+	 */
+	public function test_the_privacy_wiring_does_not_depend_on_the_capture_setting(): void {
+		$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false ) );
+
+		$this->assertNotFalse(
+			has_filter( 'wp_privacy_personal_data_erasers', 'GTM4WP\Modules\GoogleDataManager\PrivacyData->register_eraser()' )
+		);
+	}
+
+	/**
 	 * The permission callbacks bound to methods of the given controller class.
 	 *
 	 * @param string $controller_class Controller class name.

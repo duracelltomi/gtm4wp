@@ -99,7 +99,7 @@ final class RequestOrigin {
 	 * @param array<string, mixed> $site Parsed home_url() parts.
 	 * @return bool
 	 */
-	public static function url_matches_site( string $url, array $site ): bool {
+	private static function url_matches_site( string $url, array $site ): bool {
 		$parts = wp_parse_url( $url );
 
 		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
@@ -133,7 +133,7 @@ final class RequestOrigin {
 	 * @param array<string, mixed> $parts Parsed URL parts from wp_parse_url().
 	 * @return int|null The significant port, or null when it is the scheme default.
 	 */
-	public static function normalized_port( array $parts ): ?int {
+	private static function normalized_port( array $parts ): ?int {
 		$defaults = array(
 			'http'  => 80,
 			'https' => 443,

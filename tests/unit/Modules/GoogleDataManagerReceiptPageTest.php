@@ -14,6 +14,7 @@ use GTM4WP\Modules\GoogleDataManager\ReceiptPage;
 use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
+require_once __DIR__ . '/edd-stubs.php';
 
 /**
  * The flag exists because the client cannot read order meta: only the server
@@ -51,6 +52,7 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 	protected function tearDown(): void {
 		$_GET                                    = array();
 		$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		unset( $GLOBALS['wp'] );
 
 		parent::tearDown();
 	}
@@ -140,6 +142,25 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 	}
 
 	/**
+	 * On a store with pretty permalinks - most of them - `order-received` is a
+	 * WooCommerce query var rather than a $_GET key, so this is the branch the
+	 * majority of real receipts take. If it were wrong the backfill would
+	 * simply never run, which is exactly the invisible failure the capture
+	 * counters exist to expose.
+	 */
+	public function test_the_order_id_is_read_from_the_query_var_when_the_url_is_pretty(): void {
+		$this->given_wc_receipt_page();
+
+		unset( $_GET['order-received'] );
+		$GLOBALS['wp'] = (object) array( 'query_vars' => array( 'order-received' => (string) self::ORDER_ID ) );
+
+		$config = ReceiptPage::backfill_config();
+
+		$this->assertSame( '42', $config['order'] );
+		$this->assertSame( self::ORDER_KEY, $config['token'] );
+	}
+
+	/**
 	 * The printed object carries exactly five members. Pinned as an exact set
 	 * because this is the one place where server-side order state is offered
 	 * to the page: a field added here without thinking is how an order total,
@@ -203,6 +224,59 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		Functions\when( 'edd_get_order_by' )->justReturn( false );
 
 		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	/**
+	 * The buyer who reaches the success page with nothing in the URL - the
+	 * purchase-session branch of EDD's chain - gets no flag.
+	 *
+	 * The whole reason printing the flag is safe is that the token is already
+	 * in the address bar of the page being rendered. In this branch it is not,
+	 * so printing it would put a durable receipt secret into the page HTML
+	 * where any third-party script could read it. Losing the backfill for that
+	 * visitor is the cheaper trade.
+	 */
+	public function test_no_edd_flag_when_the_key_came_from_the_purchase_session(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET = array();
+
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'edd-payment-key-abc' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( (object) array( 'id' => self::ORDER_ID ) );
+		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	/**
+	 * The id-plus-hash branch does carry its proof in the URL, so it keeps the
+	 * flag - the guard above must not have cost the branch EDD's own receipt
+	 * links use.
+	 */
+	public function test_the_edd_receipt_link_branch_still_gets_the_flag(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET = array(
+			'id'    => (string) self::ORDER_ID,
+			'order' => 'the-verification-hash',
+		);
+
+		Functions\when( 'edd_get_order' )->justReturn(
+			new \EDD\Orders\Order(
+				array(
+					'id'          => self::ORDER_ID,
+					'payment_key' => 'edd-payment-key-abc',
+					'email'       => 'buyer@example.com',
+				)
+			)
+		);
+		Functions\when( 'edd_get_order_by' )->justReturn( (object) array( 'id' => self::ORDER_ID ) );
+		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+
+		// resolve_payment_key() releases the key only when the hash matches.
+		$_GET['order'] = md5( self::ORDER_ID . 'edd-payment-key-abcbuyer@example.com' );
+
+		$config = ReceiptPage::backfill_config();
+
+		$this->assertSame( 'edd-payment-key-abc', $config['token'] );
 	}
 
 	public function test_no_flag_when_the_platform_functions_are_absent(): void {

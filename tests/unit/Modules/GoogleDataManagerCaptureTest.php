@@ -209,7 +209,28 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 		$this->assertSame( array(), AttributionCapture::parse_ids() );
 	}
 
-	public function test_a_cookie_larger_than_the_cap_is_not_even_decoded(): void {
+	/**
+	 * The payload is deliberately VALID and merely oversized. A junk string of
+	 * the same length would be refused by json_decode anyway, so it would pass
+	 * with the size check deleted - and the cap, which is the guard being
+	 * named, would rest on nothing.
+	 */
+	public function test_a_cookie_larger_than_the_cap_is_refused_even_when_it_is_valid(): void {
+		$payload = array(
+			'v'         => AttributionCookies::FORMAT_VERSION,
+			'client_id' => '111.222',
+			'pad'       => str_repeat( 'a', AttributionCookies::MAX_BYTES ),
+		);
+
+		$this->set_raw_cookie(
+			AttributionCookies::IDS_COOKIE,
+			(string) json_encode( $payload ) // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		);
+
+		$this->assertSame( array(), AttributionCapture::parse_ids() );
+	}
+
+	public function test_a_cookie_of_junk_larger_than_the_cap_is_refused_too(): void {
 		$this->set_raw_cookie(
 			AttributionCookies::IDS_COOKIE,
 			str_repeat( 'a', AttributionCookies::MAX_BYTES + 1 )
@@ -472,6 +493,48 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 		$parsed = AttributionCapture::parse_consent();
 
 		$this->assertSame( array(), $parsed['signals'] );
+	}
+
+	/**
+	 * Signal names are grammar-checked, so a crafted cookie can supply
+	 * hundreds of perfectly valid ones; the cap is what stops that turning
+	 * into unbounded order meta. Mirrors the session-map cap test.
+	 */
+	public function test_the_signal_map_is_capped(): void {
+		// Every name is grammar-valid, so nothing is dropped for being
+		// malformed and only the cap can be doing the limiting.
+		$signals = array();
+		for ( $i = 0; $i < AttributionCapture::MAX_SIGNALS + 10; $i++ ) {
+			$signals[ 'signal_' . str_repeat( 'a', 1 + $i ) ] = 'granted';
+		}
+
+		$this->set_cookie( AttributionCookies::CONSENT_COOKIE, array( 'signals' => $signals ) );
+
+		$this->assertCount(
+			AttributionCapture::MAX_SIGNALS,
+			AttributionCapture::parse_consent()['signals']
+		);
+	}
+
+	/**
+	 * A payload nested deeper than the format allows is refused outright
+	 * rather than partially read.
+	 */
+	public function test_an_over_nested_payload_is_refused(): void {
+		$nested = array( 'v' => AttributionCookies::FORMAT_VERSION );
+		$cursor = &$nested['deep'];
+		for ( $i = 0; $i < AttributionCookies::MAX_DEPTH + 3; $i++ ) {
+			$cursor = array();
+			$cursor = &$cursor['deeper'];
+		}
+		unset( $cursor );
+
+		$this->set_raw_cookie(
+			AttributionCookies::IDS_COOKIE,
+			(string) json_encode( $nested ) // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		);
+
+		$this->assertSame( array(), AttributionCapture::parse_ids() );
 	}
 
 	public function test_a_consent_cookie_without_a_signal_map_yields_nothing(): void {

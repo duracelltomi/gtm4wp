@@ -120,6 +120,17 @@ final class ReceiptPage {
 			return null;
 		}
 
+		// The chain's third branch resolves the key from the buyer's session,
+		// which means it is NOT in the page URL - and printing it would put a
+		// durable receipt secret into the HTML where any third-party script on
+		// the page could read it. The flag is only worth having when it costs
+		// no disclosure, so that branch is skipped: such a visitor simply does
+		// not backfill, and the attribution stays whatever order creation
+		// captured.
+		if ( ! self::edd_key_is_in_the_url( $payment_key ) ) {
+			return null;
+		}
+
 		$order = edd_get_order_by( 'payment_key', $payment_key );
 
 		if ( ! is_object( $order ) ) {
@@ -141,6 +152,28 @@ final class ReceiptPage {
 		}
 
 		return self::config( BackfillEndpoint::PLATFORM_EDD, (string) $order_id, $payment_key );
+	}
+
+	/**
+	 * Whether the visitor arrived already holding this payment key.
+	 *
+	 * True for the two URL-borne branches of EDD's receipt chain: the key
+	 * itself as `?payment_key=`, or an `?id=` whose accompanying `?order=`
+	 * verification hash matched, which is how EDD's own receipt links carry
+	 * it. False when the key came from the purchase session, where the page
+	 * URL holds nothing secret.
+	 *
+	 * @param string $payment_key The resolved payment key.
+	 * @return bool
+	 */
+	private static function edd_key_is_in_the_url( string $payment_key ): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading the receipt URL of the page being rendered, not acting on a submission.
+		if ( isset( $_GET['payment_key'] ) && sanitize_text_field( wp_unslash( $_GET['payment_key'] ) ) === $payment_key ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- As above.
+		return ! empty( $_GET['order'] ) && ! empty( $_GET['id'] );
 	}
 
 	/**

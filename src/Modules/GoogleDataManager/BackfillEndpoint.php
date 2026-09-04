@@ -122,16 +122,10 @@ final class BackfillEndpoint {
 		$order    = (string) $request->get_param( 'order' );
 		$token    = (string) $request->get_param( 'token' );
 
-		$values = AttributionCapture::parse_payload( (array) $request->get_param( 'values' ) );
-		$this->add_consent( $request, $values );
-
-		if ( array() === $values ) {
-			// Nothing usable was posted. Answered like a success on purpose:
-			// the client has nothing to do differently, and a distinct error
-			// would tell an unauthorized caller their guess parsed.
-			return new \WP_REST_Response( null, 204 );
-		}
-
+		// Verification first, and before anything about the payload is
+		// considered: every refusal has to look the same whatever was posted,
+		// or the status code becomes a way to test whether a guessed order and
+		// key go together.
 		$writer = self::PLATFORM_WC === $platform
 			? $this->woocommerce_writer( $order, $token )
 			: $this->edd_writer( $order, $token );
@@ -147,24 +141,29 @@ final class BackfillEndpoint {
 			);
 		}
 
-		$writer( $values );
+		$values = AttributionCapture::parse_payload( (array) $request->get_param( 'values' ) );
 
-		return new \WP_REST_Response( null, 204 );
-	}
+		// The posted consent map goes through the site's own override filter,
+		// exactly as the one read from the cookie at order creation does. The
+		// filter exists for sites where the browser's view of consent is not
+		// the trustworthy one, so a route that stored the posted map verbatim
+		// would hand the buyer the answer the send gate later reads.
+		$consent = AttributionCapture::filter_consent(
+			AttributionCapture::parse_consent_payload( (array) $request->get_param( 'consent' ) ),
+			$order
+		);
 
-	/**
-	 * Adds the posted consent state to the values, when it parses.
-	 *
-	 * @param \WP_REST_Request     $request The REST request.
-	 * @param array<string, mixed> $values  Values to extend.
-	 * @return void
-	 */
-	private function add_consent( \WP_REST_Request $request, array &$values ): void {
-		$consent = AttributionCapture::parse_consent_payload( (array) $request->get_param( 'consent' ) );
+		$values = AttributionCapture::apply_consent_gate( $values, $consent );
 
 		if ( null !== $consent ) {
 			$values[ AttributionCapture::META_CONSENT_STATE ] = $consent;
 		}
+
+		if ( array() !== $values ) {
+			$writer( $values );
+		}
+
+		return new \WP_REST_Response( null, 204 );
 	}
 
 	/**
@@ -222,7 +221,9 @@ final class BackfillEndpoint {
 	 * @return callable|null Null when the order cannot be verified.
 	 */
 	private function edd_writer( string $order_id, string $token ): ?callable {
-		if ( ! function_exists( 'edd_get_order_by' ) || ! function_exists( 'edd_update_order_meta' ) ) {
+		if ( ! function_exists( 'edd_get_order_by' )
+			|| ! function_exists( 'edd_get_order_meta' )
+			|| ! function_exists( 'edd_update_order_meta' ) ) {
 			return null;
 		}
 

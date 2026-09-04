@@ -95,9 +95,22 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 				return 42;
 			}
 
+			/**
+			 * Times save() was called.
+			 *
+			 * @var int
+			 */
+			public int $save_count = 0;
+
 			public function delete_meta_data( $key ) {
 				$this->deleted[]          = $key;
 				$this->saved_meta[ $key ] = '';
+			}
+
+			public function save() {
+				++$this->save_count;
+
+				return parent::save();
 			}
 		};
 
@@ -160,10 +173,19 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 	// ---- Registration ------------------------------------------------------
 
 	public function test_registers_both_callbacks(): void {
-		( new PrivacyData() )->register_hooks();
+		$privacy = new PrivacyData();
+		$privacy->register_hooks();
 
-		$this->assertNotFalse( has_filter( 'wp_privacy_personal_data_exporters' ) );
-		$this->assertNotFalse( has_filter( 'wp_privacy_personal_data_erasers' ) );
+		// The named callbacks at the default priority, not merely something on
+		// the hooks (TC-4).
+		$this->assertSame(
+			10,
+			has_filter( 'wp_privacy_personal_data_exporters', array( $privacy, 'register_exporter' ) )
+		);
+		$this->assertSame(
+			10,
+			has_filter( 'wp_privacy_personal_data_erasers', array( $privacy, 'register_eraser' ) )
+		);
 	}
 
 	public function test_the_callbacks_are_added_under_this_plugins_own_group(): void {
@@ -311,6 +333,12 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 		foreach ( array_keys( self::captured() ) as $key ) {
 			$this->assertContains( $key, $order->deleted );
 		}
+
+		// Persistence, not just staging: the stub answers get_meta() out of
+		// what was staged on the object, so an eraser that never saved would
+		// look identical here while the row survived in the database - and the
+		// request would have reported success (TS-3).
+		$this->assertGreaterThan( 0, $order->save_count, 'The deletions are written to the database.' );
 
 		$this->assertSame(
 			array(),

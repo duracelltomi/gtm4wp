@@ -102,14 +102,17 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 			'EDD' => false,
 		);
 
-		$this->hooks()->register_hooks();
+		$hooks = $this->hooks();
+		$hooks->register_hooks();
 
-		$this->assertNotFalse(
-			has_action( 'woocommerce_checkout_order_created' ),
-			'The classic checkout path.'
+		$this->assertSame(
+			10,
+			has_action( 'woocommerce_checkout_order_created', array( $hooks, 'capture_woocommerce_order' ) ),
+			'The classic checkout path, bound to the named callback.'
 		);
-		$this->assertNotFalse(
-			has_action( 'woocommerce_store_api_checkout_order_processed' ),
+		$this->assertSame(
+			10,
+			has_action( 'woocommerce_store_api_checkout_order_processed', array( $hooks, 'capture_woocommerce_order' ) ),
 			'The Store API the block checkout posts to - a different hook, not a variant of the first.'
 		);
 		$this->assertFalse( has_action( 'edd_built_order' ) );
@@ -121,9 +124,13 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 			'EDD' => true,
 		);
 
-		$this->hooks()->register_hooks();
+		$hooks = $this->hooks();
+		$hooks->register_hooks();
 
-		$this->assertNotFalse( has_action( 'edd_built_order' ) );
+		$this->assertSame(
+			10,
+			has_action( 'edd_built_order', array( $hooks, 'capture_edd_order' ) )
+		);
 		$this->assertFalse( has_action( 'woocommerce_checkout_order_created' ) );
 	}
 
@@ -388,6 +395,24 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 			( new CaptureStats() )->is_failing(),
 			'A store with no orders yet is not a failing capture.'
 		);
+	}
+
+	/**
+	 * The counters are written at order creation, which is a checkout request,
+	 * so the row must never join the autoloaded set - it is read only on the
+	 * settings screen. Same pin as the sibling health record.
+	 */
+	public function test_the_counter_row_is_never_autoloaded(): void {
+		$stats = new CaptureStats( static fn () => 1_800_000_000 );
+
+		$stats->record( true );
+		$stats->record( false );
+
+		$this->assertNotEmpty( $this->option_writes );
+		foreach ( $this->option_writes as $write ) {
+			$this->assertSame( CaptureStats::OPTION_NAME, $write['key'] );
+			$this->assertFalse( $write['autoload'], 'Every write keeps the row out of autoload.' );
+		}
 	}
 
 	public function test_a_corrupted_stored_record_reads_as_zeroes(): void {

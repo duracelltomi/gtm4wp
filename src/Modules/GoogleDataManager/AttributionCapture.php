@@ -74,6 +74,21 @@ final class AttributionCapture {
 	public const SIGNAL_NAME_PATTERN = '/^[a-z_]{1,40}$/D';
 
 	/**
+	 * The consent-mode signal gating the Google Analytics identifiers.
+	 */
+	public const SIGNAL_ANALYTICS = 'analytics_storage';
+
+	/**
+	 * The consent-mode signal gating the Google Ads click identifiers.
+	 */
+	public const SIGNAL_ADS = 'ad_storage';
+
+	/**
+	 * The signal value that permits storing.
+	 */
+	public const CONSENT_GRANTED = 'granted';
+
+	/**
 	 * The only two values a consent signal may carry.
 	 *
 	 * @var string[]
@@ -205,11 +220,13 @@ final class AttributionCapture {
 		if ( isset( $decoded[ AttributionCookies::KEY_SESSIONS ] ) && is_array( $decoded[ AttributionCookies::KEY_SESSIONS ] ) ) {
 			$sessions = array();
 
-			foreach ( $decoded[ AttributionCookies::KEY_SESSIONS ] as $measurement_id => $session_id ) {
-				if ( count( $sessions ) >= self::MAX_SESSIONS ) {
-					break;
-				}
-
+			// Sliced, not counted while looping: the cap has to bound the work
+			// as well as the result, and counting accepted entries bounds only
+			// the result - a payload of nothing but invalid entries would run
+			// the loop over every one of them. The cookie path is bounded by
+			// the size check above, but the backfill route parses a JSON body
+			// with no such limit.
+			foreach ( array_slice( $decoded[ AttributionCookies::KEY_SESSIONS ], 0, self::MAX_SESSIONS, true ) as $measurement_id => $session_id ) {
 				// The key is a measurement id, held to the same grammar the
 				// settings table validates, so a crafted map cannot introduce
 				// keys of any other shape.
@@ -267,11 +284,8 @@ final class AttributionCapture {
 
 		$signals = array();
 
-		foreach ( $decoded[ AttributionCookies::KEY_SIGNALS ] as $name => $value ) {
-			if ( count( $signals ) >= self::MAX_SIGNALS ) {
-				break;
-			}
-
+		// Sliced for the same reason as the session map above.
+		foreach ( array_slice( $decoded[ AttributionCookies::KEY_SIGNALS ], 0, self::MAX_SIGNALS, true ) as $name => $value ) {
 			if ( ! is_string( $name ) || 1 !== preg_match( self::SIGNAL_NAME_PATTERN, $name ) ) {
 				continue;
 			}
@@ -364,6 +378,31 @@ final class AttributionCapture {
 			}
 		}
 
+		$consent = self::filter_consent( self::parse_consent(), $order_reference );
+		$meta    = self::apply_consent_gate( $meta, $consent );
+
+		if ( null !== $consent ) {
+			$meta[ self::META_CONSENT_STATE ] = $consent;
+		}
+
+		return $meta;
+	}
+
+	/**
+	 * Runs a consent state through the site's own override filter.
+	 *
+	 * Every path that stores a consent state goes through here, so a site that
+	 * answers the filter is answering for all of them. That matters most on the
+	 * backfill path: the filter exists precisely for sites where the map the
+	 * browser composed is not trustworthy, and a route that took the posted map
+	 * verbatim would let a buyer hand us the consent answer the send gate then
+	 * reads.
+	 *
+	 * @param array<string, mixed>|null $consent         The parsed consent state, or null.
+	 * @param mixed                     $order_reference The order it belongs to.
+	 * @return array<string, mixed>|null
+	 */
+	public static function filter_consent( ?array $consent, $order_reference ): ?array {
 		/**
 		 * Filters the consent state stored with an order.
 		 *
@@ -377,10 +416,44 @@ final class AttributionCapture {
 		 * @param array|null $consent         The parsed consent state, or null.
 		 * @param mixed      $order_reference The order the state belongs to.
 		 */
-		$consent = apply_filters( GTM4WP_WPFILTER_GDM_ORDER_CONSENT, self::parse_consent(), $order_reference );
+		$filtered = apply_filters( GTM4WP_WPFILTER_GDM_ORDER_CONSENT, $consent, $order_reference );
 
-		if ( is_array( $consent ) ) {
-			$meta[ self::META_CONSENT_STATE ] = $consent;
+		return is_array( $filtered ) ? $filtered : null;
+	}
+
+	/**
+	 * Drops the values a consent state does not allow storing.
+	 *
+	 * The browser applies this rule before it writes anything, so on a healthy
+	 * page this changes nothing. It exists for the pages where that half never
+	 * ran: a consent tool that blocks third-party scripts until it has an
+	 * answer stops our bundle from executing at all, and the cookie it left
+	 * behind on an earlier visit would then be read here with no one having
+	 * re-checked it. Expressing the same rule on the side that cannot be
+	 * bypassed costs one pass over an array.
+	 *
+	 * An absent signal is not a denial (the whole design distinguishes unknown
+	 * from denied), so only an observed `denied` drops anything.
+	 *
+	 * @param array<string, mixed>      $meta    The meta built for an order.
+	 * @param array<string, mixed>|null $consent The consent state stored with it.
+	 * @return array<string, mixed>
+	 */
+	public static function apply_consent_gate( array $meta, ?array $consent ): array {
+		if ( null === $consent || ! isset( $consent[ AttributionCookies::KEY_SIGNALS ] ) || ! is_array( $consent[ AttributionCookies::KEY_SIGNALS ] ) ) {
+			return $meta;
+		}
+
+		$signals = $consent[ AttributionCookies::KEY_SIGNALS ];
+
+		if ( isset( $signals[ self::SIGNAL_ANALYTICS ] ) && self::CONSENT_GRANTED !== $signals[ self::SIGNAL_ANALYTICS ] ) {
+			unset( $meta[ self::META_CLIENT_ID ], $meta[ self::META_SESSION_IDS ] );
+		}
+
+		if ( isset( $signals[ self::SIGNAL_ADS ] ) && self::CONSENT_GRANTED !== $signals[ self::SIGNAL_ADS ] ) {
+			foreach ( AttributionCookies::CLICK_ID_PARAMS as $param ) {
+				unset( $meta[ self::META_CLICK_ID_PREFIX . $param ] );
+			}
 		}
 
 		return $meta;

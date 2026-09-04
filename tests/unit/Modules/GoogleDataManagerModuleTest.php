@@ -8,12 +8,14 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
-use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\GoogleDataManager\AttributionCookies;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
+use GTM4WP\Modules\GoogleDataManager\ReceiptPage;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
+
+require_once __DIR__ . '/wc-stubs.php';
 
 /**
  * The capture bundle's three enable conditions and the config it is handed.
@@ -91,6 +93,7 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	protected function tearDown(): void {
 		// Process-wide state, so it is cleared whatever the test did (TS-7).
 		$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		$_GET                                    = array();
 
 		parent::tearDown();
 	}
@@ -174,6 +177,33 @@ final class GoogleDataManagerModuleTest extends TestCase {
 			'EDD' => false,
 		);
 
+		$module = $this->module(
+			array(
+				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+			)
+		);
+
+		$this->assertSame(
+			10,
+			has_action( 'wp_enqueue_scripts', array( $module, 'enqueue_capture_script' ) ),
+			'The named callback, not merely something on the hook.'
+		);
+	}
+
+	/**
+	 * The script writes cookies for the order-creation hooks to read, so the
+	 * module has to attach those hooks too. Asserted here rather than only in
+	 * the CaptureHooks suite, which builds its own instance: without this,
+	 * deleting the wiring line leaves the feature as a script writing cookies
+	 * that nothing ever reads, with the suite green.
+	 */
+	public function test_booting_with_capture_on_also_attaches_the_order_creation_hooks(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'  => true,
+			'EDD' => true,
+		);
+
 		$this->module(
 			array(
 				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
@@ -181,7 +211,26 @@ final class GoogleDataManagerModuleTest extends TestCase {
 			)
 		);
 
-		$this->assertNotFalse( has_action( 'wp_enqueue_scripts' ) );
+		$this->assertNotFalse( has_action( 'woocommerce_checkout_order_created' ) );
+		$this->assertNotFalse( has_action( 'woocommerce_store_api_checkout_order_processed' ) );
+		$this->assertNotFalse( has_action( 'edd_built_order' ) );
+	}
+
+	public function test_booting_with_capture_off_attaches_no_order_creation_hook(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'  => true,
+			'EDD' => true,
+		);
+
+		$this->module(
+			array(
+				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false,
+				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+			)
+		);
+
+		$this->assertFalse( has_action( 'woocommerce_checkout_order_created' ) );
+		$this->assertFalse( has_action( 'edd_built_order' ) );
 	}
 
 	/**
@@ -300,29 +349,105 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	/**
 	 * The config lands inside a script block, so whatever it carries has to
 	 * come out hex-escaped: the safe form present, the raw break-out character
-	 * absent (TS-2). Asserted on a value forced through the same encoder the
-	 * config uses, because the config's own members are all grammar-checked
-	 * before they get here - the point is that the encoding, not the
-	 * validation, is what makes the printing safe.
+	 * absent (TS-2).
+	 *
+	 * Driven through the real enqueue method with a hostile **order key**,
+	 * which is the one member of this config the plugin does not itself
+	 * validate - WooCommerce generates it and we print it back. Asserting on
+	 * the shared encoder instead would prove only that the encoder works,
+	 * which its own test already does, and would keep passing if this call
+	 * site dropped the flags.
 	 */
-	public function test_the_config_encoder_escapes_script_breakout_characters(): void {
-		$hostile = '</script><b>"&\'';
-		$printed = ScriptTag::json_literal(
-			array( 'label' => $hostile ),
-			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+	public function test_a_hostile_value_reaching_the_config_is_escaped_for_the_script_context(): void {
+		$hostile = '</script><script>alert("&\'x")</script>';
+
+		$module = $this->module(
+			array(
+				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+			)
 		);
 
-		// Neither the tag that would end the script block nor any of the
-		// characters that could break out of the JSON string survives raw.
-		$this->assertStringNotContainsString( '</script>', $printed );
+		$this->given_receipt_page_for_an_uncaptured_order( $hostile );
+
+		$module->enqueue_capture_script();
+
+		$printed = $this->inline['gtm4wp-attribution'];
+
+		$this->assertStringNotContainsString( '</script>', $printed, 'A raw closing tag would end the block the config sits in.' );
 		$this->assertStringNotContainsString( '<', $printed );
 		$this->assertStringNotContainsString( '>', $printed );
 		$this->assertStringNotContainsString( '&', $printed );
 		$this->assertStringNotContainsString( "'", $printed );
 
-		// And the escaping is lossless: what the browser parses back is the
-		// value that went in, so safety here costs no fidelity.
-		$this->assertSame( $hostile, json_decode( $printed, true )['label'] );
+		// The safe form is present and lossless: the browser parses back
+		// exactly the value that went in.
+		$this->assertSame( $hostile, $this->decoded_config()['backfill']['token'] );
+	}
+
+	/**
+	 * The server decides whether a backfill is needed, so the flag has to
+	 * survive the join into the printed config - the client half does nothing
+	 * without it. ReceiptPage is tested on its own; this pins the join.
+	 */
+	public function test_the_backfill_flag_reaches_the_printed_config(): void {
+		$module = $this->module(
+			array(
+				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+			)
+		);
+
+		$this->given_receipt_page_for_an_uncaptured_order( 'wc_order_aBcDeF123456' );
+
+		$module->enqueue_capture_script();
+
+		$this->assertSame( ReceiptPage::backfill_config(), $this->decoded_config()['backfill'] );
+	}
+
+	public function test_no_backfill_flag_away_from_a_confirmation_page(): void {
+		$module = $this->module(
+			array(
+				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+			)
+		);
+
+		$module->enqueue_capture_script();
+
+		$this->assertArrayNotHasKey( 'backfill', $this->decoded_config() );
+	}
+
+	/**
+	 * Puts the request on a WooCommerce order-received page for an order that
+	 * carries no attribution yet.
+	 *
+	 * @param string $order_key The order key, which is also the printed token.
+	 * @return void
+	 */
+	private function given_receipt_page_for_an_uncaptured_order( string $order_key ): void {
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+		Functions\when( 'rest_url' )->alias( static fn ( $path ) => 'https://example.com/wp-json/' . $path );
+		Functions\when( 'wp_create_nonce' )->justReturn( 'a-rest-nonce' );
+		Functions\when( 'wp_unslash' )->returnArg();
+		Functions\when( 'absint' )->alias( static fn ( $value ) => abs( (int) $value ) );
+		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) $value ) );
+
+		$_GET = array(
+			'order-received' => '42',
+			'key'            => $order_key,
+		);
+
+		$order = new \WC_Order(
+			array(
+				'id'        => 42,
+				'order_key' => $order_key,
+			)
+		);
+
+		Functions\when( 'wc_get_order' )->alias(
+			static fn ( $id ) => 42 === (int) $id ? $order : false
+		);
 	}
 
 	public function test_nothing_is_enqueued_without_a_usable_destination(): void {

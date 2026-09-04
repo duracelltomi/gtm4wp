@@ -114,13 +114,24 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * @return \WC_Order
 	 */
 	private function given_woocommerce_order( array $meta = array() ): \WC_Order {
-		$order = new \WC_Order(
-			array(
-				'id'        => self::ORDER_ID,
-				'order_key' => self::ORDER_KEY,
-				'meta'      => $meta,
-			)
-		);
+		$order = new class(array(
+			'id'        => self::ORDER_ID,
+			'order_key' => self::ORDER_KEY,
+			'meta'      => $meta,
+		)) extends \WC_Order {
+			/**
+			 * Times save() was called.
+			 *
+			 * @var int
+			 */
+			public int $save_count = 0;
+
+			public function save() {
+				++$this->save_count;
+
+				return parent::save();
+			}
+		};
 
 		Functions\when( 'wc_get_order' )->alias(
 			static fn ( $id ) => self::ORDER_ID === (int) $id ? $order : false
@@ -155,6 +166,53 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 				$this->edd_written[] = array( $order_id, $key, $value );
 			}
 		);
+	}
+
+	// ---- Registration ------------------------------------------------------
+
+	/**
+	 * The gate has to be attached to the route, not merely to exist.
+	 *
+	 * Without this, swapping the permission callback for `__return_true`, or
+	 * dropping the platform enum, leaves the whole suite green while the route
+	 * is wide open - the callback's own grant/deny cases below all keep
+	 * passing, because they call the method directly.
+	 */
+	public function test_the_route_is_registered_with_its_gate_and_argument_rules(): void {
+		$registered = array();
+
+		Functions\when( 'register_rest_route' )->alias(
+			static function ( $rest_namespace, $route, $args ) use ( &$registered ): void {
+				$registered[] = array( $rest_namespace, $route, $args );
+			}
+		);
+
+		$endpoint = new BackfillEndpoint();
+		$endpoint->register_routes();
+
+		$this->assertCount( 1, $registered );
+
+		[ $namespace, $route, $args ] = $registered[0];
+
+		$this->assertSame( 'gtm4wp/v2', $namespace, 'The namespace whose reflected CORS grant RestCors withdraws.' );
+		$this->assertSame( BackfillEndpoint::REST_ROUTE, $route );
+		$this->assertSame( 'POST', $args['methods'] );
+		$this->assertSame(
+			array( $endpoint, 'check_permission' ),
+			$args['permission_callback'],
+			'A guest-facing mutation must never be registered with a permissive callback.'
+		);
+		$this->assertSame( array( $endpoint, 'backfill' ), $args['callback'] );
+
+		$this->assertSame(
+			array( BackfillEndpoint::PLATFORM_WC, BackfillEndpoint::PLATFORM_EDD ),
+			$args['args']['platform']['enum'],
+			'Only the two known platforms may be named.'
+		);
+
+		foreach ( array( 'platform', 'order', 'token' ) as $required ) {
+			$this->assertTrue( $args['args'][ $required ]['required'], $required . ' is not optional.' );
+		}
 	}
 
 	// ---- Control 1: the origin gate ----------------------------------------
@@ -210,12 +268,20 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 
 	// ---- Control 2: proof of purchase --------------------------------------
 
-	public function test_a_valid_woocommerce_order_key_writes_the_attribution(): void {
+	/**
+	 * The save() count is part of this assertion, not decoration: the order
+	 * stub answers get_meta() out of what update_meta_data() staged, so
+	 * without it a version that never persisted anything would look identical
+	 * to one that did - and the meta would be gone the moment the request
+	 * ended.
+	 */
+	public function test_a_valid_woocommerce_order_key_writes_and_persists_the_attribution(): void {
 		$order = $this->given_woocommerce_order();
 
 		$response = ( new BackfillEndpoint() )->backfill( self::request() );
 
 		$this->assertSame( 204, $response->get_status() );
+		$this->assertSame( 1, $order->save_count, 'The order is written to the database exactly once.' );
 		$this->assertSame( '111.222', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
 		$this->assertSame( array( 'G-ABC123' => '1788522496' ), $order->get_meta( AttributionCapture::META_SESSION_IDS, true ) );
 		$this->assertSame( 'abc123', $order->get_meta( '_gtm4wp_gclid', true ) );
@@ -466,7 +532,113 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 		$this->assertContains( '_gtm4wp_gclid', $written_keys );
 	}
 
-	// ---- Control 4: the value grammar --------------------------------------
+	// ---- Control 4: consent, decided on the server -------------------------
+
+	/**
+	 * The posted consent map is not taken at face value.
+	 *
+	 * The override filter exists for sites where the browser's view of consent
+	 * is the untrustworthy one - a tool that keeps the choice inside the GTM
+	 * container. On such a site, a route that stored what the buyer's browser
+	 * posted would let the buyer hand us the answer the send gate later reads,
+	 * so this path runs through the same filter as order creation.
+	 */
+	public function test_the_posted_consent_state_goes_through_the_override_filter(): void {
+		$order = $this->given_woocommerce_order();
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $hook, $value, $order_reference = null ) {
+				if ( GTM4WP_WPFILTER_GDM_ORDER_CONSENT === $hook ) {
+					return array(
+						'signals'     => array( 'analytics_storage' => 'denied' ),
+						'captured_at' => 1_800_000_042,
+					);
+				}
+
+				return $value;
+			}
+		);
+
+		( new BackfillEndpoint() )->backfill( self::request() );
+
+		$this->assertSame(
+			array(
+				'signals'     => array( 'analytics_storage' => 'denied' ),
+				'captured_at' => 1_800_000_042,
+			),
+			$order->get_meta( AttributionCapture::META_CONSENT_STATE, true ),
+			"The site's own answer is stored, not the one the browser posted."
+		);
+	}
+
+	/**
+	 * And the filter's answer governs the data, not just the record of it: a
+	 * denial arriving from the filter has to drop the identifiers posted
+	 * alongside it, or the route would store exactly what the site said it may
+	 * not.
+	 */
+	public function test_a_consent_denial_drops_the_identifiers_posted_with_it(): void {
+		$order = $this->given_woocommerce_order();
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $hook, $value ) {
+				if ( GTM4WP_WPFILTER_GDM_ORDER_CONSENT === $hook ) {
+					return array( 'signals' => array( 'analytics_storage' => 'denied' ) );
+				}
+
+				return $value;
+			}
+		);
+
+		( new BackfillEndpoint() )->backfill( self::request() );
+
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_SESSION_IDS, true ) );
+		$this->assertSame(
+			'abc123',
+			$order->get_meta( '_gtm4wp_gclid', true ),
+			'Ad storage was not denied, so the click id is unaffected.'
+		);
+	}
+
+	/**
+	 * The same rule applied to what the request itself says: a payload that
+	 * carries identifiers next to a consent map denying them is
+	 * self-contradicting, and the server resolves it the safe way rather than
+	 * storing both.
+	 */
+	public function test_a_self_contradicting_payload_is_stored_as_the_consent_allows(): void {
+		$order = $this->given_woocommerce_order();
+
+		( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'consent' => array(
+						'signals' => array(
+							'analytics_storage' => 'denied',
+							'ad_storage'        => 'denied',
+						),
+					),
+				)
+			)
+		);
+
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( '', (string) $order->get_meta( '_gtm4wp_gclid', true ) );
+		$this->assertSame(
+			array(
+				'signals'     => array(
+					'analytics_storage' => 'denied',
+					'ad_storage'        => 'denied',
+				),
+				'captured_at' => 0,
+			),
+			$order->get_meta( AttributionCapture::META_CONSENT_STATE, true ),
+			'The record of the choice is still stored - that is what the send gate reads.'
+		);
+	}
+
+	// ---- Control 5: the value grammar --------------------------------------
 
 	public function test_hostile_values_are_dropped_rather_than_stored(): void {
 		$order = $this->given_woocommerce_order();
@@ -535,6 +707,31 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 
 		$this->assertSame( 204, $response->get_status() );
 		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( 0, $order->save_count, 'Nothing to write means the order is not touched at all.' );
+	}
+
+	/**
+	 * The refusal must not depend on what was posted, or the status code
+	 * becomes a way to test whether a guessed order and key belong together:
+	 * post an empty payload and a valid pair would answer 204 while an invalid
+	 * one answered 403. Verification therefore happens before the payload is
+	 * looked at.
+	 */
+	public function test_an_empty_payload_does_not_change_what_a_refusal_looks_like(): void {
+		$this->given_woocommerce_order();
+
+		$empty_and_wrong = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'token'   => 'wc_order_guessed',
+					'values'  => array(),
+					'consent' => array(),
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $empty_and_wrong );
+		$this->assertSame( 403, $empty_and_wrong->get_error_data()['status'] );
 	}
 
 	/**
