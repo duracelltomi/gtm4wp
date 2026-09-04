@@ -197,6 +197,8 @@ define( 'GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION', 'integrate-edd-persist-lis
 
 // Google Data Manager API integration (new in 2.1).
 define( 'GTM4WP_OPTION_GDM_DESTINATIONS', 'gdm-destinations' );
+define( 'GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION', 'gdm-capture-attribution' );
+define( 'GTM4WP_OPTION_GDM_CONSENT_POLICY', 'gdm-consent-policy' );
 
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
@@ -345,3 +347,12 @@ define( 'GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE', 'gtm4wp_google_service_
  * before use; an invalid row is dropped, never sent.
  */
 define( 'GTM4WP_WPFILTER_GDM_DESTINATIONS', 'gtm4wp_gdm_destinations' );
+
+/**
+ * Filter (since 2.1) over the consent-mode signal map captured for an order:
+ * receives the map parsed from the visitor's own consent cookie (or null when
+ * none was captured) and the order reference, and returns the map to store.
+ * The escape hatch for consent tools that keep the choice entirely inside the
+ * GTM container, where the page carries no reflection of it.
+ */
+define( 'GTM4WP_WPFILTER_GDM_ORDER_CONSENT', 'gtm4wp_gdm_order_consent' );

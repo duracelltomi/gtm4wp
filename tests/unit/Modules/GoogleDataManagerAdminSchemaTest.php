@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Modules\GoogleDataManager\AdminSchema;
+use GTM4WP\Modules\GoogleDataManager\ConsentPolicy;
 use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Options\Field;
@@ -54,10 +55,23 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 	 * @return Field
 	 */
 	private function field(): Field {
-		$fields = ( new AdminSchema() )->fields();
-		$this->assertCount( 1, $fields );
+		return $this->field_by_key( GTM4WP_OPTION_GDM_DESTINATIONS );
+	}
 
-		return $fields[0];
+	/**
+	 * One Field of the schema, by option key.
+	 *
+	 * @param string $key Option key.
+	 * @return Field
+	 */
+	private function field_by_key( string $key ): Field {
+		foreach ( ( new AdminSchema() )->fields() as $field ) {
+			if ( $key === $field->key ) {
+				return $field;
+			}
+		}
+
+		$this->fail( 'The schema has no field for option ' . $key . '.' );
 	}
 
 	/**
@@ -88,6 +102,49 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertSame( Field::TYPE_TABLE, $field->type );
 		$this->assertSame( array(), $field->default_value );
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase, 'The first data-leaves-the-site feature ships experimental.' );
+	}
+
+	/**
+	 * Capture is off by default and, per the capture design, needs a
+	 * destination to read a measurement ID from - so the checkbox declares the
+	 * dependency to the admin UI. That declaration only greys the control; the
+	 * module guards the value itself at hook-registration time.
+	 */
+	public function test_the_capture_field_is_an_experimental_checkbox_depending_on_the_destinations(): void {
+		$field = $this->field_by_key( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION );
+
+		$this->assertSame( Field::TYPE_CHECKBOX, $field->type );
+		$this->assertFalse( $field->default_value, 'Capture starts off: it is part of the first data-leaves-the-site feature.' );
+		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
+		$this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $field->depends_on );
+	}
+
+	/**
+	 * The consent policy is the field description's promise in code: three
+	 * choices, defaulting to the region gate.
+	 */
+	public function test_the_consent_policy_field_offers_exactly_the_three_policies(): void {
+		$field = $this->field_by_key( GTM4WP_OPTION_GDM_CONSENT_POLICY );
+
+		$this->assertSame( Field::TYPE_SELECT, $field->type );
+		$this->assertSame( ConsentPolicy::POLICY_EEA_ONLY, $field->default_value );
+		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
+		$this->assertSame( ConsentPolicy::policies(), array_keys( $field->choices ) );
+	}
+
+	/**
+	 * A value outside the choice list falls back to the default rather than
+	 * being stored: an unknown policy string reaching the send gate would be
+	 * read as the eea-only default anyway, and storing it would leave the
+	 * settings screen showing something the gate does not honour.
+	 */
+	public function test_the_consent_policy_refuses_a_value_outside_its_choices(): void {
+		$field = $this->field_by_key( GTM4WP_OPTION_GDM_CONSENT_POLICY );
+
+		$this->assertSame( ConsentPolicy::POLICY_ALWAYS, $field->sanitize( ConsentPolicy::POLICY_ALWAYS ) );
+		$this->assertSame( ConsentPolicy::POLICY_NEVER, $field->sanitize( ConsentPolicy::POLICY_NEVER ) );
+		$this->assertSame( ConsentPolicy::POLICY_EEA_ONLY, $field->sanitize( 'send-everything' ) );
+		$this->assertSame( ConsentPolicy::POLICY_EEA_ONLY, $field->sanitize( array( 'never' ) ) );
 	}
 
 	/**

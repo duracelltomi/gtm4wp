@@ -53,7 +53,9 @@ final class GoogleDataManagerModule extends AbstractModule {
 	 */
 	public function defaults(): array {
 		return array(
-			GTM4WP_OPTION_GDM_DESTINATIONS => array(),
+			GTM4WP_OPTION_GDM_DESTINATIONS        => array(),
+			GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false,
+			GTM4WP_OPTION_GDM_CONSENT_POLICY      => ConsentPolicy::POLICY_EEA_ONLY,
 		);
 	}
 

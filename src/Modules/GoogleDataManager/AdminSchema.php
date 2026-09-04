@@ -89,6 +89,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	public function groups(): array {
 		return array(
 			'destinations' => __( 'Destinations', 'duracelltomi-google-tag-manager' ),
+			'attribution'  => __( 'Attribution capture', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -154,6 +155,47 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				},
 				doc: self::DOC_PAGE
 			),
+			new Field(
+				key: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Store attribution data with each order', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Stores the Google Analytics client and session IDs, the Google Ads click IDs (gclid, gbraid, wbraid) of the visit and the consent state with every new order, so that events sent later from the server - a refund, for example - can be matched to the original purchase in Google Analytics. The IDs are read through the official Google tag API, so this needs at least one destination above whose measurement ID belongs to a Google Analytics 4 tag that actually fires in your container: without that the browser never answers and nothing is stored. The data is written into the order and is never shown on the site.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'attribution',
+				phase: Field::PHASE_EXPERIMENTAL,
+				depends_on: GTM4WP_OPTION_GDM_DESTINATIONS,
+				doc: self::DOC_PAGE
+			),
+			new Field(
+				key: GTM4WP_OPTION_GDM_CONSENT_POLICY,
+				type: Field::TYPE_SELECT,
+				default_value: ConsentPolicy::POLICY_EEA_ONLY,
+				label: __( 'Require consent before sending', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Decides for which orders the stored consent state has to allow analytics storage before anything about them is sent to Google. The billing country of the order decides the region, which is more reliable than guessing from the visitor\'s IP address. Choosing "Never" means you assert your own lawful basis for the transfer - the plugin then sends regardless of what the visitor answered in your consent banner, so only pick it if that is a decision you have made deliberately.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: 'attribution',
+				phase: Field::PHASE_EXPERIMENTAL,
+				choices: self::consent_policy_choices(),
+				doc: self::DOC_PAGE
+			),
+		);
+	}
+
+	/**
+	 * Choices of the consent policy select.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function consent_policy_choices(): array {
+		return array(
+			ConsentPolicy::POLICY_EEA_ONLY => __( 'Only for buyers in the EEA, the UK and Switzerland (recommended)', 'duracelltomi-google-tag-manager' ),
+			ConsentPolicy::POLICY_ALWAYS   => __( 'For every order', 'duracelltomi-google-tag-manager' ),
+			ConsentPolicy::POLICY_NEVER    => __( 'Never - I assert my own lawful basis', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
