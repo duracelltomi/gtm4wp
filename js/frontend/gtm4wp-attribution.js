@@ -126,13 +126,83 @@ import {
 	}
 
 	/**
+	 * Reads the consent state out of the Google tag's own consent engine.
+	 *
+	 * This is the authority whenever it exists, because it is the state the
+	 * tags themselves are gated on, and it is the ONLY place a consent choice
+	 * made inside the container is visible. A consent tool implemented as a GTM
+	 * template calls the sandboxed `updateConsentState()` API, which writes
+	 * straight into this engine and pushes nothing onto the data layer - which
+	 * is why a template that wants to *trigger* something has to push its own
+	 * separate event. On a site that drives both the default and the update
+	 * that way, the data layer carries no consent trace whatsoever, so a scan
+	 * of it cannot tell "this site runs no consent mode" from "a consent mode I
+	 * cannot see". Reading here can: the presence of these entries IS the
+	 * regime.
+	 *
+	 * Undocumented internal, entered deliberately (registered upstream). It can
+	 * only ever ADD to what we know: anything unexpected here falls back to the
+	 * data-layer scan, which is exactly the behaviour without it.
+	 *
+	 * Per-signal shape, measured 2026-09-04:
+	 * `{implicit?: bool, default: bool, update?: bool, quiet: bool}`. The
+	 * discriminator is the TYPE of `update`, not its presence: the property is
+	 * defined-but-`undefined` when no update was made, so a boolean means an
+	 * update happened and carries the new state. Reading it as
+	 * `update || default` would keep reporting granted after a withdrawal
+	 * (`default: true` then `update: false`), which is the unsafe direction.
+	 *
+	 * @return {Object|null} The signal map in gtag vocabulary, or null when the engine is unreadable.
+	 */
+	function readTagConsent() {
+		let entries;
+
+		try {
+			entries =
+				window.google_tag_data &&
+				window.google_tag_data.ics &&
+				window.google_tag_data.ics.entries;
+		} catch ( e ) {
+			return null;
+		}
+
+		if ( ! entries || 'object' !== typeof entries ) {
+			return null;
+		}
+
+		const found = {};
+
+		Object.keys( entries ).forEach( function ( name ) {
+			const entry = entries[ name ];
+
+			if ( ! entry || 'object' !== typeof entry ) {
+				return;
+			}
+
+			const state =
+				'boolean' === typeof entry.update
+					? entry.update
+					: entry.default;
+
+			if ( 'boolean' !== typeof state ) {
+				return;
+			}
+
+			found[ name ] = state ? CONSENT_GRANTED : 'denied';
+		} );
+
+		return 0 < Object.keys( found ).length ? found : null;
+	}
+
+	/**
 	 * Reads the consent state out of the data layer.
 	 *
-	 * The queue is the authority rather than any event: gtag consent commands
-	 * stay in the array after they are processed, so a single scan sees the
-	 * `default` set from the head block and every later `update`, in order,
-	 * whether they were pushed before or after this script loaded. Events only
-	 * tell us *when* to look again.
+	 * The fallback for before the Google tag has loaded, when its engine does
+	 * not exist yet. The queue is the authority rather than any event: gtag
+	 * consent commands stay in the array after they are processed, so a single
+	 * scan sees the `default` set from the head block and every later `update`,
+	 * in order, whether they were pushed before or after this script loaded.
+	 * Events only tell us *when* to look again.
 	 *
 	 * A consent command is the arguments-like ['consent', 'default'|'update',
 	 * {signal: 'granted'|'denied'}] shape.
@@ -176,6 +246,20 @@ import {
 		}
 
 		return found;
+	}
+
+	/**
+	 * The consent state, from the best source currently available.
+	 *
+	 * The tag's engine wins whenever it is readable: it holds everything the
+	 * data layer holds (page-level gtag commands are processed into it) plus
+	 * everything the data layer cannot show (in-container template calls). The
+	 * scan carries us until the tag has loaded.
+	 *
+	 * @return {Object|null} The signal map, or null when nothing has been observed at all.
+	 */
+	function currentConsent() {
+		return readTagConsent() || scanConsent();
 	}
 
 	/**
@@ -235,6 +319,12 @@ import {
 	 * @return {void}
 	 */
 	function flush() {
+		// Every persistence decision reads the freshest state rather than
+		// whatever was observed at boot. The tag's engine usually appears
+		// AFTER this script runs, so the `get` callbacks that bring the IDs in
+		// tend to arrive at the same moment the real consent state does.
+		refreshConsent();
+
 		// The consent map is written in every case, including a denial - it is
 		// the record of the choice, which is the same basis a consent tool
 		// stores its own answer on, and the server-side consent gate cannot
@@ -286,19 +376,24 @@ import {
 	}
 
 	/**
-	 * Re-reads the consent state and persists again if it changed.
+	 * Re-reads the consent state into `consentSignals`.
 	 *
-	 * @return {void}
+	 * @return {boolean} Whether it differs from what was held before.
 	 */
+	function refreshConsent() {
+		const observed = currentConsent();
+		const changed =
+			JSON.stringify( observed ) !== JSON.stringify( consentSignals );
+
+		consentSignals = observed;
+
+		return changed;
+	}
+
 	function onConsentMaybeChanged() {
-		const scanned = scanConsent();
-
-		if ( JSON.stringify( scanned ) === JSON.stringify( consentSignals ) ) {
-			return;
+		if ( refreshConsent() ) {
+			flush();
 		}
-
-		consentSignals = scanned;
-		flush();
 	}
 
 	/**
@@ -551,10 +646,17 @@ import {
 		}
 	}
 
-	consentSignals = scanConsent();
+	refreshConsent();
 	observeDataLayer();
 	restorePending();
 	captureClickIds();
 	requestIds();
 	flush();
+
+	// A consent choice made inside the container changes the tag's engine
+	// without touching the data layer, so the push wrapper above cannot see it
+	// and there may be no other activity on the page to notice. One deferred
+	// look, by which time the container and its consent tag have run - a single
+	// re-check, not a polling loop.
+	window.addEventListener( 'load', onConsentMaybeChanged );
 } )();

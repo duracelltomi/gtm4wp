@@ -116,6 +116,9 @@ describe( 'gtm4wp-attribution', () => {
 		delete window.gtm4wp_gdm_attribution_config;
 		delete window.gtm4wp_datalayer_name;
 		delete window.gtag;
+		// Process-wide, and the engine read prefers it over the data layer, so
+		// a leftover from one case would silently drive the next (TS-7).
+		delete window.google_tag_data;
 
 		window.dataLayer = [];
 
@@ -492,6 +495,224 @@ describe( 'gtm4wp-attribution', () => {
 				analytics_storage: 'granted',
 				ad_storage: 'denied',
 			} );
+		} );
+	} );
+
+	describe( "the Google tag's own consent engine", () => {
+		/**
+		 * Builds a google_tag_data.ics.entries stand-in.
+		 *
+		 * Faithful to the measured shape, including the part that matters: a
+		 * signal that was never updated carries an `update` property whose
+		 * value is `undefined`, not a missing property and not `false`. A
+		 * double that omitted the key would let a wrong implementation pass
+		 * (UC-3).
+		 *
+		 * @param {Object} signals name => {def, update} where update may be omitted.
+		 * @return {void}
+		 */
+		function setTagConsent( signals ) {
+			const entries = {};
+
+			Object.keys( signals ).forEach( ( name ) => {
+				entries[ name ] = {
+					default: signals[ name ].def,
+					update: signals[ name ].update,
+					quiet: false,
+				};
+			} );
+
+			window.google_tag_data = { ics: { entries } };
+		}
+
+		afterEach( () => {
+			delete window.google_tag_data;
+		} );
+
+		/**
+		 * The case that sent us here: a consent tool built as a GTM template
+		 * calls the sandboxed updateConsentState(), which writes into the
+		 * engine and pushes NOTHING onto the data layer. Scanning the queue
+		 * sees only the denied default and concludes the visitor refused.
+		 */
+		it( 'sees an update the data layer never carried', () => {
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'denied', ad_storage: 'denied' },
+			] );
+
+			setTagConsent( {
+				analytics_storage: { def: false, update: true },
+				ad_storage: { def: false, update: true },
+			} );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).toEqual( {
+				v: 1,
+				client_id: '111.222',
+			} );
+			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {
+				analytics_storage: 'granted',
+				ad_storage: 'granted',
+			} );
+		} );
+
+		/**
+		 * The discriminator, isolated. `update: undefined` means no update was
+		 * made, so the default stands - reading it as `update || default`
+		 * would be indistinguishable here but wrong in the next test.
+		 */
+		it( 'falls back to the default when no update was made', () => {
+			setTagConsent( {
+				analytics_storage: { def: true, update: undefined },
+				ad_storage: { def: false, update: undefined },
+			} );
+
+			loadTracker();
+
+			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {
+				analytics_storage: 'granted',
+				ad_storage: 'denied',
+			} );
+		} );
+
+		/**
+		 * The unsafe direction, and the reason the type of `update` is the
+		 * discriminator rather than its truthiness: a withdrawal is
+		 * `default: true` followed by `update: false`, which any
+		 * `update || default` reading would report as still granted.
+		 */
+		it( 'honours a withdrawal that leaves the default granted', () => {
+			setTagConsent( {
+				analytics_storage: { def: true, update: false },
+				ad_storage: { def: true, update: false },
+			} );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {
+				analytics_storage: 'denied',
+				ad_storage: 'denied',
+			} );
+		} );
+
+		/**
+		 * The compliance case a data-layer-only reading gets backwards: with
+		 * both the default AND the update set in-container, the queue is
+		 * empty, which the no-regime rule would read as "this site runs no
+		 * consent mode, so writing is the owner's posture" - and it would
+		 * write for a visitor who denied. The engine's presence IS the regime.
+		 */
+		it( 'does not mistake an invisible regime for no regime at all', () => {
+			setSearch( '?gclid=abc123' );
+
+			setTagConsent( {
+				analytics_storage: { def: false, update: false },
+				ad_storage: { def: false, update: false },
+			} );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+		} );
+
+		it( 'still writes when there is genuinely no consent regime anywhere', () => {
+			setSearch( '?gclid=abc123' );
+
+			loadTracker();
+
+			expect( readPayload( IDS_COOKIE ) ).toEqual( {
+				v: 1,
+				gclid: 'abc123',
+			} );
+		} );
+
+		it( 'prefers the engine over the data layer when the two disagree', () => {
+			// The queue holds the stale page-level default; the engine holds
+			// the answer the visitor actually gave.
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'denied' },
+			] );
+
+			setTagConsent( {
+				analytics_storage: { def: false, update: true },
+			} );
+
+			loadTracker();
+
+			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {
+				analytics_storage: 'granted',
+			} );
+		} );
+
+		/**
+		 * The engine appears when the Google tag loads, which is normally
+		 * after this script has run and written under whatever the data layer
+		 * said. Nothing pushes to the data layer when an in-container update
+		 * lands, so a deferred re-check is the only thing that would notice.
+		 */
+		it( 'picks up an engine that only appears after load', () => {
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'denied', ad_storage: 'denied' },
+			] );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+
+			setTagConsent( {
+				analytics_storage: { def: false, update: true },
+			} );
+			window.dispatchEvent( new Event( 'load' ) );
+
+			expect( readPayload( IDS_COOKIE ) ).toEqual( {
+				v: 1,
+				client_id: '111.222',
+			} );
+		} );
+
+		it( 'ignores an engine that is missing, empty or malformed', () => {
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'granted' },
+			] );
+
+			window.google_tag_data = { ics: { entries: {} } };
+
+			loadTracker();
+
+			// Falls straight back to the data layer, which is exactly the
+			// behaviour without the engine read at all.
+			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {
+				analytics_storage: 'granted',
+			} );
+		} );
+
+		it( 'survives entries of an unexpected shape', () => {
+			window.google_tag_data = {
+				ics: {
+					entries: {
+						analytics_storage: 'not-an-object',
+						ad_storage: null,
+						ad_user_data: { default: 'denied' },
+					},
+				},
+			};
+
+			expect( () => loadTracker() ).not.toThrow();
+			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {} );
 		} );
 	} );
 
