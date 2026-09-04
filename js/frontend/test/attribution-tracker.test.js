@@ -29,14 +29,41 @@ const baseConfig = {
 };
 
 /**
- * Loads the bundle fresh so its boot IIFE re-runs.
+ * Window listeners the bundle registered during the current test.
+ *
+ * @type {Array}
+ */
+const trackedListeners = [];
+
+/**
+ * Loads the bundle fresh so its boot IIFE re-runs, recording the window
+ * listeners it registers so they can be taken off again afterwards.
+ *
+ * Without that removal each test leaves a live instance attached to the jsdom
+ * window, which is shared across the whole file - and dispatching `load` or
+ * `pagehide` then runs every previous instance too. Those instances hold an
+ * empty pending buffer, so their flush CLEARS the ids cookie, which is exactly
+ * the outcome several of these tests assert. It made a test pass while the
+ * behaviour it names was broken (TS-7/TS-8).
  *
  * @return {void}
  */
 function loadTracker() {
-	jest.isolateModules( () => {
-		require( '../gtm4wp-attribution' );
-	} );
+	const realAdd = window.addEventListener;
+
+	window.addEventListener = function ( type, handler, options ) {
+		trackedListeners.push( [ type, handler ] );
+
+		return realAdd.call( window, type, handler, options );
+	};
+
+	try {
+		jest.isolateModules( () => {
+			require( '../gtm4wp-attribution' );
+		} );
+	} finally {
+		window.addEventListener = realAdd;
+	}
 }
 
 /**
@@ -108,6 +135,31 @@ function serviceQueuedGets( values ) {
 	} );
 }
 
+/**
+ * Builds a google_tag_data.ics.entries stand-in.
+ *
+ * Faithful to the measured shape, including the part that matters: a signal
+ * that was never updated carries an `update` property whose value is
+ * `undefined`, not a missing property and not `false`. A double that omitted
+ * the key would let a wrong implementation pass (UC-3).
+ *
+ * @param {Object} signals name => {def, update} where update may be omitted.
+ * @return {void}
+ */
+function setTagConsentEntries( signals ) {
+	const entries = {};
+
+	Object.keys( signals ).forEach( ( name ) => {
+		entries[ name ] = {
+			default: signals[ name ].def,
+			update: signals[ name ].update,
+			quiet: false,
+		};
+	} );
+
+	window.google_tag_data = { ics: { entries } };
+}
+
 describe( 'gtm4wp-attribution', () => {
 	beforeEach( () => {
 		// The bundle guards its boot with a window flag, so it has to be
@@ -135,6 +187,15 @@ describe( 'gtm4wp-attribution', () => {
 		setSearch( '' );
 
 		window.gtm4wp_gdm_attribution_config = { ...baseConfig };
+	} );
+
+	afterEach( () => {
+		// The window is shared across the file, so a previous test's instance
+		// would otherwise still answer a dispatched load/pagehide.
+		trackedListeners.forEach( ( [ type, handler ] ) => {
+			window.removeEventListener( type, handler );
+		} );
+		trackedListeners.length = 0;
 	} );
 
 	describe( 'boot conditions', () => {
@@ -499,32 +560,6 @@ describe( 'gtm4wp-attribution', () => {
 	} );
 
 	describe( "the Google tag's own consent engine", () => {
-		/**
-		 * Builds a google_tag_data.ics.entries stand-in.
-		 *
-		 * Faithful to the measured shape, including the part that matters: a
-		 * signal that was never updated carries an `update` property whose
-		 * value is `undefined`, not a missing property and not `false`. A
-		 * double that omitted the key would let a wrong implementation pass
-		 * (UC-3).
-		 *
-		 * @param {Object} signals name => {def, update} where update may be omitted.
-		 * @return {void}
-		 */
-		function setTagConsent( signals ) {
-			const entries = {};
-
-			Object.keys( signals ).forEach( ( name ) => {
-				entries[ name ] = {
-					default: signals[ name ].def,
-					update: signals[ name ].update,
-					quiet: false,
-				};
-			} );
-
-			window.google_tag_data = { ics: { entries } };
-		}
-
 		afterEach( () => {
 			delete window.google_tag_data;
 		} );
@@ -542,7 +577,7 @@ describe( 'gtm4wp-attribution', () => {
 				{ analytics_storage: 'denied', ad_storage: 'denied' },
 			] );
 
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: false, update: true },
 				ad_storage: { def: false, update: true },
 			} );
@@ -566,7 +601,7 @@ describe( 'gtm4wp-attribution', () => {
 		 * would be indistinguishable here but wrong in the next test.
 		 */
 		it( 'falls back to the default when no update was made', () => {
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: true, update: undefined },
 				ad_storage: { def: false, update: undefined },
 			} );
@@ -586,7 +621,7 @@ describe( 'gtm4wp-attribution', () => {
 		 * `update || default` reading would report as still granted.
 		 */
 		it( 'honours a withdrawal that leaves the default granted', () => {
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: true, update: false },
 				ad_storage: { def: true, update: false },
 			} );
@@ -611,7 +646,7 @@ describe( 'gtm4wp-attribution', () => {
 		it( 'does not mistake an invisible regime for no regime at all', () => {
 			setSearch( '?gclid=abc123' );
 
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: false, update: false },
 				ad_storage: { def: false, update: false },
 			} );
@@ -642,7 +677,7 @@ describe( 'gtm4wp-attribution', () => {
 				{ analytics_storage: 'denied' },
 			] );
 
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: false, update: true },
 			} );
 
@@ -671,7 +706,7 @@ describe( 'gtm4wp-attribution', () => {
 
 			expect( readPayload( IDS_COOKIE ) ).toBeNull();
 
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: false, update: true },
 			} );
 			window.dispatchEvent( new Event( 'load' ) );
@@ -693,7 +728,7 @@ describe( 'gtm4wp-attribution', () => {
 		 * never took effect for any tag on the page.
 		 */
 		it( 'keeps the engine as the authority over a later data layer push', () => {
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: false, update: true },
 				ad_storage: { def: false, update: true },
 			} );
@@ -713,7 +748,7 @@ describe( 'gtm4wp-attribution', () => {
 			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
 
 			// The same withdrawal, once it has actually reached the engine.
-			setTagConsent( {
+			setTagConsentEntries( {
 				analytics_storage: { def: false, update: false },
 				ad_storage: { def: false, update: false },
 			} );
@@ -790,6 +825,80 @@ describe( 'gtm4wp-attribution', () => {
 			expect( readPayload( CONSENT_COOKIE ).signals ).toEqual( {
 				analytics_storage: 'granted',
 			} );
+		} );
+
+		/**
+		 * The case that broke on a real site. GTM replaces `dataLayer.push`
+		 * with its own function while the container initialises, which happens
+		 * AFTER this deferred bundle has run - so the wrapper installed at boot
+		 * is discarded and every trigger disappears with it, silently. A
+		 * consent withdrawal after that point then went unnoticed and the
+		 * stored IDs survived it.
+		 */
+		it( 'takes its hook back after GTM replaces push', () => {
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
+
+			// GTM initialising: our wrapper is gone.
+			const nativePush = Array.prototype.push;
+			window.dataLayer.push = function () {
+				return nativePush.apply( window.dataLayer, arguments );
+			};
+
+			// The page finishes loading, which is where we re-hook.
+			window.dispatchEvent( new Event( 'load' ) );
+
+			// A withdrawal reaching the engine, announced by a push the way a
+			// real gtag() call announces one.
+			setTagConsentEntries( {
+				analytics_storage: { def: false, update: false },
+				ad_storage: { def: false, update: false },
+			} );
+			window.dataLayer.push( { event: 'anything' } );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+		} );
+
+		/**
+		 * Re-hooking runs on every flush, so without the identity guard each
+		 * one would wrap the previous wrapper and the chain would grow for the
+		 * life of the page - one frame deeper per persisted value, on the hot
+		 * path of somebody else's data layer.
+		 */
+		it( 'reuses its hook instead of wrapping again on every flush', () => {
+			loadTracker();
+
+			const hooked = window.dataLayer.push;
+
+			// Each serviced lookup flushes, and each flush re-hooks.
+			serviceQueuedGets( { client_id: '111.222' } );
+			serviceQueuedGets( {
+				client_id: '333.444',
+				sessions: { 'G-AAAA1111': '999' },
+			} );
+
+			expect( window.dataLayer.push ).toBe( hooked );
+		} );
+
+		/**
+		 * The last moment we are given. What the cookie holds as the visitor
+		 * leaves is what the server reads when they order on the next page, so
+		 * a withdrawal late in a pageview still has to land.
+		 */
+		it( 'checks once more as the page goes away', () => {
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
+
+			setTagConsentEntries( {
+				analytics_storage: { def: false, update: false },
+			} );
+			window.dispatchEvent( new Event( 'pagehide' ) );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
 		} );
 
 		it( 'ignores data layer entries that are not consent commands', () => {

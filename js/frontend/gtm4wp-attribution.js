@@ -100,6 +100,14 @@ import {
 	 */
 	let backfillScheduled = false;
 
+	/**
+	 * The push wrapper we last installed, so a re-install can tell "still ours"
+	 * from "something replaced it" without stacking wrappers.
+	 *
+	 * @type {Function|null}
+	 */
+	let installedPush = null;
+
 	window[ datalayerName ] = window[ datalayerName ] || [];
 
 	/**
@@ -322,7 +330,10 @@ import {
 		// Every persistence decision reads the freshest state rather than
 		// whatever was observed at boot. The tag's engine usually appears
 		// AFTER this script runs, so the `get` callbacks that bring the IDs in
-		// tend to arrive at the same moment the real consent state does.
+		// tend to arrive at the same moment the real consent state does - and
+		// at that moment GTM has also just replaced push, so this is the
+		// natural place to take the hook back.
+		observeDataLayer();
 		refreshConsent();
 
 		// The consent map is written in every case, including a denial - it is
@@ -397,22 +408,35 @@ import {
 	}
 
 	/**
-	 * Installs the data layer observer.
+	 * Installs, or re-installs, the data layer observer.
 	 *
-	 * Wraps push() so that a consent command or a consent-tool bridge event
-	 * arriving later triggers a re-scan. The wrapper is deliberately thin and
-	 * tolerant of being replaced: it never becomes the source of truth, because
-	 * scanConsent() reads the array itself, so even if something overwrites
-	 * push() afterwards the entries are still there to be found.
+	 * Wraps push() so that anything arriving later - a consent command, a
+	 * consent-tool bridge event, any activity at all - makes us look at the
+	 * consent state again. That matters more than it sounds, because the tag's
+	 * consent engine fires no event of its own: a push is the only moment we
+	 * are handed to notice a change.
+	 *
+	 * **It has to be re-installable.** GTM replaces `push` with its own
+	 * function when the container initialises, which happens AFTER this
+	 * deferred bundle runs - so a wrapper installed once at boot is discarded
+	 * a moment later and every trigger silently disappears with it. Calling
+	 * this again at each point we get to run re-wraps whatever `push` is now,
+	 * and the identity check keeps that from stacking wrappers or looping when
+	 * our own hook is the one already in place.
 	 *
 	 * @return {void}
 	 */
 	function observeDataLayer() {
 		const queue = window[ datalayerName ];
-		const originalPush = queue.push;
 
-		queue.push = function () {
-			const result = originalPush.apply( queue, arguments );
+		if ( ! queue || queue.push === installedPush ) {
+			return;
+		}
+
+		const underlying = queue.push;
+
+		const wrapper = function () {
+			const result = underlying.apply( queue, arguments );
 
 			try {
 				onConsentMaybeChanged();
@@ -423,6 +447,9 @@ import {
 
 			return result;
 		};
+
+		queue.push = wrapper;
+		installedPush = wrapper;
 	}
 
 	/**
@@ -653,10 +680,22 @@ import {
 	requestIds();
 	flush();
 
-	// A consent choice made inside the container changes the tag's engine
-	// without touching the data layer, so the push wrapper above cannot see it
-	// and there may be no other activity on the page to notice. One deferred
-	// look, by which time the container and its consent tag have run - a single
-	// re-check, not a polling loop.
-	window.addEventListener( 'load', onConsentMaybeChanged );
+	// Two deferred looks, and both also take the push hook back from GTM, which
+	// replaces it while the container initialises.
+	//
+	// `load` is when the container and its consent tag have run, so it catches
+	// a choice already made by then. `pagehide` is the last moment we get, and
+	// it is the one that matters most for this feature: what the cookie holds
+	// as the visitor leaves is what the server reads when they order on the
+	// next page, so a withdrawal late in a pageview still lands before it
+	// could be acted on.
+	window.addEventListener( 'load', function () {
+		observeDataLayer();
+		onConsentMaybeChanged();
+	} );
+
+	window.addEventListener( 'pagehide', function () {
+		observeDataLayer();
+		onConsentMaybeChanged();
+	} );
 } )();
