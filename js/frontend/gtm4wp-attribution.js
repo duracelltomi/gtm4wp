@@ -23,7 +23,11 @@
  *    changes, so a banner answered on the landing page still persists the
  *    click ID that page arrived with.
  */
-import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
+import {
+	gtm4wp_clear_cookie,
+	gtm4wp_read_cookie,
+	gtm4wp_write_cookie,
+} from './lib/gtm4wp-cookies';
 
 ( function () {
 	'use strict';
@@ -197,6 +201,12 @@ import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
 	 * Writes one cookie, JSON encoded and URL encoded, refusing an oversized
 	 * payload rather than storing something the server-side parser will drop.
 	 *
+	 * The encoding is not optional: a JSON body contains commas and semicolons,
+	 * which a cookie value may not carry raw. Note the asymmetry with the
+	 * server side - document.cookie hands this script back exactly what was
+	 * stored, so the read below decodes explicitly, while PHP decodes $_COOKIE
+	 * itself and the parser there must NOT decode again.
+	 *
 	 * @param {string} name    Cookie name.
 	 * @param {Object} payload Payload object; the format version is added here.
 	 * @return {void}
@@ -257,6 +267,14 @@ import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
 		}
 
 		if ( ! hasIds ) {
+			// Nothing may be stored right now, and that is not the same as
+			// "nothing to do": consent can be withdrawn after a grant, and a
+			// consent tool that loads late can push its denied default moments
+			// after this script has already written under the no-regime rule.
+			// In both cases values are sitting in the cookie that the visitor's
+			// current answer does not allow, so the cookie goes.
+			gtm4wp_clear_cookie( config.idsCookie );
+
 			return;
 		}
 
@@ -412,13 +430,30 @@ import { gtm4wp_read_cookie, gtm4wp_write_cookie } from './lib/gtm4wp-cookies';
 			return;
 		}
 
-		// Click IDs are the ones worth carrying forward: the URL that had them
-		// was two pages ago, while the IDs are re-resolved on every page.
+		// Everything stored is taken back into the buffer, not just the click
+		// IDs. The buffer is what every write is built from, so anything left
+		// out of it here would be dropped the next time the cookie is
+		// rewritten - and rewrites happen on any consent change, not only when
+		// this page resolved something of its own. The freshly queued lookups
+		// overwrite these as soon as they answer.
 		config.clickIds.forEach( function ( name ) {
 			if ( 'string' === typeof stored[ name ] ) {
 				pending.clickIds[ name ] = stored[ name ];
 			}
 		} );
+
+		if ( 'string' === typeof stored.client_id ) {
+			pending.clientId = stored.client_id;
+		}
+
+		if ( stored.sessions && 'object' === typeof stored.sessions ) {
+			Object.keys( stored.sessions ).forEach( function ( measurementId ) {
+				if ( 'string' === typeof stored.sessions[ measurementId ] ) {
+					pending.sessions[ measurementId ] =
+						stored.sessions[ measurementId ];
+				}
+			} );
+		}
 	}
 
 	/**

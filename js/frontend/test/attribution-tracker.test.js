@@ -338,6 +338,100 @@ describe( 'gtm4wp-attribution', () => {
 			} );
 		} );
 
+		it( 'removes what it stored when consent is withdrawn', () => {
+			setSearch( '?gclid=abc123' );
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'granted', ad_storage: 'granted' },
+			] );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
+
+			window.dataLayer.push( [
+				'consent',
+				'update',
+				{ analytics_storage: 'denied', ad_storage: 'denied' },
+			] );
+
+			// Declining to write from here on would not be enough: the values
+			// are already on the visitor's machine, and the answer that put
+			// them there has been taken back.
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+		} );
+
+		it( 'removes what it stored when a late consent tool answers denied', () => {
+			// The realistic race: the bundle runs before the consent tool has
+			// pushed anything, so the no-regime rule allows the write, and the
+			// denial arrives moments later.
+			setSearch( '?gclid=abc123' );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			expect( readPayload( IDS_COOKIE ) ).not.toBeNull();
+
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'denied', ad_storage: 'denied' },
+			] );
+
+			expect( readPayload( IDS_COOKIE ) ).toBeNull();
+		} );
+
+		it( 'drops only the category that was withdrawn', () => {
+			setSearch( '?gclid=abc123' );
+			window.dataLayer.push( [
+				'consent',
+				'default',
+				{ analytics_storage: 'granted', ad_storage: 'granted' },
+			] );
+
+			loadTracker();
+			serviceQueuedGets( { client_id: '111.222' } );
+
+			window.dataLayer.push( [
+				'consent',
+				'update',
+				{ ad_storage: 'denied' },
+			] );
+
+			expect( readPayload( IDS_COOKIE ) ).toEqual( {
+				v: 1,
+				client_id: '111.222',
+			} );
+		} );
+
+		it( 'keeps what an earlier page stored while this one is still resolving', () => {
+			// The counterpart to the two cases above: an empty buffer is not a
+			// denial. A page that has not resolved anything yet - or never
+			// will, because it carries no Analytics tag - must leave a stored
+			// value alone rather than treat "nothing to write" as "clear it".
+			document.cookie =
+				IDS_COOKIE +
+				'=' +
+				encodeURIComponent(
+					JSON.stringify( {
+						v: 1,
+						client_id: '111.222',
+						gclid: 'from-the-landing-page',
+					} )
+				) +
+				';path=/';
+
+			loadTracker();
+
+			expect( readPayload( IDS_COOKIE ) ).toEqual( {
+				v: 1,
+				client_id: '111.222',
+				gclid: 'from-the-landing-page',
+			} );
+		} );
+
 		it( 'reads a consent default that was queued before the bundle loaded', () => {
 			// The head block pushes its consent default long before this bundle
 			// runs, so scanning the queue - not listening for an event - is what
