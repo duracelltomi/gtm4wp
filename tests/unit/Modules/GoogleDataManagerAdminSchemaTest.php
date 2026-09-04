@@ -117,6 +117,18 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertFalse( $field->default_value, 'Capture starts off: it is part of the first data-leaves-the-site feature.' );
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
 		$this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $field->depends_on );
+
+		// Declaring the dependency is only half of it: what the string MEANS is
+		// implemented in js/admin/utils.js, and this is the first dependency in
+		// the plugin to name a table rather than a checkbox. The value shape it
+		// therefore has to handle - an empty array - is pinned on the JS side
+		// by `utils.test.js`, because an empty array is truthy there and the
+		// control silently stayed enabled without it (TS-19).
+		$this->assertSame(
+			Field::TYPE_TABLE,
+			$this->field_by_key( $field->depends_on )->type,
+			'A dependency on a table is the case the client-side helper had to learn.'
+		);
 	}
 
 	/**
@@ -130,6 +142,11 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertSame( ConsentPolicy::POLICY_EEA_ONLY, $field->default_value );
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
 		$this->assertSame( ConsentPolicy::policies(), array_keys( $field->choices ) );
+		$this->assertSame(
+			GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
+			$field->depends_on,
+			'The gate reads a consent state that only exists once capture stores one.'
+		);
 	}
 
 	/**

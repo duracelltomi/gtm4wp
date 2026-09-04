@@ -278,6 +278,45 @@ describe( 'FieldControl dependencies and annotations', () => {
 		expect( screen.getByRole( 'textbox' ) ).toBeEnabled();
 	} );
 
+	/**
+	 * The reported case, at the layer it was seen: a checkbox depending on a
+	 * table stayed operable after the last row was deleted, because an empty
+	 * array is truthy. Asserted on a checkbox rather than a text field because
+	 * that is the shape the Data Manager's capture option has.
+	 */
+	it( 'disables a checkbox whose table dependency has been emptied', () => {
+		renderField(
+			{
+				key: 'gdm-capture-attribution',
+				type: 'checkbox',
+				label: 'Store attribution data with each order',
+				depends_on: 'gdm-destinations',
+			},
+			{ value: false, values: { 'gdm-destinations': [] } }
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeDisabled();
+	} );
+
+	it( 'enables it again once the table holds a row', () => {
+		renderField(
+			{
+				key: 'gdm-capture-attribution',
+				type: 'checkbox',
+				label: 'Store attribution data with each order',
+				depends_on: 'gdm-destinations',
+			},
+			{
+				value: false,
+				values: {
+					'gdm-destinations': [ { measurement_id: 'G-ABC123' } ],
+				},
+			}
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeEnabled();
+	} );
+
 	it( 'shows the stored value of a disabled field rather than forcing it off', () => {
 		// The display must never disagree with what would be saved.
 		renderField(

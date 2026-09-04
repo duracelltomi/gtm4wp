@@ -150,10 +150,38 @@ export function choiceSections( field ) {
 }
 
 /**
+ * Whether an option value counts as set, for the purpose of a dependency.
+ *
+ * A plain truthiness test is wrong here and was wrong silently for a while: an
+ * empty array is truthy in JavaScript, so a field depending on an emptied table
+ * or multiselect stayed enabled while the thing it needs did not exist. Every
+ * dependency predating the Data Manager pointed at a checkbox, where `false` is
+ * falsy and the bug could not show.
+ *
+ * @param {*} value The current UI value of the dependency.
+ * @return {boolean} True when the dependency is satisfied.
+ */
+function isValueSet( value ) {
+	if ( Array.isArray( value ) ) {
+		return 0 < value.length;
+	}
+
+	if ( 'string' === typeof value ) {
+		return '' !== value.trim();
+	}
+
+	return Boolean( value );
+}
+
+/**
  * Whether a field's control should be disabled because the field it depends on
  * (`field.depends_on`, an option key) is currently off/empty. Fields without a
  * dependency are never disabled by this. Mirrors the per-column `depends_on`
  * handling in TableControl at the whole-field level.
+ *
+ * Admin affordance only, in both directions: the module still guards the value
+ * itself at runtime, and the stored value is shown greyed rather than forced
+ * off, so the screen never disagrees with what would be saved.
  *
  * @param {Object} field  Field description from the bootstrap data.
  * @param {Object} values Option key => current UI value map.
@@ -166,7 +194,7 @@ export function isFieldDisabled( field, values ) {
 		return false;
 	}
 
-	return ! ( values && values[ dependency ] );
+	return ! isValueSet( values ? values[ dependency ] : undefined );
 }
 
 /**

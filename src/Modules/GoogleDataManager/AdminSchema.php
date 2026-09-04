@@ -191,6 +191,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: self::GROUP_ATTRIBUTION,
 				phase: Field::PHASE_EXPERIMENTAL,
 				choices: self::consent_policy_choices(),
+				// The chain the feature actually has: a destination gives
+				// capture a measurement ID to ask about, and capture gives this
+				// gate a consent state to read. With capture off nothing is
+				// ever stored for it to decide on.
+				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
 				doc: self::DOC_PAGE
 			),
 		);

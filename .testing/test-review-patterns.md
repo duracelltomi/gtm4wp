@@ -484,6 +484,38 @@ the payload then continues into the dataLayer as `items: [5], value: NaN`.
   a module, and production silently changes from "garbage push" to "uncaught TypeError" — a
   behaviour change no test would report, in either direction.
 
+### TS-19: A declaration asserted on one side of the language boundary ⭐
+A setting whose *declaration* lives in PHP and whose *behaviour* lives in JavaScript
+gets two suites, and it is easy for both to pass while the pair does nothing. The PHP
+test asserts the string is declared; the JS test asserts the helper works on the value
+shapes that already existed. Neither asserts that this declaration produces that
+behaviour, and no single file looks incomplete.
+
+This is TS-3 (assert the effect, not the call) crossing the boundary, and it is worse
+than the same mistake inside one language: there the missing effect is usually visible
+a few lines away, whereas here it is in another suite, in another language, often
+written months earlier by someone solving a different problem.
+
+**Confirmed 2026-09-04.** The Data Manager's capture option declares
+`depends_on: gdm-destinations` so the admin greys it while no destination exists.
+`GoogleDataManagerAdminSchemaTest` asserted exactly that:
+
+    $this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $field->depends_on );
+
+The behaviour is `isFieldDisabled()` in `js/admin/utils.js`, whose own tests covered a
+missing value and an empty string. Nothing covered an **empty array** — because every
+`depends_on` before this one pointed at a *checkbox*, where `false` is falsy, and this
+was the first pointing at a **table**, whose empty value is `[]`. An empty array is
+truthy in JavaScript, so the control never greyed out. Both suites green; the feature's
+one visible affordance dead. Found by the maintainer on the dev site, not by the suite.
+
+**The litmus.** When a PHP field declares anything the *client* is responsible for
+honouring — `depends_on`, `rows_locked`, a column `pattern`, a panel's group — ask
+which value shapes that declaration can now produce, and whether the JS helper has
+ever been handed one. Introducing the first dependency on a non-checkbox type is
+exactly the moment to extend the helper's own cases rather than only assert the new
+declaration.
+
 ### TS-18: A port carries the guards but not the pins ⭐
 When a feature is built as a **parity port** of an existing integration, the source
 of the port is the sibling's *code* — so every guard the sibling carries arrives in

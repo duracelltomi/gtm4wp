@@ -279,6 +279,43 @@ describe( 'isFieldDisabled', () => {
 			false
 		);
 	} );
+
+	/**
+	 * An empty array is truthy in JavaScript, so a plain `! value` test left a
+	 * field enabled while the table it depends on held nothing. It could not
+	 * show until a dependency pointed at something other than a checkbox: the
+	 * Data Manager's capture option depends on the destinations table, and
+	 * deleting the last destination left the option looking available.
+	 */
+	it( 'treats an emptied table or multiselect as off, not as a truthy array', () => {
+		const onTable = { key: 'child', depends_on: 'a-table' };
+
+		expect( isFieldDisabled( onTable, { 'a-table': [] } ) ).toBe( true );
+		expect(
+			isFieldDisabled( onTable, { 'a-table': [ { id: 'row' } ] } )
+		).toBe( false );
+	} );
+
+	it( 'treats a whitespace-only dependency value as off', () => {
+		expect(
+			isFieldDisabled(
+				{ key: 'child', depends_on: 'parent-path' },
+				{ 'parent-path': '   ' }
+			)
+		).toBe( true );
+	} );
+
+	it( 'treats a zero integer dependency as off and a set one as on', () => {
+		const onInteger = { key: 'child', depends_on: 'a-number' };
+
+		expect( isFieldDisabled( onInteger, { 'a-number': 0 } ) ).toBe( true );
+		expect( isFieldDisabled( onInteger, { 'a-number': 3 } ) ).toBe( false );
+	} );
+
+	it( 'survives a values map it was handed nothing for', () => {
+		expect( isFieldDisabled( dependent, undefined ) ).toBe( true );
+		expect( isFieldDisabled( dependent, null ) ).toBe( true );
+	} );
 } );
 
 describe( 'isCellLocked', () => {
