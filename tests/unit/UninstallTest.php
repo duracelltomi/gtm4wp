@@ -101,6 +101,7 @@ final class UninstallTest extends TestCase {
 		$this->assertStringContainsString( 'delete_option:gtm4wp-plugin-version', $result['output'], 'The stored plugin version is deleted.' );
 		$this->assertStringContainsString( 'delete_option:gtm4wp_google_service_accounts', $result['output'], 'The encrypted service-account keys are deleted; a leftover row would keep key material in the database after the plugin is gone.' );
 		$this->assertStringContainsString( 'delete_option:gtm4wp_gdm_destination_health', $result['output'], 'The per-destination health records are deleted.' );
+		$this->assertStringContainsString( 'delete_option:gtm4wp_gdm_capture_stats', $result['output'], 'The capture-rate counters are deleted.' );
 		$this->assertStringContainsString( 'reached-end', $result['output'], 'The script runs to completion.' );
 		$this->assertSame( 0, $result['status'], 'The uninstaller completes without error.' );
 	}
@@ -126,7 +127,7 @@ final class UninstallTest extends TestCase {
 	 * so an added or dropped deletion is caught, which string matching on the
 	 * subprocess output cannot do on its own.
 	 */
-	public function test_makes_exactly_four_option_deletions_and_one_meta_deletion(): void {
+	public function test_makes_exactly_five_option_deletions_and_one_meta_deletion(): void {
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', true );
 		}
@@ -147,9 +148,15 @@ final class UninstallTest extends TestCase {
 		require self::UNINSTALL_FILE;
 
 		$this->assertSame(
-			array( 'gtm4wp-options', 'gtm4wp-plugin-version', 'gtm4wp_google_service_accounts', 'gtm4wp_gdm_destination_health' ),
+			array(
+				'gtm4wp-options',
+				'gtm4wp-plugin-version',
+				'gtm4wp_google_service_accounts',
+				'gtm4wp_gdm_destination_health',
+				'gtm4wp_gdm_capture_stats',
+			),
 			$deleted_options,
-			'Exactly the four plugin option rows are deleted, in order and with no extras.'
+			'Exactly the five plugin option rows are deleted, in order and with no extras.'
 		);
 	}
 }

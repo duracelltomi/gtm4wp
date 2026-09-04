@@ -83,6 +83,8 @@ final class GoogleDataManagerModule extends AbstractModule {
 		}
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_capture_script' ) );
+
+		( new CaptureHooks( new CaptureStats() ) )->register_hooks();
 	}
 
 	/**
