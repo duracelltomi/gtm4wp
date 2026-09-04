@@ -44,3 +44,9 @@ require_once __DIR__ . '/unit/wp-class-stubs.php';
 // depend on test order (TS-16). It delegates to the builtin unless a test hides
 // a member, so loading it changes nothing on its own.
 require_once __DIR__ . '/unit/Modules/wc-feature-guard-shim.php';
+
+// Namespaced function_exists() shim for the Google Data Manager module's
+// commerce-platform guard, loaded eagerly for the same reason. Brain Monkey
+// defines a stubbed WC()/EDD() process-wide and permanently, so without this a
+// test of the no-platform branch would depend on which files ran before it.
+require_once __DIR__ . '/unit/Modules/gdm-platform-guard-shim.php';
