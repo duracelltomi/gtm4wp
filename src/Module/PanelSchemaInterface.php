@@ -46,6 +46,12 @@ interface PanelSchemaInterface {
 	 * module's fields, for select columns whose choices only exist at
 	 * page-render time (the Data Manager destinations' service-account list).
 	 *
+	 * Reserved key `panelGroup`: the id of the accordion group this panel
+	 * belongs under. A panel is about one group's settings, so on a module with
+	 * several tabs it renders inside that tab rather than below whichever one
+	 * happens to be open. Omit it when the panel is the whole screen, or when
+	 * the module has a single group.
+	 *
 	 * @return array<string, mixed>
 	 */
 	public function panel_data(): array;

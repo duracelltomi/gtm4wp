@@ -216,9 +216,16 @@ export default function ModulePanel( {
 	// as the service-account custody screen) renders it in place of its
 	// fields when it has none, and below them when it has both (the Data
 	// Manager destinations table with its test panel).
+	//
+	// Once such a module has tabs, "below them" is no longer a location: the
+	// panel is about one group's settings, so a schema names that group and the
+	// panel travels with its tab. Without it a Test button for destinations
+	// would keep sitting under the attribution-capture tab, which reads as a
+	// control belonging to whatever is on screen.
 	const CustomPanel = module.panel ? panelComponent( module.panel ) : null;
 	const hasFields =
 		Array.isArray( module.fields ) && 0 < module.fields.length;
+	const panelGroup = module.panelGroup || '';
 
 	const customPanel = CustomPanel ? (
 		<div className="gtm4wp-panel__body">
@@ -246,6 +253,13 @@ export default function ModulePanel( {
 
 	const groups = groupsWithFields( module );
 	const hasTabs = groups.length > 1;
+
+	// The panel goes inside a tab only when that tab is actually rendered.
+	// groupsWithFields() drops a group whose fields are all gone, so a panel
+	// naming one would otherwise disappear with it - it falls back to sitting
+	// below, which is where it lived before any of this.
+	const panelInTab =
+		hasTabs && groups.some( ( group ) => group.id === panelGroup );
 
 	// Only honour a requested tab that still holds fields; an initialTabName
 	// TabPanel cannot match would leave it with nothing selected.
@@ -306,16 +320,21 @@ export default function ModulePanel( {
 							);
 
 							return (
-								<div className="gtm4wp-panel__body">
-									<GroupFields
-										fields={ group ? group.fields : [] }
-										values={ values }
-										errors={ errors }
-										focusFieldKey={ focusFieldKey }
-										revealFocused={ revealFocused }
-										onChange={ onChange }
-									/>
-								</div>
+								<>
+									<div className="gtm4wp-panel__body">
+										<GroupFields
+											fields={ group ? group.fields : [] }
+											values={ values }
+											errors={ errors }
+											focusFieldKey={ focusFieldKey }
+											revealFocused={ revealFocused }
+											onChange={ onChange }
+										/>
+									</div>
+									{ panelInTab &&
+										panelGroup === tab.name &&
+										customPanel }
+								</>
 							);
 						} }
 					</TabPanel>
@@ -333,7 +352,9 @@ export default function ModulePanel( {
 				</div>
 			) }
 
-			{ customPanel }
+			{ /* Below everything when the panel names no rendered tab, or when
+			     there are none - a module with one group renders flat. */ }
+			{ ! panelInTab && customPanel }
 		</div>
 	);
 }

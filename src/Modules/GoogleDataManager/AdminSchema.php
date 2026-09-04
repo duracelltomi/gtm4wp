@@ -44,6 +44,16 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	public const PANEL = 'gdm-destinations';
 
 	/**
+	 * Accordion group of the destinations table and its test panel.
+	 */
+	public const GROUP_DESTINATIONS = 'destinations';
+
+	/**
+	 * Accordion group of the attribution-capture settings.
+	 */
+	public const GROUP_ATTRIBUTION = 'attribution';
+
+	/**
 	 * Module documentation page.
 	 *
 	 * @return string
@@ -88,8 +98,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function groups(): array {
 		return array(
-			'destinations' => __( 'Destinations', 'duracelltomi-google-tag-manager' ),
-			'attribution'  => __( 'Attribution capture', 'duracelltomi-google-tag-manager' ),
+			self::GROUP_DESTINATIONS => __( 'Destinations', 'duracelltomi-google-tag-manager' ),
+			self::GROUP_ATTRIBUTION  => __( 'Attribution capture', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -109,7 +119,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					'Add one row for each Google Analytics 4 property the plugin should be able to send events to. The property ID is the numeric ID shown in the GA admin, the measurement ID (G-XXXXXXX) identifies the web data stream of that property. The service account of the row must be added to the property with the Editor role, and the Data Manager API must be enabled in the Google Cloud project the account belongs to - the Test button below the table checks all of that with a validation request that stores nothing on the Google side.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'destinations',
+				group: self::GROUP_DESTINATIONS,
 				phase: Field::PHASE_EXPERIMENTAL,
 				columns: array(
 					array(
@@ -164,7 +174,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					'Stores the Google Analytics client and session IDs, the Google Ads click IDs (gclid, gbraid, wbraid) of the visit and the consent state with every new order, so that events sent later from the server - a refund, for example - can be matched to the original purchase in Google Analytics. The IDs are read through the official Google tag API, so this needs at least one destination above whose measurement ID belongs to a Google Analytics 4 tag that actually fires in your container: without that the browser never answers and nothing is stored. Turning this on loads a small script on every page of the site and writes two first-party cookies (gtm4wp_gdm_ids and gtm4wp_gdm_consent, 90 days) in every visitor\'s browser, not only for those who reach the checkout - the second one records the visitor\'s consent answer and is written even when that answer is no, because it is what the send rules below are then read against. Mention both in your cookie notice. The stored values are written into the order and are never shown on the site.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'attribution',
+				group: self::GROUP_ATTRIBUTION,
 				phase: Field::PHASE_EXPERIMENTAL,
 				depends_on: GTM4WP_OPTION_GDM_DESTINATIONS,
 				doc: self::DOC_PAGE
@@ -178,7 +188,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					'Decides for which orders the stored consent state has to allow analytics storage before anything about them is sent to Google. The billing country of the order decides the region, which is more reliable than guessing from the visitor\'s IP address. Choosing "Never" means you assert your own lawful basis for the transfer - the plugin then sends regardless of what the visitor answered in your consent banner, so only pick it if that is a decision you have made deliberately.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: 'attribution',
+				group: self::GROUP_ATTRIBUTION,
 				phase: Field::PHASE_EXPERIMENTAL,
 				choices: self::consent_policy_choices(),
 				doc: self::DOC_PAGE
@@ -375,6 +385,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		}
 
 		return array(
+			// The test panel belongs to the destinations table it tests, so it
+			// renders inside that tab - not below the attribution-capture one,
+			// where a "Test destination" button has nothing to do with what the
+			// tab is showing.
+			'panelGroup'    => self::GROUP_DESTINATIONS,
 			'testPath'      => RestCors::REST_NAMESPACE . RestController::REST_ROUTE,
 			'optionKey'     => GTM4WP_OPTION_GDM_DESTINATIONS,
 			'health'        => ( new DestinationHealth() )->all(),

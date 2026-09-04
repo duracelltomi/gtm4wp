@@ -16,6 +16,7 @@ use GTM4WP\Google\TokenService;
 use GTM4WP\Module\Registry;
 use GTM4WP\Modules\GoogleAuth\AdminSchema;
 use GTM4WP\Modules\GoogleAuth\RestController;
+use GTM4WP\Modules\GoogleDataManager\AdminSchema as GdmAdminSchema;
 use GTM4WP\Tests\unit\Google\FakeTransport;
 use GTM4WP\Tests\unit\Google\KeyFileFixture;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
@@ -189,6 +190,46 @@ final class GoogleAuthCustodyTest extends TestCase {
 		);
 	}
 
+	/**
+	 * The service-accounts panel IS the whole screen - it has no fields to sit
+	 * beside and no groups to belong to - so it names no group and keeps the
+	 * original "render it in place of the fields" path.
+	 */
+	public function test_a_whole_screen_panel_names_no_group(): void {
+		list( $page ) = $this->make_settings_stack();
+
+		foreach ( $page->bootstrap_data()['modules'] as $module ) {
+			if ( 'google-auth' === $module['id'] ) {
+				$this->assertSame( '', $module['panelGroup'] );
+			}
+		}
+	}
+
+	/**
+	 * A panel that belongs to one tab of a multi-tab module says which, so the
+	 * app can render it inside that tab. Without it the Data Manager's
+	 * destination Test button sat below whichever tab was open, including the
+	 * attribution-capture one it has nothing to do with.
+	 */
+	public function test_the_data_manager_panel_names_the_group_it_belongs_to(): void {
+		list( $page ) = $this->make_settings_stack();
+
+		$descriptor = null;
+		foreach ( $page->bootstrap_data()['modules'] as $module ) {
+			if ( 'google-data-manager' === $module['id'] ) {
+				$descriptor = $module;
+			}
+		}
+
+		$this->assertNotNull( $descriptor );
+		$this->assertSame( GdmAdminSchema::GROUP_DESTINATIONS, $descriptor['panelGroup'] );
+		$this->assertArrayHasKey(
+			$descriptor['panelGroup'],
+			( new GdmAdminSchema() )->groups(),
+			'A panel must name a group the schema actually declares, or the app would render it nowhere.'
+		);
+	}
+
 	public function test_modules_without_a_panel_get_the_empty_descriptor(): void {
 		list( $page ) = $this->make_settings_stack();
 
@@ -201,6 +242,7 @@ final class GoogleAuthCustodyTest extends TestCase {
 				continue;
 			}
 			$this->assertSame( '', $module['panel'], $module['id'] );
+			$this->assertSame( '', $module['panelGroup'], $module['id'] );
 			$this->assertSame( array(), (array) $module['panelData'], $module['id'] );
 		}
 	}

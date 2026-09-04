@@ -237,6 +237,15 @@ final class SettingsPage {
 			// request site-wide.
 			$column_choices = is_array( $panel_data['columnChoices'] ?? null ) ? $panel_data['columnChoices'] : array();
 
+			// Which accordion group the panel belongs under, through the second
+			// reserved key. A panel is about one group's settings - the Data
+			// Manager's test panel tests destinations, not attribution capture -
+			// so once a module has more than one tab the panel has to travel
+			// with its own, instead of sitting below whichever tab is open.
+			// Empty means "below everything", which is right for a module whose
+			// panel is the whole screen.
+			$panel_group = is_string( $panel_data['panelGroup'] ?? null ) ? $panel_data['panelGroup'] : '';
+
 			$fields = array();
 			foreach ( $schema->fields() as $field ) {
 				$ui = $field->to_ui_array( $values[ $field->key ] ?? $field->default_value );
@@ -282,6 +291,7 @@ final class SettingsPage {
 				// A custom React panel with its own REST routes (the service
 				// accounts manager). Same instanceof opt-in as the doc link.
 				'panel'              => $schema instanceof PanelSchemaInterface ? $schema->panel() : '',
+				'panelGroup'         => $panel_group,
 				'panelData'          => (object) $panel_data,
 			);
 		}

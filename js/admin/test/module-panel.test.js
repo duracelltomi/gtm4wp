@@ -559,6 +559,138 @@ describe( 'ModulePanel custom panels', () => {
 		).toBe( document.DOCUMENT_POSITION_FOLLOWING );
 	} );
 
+	/**
+	 * A two-tab google-data-manager: the destinations table in one group, the
+	 * attribution-capture settings in another, and the test panel naming the
+	 * group it belongs to.
+	 *
+	 * @param {string} panelGroup Group the panel declares, '' for none.
+	 * @return {void}
+	 */
+	function renderTabbedDataManager( panelGroup ) {
+		renderPanel(
+			{
+				id: 'google-data-manager',
+				title: 'Google Data Manager',
+				panel: 'gdm-destinations',
+				panelGroup,
+				panelData: {
+					testPath: 'gtm4wp/v2/google/destinations/test',
+					optionKey: 'gdm-destinations',
+					health: {},
+					threshold: 3,
+					columnChoices: {
+						'gdm-destinations': {
+							service_account: {
+								sa_0123456789ab: 'Production SA',
+							},
+						},
+					},
+				},
+				groups: [
+					{ id: 'destinations', label: 'Destinations' },
+					{ id: 'attribution', label: 'Attribution capture' },
+				],
+				fields: [
+					field( 'other-option', 'destinations', 'Field A' ),
+					field(
+						'gdm-capture-attribution',
+						'attribution',
+						'Capture'
+					),
+				],
+			},
+			{
+				values: {
+					'other-option': '',
+					'gdm-capture-attribution': '',
+					'gdm-destinations': [
+						{
+							label: 'Prod',
+							service_account: 'sa_0123456789ab',
+							type: 'ga4',
+							property_id: '123456789',
+							measurement_id: 'G-ABC123',
+						},
+					],
+				},
+			}
+		);
+	}
+
+	/**
+	 * Once a module has tabs, "below the fields" stops being a place: the panel
+	 * would sit under whichever tab happened to be open, so a Test button for
+	 * destinations appeared under the attribution-capture tab and read as a
+	 * control belonging to it.
+	 */
+	it( 'keeps a grouped panel inside its own tab', () => {
+		renderTabbedDataManager( 'destinations' );
+
+		// The destinations tab opens first and carries the panel.
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
+
+		fireEvent.click(
+			screen.getByRole( 'tab', { name: 'Attribution capture' } )
+		);
+
+		expect( screen.getByLabelText( 'Capture' ) ).toBeInTheDocument();
+		expect(
+			screen.queryByRole( 'button', { name: 'Test Prod' } )
+		).not.toBeInTheDocument();
+
+		// And it comes back with its own tab rather than being unmounted for good.
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Destinations' } ) );
+
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
+	} );
+
+	/**
+	 * The pre-existing behaviour, kept for a panel that belongs to the module
+	 * as a whole rather than to one of its groups.
+	 */
+	it( 'shows an ungrouped panel under every tab', () => {
+		renderTabbedDataManager( '' );
+
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
+
+		fireEvent.click(
+			screen.getByRole( 'tab', { name: 'Attribution capture' } )
+		);
+
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
+	} );
+
+	/**
+	 * A panel naming a group that is not rendered must not vanish with it -
+	 * groupsWithFields() drops a group whose fields are all gone, and losing
+	 * the only way to test a destination would be worse than showing it in the
+	 * place it always used to sit.
+	 */
+	it( 'falls back to below the fields when the named group is not rendered', () => {
+		renderTabbedDataManager( 'a-group-that-has-no-fields' );
+
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
+
+		fireEvent.click(
+			screen.getByRole( 'tab', { name: 'Attribution capture' } )
+		);
+
+		expect(
+			screen.getByRole( 'button', { name: 'Test Prod' } )
+		).toBeInTheDocument();
+	} );
+
 	it( 'falls back to the fields when the module names a panel this bundle does not know', () => {
 		renderPanel( {
 			panel: 'from-a-newer-plugin',
