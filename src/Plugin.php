@@ -79,6 +79,13 @@ final class Plugin {
 
 		Globals::populate( $this->options );
 
+		// Personal-data requests run from wp-admin, from cron and from WP-CLI,
+		// so this cannot sit in either the admin or the frontend branch below.
+		// It is registered whatever the capture setting says: a request has to
+		// find data captured while the feature was on, including after it has
+		// been turned off again.
+		( new Modules\GoogleDataManager\PrivacyData() )->register_hooks();
+
 		// The settings REST endpoint must be reachable on REST requests where
 		// is_admin() is false; the controller class only loads when a REST
 		// request actually initializes.
