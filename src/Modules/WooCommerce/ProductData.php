@@ -226,7 +226,8 @@ final class ProductData {
 			// sibling was a string, so the same feed matched only half a store.
 			'item_id'                  => (string) $remarketing_id,
 			'item_name'                => $data_product->get_title(),
-			'sku'                      => $data_product_sku ? $data_product_sku : $data_product_id,
+			// The same rule for the SKU field, which falls back to that id.
+			'sku'                      => (string) ( $data_product_sku ? $data_product_sku : $data_product_id ),
 			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
 			'stocklevel'               => $product->get_stock_quantity(),
 			'stockstatus'              => $product->get_stock_status(),

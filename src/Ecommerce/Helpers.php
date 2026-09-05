@@ -206,6 +206,33 @@ final class Helpers {
 	 * @param string $category_taxonomy The name of the WordPress taxonomy where the category ID needs to be searched.
 	 * @return string The category path. An example output can be: Home/Clothing/Toddlers.
 	 */
+	/**
+	 * Undoes the HTML encoding WordPress applies to a term name when it is saved.
+	 *
+	 * WordPress runs every term name through `_wp_specialchars()` on save (the
+	 * `pre_term_name` filter, `wp-includes/default-filters.php`), so a category
+	 * called "Shirts & Ties" is stored, and read back, as "Shirts &amp; Ties".
+	 * Written into the data layer unchanged, that is what GA4 reports and what a
+	 * GTM trigger has to be written against.
+	 *
+	 * `wp_specialchars_decode()` with ENT_QUOTES is the exact inverse of what was
+	 * applied, so it reverses that encoding and nothing else. The decoded value is
+	 * a data value, not markup: every sink it reaches escapes for its own context
+	 * afterwards (the data layer through `wp_json_encode()` with the hex flags,
+	 * the product-data attribute through `esc_attr()`), which is why decoding here
+	 * is safe and is not the blanket decode of script output RI-3 warns about.
+	 *
+	 * Lives here rather than beside either integration, so a WooCommerce product
+	 * category and an Easy Digital Downloads download category are reported the
+	 * same way.
+	 *
+	 * @param string $name A term name as WordPress stored it.
+	 * @return string The name as it was typed.
+	 */
+	public static function decode_term_name( string $name ): string {
+		return wp_specialchars_decode( $name, ENT_QUOTES );
+	}
+
 	public static function get_product_category_hierarchy( $category_id, string $category_taxonomy = 'product_cat' ): string {
 		$cat_hierarchy = '';
 
@@ -221,7 +248,10 @@ final class Helpers {
 		);
 
 		if ( is_string( $category_parent_list ) ) {
-			$cat_hierarchy = trim( $category_parent_list, '/' );
+			// Decoded after the path is joined, never before: the encoding
+			// WordPress applies does not touch the separator, so no decoded name
+			// can introduce a level boundary that was not there.
+			$cat_hierarchy = self::decode_term_name( trim( $category_parent_list, '/' ) );
 		}
 
 		return $cat_hierarchy;
@@ -274,7 +304,7 @@ final class Helpers {
 			if ( $fullpath ) {
 				$product_category = self::get_product_category_hierarchy( $category_data->term_id, $category_taxonomy );
 			} elseif ( isset( $category_data->name ) ) {
-				$product_category = $category_data->name;
+				$product_category = self::decode_term_name( (string) $category_data->name );
 			}
 		}
 
@@ -299,7 +329,7 @@ final class Helpers {
 		);
 
 		if ( is_array( $gtm4wp_product_terms ) && ( count( $gtm4wp_product_terms ) > 0 ) ) {
-			return $gtm4wp_product_terms[0]->name;
+			return self::decode_term_name( (string) $gtm4wp_product_terms[0]->name );
 		}
 
 		return '';

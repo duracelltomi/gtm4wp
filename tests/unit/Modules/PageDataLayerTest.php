@@ -118,6 +118,18 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'get_term' )->justReturn( null );
 		Functions\when( 'get_term_parents_list' )->justReturn( '' );
 
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function. WordPress encodes a term name with
+		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
+		// ENT_QUOTES reverses exactly those five entities and nothing else.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
+
 		// The order-received visitor check (TS-16: stubbed here, in this file's own
 		// setUp, never borrowed from whichever test file happened to run first).
 		// A logged-out visitor is the default; the guest email-verification helper
@@ -2260,6 +2272,36 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( 'class="gtm4wp-wc-visitor-data"', $html );
 		// The placeholder itself carries no visitor value (safe to bake into cache).
 		$this->assertStringNotContainsString( 'data-gtm4wp-visitor-cart', $html );
+	}
+
+	/**
+	 * The term-name decode (a category stored by WordPress as "Shirts &amp; Ties"
+	 * reaching the data layer as "Shirts & Ties") hands a raw ampersand to the
+	 * script sink, which is exactly the character RI-2/RI-3 are about. Both
+	 * directions asserted: the hex-encoded form is present in the emitted script
+	 * AND the raw & is absent, so the decode cannot become a break-out.
+	 */
+	public function test_decoded_category_is_still_hex_encoded_in_the_script(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Shirts &amp; Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Tie', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		// TC-2: the expectation is produced by the same encoder the source uses,
+		// rather than hand-typed as &.
+		$expected = wp_json_encode( 'Shirts & Ties', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		$this->assertStringContainsString( (string) $expected, $this->inline_js, 'The decoded category must reach the script hex-encoded.' );
+		$this->assertStringNotContainsString( 'Shirts & Ties', $this->inline_js, 'A raw ampersand must never reach the script body.' );
+		$this->assertStringNotContainsString( 'Shirts &amp; Ties', $this->inline_js, 'And the stored entity must not survive to the data layer either.' );
 	}
 
 	public function test_cart_page_fires_view_cart_event(): void {
