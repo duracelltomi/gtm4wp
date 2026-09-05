@@ -247,6 +247,10 @@ final class WooCommerceModuleTest extends TestCase {
 
 		Functions\when( 'apply_filters' )->returnArg( 2 );
 		Functions\when( 'plugins_url' )->justReturn( 'https://example.com/build/x.js' );
+		// TS-16: stubbed here rather than relied on from another test file. The
+		// block tracker is told where the Store API cart lives, because a site can
+		// move the REST root and a guessed address would 404 in silence.
+		Functions\when( 'rest_url' )->alias( static fn ( $path = '' ) => 'https://example.com/wp-json/' . ltrim( (string) $path, '/' ) );
 		Functions\when( 'wp_json_encode' )->alias(
 			static fn ( $data, $options = 0 ) => json_encode( $data, $options ) // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 		);
@@ -283,6 +287,35 @@ final class WooCommerceModuleTest extends TestCase {
 	 * presence of the wc/store/payment store, which WooCommerce registers on the
 	 * Cart page too, so the merged context fired the checkout-step events there.
 	 */
+	/**
+	 * The block tracker falls back to reading the cart from the Store API on a
+	 * store that never registers the wc/store/cart data store (a store whose
+	 * blocks are built on the Interactivity API), so it has to be told where that
+	 * cart lives. Reported on the wordpress.org forum as add_to_cart and
+	 * remove_from_cart never firing anywhere on such a store.
+	 */
+	public function test_block_tracker_is_told_where_the_store_api_cart_is(): void {
+		CartCheckoutUtils::$cart_block = true;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+
+		$result = $this->run_enqueue( $this->make_module() );
+		$inline = $result['inline']['gtm4wp-woocommerce-blocks'];
+
+		// TC-2: the expectation is built with the same encoder the source uses, so
+		// the assertion pins the literal without hand-typing its escapes. The
+		// encoder is the one run_enqueue() stubbed just above.
+		$expected_url = wp_json_encode(
+			'https://example.com/wp-json/wc/store/v1/cart',
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		$this->assertStringContainsString( 'window.gtm4wp_blocks_cart_url = ' . $expected_url . ';', $inline, 'The address must come from rest_url(), so a moved REST root still resolves.' );
+		// The context is set in the same inline block and must survive beside it.
+		$this->assertStringContainsString( 'window.gtm4wp_blocks_context', $inline );
+	}
+
 	public function test_block_cart_page_loads_block_tracker_in_cart_context(): void {
 		CartCheckoutUtils::$cart_block = true;
 		Functions\when( 'is_checkout' )->justReturn( false );

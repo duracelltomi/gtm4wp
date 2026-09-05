@@ -260,6 +260,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 = 2.0.2 =
 
 * Fixed: the begin_checkout event was missing on stores where WooCommerce reports the checkout page as the cart page as well, which happens when a plugin or a theme forces that decision or when a cart shortcode is left in the checkout page content. Such a checkout page pushed view_cart and begin_checkout never fired anywhere. The checkout is now decided first, so a page reported as both is treated as the checkout page. The order-received page is unaffected.
+* Fixed: add_to_cart and remove_from_cart never fired on a store whose product and cart blocks are built on the WordPress Interactivity API, the newer form of the WooCommerce blocks. Product pages now report the add once WooCommerce confirms that the item reached the cart, and cart changes made anywhere else are read back from the WooCommerce Store API and reported the same way as on a store using the older blocks. A variable product added from such a product page is not covered yet, because the interactive form publishes no variation data the plugin could read.
 
 = 2.0.1 =
 
