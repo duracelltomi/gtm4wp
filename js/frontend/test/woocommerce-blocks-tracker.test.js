@@ -12,6 +12,7 @@
  */
 
 let mockSubscriber;
+let mockHasCartStore;
 let mockCartData;
 let mockActivePaymentMethod;
 let mockHasPaymentStore;
@@ -24,7 +25,7 @@ jest.mock(
 	'@wordpress/data',
 	() => ( {
 		select: ( name ) => {
-			if ( name === 'wc/store/cart' ) {
+			if ( name === 'wc/store/cart' && mockHasCartStore ) {
 				return {
 					getCartData: () => mockCartData,
 					hasFinishedResolution: () => mockHasFinishedResolution,
@@ -44,6 +45,36 @@ jest.mock(
 	} ),
 	{ virtual: true }
 );
+
+// TS-7/TS-14: loading the tracker registers a window listener for the cart sync
+// event, and jest.isolateModules never detaches it - the wp-scripts jest preset
+// shares ONE jsdom window across the whole file. Every leaked copy would answer
+// the next test's sync event with its own stale baseline and push again, so the
+// capture is file-wide, exactly as in the classic tracker's suite: record here,
+// detach in afterEach, and every test can count exactly.
+let capturedWindowListeners = [];
+let originalWindowAdd = null;
+
+beforeEach( () => {
+	capturedWindowListeners = [];
+	originalWindowAdd = window.addEventListener;
+	window.addEventListener = function ( type, fn, opts ) {
+		capturedWindowListeners.push( { type, fn, opts } );
+		return originalWindowAdd.call( this, type, fn, opts );
+	};
+} );
+
+afterEach( () => {
+	if ( originalWindowAdd ) {
+		window.addEventListener = originalWindowAdd;
+		originalWindowAdd = null;
+	}
+
+	capturedWindowListeners.forEach( ( { type, fn, opts } ) =>
+		window.removeEventListener( type, fn, opts )
+	);
+	capturedWindowListeners = [];
+} );
 
 /**
  * Builds a raw cart line carrying its GA4 item.
@@ -70,6 +101,7 @@ function loadTracker() {
 describe( 'gtm4wp-woocommerce-blocks', () => {
 	beforeEach( () => {
 		mockSubscriber = null;
+		mockHasCartStore = true;
 		mockCartData = { items: [], totals: { currency_code: 'EUR' } };
 		mockActivePaymentMethod = '';
 		mockHasPaymentStore = false;
@@ -530,5 +562,189 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		loadTracker(); // re-injected bundle: the guard blocks a second subscribe
 
 		expect( mockSubscribeCount ).toBe( 1 );
+	} );
+} );
+
+/**
+ * A store whose blocks are built on the Interactivity API never registers the
+ * wc/store/cart data store, so the subscribe path above has nothing to read and
+ * such a store reported no cart events at all. The tracker then reads the cart
+ * back from the Store API, announced by WooCommerce's own cart sync event, and
+ * diffs it exactly as the data store path does.
+ *
+ * The window listener is captured and detached per test: jsdom keeps one window
+ * for the whole file, so a leaked listener from an earlier load would answer the
+ * next test's event and double the pushes (TS-7/TS-14).
+ */
+describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
+	const CART_URL = 'https://shop.example/wp-json/wc/store/v1/cart';
+
+	/**
+	 * Lets the fetch promise chain settle. The chain is fetch -> response.json
+	 * -> handler, so a few microtask turns are enough and no timer is involved.
+	 *
+	 * @return {Promise<void>} Resolves once the chain has run.
+	 */
+	const settle = async () => {
+		for ( let i = 0; i < 5; i++ ) {
+			await Promise.resolve();
+		}
+	};
+
+	/**
+	 * Queues the cart responses the fallback will read, in order.
+	 *
+	 * @param {Array} carts The cart payloads to return, one per call.
+	 * @return {void}
+	 */
+	const respondWith = ( carts ) => {
+		let call = 0;
+		window.fetch = jest.fn( () => {
+			const cart = carts[ Math.min( call, carts.length - 1 ) ];
+			call++;
+			return Promise.resolve( {
+				ok: true,
+				json: () => Promise.resolve( cart ),
+			} );
+		} );
+	};
+
+	const cartOf = ( items ) => ( {
+		items,
+		totals: { currency_code: 'EUR' },
+	} );
+
+	const syncCart = () =>
+		window.dispatchEvent(
+			new window.CustomEvent( 'wc-blocks_store_sync_required', {
+				detail: { type: 'from_iAPI', quantityChanges: {} },
+			} )
+		);
+
+	const pushedEvents = ( name ) =>
+		window.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === name
+		);
+
+	beforeEach( () => {
+		mockSubscriber = null;
+		mockHasCartStore = false; // an Interactivity API store
+		mockCartData = { items: [], totals: { currency_code: 'EUR' } };
+		mockHasFinishedResolution = true;
+		window.gtm4wp_woocommerce_blocks_inited = false;
+		window.gtm4wp_blocks_context = 'minicart';
+		window.gtm4wp_blocks_cart_url = CART_URL;
+		window.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_currency = 'EUR';
+		document.cookie = 'woocommerce_items_in_cart=; max-age=0';
+		respondWith( [ cartOf( [] ) ] );
+	} );
+
+	afterEach( () => {
+		delete window.fetch;
+		delete window.gtm4wp_blocks_cart_url;
+		document.cookie = 'woocommerce_items_in_cart=; max-age=0';
+	} );
+
+	it( 'reports remove_from_cart from the Store API when the data store is absent', async () => {
+		respondWith( [
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+			cartOf( [] ),
+		] );
+		loadTracker();
+
+		syncCart(); // establishes the baseline, reports nothing
+		await settle();
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+		syncCart(); // the item is gone
+		await settle();
+
+		const removed = pushedEvents( 'remove_from_cart' );
+		expect( removed ).toHaveLength( 1 );
+		expect( removed[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 7, quantity: 1 } )
+		);
+		expect( removed[ 0 ][ 2 ] ).toEqual(
+			expect.objectContaining( { currency: 'EUR', value: 10 } )
+		);
+	} );
+
+	it( 'leaves add_to_cart to the classic tracker outside the block cart pages', async () => {
+		window.gtm4wp_blocks_context = 'minicart';
+		respondWith( [
+			cartOf( [] ),
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+		] );
+		loadTracker();
+
+		syncCart();
+		await settle();
+		syncCart();
+		await settle();
+
+		expect( pushedEvents( 'add_to_cart' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'reports add_to_cart on the block Cart page, where it owns the event', async () => {
+		window.gtm4wp_blocks_context = 'cart';
+		respondWith( [
+			cartOf( [] ),
+			cartOf( [ cartLine( 'A', 2, { item_id: 7, price: 10 } ) ] ),
+		] );
+		loadTracker();
+
+		syncCart();
+		await settle();
+		syncCart();
+		await settle();
+
+		const added = pushedEvents( 'add_to_cart' );
+		expect( added ).toHaveLength( 1 );
+		expect( added[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 7, quantity: 2 } )
+		);
+	} );
+
+	it( 'stays out of the way once the data store has answered', async () => {
+		mockHasCartStore = true;
+		mockCartData = cartOf( [
+			cartLine( 'A', 1, { item_id: 7, price: 10 } ),
+		] );
+		const subscriber = loadTracker();
+
+		subscriber(); // the data store path takes the cart
+
+		syncCart();
+		await settle();
+
+		// No second reader: the cart must not be fetched, and the data store
+		// path's own baseline must not be doubled by a fallback event.
+		expect( window.fetch ).not.toHaveBeenCalled();
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'reads the baseline at load only for a visitor who has a cart', () => {
+		jest.useFakeTimers();
+
+		loadTracker();
+		jest.advanceTimersByTime( 5000 );
+		expect( window.fetch ).not.toHaveBeenCalled();
+
+		jest.useRealTimers();
+	} );
+
+	it( 'reads the baseline at load when the WooCommerce cart cookie is present', () => {
+		jest.useFakeTimers();
+		document.cookie = 'woocommerce_items_in_cart=1';
+
+		loadTracker();
+		jest.advanceTimersByTime( 5000 );
+		expect( window.fetch ).toHaveBeenCalledWith(
+			CART_URL,
+			expect.objectContaining( { credentials: 'same-origin' } )
+		);
+
+		jest.useRealTimers();
 	} );
 } );

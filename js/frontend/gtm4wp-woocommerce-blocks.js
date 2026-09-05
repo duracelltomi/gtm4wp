@@ -42,9 +42,29 @@ import {
 	gtm4wp_normalize_crosssell_items,
 	gtm4wp_selected_shipping_tier,
 } from './lib/gtm4wp-blocks-cart-diff';
+import { gtm4wp_read_cookie } from './lib/gtm4wp-cookies';
 
 const CART_STORE = 'wc/store/cart';
 const PAYMENT_STORE = 'wc/store/payment';
+
+// The event WooCommerce dispatches on window after every cart change made
+// through the Interactivity API, which is what drives the fallback below.
+const CART_SYNC_EVENT = 'wc-blocks_store_sync_required';
+
+// WooCommerce writes these while the cart holds something and clears them when
+// it is emptied, so their presence answers "does this visitor have a cart"
+// without reading the cart. The same pair the PHP side checks before it loads
+// the cart-fragments channel.
+const WC_CART_COOKIES = [
+	'woocommerce_items_in_cart',
+	'woocommerce_cart_hash',
+];
+
+// How long the fallback waits for the wc/store/cart data store to appear before
+// it takes over, in milliseconds. The block scripts register their stores after
+// this deferred bundle first runs, so an immediate decision would be wrong on an
+// ordinary block store.
+const CART_STORE_WAIT = 2000;
 
 // GA4 list identity for the Cart block cross-sells.
 const CROSS_SELL_LIST_NAME = 'Cross-Sells';
@@ -198,6 +218,153 @@ function gtm4wp_blocks_bind_crosssell_clicks( get_items ) {
 	} );
 }
 
+/**
+ * Whether this browser already has a WooCommerce cart, read from the cookies
+ * WooCommerce maintains for exactly that question.
+ *
+ * @return {boolean} Whether a cart is present.
+ */
+function gtm4wp_blocks_visitor_has_cart() {
+	return WC_CART_COOKIES.some( function ( cookie_name ) {
+		return '' !== gtm4wp_read_cookie( cookie_name );
+	} );
+}
+
+/**
+ * Reads the current cart from the Store API.
+ *
+ * The response has the same shape as the wc/store/cart data store, GA4 item
+ * extension included, so the same normalizer and diff serve both paths. The
+ * session cookie identifies the cart, which is why the request is made with
+ * credentials. Any failure resolves to null and the caller then leaves its
+ * snapshot untouched, so a lost request costs an event rather than reporting a
+ * wrong one.
+ *
+ * @return {Promise<Object|null>} The cart response, or null.
+ */
+function gtm4wp_blocks_fetch_cart() {
+	const cart_url =
+		'string' === typeof window.gtm4wp_blocks_cart_url
+			? window.gtm4wp_blocks_cart_url
+			: '';
+
+	if ( '' === cart_url || 'function' !== typeof window.fetch ) {
+		return Promise.resolve( null );
+	}
+
+	return window
+		.fetch( cart_url, {
+			credentials: 'same-origin',
+			headers: { Accept: 'application/json' },
+		} )
+		.then( function ( response ) {
+			return response && response.ok ? response.json() : null;
+		} )
+		.catch( function () {
+			return null;
+		} );
+}
+
+/**
+ * Tracks cart changes on a store that never registers the wc/store/cart data
+ * store.
+ *
+ * WooCommerce is moving its blocks from React and @wordpress/data to the
+ * Interactivity API, and the blocks built that way keep their cart in a private
+ * store this tracker must not read. What they do announce publicly is that the
+ * cart changed, so the cart itself is read back from the Store API and diffed
+ * the same way the data store path diffs it. Without this, a store whose product
+ * and cart blocks are all Interactivity API based reported no add_to_cart and no
+ * remove_from_cart at all.
+ *
+ * Ownership matches the data store path exactly: add_to_cart only on the block
+ * Cart and Checkout pages, because everywhere else the classic tracker owns it.
+ *
+ * @param {boolean}  is_cartcheckout Whether this is the block Cart or Checkout page.
+ * @param {Function} store_is_live   Tells whether the data store answered after all.
+ * @return {void}
+ */
+function gtm4wp_blocks_init_store_api_fallback(
+	is_cartcheckout,
+	store_is_live
+) {
+	// The last cart this tracker knows about. Null means "not established yet",
+	// and the first refresh in that state only records the cart, since a diff
+	// against nothing would report the whole cart as just added.
+	let cart_baseline = null;
+	let refresh_running = false;
+	let refresh_again = false;
+
+	const refresh = function () {
+		if ( store_is_live() ) {
+			return;
+		}
+
+		if ( refresh_running ) {
+			// A second change arrived while the first read was in flight. Cart
+			// changes queue up behind each other, so read once more afterwards
+			// instead of racing two reads against the same cart.
+			refresh_again = true;
+			return;
+		}
+
+		refresh_running = true;
+
+		gtm4wp_blocks_fetch_cart().then( function ( cart_data ) {
+			refresh_running = false;
+
+			if ( cart_data ) {
+				const current = gtm4wp_normalize_cart_items( cart_data.items );
+
+				if ( null === cart_baseline ) {
+					cart_baseline = current;
+				} else {
+					const { added, removed } = gtm4wp_diff_cart_items(
+						cart_baseline,
+						current
+					);
+					cart_baseline = current;
+
+					const currency = gtm4wp_blocks_currency( cart_data );
+
+					if ( is_cartcheckout && added.length ) {
+						gtm4wp_blocks_push(
+							'add_to_cart',
+							added.map( gtm4wp_blocks_to_item ),
+							{ currency, value: gtm4wp_blocks_value( added ) }
+						);
+					}
+
+					if ( removed.length ) {
+						gtm4wp_blocks_push(
+							'remove_from_cart',
+							removed.map( gtm4wp_blocks_to_item ),
+							{ currency, value: gtm4wp_blocks_value( removed ) }
+						);
+					}
+				}
+			}
+
+			if ( refresh_again ) {
+				refresh_again = false;
+				refresh();
+			}
+		} );
+	};
+
+	// The baseline is only worth reading for a visitor who already has a cart:
+	// with an empty cart there is nothing that could be removed yet, and the
+	// first change establishes the baseline on its own. That keeps the request
+	// off every page view of every other visitor.
+	window.setTimeout( function () {
+		if ( ! store_is_live() && gtm4wp_blocks_visitor_has_cart() ) {
+			refresh();
+		}
+	}, CART_STORE_WAIT );
+
+	window.addEventListener( CART_SYNC_EVENT, refresh );
+}
+
 function gtm4wp_blocks_init() {
 	// Guard against a re-injected bundle double-subscribing.
 	if ( window.gtm4wp_woocommerce_blocks_inited ) {
@@ -238,6 +405,18 @@ function gtm4wp_blocks_init() {
 		gtm4wp_blocks_bind_crosssell_clicks( () => crosssell_items );
 	}
 
+	// Whether the wc/store/cart data store ever answered. It stays false on a
+	// store whose blocks are built on the Interactivity API, and that is what
+	// hands the cart events to the fallback below. Both paths are registered
+	// because nothing here can tell the two kinds of store apart up front, and
+	// the one that is not in use does nothing.
+	let cart_store_answered = false;
+
+	gtm4wp_blocks_init_store_api_fallback(
+		is_cartcheckout,
+		() => cart_store_answered
+	);
+
 	subscribe( () => {
 		const cart_store = gtm4wp_safe_select( CART_STORE );
 		if ( ! cart_store || typeof cart_store.getCartData !== 'function' ) {
@@ -255,6 +434,8 @@ function gtm4wp_blocks_init() {
 		if ( ! cart_data ) {
 			return;
 		}
+
+		cart_store_answered = true;
 
 		const current = gtm4wp_normalize_cart_items( cart_data.items );
 		const currency = gtm4wp_blocks_currency( cart_data );

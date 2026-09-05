@@ -465,14 +465,22 @@ final class WooCommerceModule extends AbstractModule {
 			$in_footer
 		);
 
-		wp_add_inline_script(
-			'gtm4wp-woocommerce-blocks',
-			'window.gtm4wp_blocks_context = ' . ScriptTag::json_literal(
-				$context,
-				JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
-			) . ';',
-			'before'
-		);
+		$inline = 'window.gtm4wp_blocks_context = ' . ScriptTag::json_literal(
+			$context,
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		) . ';';
+
+		// Where the tracker reads the cart back from when the store does not
+		// register the wc/store/cart data store, which is the case on a store
+		// whose blocks are built on the Interactivity API. The address is built
+		// here rather than in the browser because a site can move the REST root,
+		// and a guessed one would simply 404 in silence.
+		$inline .= 'window.gtm4wp_blocks_cart_url = ' . ScriptTag::json_literal(
+			rest_url( 'wc/store/v1/cart' ),
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		) . ';';
+
+		wp_add_inline_script( 'gtm4wp-woocommerce-blocks', $inline, 'before' );
 	}
 
 	/**
