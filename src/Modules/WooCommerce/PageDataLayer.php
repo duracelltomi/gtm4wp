@@ -115,14 +115,27 @@ final class PageDataLayer {
 		}
 
 		// Product detail view data layer content.
+		//
+		// The order of the cart/checkout arms matters, because WooCommerce answers
+		// both is_cart() and is_checkout() with true on some stores: a plugin or a
+		// theme can define WOOCOMMERCE_CART or answer the woocommerce_is_cart
+		// filter while the checkout page renders, and a leftover cart shortcode in
+		// the checkout page content does the same. The checkout arm is therefore
+		// tested first, matching WooCommerceModule::block_cart_or_checkout_context(),
+		// which resolves the tracker's context the same way. When the two disagreed,
+		// such a page emitted view_cart from here while the block tracker fired the
+		// checkout steps, and begin_checkout could never fire at all. The
+		// order-received endpoint keeps its place ahead of both: is_checkout() is
+		// true there as well, and that page reports a purchase rather than a
+		// checkout start.
 		if ( is_product() ) {
 			$data_layer = $this->add_product_view( $data_layer );
-		} elseif ( is_cart() ) {
-			$this->add_cart_view( $woo );
 		} elseif ( is_order_received_page() ) {
 			$data_layer = $this->add_order_received_data( $data_layer );
 		} elseif ( is_checkout() ) {
 			$this->add_begin_checkout( $woo );
+		} elseif ( is_cart() ) {
+			$this->add_cart_view( $woo );
 		}
 
 		// The one-shot cookie/session events are visitor/session specific, so they
