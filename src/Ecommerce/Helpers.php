@@ -200,13 +200,6 @@ final class Helpers {
 	}
 
 	/**
-	 * Given a category ID, this function returns the full path to this category separated with the / character.
-	 *
-	 * @param int    $category_id The ID of the category that needs to be scanned for parents.
-	 * @param string $category_taxonomy The name of the WordPress taxonomy where the category ID needs to be searched.
-	 * @return string The category path. An example output can be: Home/Clothing/Toddlers.
-	 */
-	/**
 	 * Undoes the HTML encoding WordPress applies to a term name when it is saved.
 	 *
 	 * WordPress runs every term name through `_wp_specialchars()` on save (the
@@ -233,6 +226,13 @@ final class Helpers {
 		return wp_specialchars_decode( $name, ENT_QUOTES );
 	}
 
+	/**
+	 * Given a category ID, this function returns the full path to this category separated with the / character.
+	 *
+	 * @param int    $category_id The ID of the category that needs to be scanned for parents.
+	 * @param string $category_taxonomy The name of the WordPress taxonomy where the category ID needs to be searched.
+	 * @return string The category path. An example output can be: Home/Clothing/Toddlers.
+	 */
 	public static function get_product_category_hierarchy( $category_id, string $category_taxonomy = 'product_cat' ): string {
 		$cat_hierarchy = '';
 
