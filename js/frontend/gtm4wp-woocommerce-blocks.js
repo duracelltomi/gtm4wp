@@ -244,8 +244,8 @@ function gtm4wp_blocks_visitor_has_cart() {
  */
 function gtm4wp_blocks_fetch_cart() {
 	const cart_url =
-		'string' === typeof window.gtm4wp_blocks_cart_url
-			? window.gtm4wp_blocks_cart_url
+		'string' === typeof window.gtm4wp_store_api_cart_url
+			? window.gtm4wp_store_api_cart_url
 			: '';
 
 	if ( '' === cart_url || 'function' !== typeof window.fetch ) {

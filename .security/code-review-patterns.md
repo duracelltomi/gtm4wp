@@ -30,6 +30,8 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-21** — an encoder that can fail returns something PHP concatenates anyway: `false` becomes `''`, so `'var x = ' . wp_json_encode( … ) . ';'` emits `var x = ;` and the whole `<script>` block is a `SyntaxError`. Route assignment-position sinks through `ScriptTag::json_literal()`, or test `false ===` and omit the statement. Ask where each encode's result is *used*, not whether it shares a line with the concatenation (#141).
 
 **Recurring Issues (RI):**
+- **RI-28** — an `elseif` chain over predicates that can BOTH be true encodes a precedence nobody decided; and when a second file answers the same question in the other order, each file reads correctly on its own while the pair is broken.
+- **RI-29** — a fix whose mechanism is "stop tripping somebody else's detector" flips their whole branch, not only the part you wanted; enumerate what else differs between their two branches before shipping it.
 - **RI-1** — every PHP file starts with `defined( 'ABSPATH' ) || exit;` (the main plugin file included).
 - **RI-11** — every value added to the dataLayer is an *exposure* decision, not just an escaping one: does the client need it, and is the lowest actor who can read the page entitled to it? Escaping never answers "should this be here at all?"
 - **RI-5** — every user-facing string uses `__()`/`esc_html__()` with text domain `duracelltomi-google-tag-manager`.
@@ -1391,6 +1393,73 @@ The instance is **#99** (2026-08-04, external scan) — **fixed in 2.0**, `wontf
 > **An FP is a standing waiver over live code — re-derive it, don't re-read it.** Each entry below records a *mechanism* that made something safe on the day it was written. The code it blesses keeps changing; the entry does not. So an FP is only as good as its last verification, and its conclusion ("do not flag this") is exactly the sentence that stops the next review from checking. Two rules follow:
 > - **Every FP states the conditions as verifiable properties, and names what would invalidate it.** "It keeps a nonce" is a conclusion; "it keeps a nonce *that is bound to this caller*" is a property you can go and check.
 > - **Re-derive at least one FP per review**, oldest first, and re-derive any FP whose blessed code appears in the diff. Record it in the review's verification highlights. FP-5 sat unexamined from 2026-07-16 to 2026-07-29 (#78) while carrying a condition that read as satisfied and was not.
+
+### RI-28: Two answers to one question, and the `elseif` chain that hides the second ⭐
+
+Two shapes of the same defect, and the 2026-09-05 case had both at once.
+
+**(a) An `elseif` chain over predicates that are not mutually exclusive.** Writing
+`if ( A() ) … elseif ( B() )` states a precedence, but only the author knows whether that
+precedence was decided or fell out of the order the arms happened to be written in. When
+`A` and `B` can be true on the same request, the chain silently drops the `B` branch and
+nothing in the code says that was intended.
+
+**(b) The same question answered in two files, in two different orders.** Each file reads
+correctly on its own, which is why neither a review of one diff nor a green suite finds it.
+The defect exists only in the *pair*, and it surfaces on the subset of sites where the two
+predicates overlap.
+
+Confirmed 2026-09-05, from a wordpress.org report. `PageDataLayer::add_datalayer_data()`
+resolved the WooCommerce page with `is_product()` → `is_cart()` → `is_order_received_page()`
+→ `is_checkout()`, while `WooCommerceModule::block_cart_or_checkout_context()` resolved the
+same page with `is_checkout()` first. WooCommerce answers `is_cart()` from several sources,
+so a plugin defining `WOOCOMMERCE_CART` or answering the `woocommerce_is_cart` filter while
+the checkout renders makes both true on one page. On such a store the server pushed
+`view_cart` on the checkout page, the block tracker fired the checkout steps on that same
+page, and `begin_checkout` fired nowhere at all. Both files had been reviewed. Both were
+right, separately.
+
+- **Ask "who else answers this?" before reading the chain itself.** `grep` the predicate
+  pair across the tree (`is_cart\|is_checkout`, `is_singular\|is_page`, any `switch` over
+  the same third-party state). Two answerers is the finding; the order they disagree in is
+  only the symptom.
+- **For every `elseif` over third-party predicates, ask whether two arms can be true at
+  once.** If they can, the precedence is a decision and belongs in a comment beside the
+  chain, with a test that pins the overlap case. The reordering fix here also exposed a
+  second latent bug the overlap test caught immediately: with `is_cart()` true, the old
+  chain emitted `view_cart` on the **order-received** page, which nobody had reported.
+- **Prefer one resolver over two chains.** Where the two must stay separate (one runs in
+  PHP at render time, the other decides an enqueue), the test that keeps them honest asserts
+  the same input yields the same surface on both sides. This is RI-14's rule (one
+  definition, two ends must agree) applied to a *decision* rather than to a value.
+- The overlap is not exotic. It is exactly the configuration a support report arrives from,
+  and it is invisible on a default install, which is where all the testing happens.
+
+### RI-29: A fix that changes what a third party renders changes it for every consumer ⭐
+
+When the mechanism of a fix is "stop tripping somebody else's detector", the thing you flip
+is their whole branch. The part you wanted is one line of it. Everything else that differs
+between their two branches changes at the same moment, including the parts other code of
+ours depends on.
+
+Confirmed 2026-09-05, from the same report. GTM4WP printed a hidden `<input>` into
+WooCommerce's add-to-cart hooks; WooCommerce scans that buffered output for form elements
+and, when it finds any, renders the classic POST form instead of its Interactivity API flow.
+The 2.0.0 fix (#462) removed the input so block stores would stop doing a full page reload
+on add to cart. That worked. The other half of the same switch is that the legacy branch
+renders `<form class="cart">` and the interactive branch does not, and our own click tracker
+looked for `form.cart` before reading the product data. So the fix silently turned
+`add_to_cart` off on precisely the stores it was written for, with the button still carrying
+every class the tracker expects.
+
+- **Read the other branch of their `if`.** Not the docs for the behavior you are changing:
+  the actual source of both arms, listing every output difference, then grep our tree for
+  each one. The diff that matters is theirs, not ours.
+- **A fix that depends on somebody else's detection heuristic is a coupling** and gets a
+  registry row in `.upstream/` in the same change (UD-20), whichever direction it runs in.
+- **The silence is total.** No error, no failing test, and the feature's settings screen
+  still says it is on. See `.testing` TC-17 for why the suite stayed green: every fixture
+  encoded the render mode that the fix had just stopped producing.
 
 ### FP-1: `echo` in `ScriptTag::print_script_block()`
 Carries a `phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped`. The block is `wp_kses`-sanitized and only the ampersand entity is restored (`str_replace('&amp;','&', …)`); all other entities stay inert. Intentional and reviewed — do not re-flag as unescaped output.

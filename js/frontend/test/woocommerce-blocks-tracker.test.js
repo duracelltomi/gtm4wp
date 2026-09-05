@@ -633,7 +633,7 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		mockHasFinishedResolution = true;
 		window.gtm4wp_woocommerce_blocks_inited = false;
 		window.gtm4wp_blocks_context = 'minicart';
-		window.gtm4wp_blocks_cart_url = CART_URL;
+		window.gtm4wp_store_api_cart_url = CART_URL;
 		window.gtm4wp_push_ecommerce = jest.fn();
 		global.gtm4wp_currency = 'EUR';
 		document.cookie = 'woocommerce_items_in_cart=; max-age=0';
@@ -642,7 +642,7 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 
 	afterEach( () => {
 		delete window.fetch;
-		delete window.gtm4wp_blocks_cart_url;
+		delete window.gtm4wp_store_api_cart_url;
 		document.cookie = 'woocommerce_items_in_cart=; max-age=0';
 	} );
 

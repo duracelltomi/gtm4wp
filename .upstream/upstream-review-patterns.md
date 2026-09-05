@@ -32,6 +32,7 @@ Each row is `ID — one-line litmus`.
 | ID | Litmus |
 |----|--------|
 | UD-1 ⭐ | A hand-maintained mirror of an upstream list carries no expiry date; it looks equally correct on the day it goes stale. |
+| UD-20 | Our own output can be an input to *their* render decision, so both branches of that decision are our problem. |
 | UD-2 ⭐ | Silent failure needs a canary, not a comment. A code comment recording the last manual sync does not fire when the sync goes stale. |
 | UD-3 | A documentation page is a spec with no version and no changelog; diff the *claim*, never the page. |
 | UD-4 | An upstream deprecation notice is a dated obligation, not news — it belongs in the ledger with the removal release as its due date. |
@@ -437,6 +438,28 @@ An exclusivity inference breaks in the **appear** direction, which nothing watch
 ---
 
 ## Upstream Coupling anti-patterns
+
+### UD-20: Our output is an input to their render decision
+
+The couplings this file usually tracks run one way: we read a string, a selector or a
+version that upstream publishes. This one runs the other way. What GTM4WP prints into
+somebody else's hook can decide which of *their* code paths runs, and that makes our own
+output an upstream contract with no registry row and no obvious owner.
+
+Confirmed 2026-09-05. WooCommerce's Add to Cart + Options block buffers the output of the
+classic `woocommerce_before/after_add_to_cart_*` hooks and scans it for form elements. Any
+INPUT, TEXTAREA, SELECT, BUTTON or FORM found there makes it render the classic POST form
+instead of its Interactivity API flow. GTM4WP printed a hidden input into that hook, so
+every block store rendered the legacy form, and when the input was changed to a span in
+2.0.0 the stores switched mode, taking a DOM assumption in our own click tracker with them
+(`.security` RI-29).
+
+- **If our output feeds somebody's detector, both branches of their decision are our
+  problem**, and the row records which branch we are currently in and what changes if we
+  leave it.
+- The tell in a diff is a hook callback whose output shape changes: an `<input>` becoming a
+  `<span>` is invisible as a *value* change and total as a *mode* change.
+- Register the element **kind**, not the markup. What the scan tests for is the tag name.
 
 ### UC-1: A version floor written in N places drifts ⭐
 
