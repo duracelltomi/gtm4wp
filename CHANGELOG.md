@@ -1,5 +1,9 @@
 # Full changelog for GTM4WP
 
+## 2.0.2
+
+* Fixed: the `begin_checkout` event was missing on stores where WooCommerce reports the checkout page as the cart page as well. WooCommerce answers that question from several sources, so a plugin or a theme defining `WOOCOMMERCE_CART` or answering the `woocommerce_is_cart` filter while the checkout renders, or a cart shortcode left in the checkout page content, makes both answers true on the same page. The data layer asked the cart question first, so such a checkout page pushed `view_cart` and `begin_checkout` never fired anywhere, while the block tracker resolved the very same page as the checkout and fired the checkout steps on it. Both halves of the plugin now decide the checkout first, so a page reported as both is treated as the checkout page, and the two can no longer disagree about the page they are on. The order-received page is unaffected, it is still recognized ahead of both.
+
 ## 2.0.1
 
 * Fixed: on a block-based store, opening the Cart page pushed `add_shipping_info` and `add_payment_info` into the data layer with no interaction, and both events then fired again on the Checkout page. The block tracker told the two pages apart by the presence of the WooCommerce payment data store, which WooCommerce registers on the Cart page as well; the Cart and Checkout pages now each receive their own context and the checkout-step events fire only on the Checkout page. (#463)

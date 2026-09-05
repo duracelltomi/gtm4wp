@@ -2277,6 +2277,54 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"item_name":"Mug"', $this->inline_js, 'The cart item must be carried on the view_cart event.' );
 	}
 
+	/**
+	 * A store where WooCommerce answers both conditionals with true on the same
+	 * request - a plugin defining WOOCOMMERCE_CART or answering woocommerce_is_cart
+	 * while the checkout renders, or a leftover cart shortcode in the checkout page
+	 * content. Reported on the wordpress.org forum, where the checkout page emitted
+	 * view_cart and begin_checkout was never emitted anywhere, while the block
+	 * tracker fired the checkout steps on the same page because
+	 * WooCommerceModule::block_cart_or_checkout_context() resolves is_checkout()
+	 * first. The two halves have to answer the same way, and the checkout is the
+	 * more specific of the two states, so it wins.
+	 */
+	public function test_checkout_wins_when_woocommerce_reports_the_page_as_both_cart_and_checkout(): void {
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		// Both directions: the checkout event is present AND the cart event is gone.
+		// Asserting only the first would keep passing if both fired.
+		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js, 'A page reported as both must fire begin_checkout.' );
+		$this->assertStringNotContainsString( '"event":"view_cart"', $this->inline_js, 'A page reported as both must not also fire view_cart.' );
+	}
+
+	/**
+	 * The order-received endpoint keeps its place ahead of the checkout arm:
+	 * is_checkout() is true there as well, and that page reports a purchase, not a
+	 * checkout start. Without this the reordering above would turn every
+	 * thank-you page into a begin_checkout.
+	 */
+	public function test_order_received_still_wins_over_checkout_and_cart(): void {
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"begin_checkout"', $this->inline_js, 'The order-received page must not fire begin_checkout.' );
+		$this->assertStringNotContainsString( '"event":"view_cart"', $this->inline_js, 'The order-received page must not fire view_cart.' );
+	}
+
 	public function test_item_with_source_filter_receives_the_cart_item_on_a_cart_line(): void {
 		// #324 (a): on a cart line, the new gtm4wp_eec_item_with_source filter receives
 		// the raw WooCommerce cart item (with its custom meta) as its source argument,
