@@ -67,7 +67,7 @@ final class StoreApiDataTest extends TestCase {
 
 		$this->assertArrayHasKey( 'item', $data );
 		$this->assertIsArray( $data['item'] );
-		$this->assertSame( 42, $data['item']['item_id'] );
+		$this->assertSame( '42', $data['item']['item_id'], 'Identifiers cross the Store API as strings, product ids included.' );
 		$this->assertSame( 'Boots', $data['item']['item_name'] );
 	}
 
@@ -89,7 +89,7 @@ final class StoreApiDataTest extends TestCase {
 		$this->assertIsString( $data['item'], 'Cart-item extension values must be JSON strings.' );
 
 		$decoded = json_decode( $data['item'], true );
-		$this->assertSame( 42, $decoded['item_id'] );
+		$this->assertSame( '42', $decoded['item_id'], 'Identifiers cross the Store API as strings, product ids included.' );
 		$this->assertSame( 3, $decoded['quantity'] );
 	}
 

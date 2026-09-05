@@ -35,6 +35,18 @@ final class ProductDataTest extends TestCase {
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
 		Functions\when( 'get_term_parents_list' )->justReturn( '' );
+
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function. WordPress encodes a term name with
+		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
+		// ENT_QUOTES reverses exactly those five entities and nothing else.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
 		// process_product() derives item_list_id from the list name via sanitize_title.
 		Functions\when( 'sanitize_title' )->alias(
 			static fn ( $title ) => strtolower( trim( (string) preg_replace( '/[^a-z0-9]+/i', '-', (string) $title ), '-' ) )
@@ -647,13 +659,13 @@ final class ProductDataTest extends TestCase {
 		$item         = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 123, $item['internal_id'] );
-		$this->assertSame( 123, $item['item_id'], 'ID is used when SKU mode is off.' );
+		$this->assertSame( '123', $item['item_id'], 'ID is used when SKU mode is off, as a string.' );
 		$this->assertSame( 'Test Product', $item['item_name'] );
 		$this->assertSame( 'SKU-1', $item['sku'] );
 		$this->assertSame( 20.0, $item['price'], 'Price must be rounded to 2 decimals.' );
 		$this->assertSame( 'Shoes', $item['item_category'] );
 		$this->assertSame( 'retail', $item['google_business_vertical'] );
-		$this->assertSame( 123, $item['id'], 'Retail vertical uses the id field name.' );
+		$this->assertSame( '123', $item['id'], 'Retail vertical uses the id field name, and it follows item_id as a string.' );
 		$this->assertArrayNotHasKey( 'item_group_id', $item );
 		$this->assertArrayNotHasKey( 'item_variant', $item );
 	}
@@ -675,8 +687,12 @@ final class ProductDataTest extends TestCase {
 
 		$item = $product_data->process_product( $this->make_product( array( 'sku' => '' ) ), array(), 'productdetail' );
 
-		$this->assertSame( 123, $item['item_id'] );
-		$this->assertSame( 123, $item['sku'], 'sku field falls back to the product ID.' );
+		// Identifiers are strings, the id used as a fallback SKU included: a field
+		// that is a JSON number on a product with no SKU and a string on every
+		// other one cannot be compared in a GTM trigger. assertSame, so a silent
+		// return to the integer would fail here rather than pass on ==.
+		$this->assertSame( '123', $item['item_id'] );
+		$this->assertSame( '123', $item['sku'], 'sku field falls back to the product ID, as a string.' );
 	}
 
 	public function test_product_id_prefix_applied_to_remarketing_id(): void {
@@ -687,7 +703,7 @@ final class ProductDataTest extends TestCase {
 		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 'woocommerce_gpf_123', $item['id'] );
-		$this->assertSame( 123, $item['item_id'], 'item_id itself stays unprefixed.' );
+		$this->assertSame( '123', $item['item_id'], 'item_id itself stays unprefixed, and stays a string.' );
 	}
 
 	public function test_variation_product_mapping(): void {
@@ -790,7 +806,7 @@ final class ProductDataTest extends TestCase {
 		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
 		$this->assertSame( 'travel', $item['google_business_vertical'] );
-		$this->assertSame( 123, $item['destination'] );
+		$this->assertSame( '123', $item['destination'], 'The dynamic-remarketing id follows item_id and is a string too.' );
 		$this->assertArrayNotHasKey( 'id', $item );
 	}
 
@@ -1312,6 +1328,59 @@ final class ProductDataTest extends TestCase {
 		$this->assertStringContainsString( "\x22", $item['item_category'], 'A raw " must survive for the JSON sink to hex-encode.' );
 		$this->assertStringNotContainsString( '&amp;', $item['item_category'], 'The category must not be entity-encoded upstream of the sink.' );
 		$this->assertStringNotContainsString( '&quot;', $item['item_category'] );
+	}
+
+	/**
+	 * WordPress encodes a term name with _wp_specialchars() when it is saved (the
+	 * pre_term_name filter), so a category typed as "Shirts & Ties" is read back
+	 * as "Shirts &amp; Ties". Written into the data layer unchanged, that is the
+	 * literal string GA4 reports and the one a GTM trigger has to match, which is
+	 * what a live store showed. The encoding is undone here, once, and the value
+	 * still reaches the sink raw so the JSON encoder escapes it itself.
+	 */
+	public function test_term_name_arrives_as_it_was_typed_not_as_wordpress_stored_it(): void {
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Shirts &amp; Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
+
+		// Both directions: the typed form is present AND the stored entity is gone.
+		$this->assertSame( 'Shirts & Ties', $item['item_category'] );
+		$this->assertStringNotContainsString( '&amp;', $item['item_category'] );
+	}
+
+	public function test_full_category_path_is_decoded_level_by_level(): void {
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+		Functions\when( 'get_term_parents_list' )->justReturn( 'Shirts &amp; Ties/Silk &quot;Classic&quot;/' );
+
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH => true )
+		);
+
+		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 'Shirts & Ties', $item['item_category'] );
+		$this->assertSame( 'Silk "Classic"', $item['item_category2'] );
+		// The separator is not something the encoding can produce, so decoding
+		// cannot invent a level boundary; two levels in, two levels out.
+		$this->assertArrayNotHasKey( 'item_category3', $item );
+	}
+
+	public function test_brand_name_is_decoded_as_well(): void {
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Bang &amp; Olufsen', 'term_id' => 9 ) ) // phpcs:ignore
+		);
+
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY => 'product_brand' )
+		);
+
+		$item = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( 'Bang & Olufsen', $item['item_brand'] );
 	}
 
 	public function test_item_variant_and_brand_pass_special_characters_raw(): void {

@@ -173,11 +173,18 @@ final class ProductData {
 			$display_price = (float) wc_get_price_to_display( $product );
 		}
 
+		// Identifiers are strings, product ids included. 2.0 stopped coercing
+		// numeric-looking strings into JSON numbers so that a leading-zero SKU
+		// survives, and these two are the other half of that promise: a product
+		// with no SKU falls back to its id, and an id typed as a JSON number
+		// makes the same field arrive as a number on some products and as a
+		// string on others, which is the case a GTM trigger comparing item_id
+		// cannot be written for.
 		$_temp_productdata = array(
 			'internal_id'              => $product_id,
-			'item_id'                  => $remarketing_id,
+			'item_id'                  => (string) $remarketing_id,
 			'item_name'                => $product->get_title(),
-			'sku'                      => $product_sku ? $product_sku : $product_id,
+			'sku'                      => (string) ( $product_sku ? $product_sku : $product_id ),
 			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
 			'stocklevel'               => $product->get_stock_quantity(),
 			'stockstatus'              => $product->get_stock_status(),
