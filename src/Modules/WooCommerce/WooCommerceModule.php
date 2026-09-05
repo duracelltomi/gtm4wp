@@ -322,6 +322,7 @@ final class WooCommerceModule extends AbstractModule {
 			$this->enqueue_blocks_tracker( $block_context, $in_footer );
 		} else {
 			$this->enqueue_script( 'gtm4wp-woocommerce', 'gtm4wp-woocommerce.js', array( 'jquery' ), $in_footer, '' );
+			$this->inline_store_api_cart_url( 'gtm4wp-woocommerce' );
 
 			// A block-based store usually renders the Mini-Cart block in its header on
 			// every page. Removing an item (or changing its quantity) in the Mini-Cart
@@ -472,17 +473,33 @@ final class WooCommerceModule extends AbstractModule {
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		) . ';';
 
-		// Where the tracker reads the cart back from when the store does not
-		// register the wc/store/cart data store, which is the case on a store
-		// whose blocks are built on the Interactivity API. The address is built
-		// here rather than in the browser because a site can move the REST root,
-		// and a guessed one would simply 404 in silence.
-		$inline .= 'window.gtm4wp_blocks_cart_url = ' . ScriptTag::json_literal(
-			rest_url( 'wc/store/v1/cart' ),
-			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
-		) . ';';
-
 		wp_add_inline_script( 'gtm4wp-woocommerce-blocks', $inline, 'before' );
+		$this->inline_store_api_cart_url( 'gtm4wp-woocommerce-blocks' );
+	}
+
+	/**
+	 * Tells a tracker where the Store API cart lives.
+	 *
+	 * Both trackers read the cart back from there on a store built on the
+	 * Interactivity API: the block tracker because such a store registers no
+	 * wc/store/cart data store, and the classic tracker to resolve the variation
+	 * a product page just added, since the interactive form publishes no
+	 * variation data of its own. The address is built here rather than in the
+	 * browser because a site can move the REST root, and a guessed one would
+	 * simply 404 in silence.
+	 *
+	 * @param string $handle The script handle to attach it to.
+	 * @return void
+	 */
+	private function inline_store_api_cart_url( string $handle ): void {
+		wp_add_inline_script(
+			$handle,
+			'window.gtm4wp_store_api_cart_url = ' . ScriptTag::json_literal(
+				rest_url( 'wc/store/v1/cart' ),
+				JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+			) . ';',
+			'before'
+		);
 	}
 
 	/**

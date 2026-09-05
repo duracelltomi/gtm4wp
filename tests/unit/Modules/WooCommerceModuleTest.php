@@ -260,9 +260,13 @@ final class WooCommerceModuleTest extends TestCase {
 				$args[ $handle ] = $script_args;
 			}
 		);
+		// UC-3: WordPress keeps every inline script attached to a handle and prints
+		// them together, so the double concatenates in call order instead of
+		// keeping only the last one. Overwriting made a second attachment on the
+		// same handle invisible here while both reach the page in production.
 		Functions\when( 'wp_add_inline_script' )->alias(
 			static function ( $handle, $code = '', $position = 'after' ) use ( &$inline ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real wp_add_inline_script() signature
-				$inline[ $handle ] = $code;
+				$inline[ $handle ] = ( $inline[ $handle ] ?? '' ) . $code;
 			}
 		);
 
@@ -311,7 +315,7 @@ final class WooCommerceModuleTest extends TestCase {
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 		);
 
-		$this->assertStringContainsString( 'window.gtm4wp_blocks_cart_url = ' . $expected_url . ';', $inline, 'The address must come from rest_url(), so a moved REST root still resolves.' );
+		$this->assertStringContainsString( 'window.gtm4wp_store_api_cart_url = ' . $expected_url . ';', $inline, 'The address must come from rest_url(), so a moved REST root still resolves.' );
 		// The context is set in the same inline block and must survive beside it.
 		$this->assertStringContainsString( 'window.gtm4wp_blocks_context', $inline );
 	}
