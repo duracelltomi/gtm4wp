@@ -59,6 +59,7 @@ final class GoogleDataManagerHealthTest extends TestCase {
 				'last_failure'         => 0,
 				'consecutive_failures' => 0,
 				'last_error'           => '',
+				'last_error_class'     => '',
 			),
 			$this->health()->get( self::MEASUREMENT )
 		);

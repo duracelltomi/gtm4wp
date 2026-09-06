@@ -33,5 +33,21 @@ delete_option( 'gtm4wp_gdm_destination_health' );
 // path for it.
 delete_option( 'gtm4wp_gdm_capture_stats' );
 
+// Diagnostics ring of the server-side send lanes.
+delete_option( 'gtm4wp_gdm_send_log' );
+
+// Queued sends and status checks. The hook names are written out rather than
+// read from SendQueue::HOOKS because this file runs without the plugin's
+// autoloader; the SendQueueTest pins the two lists against each other so they
+// cannot drift apart.
+foreach ( array( 'gtm4wp_gdm_send_refund', 'gtm4wp_gdm_poll_status' ) as $gtm4wp_queue_hook ) {
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( $gtm4wp_queue_hook, array(), 'gtm4wp' );
+	}
+
+	wp_unschedule_hook( $gtm4wp_queue_hook );
+}
+unset( $gtm4wp_queue_hook );
+
 // Per-user dismissed notice states.
 delete_metadata( 'user', 0, 'gtm4wp_user_notices_dismisses_json', '', true );

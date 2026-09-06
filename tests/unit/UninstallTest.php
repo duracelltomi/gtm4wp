@@ -11,11 +11,12 @@ use Brain\Monkey\Functions;
 
 /**
  * Uninstall routine — the plugin's only data-destruction path: it drops the
- * four option rows (settings, stored version, encrypted service-account keys,
- * destination health records) and, with $delete_all = true, the
+ * plugin's option rows (settings, stored version, encrypted service-account
+ * keys, destination health records, capture counters, the send log), unschedules
+ * the background send queue, and, with $delete_all = true, drops the
  * dismissed-notice meta of EVERY user. Two things are worth pinning (T38):
  *
- * 1. It deletes exactly the five things it should, with the exact keys - a typo
+ * 1. It deletes exactly the things it should, with the exact keys - a typo
  *    in a key silently orphans data, and a wrong $delete_all argument is the
  *    difference between clearing one user's meta and clearing everyone's.
  * 2. The WP_UNINSTALL_PLUGIN guard actually halts. That branch calls die(), so it
@@ -49,6 +50,10 @@ final class UninstallTest extends TestCase {
 			echo 'delete_metadata:' . \$type . '|' . var_export( \$object_id, true )
 				. '|' . \$meta_key . '|' . var_export( \$delete_all, true ) . "\n";
 			return true;
+		}
+		function wp_unschedule_hook( \$hook ) {
+			echo 'wp_unschedule_hook:' . \$hook . "\n";
+			return 0;
 		}
 		{$guard}
 		require %s;
@@ -102,8 +107,24 @@ final class UninstallTest extends TestCase {
 		$this->assertStringContainsString( 'delete_option:gtm4wp_google_service_accounts', $result['output'], 'The encrypted service-account keys are deleted; a leftover row would keep key material in the database after the plugin is gone.' );
 		$this->assertStringContainsString( 'delete_option:gtm4wp_gdm_destination_health', $result['output'], 'The per-destination health records are deleted.' );
 		$this->assertStringContainsString( 'delete_option:gtm4wp_gdm_capture_stats', $result['output'], 'The capture-rate counters are deleted.' );
+		$this->assertStringContainsString( 'delete_option:gtm4wp_gdm_send_log', $result['output'], 'The send diagnostics ring is deleted.' );
 		$this->assertStringContainsString( 'reached-end', $result['output'], 'The script runs to completion.' );
 		$this->assertSame( 0, $result['status'], 'The uninstaller completes without error.' );
+	}
+
+	/**
+	 * A queued send outlives the plugin: WP-Cron keeps firing a hook nothing
+	 * listens on any more, and the job payload sits in the cron array for as long
+	 * as it takes someone to notice. Both queue hooks are therefore unscheduled,
+	 * and the names asserted here are the literals the uninstaller writes out -
+	 * it runs without the autoloader, so it cannot read SendQueue::HOOKS, and
+	 * SendQueueTest pins the two lists against each other from the other side.
+	 */
+	public function test_unschedules_the_background_send_queue(): void {
+		$result = $this->run_in_subprocess( true );
+
+		$this->assertStringContainsString( 'wp_unschedule_hook:gtm4wp_gdm_send_refund', $result['output'], 'Queued refund sends are unscheduled.' );
+		$this->assertStringContainsString( 'wp_unschedule_hook:gtm4wp_gdm_poll_status', $result['output'], 'Queued status checks are unscheduled.' );
 	}
 
 	/**
@@ -127,7 +148,7 @@ final class UninstallTest extends TestCase {
 	 * so an added or dropped deletion is caught, which string matching on the
 	 * subprocess output cannot do on its own.
 	 */
-	public function test_makes_exactly_five_option_deletions_and_one_meta_deletion(): void {
+	public function test_makes_exactly_six_option_deletions_and_one_meta_deletion(): void {
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', true );
 		}
@@ -145,6 +166,26 @@ final class UninstallTest extends TestCase {
 			->with( 'user', 0, 'gtm4wp_user_notices_dismisses_json', '', true )
 			->andReturn( true );
 
+		$unscheduled = array();
+		Functions\when( 'wp_unschedule_hook' )->alias(
+			static function ( $hook ) use ( &$unscheduled ) {
+				$unscheduled[] = $hook;
+				return 0;
+			}
+		);
+
+		// Stubbed here rather than relied on: another suite defining an as_*
+		// function defines it for the whole process, so whether the uninstaller
+		// takes its Action Scheduler branch would otherwise depend on test order
+		// (TS-16). With the stub in place the branch is taken deliberately, and
+		// the purge it performs is asserted instead of merely tolerated.
+		$purged = array();
+		Functions\when( 'as_unschedule_all_actions' )->alias(
+			static function ( $hook, $args, $group ) use ( &$purged ) {
+				$purged[] = $hook . '|' . $group;
+			}
+		);
+
 		require self::UNINSTALL_FILE;
 
 		$this->assertSame(
@@ -154,9 +195,25 @@ final class UninstallTest extends TestCase {
 				'gtm4wp_google_service_accounts',
 				'gtm4wp_gdm_destination_health',
 				'gtm4wp_gdm_capture_stats',
+				'gtm4wp_gdm_send_log',
 			),
 			$deleted_options,
-			'Exactly the five plugin option rows are deleted, in order and with no extras.'
+			'Exactly the six plugin option rows are deleted, in order and with no extras.'
+		);
+
+		$this->assertSame(
+			\GTM4WP\Modules\GoogleDataManager\SendQueue::HOOKS,
+			$unscheduled,
+			'Every hook SendQueue schedules is unscheduled - the uninstaller writes the names out, so this is what keeps the two lists identical.'
+		);
+
+		$this->assertSame(
+			array(
+				'gtm4wp_gdm_send_refund|gtm4wp',
+				'gtm4wp_gdm_poll_status|gtm4wp',
+			),
+			$purged,
+			'On a store with Action Scheduler the queued actions are purged from its own store too, in the group this plugin uses.'
 		);
 	}
 }

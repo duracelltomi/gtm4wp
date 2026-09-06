@@ -28,6 +28,12 @@ defined( 'ABSPATH' ) || exit;
  * Only error summaries are stored - a short, sanitized reason. No tokens, no
  * key material, no raw API response bodies (an error body can echo request
  * fragments).
+ *
+ * Each failure also records a **reason class** next to the summary: a bare
+ * code name such as PERMISSION_DENIED. The two are not redundant. The summary
+ * is what an admin reads on the settings screen, and it can quote Google's
+ * own sentence about our request; the class is what may be shown where that
+ * sentence must not go, which is Site Health's debug section.
  */
 final class DestinationHealth {
 
@@ -52,6 +58,11 @@ final class DestinationHealth {
 	 * bloating the option row.
 	 */
 	private const ERROR_MAX_LENGTH = 200;
+
+	/**
+	 * Longest stored reason class. A google.rpc.Code name is well inside this.
+	 */
+	private const ERROR_CLASS_MAX_LENGTH = 40;
 
 	/**
 	 * Returns the current Unix time. Injectable so tests can pin the stored
@@ -89,6 +100,7 @@ final class DestinationHealth {
 			'last_failure'         => (int) ( $records[ $measurement_id ]['last_failure'] ?? 0 ),
 			'consecutive_failures' => 0,
 			'last_error'           => '',
+			'last_error_class'     => '',
 		);
 
 		$this->write( $records );
@@ -99,9 +111,10 @@ final class DestinationHealth {
 	 *
 	 * @param string $measurement_id The destination's measurement id.
 	 * @param string $message        Short error summary; sanitized and capped here.
+	 * @param string $reason_class   Bare code name of the failure, safe to show in Site Health.
 	 * @return void
 	 */
-	public function record_failure( string $measurement_id, string $message ): void {
+	public function record_failure( string $measurement_id, string $message, string $reason_class = '' ): void {
 		if ( '' === $measurement_id ) {
 			return;
 		}
@@ -114,6 +127,7 @@ final class DestinationHealth {
 			'last_failure'         => $this->now(),
 			'consecutive_failures' => (int) ( $record['consecutive_failures'] ?? 0 ) + 1,
 			'last_error'           => mb_substr( sanitize_text_field( $message ), 0, self::ERROR_MAX_LENGTH ),
+			'last_error_class'     => mb_substr( sanitize_text_field( $reason_class ), 0, self::ERROR_CLASS_MAX_LENGTH ),
 		);
 
 		$this->write( $records );
@@ -123,7 +137,7 @@ final class DestinationHealth {
 	 * One destination's record, or null when none exists yet.
 	 *
 	 * @param string $measurement_id The destination's measurement id.
-	 * @return array{last_success: int, last_failure: int, consecutive_failures: int, last_error: string}|null
+	 * @return array{last_success: int, last_failure: int, consecutive_failures: int, last_error: string, last_error_class: string}|null
 	 */
 	public function get( string $measurement_id ): ?array {
 		$records = $this->read();
@@ -135,7 +149,7 @@ final class DestinationHealth {
 	 * Every record, keyed by measurement id. Callers join against the
 	 * configured destination rows; a stale record is theirs to skip.
 	 *
-	 * @return array<string, array{last_success: int, last_failure: int, consecutive_failures: int, last_error: string}>
+	 * @return array<string, array{last_success: int, last_failure: int, consecutive_failures: int, last_error: string, last_error_class: string}>
 	 */
 	public function all(): array {
 		$records = array();
@@ -173,7 +187,7 @@ final class DestinationHealth {
 	 * written before a field existed (or damaged at the DB level).
 	 *
 	 * @param mixed $record Stored record.
-	 * @return array{last_success: int, last_failure: int, consecutive_failures: int, last_error: string}
+	 * @return array{last_success: int, last_failure: int, consecutive_failures: int, last_error: string, last_error_class: string}
 	 */
 	private function clean_record( $record ): array {
 		$record = is_array( $record ) ? $record : array();
@@ -183,6 +197,7 @@ final class DestinationHealth {
 			'last_failure'         => (int) ( $record['last_failure'] ?? 0 ),
 			'consecutive_failures' => (int) ( $record['consecutive_failures'] ?? 0 ),
 			'last_error'           => is_string( $record['last_error'] ?? null ) ? $record['last_error'] : '',
+			'last_error_class'     => is_string( $record['last_error_class'] ?? null ) ? $record['last_error_class'] : '',
 		);
 	}
 
