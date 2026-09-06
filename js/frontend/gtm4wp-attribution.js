@@ -85,13 +85,21 @@ import {
 	let consentSignals = null;
 
 	/**
-	 * Whether the confirmation-page backfill has already been posted. One
-	 * attempt per pageview: the route writes only into fields that are still
-	 * empty, so a second POST could not add anything a first one did not.
+	 * Which value keys the confirmation-page backfill has already posted.
 	 *
-	 * @type {boolean}
+	 * Not a "sent once" flag, which is what this started as and what made it
+	 * wrong: the client id and the session ids arrive in separate callbacks,
+	 * and a single POST fired after the first of them left the second with
+	 * nowhere to go. Keying it lets a later arrival be offered too, while a
+	 * value already sent is never sent twice - so the number of requests is
+	 * bounded by the number of distinct values, not by how often flush runs.
+	 *
+	 * Repeat POSTs are safe by construction anyway: the route only ever fills
+	 * a field that is still empty.
+	 *
+	 * @type {Object}
 	 */
-	let backfillSent = false;
+	const backfillSentKeys = {};
 
 	/**
 	 * Whether a backfill POST is already queued for the end of this task.
@@ -581,16 +589,16 @@ import {
 	/**
 	 * Schedules the backfill POST for the end of the current task.
 	 *
-	 * The Google tag core services the whole queued batch back to back, so the
-	 * client id and the session ids resolve in the same task. Sending straight
-	 * from the first callback would post the client id alone and, since only
-	 * one POST is ever made, silently drop the session ids. A microtask waits
-	 * for the batch to finish without introducing a timer or a retry loop.
+	 * A microtask, so that lookups serviced back to back in one task are posted
+	 * together rather than one request each. It is only a batching convenience,
+	 * never the correctness guarantee: measured on a real site, the client id
+	 * and the session id can resolve milliseconds apart in SEPARATE tasks, and
+	 * anything that arrives after this has run is picked up by the next POST.
 	 *
 	 * @return {void}
 	 */
 	function scheduleBackfill() {
-		if ( ! config.backfill || backfillSent || backfillScheduled ) {
+		if ( ! config.backfill || backfillScheduled ) {
 			return;
 		}
 
@@ -607,43 +615,52 @@ import {
 	 *
 	 * Only runs on a confirmation page the server flagged as still missing its
 	 * attribution - the client cannot read order meta, so that flag is the only
-	 * way it could know. Sent once, and only what consent allows storing, so the
-	 * POST never carries more than the cookie would have.
+	 * way it could know. Carries only what consent allows storing, so a POST
+	 * never holds more than the cookie would have.
+	 *
+	 * The body repeats every value it has, not just the newly arrived ones,
+	 * which costs nothing against a write-only-if-absent route and means a
+	 * first request lost to the network is retried by the next one.
 	 *
 	 * @return {void}
 	 */
 	function sendBackfill() {
-		if ( ! config.backfill || backfillSent ) {
+		if ( ! config.backfill ) {
 			return;
 		}
 
 		const values = {};
-		let hasValues = false;
 
 		if ( isGranted( SIGNAL_ANALYTICS ) ) {
 			if ( pending.clientId ) {
 				values.client_id = pending.clientId;
-				hasValues = true;
 			}
 
 			if ( Object.keys( pending.sessions ).length ) {
 				values.sessions = pending.sessions;
-				hasValues = true;
 			}
 		}
 
 		if ( isGranted( SIGNAL_ADS ) ) {
 			Object.keys( pending.clickIds ).forEach( function ( name ) {
 				values[ name ] = pending.clickIds[ name ];
-				hasValues = true;
 			} );
 		}
 
-		if ( ! hasValues ) {
+		// Only what has not been offered yet. Everything resolved before the
+		// first POST goes in that one; a lookup that answers afterwards gets a
+		// second, and a flush that brings nothing new sends nothing at all.
+		const fresh = Object.keys( values ).filter( function ( key ) {
+			return ! backfillSentKeys[ key ];
+		} );
+
+		if ( ! fresh.length ) {
 			return;
 		}
 
-		backfillSent = true;
+		fresh.forEach( function ( key ) {
+			backfillSentKeys[ key ] = true;
+		} );
 
 		const body = {
 			platform: config.backfill.platform,

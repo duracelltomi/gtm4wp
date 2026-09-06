@@ -136,6 +136,28 @@ function serviceQueuedGets( values ) {
 }
 
 /**
+ * Services ONE queued lookup, leaving the others outstanding.
+ *
+ * serviceQueuedGets() answers the whole batch in a single task, which is the
+ * friendly case. The Google tag does not promise that: on a live site the
+ * client id and the session id came back milliseconds apart in separate tasks.
+ * This is how a test reproduces that ordering.
+ *
+ * @param {string} field The field to answer ('client_id' or 'session_id').
+ * @param {string} value The value to hand its callback.
+ * @return {void}
+ */
+function answerGet( field, value ) {
+	getCommands().forEach( ( command ) => {
+		const [ , , commandField, callback ] = command;
+
+		if ( commandField === field && 'function' === typeof callback ) {
+			callback( value );
+		}
+	} );
+}
+
+/**
  * Builds a google_tag_data.ics.entries stand-in.
  *
  * Faithful to the measured shape, including the part that matters: a signal
@@ -993,7 +1015,7 @@ describe( 'gtm4wp-attribution', () => {
 			} );
 		} );
 
-		it( 'posts at most once per pageview', async () => {
+		it( 'does not post again when nothing new has resolved', async () => {
 			window.gtm4wp_gdm_attribution_config.backfill = backfill;
 
 			loadTracker();
@@ -1003,8 +1025,8 @@ describe( 'gtm4wp-attribution', () => {
 			} );
 			await settle();
 
-			// A later consent change re-runs persistence; the route only ever
-			// fills empty fields, so a second POST could add nothing.
+			// A later consent change re-runs persistence, but every value it
+			// could offer has already been offered.
 			window.dataLayer.push( [
 				'consent',
 				'update',
@@ -1013,6 +1035,64 @@ describe( 'gtm4wp-attribution', () => {
 			await settle();
 
 			expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+		} );
+
+		/**
+		 * The case that reached a real order. The client id and the session id
+		 * come back in separate callbacks, and on a live site they can land
+		 * milliseconds apart in DIFFERENT tasks - measured at 4150ms and
+		 * 4153ms. A single POST fired after the first of them left the session
+		 * ids in the cookie but never on the order, which is exactly how the
+		 * order looked: client id stored, session ids absent.
+		 */
+		it( 'posts again for a lookup that answers after the first request', async () => {
+			window.gtm4wp_gdm_attribution_config.backfill = backfill;
+
+			loadTracker();
+
+			// Only the client id is serviced in this task.
+			answerGet( 'client_id', '111.222' );
+			await settle();
+
+			expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+			expect(
+				JSON.parse( window.fetch.mock.calls[ 0 ][ 1 ].body ).values
+			).toEqual( { client_id: '111.222' } );
+
+			// The session id answers in a later task.
+			answerGet( 'session_id', '1788522496' );
+			await settle();
+
+			expect( window.fetch ).toHaveBeenCalledTimes( 2 );
+			expect(
+				JSON.parse( window.fetch.mock.calls[ 1 ][ 1 ].body ).values
+			).toEqual( {
+				// Repeated deliberately: against a write-only-if-absent route
+				// it costs nothing and retries a first request lost in transit.
+				client_id: '111.222',
+				sessions: { 'G-AAAA1111': '1788522496' },
+			} );
+		} );
+
+		it( 'offers a click id captured after the first request too', async () => {
+			setSearch( '?gclid=late123' );
+			window.gtm4wp_gdm_attribution_config.backfill = backfill;
+
+			loadTracker();
+			await settle();
+
+			// The click id is captured at boot, so it goes in the first POST.
+			expect(
+				JSON.parse( window.fetch.mock.calls[ 0 ][ 1 ].body ).values
+			).toEqual( { gclid: 'late123' } );
+
+			answerGet( 'client_id', '111.222' );
+			await settle();
+
+			expect( window.fetch ).toHaveBeenCalledTimes( 2 );
+			expect(
+				JSON.parse( window.fetch.mock.calls[ 1 ][ 1 ].body ).values
+			).toEqual( { gclid: 'late123', client_id: '111.222' } );
 		} );
 
 		it( 'posts nothing that consent does not allow storing', async () => {
