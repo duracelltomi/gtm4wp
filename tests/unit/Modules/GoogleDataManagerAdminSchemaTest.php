@@ -253,6 +253,7 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 						'last_failure'         => 1_800_000_100,
 						'consecutive_failures' => 4,
 						'last_error'           => 'PERMISSION_DENIED: no access.',
+						'last_error_class'     => 'PERMISSION_DENIED',
 					),
 				),
 			)
@@ -267,6 +268,7 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 					'last_failure'         => 1_800_000_100,
 					'consecutive_failures' => 4,
 					'last_error'           => 'PERMISSION_DENIED: no access.',
+					'last_error_class'     => 'PERMISSION_DENIED',
 				),
 			),
 			$data['health']

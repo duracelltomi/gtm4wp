@@ -17,11 +17,17 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Sends e-commerce signals from the server to Google through the Data Manager
- * API. This version carries the foundation: the destination list (which GA4
- * property and data stream to send to, with which stored GoogleAuth service
- * account), its validateOnly test probe and the per-destination health
- * records. The features that actually send - server-side refund events,
- * attribution capture - build on these in later development phases.
+ * API: the destination list (which GA4 property and data stream to send to,
+ * with which stored GoogleAuth service account), the attribution capture that
+ * lets a later server-side event be matched to its purchase, and the refund
+ * events themselves - the signal a browser never sees, because a refund is
+ * issued in the store admin.
+ *
+ * The send lane itself is not registered from here. It has to exist on cron,
+ * WP-CLI and admin requests as well as frontend ones - a refund is issued in
+ * wp-admin and sent from a background job - so Plugin::boot() registers it
+ * before the admin/frontend split, next to the privacy wiring that needs the
+ * same reach.
  *
  * The is_available() answer stays unconditional on purpose (the inherited true): "no
  * service account uploaded yet" is an onboarding state, not an environment
@@ -57,6 +63,7 @@ final class GoogleDataManagerModule extends AbstractModule {
 			GTM4WP_OPTION_GDM_DESTINATIONS        => array(),
 			GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false,
 			GTM4WP_OPTION_GDM_CONSENT_POLICY      => ConsentPolicy::POLICY_EEA_ONLY,
+			GTM4WP_OPTION_GDM_SEND_REFUNDS        => false,
 		);
 	}
 

@@ -54,6 +54,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	public const GROUP_ATTRIBUTION = 'attribution';
 
 	/**
+	 * Accordion group of the server-side send lanes.
+	 */
+	public const GROUP_SENDING = 'sending';
+
+	/**
 	 * Module documentation page.
 	 *
 	 * @return string
@@ -78,7 +83,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function intro(): string {
 		return '<p>' . esc_html__(
-			'The Google Data Manager API lets this site send e-commerce signals to Google from the server - most importantly signals the browser never sees, such as refunds issued in the store admin. This section is the foundation: define where the data should go and verify that Google accepts it. The features that actually send are still in development and will appear here in a later version; nothing is sent anywhere until one of them is turned on.',
+			'The Google Data Manager API lets this site send e-commerce signals to Google from the server - most importantly signals the browser never sees, such as refunds issued in the store admin. Define where the data should go, verify that Google accepts it, then turn on the signals you want sent. Nothing leaves the site until you do: every option here is off by default.',
 			'duracelltomi-google-tag-manager'
 		) . '</p><p>' . sprintf(
 			/* translators: 1: opening anchor tag linking to the Google service accounts section. 2: closing anchor tag. */
@@ -100,6 +105,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		return array(
 			self::GROUP_DESTINATIONS => __( 'Destinations', 'duracelltomi-google-tag-manager' ),
 			self::GROUP_ATTRIBUTION  => __( 'Attribution capture', 'duracelltomi-google-tag-manager' ),
+			self::GROUP_SENDING      => __( 'Sending events', 'duracelltomi-google-tag-manager' ),
 		);
 	}
 
@@ -195,6 +201,23 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				// capture a measurement ID to ask about, and capture gives this
 				// gate a consent state to read. With capture off nothing is
 				// ever stored for it to decide on.
+				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
+				doc: self::DOC_PAGE
+			),
+			new Field(
+				key: GTM4WP_OPTION_GDM_SEND_REFUNDS,
+				type: Field::TYPE_CHECKBOX,
+				default_value: false,
+				label: __( 'Send refunds to Google Analytics', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__(
+					'Sends a refund event to every destination above whenever a refund is issued in your store, so that Google Analytics stops counting revenue you have given back. This is the signal browser-side tracking can never report: a refund happens in the store admin, where no page is loaded and no tag fires. A refund that returns a whole order reverses the entire purchase; a partial refund reports its own amount and the items it covers. Nothing is sent for an order the attribution capture above stored no client ID for, or where the consent rule below does not allow it - the Recent sends list under the destinations shows the reason in each case. Sending happens in the background a minute after the refund, so issuing one is never slowed down by it.',
+					'duracelltomi-google-tag-manager'
+				),
+				group: self::GROUP_SENDING,
+				phase: Field::PHASE_EXPERIMENTAL,
+				// The chain in full: a destination to send to, and capture to
+				// have a client id to send with. Without the second one every
+				// refund would be skipped for want of an identifier.
 				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
 				doc: self::DOC_PAGE
 			),
@@ -399,6 +422,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'optionKey'     => GTM4WP_OPTION_GDM_DESTINATIONS,
 			'health'        => ( new DestinationHealth() )->all(),
 			'threshold'     => DestinationHealth::FAILURE_THRESHOLD,
+			'logPath'       => RestCors::REST_NAMESPACE . RestController::LOG_ROUTE,
 			'columnChoices' => array(
 				GTM4WP_OPTION_GDM_DESTINATIONS => array(
 					DestinationRows::COLUMN_ACCOUNT => $accounts,

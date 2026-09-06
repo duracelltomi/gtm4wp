@@ -86,6 +86,15 @@ final class Plugin {
 		// been turned off again.
 		( new Modules\GoogleDataManager\PrivacyData() )->register_hooks();
 
+		// The refund send lane, for the same reason: a refund is issued in
+		// wp-admin or by a gateway callback, and the send that follows it runs
+		// from Action Scheduler or WP-Cron, where neither the admin nor the
+		// frontend branch below is taken. Registered only when the feature is
+		// on, so a store that does not use it pays nothing for it.
+		if ( $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ) {
+			$this->boot_refund_lane();
+		}
+
 		// The settings REST endpoint must be reachable on REST requests where
 		// is_admin() is false; the controller class only loads when a REST
 		// request actually initializes.
@@ -116,7 +125,8 @@ final class Plugin {
 				// endpoint and scope keep their single definitions.
 				( new Modules\GoogleDataManager\RestController(
 					$vault,
-					new Modules\GoogleDataManager\EventsIngest( $tokens, $transport )
+					new Modules\GoogleDataManager\EventsIngest( $tokens, $transport ),
+					new Modules\GoogleDataManager\SendLog()
 				) )->register_routes();
 
 				// The attribution backfill is guest-facing, so it registers only
@@ -180,6 +190,41 @@ final class Plugin {
 	 */
 	public function options(): ?Options {
 		return $this->options;
+	}
+
+	/**
+	 * Registers the server-side refund send lane and its status polling.
+	 *
+	 * Both commerce platforms are wired unconditionally; each adapter decides
+	 * for itself whether its platform is active, which keeps the parity rule
+	 * (WooCommerce and Easy Digital Downloads land together) a property of the
+	 * adapter list rather than of this method.
+	 *
+	 * @return void
+	 */
+	private function boot_refund_lane(): void {
+		if ( null === $this->options ) {
+			return;
+		}
+
+		$ingest = new Modules\GoogleDataManager\EventsIngest(
+			new Google\TokenService( new Google\KeyVault(), new Google\WpTransport() ),
+			new Google\WpTransport()
+		);
+		$log    = new Modules\GoogleDataManager\SendLog();
+
+		( new Modules\GoogleDataManager\RefundSender(
+			$this->options,
+			$ingest,
+			new Modules\GoogleDataManager\DestinationHealth(),
+			$log,
+			array(
+				new Modules\GoogleDataManager\WooCommerceRefunds( $this->options ),
+				new Modules\GoogleDataManager\EddRefunds( $this->options ),
+			)
+		) )->register_hooks();
+
+		( new Modules\GoogleDataManager\StatusPoller( $ingest, $log ) )->register_hooks();
 	}
 
 	/**

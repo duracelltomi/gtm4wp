@@ -199,6 +199,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION', 'integrate-edd-persist-lis
 define( 'GTM4WP_OPTION_GDM_DESTINATIONS', 'gdm-destinations' );
 define( 'GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION', 'gdm-capture-attribution' );
 define( 'GTM4WP_OPTION_GDM_CONSENT_POLICY', 'gdm-consent-policy' );
+define( 'GTM4WP_OPTION_GDM_SEND_REFUNDS', 'gdm-send-refunds' );
 
 // Removed in 2.0: WP e-Commerce integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WPECOMMERCE', 'integrate-wp-e-commerce' );
@@ -356,3 +357,13 @@ define( 'GTM4WP_WPFILTER_GDM_DESTINATIONS', 'gtm4wp_gdm_destinations' );
  * GTM container, where the page carries no reflection of it.
  */
 define( 'GTM4WP_WPFILTER_GDM_ORDER_CONSENT', 'gtm4wp_gdm_order_consent' );
+
+/**
+ * Filter (since 2.1) over one assembled Data Manager refund event: receives the
+ * event array exactly as it would be sent, together with the platform's refund
+ * object and the order it belongs to. Returning an empty array (or anything
+ * that is not an array) cancels the send for that refund, which is the
+ * documented veto; anything else is validated the same way the built-in
+ * assembly is before it leaves the site.
+ */
+define( 'GTM4WP_WPFILTER_GDM_REFUND_EVENT', 'gtm4wp_gdm_refund_event' );

@@ -462,3 +462,41 @@ describe( 'DestinationsPanel stored health', () => {
 		expect( screen.queryByText( /blip/ ) ).not.toBeInTheDocument();
 	} );
 } );
+
+describe( 'DestinationsPanel send log', () => {
+	it( 'renders the recent-sends list when the server names its path', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		renderPanel( {
+			data: panelData( { logPath: 'gtm4wp/v2/google/send-log' } ),
+		} );
+
+		expect(
+			await screen.findByText( 'Nothing has been sent yet.' )
+		).toBeInTheDocument();
+		expect( apiFetch ).toHaveBeenCalledWith( {
+			path: 'gtm4wp/v2/google/send-log',
+		} );
+	} );
+
+	it( 'still shows the log when no row is complete enough to test', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		renderPanel( {
+			data: panelData( { logPath: 'gtm4wp/v2/google/send-log' } ),
+			rows: [ { ...ROW, measurement_id: '' } ],
+		} );
+
+		// The most useful entries are the ones explaining why nothing was
+		// sent, and "no destination configured" is one of them.
+		expect(
+			await screen.findByText( 'Nothing has been sent yet.' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'does not reach the network when the server named no path', () => {
+		renderPanel();
+
+		expect( apiFetch ).not.toHaveBeenCalled();
+	} );
+} );

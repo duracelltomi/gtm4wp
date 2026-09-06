@@ -16,11 +16,12 @@ use GTM4WP\RestCors;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * REST route of the destinations panel under gtm4wp/v2/google:
+ * REST routes of the destinations panel under gtm4wp/v2/google:
  *
  * - POST destinations/test  probe one destination with a validateOnly ingest
+ * - GET  send-log           read the diagnostics ring of the send lanes
  *
- * The route takes the destination's values from the request rather than a
+ * The test route takes the destination's values from the request rather than a
  * stored row index, so the settings screen can test an edit before saving
  * it. Every value is validated against the same DestinationRows rules the
  * save-time sanitizer enforces before anything leaves the site, and the only
@@ -33,12 +34,18 @@ final class RestController {
 	public const REST_ROUTE = '/google/destinations/test';
 
 	/**
+	 * Read-only view of the send diagnostics ring.
+	 */
+	public const LOG_ROUTE = '/google/send-log';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param KeyVault     $vault  The key store, to name an unknown account before any request.
 	 * @param EventsIngest $ingest The validateOnly probe.
+	 * @param SendLog      $log    The diagnostics ring.
 	 */
-	public function __construct( private KeyVault $vault, private EventsIngest $ingest ) {
+	public function __construct( private KeyVault $vault, private EventsIngest $ingest, private SendLog $log ) {
 	}
 
 	/**
@@ -72,6 +79,34 @@ final class RestController {
 						'required' => true,
 					),
 				),
+			)
+		);
+
+		register_rest_route(
+			RestCors::REST_NAMESPACE,
+			self::LOG_ROUTE,
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'send_log' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			)
+		);
+	}
+
+	/**
+	 * GET handler: the diagnostics ring, newest entry first.
+	 *
+	 * The ring is returned as stored. What may be in it is decided where it is
+	 * written (SendLog): statuses, counts, reason codes and the store's own
+	 * order and refund ids - never a token, key material or a response body
+	 * from Google.
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function send_log(): \WP_REST_Response {
+		return new \WP_REST_Response(
+			array(
+				'entries' => array_reverse( $this->log->all() ),
 			)
 		);
 	}

@@ -13,6 +13,8 @@ import { Button, Notice } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 
+import SendLogList from './SendLogList';
+
 // Column keys of a destination row. They double as the parameter names of the
 // test route, which validates them server side against the same rules.
 const COLUMN_ACCOUNT = 'service_account';
@@ -80,7 +82,7 @@ function probePayload( row ) {
 }
 
 export default function DestinationsPanel( { data, values } ) {
-	const { testPath, optionKey, health, threshold } = data;
+	const { testPath, optionKey, health, threshold, logPath } = data;
 
 	const rows = Array.isArray( values && values[ optionKey ] )
 		? values[ optionKey ]
@@ -170,8 +172,11 @@ export default function DestinationsPanel( { data, values } ) {
 		.map( ( row, index ) => ( { row, index } ) )
 		.filter( ( { row } ) => isTestable( row ) );
 
+	// The send log is shown even when no row is testable yet: its most useful
+	// entries are the ones that explain why nothing was sent, and "no
+	// destination configured" is one of them.
 	if ( 0 === testable.length ) {
-		return null;
+		return <SendLogList logPath={ logPath } />;
 	}
 
 	return (
@@ -253,6 +258,7 @@ export default function DestinationsPanel( { data, values } ) {
 					);
 				} ) }
 			</ul>
+			<SendLogList logPath={ logPath } />
 		</div>
 	);
 }

@@ -349,6 +349,76 @@ if ( ! class_exists( 'WC_Customer' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WC_Order_Refund' ) ) {
+	// A refund is NOT a WC_Order in WooCommerce: both extend WC_Abstract_Order,
+	// and nothing else connects them. The stub keeps that apart deliberately -
+	// making it extend the WC_Order stub would let the refund adapter's
+	// `instanceof WC_Order` guard pass over a refund, which production would
+	// never do, and the suite would then be green because the guard is untested.
+	class WC_Order_Refund {
+		public function __construct( private array $data = array() ) {}
+
+		private function value( string $key, $fallback = null ) {
+			return array_key_exists( $key, $this->data ) ? $this->data[ $key ] : $fallback;
+		}
+
+		public function get_id() {
+			return $this->value( 'id', 0 );
+		}
+
+		// WooCommerce stores a refund's total NEGATED (wc_create_refund() sets
+		// it to the amount times -1), so the fixtures pass it negated too.
+		public function get_total() {
+			return $this->value( 'total', 0 );
+		}
+
+		public function get_amount() {
+			return $this->value( 'amount', 0 );
+		}
+
+		public function get_items() {
+			return $this->value( 'items', array() );
+		}
+
+		// Both the line total and the quantity are negative on a refund, so the
+		// real method's division yields a positive number. The stub reproduces
+		// that arithmetic rather than returning a canned positive value.
+		public function get_item_total( $order_item, $inc_tax = false, $round = true ) {
+			$total = (float) $order_item->get_total();
+
+			if ( $inc_tax && method_exists( $order_item, 'get_total_tax' ) ) {
+				$total += (float) $order_item->get_total_tax();
+			}
+
+			$quantity = max( 1, abs( (int) $order_item->get_quantity() ) );
+			$per_unit = $total / $quantity;
+
+			return $round ? round( $per_unit, 2 ) : $per_unit;
+		}
+
+		public function get_date_created() {
+			$value = $this->value( 'date_created', 'now' );
+			return $value instanceof \DateTimeInterface ? $value : new \WC_DateTime( (string) $value );
+		}
+
+		public array $saved_meta = array();
+		public int $saves        = 0;
+
+		public function get_meta( $key, $single = true ) {
+			return $this->saved_meta[ $key ] ?? ( $this->value( 'meta', array() )[ $key ] ?? '' );
+		}
+
+		public function update_meta_data( $key, $value ) {
+			$this->saved_meta[ $key ] = $value;
+		}
+
+		public function save() {
+			++$this->saves;
+			return $this->get_id();
+		}
+	}
+}
+
 // The WC_Countries / GTM4WP_Test_WooCommerce doubles that used to live here were
 // removed on 2026-08-11 with the code that reached them: the phone normalizer no
 // longer asks WooCommerce for a calling code, because that table embeds an area

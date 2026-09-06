@@ -14,6 +14,7 @@ use GTM4WP\Google\TokenService;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Modules\GoogleDataManager\EventsIngest;
 use GTM4WP\Modules\GoogleDataManager\RestController;
+use GTM4WP\Modules\GoogleDataManager\SendLog;
 use GTM4WP\Tests\unit\Google\FakeTransport;
 use GTM4WP\Tests\unit\Google\KeyFileFixture;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
@@ -76,7 +77,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$clock  = static fn () => self::NOW;
 		$tokens = new TokenService( $this->vault, $this->transport, $clock );
 
-		return new RestController( $this->vault, new EventsIngest( $tokens, $this->transport, $clock ) );
+		return new RestController( $this->vault, new EventsIngest( $tokens, $this->transport, $clock ), new SendLog() );
 	}
 
 	/**
@@ -165,7 +166,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$controller = $this->make_controller();
 		$controller->register_routes();
 
-		$this->assertCount( 1, $captured );
+		$this->assertCount( 2, $captured );
 		$this->assertSame( 'gtm4wp/v2', $captured[0]['ns'] );
 		$this->assertSame( RestController::REST_ROUTE, $captured[0]['route'] );
 		$this->assertSame( array( $controller, 'can_manage' ), $captured[0]['args']['permission_callback'] );
@@ -197,6 +198,16 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 			),
 			$captured[0]['args']['args']
 		);
+
+		// The send log is a second route on the same controller, and it is the
+		// one that returns stored content rather than probing. Its gate is
+		// pinned here for the same reason as the probe's: it is read-only, but
+		// what it returns names the store's own orders and refunds.
+		$this->assertSame( 'gtm4wp/v2', $captured[1]['ns'] );
+		$this->assertSame( RestController::LOG_ROUTE, $captured[1]['route'] );
+		$this->assertSame( 'GET', $captured[1]['args']['methods'] );
+		$this->assertSame( array( $controller, 'send_log' ), $captured[1]['args']['callback'] );
+		$this->assertSame( array( $controller, 'can_manage' ), $captured[1]['args']['permission_callback'] );
 	}
 
 	// ---- Contract ----------------------------------------------------------
