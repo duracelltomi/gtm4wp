@@ -69,6 +69,14 @@ final class KeyVault {
 	public const LABEL_MAX_LENGTH = 100;
 
 	/**
+	 * How stale the "last checked" timestamp of a working account may get before
+	 * an otherwise unchanged successful mint writes the row again. Shorter than
+	 * an access token's lifetime, so on a normally busy site the timestamp still
+	 * moves with every real mint; see is_unchanged_success().
+	 */
+	public const STATUS_REFRESH_INTERVAL = 900;
+
+	/**
 	 * Longest last-error text kept per account. The text comes from Google's
 	 * OAuth error response and is shown on the settings screen; the cap keeps a
 	 * verbose upstream error from bloating the option row.
@@ -370,12 +378,19 @@ final class KeyVault {
 	 * @param string $message Error summary from Google when it did not; ignored on success.
 	 * @param string $scope   OAuth scope the mint was for; remembered on success so
 	 *                        delete() can purge that scope's cached token (#226).
+	 * @param bool   $force   Write even when nothing about the outcome changed. The
+	 *                        settings screen's Test button passes this: an admin who
+	 *                        pressed Test has to see the time move.
 	 * @return void
 	 */
-	public function record_token_result( string $id, bool $ok, string $message = '', string $scope = '' ): void {
+	public function record_token_result( string $id, bool $ok, string $message = '', string $scope = '', bool $force = false ): void {
 		$accounts = $this->read();
 
 		if ( ! isset( $accounts[ $id ] ) ) {
+			return;
+		}
+
+		if ( ! $force && $this->is_unchanged_success( $accounts[ $id ], $ok, $scope ) ) {
 			return;
 		}
 
@@ -394,6 +409,42 @@ final class KeyVault {
 		}
 
 		$this->write( $accounts );
+	}
+
+	/**
+	 * Whether a successful mint would record nothing this row does not already
+	 * say, and recently enough that the timestamp is not worth a write.
+	 *
+	 * This is the concurrency mitigation the send lanes made worth having. The
+	 * account row is read, modified and written whole, with no compare-and-swap
+	 * anywhere in the WordPress options API - so two writers in the same instant
+	 * can lose one another's change. That was an accepted risk while the only
+	 * writers were an admin pressing buttons; background send jobs can genuinely
+	 * run at once, and a cache miss can send several of them to the token
+	 * endpoint together. Skipping the write when it would change nothing but the
+	 * timestamp collapses that herd to a single writer without giving up the
+	 * signal: a failure always writes, a status change always writes, a newly
+	 * used scope always writes, and the settings screen's Test button forces one.
+	 *
+	 * @param array<string, mixed> $account The stored account.
+	 * @param bool                 $ok      Whether Google issued a token.
+	 * @param string               $scope   The scope the mint was for.
+	 * @return bool
+	 */
+	private function is_unchanged_success( array $account, bool $ok, string $scope ): bool {
+		if ( ! $ok ) {
+			return false;
+		}
+
+		if ( self::STATUS_OK !== ( $account['status'] ?? '' ) || '' !== (string) ( $account['last_error'] ?? '' ) ) {
+			return false;
+		}
+
+		if ( ( '' !== $scope ) && ! in_array( $scope, self::minted_scopes( $account ), true ) ) {
+			return false;
+		}
+
+		return ( $this->now() - (int) ( $account['last_checked'] ?? 0 ) ) < self::STATUS_REFRESH_INTERVAL;
 	}
 
 	/**

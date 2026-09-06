@@ -521,6 +521,106 @@ final class KeyVaultTest extends TestCase {
 		$this->assertSame( '', $account['last_error'], 'A success clears the previous error.' );
 	}
 
+	/**
+	 * The concurrency mitigation the background send lanes made worth having:
+	 * the row is read, modified and written whole, with no compare-and-swap in
+	 * the options API, and a cache miss can send several queued jobs to the
+	 * token endpoint at once. A repeat that would change nothing but the
+	 * timestamp therefore writes nothing.
+	 */
+	public function test_a_repeated_successful_mint_does_not_rewrite_the_row(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+		$scope = 'https://www.googleapis.com/auth/datamanager';
+
+		$vault->record_token_result( $id, true, '', $scope );
+		$writes_after_first = count( $this->option_writes );
+
+		$vault->record_token_result( $id, true, '', $scope );
+		$vault->record_token_result( $id, true, '', $scope );
+
+		$this->assertCount( $writes_after_first, $this->option_writes );
+		$this->assertSame( KeyVault::STATUS_OK, $vault->get( $id )['status'], 'The recorded outcome is unchanged, which is why the write was pointless.' );
+	}
+
+	public function test_a_failure_always_writes_however_recent_the_last_check(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+		$scope = 'https://www.googleapis.com/auth/datamanager';
+
+		$vault->record_token_result( $id, true, '', $scope );
+		$writes_after_success = count( $this->option_writes );
+
+		$vault->record_token_result( $id, false, 'invalid_grant', $scope );
+
+		$this->assertGreaterThan( $writes_after_success, count( $this->option_writes ) );
+		$this->assertSame( KeyVault::STATUS_ERROR, $vault->get( $id )['status'] );
+	}
+
+	public function test_a_success_after_a_failure_always_writes(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+		$scope = 'https://www.googleapis.com/auth/datamanager';
+
+		$vault->record_token_result( $id, false, 'invalid_grant', $scope );
+		$writes_after_failure = count( $this->option_writes );
+
+		$vault->record_token_result( $id, true, '', $scope );
+
+		$this->assertGreaterThan( $writes_after_failure, count( $this->option_writes ), 'The account recovering is exactly what the admin notice is waiting for.' );
+		$this->assertSame( '', $vault->get( $id )['last_error'] );
+	}
+
+	public function test_a_newly_used_scope_always_writes(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+
+		$vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a' );
+		$writes_after_first = count( $this->option_writes );
+
+		$vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-b' );
+
+		$this->assertGreaterThan(
+			$writes_after_first,
+			count( $this->option_writes ),
+			'The scope list is what delete() purges cached tokens from; losing an entry would leave a usable token behind.'
+		);
+	}
+
+	public function test_the_test_button_always_refreshes_the_checked_time(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+		$scope = 'https://www.googleapis.com/auth/datamanager';
+
+		$vault->record_token_result( $id, true, '', $scope );
+		$writes_after_first = count( $this->option_writes );
+
+		$vault->record_token_result( $id, true, '', $scope, true );
+
+		$this->assertGreaterThan(
+			$writes_after_first,
+			count( $this->option_writes ),
+			'An admin who pressed Test has to see the time move, whatever the throttle would otherwise say.'
+		);
+	}
+
+	public function test_a_stale_check_writes_again_even_when_nothing_changed(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+		$scope = 'https://www.googleapis.com/auth/datamanager';
+
+		$vault->record_token_result( $id, true, '', $scope );
+		$writes_after_first = count( $this->option_writes );
+
+		// A later vault, past the refresh interval: the timestamp is the whole
+		// point of the record, so it does not go stale indefinitely.
+		$later = new KeyVault( self::SECRET, static fn () => self::NOW + KeyVault::STATUS_REFRESH_INTERVAL + 1 );
+		$later->record_token_result( $id, true, '', $scope );
+
+		$this->assertGreaterThan( $writes_after_first, count( $this->option_writes ) );
+		$this->assertSame( self::NOW + KeyVault::STATUS_REFRESH_INTERVAL + 1, $later->get( $id )['last_checked'] );
+	}
+
 	public function test_record_token_result_for_an_unknown_id_writes_nothing(): void {
 		$vault = $this->make_vault();
 		$this->add_fixture( $vault );

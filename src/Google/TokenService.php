@@ -139,7 +139,10 @@ final class TokenService {
 			return new \WP_Error( 'gtm4wp_google_token_refused', $message );
 		}
 
-		$this->vault->record_token_result( $account_id, true, '', $scope );
+		// $fresh is the settings screen's Test button: an admin who pressed it has
+		// to see the time move, so that path always writes (see the vault's
+		// is_unchanged_success()).
+		$this->vault->record_token_result( $account_id, true, '', $scope, $fresh );
 
 		$ttl = $expires_in - self::EARLY_EXPIRY;
 		if ( $ttl > 0 ) {
