@@ -228,3 +228,60 @@ describe( 'SendLogList entries', () => {
 		).toBeInTheDocument();
 	} );
 } );
+
+describe( 'SendLogList with every send lane off', () => {
+	it( 'renders no block at all while the log is empty', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		const { container } = render(
+			<SendLogList logPath={ LOG_PATH } hideWhenEmpty />
+		);
+
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 1 ) );
+
+		expect( container ).toBeEmptyDOMElement();
+		expect(
+			screen.queryByText( 'Nothing has been sent yet.' )
+		).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole( 'heading', { name: 'Recent sends' } )
+		).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole( 'button', { name: 'Refresh' } )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'still shows what was sent while a lane was on', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [ entry() ] } );
+
+		render( <SendLogList logPath={ LOG_PATH } hideWhenEmpty /> );
+
+		expect( await screen.findByText( 'Accepted' ) ).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'heading', { name: 'Recent sends' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'stays silent when the log cannot be loaded either', async () => {
+		apiFetch.mockRejectedValueOnce( new Error( 'Forbidden' ) );
+
+		const { container } = render(
+			<SendLogList logPath={ LOG_PATH } hideWhenEmpty />
+		);
+
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 1 ) );
+
+		expect( container ).toBeEmptyDOMElement();
+		expect( screen.queryByText( 'Forbidden' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'says so when a lane is on and nothing has been sent yet', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		render( <SendLogList logPath={ LOG_PATH } hideWhenEmpty={ false } /> );
+
+		expect(
+			await screen.findByText( 'Nothing has been sent yet.' )
+		).toBeInTheDocument();
+	} );
+} );

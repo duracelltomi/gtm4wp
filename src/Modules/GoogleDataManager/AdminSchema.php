@@ -423,6 +423,10 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'health'        => ( new DestinationHealth() )->all(),
 			'threshold'     => DestinationHealth::FAILURE_THRESHOLD,
 			'logPath'       => RestCors::REST_NAMESPACE . RestController::LOG_ROUTE,
+			// The send lanes, so the panel can tell an empty log that is
+			// waiting for its first send from one that can never fill up
+			// because nothing is turned on. A new lane joins this list.
+			'sendKeys'      => array( GTM4WP_OPTION_GDM_SEND_REFUNDS ),
 			'columnChoices' => array(
 				GTM4WP_OPTION_GDM_DESTINATIONS => array(
 					DestinationRows::COLUMN_ACCOUNT => $accounts,

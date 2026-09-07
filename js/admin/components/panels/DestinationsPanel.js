@@ -84,6 +84,14 @@ function probePayload( row ) {
 export default function DestinationsPanel( { data, values } ) {
 	const { testPath, optionKey, health, threshold, logPath } = data;
 
+	// Whether any server-side send lane is on, read from the CURRENT editor
+	// state so switching the refund option hides or shows the log without a
+	// save. The lane option keys come from the server (panel_data) rather
+	// than being spelled out here, so the two ends cannot drift.
+	const sendingEnabled = ( data.sendKeys || [] ).some(
+		( key ) => !! ( values && values[ key ] )
+	);
+
 	const rows = Array.isArray( values && values[ optionKey ] )
 		? values[ optionKey ]
 		: [];
@@ -176,7 +184,12 @@ export default function DestinationsPanel( { data, values } ) {
 	// entries are the ones that explain why nothing was sent, and "no
 	// destination configured" is one of them.
 	if ( 0 === testable.length ) {
-		return <SendLogList logPath={ logPath } />;
+		return (
+			<SendLogList
+				logPath={ logPath }
+				hideWhenEmpty={ ! sendingEnabled }
+			/>
+		);
 	}
 
 	return (
@@ -258,7 +271,10 @@ export default function DestinationsPanel( { data, values } ) {
 					);
 				} ) }
 			</ul>
-			<SendLogList logPath={ logPath } />
+			<SendLogList
+				logPath={ logPath }
+				hideWhenEmpty={ ! sendingEnabled }
+			/>
 		</div>
 	);
 }

@@ -16,6 +16,8 @@ import DestinationsPanel from '../components/panels/DestinationsPanel';
 
 const TEST_PATH = 'gtm4wp/v2/google/destinations/test';
 const OPTION_KEY = 'gdm-destinations';
+const LOG_PATH = 'gtm4wp/v2/google/send-log';
+const SEND_REFUNDS_KEY = 'gdm-send-refunds';
 
 const ROW = {
 	label: 'Production',
@@ -40,9 +42,16 @@ function panelData( overrides = {} ) {
 	};
 }
 
-function renderPanel( { data = panelData(), rows = [ ROW ] } = {} ) {
+function renderPanel( {
+	data = panelData(),
+	rows = [ ROW ],
+	values = {},
+} = {} ) {
 	return render(
-		<DestinationsPanel data={ data } values={ { [ OPTION_KEY ]: rows } } />
+		<DestinationsPanel
+			data={ data }
+			values={ { [ OPTION_KEY ]: rows, ...values } }
+		/>
 	);
 }
 
@@ -468,14 +477,18 @@ describe( 'DestinationsPanel send log', () => {
 		apiFetch.mockResolvedValueOnce( { entries: [] } );
 
 		renderPanel( {
-			data: panelData( { logPath: 'gtm4wp/v2/google/send-log' } ),
+			data: panelData( {
+				logPath: LOG_PATH,
+				sendKeys: [ SEND_REFUNDS_KEY ],
+			} ),
+			values: { [ SEND_REFUNDS_KEY ]: true },
 		} );
 
 		expect(
 			await screen.findByText( 'Nothing has been sent yet.' )
 		).toBeInTheDocument();
 		expect( apiFetch ).toHaveBeenCalledWith( {
-			path: 'gtm4wp/v2/google/send-log',
+			path: LOG_PATH,
 		} );
 	} );
 
@@ -483,8 +496,12 @@ describe( 'DestinationsPanel send log', () => {
 		apiFetch.mockResolvedValueOnce( { entries: [] } );
 
 		renderPanel( {
-			data: panelData( { logPath: 'gtm4wp/v2/google/send-log' } ),
+			data: panelData( {
+				logPath: LOG_PATH,
+				sendKeys: [ SEND_REFUNDS_KEY ],
+			} ),
 			rows: [ { ...ROW, measurement_id: '' } ],
+			values: { [ SEND_REFUNDS_KEY ]: true },
 		} );
 
 		// The most useful entries are the ones explaining why nothing was
@@ -498,5 +515,93 @@ describe( 'DestinationsPanel send log', () => {
 		renderPanel();
 
 		expect( apiFetch ).not.toHaveBeenCalled();
+	} );
+} );
+
+describe( 'DestinationsPanel send log visibility', () => {
+	it( 'shows no empty send log while every send lane is off', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		renderPanel( {
+			data: panelData( {
+				logPath: LOG_PATH,
+				sendKeys: [ SEND_REFUNDS_KEY ],
+			} ),
+			values: { [ SEND_REFUNDS_KEY ]: false },
+		} );
+
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 1 ) );
+
+		expect(
+			screen.queryByText( 'Nothing has been sent yet.' )
+		).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole( 'heading', { name: 'Recent sends' } )
+		).not.toBeInTheDocument();
+		// The rest of the panel is untouched by the gate.
+		expect(
+			screen.getByRole( 'heading', { name: 'Test destinations' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'shows the empty send log as soon as a send lane is on', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		renderPanel( {
+			data: panelData( {
+				logPath: LOG_PATH,
+				sendKeys: [ SEND_REFUNDS_KEY ],
+			} ),
+			values: { [ SEND_REFUNDS_KEY ]: true },
+		} );
+
+		expect(
+			await screen.findByText( 'Nothing has been sent yet.' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'keeps showing past sends after the lane is switched off', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [
+				{
+					time: 1800000000,
+					feature: 'refund',
+					reference: 'woocommerce:12:34',
+					destination: 'G-ABC123',
+					outcome: 'accepted',
+					reason: '',
+					result: '',
+					errors: 0,
+					warnings: 0,
+				},
+			],
+		} );
+
+		renderPanel( {
+			data: panelData( {
+				logPath: LOG_PATH,
+				sendKeys: [ SEND_REFUNDS_KEY ],
+			} ),
+			values: { [ SEND_REFUNDS_KEY ]: false },
+		} );
+
+		expect( await screen.findByText( 'Accepted' ) ).toBeInTheDocument();
+	} );
+
+	it( 'renders the whole panel empty with no testable row and nothing sent', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		const { container } = renderPanel( {
+			data: panelData( {
+				logPath: LOG_PATH,
+				sendKeys: [ SEND_REFUNDS_KEY ],
+			} ),
+			rows: [],
+			values: { [ SEND_REFUNDS_KEY ]: false },
+		} );
+
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 1 ) );
+
+		expect( container ).toBeEmptyDOMElement();
 	} );
 } );

@@ -144,7 +144,7 @@ function formatTime( time ) {
 	return new Date( time * 1000 ).toLocaleString();
 }
 
-export default function SendLogList( { logPath } ) {
+export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 	const [ entries, setEntries ] = useState( null );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( false );
@@ -190,6 +190,19 @@ export default function SendLogList( { logPath } ) {
 	}, [ load ] );
 
 	if ( ! logPath ) {
+		return null;
+	}
+
+	// Nothing has ever been sent AND no send lane is on: there is no reading
+	// of "Nothing has been sent yet" that tells the admin anything, because
+	// nothing is waiting to happen. The heading, the explanation and the
+	// Refresh button would be a block about a feature that is off. Once an
+	// entry exists the list is shown whatever the lanes say - turning a lane
+	// off must not hide what it did while it was on. This also covers the
+	// still-loading state, so an empty log never flashes the block on mount,
+	// and a log that failed to load: with every lane off, silence is the
+	// honest answer.
+	if ( hideWhenEmpty && ( null === entries || 0 === entries.length ) ) {
 		return null;
 	}
 
