@@ -35,10 +35,22 @@ final class ContainerRows {
 	public const COLUMN_PATH    = 'path';
 	public const COLUMN_NO_ID   = 'no_id';
 
-	public const GTM_ID_PATTERN  = '/^GTM-[A-Z0-9]+$/';
-	public const AUTH_PATTERN    = '/^[a-zA-Z0-9\-_]+$/';
-	public const PREVIEW_PATTERN = '/^env-[0-9]+$/';
-	public const PATH_PATTERN    = '/^[a-zA-Z0-9\.\-\_\/]*$/';
+	/**
+	 * The D modifier on all four patterns is the same control the
+	 * JS_IDENTIFIER_PATTERN docblock below explains: without it PCRE lets `$`
+	 * match before one trailing newline, so "value\n" passes a pattern that
+	 * reads as though it could not. The stored-options path is immune (every
+	 * row value is trimmed by normalize_row() before any check), but the
+	 * GTM4WP_HARDCODED_* wp-config constants are validated untrimmed - and an
+	 * accepted trailing newline in the auth/preview values used to reach the
+	 * container loader snippet raw, turning the whole <script> block into a
+	 * SyntaxError. Rejecting is the class contract: the admin notice names the
+	 * constant instead of the container silently not loading.
+	 */
+	public const GTM_ID_PATTERN  = '/^GTM-[A-Z0-9]+$/D';
+	public const AUTH_PATTERN    = '/^[a-zA-Z0-9\-_]+$/D';
+	public const PREVIEW_PATTERN = '/^env-[0-9]+$/D';
+	public const PATH_PATTERN    = '/^[a-zA-Z0-9\.\-\_\/]*$/D';
 
 	/**
 	 * A valid JavaScript identifier (the ASCII subset the plugin supports).
