@@ -20,6 +20,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # 8.2 is not an arbitrary lower leg: it is the oldest PHP the suite can
+        # run on at all (PHPUnit 11 requires it), and it is therefore also the
+        # value composer.json pins `config.platform.php` to. The two have to stay
+        # equal. The lock file is resolved on the maintainer's much newer PHP, so
+        # without that pin a dev dependency requiring 8.3+ resolves happily there
+        # and then makes `composer install` on this leg fail outright - which is
+        # exactly what a committed lock file exists to prevent. Registered as U140.
         php: [ '8.2', '8.4' ]
     steps:
       - uses: actions/checkout@v4
