@@ -30,6 +30,18 @@ final class ListTrackingTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function. WordPress encodes a term name with
+		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
+		// ENT_QUOTES reverses exactly those five entities and nothing else.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
+
 		Functions\stubEscapeFunctions();
 		Functions\stubTranslationFunctions();
 		Functions\when( 'wp_json_encode' )->alias(

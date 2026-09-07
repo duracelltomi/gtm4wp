@@ -26,6 +26,18 @@ final class StoreApiDataTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function. WordPress encodes a term name with
+		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
+		// ENT_QUOTES reverses exactly those five entities and nothing else.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
+
 		Functions\stubTranslationFunctions();
 		Functions\when( 'wc_get_price_to_display' )->justReturn( 12.5 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
@@ -67,7 +79,7 @@ final class StoreApiDataTest extends TestCase {
 
 		$this->assertArrayHasKey( 'item', $data );
 		$this->assertIsArray( $data['item'] );
-		$this->assertSame( '42', $data['item']['item_id'] );
+		$this->assertSame( '42', $data['item']['item_id'], 'Identifiers cross the Store API as strings, product ids included.' );
 		$this->assertSame( 'Boots', $data['item']['item_name'] );
 	}
 
@@ -89,7 +101,7 @@ final class StoreApiDataTest extends TestCase {
 		$this->assertIsString( $data['item'], 'Cart-item extension values must be JSON strings.' );
 
 		$decoded = json_decode( $data['item'], true );
-		$this->assertSame( '42', $decoded['item_id'] );
+		$this->assertSame( '42', $decoded['item_id'], 'Identifiers cross the Store API as strings, product ids included.' );
 		$this->assertSame( 3, $decoded['quantity'] );
 	}
 

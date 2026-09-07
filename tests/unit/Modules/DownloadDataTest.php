@@ -26,6 +26,18 @@ final class DownloadDataTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function. WordPress encodes a term name with
+		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
+		// ENT_QUOTES reverses exactly those five entities and nothing else.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
+
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
@@ -457,7 +469,7 @@ final class DownloadDataTest extends TestCase {
 	}
 
 	/**
-	 * U117 drift (found 2026-09-01 against EDD 3.7.0): EDD core has shipped an
+	 * U119 drift (found 2026-09-01 against EDD 3.7.0): EDD core has shipped an
 	 * opt-in checkout Phone field since 3.3.8 that stores the number as order
 	 * meta '_edd_phone' - a key this module never read, so on such stores the
 	 * hashed phone silently vanished from Enhanced Conversions. Pins the read

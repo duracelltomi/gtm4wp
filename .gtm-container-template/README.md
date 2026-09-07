@@ -4,7 +4,7 @@ The Google Tag Manager container export offered on gtm4wp.com, kept here so it i
 version controlled next to the code whose data layer it reads.
 
 Current file: **`gtm4wp-ga4-container-elements-20260810.json`** — 68 variables,
-2 triggers, 3 tags. Built for **GTM4WP 2.0.0**.
+2 triggers, 3 tags. Built for the **GTM4WP 2.0** line (first shipped with 2.0.0).
 
 Published at `https://gtm4wp.com/gtm-containers/<filename>`. The previous public
 versions `gtm4wp-ga4-container-elements-20240129.json` (18 variables, 1 trigger,

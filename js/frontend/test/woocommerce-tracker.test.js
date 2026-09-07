@@ -2054,3 +2054,337 @@ describe( 'gtm4wp-woocommerce legacy product grid block list identity', () => {
 		).toHaveBeenCalledWith( 1, 'New Products', 'new-products' );
 	} );
 } );
+
+/**
+ * Interactivity API product page: WooCommerce renders the Add to Cart + Options
+ * block without the `cart` class on the form and adds the item over the Store
+ * API, so the classic path found no form and reported nothing at all. The event
+ * is now built on the click and released only when WooCommerce confirms the add
+ * with wc-blocks_added_to_cart, so a refused add stays unreported.
+ */
+describe( 'gtm4wp-woocommerce Interactivity API add_to_cart', () => {
+	const INTERACTIVE_FORM =
+		// No `cart` class: this is what WooCommerce renders when the block runs
+		// its Interactivity API flow rather than the classic POST form.
+		'<form class="wp-block-woocommerce-add-to-cart-with-options wc-block-add-to-cart-with-options">' +
+		'<span class="gtm4wp_single_productdata" data-gtm4wp_product_data=\'' +
+		JSON.stringify( PRODUCT_DATA ) +
+		"'></span>" +
+		'<input type="number" name="quantity" value="2" />' +
+		'<button type="button" class="single_add_to_cart_button wc-interactive">Add</button>' +
+		'</form>';
+
+	const CLASSIC_FORM =
+		'<form class="cart" method="post" action="https://shop/p42">' +
+		'<span class="gtm4wp_single_productdata" data-gtm4wp_product_data=\'' +
+		JSON.stringify( PRODUCT_DATA ) +
+		"'></span>" +
+		'<input type="number" name="quantity" value="2" />' +
+		'<button type="button" class="single_add_to_cart_button">Add</button>' +
+		'</form>';
+
+	beforeEach( () => {
+		document.body.className = '';
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_from_json = ( json ) => {
+			const parsed = JSON.parse( json );
+			delete parsed.productlink;
+			return parsed;
+		};
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	} );
+
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	const boot = ( markup ) => {
+		document.body.innerHTML = markup;
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers(); // binds the delegated listeners
+		global.gtm4wp_push_ecommerce.mockClear();
+	};
+
+	const clickAdd = () =>
+		document
+			.querySelector( '.single_add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+	const confirmAdd = () =>
+		document.body.dispatchEvent(
+			new window.CustomEvent( 'wc-blocks_added_to_cart', {
+				bubbles: true,
+				detail: { preserveCartData: true },
+			} )
+		);
+
+	const addToCartCalls = () =>
+		global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+
+	it( 'fires add_to_cart once WooCommerce confirms the add', () => {
+		boot( INTERACTIVE_FORM );
+
+		clickAdd();
+		// Both directions: nothing may be reported on the click itself, because
+		// the item is not in the cart yet.
+		expect( addToCartCalls() ).toHaveLength( 0 );
+
+		confirmAdd();
+
+		const calls = addToCartCalls();
+		expect( calls ).toHaveLength( 1 );
+		expect( calls[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 42, quantity: 2 } )
+		);
+		expect( calls[ 0 ][ 2 ] ).toEqual(
+			expect.objectContaining( { currency: 'EUR' } )
+		);
+	} );
+
+	it( 'reports nothing when the add is never confirmed', () => {
+		boot( INTERACTIVE_FORM );
+
+		clickAdd();
+		jest.advanceTimersByTime( 60000 );
+		confirmAdd(); // a later, unrelated confirmation must not release it
+
+		expect( addToCartCalls() ).toHaveLength( 0 );
+	} );
+
+	it( 'reports the newest click only, so a refused add is not reported later', () => {
+		boot( INTERACTIVE_FORM );
+
+		clickAdd();
+		document.querySelector( '[name=quantity]' ).value = '5';
+		clickAdd();
+		confirmAdd();
+
+		const calls = addToCartCalls();
+		expect( calls ).toHaveLength( 1 );
+		expect( calls[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { quantity: 5 } )
+		);
+	} );
+
+	it( 'still reports the classic form on the click, with no confirmation', () => {
+		boot( CLASSIC_FORM );
+
+		clickAdd();
+
+		// The classic form posts the page away, so the click is the last moment
+		// to report it and the behavior must not have changed.
+		expect( addToCartCalls() ).toHaveLength( 1 );
+	} );
+} );
+
+/**
+ * A variable product on an Interactivity API product page. The variation data
+ * reaches the classic page through WooCommerce's jQuery found_variation event,
+ * which these blocks do not dispatch, so the event is completed from the cart
+ * line the add creates: that line carries the finished GA4 item for the
+ * variation, built by the same server code as every other item.
+ */
+describe( 'gtm4wp-woocommerce Interactivity API variable product', () => {
+	const CART_URL = 'https://shop.example/wp-json/wc/store/v1/cart';
+
+	const VARIATION_ITEM = {
+		internal_id: 71,
+		item_id: '71',
+		item_name: 'Cap - Blue',
+		price: 16,
+		item_group_id: 29,
+		item_category: 'Accessories',
+	};
+
+	const VARIABLE_FORM =
+		'<form class="wp-block-woocommerce-add-to-cart-with-options">' +
+		// The parent's product data is on the page, but the variation branch
+		// takes over as soon as the form carries a variation_id field.
+		'<span class="gtm4wp_single_productdata" data-gtm4wp_product_data=\'' +
+		JSON.stringify( PRODUCT_DATA ) +
+		"'></span>" +
+		'<input type="hidden" name="variation_id" value="71" />' +
+		'<input type="number" name="quantity" value="3" />' +
+		'<button type="button" class="single_add_to_cart_button">Add</button>' +
+		'</form>';
+
+	const settle = async () => {
+		for ( let i = 0; i < 5; i++ ) {
+			await Promise.resolve();
+		}
+	};
+
+	beforeEach( () => {
+		document.body.className = '';
+		document.body.innerHTML = VARIABLE_FORM;
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.google_tag_manager = { 'GTM-TEST': {} };
+		window.gtm4wp_store_api_cart_url = CART_URL;
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_from_json = ( json ) => JSON.parse( json );
+		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
+			const raw = el && el.dataset && el.dataset[ key ];
+			if ( ! raw ) {
+				return false;
+			}
+			const parsed = JSON.parse( raw );
+			exclude.forEach( ( k ) => delete parsed[ k ] );
+			return parsed;
+		};
+
+		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
+		global.jQuery = jest.fn( () => jq );
+
+		// The cart-item extension value is a JSON string, which is how the Store
+		// API carries a cart-item extension (verified against a live store).
+		window.fetch = jest.fn( () =>
+			Promise.resolve( {
+				ok: true,
+				json: () =>
+					Promise.resolve( {
+						items: [
+							{
+								key: 'abc',
+								id: 71,
+								quantity: 5, // already in the cart plus this add
+								extensions: {
+									gtm4wp: {
+										item: JSON.stringify( VARIATION_ITEM ),
+									},
+								},
+							},
+						],
+					} ),
+			} )
+		);
+	} );
+
+	afterEach( () => {
+		delete window.google_tag_manager;
+		delete window.gtm4wp_datalayer_max_timeout;
+		delete window.gtm4wp_store_api_cart_url;
+		delete window.fetch;
+		jest.useRealTimers();
+	} );
+
+	const boot = () => {
+		jest.useFakeTimers();
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+		jest.useRealTimers();
+		global.gtm4wp_push_ecommerce.mockClear();
+	};
+
+	const clickAdd = () =>
+		document
+			.querySelector( '.single_add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+	const confirmAdd = () =>
+		document.body.dispatchEvent(
+			new window.CustomEvent( 'wc-blocks_added_to_cart', {
+				bubbles: true,
+				detail: { preserveCartData: true },
+			} )
+		);
+
+	const addToCartCalls = () =>
+		global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+
+	it( 'reports the variation, not the parent, once the add is confirmed', async () => {
+		boot();
+
+		clickAdd();
+		expect( window.fetch ).not.toHaveBeenCalled();
+
+		confirmAdd();
+		await settle();
+
+		const calls = addToCartCalls();
+		expect( calls ).toHaveLength( 1 );
+		// The variation's own id and price, and the quantity from the form
+		// rather than the cart line's running total.
+		expect( calls[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( {
+				item_id: '71',
+				item_name: 'Cap - Blue',
+				item_group_id: 29,
+				quantity: 3,
+			} )
+		);
+		expect( calls[ 0 ][ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
+		expect( calls[ 0 ][ 1 ][ 0 ].item_id ).not.toBe( PRODUCT_DATA.item_id );
+		expect( calls[ 0 ][ 2 ] ).toEqual(
+			expect.objectContaining( { currency: 'EUR', value: '48.00' } )
+		);
+	} );
+
+	it( 'reports nothing when the variation has no cart line', async () => {
+		window.fetch = jest.fn( () =>
+			Promise.resolve( {
+				ok: true,
+				json: () => Promise.resolve( { items: [] } ),
+			} )
+		);
+		boot();
+
+		clickAdd();
+		confirmAdd();
+		await settle();
+
+		expect( addToCartCalls() ).toHaveLength( 0 );
+	} );
+
+	it( 'reads no cart when the add is never confirmed', async () => {
+		boot();
+
+		clickAdd();
+		await settle();
+
+		expect( window.fetch ).not.toHaveBeenCalled();
+		expect( addToCartCalls() ).toHaveLength( 0 );
+	} );
+} );

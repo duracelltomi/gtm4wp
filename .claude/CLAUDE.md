@@ -118,7 +118,7 @@ back — use the `Options`/`Frontend` services instead.
 <!-- release-coupled: canonical values in .claude/RELEASE-STATE.md, pinned by ReleaseStateConsistencyTest -->
 - PHP >= 8.0
 - WordPress >= 6.3 (tested up to 7.1)
-- WooCommerce >= 5.0 (tested up to 11.0.0)
+- WooCommerce >= 5.0 (tested up to 11.1.0)
 
 ## Coding Standards
 

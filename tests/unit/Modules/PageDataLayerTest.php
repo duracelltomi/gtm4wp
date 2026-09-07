@@ -118,6 +118,18 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'get_term' )->justReturn( null );
 		Functions\when( 'get_term_parents_list' )->justReturn( '' );
 
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function. WordPress encodes a term name with
+		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
+		// ENT_QUOTES reverses exactly those five entities and nothing else.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
+
 		// The order-received visitor check (TS-16: stubbed here, in this file's own
 		// setUp, never borrowed from whichever test file happened to run first).
 		// A logged-out visitor is the default; the guest email-verification helper
@@ -2262,6 +2274,36 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'data-gtm4wp-visitor-cart', $html );
 	}
 
+	/**
+	 * The term-name decode (a category stored by WordPress as "Shirts &amp; Ties"
+	 * reaching the data layer as "Shirts & Ties") hands a raw ampersand to the
+	 * script sink, which is exactly the character RI-2/RI-3 are about. Both
+	 * directions asserted: the hex-encoded form is present in the emitted script
+	 * AND the raw & is absent, so the decode cannot become a break-out.
+	 */
+	public function test_decoded_category_is_still_hex_encoded_in_the_script(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Shirts &amp; Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Tie', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		Functions\when( 'wc_get_product' )->justReturn( $product );
+		$this->stub_wc();
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		// TC-2: the expectation is produced by the same encoder the source uses,
+		// rather than hand-typed as &.
+		$expected = wp_json_encode( 'Shirts & Ties', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		$this->assertStringContainsString( (string) $expected, $this->inline_js, 'The decoded category must reach the script hex-encoded.' );
+		$this->assertStringNotContainsString( 'Shirts & Ties', $this->inline_js, 'A raw ampersand must never reach the script body.' );
+		$this->assertStringNotContainsString( 'Shirts &amp; Ties', $this->inline_js, 'And the stored entity must not survive to the data layer either.' );
+	}
+
 	public function test_cart_page_fires_view_cart_event(): void {
 		// TS-5: the is_cart() branch (add_cart_view) fires the GA4 view_cart event for a
 		// non-empty cart when e-commerce tracking is on.
@@ -2275,6 +2317,54 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertStringContainsString( '"event":"view_cart"', $this->inline_js, 'The cart page must fire the GA4 view_cart event.' );
 		$this->assertStringContainsString( '"item_name":"Mug"', $this->inline_js, 'The cart item must be carried on the view_cart event.' );
+	}
+
+	/**
+	 * A store where WooCommerce answers both conditionals with true on the same
+	 * request - a plugin defining WOOCOMMERCE_CART or answering woocommerce_is_cart
+	 * while the checkout renders, or a leftover cart shortcode in the checkout page
+	 * content. Reported on the wordpress.org forum, where the checkout page emitted
+	 * view_cart and begin_checkout was never emitted anywhere, while the block
+	 * tracker fired the checkout steps on the same page because
+	 * WooCommerceModule::block_cart_or_checkout_context() resolves is_checkout()
+	 * first. The two halves have to answer the same way, and the checkout is the
+	 * more specific of the two states, so it wins.
+	 */
+	public function test_checkout_wins_when_woocommerce_reports_the_page_as_both_cart_and_checkout(): void {
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		// Both directions: the checkout event is present AND the cart event is gone.
+		// Asserting only the first would keep passing if both fired.
+		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js, 'A page reported as both must fire begin_checkout.' );
+		$this->assertStringNotContainsString( '"event":"view_cart"', $this->inline_js, 'A page reported as both must not also fire view_cart.' );
+	}
+
+	/**
+	 * The order-received endpoint keeps its place ahead of the checkout arm:
+	 * is_checkout() is true there as well, and that page reports a purchase, not a
+	 * checkout start. Without this the reordering above would turn every
+	 * thank-you page into a begin_checkout.
+	 */
+	public function test_order_received_still_wins_over_checkout_and_cart(): void {
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"begin_checkout"', $this->inline_js, 'The order-received page must not fire begin_checkout.' );
+		$this->assertStringNotContainsString( '"event":"view_cart"', $this->inline_js, 'The order-received page must not fire view_cart.' );
 	}
 
 	public function test_item_with_source_filter_receives_the_cart_item_on_a_cart_line(): void {

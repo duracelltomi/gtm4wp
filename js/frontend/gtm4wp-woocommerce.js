@@ -1,3 +1,5 @@
+import { gtm4wp_parse_block_item } from './lib/gtm4wp-blocks-cart-diff';
+
 let gtm4wp_last_selected_product_variation;
 
 // #82: these three carry de-dupe state that the document-level listeners registered
@@ -233,12 +235,28 @@ function gtm4wp_woocommerce_checkoutwc_step( e ) {
  *
  * @param {Element} trigger_element The clicked add-to-cart button (or a descendant).
  * @param {Element} [product_form]  The product's form.cart; derived from the button when omitted.
+ * @param {Object}  [options]       Optional { emit }: a replacement for the dataLayer
+ *                                  push, so a caller can hold the event back until
+ *                                  the add is confirmed (see the block add to cart
+ *                                  below). Defaults to pushing immediately.
  * @return {boolean} Whether an add_to_cart event was tracked.
  */
-function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
+function gtm4wp_track_single_add_to_cart(
+	trigger_element,
+	product_form,
+	options
+) {
 	if ( ! trigger_element || ! trigger_element.closest ) {
 		return false;
 	}
+
+	// Where the finished event goes. The default is the dataLayer; the block
+	// add-to-cart path passes its own collector so the event can wait for
+	// WooCommerce to confirm that the item was really added.
+	const emit =
+		options && 'function' === typeof options.emit
+			? options.emit
+			: gtm4wp_push_ecommerce;
 
 	const add_to_cart_button =
 		trigger_element.closest( '.single_add_to_cart_button' ) ||
@@ -281,17 +299,13 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 			gtm4wp_last_selected_product_variation.quantity =
 				null === variation_qty || variation_qty < 1 ? 1 : variation_qty;
 
-			gtm4wp_push_ecommerce(
-				'add_to_cart',
-				[ gtm4wp_last_selected_product_variation ],
-				{
-					currency: gtm4wp_currency,
-					value: (
-						gtm4wp_last_selected_product_variation.price *
-						gtm4wp_last_selected_product_variation.quantity
-					).toFixed( 2 ),
-				}
-			);
+			emit( 'add_to_cart', [ gtm4wp_last_selected_product_variation ], {
+				currency: gtm4wp_currency,
+				value: (
+					gtm4wp_last_selected_product_variation.price *
+					gtm4wp_last_selected_product_variation.quantity
+				).toFixed( 2 ),
+			} );
 		}
 	} else if ( product_is_grouped ) {
 		const products_in_group = document.querySelectorAll(
@@ -350,7 +364,7 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 			return false;
 		}
 
-		gtm4wp_push_ecommerce( 'add_to_cart', products, {
+		emit( 'add_to_cart', products, {
 			currency: gtm4wp_currency,
 			value: sum_value.toFixed( 2 ),
 		} );
@@ -403,13 +417,231 @@ function gtm4wp_track_single_add_to_cart( trigger_element, product_form ) {
 		}
 		delete productdata.internal_id;
 
-		gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
+		emit( 'add_to_cart', [ productdata ], {
 			currency: gtm4wp_currency,
 			value: productdata.price * productdata.quantity,
 		} );
 	}
 
 	return true;
+}
+
+/**
+ * How long a queued block add_to_cart waits for WooCommerce to confirm the add
+ * before it is thrown away, in milliseconds.
+ */
+const GTM4WP_BLOCK_ADD_TO_CART_TIMEOUT = 10000;
+
+// The add_to_cart event of the most recent click on a block add-to-cart button,
+// held back until WooCommerce confirms the add. Only the newest click is kept:
+// a click whose add failed is replaced by the next one rather than firing later.
+let gtm4wp_pending_block_add_to_cart = null;
+let gtm4wp_pending_block_add_to_cart_timer = null;
+
+/**
+ * The product form around an add-to-cart button when WooCommerce rendered it
+ * with the Interactivity API rather than as the classic POST form.
+ *
+ * WooCommerce gives the classic form the `cart` class and the interactive one
+ * only its submit directive, so the missing class is what tells the two apart.
+ * That difference is why add_to_cart stopped firing on product pages built with
+ * the Add to Cart + Options block: the classic path looks for `form.cart`, finds
+ * nothing and returns before it reads the product data, even though the button
+ * carries the classes it expects.
+ *
+ * @param {Element} trigger_element The clicked add-to-cart button.
+ * @return {Element|null} The interactive product form, or null for the classic one.
+ */
+function gtm4wp_interactive_product_form( trigger_element ) {
+	const form = trigger_element.closest( 'form' );
+
+	if ( ! form || ( form.classList && form.classList.contains( 'cart' ) ) ) {
+		return null;
+	}
+
+	return form;
+}
+
+/**
+ * Resolves the GA4 item of a product that was just added, by reading the cart
+ * back from the Store API and taking the line that product created.
+ *
+ * This is how a variable product is reported on an interactive product page.
+ * The classic page hands the tracker the selected variation through
+ * WooCommerce's jQuery found_variation event, which the Interactivity API form
+ * does not dispatch, and the parent product's price would be the wrong number
+ * to report. The cart line carries the finished item for the variation itself,
+ * built by the same server code as every other item, so it is a better source
+ * than anything that could be reassembled in the browser.
+ *
+ * @param {number} product_id The product or variation id whose cart line to find.
+ * @return {Promise<Object|null>} The GA4 item, or null when it cannot be resolved.
+ */
+function gtm4wp_fetch_cart_item( product_id ) {
+	const cart_url =
+		'string' === typeof window.gtm4wp_store_api_cart_url
+			? window.gtm4wp_store_api_cart_url
+			: '';
+
+	if ( '' === cart_url || 'function' !== typeof window.fetch ) {
+		return Promise.resolve( null );
+	}
+
+	return window
+		.fetch( cart_url, {
+			credentials: 'same-origin',
+			headers: { Accept: 'application/json' },
+		} )
+		.then( function ( response ) {
+			return response && response.ok ? response.json() : null;
+		} )
+		.then( function ( cart ) {
+			if ( ! cart || ! Array.isArray( cart.items ) ) {
+				return null;
+			}
+
+			const line = cart.items.find( function ( cart_item ) {
+				return (
+					cart_item && String( cart_item.id ) === String( product_id )
+				);
+			} );
+
+			const extensions =
+				line && line.extensions && line.extensions.gtm4wp;
+
+			return extensions
+				? gtm4wp_parse_block_item( extensions.item )
+				: null;
+		} )
+		.catch( function () {
+			return null;
+		} );
+}
+
+/**
+ * Drops the queued block add_to_cart, if there is one.
+ *
+ * @return {void}
+ */
+function gtm4wp_clear_pending_block_add_to_cart() {
+	if ( gtm4wp_pending_block_add_to_cart_timer ) {
+		window.clearTimeout( gtm4wp_pending_block_add_to_cart_timer );
+	}
+
+	gtm4wp_pending_block_add_to_cart = null;
+	gtm4wp_pending_block_add_to_cart_timer = null;
+}
+
+/**
+ * Builds the add_to_cart event for a click on a block add-to-cart button and
+ * holds it until the add is confirmed.
+ *
+ * The interactive form adds the item over the Store API without reloading the
+ * page, so a click is not yet an add: the item can be refused for being out of
+ * stock, or the block's own validation can stop the submit. WooCommerce
+ * dispatches wc-blocks_added_to_cart once the request succeeded, and that is
+ * what releases the event here. An add that never succeeds is dropped after
+ * GTM4WP_BLOCK_ADD_TO_CART_TIMEOUT rather than reported.
+ *
+ * @param {Element} trigger_element The clicked add-to-cart button.
+ * @param {Element} product_form    The interactive product form around it.
+ * @return {boolean} Whether an event was queued.
+ */
+function gtm4wp_queue_block_add_to_cart( trigger_element, product_form ) {
+	gtm4wp_clear_pending_block_add_to_cart();
+
+	const queued = [];
+	gtm4wp_track_single_add_to_cart( trigger_element, product_form, {
+		emit( event_name, items, extra_params ) {
+			queued.push( [ event_name, items, extra_params ] );
+		},
+	} );
+
+	let pending = queued.length ? { pushes: queued } : null;
+
+	if ( ! pending ) {
+		// Nothing could be built from the page, which on an interactive form
+		// means a variable product: its variation data reaches the classic page
+		// through an event these blocks do not dispatch. The form does carry the
+		// selected variation id, and the cart line the add creates carries the
+		// finished item, so the event is completed from the cart afterwards.
+		const variation_el = product_form.querySelector(
+			'[name=variation_id]'
+		);
+		const variation_id = parseInt( variation_el && variation_el.value, 10 );
+
+		if ( ! variation_id ) {
+			return false;
+		}
+
+		const variation_qty = gtm4wp_read_quantity(
+			product_form.querySelector( '[name=quantity]' ),
+			'value'
+		);
+
+		pending = {
+			lookup: {
+				product_id: variation_id,
+				quantity:
+					null === variation_qty || variation_qty < 1
+						? 1
+						: variation_qty,
+			},
+		};
+	}
+
+	gtm4wp_pending_block_add_to_cart = pending;
+	gtm4wp_pending_block_add_to_cart_timer = window.setTimeout(
+		gtm4wp_clear_pending_block_add_to_cart,
+		GTM4WP_BLOCK_ADD_TO_CART_TIMEOUT
+	);
+
+	return true;
+}
+
+/**
+ * Pushes the queued block add_to_cart, now that WooCommerce has confirmed it.
+ *
+ * @return {void}
+ */
+function gtm4wp_flush_pending_block_add_to_cart() {
+	const pending = gtm4wp_pending_block_add_to_cart;
+	gtm4wp_clear_pending_block_add_to_cart();
+
+	if ( ! pending ) {
+		return;
+	}
+
+	if ( pending.pushes ) {
+		pending.pushes.forEach( function ( push_arguments ) {
+			gtm4wp_push_ecommerce(
+				push_arguments[ 0 ],
+				push_arguments[ 1 ],
+				push_arguments[ 2 ]
+			);
+		} );
+
+		return;
+	}
+
+	// The variable product case: the item comes from the cart line the add has
+	// just created. The quantity is the one on the form rather than the one on
+	// the line, since the line also counts what was already in the cart.
+	gtm4wp_fetch_cart_item( pending.lookup.product_id ).then(
+		function ( item ) {
+			if ( ! item ) {
+				return;
+			}
+
+			item.quantity = pending.lookup.quantity;
+			delete item.internal_id;
+
+			gtm4wp_push_ecommerce( 'add_to_cart', [ item ], {
+				currency: gtm4wp_currency,
+				value: ( item.price * item.quantity ).toFixed( 2 ),
+			} );
+		}
+	);
 }
 
 /**
@@ -635,6 +867,16 @@ function gtm4wp_woocommerce_process_pages() {
 		}
 	}
 
+	// WooCommerce confirms a block add to cart with this event, dispatched on
+	// document.body only after the Store API accepted the item. It releases the
+	// add_to_cart held back by the click handler below. Listening on document
+	// rather than on body, since the event bubbles and body is not guaranteed to
+	// be the same element for the whole life of the page.
+	document.addEventListener(
+		'wc-blocks_added_to_cart',
+		gtm4wp_flush_pending_block_add_to_cart
+	);
+
 	// manage events related to user clicks
 	document.addEventListener(
 		'click',
@@ -660,7 +902,21 @@ function gtm4wp_woocommerce_process_pages() {
 				'.single_add_to_cart_button'
 			);
 			if ( add_to_cart_button ) {
-				gtm4wp_track_single_add_to_cart( add_to_cart_button );
+				// A block product page adds the item in the background, so the
+				// event waits there for WooCommerce to confirm the add. The
+				// classic form posts the page, where the click is the last
+				// moment to report it.
+				const interactive_form =
+					gtm4wp_interactive_product_form( add_to_cart_button );
+
+				if ( interactive_form ) {
+					gtm4wp_queue_block_add_to_cart(
+						add_to_cart_button,
+						interactive_form
+					);
+				} else {
+					gtm4wp_track_single_add_to_cart( add_to_cart_button );
+				}
 			}
 
 			// track remove links in mini cart widget and on cart page
