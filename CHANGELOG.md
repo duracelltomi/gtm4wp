@@ -2,6 +2,7 @@
 
 ## 2.0.2
 
+* Updated: tested with WooCommerce 11.1.
 * Fixed: a product category or brand name containing an ampersand reached the data layer as `Shirts &amp; Ties` rather than `Shirts & Ties`, and that is the literal string GA4 reported. WordPress encodes a term name when it is saved, so what the plugin read back was the encoded form; it is decoded once now, at the point the name is read, and the value still reaches the page through the same JSON encoder as before, so nothing about the escaping of the script changes.
 * Fixed: `item_id`, `sku` and the dynamic remarketing `id` are now always strings, on every product. A product with no SKU falls back to its numeric id, and that fallback was written into the data layer as a JSON number while the same fields are strings on every product that has a SKU. A Google Tag Manager trigger comparing one of those fields cannot be written for both cases at once, so this completes the change 2.0 started when it stopped turning identifiers into numbers. **Check your GTM setup if a trigger or variable compares `item_id`, `sku` or `id` against a number on products without a SKU.**
 

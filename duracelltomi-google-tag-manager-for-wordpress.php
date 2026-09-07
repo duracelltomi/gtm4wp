@@ -21,7 +21,7 @@
  * Text Domain: duracelltomi-google-tag-manager
  *
  * WC requires at least: 5.0
- * WC tested up to: 11.0.0
+ * WC tested up to: 11.1.0
  */
 
 // This file must stay parseable on outdated PHP versions so that the
