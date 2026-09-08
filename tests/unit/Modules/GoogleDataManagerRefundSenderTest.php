@@ -559,6 +559,25 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( 'woocommerce:12:34', $this->entry()['reference'] );
 	}
 
+	public function test_the_missing_destination_is_reported_ahead_of_a_per_order_gap(): void {
+		$this->sender(
+			$this->source(
+				self::refund(
+					array(
+						'client_id'     => '',
+						'consent_state' => array( 'signals' => array( 'analytics_storage' => 'denied' ) ),
+					)
+				)
+			),
+			array( GTM4WP_OPTION_GDM_DESTINATIONS => array() )
+		)->run( self::job() );
+
+		// Both are true of this refund. The one worth reporting is the one that
+		// stops every refund on the site and is fixed once, on this screen -
+		// not the one that would send the reader auditing orders.
+		$this->assertSame( RefundSender::REASON_NO_DESTINATION, $this->entry()['reason'] );
+	}
+
 	public function test_no_configured_destination_is_a_reason_not_a_silence(): void {
 		$this->sender( $this->source( self::refund() ), array( GTM4WP_OPTION_GDM_DESTINATIONS => array() ) )->run( self::job() );
 

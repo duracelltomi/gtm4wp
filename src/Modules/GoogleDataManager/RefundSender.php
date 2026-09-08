@@ -199,17 +199,23 @@ final class RefundSender {
 			return;
 		}
 
-		$reason = $this->refusal( $refund );
-
-		if ( null !== $reason ) {
-			$this->skip( $refund->reference(), $attempt, $reason );
-			return;
-		}
-
+		// Ahead of the per-order refusals on purpose. With no destination
+		// configured, nothing about this site can send anything at all, and
+		// that is one fix in one place; telling the reader instead that this
+		// particular order has no client id sends them auditing orders while
+		// the whole lane is pointed at nowhere. A site-wide fault outranks a
+		// per-order one whenever both are true.
 		$rows = $this->destinations( $only );
 
 		if ( array() === $rows ) {
 			$this->skip( $refund->reference(), $attempt, self::REASON_NO_DESTINATION );
+			return;
+		}
+
+		$reason = $this->refusal( $refund );
+
+		if ( null !== $reason ) {
+			$this->skip( $refund->reference(), $attempt, $reason );
 			return;
 		}
 
