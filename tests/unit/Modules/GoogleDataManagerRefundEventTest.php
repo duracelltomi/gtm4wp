@@ -60,6 +60,8 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 				'client_id'       => '313930999.1788522497',
 				'consent_state'   => null,
 				'billing_country' => 'DE',
+				'shipping'        => 0.0,
+				'tax'             => 0.0,
 			),
 			$overrides
 		);
@@ -76,7 +78,9 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 			$values['items'],
 			$values['client_id'],
 			$values['consent_state'],
-			$values['billing_country']
+			$values['billing_country'],
+			$values['shipping'],
+			$values['tax']
 		);
 	}
 
@@ -355,5 +359,116 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 
 		$this->assertSame( 'crm-77', $event['userId'] );
 		$this->assertSame( 'WC-1001', $event['transactionId'] );
+	}
+
+	// ---- Refunded shipping and tax -----------------------------------------
+
+	public function test_a_partial_refund_reports_the_returned_shipping_and_tax_as_event_parameters(): void {
+		$event = RefundEvent::build(
+			self::refund(
+				array(
+					'amount'   => 19.0,
+					'items'    => array( self::item() ),
+					'shipping' => 1.0,
+					'tax'      => 3.5,
+				)
+			)
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'parameterName' => 'shipping',
+					'value'         => '1.00',
+				),
+				array(
+					'parameterName' => 'tax',
+					'value'         => '3.50',
+				),
+			),
+			$event['additionalEventParameters'],
+			'Neither amount has a field of its own; both travel as event parameters under their Google Analytics names, as strings.'
+		);
+	}
+
+	public function test_the_refunded_shipping_is_reported_even_though_the_conversion_value_already_covers_it(): void {
+		$event = RefundEvent::build(
+			self::refund(
+				array(
+					'amount'   => 19.0,
+					'items'    => array( self::item() ),
+					'shipping' => 1.0,
+				)
+			)
+		);
+
+		// The whole reason this exists: conversionValue carries the money, but
+		// Analytics' shipping metric is incremented by the purchase event and
+		// would never be decremented again.
+		$this->assertSame( 19.0, $event['conversionValue'] );
+		$this->assertSame(
+			array(
+				array(
+					'parameterName' => 'shipping',
+					'value'         => '1.00',
+				),
+			),
+			$event['additionalEventParameters']
+		);
+	}
+
+	public function test_an_amount_that_was_not_returned_is_left_out_rather_than_sent_as_zero(): void {
+		$event = RefundEvent::build(
+			self::refund(
+				array(
+					'amount'   => 40.0,
+					'items'    => array( self::item() ),
+					'shipping' => 0.0,
+					'tax'      => 8.0,
+				)
+			)
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'parameterName' => 'tax',
+					'value'         => '8.00',
+				),
+			),
+			$event['additionalEventParameters'],
+			'A refund that returned no shipping makes no claim about shipping.'
+		);
+	}
+
+	public function test_a_partial_that_returned_neither_carries_no_parameter_list_at_all(): void {
+		$event = RefundEvent::build(
+			self::refund(
+				array(
+					'amount' => 40.0,
+					'items'  => array( self::item() ),
+				)
+			)
+		);
+
+		$this->assertArrayNotHasKey( 'additionalEventParameters', $event );
+	}
+
+	public function test_a_full_refund_reports_no_shipping_or_tax_because_it_reverses_the_whole_transaction(): void {
+		$event = RefundEvent::build(
+			self::refund(
+				array(
+					'amount'   => 100.0,
+					'shipping' => 1.0,
+					'tax'      => 20.0,
+				)
+			)
+		);
+
+		$this->assertArrayNotHasKey(
+			'additionalEventParameters',
+			$event,
+			'The full shape carries the transaction id alone; adding amounts to it would describe a partial.'
+		);
 	}
 }

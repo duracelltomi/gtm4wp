@@ -376,6 +376,17 @@ if ( ! class_exists( 'WC_Order_Refund' ) ) {
 			return $this->value( 'amount', 0 );
 		}
 
+		// Negated on a refund like every other amount, so the fixtures pass them
+		// negated and the adapter's abs() is doing real work rather than being
+		// handed a positive number by a friendly double.
+		public function get_shipping_total() {
+			return $this->value( 'shipping_total', 0 );
+		}
+
+		public function get_total_tax() {
+			return $this->value( 'total_tax', 0 );
+		}
+
 		public function get_items() {
 			return $this->value( 'items', array() );
 		}

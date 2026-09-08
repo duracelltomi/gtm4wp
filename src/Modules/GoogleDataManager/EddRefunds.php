@@ -124,7 +124,13 @@ final class EddRefunds implements RefundSource {
 			$this->items( $refund ),
 			(string) edd_get_order_meta( $order_id, AttributionCapture::META_CLIENT_ID, true ),
 			is_array( $consent ) ? $consent : null,
-			self::billing_country( $order )
+			self::billing_country( $order ),
+			// Easy Digital Downloads has no shipping on an order, and its
+			// purchase event reports none either, so there is nothing to
+			// reverse. The tax is negated on the refund order like every other
+			// amount.
+			0.0,
+			abs( (float) DownloadData::row_prop( $refund, 'tax', 0 ) )
 		);
 	}
 

@@ -111,7 +111,54 @@ final class RefundEvent {
 			$event['cartData'] = array( 'items' => array_values( $refund->items ) );
 		}
 
+		$parameters = self::amount_parameters( $refund );
+
+		if ( array() !== $parameters ) {
+			$event['additionalEventParameters'] = $parameters;
+		}
+
 		return $event;
+	}
+
+	/**
+	 * The refunded shipping and tax, in the API's event-parameter shape.
+	 *
+	 * Neither has a field of its own on the event: the recommended-events
+	 * reference puts both in additionalEventParameters, under the Google
+	 * Analytics parameter names, with string values. Without them Analytics
+	 * increments its shipping and tax metrics at the purchase and never
+	 * decrements them, because the purchase event reports both (see the
+	 * WooCommerce purchase builder) while the refund would not.
+	 *
+	 * Only the partial shape sends them: a full refund reverses the whole
+	 * transaction, its shipping and tax included, from the transaction id
+	 * alone. A zero amount is omitted rather than sent as "0", for the same
+	 * reason the items are - a present field is a claim, and nothing was
+	 * returned.
+	 *
+	 * @param RefundData $refund The refund.
+	 * @return array<int, array{parameterName: string, value: string}>
+	 */
+	private static function amount_parameters( RefundData $refund ): array {
+		$parameters = array();
+
+		foreach ( array(
+			'shipping' => $refund->shipping,
+			'tax'      => $refund->tax,
+		) as $name => $amount ) {
+			if ( $amount <= 0 ) {
+				continue;
+			}
+
+			$parameters[] = array(
+				'parameterName' => $name,
+				// A string, which is what EventParameter.value is, and fixed to
+				// two decimals so 1.0 does not travel as "1".
+				'value'         => number_format( round( $amount, 2 ), 2, '.', '' ),
+			);
+		}
+
+		return $parameters;
 	}
 
 	/**

@@ -475,4 +475,27 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 		$this->assertSame( RefundSource::PLATFORM_EDD, $this->adapter()->platform() );
 		$this->assertSame( 'edd', $this->adapter()->platform() );
 	}
+
+	// ---- Refunded tax ------------------------------------------------------
+
+	public function test_the_returned_tax_is_read_off_the_refund_order_as_a_positive_amount(): void {
+		$this->stub_orders(
+			self::order(),
+			self::refund( 40.0, array(), array( 'tax' => -8.0 ) )
+		);
+
+		$refund = $this->adapter()->load( 12, 34 );
+
+		$this->assertSame( 8.0, $refund->tax );
+	}
+
+	public function test_no_shipping_is_reported_because_easy_digital_downloads_has_none(): void {
+		$this->stub_orders( self::order(), self::refund( 40.0, array(), array( 'tax' => -8.0 ) ) );
+
+		$refund = $this->adapter()->load( 12, 34 );
+
+		// Not an oversight: an EDD order carries no shipping total, and its
+		// purchase event reports none either, so there is nothing to reverse.
+		$this->assertSame( 0.0, $refund->shipping );
+	}
 }

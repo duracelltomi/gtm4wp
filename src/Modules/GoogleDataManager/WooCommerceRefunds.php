@@ -113,7 +113,12 @@ final class WooCommerceRefunds implements RefundSource {
 			$this->items( $refund ),
 			(string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ),
 			is_array( $consent ) ? $consent : null,
-			(string) $order->get_billing_country()
+			(string) $order->get_billing_country(),
+			// The same two totals the purchase event reports, read off the
+			// refund instead of the order and turned positive. get_total_tax()
+			// covers the shipping tax as well, exactly as it does there.
+			abs( (float) $refund->get_shipping_total() ),
+			abs( (float) $refund->get_total_tax() )
 		);
 	}
 

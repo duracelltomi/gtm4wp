@@ -489,4 +489,63 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		$this->assertSame( RefundSource::PLATFORM_WOOCOMMERCE, $this->adapter()->platform() );
 		$this->assertSame( 'woocommerce', $this->adapter()->platform() );
 	}
+
+	// ---- Refunded shipping and tax -----------------------------------------
+
+	public function test_the_returned_shipping_and_tax_are_read_off_the_refund_as_positive_amounts(): void {
+		$this->stub_orders(
+			self::order(),
+			self::refund(
+				19.0,
+				array(),
+				array(
+					// WooCommerce negates these on a refund exactly as it does
+					// the total.
+					'shipping_total' => -1.0,
+					'total_tax'      => -3.5,
+				)
+			)
+		);
+
+		$refund = $this->adapter()->load( 12, 34 );
+
+		$this->assertSame( 1.0, $refund->shipping );
+		$this->assertSame( 3.5, $refund->tax );
+	}
+
+	public function test_a_refund_that_returned_no_shipping_reports_none(): void {
+		$this->stub_orders( self::order(), self::refund( 40.0 ) );
+
+		$refund = $this->adapter()->load( 12, 34 );
+
+		$this->assertSame( 0.0, $refund->shipping );
+		$this->assertSame( 0.0, $refund->tax );
+	}
+
+	public function test_the_refunded_shipping_and_tax_are_the_two_totals_the_purchase_event_reports(): void {
+		$order = self::order();
+
+		$this->stub_orders(
+			$order,
+			self::refund(
+				66.0,
+				array(),
+				array(
+					'shipping_total' => -1.0,
+					'total_tax'      => -5.0,
+				)
+			)
+		);
+
+		$refund   = $this->adapter()->load( 12, 34 );
+		$purchase = $this->product_data()->get_purchase_datalayer( $order, array() );
+
+		// Same two keys, same meaning, opposite direction: whatever the purchase
+		// added to Analytics' shipping and tax metrics is what a refund has to be
+		// able to take off again.
+		$this->assertArrayHasKey( 'shipping', $purchase['ecommerce'] );
+		$this->assertArrayHasKey( 'tax', $purchase['ecommerce'] );
+		$this->assertSame( 1.0, $refund->shipping );
+		$this->assertSame( 5.0, $refund->tax );
+	}
 }

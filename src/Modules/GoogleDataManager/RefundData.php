@@ -44,6 +44,8 @@ final class RefundData {
 	 * @param string                                                             $client_id       Stored Google Analytics client id, empty when none was captured.
 	 * @param array<string, mixed>|null                                          $consent_state   Stored consent-mode state, or null when none was captured.
 	 * @param string                                                             $billing_country Two-letter billing country, empty when the order has none.
+	 * @param float                                                              $shipping        Refunded shipping, positive; 0.0 when none was returned or the platform has no shipping.
+	 * @param float                                                              $tax             Refunded tax, positive; 0.0 when none was returned.
 	 */
 	public function __construct(
 		public string $platform,
@@ -57,7 +59,11 @@ final class RefundData {
 		public array $items,
 		public string $client_id,
 		public ?array $consent_state,
-		public string $billing_country
+		public string $billing_country,
+		// Defaulted so an adapter that has no such amount to report - EDD
+		// carries no shipping on an order at all - simply leaves it out.
+		public float $shipping = 0.0,
+		public float $tax = 0.0
 	) {
 	}
 
