@@ -129,7 +129,7 @@ final class SendLog {
 	}
 
 	/**
-	 * Appends one entry, dropping the oldest when the ring is full.
+	 * Appends one entry, making room for it when the ring is full.
 	 *
 	 * @param array<string, mixed> $entry Entry fields; unknown keys are dropped by clean_entry().
 	 * @return void
@@ -138,11 +138,60 @@ final class SendLog {
 		$entries   = $this->read();
 		$entries[] = $this->clean_entry( $entry );
 
+		$this->write( self::trim( $entries ) );
+	}
+
+	/**
+	 * The ring cut back to MAX_ENTRIES, dropping routine sends before problems.
+	 *
+	 * A plain "drop the oldest" is the wrong rule for what this ring is for.
+	 * The rows worth reading are the rare ones - a failure, a deliberate skip -
+	 * and the rows that crowd them out are the successes, which arrive in bulk.
+	 * A store refunding a batch of orders would push this morning's failure out
+	 * of the ring before anybody looked at it, and the failure is the only row
+	 * that could have explained the number in Analytics.
+	 *
+	 * So the oldest routine entry goes first, and a problem is dropped only
+	 * when the ring holds nothing else. Order is preserved either way: this
+	 * removes entries, it never reorders them.
+	 *
+	 * @param array<int, array<string, mixed>> $entries Entries, oldest first.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function trim( array $entries ): array {
+		$excess = count( $entries ) - self::MAX_ENTRIES;
+
+		if ( $excess <= 0 ) {
+			return $entries;
+		}
+
+		// Oldest first, and only the routine ones: the newest entry is never a
+		// candidate, because it is the one just recorded.
+		foreach ( array_keys( $entries ) as $index ) {
+			if ( $excess <= 0 ) {
+				break;
+			}
+
+			$tone = self::tone( $entries[ $index ] );
+
+			if ( self::TONE_WARN === $tone || self::TONE_ERROR === $tone ) {
+				continue;
+			}
+
+			unset( $entries[ $index ] );
+			--$excess;
+		}
+
+		$entries = array_values( $entries );
+
+		// A ring holding nothing but problems still has to give way to the new
+		// entry, or it would freeze at the first fifty failures and stop
+		// recording what happened next.
 		if ( count( $entries ) > self::MAX_ENTRIES ) {
 			$entries = array_slice( $entries, -self::MAX_ENTRIES );
 		}
 
-		$this->write( $entries );
+		return $entries;
 	}
 
 	/**

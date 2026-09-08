@@ -12,7 +12,7 @@
  */
 
 import apiFetch from '@wordpress/api-fetch';
-import { Button, Notice } from '@wordpress/components';
+import { Button, Notice, ToggleControl } from '@wordpress/components';
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 
@@ -170,6 +170,7 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 	const [ entries, setEntries ] = useState( null );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( false );
+	const [ problemsOnly, setProblemsOnly ] = useState( false );
 
 	const load = useCallback( async () => {
 		// The effect below is registered before the early return further down,
@@ -228,6 +229,14 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 		return null;
 	}
 
+	const all = entries || [];
+	const problems = all.filter( ( entry ) => {
+		const tone = toneClass( entry );
+
+		return 'warn' === tone || 'error' === tone;
+	} );
+	const shown = problemsOnly ? problems : all;
+
 	return (
 		<div className="gtm4wp-send-log">
 			<h3>{ __( 'Recent sends', 'duracelltomi-google-tag-manager' ) }</h3>
@@ -259,6 +268,28 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 				</Notice>
 			) }
 
+			{ /* Only worth offering once there is something to hide behind it. */ }
+			{ all.length > 0 && (
+				<ToggleControl
+					__nextHasNoMarginBottom
+					className="gtm4wp-send-log__filter"
+					checked={ problemsOnly }
+					label={ sprintf(
+						/* translators: %d: number of entries that failed, were skipped or came back with warnings. */
+						__(
+							'Only what needs attention (%d)',
+							'duracelltomi-google-tag-manager'
+						),
+						problems.length
+					) }
+					help={ __(
+						'Hides the sends Google accepted and applied, so the failures and the deliberate skips are what is left. It filters this list, which keeps the most recent sends only - it does not search further back.',
+						'duracelltomi-google-tag-manager'
+					) }
+					onChange={ ( next ) => setProblemsOnly( next ) }
+				/>
+			) }
+
 			{ null !== entries && 0 === entries.length && ! error && (
 				<p className="gtm4wp-send-log__empty">
 					{ __(
@@ -268,7 +299,16 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 				</p>
 			) }
 
-			{ null !== entries && entries.length > 0 && (
+			{ problemsOnly && 0 === problems.length && all.length > 0 && (
+				<p className="gtm4wp-send-log__empty">
+					{ __(
+						'Nothing needs attention: every send in this list was accepted.',
+						'duracelltomi-google-tag-manager'
+					) }
+				</p>
+			) }
+
+			{ shown.length > 0 && (
 				<table className="gtm4wp-send-log__table widefat striped">
 					<thead>
 						<tr>
@@ -305,7 +345,7 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 						</tr>
 					</thead>
 					<tbody>
-						{ entries.map( ( entry, index ) => (
+						{ shown.map( ( entry, index ) => (
 							<tr
 								key={ index }
 								className={ `gtm4wp-send-log__row gtm4wp-send-log__row--${ toneClass(

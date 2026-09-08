@@ -527,4 +527,141 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 			)
 		);
 	}
+
+	// ---- Which entries survive a full ring ---------------------------------
+
+	public function test_a_flood_of_successful_sends_does_not_push_a_failure_out_of_the_ring(): void {
+		$log = $this->log();
+
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:1:2',
+					'outcome'   => SendLog::OUTCOME_FAILED,
+					'reason'    => 'quota exhausted',
+				)
+			)
+		);
+
+		// Twice the ring's capacity of routine sends on top of it.
+		for ( $i = 0; $i < ( SendLog::MAX_ENTRIES * 2 ); $i++ ) {
+			$log->record(
+				self::entry(
+					array(
+						'reference' => 'woocommerce:9:' . $i,
+						'outcome'   => SendLog::OUTCOME_ACCEPTED,
+						'result'    => 'SUCCESS',
+					)
+				)
+			);
+		}
+
+		$entries    = $log->all();
+		$references = array_column( $entries, 'reference' );
+
+		$this->assertCount( SendLog::MAX_ENTRIES, $entries );
+		$this->assertContains(
+			'woocommerce:1:2',
+			$references,
+			'The failure is the row that explains the number in Analytics; a batch of refunds must not evict it.'
+		);
+	}
+
+	public function test_the_oldest_routine_send_is_the_one_that_makes_room(): void {
+		$log = $this->log();
+
+		for ( $i = 0; $i < SendLog::MAX_ENTRIES; $i++ ) {
+			$log->record(
+				self::entry(
+					array(
+						'reference' => 'woocommerce:9:' . $i,
+						'outcome'   => SendLog::OUTCOME_ACCEPTED,
+						'result'    => 'SUCCESS',
+					)
+				)
+			);
+		}
+
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:9:new',
+					'outcome'   => SendLog::OUTCOME_ACCEPTED,
+					'result'    => 'SUCCESS',
+				)
+			)
+		);
+
+		$references = array_column( $log->all(), 'reference' );
+
+		$this->assertNotContains( 'woocommerce:9:0', $references );
+		$this->assertContains( 'woocommerce:9:1', $references );
+		$this->assertContains( 'woocommerce:9:new', $references );
+		$this->assertSame( 'woocommerce:9:new', end( $references ), 'Trimming removes entries; it never reorders them.' );
+	}
+
+	public function test_a_ring_of_nothing_but_problems_still_records_what_happens_next(): void {
+		$log = $this->log();
+
+		for ( $i = 0; $i < SendLog::MAX_ENTRIES; $i++ ) {
+			$log->record(
+				self::entry(
+					array(
+						'reference' => 'woocommerce:8:' . $i,
+						'outcome'   => SendLog::OUTCOME_FAILED,
+						'reason'    => 'refused',
+					)
+				)
+			);
+		}
+
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:8:new',
+					'outcome'   => SendLog::OUTCOME_FAILED,
+					'reason'    => 'refused',
+				)
+			)
+		);
+
+		$entries    = $log->all();
+		$references = array_column( $entries, 'reference' );
+
+		$this->assertCount( SendLog::MAX_ENTRIES, $entries );
+		$this->assertContains(
+			'woocommerce:8:new',
+			$references,
+			'A ring full of failures must not freeze and stop recording; the oldest problem gives way to the newest one.'
+		);
+		$this->assertNotContains( 'woocommerce:8:0', $references );
+	}
+
+	public function test_a_skipped_send_counts_as_a_problem_worth_keeping(): void {
+		$log = $this->log();
+
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:7:1',
+					'outcome'   => SendLog::OUTCOME_SKIPPED,
+					'reason'    => 'no_client_id',
+				)
+			)
+		);
+
+		for ( $i = 0; $i < ( SendLog::MAX_ENTRIES + 5 ); $i++ ) {
+			$log->record(
+				self::entry(
+					array(
+						'reference' => 'woocommerce:9:' . $i,
+						'outcome'   => SendLog::OUTCOME_ACCEPTED,
+						'result'    => 'SUCCESS',
+					)
+				)
+			);
+		}
+
+		$this->assertContains( 'woocommerce:7:1', array_column( $log->all(), 'reference' ) );
+	}
 }

@@ -347,3 +347,96 @@ describe( 'SendLogList tones', () => {
 		expect( row ).toHaveClass( 'gtm4wp-send-log__row--pending' );
 	} );
 } );
+
+describe( 'SendLogList problems-only filter', () => {
+	const mixed = [
+		entry( {
+			reference: 'woocommerce:1:2',
+			tone: 'ok',
+			result: 'SUCCESS',
+		} ),
+		entry( {
+			reference: 'woocommerce:3:4',
+			tone: 'warn',
+			outcome: 'skipped',
+			reason: 'no_client_id',
+			result: '',
+		} ),
+		entry( {
+			reference: 'woocommerce:5:6',
+			tone: 'error',
+			outcome: 'failed',
+			result: '',
+		} ),
+	];
+
+	it( 'counts what needs attention before anything is hidden', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: mixed } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		expect(
+			await screen.findByLabelText( 'Only what needs attention (2)' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'leaves the accepted sends out once it is on', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: mixed } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		fireEvent.click(
+			await screen.findByLabelText( 'Only what needs attention (2)' )
+		);
+
+		expect( screen.getByText( /woocommerce:3:4/ ) ).toBeInTheDocument();
+		expect( screen.getByText( /woocommerce:5:6/ ) ).toBeInTheDocument();
+		expect(
+			screen.queryByText( /woocommerce:1:2/ )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'shows everything again when it is switched back off', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: mixed } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		const toggle = await screen.findByLabelText(
+			'Only what needs attention (2)'
+		);
+
+		fireEvent.click( toggle );
+		fireEvent.click( toggle );
+
+		expect( screen.getByText( /woocommerce:1:2/ ) ).toBeInTheDocument();
+	} );
+
+	it( 'says so rather than showing an empty table when nothing needs attention', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ entry( { tone: 'ok', result: 'SUCCESS' } ) ],
+		} );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		fireEvent.click(
+			await screen.findByLabelText( 'Only what needs attention (0)' )
+		);
+
+		expect(
+			screen.getByText(
+				'Nothing needs attention: every send in this list was accepted.'
+			)
+		).toBeInTheDocument();
+		expect( screen.queryByRole( 'table' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'is not offered while the list is empty', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		await screen.findByText( 'Nothing has been sent yet.' );
+
+		expect( screen.queryByRole( 'checkbox' ) ).not.toBeInTheDocument();
+	} );
+} );
