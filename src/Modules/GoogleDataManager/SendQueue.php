@@ -22,16 +22,20 @@ defined( 'ABSPATH' ) || exit;
  *
  * Two backends, because the plugin serves two commerce platforms:
  *
- * - **Action Scheduler**, which WooCommerce bundles. It is the better one -
+ * - **Action Scheduler**, which both commerce platforms bundle - WooCommerce
+ *   always, Easy Digital Downloads since 3.6.5 (U139). It is the better one -
  *   durable, visible in an admin screen, with its own retry and concurrency
  *   handling - so it is used whenever it is loaded.
- * - **WP-Cron**, everywhere else. Easy Digital Downloads does not bundle
- *   Action Scheduler, so this is not a hypothetical fallback: on an
- *   EDD-only store it is the only path.
+ * - **WP-Cron**, everywhere else: a store on an older Easy Digital Downloads,
+ *   or any site where the library is not loaded for a reason of its own.
  *
- * The two are reached only through the functions Action Scheduler documents as
- * its public API, each behind function_exists (UC-2): a store that deactivates
- * WooCommerce mid-flight falls back to WP-Cron rather than fataling.
+ * Which of the two is in front of a given store is therefore not something
+ * this class may assume - it was assumed once, and the assumption was wrong
+ * for every current EDD store (measured on an EDD-only site, 2026-09-08).
+ * Both are reached only through the functions Action Scheduler documents as
+ * its public API, each behind function_exists (UC-2), so a store that
+ * deactivates its commerce plugin mid-flight falls back to WP-Cron rather
+ * than fataling, and a store that gains the library starts using it.
  */
 final class SendQueue {
 

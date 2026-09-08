@@ -12,10 +12,13 @@ use GTM4WP\Modules\GoogleDataManager\SendQueue;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
- * The queue has two backends and the plugin has to work on both: WooCommerce
- * bundles Action Scheduler, Easy Digital Downloads does not, so on an EDD-only
- * store the WP-Cron path is the only one there is. Every test here therefore
- * runs both ways rather than assuming the better backend is present.
+ * The queue has two backends and the plugin has to work on both. Which one a
+ * given store has is not ours to predict: WooCommerce bundles Action Scheduler,
+ * Easy Digital Downloads bundles it too since 3.6.5, and a store on an older
+ * EDD - or one where the library is not loaded for its own reasons - has only
+ * WP-Cron. Every test here therefore runs both ways rather than assuming the
+ * better backend is present, which is what kept the code correct while the
+ * comment beside it claimed EDD had no Action Scheduler.
  *
  * The Action Scheduler functions are stubbed rather than the class: the
  * `as_*` functions are its documented API, the classes behind them are not,
