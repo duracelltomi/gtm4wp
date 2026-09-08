@@ -68,6 +68,32 @@ export default function App( { settings } ) {
 	);
 	const isDirty = Object.keys( changed ).length > 0;
 
+	// Nothing on this screen is written until Save, and some edits look final
+	// enough to be mistaken for done - a removed table row above all, which now
+	// asks for confirmation and then still only changes the editor. So the
+	// browser asks before the tab carries the change away. Registered only
+	// while there is something to lose: a permanent handler would make every
+	// reload of an untouched screen prompt.
+	useEffect( () => {
+		if ( ! isDirty ) {
+			return undefined;
+		}
+
+		const warn = ( event ) => {
+			event.preventDefault();
+
+			// Browsers show their own wording and ignore ours; what they need
+			// is returnValue set. Kept for the ones that still read it.
+			event.returnValue = '';
+
+			return '';
+		};
+
+		window.addEventListener( 'beforeunload', warn );
+
+		return () => window.removeEventListener( 'beforeunload', warn );
+	}, [ isDirty ] );
+
 	const dirtyModules = useMemo(
 		() =>
 			modules
@@ -171,6 +197,18 @@ export default function App( { settings } ) {
 					) }
 				</h1>
 				<div className="gtm4wp-app__actions">
+					{ /* An enabled Save button is a weak signal - it says what
+					     you may do, not that anything is waiting. role=status
+					     announces it to a screen reader the moment an edit
+					     makes it appear. */ }
+					{ isDirty && (
+						<span className="gtm4wp-app__unsaved" role="status">
+							{ __(
+								'Unsaved changes',
+								'duracelltomi-google-tag-manager'
+							) }
+						</span>
+					) }
 					<ImportExport
 						exportPath={ settings.exportPath }
 						importPath={ settings.importPath }

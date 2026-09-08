@@ -166,6 +166,53 @@ describe( 'App dirty tracking', () => {
 	} );
 } );
 
+describe( 'App unsaved-change warnings', () => {
+	it( 'says in words that something is waiting to be saved', () => {
+		renderApp();
+
+		expect( screen.queryByRole( 'status' ) ).not.toBeInTheDocument();
+
+		editContainerId( 'GTM-NEW' );
+
+		// An enabled button says what you may do; this says something is
+		// pending - the distinction that matters after an edit which looked
+		// final, such as removing a table row.
+		expect( screen.getByRole( 'status' ) ).toHaveTextContent(
+			'Unsaved changes'
+		);
+	} );
+
+	it( 'stops saying it once the value is back to what was saved', () => {
+		renderApp();
+		editContainerId( 'GTM-NEW' );
+		fireEvent.change( screen.getByDisplayValue( 'GTM-NEW' ), {
+			target: { value: 'GTM-AAA' },
+		} );
+
+		expect( screen.queryByRole( 'status' ) ).not.toBeInTheDocument();
+	} );
+
+	it( 'lets the browser ask before a tab carries the change away', () => {
+		renderApp();
+		editContainerId( 'GTM-NEW' );
+
+		const event = new Event( 'beforeunload', { cancelable: true } );
+		window.dispatchEvent( event );
+
+		expect( event.defaultPrevented ).toBe( true );
+	} );
+
+	it( 'does not ask when there is nothing to lose', () => {
+		renderApp();
+
+		const event = new Event( 'beforeunload', { cancelable: true } );
+		window.dispatchEvent( event );
+
+		// A screen nobody has touched must reload without a prompt.
+		expect( event.defaultPrevented ).toBe( false );
+	} );
+} );
+
 describe( 'App saving', () => {
 	it( 'posts only the changed values, not the whole settings map', async () => {
 		apiFetch.mockResolvedValue( { saved: true, errors: {} } );

@@ -85,6 +85,13 @@ $gtm4wp-mobile: 782px;
 		}
 	}
 
+	&__unsaved {
+		color: var(--gtm4wp-warning);
+		font-size: var(--gtm4wp-fs-help);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
 	&__actions {
 		align-items: center;
 		display: flex;
