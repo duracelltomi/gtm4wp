@@ -9,6 +9,7 @@ import {
 	SelectControl,
 	TextControl,
 } from '@wordpress/components';
+import { useState } from '@wordpress/element';
 import { sprintf, __ } from '@wordpress/i18n';
 
 import { isCellLocked } from '../utils';
@@ -53,6 +54,26 @@ function violatesPattern( column, value ) {
 	} catch ( error ) {
 		return false;
 	}
+}
+
+/**
+ * Whether a row still holds only what a fresh one starts with.
+ *
+ * Such a row is the "Add row" state nobody typed into, and removing it throws
+ * nothing away - so it needs no confirmation. The same rule the save-time
+ * sanitizer uses when it drops an untouched row silently, applied here so the
+ * two ends agree on what an empty row is.
+ *
+ * @param {Object} row     The row to judge.
+ * @param {Array}  columns Column definitions.
+ * @return {boolean} Whether the row carries nothing the user entered.
+ */
+function isUntouched( row, columns ) {
+	const fresh = emptyRow( columns );
+
+	return columns.every(
+		( column ) => ( row?.[ column.key ] ?? '' ) === fresh[ column.key ]
+	);
 }
 
 function emptyRow( columns ) {
@@ -118,6 +139,11 @@ export default function TableControl( {
 		);
 	};
 
+	// Index of the row whose removal is waiting for a second click, or null.
+	// Only ever one: asking about a second row replaces the question rather
+	// than stacking two of them.
+	const [ pendingRemoval, setPendingRemoval ] = useState( null );
+
 	const addRow = () => {
 		if ( rowsLocked ) {
 			return;
@@ -131,7 +157,29 @@ export default function TableControl( {
 			return;
 		}
 
+		setPendingRemoval( null );
 		onChange( rows.filter( ( row, index ) => index !== rowIndex ) );
+	};
+
+	// A row someone filled in is a piece of configuration - a container id, a
+	// destination and the service account it authenticates with - and the
+	// trash icon sits at the end of the row the pointer is already travelling
+	// along. Asking once costs a click; not asking costs whatever was typed,
+	// with no undo on the screen. A row nobody typed into is removed straight
+	// away: there is nothing to lose and confirming it would only train the
+	// habit of dismissing the question.
+	const requestRemoval = ( rowIndex ) => {
+		if ( rowsLocked ) {
+			return;
+		}
+
+		if ( isUntouched( rows[ rowIndex ], columns ) ) {
+			removeRow( rowIndex );
+
+			return;
+		}
+
+		setPendingRemoval( rowIndex );
 	};
 
 	return (
@@ -314,20 +362,72 @@ export default function TableControl( {
 									);
 								} ) }
 								<td className="gtm4wp-table__actions">
-									<Button
-										icon="trash"
-										isDestructive
-										disabled={ disabled || rowsLocked }
-										label={ sprintf(
-											/* translators: %d: row number. */
-											__(
-												'Remove row %d',
-												'duracelltomi-google-tag-manager'
-											),
-											rowIndex + 1
-										) }
-										onClick={ () => removeRow( rowIndex ) }
-									/>
+									{ pendingRemoval === rowIndex ? (
+										<>
+											<Button
+												variant="primary"
+												isDestructive
+												disabled={
+													disabled || rowsLocked
+												}
+												label={ sprintf(
+													/* translators: %d: row number. */
+													__(
+														'Confirm removing row %d',
+														'duracelltomi-google-tag-manager'
+													),
+													rowIndex + 1
+												) }
+												onClick={ () =>
+													removeRow( rowIndex )
+												}
+											>
+												{ __(
+													'Remove',
+													'duracelltomi-google-tag-manager'
+												) }
+											</Button>
+											<Button
+												variant="tertiary"
+												disabled={
+													disabled || rowsLocked
+												}
+												label={ sprintf(
+													/* translators: %d: row number. */
+													__(
+														'Keep row %d',
+														'duracelltomi-google-tag-manager'
+													),
+													rowIndex + 1
+												) }
+												onClick={ () =>
+													setPendingRemoval( null )
+												}
+											>
+												{ __(
+													'Cancel',
+													'duracelltomi-google-tag-manager'
+												) }
+											</Button>
+										</>
+									) : (
+										<Button
+											icon="trash"
+											isDestructive
+											disabled={ disabled || rowsLocked }
+											label={ sprintf(
+												/* translators: %d: row number. */
+												__(
+													'Remove row %d',
+													'duracelltomi-google-tag-manager'
+												),
+												rowIndex + 1
+											) }
+											onClick={ () =>
+												requestRemoval( rowIndex )
+											}
+										/>
+									) }
 								</td>
 							</tr>
 						) ) }

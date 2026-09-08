@@ -209,11 +209,128 @@ describe( 'TableControl row actions', () => {
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Remove row 2' } )
 		);
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Confirm removing row 2' } )
+		);
 
 		expect( onChange ).toHaveBeenCalledWith( [
 			{ id: 'GTM-AAA', domain: 'a.example' },
 			{ id: 'GTM-CCC', domain: 'c.example' },
 		] );
+	} );
+} );
+
+describe( 'TableControl row removal asks first', () => {
+	const FILLED = [
+		{ id: 'GTM-AAA', domain: 'a.example' },
+		{ id: 'GTM-BBB', domain: 'b.example' },
+	];
+
+	it( 'does not remove a filled row on the first click', () => {
+		const { onChange } = renderTable( { value: FILLED } );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove row 1' } )
+		);
+
+		// TS-3: the effect, not the render. Nothing was thrown away.
+		expect( onChange ).not.toHaveBeenCalled();
+		expect(
+			screen.getByRole( 'button', { name: 'Confirm removing row 1' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'keeps the row when the question is dismissed', () => {
+		const { onChange } = renderTable( { value: FILLED } );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove row 1' } )
+		);
+		fireEvent.click( screen.getByRole( 'button', { name: 'Keep row 1' } ) );
+
+		expect( onChange ).not.toHaveBeenCalled();
+		expect(
+			screen.getByRole( 'button', { name: 'Remove row 1' } )
+		).toBeInTheDocument();
+	} );
+
+	it( 'asks about one row at a time', () => {
+		renderTable( { value: FILLED } );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove row 1' } )
+		);
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove row 2' } )
+		);
+
+		expect(
+			screen.getByRole( 'button', { name: 'Confirm removing row 2' } )
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole( 'button', {
+				name: 'Confirm removing row 1',
+			} )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'removes an untouched row without asking', () => {
+		const { onChange } = renderTable( {
+			value: [
+				{ id: 'GTM-AAA', domain: 'a.example' },
+				{ id: '', domain: '' },
+			],
+		} );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove row 2' } )
+		);
+
+		// Nothing was typed into it, so there is nothing to confirm losing -
+		// and a question asked over nothing teaches people to click through it.
+		expect( onChange ).toHaveBeenCalledWith( [
+			{ id: 'GTM-AAA', domain: 'a.example' },
+		] );
+	} );
+
+	it( 'treats a seeded default as untouched, like the save-time sanitizer does', () => {
+		const { onChange } = renderTable( {
+			field: {
+				columns: [
+					{ key: 'id', label: 'Container ID' },
+					{
+						key: 'type',
+						label: 'Type',
+						type: 'select',
+						default: 'ga4',
+						choices: { ga4: 'GA4' },
+					},
+				],
+			},
+			value: [ { id: '', type: 'ga4' } ],
+		} );
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove row 1' } )
+		);
+
+		expect( onChange ).toHaveBeenCalledWith( [] );
+	} );
+
+	it( 'still refuses every removal while the rows are locked', () => {
+		const { onChange } = renderTable( {
+			field: { columns: COLUMNS, rows_locked: true },
+			value: FILLED,
+		} );
+
+		const trash = screen.queryByRole( 'button', { name: 'Remove row 1' } );
+
+		if ( trash ) {
+			fireEvent.click( trash );
+			fireEvent.click( trash );
+		}
+
+		expect( onChange ).not.toHaveBeenCalled();
 	} );
 } );
 
