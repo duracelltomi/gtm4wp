@@ -191,7 +191,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: ConsentPolicy::POLICY_EEA_ONLY,
 				label: __( 'Require consent before sending', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Decides for which orders the stored consent state has to allow analytics storage before anything about them is sent to Google. The billing country of the order decides the region, which is more reliable than guessing from the visitor\'s IP address. Choosing "Never" means you assert your own lawful basis for the transfer - the plugin then sends regardless of what the visitor answered in your consent banner, so only pick it if that is a decision you have made deliberately.',
+					'Decides for which orders the stored consent state has to allow analytics storage before anything about them is sent to Google. The billing country of the order decides the region, which is more reliable than guessing from the visitor\'s IP address. Choosing "Never" means you assert your own lawful basis for the transfer, so the plugin sends whatever it holds regardless of the stored answer - pick it only if that is a decision you have made deliberately. It governs sending, not collecting, and there is one thing it cannot do: an order whose buyer refused analytics storage has no client ID stored at all, because the browser was never allowed to keep one, so nothing can be sent for it under any rule here. Where this setting does make the difference is an order whose consent answer was never recorded - a visitor who ordered before your banner loaded, or a site running no consent tool at all.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: self::GROUP_ATTRIBUTION,

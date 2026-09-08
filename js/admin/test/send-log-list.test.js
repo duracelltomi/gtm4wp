@@ -440,3 +440,30 @@ describe( 'SendLogList problems-only filter', () => {
 		expect( screen.queryByRole( 'checkbox' ) ).not.toBeInTheDocument();
 	} );
 } );
+
+describe( 'SendLogList consent-caused gaps', () => {
+	it( 'names the buyer refusal rather than the missing id it caused', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [
+				entry( {
+					tone: 'warn',
+					outcome: 'skipped',
+					reason: 'consent_no_client_id',
+					result: '',
+				} ),
+			],
+		} );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		expect(
+			await screen.findByText(
+				/The buyer did not allow analytics storage/
+			)
+		).toBeInTheDocument();
+		// And says why no setting on the screen will rescue it.
+		expect(
+			screen.getByText( /new client ID on every page view/ )
+		).toBeInTheDocument();
+	} );
+} );

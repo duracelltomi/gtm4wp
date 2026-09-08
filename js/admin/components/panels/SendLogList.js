@@ -56,6 +56,11 @@ function reasonLabel( reason ) {
 				'No Google Analytics client ID was stored with the order, so the event could not be matched to its purchase.',
 				'duracelltomi-google-tag-manager'
 			);
+		case 'consent_no_client_id':
+			return __(
+				'The buyer did not allow analytics storage, so no Google Analytics client ID was stored with the order and the refund cannot be matched to its purchase. The consent rule below does not change this: with analytics storage denied, Google issues a new client ID on every page view, and one captured then would match nothing.',
+				'duracelltomi-google-tag-manager'
+			);
 		case 'consent_denied':
 			return __(
 				'The buyer did not allow analytics storage.',

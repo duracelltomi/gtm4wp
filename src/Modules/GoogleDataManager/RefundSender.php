@@ -60,6 +60,19 @@ final class RefundSender {
 	public const REASON_NO_CLIENT_ID = 'no_client_id';
 
 	/**
+	 * Skip reason: no client id was captured BECAUSE the buyer refused
+	 * analytics storage. The same missing identifier as above, told apart from
+	 * it because the two are answered differently: one is a setup question
+	 * (was capture on, did the Google tag fire), the other is the visitor's own
+	 * decision, which no setting on this screen overrides.
+	 *
+	 * Reported instead of the bare missing-id reason whenever the order's own
+	 * stored consent state says analytics storage was not granted. It is the
+	 * cause; the missing id is the symptom.
+	 */
+	public const REASON_CONSENT_NO_CLIENT_ID = 'consent_no_client_id';
+
+	/**
 	 * Skip reason: no usable destination is configured.
 	 */
 	public const REASON_NO_DESTINATION = 'no_destination';
@@ -341,6 +354,22 @@ final class RefundSender {
 		}
 
 		if ( '' === $refund->client_id ) {
+			// Deliberately ahead of the policy check below, and unaffected by
+			// it: a "Never" policy waives the transfer rule for data the site
+			// holds, and cannot conjure an identifier that was never captured.
+			// It could not usefully do so either - with analytics storage
+			// denied, Google's tag runs cookieless and hands out a fresh client
+			// id on every page view, so a value captured then would match no
+			// purchase in Analytics.
+			$signals = $refund->consent_signals();
+
+			if ( is_array( $signals )
+				&& array_key_exists( ConsentPolicy::SIGNAL_ANALYTICS, $signals )
+				&& ConsentPolicy::GRANTED !== $signals[ ConsentPolicy::SIGNAL_ANALYTICS ]
+			) {
+				return self::REASON_CONSENT_NO_CLIENT_ID;
+			}
+
 			return self::REASON_NO_CLIENT_ID;
 		}
 

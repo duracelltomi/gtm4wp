@@ -471,6 +471,81 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		);
 	}
 
+	public function test_a_missing_client_id_names_the_buyers_refusal_when_that_is_what_caused_it(): void {
+		$this->sender(
+			$this->source(
+				self::refund(
+					array(
+						'client_id'     => '',
+						'consent_state' => array( 'signals' => array( 'analytics_storage' => 'denied' ) ),
+					)
+				)
+			)
+		)->run( self::job() );
+
+		$this->assertSame( array(), $this->transport->requests );
+		$this->assertSame(
+			RefundSender::REASON_CONSENT_NO_CLIENT_ID,
+			$this->entry()['reason'],
+			'The refusal is the cause and the missing id only the symptom; a store owner told the latter would go looking for a setup fault that is not there.'
+		);
+	}
+
+	public function test_a_missing_client_id_stays_a_setup_question_when_the_buyer_allowed_analytics(): void {
+		$this->sender(
+			$this->source(
+				self::refund(
+					array(
+						'client_id'     => '',
+						'consent_state' => array( 'signals' => array( 'analytics_storage' => 'granted' ) ),
+					)
+				)
+			)
+		)->run( self::job() );
+
+		$this->assertSame( RefundSender::REASON_NO_CLIENT_ID, $this->entry()['reason'] );
+	}
+
+	public function test_a_missing_client_id_with_no_stored_answer_stays_a_setup_question(): void {
+		$this->sender(
+			$this->source(
+				self::refund(
+					array(
+						'client_id'     => '',
+						'consent_state' => null,
+					)
+				)
+			)
+		)->run( self::job() );
+
+		$this->assertSame(
+			RefundSender::REASON_NO_CLIENT_ID,
+			$this->entry()['reason'],
+			'An order predating the feature has no answer stored, and blaming consent for it would be an invention.'
+		);
+	}
+
+	public function test_the_never_policy_cannot_send_an_order_whose_buyer_refused_analytics_storage(): void {
+		$this->sender(
+			$this->source(
+				self::refund(
+					array(
+						'client_id'     => '',
+						'consent_state' => array( 'signals' => array( 'analytics_storage' => 'denied' ) ),
+					)
+				)
+			),
+			array( GTM4WP_OPTION_GDM_CONSENT_POLICY => ConsentPolicy::POLICY_NEVER )
+		)->run( self::job() );
+
+		// "Never" waives the transfer rule for data the site holds. It cannot
+		// invent an identifier the browser was never allowed to keep - and one
+		// captured under a denial would be a fresh per-pageview value that
+		// matches no purchase anyway.
+		$this->assertSame( array(), $this->transport->requests );
+		$this->assertSame( RefundSender::REASON_CONSENT_NO_CLIENT_ID, $this->entry()['reason'] );
+	}
+
 	public function test_a_refund_of_nothing_is_skipped(): void {
 		$this->sender( $this->source( self::refund( array( 'amount' => 0.0 ) ) ) )->run( self::job() );
 
