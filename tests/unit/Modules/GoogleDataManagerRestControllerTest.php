@@ -517,4 +517,64 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 			$this->assertStringNotContainsString( 'BEGIN', $flat, 'No PEM.' );
 		}
 	}
+
+	// ---- The send log route ------------------------------------------------
+
+	public function test_the_send_log_route_hands_every_entry_its_tone(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-ABC123',
+				'outcome'     => SendLog::OUTCOME_SKIPPED,
+				'reason'      => 'consent_denied',
+			)
+		);
+		$log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:35',
+				'destination' => 'G-ABC123',
+				'outcome'     => SendLog::OUTCOME_ACCEPTED,
+				'status'      => 200,
+				'request_id'  => 'req-42',
+			)
+		);
+
+		$response = $this->make_controller()->send_log();
+		$entries  = $response->get_data()['entries'];
+
+		// Newest first: the accepted one, then the skipped one.
+		$this->assertCount( 2, $entries );
+		$this->assertSame( SendLog::TONE_PENDING, $entries[0]['tone'] );
+		$this->assertSame( SendLog::TONE_WARN, $entries[1]['tone'] );
+
+		// Derived, never stored: the ring itself keeps no such field.
+		foreach ( $log->all() as $stored ) {
+			$this->assertArrayNotHasKey( 'tone', $stored );
+		}
+	}
+
+	public function test_the_send_log_route_still_carries_no_token_key_or_response_body(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-ABC123',
+				'outcome'     => SendLog::OUTCOME_ACCEPTED,
+				'status'      => 200,
+				'request_id'  => 'req-42',
+			)
+		);
+
+		$entries = $this->make_controller()->send_log()->get_data()['entries'];
+
+		$this->assertSame(
+			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone' ),
+			array_keys( $entries[0] ),
+			'The route adds exactly one derived field to what the ring stores, and nothing else joins it.'
+		);
+	}
 }

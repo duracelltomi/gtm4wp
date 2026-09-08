@@ -101,12 +101,23 @@ final class RestController {
 	 * order and refund ids - never a token, key material or a response body
 	 * from Google.
 	 *
+	 * The one added field is `tone`, derived from the entry rather than stored
+	 * with it: how much attention the row deserves, decided next to Google's
+	 * status vocabulary instead of in the admin bundle.
+	 *
 	 * @return \WP_REST_Response
 	 */
 	public function send_log(): \WP_REST_Response {
+		$entries = array();
+
+		foreach ( array_reverse( $this->log->all() ) as $entry ) {
+			$entry['tone'] = SendLog::tone( $entry );
+			$entries[]     = $entry;
+		}
+
 		return new \WP_REST_Response(
 			array(
-				'entries' => array_reverse( $this->log->all() ),
+				'entries' => $entries,
 			)
 		);
 	}

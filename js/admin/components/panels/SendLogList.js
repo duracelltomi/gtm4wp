@@ -131,6 +131,28 @@ function resultLabel( entry ) {
 }
 
 /**
+ * The CSS suffix for an entry's tone.
+ *
+ * The judgement itself is the server's (SendLog::tone), because it rests on
+ * Google's status vocabulary. This only decides that an unknown word - a newer
+ * server than this bundle - is drawn as the neutral state rather than as a
+ * missing class, and never as a success.
+ *
+ * @param {Object} entry Stored entry.
+ * @return {string} One of ok, pending, warn, error.
+ */
+function toneClass( entry ) {
+	switch ( entry.tone ) {
+		case 'ok':
+		case 'warn':
+		case 'error':
+			return entry.tone;
+		default:
+			return 'pending';
+	}
+}
+
+/**
  * A stored Unix timestamp in the reader's own locale, or an em dash.
  *
  * @param {number} time Unix timestamp.
@@ -284,14 +306,21 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 					</thead>
 					<tbody>
 						{ entries.map( ( entry, index ) => (
-							<tr key={ index }>
+							<tr
+								key={ index }
+								className={ `gtm4wp-send-log__row gtm4wp-send-log__row--${ toneClass(
+									entry
+								) }` }
+							>
 								<td>{ formatTime( entry.time ) }</td>
 								<td>
 									{ entry.feature } { entry.reference }
 								</td>
 								<td>{ entry.destination || '—' }</td>
-								<td>{ outcomeLabel( entry.outcome ) }</td>
-								<td>
+								<td className="gtm4wp-send-log__outcome">
+									{ outcomeLabel( entry.outcome ) }
+								</td>
+								<td className="gtm4wp-send-log__details">
 									{ reasonLabel( entry.reason ) }
 									{ resultLabel( entry ) }
 								</td>

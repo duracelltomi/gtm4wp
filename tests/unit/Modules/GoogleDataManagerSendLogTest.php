@@ -381,4 +381,150 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 	private static function flatten( $value ): string {
 		return (string) json_encode( $value ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- test helper, not plugin output.
 	}
+
+	// ---- The tone the settings screen colours by ---------------------------
+
+	public function test_a_send_google_applied_is_the_only_quiet_tone(): void {
+		$this->assertSame(
+			SendLog::TONE_OK,
+			SendLog::tone(
+				array(
+					'outcome'  => SendLog::OUTCOME_ACCEPTED,
+					'result'   => 'SUCCESS',
+					'errors'   => 0,
+					'warnings' => 0,
+				)
+			)
+		);
+	}
+
+	public function test_an_accepted_send_google_has_not_answered_about_is_neither_good_nor_bad(): void {
+		$this->assertSame(
+			SendLog::TONE_PENDING,
+			SendLog::tone(
+				array(
+					'outcome' => SendLog::OUTCOME_ACCEPTED,
+					'result'  => '',
+				)
+			),
+			'A fresh row spends its first half hour here; drawing it as a problem would make every send look broken.'
+		);
+
+		$this->assertSame(
+			SendLog::TONE_PENDING,
+			SendLog::tone(
+				array(
+					'outcome' => SendLog::OUTCOME_ACCEPTED,
+					'result'  => 'PROCESSING',
+				)
+			)
+		);
+	}
+
+	public function test_a_failed_send_is_an_error(): void {
+		$this->assertSame(
+			SendLog::TONE_ERROR,
+			SendLog::tone(
+				array(
+					'outcome' => SendLog::OUTCOME_FAILED,
+					'result'  => '',
+				)
+			)
+		);
+	}
+
+	public function test_a_send_google_took_but_could_not_process_is_an_error(): void {
+		$this->assertSame(
+			SendLog::TONE_ERROR,
+			SendLog::tone(
+				array(
+					'outcome'  => SendLog::OUTCOME_ACCEPTED,
+					'result'   => 'SUCCESS',
+					'errors'   => 2,
+					'warnings' => 0,
+				)
+			),
+			'Records that failed inside an otherwise accepted request are lost data, whatever the request-level word says.'
+		);
+	}
+
+	public function test_a_skipped_or_retrying_send_asks_for_a_look_without_claiming_data_was_lost(): void {
+		$this->assertSame(
+			SendLog::TONE_WARN,
+			SendLog::tone(
+				array(
+					'outcome' => SendLog::OUTCOME_SKIPPED,
+					'reason'  => 'consent_denied',
+					'result'  => '',
+				)
+			)
+		);
+
+		$this->assertSame(
+			SendLog::TONE_WARN,
+			SendLog::tone(
+				array(
+					'outcome' => SendLog::OUTCOME_RETRYING,
+					'result'  => '',
+				)
+			)
+		);
+	}
+
+	public function test_warnings_and_a_partial_success_both_warn(): void {
+		$this->assertSame(
+			SendLog::TONE_WARN,
+			SendLog::tone(
+				array(
+					'outcome'  => SendLog::OUTCOME_ACCEPTED,
+					'result'   => 'SUCCESS',
+					'errors'   => 0,
+					'warnings' => 1,
+				)
+			)
+		);
+
+		$this->assertSame(
+			SendLog::TONE_WARN,
+			SendLog::tone(
+				array(
+					'outcome'  => SendLog::OUTCOME_ACCEPTED,
+					'result'   => 'PARTIAL_SUCCESS',
+					'errors'   => 0,
+					'warnings' => 0,
+				)
+			)
+		);
+	}
+
+	public function test_a_status_name_google_adds_later_is_drawn_as_something_to_look_at(): void {
+		// Both spellings of the failure status Google's own two pages disagree
+		// on (U136), and a name neither page has today.
+		foreach ( array( 'FAILED', 'FAILURE', 'REJECTED_TOMORROW' ) as $status ) {
+			$this->assertNotSame(
+				SendLog::TONE_OK,
+				SendLog::tone(
+					array(
+						'outcome'  => SendLog::OUTCOME_ACCEPTED,
+						'result'   => $status,
+						'errors'   => 0,
+						'warnings' => 0,
+					)
+				),
+				'Only SUCCESS is a success; anything else Google finished with needs a human.'
+			);
+		}
+	}
+
+	public function test_an_entry_missing_its_counts_is_read_without_warnings(): void {
+		$this->assertSame(
+			SendLog::TONE_OK,
+			SendLog::tone(
+				array(
+					'outcome' => SendLog::OUTCOME_ACCEPTED,
+					'result'  => 'SUCCESS',
+				)
+			)
+		);
+	}
 }

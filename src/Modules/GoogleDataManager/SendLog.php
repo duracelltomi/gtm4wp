@@ -79,6 +79,28 @@ final class SendLog {
 	public const OUTCOME_SKIPPED = 'skipped';
 
 	/**
+	 * Tone: nothing needs looking at - Google applied the event.
+	 */
+	public const TONE_OK = 'ok';
+
+	/**
+	 * Tone: sent, and nothing is known about it yet. Every accepted request
+	 * spends its first half hour here.
+	 */
+	public const TONE_PENDING = 'pending';
+
+	/**
+	 * Tone: no data was lost yet, but somebody should look - a refund the lane
+	 * deliberately skipped, a send being retried, a partial result.
+	 */
+	public const TONE_WARN = 'warn';
+
+	/**
+	 * Tone: this event did not arrive.
+	 */
+	public const TONE_ERROR = 'error';
+
+	/**
 	 * Longest stored reason / error summary.
 	 */
 	private const REASON_MAX_LENGTH = 200;
@@ -184,6 +206,54 @@ final class SendLog {
 		if ( $changed ) {
 			$this->write( $entries );
 		}
+	}
+
+	/**
+	 * How much attention one entry deserves, in four steps the settings screen
+	 * renders as colour.
+	 *
+	 * Decided here rather than in the admin bundle on purpose: the judgement
+	 * rests on Google's requestStatus vocabulary (U136), which already lives in
+	 * EventsIngest and disagrees with itself across Google's own two pages
+	 * (FAILED vs FAILURE). A second copy of that vocabulary in JavaScript would
+	 * be a second thing to keep in step with a moving external contract - and
+	 * the one that silently stops matching, because a colour has no test on the
+	 * screen.
+	 *
+	 * Written as "terminal but not a success deserves a look" rather than as a
+	 * list of failure names, so a status Google adds later is drawn as
+	 * something to look at instead of as a success (UC-5).
+	 *
+	 * @param array<string, mixed> $entry One stored entry.
+	 * @return string One of the TONE_* values.
+	 */
+	public static function tone( array $entry ): string {
+		$outcome = (string) ( $entry['outcome'] ?? '' );
+		$result  = (string) ( $entry['result'] ?? '' );
+
+		if ( self::OUTCOME_FAILED === $outcome ) {
+			return self::TONE_ERROR;
+		}
+
+		if ( self::OUTCOME_SKIPPED === $outcome || self::OUTCOME_RETRYING === $outcome ) {
+			return self::TONE_WARN;
+		}
+
+		if ( (int) ( $entry['errors'] ?? 0 ) > 0 ) {
+			return self::TONE_ERROR;
+		}
+
+		// Accepted, and Google has not finished with it: the normal state of a
+		// fresh row, and not something to colour as either good or bad.
+		if ( ! EventsIngest::is_terminal_status( $result ) ) {
+			return self::TONE_PENDING;
+		}
+
+		if ( EventsIngest::STATUS_SUCCESS !== $result || (int) ( $entry['warnings'] ?? 0 ) > 0 ) {
+			return self::TONE_WARN;
+		}
+
+		return self::TONE_OK;
 	}
 
 	/**

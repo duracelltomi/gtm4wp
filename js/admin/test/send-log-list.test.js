@@ -30,6 +30,7 @@ function entry( overrides = {} ) {
 		result: '',
 		errors: 0,
 		warnings: 0,
+		tone: 'ok',
 		...overrides,
 	};
 }
@@ -283,5 +284,66 @@ describe( 'SendLogList with every send lane off', () => {
 		expect(
 			await screen.findByText( 'Nothing has been sent yet.' )
 		).toBeInTheDocument();
+	} );
+} );
+
+describe( 'SendLogList tones', () => {
+	it( 'wears the tone the server decided, on the row', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ entry( { tone: 'error', outcome: 'failed' } ) ],
+		} );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		const row = ( await screen.findByText( 'Failed' ) ).closest( 'tr' );
+
+		expect( row ).toHaveClass( 'gtm4wp-send-log__row--error' );
+	} );
+
+	it( 'keeps the words as well as the colour', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [
+				entry( {
+					tone: 'warn',
+					outcome: 'skipped',
+					reason: 'consent_denied',
+					result: '',
+				} ),
+			],
+		} );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		// A reader who cannot tell the colours apart still gets the whole story.
+		expect( await screen.findByText( 'Not sent' ) ).toBeInTheDocument();
+		expect(
+			screen.getByText( 'The buyer did not allow analytics storage.' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'draws a tone it does not know as the neutral one, never as a success', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ entry( { tone: 'catastrophic' } ) ],
+		} );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		const row = ( await screen.findByText( 'Accepted' ) ).closest( 'tr' );
+
+		expect( row ).toHaveClass( 'gtm4wp-send-log__row--pending' );
+		expect( row ).not.toHaveClass( 'gtm4wp-send-log__row--ok' );
+	} );
+
+	it( 'falls back to the neutral tone for an entry from an older server', async () => {
+		const without = entry();
+		delete without.tone;
+
+		apiFetch.mockResolvedValueOnce( { entries: [ without ] } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		const row = ( await screen.findByText( 'Accepted' ) ).closest( 'tr' );
+
+		expect( row ).toHaveClass( 'gtm4wp-send-log__row--pending' );
 	} );
 } );

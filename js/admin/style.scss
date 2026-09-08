@@ -42,6 +42,8 @@ $gtm4wp-mobile: 782px;
 	--gtm4wp-text-2: #50575e;
 	--gtm4wp-text-3: #757575;
 	--gtm4wp-danger: #d63638;
+	--gtm4wp-success: #007017;
+	--gtm4wp-warning: #8a5d00;
 	--gtm4wp-danger-bg: #fcf0f0;
 	--gtm4wp-danger-bg: color-mix(in srgb, var(--gtm4wp-danger) 8%, #fff);
 
@@ -603,7 +605,7 @@ $gtm4wp-mobile: 782px;
 	}
 
 	&__status--ok {
-		color: #007017;
+		color: var(--gtm4wp-success);
 	}
 
 	&__status--error,
@@ -698,11 +700,67 @@ $gtm4wp-mobile: 782px;
 	}
 
 	&__result--ok {
-		color: #007017;
+		color: var(--gtm4wp-success);
 	}
 
 	&__result--error {
 		color: var(--gtm4wp-danger);
+	}
+}
+
+// The send log's four tones. Colour is the second signal and never the only
+// one: the Outcome cell still reads "Failed" or "Not sent" in words and the
+// Details cell still carries its sentence, so a reader who cannot tell the
+// colours apart loses nothing - the colour only decides what the eye reaches
+// first. Which tone a row wears is the server's judgement (SendLog::tone),
+// because it depends on Google's status vocabulary.
+.gtm4wp-send-log {
+	border-top: 1px solid var(--gtm4wp-border);
+	margin-top: var(--gtm4wp-s5);
+	padding-top: var(--gtm4wp-s4);
+
+	h3 {
+		font-size: var(--gtm4wp-fs-section);
+		margin: 0 0 var(--gtm4wp-s2);
+	}
+
+	&__empty {
+		color: var(--gtm4wp-text-3);
+	}
+
+	&__table {
+		margin-top: var(--gtm4wp-s3);
+	}
+
+	&__outcome {
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	// A finished send: stated, not celebrated. The row stays quiet so the ones
+	// that are not fine stand out next to it.
+	&__row--ok &__outcome {
+		color: var(--gtm4wp-success);
+	}
+
+	// Sent, nothing known yet - every accepted request spends its first half
+	// hour here, so this must not read as a problem.
+	&__row--pending &__outcome {
+		color: var(--gtm4wp-text-2);
+	}
+
+	&__row--warn &__outcome,
+	&__row--warn &__details {
+		color: var(--gtm4wp-warning);
+	}
+
+	&__row--error &__outcome,
+	&__row--error &__details {
+		color: var(--gtm4wp-danger);
+	}
+
+	&__row--error &__outcome {
+		font-weight: 700;
 	}
 }
 
