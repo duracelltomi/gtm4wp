@@ -259,7 +259,21 @@ final class PageVariablesModule extends AbstractModule {
 				if ( function_exists( 'get_multiple_authors' ) ) {
 					$ppress_authors = get_multiple_authors( $post->ID );
 					if ( is_array( $ppress_authors ) ) {
-						$multiple_authors = $ppress_authors;
+						// PublishPress puts a false into that array in place of an
+						// author it cannot resolve - deleting the author's user
+						// account, or a page never associated with one, produces it -
+						// and the array can hold that false next to real authors.
+						// read_author_prop() declares object, so passing one through
+						// is a fatal TypeError that takes the whole page down.
+						//
+						// Non-objects are dropped HERE rather than skipped inside the
+						// loop below, because the loop is not the only reader: the
+						// count decides whether the array variables are emitted at all
+						// and whether $author_names[0] exists. Filtering first keeps
+						// both honest, and a list of nothing but unresolvable authors
+						// becomes an empty array, which takes the get_userdata()
+						// fallback below exactly as an inactive PublishPress does.
+						$multiple_authors = array_values( array_filter( $ppress_authors, 'is_object' ) );
 					}
 				}
 

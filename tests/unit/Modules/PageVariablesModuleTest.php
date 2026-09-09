@@ -2158,6 +2158,138 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * Fatal on an unresolvable PublishPress author (wordpress.org report
+	 * "Critical error on WooCommerce My Account page", 2026-09-08): PublishPress
+	 * returns false in place of an author it cannot resolve, which is what deleting
+	 * the page's author user produces. is_array() and count() both pass on
+	 * array( false ), the entry then reaches read_author_prop( object $author ) and
+	 * the TypeError takes the whole page down with "There has been a critical error
+	 * on this website".
+	 *
+	 * Removing the array_filter() in the module makes this test fatal, not fail.
+	 * With the guard the list is empty, so the get_userdata() fallback runs; here
+	 * the user is gone too, so BOTH author variables are omitted rather than
+	 * emitted as "" / 0 placeholders (the null-global-post rule: a GTM trigger may
+	 * test for key presence).
+	 */
+	public function test_unresolvable_publishpress_author_does_not_fatal_and_omits_the_variables(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_multiple_authors' )->justReturn( array( false ) );
+		// The author's user account was deleted, so WordPress has nothing either.
+		Functions\when( 'get_userdata' )->justReturn( false );
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 0,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'pagePostAuthor', $data_layer, 'An unresolvable author is omitted, not emitted as an empty string.' );
+		$this->assertArrayNotHasKey( 'pagePostAuthorID', $data_layer, 'An unresolvable author id is omitted, not emitted as 0.' );
+		$this->assertArrayNotHasKey( 'pagePostAuthors', $data_layer );
+		$this->assertArrayNotHasKey( 'pagePostAuthorIDs', $data_layer );
+	}
+
+	/**
+	 * Same guard, the other half: when every PublishPress entry is unresolvable but
+	 * the WordPress user behind the post still exists, the filtered list is empty and
+	 * the request takes the get_userdata() fallback, exactly as an inactive
+	 * PublishPress does. This is the assertion that pins the fix to filtering BEFORE
+	 * the count() test rather than skipping inside the loop.
+	 */
+	public function test_all_unresolvable_publishpress_authors_fall_back_to_get_userdata(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_multiple_authors' )->justReturn( array( false, false ) );
+		Functions\when( 'get_userdata' )->justReturn(
+			(object) array(
+				'ID'           => 7,
+				'display_name' => 'Creating User',
+			)
+		);
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 7,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Creating User', $data_layer['pagePostAuthor'] );
+		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
+		$this->assertArrayNotHasKey( 'pagePostAuthors', $data_layer, 'Two unresolvable entries are not two authors.' );
+		$this->assertArrayNotHasKey( 'pagePostAuthorIDs', $data_layer );
+	}
+
+	/**
+	 * A real author next to an unresolvable one: the false is dropped and the single
+	 * real author is used, with NO array variables. Skipping the entry inside the
+	 * loop instead of filtering the list would leave the count at 2 here, so the
+	 * module would announce two authors and emit pagePostAuthors / pagePostAuthorIDs
+	 * for one. That is what these two assertArrayNotHasKey calls pin.
+	 */
+	public function test_unresolvable_author_is_dropped_from_the_publishpress_list(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		Functions\when( 'get_multiple_authors' )->justReturn(
+			array(
+				false,
+				(object) array(
+					'ID'           => '7',
+					'display_name' => 'Jane Writer',
+				),
+			)
+		);
+		Functions\when( 'get_userdata' )->justReturn(
+			(object) array(
+				'ID'           => 99,
+				'display_name' => 'Creating User',
+			)
+		);
+
+		$GLOBALS['post'] = (object) array(
+			'post_author' => 99,
+			'ID'          => 42,
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_TAGS       => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => true,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Jane Writer', $data_layer['pagePostAuthor'], 'The surviving PublishPress author is used, not the creating WP user.' );
+		$this->assertSame( 7, $data_layer['pagePostAuthorID'] );
+		$this->assertArrayNotHasKey( 'pagePostAuthors', $data_layer, 'One real author plus one unresolvable entry is a single author.' );
+		$this->assertArrayNotHasKey( 'pagePostAuthorIDs', $data_layer );
+	}
+
+	/**
 	 * #43: a real PublishPress Author resolves display_name/ID through __get() and
 	 * may not implement __isset(). The old isset()-based read would report false and
 	 * blank every author; read_author_prop() must still read the value through
