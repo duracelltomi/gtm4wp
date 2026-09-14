@@ -61,6 +61,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **PA-14** — the repo's own toolchain is attack surface: a pre-approved tool permission, **a committed agent/subagent definition carrying its own tool patterns** (`.claude/agents/` had no Coverage Matrix row and no place in the inventory grep for the two reviews after a finding was found inside it — #135) — **and check the frontmatter KEY, not just its contents: an agent's restriction key is `tools:`, and `allowed-tools:` is the slash-command key, which an agent file accepts silently and ignores, so all three reviewer agents ran with every tool while their files declared read-only (#140)**, a hook that executes a repo-relative path, **a tool CONFIG resolved from the working tree that can name code to load** (watch every filename the tool accepts, not the one in the tree — the dotfile variant usually wins), a CI trigger, or **what the history already published** (removing it from HEAD does not retract it; no diff-scoped review will ever see it; and a finding of that shape belongs in the local report, never in a committed file), reached by third-party text an agent run ingests — **and a hook that merely READS a worktree file into the session context is an entry point too**, which the "does it execute?" question cannot select (#118). Enforced allowlist must match the write surface its skill documents.
 - **RI-26** — a core predicate that ends in `return apply_filters( … )` is not "core's rule", it is *this site's* rule; borrowed as a privacy gate it can be moved in **both** directions, so keep your own test as the floor and OR the helper in (#M1: `is_protected_meta()` can be filtered to UNprotect an underscore key, publishing it to an A0 dataLayer).
 - **PA-19** — a ledger is only as wide as the SCOPES it enumerates, and permissions are not the only thing assembled from several: agents, skills, commands and hooks merge project + user + each enabled plugin's scope too (#186 — a **relative** inventory path counted 4 agent definitions where 28 resolve, 17 of the 24 uncounted declaring `Write`/`Edit`). Fix a scope gap in one ledger and the same edit is owed to every ledger of that shape. The enforced allowlist is merged from user / project / local scope (plus per-agent frontmatter, which *restricts* rather than *grants*); this system read only the two project-scope files for 21 reviews while a user-scope dispatcher sat unread outside the repository (#162). Enumerate scopes, then files.
+- **PA-20** — a branch-named list in the toolchain (a workflow trigger, a hook's branch check, a release gate) excludes every branch created after it was written, and the failure is a run that never happens — which reads as green. Grep for branch names when a branch is created; prefer a rule (`'*.*'`) to a list; the fix must live on the branch itself (#235).
 - **PA-16** — moving a request out of `wp_enqueue_script` into runtime JS takes it out of `script_loader_tag`, `wp_dequeue_script` and the served HTML, so every control the SITE had over it disappears silently. Give the runtime fetch a lever, check it at the request rather than at the scan, and name the handle that still gates it. **Then verify each lever against WordPress's own code**: a handle everything depends on cannot be dequeued, and an inline `before` script is inside the `script_loader_tag` string rather than beside it — the pattern's own reference implementation shipped with two of its three levers broken, both failing open (#133/#134).
 - **PA-15** — never relax a host security control (a `wp_kses`/`safe_*`/allowed-list filter) globally to make your own markup survive it: scope the filter to your own sanitizer call and remove it after, or change the markup so it is not needed. A filter that only appends to the array it receives is a filter that loosens — and it loosens for every unrelated sanitizer call in the same request, including the block editor's save path (a REST request is not `is_admin()`).
 - **PA-8** — `wc_enqueue_js()` is deprecated (WC 10.4); do not reintroduce it — emit inline JS via `wp_add_inline_script()`. It was also a raw-`<script>` sink, so JSON in any inline-script body still needs the RI-2 hex flags.
@@ -1070,6 +1071,34 @@ Three properties, each of which cost a measurement to establish:
 - Rate with the threat model's **D-actor** axis (D0 outside contributor / third-party text → D1 maintainer workstation), not A0–A4: this class has no site actor at all.
 - **A tool config can also carry a control that is only DESCRIBED, and its override point is usually git-ignored too (2026-08-12, #175).** `phpcs.xml` ended with a comment asserting "warnings fail the build alongside errors" and no directive under it: the 2026-08-04 fix had **deleted** an `ignore_warnings_on_exit value="1"` line rather than setting `value="0"`, so the behaviour was PHP_CodeSniffer's default and nothing in the repo pinned it. Measured: writing that value into `vendor/squizlabs/php_codesniffer/CodeSniffer.conf` — git-ignored, so invisible to every diff — silently returns local runs to exit 0 on warnings, while the comment still reads as enforcement. Two rules follow, and they are the bullet above turned around: **when you fix a config by deleting a line, ask whether the correct value is now merely a default**, and treat a `<!-- -->` block where a directive belongs as documentation, never as a control. Note the severity honestly — the only writer of that file is D1, so this is drift and an unpinned setting rather than an exploitable weakening; CI is insulated because `vendor/` is untracked and rebuilt.
 
+### PA-20: A branch-named list in the toolchain excludes every branch created after it was written ⭐
+
+Confirmed 2026-09-14 (R32, #235). `ci.yml` triggered on `branches: [ master, 1.x ]`. The
+branch model introduced at 2.0.0 names each maintenance branch after its line (`2.0`,
+later `2.1`), and the 2.0.2 patch was being cut from `2.0` — a branch that had **never
+had a CI run**. It shipped 2.0.1 that way, and a cherry-pick that dropped a docblock sat on
+its tip red under `phpcs` for nine days without a failed run, because there was no run.
+
+The general shape: any toolchain guard that enumerates branches by name — a workflow
+trigger, a hook that checks `git rev-parse --abbrev-ref HEAD`, a release check, a
+scheduled job's checkout ref — is a claim that *those are all the branches that matter*,
+and it was true when written. Creating a branch does not update it, and the failure is
+silent in the strongest sense: the guard does not fail on the new branch, it does not run,
+and "no failures" reads as green. It is UD-11's "it evidently works" applied to CI.
+
+- **When a branch is created, grep for branch names** in `.github/workflows/`,
+  `.githooks/`, `.claude/hooks/` and `tools/` (`grep -rnE "master|1\.x|2\.0"`) before
+  calling the branch mechanics done. The `release` skill's branch step carries this now.
+- **Prefer a rule to a list.** The branch model already has one (dotted name = maintenance
+  line), so `'*.*'` in a GitHub branch filter (a `*` never crosses `/`, a dot is literal,
+  a leading `*` needs YAML quoting) covers every line without an edit at release time. A
+  list needs a `release-coupled` marker so the propagation sweep visits it.
+- **A workflow is read from the pushed branch's commit**, so the fix has to exist *on* the
+  maintenance branch, not only on `master` — and on `master` too, or the next branch cut
+  from it inherits the gap.
+- Litmus for the next review: `gh run list --branch <maintenance-branch>` empty is the
+  finding; do not infer coverage from `master` being green.
+
 ### PA-19: A ledger is only as wide as the SCOPES it enumerates — and permissions are not the only thing assembled from more than one
 
 > **Widened 2026-08-12 (#186), and the widening is the entry's real lesson.** #162 fixed this
@@ -1435,6 +1464,20 @@ right, separately.
 - The overlap is not exotic. It is exactly the configuration a support report arrives from,
   and it is invisible on a default install, which is where all the testing happens.
 
+
+**Re-derived 2026-09-14 (R32, #236) — the pair fix left a third-predicate case.** The
+2.0.2 fix aligned the two resolvers on the *reported* overlap (`is_cart()` with
+`is_checkout()`) and its comment said the block side "resolves the tracker's context the
+same way". It did for that pair. The block resolver excluded `is_order_received_page()`
+from its checkout arm only, so with all three predicates true — the same overlap store,
+on its thank-you page — it fell through to the cart arm while the server side said
+order-received. The verifier settled it by **enumerating every combination of every
+predicate both resolvers read (2^5 = 32) and diffing the two answers**, which found
+exactly the four disagreeing rows and showed the two candidate fixes identical. That
+table is the tool this entry was missing: a reorder fixes the pair you were shown, the
+truth table finds the pair you were not. Fixed by deciding the order-received page ahead
+of both arms, mirroring the server side.
+
 ### RI-29: A fix that changes what a third party renders changes it for every consumer ⭐
 
 When the mechanism of a fix is "stop tripping somebody else's detector", the thing you flip
@@ -1580,3 +1623,4 @@ Reference: `PageDataLayer::confirm_pending_purchase_tracked()` (#398) writes the
 | 2026-08-29 (R27) | Added **RI-27** (numeric-string array keys are ints by read time — strict compares over DB-derived map keys silently miss; #211) with its Quick Index row; added the #215 instance to RI-14 (a CSS-class contract that diverged in 2017 with nothing going red). Adjudication note for the record: three of four drafted recommendations were refuted this run — including one where sibling asymmetry (#214, cookie `secure` rules) re-derived as *justified by request context* rather than drift, so an asymmetry is a tell to re-derive, never a verdict. |
 | 2026-09-02 (Review 28) | Reviewed `7f226b4..7eba61f` (31 commits — the 2.0.0 release, the whole EDD integration, the #145 master-language feature). **1 High + 1 Medium + 4 Low (#217–#222).** Extended **PA-10** (quick index + a new corollary) with the High's generalizable half: *a resolver ported from another plugin must bring upstream's authorization half with it* — upstream splits "which record" from "may this caller see it" across files, so a line-faithful port of the resolver silently drops the gate, and a request parameter the port checks for mere presence may be a verification value upstream (#217; also #219's shape — the can-view gate omitted while the docblock claims chain parity). Extended **PA-9** with the third double-init recurrence (#218): a NEW bundle ships the first-statement guard from birth, and the drafted fix mirroring the `gtm4wp-woocommerce.js` counter-example was itself caught by a verifier reading the litmus — copying half of an asymmetric fix recreates #82. **RI-25 ledger 12 → 13** (two WPML applications added, arities verified against WPML docs; one site removed with #215's fix), corrected in both files per its own rule. Adjudication: 2 recommendations + 1 disposition refuted; #219's "WC parity" disposition failed because WC *as implemented* withholds customer blocks where upstream hides the order — a recorded-decision premise ("exactly like WC") that did not survive re-derivation against the code it cited. |
 | 2026-09-02 (Review 29) | Empty-diff deep pass over `ef3d226..4b4026a` (1 ledger-only commit). **3 Low (#223–#225), everything re-audited clean.** Extended **PA-19** with the *out-of-repo scopes go stale on their own clock* bullet (#224): every staleness trigger was repo-keyed, so a same-morning marketplace plugin update (0.10.2.3 → 0.11.0, agents 7→8, hooks banner-only → +PostToolUse/+PostToolUseFailure) invalidated the plugin-scope ledger while R28 correctly followed the rules — the trigger is now `installed_plugins.json` `version`/`lastUpdated` re-read every run plus the 0.106s active-tree digest, with `.orphaned_at` added to the digest exclusions (false-drift class, same family as `.in_use/`). Corrected **PA-2**'s stale "AUTH/PREVIEW enforced *only* on save" bullet against the long-fixed #60/#61 sink code — a pattern entry describing a fixed defect must be updated in the fixing change (PA-7's #74 lesson, on our own ledger). FP-1 re-derived (rotation): 12 callers, same distribution. Adjudication earned its keep on a 2-draft run: #223's drafted reach ("corrupted URL parameter") was refuted and *strengthened* by probe — a trailing-newline wp-config env constant passes the `/D`-less patterns, survives `esc_attr()` raw, and kills the whole container loader block with a SyntaxError; recommendation suite-tested green. **Next review re-derives FP-2.** |
+| 2026-09-14 (R32, release gate 2.0.2 on `2.0`) | Added **PA-20** (a branch-named toolchain list excludes every branch created after it — `ci.yml` had never run on the `2.0` maintenance branch; #235) with its Quick Index row; extended **RI-28** with the all-predicates truth-table method after the pair fix in range left a third-predicate overlap (#236). 0 security findings; a drafted list-attribution finding was refuted by its verifier and dropped. |
