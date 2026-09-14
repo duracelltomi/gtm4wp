@@ -43,6 +43,11 @@ final class WooCommerceModuleTest extends TestCase {
 		// (TS-16). The default is the case that matters most for #124: an
 		// anonymous visitor who has never touched the shop.
 		Functions\when( 'is_user_logged_in' )->justReturn( false );
+
+		// The block context resolver asks is_order_received_page() before any
+		// other page predicate, so every page test reaches it. Default to the
+		// ordinary case; the order-received tests override it.
+		Functions\when( 'is_order_received_page' )->justReturn( false );
 	}
 
 	protected function tearDown(): void {
@@ -220,6 +225,25 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertFalse(
 			( new WooCommerceModule() )->is_block_cart_or_checkout(),
 			'The order-received endpoint is excluded; its purchase event is server-side.'
+		);
+	}
+
+	/**
+	 * The RI-28 overlap on the thank-you page: a store where is_cart() is true
+	 * while the checkout renders answers all three predicates true there. The
+	 * page must resolve as order-received on the block side too, or it drops
+	 * the classic tracker and loads the block tracker in its cart context.
+	 */
+	public function test_order_received_page_is_not_treated_as_block_cart_when_is_cart_overlaps(): void {
+		CartCheckoutUtils::$checkout_block = true;
+		CartCheckoutUtils::$cart_block     = true;
+		Functions\when( 'is_checkout' )->justReturn( true );
+		Functions\when( 'is_order_received_page' )->justReturn( true );
+		Functions\when( 'is_cart' )->justReturn( true );
+
+		$this->assertFalse(
+			( new WooCommerceModule() )->is_block_cart_or_checkout(),
+			'The order-received endpoint is decided ahead of both the checkout and the cart arm.'
 		);
 	}
 

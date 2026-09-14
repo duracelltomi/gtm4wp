@@ -543,13 +543,23 @@ final class WooCommerceModule extends AbstractModule {
 	 * store, but WooCommerce registers that store on the Cart page too, which made
 	 * add_shipping_info / add_payment_info fire there with no interaction (#463).
 	 *
+	 * The order-received page is decided before either arm rather than inside the
+	 * checkout arm alone: WooCommerce answers is_checkout() true there, and on a
+	 * store where is_cart() is true while the checkout renders (see
+	 * PageDataLayer::add_datalayer_data() for how that happens) it is true on the
+	 * thank-you page as well. Excluding the page from the checkout arm only let it
+	 * fall through to the cart arm on such a store, so the thank-you page loaded
+	 * the block tracker in its cart context in place of the classic tracker. The
+	 * server side resolves the order-received page ahead of both; so does this.
+	 *
 	 * @return string
 	 */
 	private function block_cart_or_checkout_context(): string {
-		if (
-			function_exists( 'is_checkout' ) && is_checkout()
-			&& ! ( function_exists( 'is_order_received_page' ) && is_order_received_page() )
-		) {
+		if ( function_exists( 'is_order_received_page' ) && is_order_received_page() ) {
+			return '';
+		}
+
+		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
 			return $this->page_uses_block( 'woocommerce/checkout' ) ? 'checkout' : '';
 		}
 
