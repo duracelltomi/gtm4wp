@@ -83,6 +83,13 @@ change already carries its own. Then an annotated tag: `git tag -a X.Y.Z -m X.Y.
 
 - `git branch X.Y <release-commit>` and push — the maintenance home for X.Y.z
   bugfixes, which from now on land on BOTH `master` and this branch.
+- **Grep the toolchain for branch-name lists before calling this step done**
+  (`grep -rnE "master|1\.x|[0-9]\.[0-9]" .github/workflows/ .githooks/ .claude/hooks/ tools/`).
+  A workflow trigger or hook that names branches excludes the one just created, and the
+  failure is a run that never happens: `2.0` had no CI from its creation until the 2.0.2
+  pre-flight found `phpcs` red on its tip (security review 32, #235; pattern PA-20).
+  `ci.yml` now uses `branches: [ master, '*.*' ]`, so a dotted maintenance branch needs
+  no edit — but confirm with `gh run list --branch X.Y` after the first push.
 - Decide (with the maintainer) what happens to the *previous* stable branch, and
   record the decision in RELEASE-STATE.md. Precedent: at 2.0.0, `1.x` was frozen
   to reported-security-fixes only.
