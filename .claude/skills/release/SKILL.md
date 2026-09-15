@@ -39,7 +39,11 @@ Read `.claude/RELEASE-STATE.md`. Then classify:
    on its "no release blockers" verdict; advisories go on the follow-up list.
 5. Changelog: the top heading must be this release's section, complete, with the
    `readme.txt` mirror block in sync (invoke the `changelog` skill for the
-   rules). The heading itself does not change at release time.
+   rules). The heading itself does not change at release time. **Count the words of
+   `readme.txt`'s `== Changelog ==` section** (to `== Upgrade Notice ==`,
+   `len(text.split())`): wordpress.org truncates it at 5,000 and only emails the
+   committers afterwards (U124, hit on 2.0.2). Keep it under ~4,000 by summarizing
+   the oldest big section and pointing at `CHANGELOG.md` on GitHub.
 
 ## 2. Version bump
 
