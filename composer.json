@@ -21,7 +21,7 @@
         "phpunit/phpunit": "^11.0",
         "brain/monkey": "^2.6",
         "mralaminahamed/easy-digital-downloads-stubs": "3.7.0",
-        "infection/infection": "^0.35.4"
+        "infection/infection": "^0.31.9"
     },
     "autoload": {
         "psr-4": {
@@ -37,6 +37,9 @@
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true,
             "infection/extension-installer": true
+        },
+        "platform": {
+            "php": "8.2.0"
         }
     },
     "scripts": {

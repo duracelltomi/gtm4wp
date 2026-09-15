@@ -13,6 +13,12 @@
     // Suspected ZTS/Windows environment issue, not config: reproduced with
     // default tmpDir, single file, --dry-run, one thread. Expected to work on
     // an NTS build or Linux CI; re-test after the next PHP or Infection bump.
+    // PINNED TO THE 0.31 LINE (2026-09-15): 0.33+ requires PHP 8.3 and its
+    // Symfony 8 dependencies require 8.4, which made composer install fail on
+    // CI's PHP 8.2 job from the day Infection landed (2026-09-07 onward, every
+    // master run red). composer.json now sets config.platform.php to 8.2.0 so
+    // the lock always resolves for the lowest runtime CI tests on; bump the
+    // platform and Infection together when 8.2 leaves the matrix.
     "$schema": "vendor/infection/infection/resources/schema.json",
     "source": {
         "directories": [ "src" ]
