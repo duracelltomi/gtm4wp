@@ -697,6 +697,90 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( 'G-BBB', $destinations[0]['productDestinationId'] );
 	}
 
+	// ---- Replaying a refund that one destination already took -------------
+
+	public function test_a_targeted_job_runs_for_a_refund_already_marked_sent(): void {
+		$source = $this->source( self::refund() );
+		// One destination accepted the refund earlier, the other exhausted its
+		// retries: the refund carries the sent marker, and G-BBB never got it.
+		$source->mark_sent( 34, 'req-earlier' );
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-AAA',
+				'outcome'     => SendLog::OUTCOME_ACCEPTED,
+				'request_id'  => 'req-earlier',
+			)
+		);
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-BBB',
+				'outcome'     => SendLog::OUTCOME_FAILED,
+				'reason'      => 'UNAVAILABLE',
+			)
+		);
+
+		$this->queue_send( 200, array( 'requestId' => 'req-replay' ) );
+
+		$this->sender(
+			$source,
+			array(
+				GTM4WP_OPTION_GDM_DESTINATIONS => array(
+					$this->destination( 'G-AAA' ),
+					$this->destination( 'G-BBB', '987654321' ),
+				),
+			)
+		)->run( self::job( array( 'only' => array( 'G-BBB' ) ) ) );
+
+		$destinations = $this->transport->requests[1]['body']['destinations'];
+
+		$this->assertCount( 1, $destinations, 'The per-refund marker must not block a job aimed at the destination that never got the event.' );
+		$this->assertSame( 'G-BBB', $destinations[0]['productDestinationId'] );
+	}
+
+	public function test_a_targeted_job_drops_a_destination_whose_newest_row_says_accepted(): void {
+		$source = $this->source( self::refund() );
+		$source->mark_sent( 34, 'req-earlier' );
+		// Two replays were queued before the first ran; the first succeeded.
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-BBB',
+				'outcome'     => SendLog::OUTCOME_FAILED,
+				'reason'      => 'UNAVAILABLE',
+			)
+		);
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-BBB',
+				'outcome'     => SendLog::OUTCOME_ACCEPTED,
+				'request_id'  => 'req-first-replay',
+			)
+		);
+
+		$this->sender(
+			$source,
+			array( GTM4WP_OPTION_GDM_DESTINATIONS => array( $this->destination( 'G-BBB' ) ) )
+		)->run( self::job( array( 'only' => array( 'G-BBB' ) ) ) );
+
+		$this->assertSame( array(), $this->transport->requests, 'The second replay finds the destination already served and sends nothing - one refund, one event, per destination.' );
+	}
+
+	public function test_an_untargeted_job_is_still_stopped_by_the_sent_marker(): void {
+		$source = $this->source( self::refund() );
+		$source->mark_sent( 34, 'req-earlier' );
+
+		$this->sender( $source )->run( self::job() );
+
+		$this->assertSame( array(), $this->transport->requests );
+	}
+
 	public function test_an_inactive_platform_is_retried_before_it_is_given_up_on(): void {
 		$this->sender( $this->source( self::refund(), false ) )->run( self::job() );
 

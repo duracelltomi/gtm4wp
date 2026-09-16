@@ -101,6 +101,24 @@ final class SendLog {
 	public const TONE_ERROR = 'error';
 
 	/**
+	 * Skip reasons a later configuration change can put right, so the refund
+	 * is worth queueing again once the admin has acted. The two missing-id
+	 * reasons and the empty refund are deliberately absent: nothing on the
+	 * settings screen can produce an identifier that was never captured, and
+	 * a refund of nothing has nothing to send.
+	 *
+	 * @var string[]
+	 */
+	private const REPLAYABLE_SKIPS = array(
+		'no_destination',
+		'consent_unknown',
+		'consent_denied',
+		'vetoed',
+		'platform_inactive',
+		'refund_unreadable',
+	);
+
+	/**
 	 * Longest stored reason / error summary.
 	 */
 	private const REASON_MAX_LENGTH = 200;
@@ -303,6 +321,145 @@ final class SendLog {
 		}
 
 		return self::TONE_OK;
+	}
+
+	/**
+	 * Whether an entry describes something worth queueing again.
+	 *
+	 * A failed send always is: the retry ladder is finite, and once it is used
+	 * up nothing else ever asks about that refund. A skip is, when its reason
+	 * is one a configuration change can fix.
+	 *
+	 * @param array<string, mixed> $entry One stored entry.
+	 * @return bool
+	 */
+	public static function is_replayable( array $entry ): bool {
+		$outcome = (string) ( $entry['outcome'] ?? '' );
+
+		if ( self::OUTCOME_FAILED === $outcome ) {
+			return true;
+		}
+
+		return ( self::OUTCOME_SKIPPED === $outcome )
+			&& in_array( (string) ( $entry['reason'] ?? '' ), self::REPLAYABLE_SKIPS, true );
+	}
+
+	/**
+	 * What a replay would queue, one job per refund.
+	 *
+	 * The ring holds a row per destination per attempt, so thirty failed rows
+	 * are rarely thirty refunds. This reduces them: for each refund only the
+	 * NEWEST row per destination counts (a destination that failed on the
+	 * first attempt and was accepted on the second is fine), and the job that
+	 * comes out names exactly the destinations still failing in `only`, so a
+	 * destination that already took the event is never sent it twice. A
+	 * refund whose newest word is a replayable skip is queued whole - it was
+	 * never sent anywhere.
+	 *
+	 * @param string[] $references Limit to these references; empty means every replayable refund.
+	 * @return array<string, array{platform: string, order_id: int, refund_id: int, only: string[]}> Keyed by reference.
+	 */
+	public function replay_plan( array $references = array() ): array {
+		$latest = array();
+		$order  = array();
+
+		foreach ( $this->all() as $index => $entry ) {
+			$reference = (string) ( $entry['reference'] ?? '' );
+
+			if ( '' === $reference || ( array() !== $references && ! in_array( $reference, $references, true ) ) ) {
+				continue;
+			}
+
+			$destination = (string) ( $entry['destination'] ?? '' );
+
+			// Oldest first, so the last write for a key is the newest row.
+			$latest[ $reference ][ $destination ] = array( 'index' => $index ) + $entry;
+			$order[ $reference ]                  = $index;
+		}
+
+		$plan = array();
+
+		foreach ( $latest as $reference => $by_destination ) {
+			$parsed = self::parse_reference( $reference );
+
+			if ( null === $parsed ) {
+				continue;
+			}
+
+			$only = array();
+
+			foreach ( $by_destination as $destination => $entry ) {
+				if ( '' !== $destination && self::OUTCOME_FAILED === (string) ( $entry['outcome'] ?? '' ) ) {
+					$only[] = $destination;
+				}
+			}
+
+			// The refund-level row (a skip carries no destination). It wins
+			// only when it is the newest word about the refund: an older skip
+			// followed by a real send attempt is history.
+			$whole = $by_destination[''] ?? null;
+
+			if ( null !== $whole
+				&& (int) $whole['index'] === (int) $order[ $reference ]
+				&& self::is_replayable( $whole )
+			) {
+				$plan[ $reference ] = $parsed + array( 'only' => array() );
+
+				continue;
+			}
+
+			if ( array() !== $only ) {
+				$plan[ $reference ] = $parsed + array( 'only' => $only );
+			}
+		}
+
+		return $plan;
+	}
+
+	/**
+	 * Whether the newest row about one refund and destination says Google
+	 * took it. The sender's guard against sending a destination the same
+	 * event twice when a replay is queued for one that already recovered.
+	 *
+	 * @param string $reference   The refund reference.
+	 * @param string $measurement The destination.
+	 * @return bool
+	 */
+	public function latest_is_accepted( string $reference, string $measurement ): bool {
+		$newest = null;
+
+		foreach ( $this->all() as $entry ) {
+			if ( (string) ( $entry['reference'] ?? '' ) === $reference
+				&& (string) ( $entry['destination'] ?? '' ) === $measurement
+			) {
+				$newest = $entry;
+			}
+		}
+
+		return null !== $newest && self::OUTCOME_ACCEPTED === (string) ( $newest['outcome'] ?? '' );
+	}
+
+	/**
+	 * The three ids inside a stored reference, or null when it is not one.
+	 *
+	 * The reference is written by RefundData::reference() as
+	 * platform:order_id:refund_id, and the platform ids carry no colon.
+	 *
+	 * @param string $reference A stored reference.
+	 * @return array{platform: string, order_id: int, refund_id: int}|null
+	 */
+	public static function parse_reference( string $reference ): ?array {
+		$parts = explode( ':', $reference );
+
+		if ( 3 !== count( $parts ) || '' === $parts[0] || ! ctype_digit( $parts[1] ) || ! ctype_digit( $parts[2] ) ) {
+			return null;
+		}
+
+		return array(
+			'platform'  => $parts[0],
+			'order_id'  => (int) $parts[1],
+			'refund_id' => (int) $parts[2],
+		);
 	}
 
 	/**

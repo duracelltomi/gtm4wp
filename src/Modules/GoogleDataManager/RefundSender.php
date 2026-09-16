@@ -188,8 +188,32 @@ final class RefundSender {
 		// this job in the queue. This is the guarantee the per-refund meta
 		// exists for: several partial refunds of one order each send once, and
 		// a duplicate job for any of them sends nothing.
-		if ( $source->is_sent( $refund_id ) ) {
-			return;
+		//
+		// A job naming destinations in `only` is the exception, and a narrow
+		// one: the marker is per refund, and a refund that one destination
+		// accepted while another exhausted its retries carries it although the
+		// second destination never got the event. Such a job is a retry or a
+		// replay aimed at the destinations still missing it, so the guard
+		// moves down a level: each named destination is checked against the
+		// ring, and one whose newest row says accepted is dropped from the
+		// list. Two replays queued before the first has run therefore send
+		// once, not twice.
+		if ( array() === $only ) {
+			if ( $source->is_sent( $refund_id ) ) {
+				return;
+			}
+		} else {
+			$reference = $platform . ':' . $order_id . ':' . $refund_id;
+			$only      = array_values(
+				array_filter(
+					$only,
+					fn ( string $measurement ): bool => ! $this->log->latest_is_accepted( $reference, $measurement )
+				)
+			);
+
+			if ( array() === $only ) {
+				return;
+			}
 		}
 
 		$refund = $source->load( $order_id, $refund_id );

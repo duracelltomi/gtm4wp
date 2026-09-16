@@ -107,6 +107,37 @@ final class DestinationHealth {
 	}
 
 	/**
+	 * Ends a destination's failure streak without claiming a send succeeded.
+	 *
+	 * For the Test button: a validation probe that passes after the admin has
+	 * corrected the destination exercises the same chain a send does - the
+	 * key, the API being enabled, the account's access to the property - and
+	 * is the moment the site-wide notice should stop. It is not a send, so
+	 * last_success stays what it was; if the next real send fails, the streak
+	 * starts counting again from there.
+	 *
+	 * @param string $measurement_id The destination's measurement id.
+	 * @return void
+	 */
+	public function clear_failures( string $measurement_id ): void {
+		if ( '' === $measurement_id ) {
+			return;
+		}
+
+		$records = $this->read();
+
+		if ( ! isset( $records[ $measurement_id ] ) ) {
+			return;
+		}
+
+		$records[ $measurement_id ]['consecutive_failures'] = 0;
+		$records[ $measurement_id ]['last_error']           = '';
+		$records[ $measurement_id ]['last_error_class']     = '';
+
+		$this->write( $records );
+	}
+
+	/**
 	 * Records a failed send to a destination.
 	 *
 	 * @param string $measurement_id The destination's measurement id.

@@ -14,7 +14,7 @@
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice, ToggleControl } from '@wordpress/components';
 import { useCallback, useEffect, useState } from '@wordpress/element';
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 
 /**
  * Plain-words label of a stored outcome. An outcome this bundle does not know -
@@ -171,11 +171,17 @@ function formatTime( time ) {
 	return new Date( time * 1000 ).toLocaleString();
 }
 
-export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
+export default function SendLogList( {
+	logPath,
+	replayPath,
+	hideWhenEmpty = false,
+} ) {
 	const [ entries, setEntries ] = useState( null );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( false );
 	const [ problemsOnly, setProblemsOnly ] = useState( false );
+	const [ replaying, setReplaying ] = useState( false );
+	const [ replayNotice, setReplayNotice ] = useState( null );
 
 	const load = useCallback( async () => {
 		// The effect below is registered before the early return further down,
@@ -217,6 +223,62 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 		load();
 	}, [ load ] );
 
+	// Queues the failed and fixable refunds again - every one of them, or the
+	// ones named. Nothing is sent from here: the server puts each refund back
+	// on the queue aimed at the destinations still missing it, and the sender
+	// applies every gate again when it runs a minute later. The reload
+	// afterwards therefore shows the same rows; what changes is what the
+	// queue does next, which the next Refresh will show.
+	const replay = async ( references ) => {
+		if ( ! replayPath || replaying ) {
+			return;
+		}
+
+		setReplaying( true );
+		setReplayNotice( null );
+
+		try {
+			const response = await apiFetch( {
+				path: replayPath,
+				method: 'POST',
+				data: references ? { references } : {},
+			} );
+			const queued = Number( response && response.queued ) || 0;
+
+			setReplayNotice( {
+				status: queued > 0 ? 'success' : 'info',
+				text:
+					queued > 0
+						? sprintf(
+								/* translators: %d: number of refunds queued to be sent again. */
+								_n(
+									'%d refund is queued to be sent again. It runs in the background within a minute; press Refresh afterwards to see what became of it.',
+									'%d refunds are queued to be sent again. They run in the background within a minute; press Refresh afterwards to see what became of them.',
+									queued,
+									'duracelltomi-google-tag-manager'
+								),
+								queued
+						  )
+						: __(
+								'Nothing was queued: every refund in this list has either been accepted since, or is one that a setting cannot fix.',
+								'duracelltomi-google-tag-manager'
+						  ),
+			} );
+		} catch ( caught ) {
+			setReplayNotice( {
+				status: 'error',
+				text:
+					( caught && caught.message ) ||
+					__(
+						'The refunds could not be queued again.',
+						'duracelltomi-google-tag-manager'
+					),
+			} );
+		} finally {
+			setReplaying( false );
+		}
+	};
+
 	if ( ! logPath ) {
 		return null;
 	}
@@ -242,6 +304,16 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 	} );
 	const shown = problemsOnly ? problems : all;
 
+	// Distinct refunds the bulk action would touch. Counting rows would
+	// overstate it - a refund that failed six times over two destinations is
+	// twelve rows and one job - and the server decides what is replayable, so
+	// this only ever says how many of ITS answers are in view.
+	const replayable = new Set(
+		all
+			.filter( ( entry ) => entry.replayable )
+			.map( ( entry ) => entry.reference )
+	);
+
 	return (
 		<div className="gtm4wp-send-log">
 			<h3>{ __( 'Recent sends', 'duracelltomi-google-tag-manager' ) }</h3>
@@ -252,20 +324,51 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 				) }
 			</p>
 
-			<Button
-				variant="secondary"
-				disabled={ busy }
-				isBusy={ busy }
-				onClick={ () => {
-					// Handler-level twin of the disabled prop, which cannot be
-					// trusted across the supported WordPress range.
-					if ( ! busy ) {
-						load();
-					}
-				} }
-			>
-				{ __( 'Refresh', 'duracelltomi-google-tag-manager' ) }
-			</Button>
+			<div className="gtm4wp-send-log__actions">
+				<Button
+					variant="secondary"
+					disabled={ busy }
+					isBusy={ busy }
+					onClick={ () => {
+						// Handler-level twin of the disabled prop, which cannot be
+						// trusted across the supported WordPress range.
+						if ( ! busy ) {
+							load();
+						}
+					} }
+				>
+					{ __( 'Refresh', 'duracelltomi-google-tag-manager' ) }
+				</Button>
+				{ replayPath && replayable.size > 0 && (
+					<Button
+						variant="secondary"
+						disabled={ replaying || busy }
+						isBusy={ replaying }
+						onClick={ () => replay( null ) }
+					>
+						{ sprintf(
+							/* translators: %d: number of refunds that can be sent again. */
+							_n(
+								'Send the failed one again (%d)',
+								'Send the failed ones again (%d)',
+								replayable.size,
+								'duracelltomi-google-tag-manager'
+							),
+							replayable.size
+						) }
+					</Button>
+				) }
+			</div>
+
+			{ replayNotice && (
+				<Notice
+					status={ replayNotice.status }
+					isDismissible
+					onRemove={ () => setReplayNotice( null ) }
+				>
+					{ replayNotice.text }
+				</Notice>
+			) }
 
 			{ error && (
 				<Notice status="error" isDismissible={ false }>
@@ -368,6 +471,29 @@ export default function SendLogList( { logPath, hideWhenEmpty = false } ) {
 								<td className="gtm4wp-send-log__details">
 									{ reasonLabel( entry.reason ) }
 									{ resultLabel( entry ) }
+									{ replayPath && entry.replayable && (
+										<Button
+											variant="link"
+											className="gtm4wp-send-log__replay"
+											disabled={ replaying }
+											label={ sprintf(
+												/* translators: %s: the refund reference. */
+												__(
+													'Send %s again',
+													'duracelltomi-google-tag-manager'
+												),
+												entry.reference
+											) }
+											onClick={ () =>
+												replay( [ entry.reference ] )
+											}
+										>
+											{ __(
+												'Send again',
+												'duracelltomi-google-tag-manager'
+											) }
+										</Button>
+									) }
 								</td>
 							</tr>
 						) ) }

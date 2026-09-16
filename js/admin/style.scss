@@ -735,8 +735,19 @@ $gtm4wp-mobile: 782px;
 		color: var(--gtm4wp-text-3);
 	}
 
+	&__actions {
+		align-items: center;
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--gtm4wp-s2);
+	}
+
 	&__filter {
 		margin-top: var(--gtm4wp-s3);
+	}
+
+	&__replay {
+		margin-left: var(--gtm4wp-s2);
 	}
 
 	&__table {

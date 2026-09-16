@@ -82,7 +82,7 @@ function probePayload( row ) {
 }
 
 export default function DestinationsPanel( { data, values } ) {
-	const { testPath, optionKey, health, threshold, logPath } = data;
+	const { testPath, optionKey, health, threshold, logPath, replayPath } = data;
 
 	// Whether any server-side send lane is on, read from the CURRENT editor
 	// state so switching the refund option hides or shows the log without a
@@ -187,6 +187,7 @@ export default function DestinationsPanel( { data, values } ) {
 		return (
 			<SendLogList
 				logPath={ logPath }
+				replayPath={ replayPath }
 				hideWhenEmpty={ ! sendingEnabled }
 			/>
 		);
@@ -273,6 +274,7 @@ export default function DestinationsPanel( { data, values } ) {
 			</ul>
 			<SendLogList
 				logPath={ logPath }
+				replayPath={ replayPath }
 				hideWhenEmpty={ ! sendingEnabled }
 			/>
 		</div>

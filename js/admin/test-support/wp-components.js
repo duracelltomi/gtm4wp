@@ -345,13 +345,31 @@ export function SearchControl( { label, value, onChange } ) {
 }
 
 /**
- * @param {Object} props          Component props.
- * @param          props.children
- * @param          props.status
+ * Notice stand-in. `isDismissible` and `onRemove` are honoured rather than
+ * swallowed: the send log's replay notice relies on onRemove to go away, and a
+ * stand-in that accepted the prop and did nothing would keep that path green
+ * without ever exercising it (TC-15).
+ *
+ * @param {Object}   props               Component props.
+ * @param            props.children
+ * @param            props.status
+ * @param {boolean}  props.isDismissible Whether a dismiss button renders.
+ * @param {Function} props.onRemove      Called when it is dismissed.
  * @return {Object} React element.
  */
-export function Notice( { children, status } ) {
-	return h( 'div', { role: 'alert', 'data-status': status }, children );
+export function Notice( { children, status, isDismissible, onRemove } ) {
+	return h(
+		'div',
+		{ role: 'alert', 'data-status': status },
+		children,
+		isDismissible
+			? h(
+					'button',
+					{ type: 'button', onClick: onRemove },
+					'Dismiss this notice'
+			  )
+			: null
+	);
 }
 
 /**

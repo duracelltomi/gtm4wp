@@ -126,7 +126,9 @@ final class Plugin {
 				( new Modules\GoogleDataManager\RestController(
 					$vault,
 					new Modules\GoogleDataManager\EventsIngest( $tokens, $transport ),
-					new Modules\GoogleDataManager\SendLog()
+					new Modules\GoogleDataManager\SendLog(),
+					$this->options,
+					new Modules\GoogleDataManager\DestinationHealth()
 				) )->register_routes();
 
 				// The attribution backfill is guest-facing, so it registers only

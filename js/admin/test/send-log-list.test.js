@@ -467,3 +467,175 @@ describe( 'SendLogList consent-caused gaps', () => {
 		).toBeInTheDocument();
 	} );
 } );
+
+describe( 'SendLogList sending failed refunds again', () => {
+	const REPLAY_PATH = 'gtm4wp/v2/google/send-log/replay';
+
+	// Six attempts over two destinations of one refund, plus a fixable skip
+	// of another and an accepted send of a third: twelve failed-looking rows,
+	// two refunds worth queueing.
+	const rows = [
+		...[ 1, 2, 3, 4, 5, 6 ].flatMap( ( attempt ) => [
+			entry( {
+				reference: 'woocommerce:12:34',
+				destination: 'G-AAA',
+				attempt,
+				outcome: 6 === attempt ? 'failed' : 'retrying',
+				tone: 6 === attempt ? 'error' : 'warn',
+				replayable: 6 === attempt,
+				result: '',
+			} ),
+			entry( {
+				reference: 'woocommerce:12:34',
+				destination: 'G-BBB',
+				attempt,
+				outcome: 6 === attempt ? 'failed' : 'retrying',
+				tone: 6 === attempt ? 'error' : 'warn',
+				replayable: 6 === attempt,
+				result: '',
+			} ),
+		] ),
+		entry( {
+			reference: 'edd:3:4',
+			destination: '',
+			outcome: 'skipped',
+			reason: 'no_destination',
+			tone: 'warn',
+			replayable: true,
+			result: '',
+		} ),
+		entry( { reference: 'edd:5:6', tone: 'ok', replayable: false } ),
+	];
+
+	function renderWithReplay( entries ) {
+		apiFetch.mockResolvedValueOnce( { entries } );
+
+		return render(
+			<SendLogList logPath={ LOG_PATH } replayPath={ REPLAY_PATH } />
+		);
+	}
+
+	it( 'counts refunds, not rows', async () => {
+		renderWithReplay( rows );
+
+		expect(
+			await screen.findByRole( 'button', {
+				name: 'Send the failed ones again (2)',
+			} )
+		).toBeInTheDocument();
+	} );
+
+	it( 'asks the server to queue every replayable refund', async () => {
+		renderWithReplay( rows );
+		apiFetch.mockResolvedValueOnce( { queued: 2, references: [] } );
+
+		fireEvent.click(
+			await screen.findByRole( 'button', {
+				name: 'Send the failed ones again (2)',
+			} )
+		);
+
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 2 ) );
+		expect( apiFetch ).toHaveBeenLastCalledWith( {
+			path: REPLAY_PATH,
+			method: 'POST',
+			data: {},
+		} );
+		expect(
+			await screen.findByText( /2 refunds are queued to be sent again/ )
+		).toBeInTheDocument();
+	} );
+
+	it( 'can queue a single refund from its row', async () => {
+		renderWithReplay( rows );
+		apiFetch.mockResolvedValueOnce( { queued: 1, references: [ 'edd:3:4' ] } );
+
+		fireEvent.click(
+			await screen.findByRole( 'button', { name: 'Send edd:3:4 again' } )
+		);
+
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 2 ) );
+		expect( apiFetch ).toHaveBeenLastCalledWith( {
+			path: REPLAY_PATH,
+			method: 'POST',
+			data: { references: [ 'edd:3:4' ] },
+		} );
+	} );
+
+	it( 'offers nothing to send again on a row the server did not mark', async () => {
+		renderWithReplay( rows );
+
+		await screen.findAllByText( /woocommerce:12:34/ );
+
+		// The accepted row, and the retrying rows: the judgement is the
+		// server's, and the bundle never second-guesses it from outcome words.
+		expect(
+			screen.queryByRole( 'button', { name: 'Send edd:5:6 again' } )
+		).not.toBeInTheDocument();
+		expect(
+			screen.getAllByRole( 'button', { name: 'Send woocommerce:12:34 again' } )
+		).toHaveLength( 2 );
+	} );
+
+	it( 'says so when the server found nothing left to queue', async () => {
+		renderWithReplay( rows );
+		apiFetch.mockResolvedValueOnce( { queued: 0, references: [] } );
+
+		fireEvent.click(
+			await screen.findByRole( 'button', {
+				name: 'Send the failed ones again (2)',
+			} )
+		);
+
+		expect(
+			await screen.findByText( /Nothing was queued/ )
+		).toBeInTheDocument();
+	} );
+
+	it( "reports a refusal in the server's own words and can be dismissed", async () => {
+		renderWithReplay( rows );
+		apiFetch.mockRejectedValueOnce(
+			new Error( 'Turn on "Send refunds to Google Analytics" and save before sending anything again.' )
+		);
+
+		fireEvent.click(
+			await screen.findByRole( 'button', {
+				name: 'Send the failed ones again (2)',
+			} )
+		);
+
+		expect(
+			await screen.findByText( /Turn on "Send refunds to Google Analytics"/ )
+		).toBeInTheDocument();
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Dismiss this notice' } )
+		);
+
+		expect(
+			screen.queryByText( /Turn on "Send refunds to Google Analytics"/ )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'shows no bulk action when nothing can be sent again', async () => {
+		renderWithReplay( [ entry( { tone: 'ok', replayable: false } ) ] );
+
+		await screen.findByText( 'Accepted' );
+
+		expect(
+			screen.queryByRole( 'button', { name: /Send the failed/ } )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'shows no replay controls at all without a replay path', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: rows } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		await screen.findAllByText( /woocommerce:12:34/ );
+
+		expect(
+			screen.queryByRole( 'button', { name: /again/ } )
+		).not.toBeInTheDocument();
+	} );
+} );

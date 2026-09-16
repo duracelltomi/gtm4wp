@@ -11,10 +11,13 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Google\TokenService;
+use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Modules\GoogleDataManager\EventsIngest;
+use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
 use GTM4WP\Modules\GoogleDataManager\RestController;
 use GTM4WP\Modules\GoogleDataManager\SendLog;
+use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Google\FakeTransport;
 use GTM4WP\Tests\unit\Google\KeyFileFixture;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
@@ -45,6 +48,13 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 	private KeyVault $vault;
 
 	private FakeTransport $transport;
+
+	/**
+	 * Jobs the replay tests saw queued.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private array $scheduled = array();
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -166,7 +176,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$controller = $this->make_controller();
 		$controller->register_routes();
 
-		$this->assertCount( 2, $captured );
+		$this->assertCount( 3, $captured );
 		$this->assertSame( 'gtm4wp/v2', $captured[0]['ns'] );
 		$this->assertSame( RestController::REST_ROUTE, $captured[0]['route'] );
 		$this->assertSame( array( $controller, 'can_manage' ), $captured[0]['args']['permission_callback'] );
@@ -208,6 +218,14 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertSame( 'GET', $captured[1]['args']['methods'] );
 		$this->assertSame( array( $controller, 'send_log' ), $captured[1]['args']['callback'] );
 		$this->assertSame( array( $controller, 'can_manage' ), $captured[1]['args']['permission_callback'] );
+
+		// The replay route queues work that ends in requests to Google, so its
+		// gate is the one that matters most of the three. POST, same capability.
+		$this->assertSame( 'gtm4wp/v2', $captured[2]['ns'] );
+		$this->assertSame( RestController::REPLAY_ROUTE, $captured[2]['route'] );
+		$this->assertSame( 'POST', $captured[2]['args']['methods'] );
+		$this->assertSame( array( $controller, 'replay' ), $captured[2]['args']['callback'] );
+		$this->assertSame( array( $controller, 'can_manage' ), $captured[2]['args']['permission_callback'] );
 	}
 
 	// ---- Contract ----------------------------------------------------------
@@ -572,9 +590,309 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$entries = $this->make_controller()->send_log()->get_data()['entries'];
 
 		$this->assertSame(
-			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone' ),
+			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone', 'replayable' ),
 			array_keys( $entries[0] ),
-			'The route adds exactly one derived field to what the ring stores, and nothing else joins it.'
+			'The route adds exactly two derived fields to what the ring stores, and nothing else joins it.'
 		);
+	}
+
+	// ---- The replay route --------------------------------------------------
+
+	/**
+	 * A controller whose queue calls are captured, over a log seeded by the
+	 * caller, with sending turned on unless said otherwise.
+	 *
+	 * @param SendLog              $log    The ring.
+	 * @param array<string, mixed> $stored Stored option values.
+	 * @return RestController
+	 */
+	private function replay_controller( SendLog $log, array $stored = array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) ): RestController {
+		$this->scheduled = array();
+
+		Functions\when( 'as_schedule_single_action' )->alias(
+			function ( $when, $hook, $args, $group ) {
+				$this->scheduled[] = array(
+					'hook'    => $hook,
+					'payload' => $args[0],
+				);
+				return count( $this->scheduled );
+			}
+		);
+		Functions\when( 'as_next_scheduled_action' )->justReturn( false );
+		Functions\when( 'wp_schedule_single_event' )->justReturn( true );
+
+		$clock  = static fn () => self::NOW;
+		$tokens = new TokenService( $this->vault, $this->transport, $clock );
+
+		// The option store trait serves get_option() from $this->options.
+		$this->options['gtm4wp-options'] = $stored;
+		$options                         = new Options( ( new GoogleDataManagerModule() )->defaults() );
+
+		return new RestController(
+			$this->vault,
+			new EventsIngest( $tokens, $this->transport, $clock ),
+			$log,
+			$options,
+			new DestinationHealth()
+		);
+	}
+
+	/**
+	 * A stored entry.
+	 *
+	 * @param array<string, mixed> $overrides Fields.
+	 * @return array<string, mixed>
+	 */
+	private static function row( array $overrides ): array {
+		return array_merge(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => 'G-ABC123',
+				'outcome'     => SendLog::OUTCOME_FAILED,
+				'attempt'     => 6,
+				'reason'      => 'PERMISSION_DENIED',
+			),
+			$overrides
+		);
+	}
+
+	public function test_replay_queues_each_failed_refund_once_aimed_at_the_destinations_still_failing(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		// Six attempts at one refund, two destinations: the ring holds twelve rows.
+		for ( $attempt = 1; $attempt <= 6; $attempt++ ) {
+			$log->record(
+				self::row(
+					array(
+						'attempt'     => $attempt,
+						'destination' => 'G-ABC123',
+						'outcome'     => $attempt < 6 ? SendLog::OUTCOME_RETRYING : SendLog::OUTCOME_FAILED,
+					)
+				)
+			);
+			$log->record(
+				self::row(
+					array(
+						'attempt'     => $attempt,
+						'destination' => 'G-XYZ789',
+						'outcome'     => $attempt < 6 ? SendLog::OUTCOME_RETRYING : SendLog::OUTCOME_FAILED,
+					)
+				)
+			);
+		}
+
+		$controller = $this->replay_controller( $log );
+
+		$response = $controller->replay( new \WP_REST_Request() );
+
+		$this->assertSame( 1, $response->get_data()['queued'], 'Twelve rows, one refund, one job.' );
+		$this->assertCount( 1, $this->scheduled );
+		$this->assertSame(
+			array(
+				'platform'  => 'woocommerce',
+				'order_id'  => 12,
+				'refund_id' => 34,
+				'attempt'   => 1,
+				'only'      => array( 'G-ABC123', 'G-XYZ789' ),
+			),
+			$this->scheduled[0]['payload']
+		);
+	}
+
+	public function test_replay_leaves_out_a_destination_that_recovered_on_a_later_attempt(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 1,
+					'destination' => 'G-ABC123',
+					'outcome'     => SendLog::OUTCOME_RETRYING,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 1,
+					'destination' => 'G-XYZ789',
+					'outcome'     => SendLog::OUTCOME_RETRYING,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 2,
+					'destination' => 'G-ABC123',
+					'outcome'     => SendLog::OUTCOME_ACCEPTED,
+					'reason'      => '',
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 6,
+					'destination' => 'G-XYZ789',
+					'outcome'     => SendLog::OUTCOME_FAILED,
+				)
+			)
+		);
+
+		$controller = $this->replay_controller( $log );
+		$controller->replay( new \WP_REST_Request() );
+
+		$this->assertSame( array( 'G-XYZ789' ), $this->scheduled[0]['payload']['only'], 'The destination Google accepted must not be sent the same refund again.' );
+	}
+
+	public function test_replay_queues_a_fixable_skip_whole_and_ignores_one_nothing_can_fix(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'reference'   => 'edd:3:4',
+					'destination' => '',
+					'outcome'     => SendLog::OUTCOME_SKIPPED,
+					'reason'      => 'no_destination',
+					'attempt'     => 1,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'reference'   => 'edd:5:6',
+					'destination' => '',
+					'outcome'     => SendLog::OUTCOME_SKIPPED,
+					'reason'      => 'no_client_id',
+					'attempt'     => 1,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'reference'   => 'edd:7:8',
+					'destination' => '',
+					'outcome'     => SendLog::OUTCOME_SKIPPED,
+					'reason'      => 'consent_no_client_id',
+					'attempt'     => 1,
+				)
+			)
+		);
+
+		$controller = $this->replay_controller( $log );
+		$response   = $controller->replay( new \WP_REST_Request() );
+
+		$this->assertSame( array( 'edd:3:4' ), $response->get_data()['references'] );
+		$this->assertArrayNotHasKey( 'only', $this->scheduled[0]['payload'], 'A refund never sent anywhere is queued whole.' );
+	}
+
+	public function test_replay_can_be_limited_to_named_references(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record( self::row( array( 'reference' => 'woocommerce:1:2' ) ) );
+		$log->record( self::row( array( 'reference' => 'woocommerce:3:4' ) ) );
+
+		$controller = $this->replay_controller( $log );
+
+		$response = $controller->replay(
+			new \WP_REST_Request( array( 'references' => array( 'woocommerce:3:4', 'not a reference', 42 ) ) )
+		);
+
+		$this->assertSame( array( 'woocommerce:3:4' ), $response->get_data()['references'] );
+		$this->assertCount( 1, $this->scheduled );
+	}
+
+	public function test_replay_queues_nothing_when_nothing_needs_it(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'outcome' => SendLog::OUTCOME_ACCEPTED,
+					'reason'  => '',
+					'attempt' => 1,
+				)
+			)
+		);
+
+		$controller = $this->replay_controller( $log );
+		$response   = $controller->replay( new \WP_REST_Request() );
+
+		$this->assertSame( 0, $response->get_data()['queued'] );
+		$this->assertSame( array(), $this->scheduled );
+	}
+
+	public function test_replay_refuses_while_sending_is_off(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record( self::row( array() ) );
+
+		$controller = $this->replay_controller( $log, array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) );
+		$result     = $controller->replay( new \WP_REST_Request() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
+		$this->assertSame( array(), $this->scheduled, 'A job queued now would be dropped by the sender with no row to say so.' );
+	}
+
+	// ---- A passing test ends the failure streak ----------------------------
+
+	public function test_a_passing_probe_clears_the_destinations_failure_streak(): void {
+		$health = new DestinationHealth( static fn () => self::NOW );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$this->assertTrue( $health->is_failing( 'G-ABC123' ) );
+
+		$id = $this->store_account();
+		$this->queue_token();
+		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-1' ) );
+
+		$clock      = static fn () => self::NOW;
+		$controller = new RestController(
+			$this->vault,
+			new EventsIngest( new TokenService( $this->vault, $this->transport, $clock ), $this->transport, $clock ),
+			new SendLog(),
+			null,
+			$health
+		);
+
+		$response = $controller->test_destination( self::request( $id ) );
+
+		$this->assertTrue( $response->get_data()['ok'] );
+		$this->assertFalse( $health->is_failing( 'G-ABC123' ), 'The probe proved the chain; the site-wide notice has nothing left to say.' );
+		$this->assertSame( 0, $health->get( 'G-ABC123' )['consecutive_failures'] );
+		$this->assertSame( 0, $health->get( 'G-ABC123' )['last_success'], 'A probe is not a send: it must not fake a success timestamp.' );
+	}
+
+	public function test_a_failing_probe_leaves_the_streak_alone(): void {
+		$health = new DestinationHealth( static fn () => self::NOW );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+
+		$id = $this->store_account();
+		$this->queue_token();
+		$this->transport->will_respond_json(
+			404,
+			array(
+				'error' => array(
+					'status'  => 'NOT_FOUND',
+					'message' => 'Property not found',
+				),
+			)
+		);
+
+		$clock      = static fn () => self::NOW;
+		$controller = new RestController(
+			$this->vault,
+			new EventsIngest( new TokenService( $this->vault, $this->transport, $clock ), $this->transport, $clock ),
+			new SendLog(),
+			null,
+			$health
+		);
+
+		$controller->test_destination( self::request( $id ) );
+
+		$this->assertTrue( $health->is_failing( 'G-ABC123' ) );
 	}
 }

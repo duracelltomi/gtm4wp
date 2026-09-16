@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\GoogleDataManager;
 
 use GTM4WP\Google\KeyVault;
+use GTM4WP\Options\Options;
 use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
@@ -39,13 +40,26 @@ final class RestController {
 	public const LOG_ROUTE = '/google/send-log';
 
 	/**
+	 * Route that queues failed or fixable-skipped refunds again.
+	 */
+	public const REPLAY_ROUTE = '/google/send-log/replay';
+
+	/**
 	 * Constructor.
 	 *
-	 * @param KeyVault     $vault  The key store, to name an unknown account before any request.
-	 * @param EventsIngest $ingest The validateOnly probe.
-	 * @param SendLog      $log    The diagnostics ring.
+	 * @param KeyVault               $vault   The key store, to name an unknown account before any request.
+	 * @param EventsIngest           $ingest  The validateOnly probe.
+	 * @param SendLog                $log     The diagnostics ring.
+	 * @param Options|null           $options Plugin options; null skips the sending-on check of the replay route (tests).
+	 * @param DestinationHealth|null $health  Per-destination health, cleared by a passing probe; null builds one on demand.
 	 */
-	public function __construct( private KeyVault $vault, private EventsIngest $ingest, private SendLog $log ) {
+	public function __construct(
+		private KeyVault $vault,
+		private EventsIngest $ingest,
+		private SendLog $log,
+		private ?Options $options = null,
+		private ?DestinationHealth $health = null
+	) {
 	}
 
 	/**
@@ -91,6 +105,79 @@ final class RestController {
 				'permission_callback' => array( $this, 'can_manage' ),
 			)
 		);
+
+		register_rest_route(
+			RestCors::REST_NAMESPACE,
+			self::REPLAY_ROUTE,
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'replay' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+				'args'                => array(
+					'references' => array(
+						'type'     => 'array',
+						'required' => false,
+						'items'    => array( 'type' => 'string' ),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * POST handler: queues every replayable refund again, or only the named ones.
+	 *
+	 * Nothing is sent from inside this request. Each refund goes back onto the
+	 * queue as a fresh first attempt, aimed only at the destinations still
+	 * missing it, and the sender applies every gate again when it runs - so a
+	 * refund that was skipped for want of a destination is skipped once more,
+	 * with the same reason, if the admin has not actually added one.
+	 *
+	 * @param \WP_REST_Request $request The request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function replay( \WP_REST_Request $request ) {
+		if ( null !== $this->options && ! $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ) {
+			return new \WP_Error(
+				'gtm4wp_gdm_sending_off',
+				__( 'Turn on "Send refunds to Google Analytics" and save before sending anything again.', 'duracelltomi-google-tag-manager' ),
+				array( 'status' => 409 )
+			);
+		}
+
+		$references = array();
+
+		foreach ( (array) $request->get_param( 'references' ) as $reference ) {
+			if ( is_string( $reference ) && null !== SendLog::parse_reference( $reference ) ) {
+				$references[] = $reference;
+			}
+		}
+
+		$queued = array();
+
+		foreach ( $this->log->replay_plan( $references ) as $reference => $job ) {
+			$payload = array(
+				'platform'  => $job['platform'],
+				'order_id'  => $job['order_id'],
+				'refund_id' => $job['refund_id'],
+				'attempt'   => 1,
+			);
+
+			if ( array() !== $job['only'] ) {
+				$payload['only'] = $job['only'];
+			}
+
+			if ( SendQueue::schedule( SendQueue::HOOK_SEND, $payload ) ) {
+				$queued[] = $reference;
+			}
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'queued'     => count( $queued ),
+				'references' => $queued,
+			)
+		);
 	}
 
 	/**
@@ -101,9 +188,10 @@ final class RestController {
 	 * order and refund ids - never a token, key material or a response body
 	 * from Google.
 	 *
-	 * The one added field is `tone`, derived from the entry rather than stored
-	 * with it: how much attention the row deserves, decided next to Google's
-	 * status vocabulary instead of in the admin bundle.
+	 * Two added fields, both derived from the entry rather than stored with it:
+	 * `tone`, how much attention the row deserves, and `replayable`, whether
+	 * the row is one the replay route would act on - both decided next to the
+	 * vocabulary they rest on instead of in the admin bundle.
 	 *
 	 * @return \WP_REST_Response
 	 */
@@ -111,8 +199,9 @@ final class RestController {
 		$entries = array();
 
 		foreach ( array_reverse( $this->log->all() ) as $entry ) {
-			$entry['tone'] = SendLog::tone( $entry );
-			$entries[]     = $entry;
+			$entry['tone']       = SendLog::tone( $entry );
+			$entry['replayable'] = SendLog::is_replayable( $entry );
+			$entries[]           = $entry;
 		}
 
 		return new \WP_REST_Response(
@@ -168,6 +257,14 @@ final class RestController {
 
 		$result = $this->ingest->validate_destination( $row );
 		$ok     = ! ( $result instanceof \WP_Error );
+
+		// A probe that passes after the admin corrected the destination is the
+		// moment the failure streak - and the site-wide notice it raises - has
+		// served its purpose. Without this the notice stayed until the next
+		// customer happened to ask for a refund.
+		if ( $ok ) {
+			( $this->health ?? new DestinationHealth() )->clear_failures( $row[ DestinationRows::COLUMN_MEASUREMENT ] );
+		}
 
 		return new \WP_REST_Response(
 			array(
