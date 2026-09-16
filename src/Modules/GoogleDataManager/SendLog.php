@@ -422,6 +422,48 @@ final class SendLog {
 	}
 
 	/**
+	 * Which stored entries a replay would act on, by their index in all().
+	 *
+	 * The per-row answer to the question replay_plan() answers per refund,
+	 * and derived from the plan rather than judged row by row: a failed row
+	 * that a later accepted row for the same destination has overtaken is
+	 * history, and must not advertise a replay the plan would not perform.
+	 * Only the newest row per destination among the plan's targets qualifies;
+	 * a refund the plan queues whole (its newest word is a fixable skip) marks
+	 * that skip row alone.
+	 *
+	 * @return array<int, true> Indices of the replayable entries.
+	 */
+	public function replayable_entries(): array {
+		$plan   = $this->replay_plan();
+		$newest = array();
+
+		foreach ( $this->all() as $index => $entry ) {
+			$reference = (string) ( $entry['reference'] ?? '' );
+
+			if ( ! isset( $plan[ $reference ] ) ) {
+				continue;
+			}
+
+			$destination = (string) ( $entry['destination'] ?? '' );
+			$targets     = $plan[ $reference ]['only'];
+
+			$wanted = ( array() === $targets )
+				? ( '' === $destination )
+				: in_array( $destination, $targets, true );
+
+			if ( $wanted ) {
+				// Oldest first: the last write wins, which is the newest row.
+				// A pipe as the separator: a reference is platform:ids and a destination
+				// a G- id, so neither can contain one.
+				$newest[ $reference . '|' . $destination ] = $index;
+			}
+		}
+
+		return array_fill_keys( array_values( $newest ), true );
+	}
+
+	/**
 	 * Whether the newest row about one refund and destination says Google
 	 * took it. The sender's guard against sending a destination the same
 	 * event twice when a replay is queued for one that already recovered.

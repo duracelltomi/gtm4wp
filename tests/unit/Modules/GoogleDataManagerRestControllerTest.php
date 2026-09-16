@@ -834,6 +834,138 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertSame( array(), $this->scheduled, 'A job queued now would be dropped by the sender with no row to say so.' );
 	}
 
+	// ---- What the rows say they can do ------------------------------------
+
+	public function test_a_failure_a_later_success_overtook_stops_offering_a_replay(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'attempt' => 6,
+					'outcome' => SendLog::OUTCOME_FAILED,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'    => 1,
+					'outcome'    => SendLog::OUTCOME_ACCEPTED,
+					'reason'     => '',
+					'request_id' => 'req-replay',
+				)
+			)
+		);
+
+		$controller = $this->replay_controller( $log );
+		$entries    = $controller->send_log()->get_data()['entries'];
+
+		// Newest first: the accepted replay, then the failure it answered.
+		$this->assertFalse( $entries[0]['replayable'] );
+		$this->assertFalse(
+			$entries[1]['replayable'],
+			'The row is still a failure, but the refund has been sent since; offering a replay would queue nothing and say so - the screen should not ask the question at all.'
+		);
+		$this->assertSame( 0, $controller->replay( new \WP_REST_Request() )->get_data()['queued'], 'What the rows advertise and what the button does must agree.' );
+	}
+
+	public function test_only_the_newest_failed_row_per_destination_offers_a_replay(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'attempt' => 5,
+					'outcome' => SendLog::OUTCOME_RETRYING,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt' => 6,
+					'outcome' => SendLog::OUTCOME_FAILED,
+				)
+			)
+		);
+
+		$entries = $this->replay_controller( $log )->send_log()->get_data()['entries'];
+
+		$this->assertTrue( $entries[0]['replayable'], 'The final failure is the row that stands for the refund.' );
+		$this->assertFalse( $entries[1]['replayable'], 'An earlier attempt of the same refund is history, not a second thing to send.' );
+	}
+
+	public function test_a_skip_a_later_send_overtook_stops_offering_a_replay(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'destination' => '',
+					'outcome'     => SendLog::OUTCOME_SKIPPED,
+					'reason'      => 'no_destination',
+					'attempt'     => 1,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'    => 1,
+					'outcome'    => SendLog::OUTCOME_ACCEPTED,
+					'reason'     => '',
+					'request_id' => 'req-1',
+				)
+			)
+		);
+
+		$entries = $this->replay_controller( $log )->send_log()->get_data()['entries'];
+
+		$this->assertFalse( $entries[1]['replayable'], 'The destination was added and the refund went through; the old skip is not a refund waiting.' );
+	}
+
+	public function test_a_destination_still_failing_offers_a_replay_while_its_sibling_does_not(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 6,
+					'destination' => 'G-ABC123',
+					'outcome'     => SendLog::OUTCOME_FAILED,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 6,
+					'destination' => 'G-XYZ789',
+					'outcome'     => SendLog::OUTCOME_FAILED,
+				)
+			)
+		);
+		$log->record(
+			self::row(
+				array(
+					'attempt'     => 1,
+					'destination' => 'G-ABC123',
+					'outcome'     => SendLog::OUTCOME_ACCEPTED,
+					'reason'      => '',
+					'request_id'  => 'req-r',
+				)
+			)
+		);
+
+		$entries = $this->replay_controller( $log )->send_log()->get_data()['entries'];
+		$by_key  = array();
+
+		foreach ( $entries as $entry ) {
+			$by_key[ $entry['destination'] . '#' . $entry['outcome'] ] = $entry['replayable'];
+		}
+
+		$this->assertTrue( $by_key['G-XYZ789#failed'] );
+		$this->assertFalse( $by_key['G-ABC123#failed'] );
+		$this->assertFalse( $by_key['G-ABC123#accepted'] );
+	}
+
 	// ---- A passing test ends the failure streak ----------------------------
 
 	public function test_a_passing_probe_clears_the_destinations_failure_streak(): void {

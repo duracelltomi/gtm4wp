@@ -188,19 +188,22 @@ final class RestController {
 	 * order and refund ids - never a token, key material or a response body
 	 * from Google.
 	 *
-	 * Two added fields, both derived from the entry rather than stored with it:
-	 * `tone`, how much attention the row deserves, and `replayable`, whether
-	 * the row is one the replay route would act on - both decided next to the
-	 * vocabulary they rest on instead of in the admin bundle.
+	 * Two added fields, both derived rather than stored: `tone`, how much
+	 * attention the row deserves, and `replayable`, whether the row is one the
+	 * replay route would act on. The second is answered from the replay plan
+	 * itself, not from the row alone, so a failure that a later success has
+	 * overtaken does not keep offering a replay that would queue nothing.
 	 *
 	 * @return \WP_REST_Response
 	 */
 	public function send_log(): \WP_REST_Response {
 		$entries = array();
 
-		foreach ( array_reverse( $this->log->all() ) as $entry ) {
+		$replayable = $this->log->replayable_entries();
+
+		foreach ( array_reverse( $this->log->all(), true ) as $index => $entry ) {
 			$entry['tone']       = SendLog::tone( $entry );
-			$entry['replayable'] = SendLog::is_replayable( $entry );
+			$entry['replayable'] = isset( $replayable[ $index ] );
 			$entries[]           = $entry;
 		}
 
