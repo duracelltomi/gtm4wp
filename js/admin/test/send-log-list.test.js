@@ -520,7 +520,7 @@ describe( 'SendLogList sending failed refunds again', () => {
 
 		expect(
 			await screen.findByRole( 'button', {
-				name: 'Send the failed ones again (2)',
+				name: 'Send again what can be sent (2)',
 			} )
 		).toBeInTheDocument();
 	} );
@@ -531,7 +531,7 @@ describe( 'SendLogList sending failed refunds again', () => {
 
 		fireEvent.click(
 			await screen.findByRole( 'button', {
-				name: 'Send the failed ones again (2)',
+				name: 'Send again what can be sent (2)',
 			} )
 		);
 
@@ -588,7 +588,7 @@ describe( 'SendLogList sending failed refunds again', () => {
 
 		fireEvent.click(
 			await screen.findByRole( 'button', {
-				name: 'Send the failed ones again (2)',
+				name: 'Send again what can be sent (2)',
 			} )
 		);
 
@@ -607,7 +607,7 @@ describe( 'SendLogList sending failed refunds again', () => {
 
 		fireEvent.click(
 			await screen.findByRole( 'button', {
-				name: 'Send the failed ones again (2)',
+				name: 'Send again what can be sent (2)',
 			} )
 		);
 
@@ -632,7 +632,9 @@ describe( 'SendLogList sending failed refunds again', () => {
 		await screen.findByText( 'Accepted' );
 
 		expect(
-			screen.queryByRole( 'button', { name: /Send the failed/ } )
+			screen.queryByRole( 'button', {
+				name: /Send again what can be sent/,
+			} )
 		).not.toBeInTheDocument();
 	} );
 

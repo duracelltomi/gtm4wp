@@ -197,10 +197,31 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->assertStringContainsString( 'PERMISSION_DENIED', $reason );
 	}
 
-	public function test_an_oversized_reason_is_capped(): void {
+	public function test_an_oversized_reason_is_capped_and_says_so(): void {
 		$this->log()->record( self::entry( array( 'reason' => str_repeat( 'x', 5000 ) ) ) );
 
-		$this->assertSame( 200, mb_strlen( $this->log()->all()[0]['reason'] ) );
+		$reason = $this->log()->all()[0]['reason'];
+
+		$this->assertSame( SendLog::REASON_MAX_LENGTH, mb_strlen( $reason ), 'The ellipsis is inside the budget, not on top of it.' );
+		$this->assertStringEndsWith( '…', $reason, 'A cut sentence must not read as a complete one.' );
+	}
+
+	public function test_a_reason_within_the_cap_is_stored_whole_with_no_ellipsis(): void {
+		$reason = str_repeat( 'y', SendLog::REASON_MAX_LENGTH );
+
+		$this->log()->record( self::entry( array( 'reason' => $reason ) ) );
+
+		$this->assertSame( $reason, $this->log()->all()[0]['reason'] );
+	}
+
+	public function test_the_plugins_own_not_found_explanation_fits_the_cap(): void {
+		// The sentence the cap used to cut, verbatim from EventsIngest; if it
+		// grows past the budget again this is the test that says so.
+		$explanation = 'Google Analytics could not find this destination. Please double-check both the GA4 property ID and the measurement ID - and check that the service account was added to the property, because a property the account is not allowed to see is reported as not found too (NOT_FOUND: Requested entity was not found.)';
+
+		$this->log()->record( self::entry( array( 'reason' => $explanation ) ) );
+
+		$this->assertSame( $explanation, $this->log()->all()[0]['reason'] );
 	}
 
 	public function test_an_oversized_reference_is_capped(): void {

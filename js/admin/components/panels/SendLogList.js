@@ -349,8 +349,8 @@ export default function SendLogList( {
 						{ sprintf(
 							/* translators: %d: number of refunds that can be sent again. */
 							_n(
-								'Send the failed one again (%d)',
-								'Send the failed ones again (%d)',
+								'Send again what can be sent (%d)',
+								'Send again what can be sent (%d)',
 								replayable.size,
 								'duracelltomi-google-tag-manager'
 							),

@@ -119,9 +119,14 @@ final class SendLog {
 	);
 
 	/**
-	 * Longest stored reason / error summary.
+	 * Longest stored reason / error summary, in characters.
+	 *
+	 * It was 200, which cut the plugin's own plain-words explanation of a
+	 * NOT_FOUND answer mid-sentence - the one sentence the row exists to
+	 * carry. Fifty rows of 400 is still a few kilobytes, and anything cut is
+	 * now marked as cut rather than left reading as a complete thought.
 	 */
-	private const REASON_MAX_LENGTH = 200;
+	public const REASON_MAX_LENGTH = 400;
 
 	/**
 	 * Longest stored order or refund reference. These are the store's own
@@ -517,7 +522,15 @@ final class SendLog {
 			return '';
 		}
 
-		return mb_substr( sanitize_text_field( (string) $value ), 0, $max_size );
+		$clean = sanitize_text_field( (string) $value );
+
+		if ( mb_strlen( $clean ) <= $max_size ) {
+			return $clean;
+		}
+
+		// The ellipsis is part of the budget, so a capped value never exceeds
+		// the cap by the character that says it was capped.
+		return mb_substr( $clean, 0, $max_size - 1 ) . '…';
 	}
 
 	/**
