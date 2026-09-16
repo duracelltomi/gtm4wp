@@ -299,8 +299,13 @@ def fetch_list(view: str, pages: int, stars: list[int] | None) -> list[dict]:
 # ----------------------------------------------------------------- topic parsing
 
 
+# The md render puts an optional badge before the author link: "Plugin Author",
+# "Thread Starter", or the topic's "Resolved" status on the opening post (observed
+# 2026-09-16; before that the link came first). The badge is a plain word run, so
+# accept one but never require it.
 _POST_HEADER_RE = re.compile(
-	r"^ \*\s+\[(?P<name>[^\]]+)\]\((?P<profile>https://wordpress\.org/support/users/[^)]*)\)\n"
+	r"^ \*\s+(?:(?P<role>[A-Za-z][A-Za-z ]*?) )?"
+	r"\[(?P<name>[^\]]+)\]\((?P<profile>https://wordpress\.org/support/users/[^)]*)\)\n"
 	r" \* \(@(?P<login>[^)]*)\)\n"
 	r" \* \[(?P<when>[^\]]+)\]\((?P<link>[^)]+)\)\n",
 	re.M,
@@ -348,6 +353,10 @@ def fetch_topic(reference: str) -> dict:
 			{
 				"author": match.group("name").strip(),
 				"author_login": match.group("login").strip(),
+				# Badge text as rendered ("Plugin Author", "Thread Starter", "Resolved"
+				# on a resolved topic's opening post), or None. Informational only:
+				# the maintainer is identified by author_login, never by this label.
+				"role": (match.group("role") or "").strip() or None,
 				"post_id": int(post_id.group(1)) if post_id else None,
 				"relative_time": when,
 				"age_days": relative_to_days(when),
