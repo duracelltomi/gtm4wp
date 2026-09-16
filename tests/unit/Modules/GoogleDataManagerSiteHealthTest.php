@@ -163,12 +163,14 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$this->assertSame( SiteHealth::TEST_ID, $result['test'] );
 	}
 
-	public function test_a_repeatedly_failing_destination_is_recommended_and_named(): void {
+	public function test_a_repeatedly_failing_destination_is_critical_and_named(): void {
 		$this->fail_the_destination();
 
 		$result = $this->site_health()->run_test();
 
-		$this->assertSame( 'recommended', $result['status'] );
+		// The same condition raises a red, non-dismissible admin notice; Site
+		// Health must not file it under improvements.
+		$this->assertSame( 'critical', $result['status'] );
 		$this->assertStringContainsString( 'Main property', $result['description'] );
 		$this->assertStringContainsString( 'href=', $result['actions'], 'The result links to the settings the admin has to fix.' );
 	}
@@ -199,7 +201,12 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 
 		$result = $this->site_health()->run_test();
 
-		$this->assertSame( 'critical', $result['status'], 'Every destination on that key is dead, which outranks one destination being refused.' );
+		$this->assertSame( 'critical', $result['status'] );
+		$this->assertStringContainsString(
+			'no longer be read',
+			$result['label'],
+			'Every destination on that key is dead, which outranks one destination being refused: the key is what gets reported.'
+		);
 	}
 
 	public function test_orders_arriving_with_no_attribution_is_reported(): void {

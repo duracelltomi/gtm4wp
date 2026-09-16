@@ -100,15 +100,23 @@ final class SiteHealth {
 	 * Three outcomes, in order of severity:
 	 *
 	 * - **critical** when a stored service-account key can no longer be
-	 *   decrypted. That kills every destination using it at once, and it
-	 *   happens without anyone touching the plugin - rotating the security
-	 *   keys in wp-config.php is enough.
-	 * - **recommended** when a destination has failed repeatedly, or when
-	 *   attribution capture is on and orders are arriving with nothing being
-	 *   captured. The second one is the failure this feature is otherwise
-	 *   silent about: a measurement ID that matches no tag in the container
-	 *   produces no error anywhere, and would first be noticed weeks later as
-	 *   refunds that could not be sent.
+	 *   decrypted - that kills every destination using it at once, and it
+	 *   happens without anyone touching the plugin; rotating the security keys
+	 *   in wp-config.php is enough - and when a destination has failed
+	 *   repeatedly. Both are the same outcome for the store: events it was set
+	 *   up to send are being lost, right now, with every refund. The key case
+	 *   is listed first only because it outranks the other when both hold. It
+	 *   was "recommended" once, while the admin notice for the very same
+	 *   condition was red, site-wide and not dismissible; Site Health's
+	 *   "recommended" bucket is for improvements, and a configured lane that
+	 *   is dropping data is not an improvement waiting to be made.
+	 * - **recommended** when attribution capture is on and orders are arriving
+	 *   with nothing being captured. This is the failure the feature is
+	 *   otherwise silent about - a measurement ID that matches no tag in the
+	 *   container produces no error anywhere, and would first be noticed weeks
+	 *   later as refunds that could not be sent - but it is an inference from
+	 *   a run of orders, not a refusal Google answered with, so it asks for a
+	 *   look rather than declaring a breakage.
 	 * - **good** otherwise, including when nothing is turned on.
 	 *
 	 * @return array<string, mixed>
@@ -142,7 +150,7 @@ final class SiteHealth {
 		if ( array() !== $failing ) {
 			return $this->problem(
 				$result,
-				'recommended',
+				'critical',
 				__( 'Sending to a Google Data Manager destination keeps failing', 'duracelltomi-google-tag-manager' ),
 				sprintf(
 					/* translators: %s: comma separated list of destination names. */
