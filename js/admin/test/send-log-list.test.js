@@ -548,7 +548,10 @@ describe( 'SendLogList sending failed refunds again', () => {
 
 	it( 'can queue a single refund from its row', async () => {
 		renderWithReplay( rows );
-		apiFetch.mockResolvedValueOnce( { queued: 1, references: [ 'edd:3:4' ] } );
+		apiFetch.mockResolvedValueOnce( {
+			queued: 1,
+			references: [ 'edd:3:4' ],
+		} );
 
 		fireEvent.click(
 			await screen.findByRole( 'button', { name: 'Send edd:3:4 again' } )
@@ -573,7 +576,9 @@ describe( 'SendLogList sending failed refunds again', () => {
 			screen.queryByRole( 'button', { name: 'Send edd:5:6 again' } )
 		).not.toBeInTheDocument();
 		expect(
-			screen.getAllByRole( 'button', { name: 'Send woocommerce:12:34 again' } )
+			screen.getAllByRole( 'button', {
+				name: 'Send woocommerce:12:34 again',
+			} )
 		).toHaveLength( 2 );
 	} );
 
@@ -595,7 +600,9 @@ describe( 'SendLogList sending failed refunds again', () => {
 	it( "reports a refusal in the server's own words and can be dismissed", async () => {
 		renderWithReplay( rows );
 		apiFetch.mockRejectedValueOnce(
-			new Error( 'Turn on "Send refunds to Google Analytics" and save before sending anything again.' )
+			new Error(
+				'Turn on "Send refunds to Google Analytics" and save before sending anything again.'
+			)
 		);
 
 		fireEvent.click(
@@ -605,7 +612,9 @@ describe( 'SendLogList sending failed refunds again', () => {
 		);
 
 		expect(
-			await screen.findByText( /Turn on "Send refunds to Google Analytics"/ )
+			await screen.findByText(
+				/Turn on "Send refunds to Google Analytics"/
+			)
 		).toBeInTheDocument();
 
 		fireEvent.click(
