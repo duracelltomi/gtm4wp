@@ -162,6 +162,27 @@ it on purpose):
   embed), all with the `defer` strategy via `AbstractModule::enqueue_script()`.
   On HTTP/2 this beats a single always-loaded bundle.
 
+### Script file naming (external contract — hard rule)
+
+Since 2026-09-16 the **EasyPrivacy** and **AdGuard SpywareFilter** block lists
+carry `/gtm4wp-$script` instead of a folder-wide block on this plugin, at our
+request (easylist/easylist#25228), so that the settings screen is no longer blank
+behind an ad blocker. Their coverage now rests on our file names, and a break is
+silent on both sides. Two invariants, both pinned by
+`tests/unit/ScriptNamingContractTest.php` and refused by `webpack.config.js` at
+build time:
+
+- **Every frontend bundle is named `gtm4wp-*.js`** — every file in `js/frontend/`
+  starts with `gtm4wp-`. A frontend script without the prefix would escape the
+  lists (a privacy regression for their users and a broken promise from us).
+- **No script loaded in wp-admin may carry the `gtm4wp-` prefix** — the admin
+  bundle is `build/admin.js`, and nothing under `js/admin/` starts with `gtm4wp-`.
+  An admin script with the prefix would be blocked and its screen blank again.
+
+If a future change genuinely needs to break either invariant, the change ships a
+new easylist issue *before* the release, not a rename. Registry row: U125 in
+`.upstream/upstream-review-checklist.md`.
+
 ## Changelog policy
 
 Every **production-code** change ships a matching bullet under the top **unreleased**
@@ -206,6 +227,7 @@ See `.claude/skills/woocommerce-extension-developer/SKILL.md` for WooCommerce co
 - Namespaced classes under `GTM4WP\` (PSR-4, one class per file); the `gtm4wp_`-prefixed procedural functions only survive as the compat template wrappers in `compat/functions.php`
 - Option and hook names come from constants in `compat/constants.php` (`GTM4WP_OPTION_*`, `GTM4WP_WPFILTER_*`, `GTM4WP_WPACTION_*`); their string values are part of the public API and must never change
 - Read options through `Options::get()` / `AbstractModule::opt()`, not the backward-compatible globals
+- Frontend scripts are `js/frontend/gtm4wp-*.js` and admin scripts never carry the `gtm4wp-` prefix — an external block-list contract, see **Script file naming** above
 - Register new features as modules under `src/Modules/` (lean `Module` + admin `AdminSchema`), keeping the defaults-vs-schema consistency unit test green
 - Never use WordPress post functions (`get_post_meta`, etc.) for WooCommerce order data - use the WC CRUD API
 - All user-facing strings must use `__()`/`esc_html__()` with text domain `'duracelltomi-google-tag-manager'`
