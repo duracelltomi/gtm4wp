@@ -86,8 +86,12 @@ python .claude/skills/wporg-forum-triage/scripts/wporg_forum.py list --view unre
 ```
 
 `topic` returns `{title, status, closed, replies, participants, last_reply_from,
-last_post_id, opened_age_days, in_reply_window, posts:[{author_login, post_id,
-relative_time, age_days, body}], raw_md}`.
+last_post_id, opened_age_days, in_reply_window, posts:[{author_login, role, post_id,
+relative_time, age_days, body}], raw_md}`. `role` is the badge the page renders next to
+the author ("Plugin Author", "Thread Starter", "Resolved" on the opening post) or null;
+it is informational, the maintainer is still identified by `author_login` only. If
+`posts` ever comes back shorter than `replies + 1`, the page markup has moved again:
+`raw_md` still holds the whole thread, read from that and fix the header regex.
 
 Two things to respect:
 
