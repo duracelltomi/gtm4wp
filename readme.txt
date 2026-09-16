@@ -257,6 +257,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 == Changelog ==
 
+= 2.0.3 =
+
+* Fixed: on a store that displays prices including tax, every cart line in view_cart, begin_checkout and the cart content carried a discount equal to the line's tax, with no coupon or sale involved, so GA4 reported a share of the revenue as a discount on every order. The total side of the discount calculation read a key WooCommerce never writes on a cart item, so only the subtotal side gained the tax. An undiscounted line carries no discount again. Stores displaying prices excluding tax were never affected, and neither was the purchase event.
+
 = 2.0.2 =
 
 * Updated: tested with WooCommerce 11.1.

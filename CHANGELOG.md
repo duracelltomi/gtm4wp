@@ -1,5 +1,9 @@
 # Full changelog for GTM4WP
 
+## 2.0.3
+
+* Fixed: on a store that displays prices including tax, every cart line in `view_cart`, `begin_checkout` and the cart content carried a `discount` equal to the line's tax, with no coupon or sale involved, so GA4 reported a share of the revenue as a discount on every order. The per-item discount is the gap between the line subtotal and the line total, and on such a store the tax is added to both before comparing them, but the total side read a key WooCommerce never writes on a cart item, so only the subtotal side gained the tax and the difference between the two was exactly the tax. The total side now reads the key WooCommerce does write, and an undiscounted line carries no `discount` again, on every WooCommerce version the plugin supports. Stores displaying prices excluding tax were never affected, and neither was the `purchase` event. (#470)
+
 ## 2.0.2
 
 * Updated: tested with WooCommerce 11.1.

@@ -332,8 +332,9 @@ final class HelpersTest extends TestCase {
 	}
 
 	public function test_cart_line_discount_includes_tax_on_both_sides_when_requested(): void {
-		// Including tax adds line_subtotal_tax and line_total_tax before the gap:
-		// (40 + 8) - (30 + 6) = 12, / 2 = 6.
+		// Including tax adds line_subtotal_tax and line_tax before the gap:
+		// (40 + 8) - (30 + 6) = 12, / 2 = 6. The keys are the ones WooCommerce
+		// writes in WC_Cart_Totals (asymmetric: line_subtotal_tax vs line_tax).
 		$this->assertSame(
 			6.0,
 			Helpers::cart_line_discount(
@@ -341,7 +342,45 @@ final class HelpersTest extends TestCase {
 					'line_subtotal'     => 40.0,
 					'line_subtotal_tax' => 8.0,
 					'line_total'        => 30.0,
-					'line_total_tax'    => 6.0,
+					'line_tax'          => 6.0,
+					'quantity'          => 2,
+				),
+				true
+			)
+		);
+	}
+
+	public function test_cart_line_discount_null_for_undiscounted_line_on_tax_inclusive_store(): void {
+		// #470: an undiscounted line on a shop displaying prices including tax must
+		// carry no discount. The helper used to read `line_total_tax`, a key
+		// WooCommerce never sets, so only the subtotal side gained the tax and the
+		// whole line tax (8 / 2 = 4 per unit) was reported as a discount.
+		$this->assertNull(
+			Helpers::cart_line_discount(
+				array(
+					'line_subtotal'     => 40.0,
+					'line_subtotal_tax' => 8.0,
+					'line_total'        => 40.0,
+					'line_tax'          => 8.0,
+					'quantity'          => 2,
+				),
+				true
+			)
+		);
+	}
+
+	public function test_cart_line_discount_ignores_the_key_woocommerce_never_writes(): void {
+		// The old key must not be read back in by mistake: a stray line_total_tax
+		// on the item changes nothing, the total side takes its tax from line_tax.
+		$this->assertSame(
+			6.0,
+			Helpers::cart_line_discount(
+				array(
+					'line_subtotal'     => 40.0,
+					'line_subtotal_tax' => 8.0,
+					'line_total'        => 30.0,
+					'line_tax'          => 6.0,
+					'line_total_tax'    => 99.0,
 					'quantity'          => 2,
 				),
 				true
