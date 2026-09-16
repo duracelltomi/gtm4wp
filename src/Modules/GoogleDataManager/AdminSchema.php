@@ -14,8 +14,10 @@ use GTM4WP\Google\KeyVault;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\PanelSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Modules\GoogleAuth\GoogleAuthModule;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
@@ -30,7 +32,7 @@ defined( 'ABSPATH' ) || exit;
  * through panel_data() instead (columnChoices), which only runs when the
  * settings page itself is rendered - the same cost class as the key notice.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -396,6 +398,21 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function panel(): string {
 		return self::PANEL;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The rows themselves live in SiteHealth next to the status test, which
+	 * reads the same records: what is safe to show is decided once, there.
+	 * Runs only when the Site Health page is rendered, so the reads are in
+	 * the same cost class as panel_data().
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		return ( new SiteHealth( $options, new DestinationHealth(), new CaptureStats(), new KeyVault() ) )->debug_fields();
 	}
 
 	/**

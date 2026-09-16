@@ -120,9 +120,9 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 	 * @return string
 	 */
 	private function debug_text( array $stored = array() ): string {
-		$info = $this->site_health( $stored )->add_debug_information( array() );
+		$fields = $this->site_health( $stored )->debug_fields();
 
-		return (string) json_encode( $info ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for a substring assertion.
+		return (string) json_encode( $fields ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for a substring assertion.
 	}
 
 	/**
@@ -150,7 +150,6 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$site_health = $this->site_health();
 
 		$this->assertSame( 'unexpected', $site_health->add_test( 'unexpected' ) );
-		$this->assertSame( 'unexpected', $site_health->add_debug_information( 'unexpected' ) );
 	}
 
 	// ---- The status test ---------------------------------------------------
@@ -245,7 +244,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
 				GTM4WP_OPTION_GDM_SEND_REFUNDS        => false,
 			)
-		)->add_debug_information( array() )['gtm4wp']['fields'];
+		)->debug_fields();
 
 		$this->assertSame( 'on', $fields['gdm_capture_attribution']['value'] );
 		$this->assertSame( 'off', $fields['gdm_send_refunds']['value'] );
@@ -256,7 +255,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$this->health->record_success( self::MEASUREMENT );
 		$this->health->record_failure( self::MEASUREMENT, 'PERMISSION_DENIED: no access to property 123456789.', 'PERMISSION_DENIED' );
 
-		$fields = $this->site_health()->add_debug_information( array() )['gtm4wp']['fields'];
+		$fields = $this->site_health()->debug_fields();
 
 		$row = $fields['gdm_destination_0']['value'];
 
@@ -267,7 +266,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 	}
 
 	public function test_a_destination_nothing_has_been_sent_to_says_so(): void {
-		$fields = $this->site_health()->add_debug_information( array() )['gtm4wp']['fields'];
+		$fields = $this->site_health()->debug_fields();
 
 		$this->assertStringContainsString( 'nothing sent yet', $fields['gdm_destination_0']['value'] );
 	}
@@ -276,7 +275,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$this->stats->record( true );
 		$this->stats->record( false );
 
-		$fields = $this->site_health()->add_debug_information( array() )['gtm4wp']['fields'];
+		$fields = $this->site_health()->debug_fields();
 
 		$this->assertStringContainsString( '1 of the last 2 orders', $fields['gdm_capture_rate']['value'] );
 		$this->assertStringContainsString( '0 to send', $fields['gdm_queue']['value'] );
@@ -286,7 +285,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 	public function test_a_service_account_is_named_by_its_label_and_status(): void {
 		$this->vault->add( KeyFileFixture::parse(), 'Production' );
 
-		$fields = $this->site_health()->add_debug_information( array() )['gtm4wp']['fields'];
+		$fields = $this->site_health()->debug_fields();
 
 		$this->assertStringContainsString( 'Production', $fields['gdm_account_0']['value'] );
 		$this->assertStringContainsString( 'unverified', $fields['gdm_account_0']['value'] );

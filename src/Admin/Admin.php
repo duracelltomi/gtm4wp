@@ -50,6 +50,7 @@ final class Admin {
 		( new KeyNotice( new KeyVault() ) )->register_hooks();
 		( new HealthNotice( $this->options, new DestinationHealth() ) )->register_hooks();
 		( new SiteHealth( $this->options, new DestinationHealth(), new CaptureStats(), new KeyVault() ) )->register_hooks();
+		( new SiteHealthInfo( $this->registry, $this->options ) )->register_hooks();
 		( new PluginRow() )->register_hooks();
 	}
 }

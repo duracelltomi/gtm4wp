@@ -25,6 +25,13 @@ defined( 'ABSPATH' ) || exit;
  * rather than duplicating: the notice is about a live gap, the status test is
  * a standing answer to "is this working".
  *
+ * Two surfaces, wired differently. The status test is registered here, as
+ * this module's own. The Info rows are not: the plugin has ONE section on the
+ * Info tab, assembled by Admin\SiteHealthInfo from every module that opts in
+ * through SiteHealthInfoInterface, and this module's AdminSchema is the one
+ * that opts in - it asks this class for the rows (debug_fields()), which is
+ * where the knowledge of what is safe to show stays.
+ *
  * Both surfaces read the STORED records only. Neither ever makes an HTTP call:
  * a Site Health page load must not depend on Google being reachable, and the
  * destination panel's Test button remains the one place a live probe happens.
@@ -45,11 +52,6 @@ final class SiteHealth {
 	public const TEST_ID = 'gtm4wp_google_data_manager';
 
 	/**
-	 * Id of the debug-information section.
-	 */
-	public const DEBUG_SECTION = 'gtm4wp';
-
-	/**
 	 * Constructor.
 	 *
 	 * @param Options           $options The plugin options service.
@@ -66,13 +68,13 @@ final class SiteHealth {
 	}
 
 	/**
-	 * Registers both surfaces.
+	 * Registers the status test. The Info rows reach WordPress through
+	 * Admin\SiteHealthInfo, not from here.
 	 *
 	 * @return void
 	 */
 	public function register_hooks(): void {
 		add_filter( 'site_status_tests', array( $this, 'add_test' ) );
-		add_filter( 'debug_information', array( $this, 'add_debug_information' ) );
 	}
 
 	/**
@@ -186,31 +188,14 @@ final class SiteHealth {
 	}
 
 	/**
-	 * Adds the debug-information section.
+	 * This module's rows of the plugin's Site Health Info section.
 	 *
-	 * @param array<string, mixed> $info The registered sections.
-	 * @return array<string, mixed>
-	 */
-	public function add_debug_information( $info ) {
-		if ( ! is_array( $info ) ) {
-			return $info;
-		}
-
-		$info[ self::DEBUG_SECTION ] = array(
-			'label'       => __( 'Google Tag Manager for WordPress', 'duracelltomi-google-tag-manager' ),
-			'description' => __( 'State of the data this site sends to Google from the server. Statuses and counts only - no account addresses, no keys and no property IDs, so this section is safe to paste into a support thread.', 'duracelltomi-google-tag-manager' ),
-			'fields'      => $this->debug_fields(),
-		);
-
-		return $info;
-	}
-
-	/**
-	 * The debug rows.
+	 * The keys are module-local; the collector prefixes them with the module
+	 * id. Everything the class doc block forbids is forbidden here.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
-	private function debug_fields(): array {
+	public function debug_fields(): array {
 		$fields = array(
 			'gdm_capture_attribution' => array(
 				'label' => __( 'Attribution capture', 'duracelltomi-google-tag-manager' ),

@@ -1,0 +1,134 @@
+<?php
+/**
+ * The plugin's section on the Site Health Info tab.
+ *
+ * @package GTM4WP
+ * @author Thomas Geiger
+ * @copyright 2013- Geiger Tamás e.v. (Thomas Geiger s.e.)
+ * @license GNU General Public License, version 3
+ */
+
+namespace GTM4WP\Admin;
+
+use GTM4WP\Module\Registry;
+use GTM4WP\Module\SiteHealthInfoInterface;
+use GTM4WP\Options\Options;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Assembles one Site Health Info section for the whole plugin out of the rows
+ * each module contributes.
+ *
+ * One section, not one per module: the Info tab is what a support thread
+ * asks for, and "paste the Google Tag Manager section" has to name a single
+ * thing. Modules opt in through SiteHealthInfoInterface on their admin
+ * schema, in the order the registry holds them, so the table reads top to
+ * bottom the way the settings screen does.
+ *
+ * The disclosure rule is stated on the interface; this class adds nothing to
+ * a row and removes nothing from it, so what a module returns is what gets
+ * pasted. The section is only added when at least one module has something
+ * to say, so a site running none of the reporting features gets no empty
+ * heading.
+ */
+final class SiteHealthInfo {
+
+	/**
+	 * Id of the debug-information section.
+	 */
+	public const SECTION = 'gtm4wp';
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Registry $registry The module registry.
+	 * @param Options  $options  The plugin options service.
+	 */
+	public function __construct( private Registry $registry, private Options $options ) {
+	}
+
+	/**
+	 * Registers the filter.
+	 *
+	 * @return void
+	 */
+	public function register_hooks(): void {
+		add_filter( 'debug_information', array( $this, 'add_debug_information' ) );
+	}
+
+	/**
+	 * Adds the section, when any module has rows for it.
+	 *
+	 * @param array<string, mixed> $info The registered sections.
+	 * @return array<string, mixed>
+	 */
+	public function add_debug_information( $info ) {
+		if ( ! is_array( $info ) ) {
+			return $info;
+		}
+
+		$fields = $this->fields();
+
+		if ( array() === $fields ) {
+			return $info;
+		}
+
+		$info[ self::SECTION ] = array(
+			'label'       => __( 'Google Tag Manager for WordPress', 'duracelltomi-google-tag-manager' ),
+			'description' => __( 'The state of this plugin\'s features on this site. Statuses, counts and option states only - no keys, no account addresses and no visitor data - so this section is safe to paste into a support thread.', 'duracelltomi-google-tag-manager' ),
+			'fields'      => $fields,
+		);
+
+		return $info;
+	}
+
+	/**
+	 * Every module's rows, in registry order, keys prefixed with the module id.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function fields(): array {
+		$fields = array();
+
+		foreach ( $this->registry->all() as $module ) {
+			$schema_class = $module->admin_schema();
+
+			if ( ! class_exists( $schema_class ) ) {
+				continue;
+			}
+
+			$schema = new $schema_class();
+
+			// instanceof, not method_exists(): a third party schema predating
+			// the interface stays valid and simply contributes nothing.
+			if ( ! $schema instanceof SiteHealthInfoInterface ) {
+				continue;
+			}
+
+			foreach ( $schema->site_health_info( $this->options ) as $key => $row ) {
+				if ( ! is_array( $row ) ) {
+					continue;
+				}
+
+				$fields[ $module->id() . '_' . (string) $key ] = $row;
+			}
+		}
+
+		/**
+		 * Filters the rows of the plugin's Site Health Info section.
+		 *
+		 * For code that has state worth reporting but no module of its own.
+		 * The same disclosure rule applies as to a module's rows: the Info tab
+		 * is pasted into public threads, so nothing secret or personal.
+		 *
+		 * @since 2.1.0
+		 *
+		 * @param array<string, array<string, mixed>> $fields Rows keyed by id, in the shape of the debug_information filter.
+		 * @param Options                             $options The plugin options service.
+		 */
+		$filtered = apply_filters( 'gtm4wp_site_health_info', $fields, $this->options );
+
+		return is_array( $filtered ) ? $filtered : $fields;
+	}
+}

@@ -12,8 +12,13 @@ use GTM4WP\Google\KeyVault;
 use GTM4WP\Modules\GoogleDataManager\AdminSchema;
 use GTM4WP\Modules\GoogleDataManager\ConsentPolicy;
 use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
+use GTM4WP\Admin\SiteHealthInfo;
+use GTM4WP\Module\Registry;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
+use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -456,5 +461,41 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		);
 
 		$this->assertSame( array(), $result, 'A row of nothing but non-scalars normalizes to all-empty and is dropped.' );
+	}
+
+	// ---- Site Health Info --------------------------------------------------
+
+	public function test_the_schema_reports_into_the_plugins_site_health_section(): void {
+		Functions\when( '_get_cron_array' )->justReturn( array() );
+		Functions\when( 'as_get_scheduled_actions' )->justReturn( array() );
+		Functions\when( 'as_schedule_single_action' )->justReturn( 1 );
+		Functions\when( 'as_next_scheduled_action' )->justReturn( false );
+
+		$schema = new AdminSchema();
+		$this->assertInstanceOf( SiteHealthInfoInterface::class, $schema );
+
+		$rows = $schema->site_health_info( new Options( ( new GoogleDataManagerModule() )->defaults() ) );
+
+		// The rows are SiteHealth's, under its module-local keys; the collector
+		// is what files them under the module id.
+		foreach ( array( 'gdm_capture_attribution', 'gdm_send_refunds', 'gdm_consent_policy', 'gdm_capture_rate', 'gdm_queue' ) as $key ) {
+			$this->assertArrayHasKey( $key, $rows );
+			$this->assertArrayHasKey( 'label', $rows[ $key ] );
+			$this->assertArrayHasKey( 'value', $rows[ $key ] );
+		}
+	}
+
+	public function test_the_whole_plugin_files_the_data_manager_rows_under_its_module_id(): void {
+		Functions\when( '_get_cron_array' )->justReturn( array() );
+		Functions\when( 'as_get_scheduled_actions' )->justReturn( array() );
+		Functions\when( 'as_schedule_single_action' )->justReturn( 1 );
+		Functions\when( 'as_next_scheduled_action' )->justReturn( false );
+		Functions\when( 'apply_filters' )->returnArg( 2 );
+		Functions\when( 'do_action' )->justReturn( null );
+
+		$registry = Registry::with_default_modules();
+		$fields   = ( new SiteHealthInfo( $registry, new Options( $registry->defaults() ) ) )->fields();
+
+		$this->assertArrayHasKey( GoogleDataManagerModule::ID . '_gdm_send_refunds', $fields );
 	}
 }
