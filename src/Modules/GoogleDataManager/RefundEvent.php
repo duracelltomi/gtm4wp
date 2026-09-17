@@ -15,26 +15,34 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Turns one platform-neutral RefundData into the event body the API takes.
  *
- * **The two shapes.** Google Analytics understands two different refunds and
- * this class sends whichever one actually happened:
+ * **One shape.** Every refund carries its own amount, its currency and, where
+ * the platform recorded them, the lines it covers. A refund that returns the
+ * whole order is simply one that lists every line at its refunded quantity.
  *
- * - A **full refund** - one refund action that returns the whole order - is
- *   identified by its transaction id alone. No value, no currency, no items:
- *   the transaction id says which purchase to reverse, and Analytics reverses
- *   all of it.
- * - A **partial refund** carries its own amount and, where the platform
- *   recorded them, the lines it covers. Item-level refund metrics need the
- *   lines; the value pair is what the API requires alongside them.
+ * It was two shapes until 2026-09-17: a whole-order refund went out as the
+ * transaction id alone, on the old gtag contract that Analytics would reverse
+ * the entire purchase from the id. The phase 4 acceptance run measured that
+ * contract in a live property and it does not hold for the Data Manager API:
+ * nine such events were accepted, applied (SUCCESS), counted as refunds - and
+ * attributed a refund amount of zero, every one of them. Google's current
+ * reference marks the value as required and says to include each refunded
+ * item "regardless of whether you issue a full or partial refund" (U134).
+ * Partials with a value were attributed correctly in the same run.
  *
- * **A completing partial stays partial.** "Full" means *this one action
- * returned the entire order*, never "the order is now fully refunded". A
- * sequence of partials that adds up to the order total has already sent each
- * slice; turning the last one into a transaction-id-only event would tell
- * Analytics to reverse the whole purchase a second time, on top of the slices
- * already reversed. Both platforms make this easy to get wrong - Easy Digital
- * Downloads even hands the completing case a flag literally named
- * "all refunded" - so the decision is made here, from amounts, once, and
- * pinned by tests.
+ * The single shape also removes the decision the two-shape design had to get
+ * right: which refund is "full". A sequence of partials that adds up to the
+ * order total was the trap - both platforms make the completing slice easy to
+ * mistake for a whole-order refund (Easy Digital Downloads hands it a flag
+ * literally named "all refunded"), and treating it as one would have reversed
+ * the purchase twice. With every refund reporting its own slice there is
+ * nothing to decide, so nothing to get wrong.
+ *
+ * The amount mirrors the purchase event's value - the platform's own refund
+ * total, shipping and tax included unless the store's exclude options say
+ * otherwise on the purchase side - so a full refund nets to zero against the
+ * purchase it reverses. The refunded shipping and tax also travel as event
+ * parameters, which is where Analytics' own shipping and tax metrics are
+ * decremented from.
  */
 final class RefundEvent {
 
@@ -43,40 +51,6 @@ final class RefundEvent {
 	 * allowlist on the destination (U135).
 	 */
 	public const EVENT_NAME = 'refund';
-
-	/**
-	 * How close a refund's amount must be to the order total to count as
-	 * returning the whole order.
-	 *
-	 * Stored money is decimal, read back as a float and summed on both sides,
-	 * so an exact comparison would classify a rounding artefact as a partial
-	 * refund of nothing. Half a cent is below the smallest amount any currency
-	 * this runs in can express.
-	 */
-	public const AMOUNT_EPSILON = 0.005;
-
-	/**
-	 * Whether this refund returns the entire order in one action.
-	 *
-	 * Decided by comparing the refund's own amount against the parent order's
-	 * own total - not against what is left unrefunded, and not from any flag
-	 * the platform offers. A partial that happens to complete the order is
-	 * smaller than the order total by exactly the slices already sent, so it
-	 * falls out on the partial side by construction.
-	 *
-	 * An order with a total of zero or less has nothing to compare against and
-	 * is never called full.
-	 *
-	 * @param RefundData $refund The refund.
-	 * @return bool
-	 */
-	public static function is_full( RefundData $refund ): bool {
-		if ( $refund->order_total <= 0 ) {
-			return false;
-		}
-
-		return abs( $refund->amount - $refund->order_total ) < self::AMOUNT_EPSILON;
-	}
 
 	/**
 	 * Builds the event body.
@@ -100,13 +74,12 @@ final class RefundEvent {
 			$event['clientId'] = $refund->client_id;
 		}
 
-		if ( self::is_full( $refund ) ) {
-			return $event;
-		}
-
 		$event['currency']        = $refund->currency;
 		$event['conversionValue'] = round( $refund->amount, 2 );
 
+		// Lines only when the platform recorded them. A by-amount refund
+		// names none, and an empty list would claim "no items were refunded"
+		// where the truth is "the store did not say which".
 		if ( array() !== $refund->items ) {
 			$event['cartData'] = array( 'items' => array_values( $refund->items ) );
 		}
@@ -130,11 +103,8 @@ final class RefundEvent {
 	 * decrements them, because the purchase event reports both (see the
 	 * WooCommerce purchase builder) while the refund would not.
 	 *
-	 * Only the partial shape sends them: a full refund reverses the whole
-	 * transaction, its shipping and tax included, from the transaction id
-	 * alone. A zero amount is omitted rather than sent as "0", for the same
-	 * reason the items are - a present field is a claim, and nothing was
-	 * returned.
+	 * A zero amount is omitted rather than sent as "0", for the same reason
+	 * the items are - a present field is a claim, and nothing was returned.
 	 *
 	 * @param RefundData $refund The refund.
 	 * @return array<int, array{parameterName: string, value: string}>

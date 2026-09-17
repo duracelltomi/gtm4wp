@@ -97,25 +97,16 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 		);
 	}
 
-	// ---- The full-refund shape ---------------------------------------------
+	// ---- One shape, whatever the refund returns ----------------------------
 
-	public function test_a_refund_of_the_whole_order_is_identified_by_its_transaction_id_alone(): void {
-		$event = RefundEvent::build( self::refund( array( 'amount' => 100.0 ) ) );
-
-		$this->assertSame(
-			array(
-				'eventName'      => 'refund',
-				'eventTimestamp' => '2027-01-15T08:00:00Z',
-				'transactionId'  => 'WC-1001',
-				'eventSource'    => 'WEB',
-				'clientId'       => '313930999.1788522497',
-			),
-			$event,
-			'A full refund carries no money and no items at all - Analytics reverses the whole transaction from the id.'
-		);
-	}
-
-	public function test_a_full_refund_carries_no_value_currency_or_cart_keys(): void {
+	/**
+	 * The measurement this pins: nine whole-order refunds sent as the
+	 * transaction id alone were accepted and applied by Google, counted as
+	 * refunds, and attributed a refund amount of zero in the property, every
+	 * one of them - while partials carrying a value were attributed in the
+	 * same run. The id-only shape is a claim Google no longer honours.
+	 */
+	public function test_a_refund_of_the_whole_order_carries_its_amount_currency_and_every_line(): void {
 		$event = RefundEvent::build(
 			self::refund(
 				array(
@@ -125,62 +116,44 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayNotHasKey( 'conversionValue', $event );
-		$this->assertArrayNotHasKey( 'currency', $event );
-		$this->assertArrayNotHasKey( 'cartData', $event, 'Items are dropped even when the refund object carries them: sending both reverses the order twice.' );
-	}
-
-	public function test_a_rounding_difference_still_counts_as_a_full_refund(): void {
-		$this->assertTrue(
-			RefundEvent::is_full(
-				self::refund(
-					array(
-						'amount'      => 99.999,
-						'order_total' => 100.0,
-					)
-				)
-			)
-		);
-		$this->assertTrue(
-			RefundEvent::is_full(
-				self::refund(
-					array(
-						'amount'      => 100.001,
-						'order_total' => 100.0,
-					)
-				)
-			)
-		);
-	}
-
-	public function test_a_cent_short_is_a_partial_refund(): void {
-		$this->assertFalse(
-			RefundEvent::is_full(
-				self::refund(
-					array(
-						'amount'      => 99.99,
-						'order_total' => 100.0,
-					)
-				)
-			)
-		);
-	}
-
-	public function test_an_order_with_no_total_is_never_called_a_full_refund(): void {
-		$this->assertFalse(
-			RefundEvent::is_full(
-				self::refund(
-					array(
-						'amount'      => 0.0,
-						'order_total' => 0.0,
-					)
-				)
+		$this->assertSame(
+			array(
+				'eventName'       => 'refund',
+				'eventTimestamp'  => '2027-01-15T08:00:00Z',
+				'transactionId'   => 'WC-1001',
+				'eventSource'     => 'WEB',
+				'clientId'        => '313930999.1788522497',
+				'currency'        => 'EUR',
+				'conversionValue' => 100.0,
+				'cartData'        => array( 'items' => array( self::item() ) ),
 			),
-			'Zero equals zero, but an order with nothing to refund gives the comparison no meaning.'
+			$event,
+			'A whole-order refund is a refund that lists every line; there is no transaction-id-only shape any more.'
 		);
 	}
 
-	// ---- The partial shape -------------------------------------------------
+	public function test_a_refund_matching_the_order_total_is_not_treated_differently_from_any_other(): void {
+		$whole = RefundEvent::build(
+			self::refund(
+				array(
+					'amount' => 100.0,
+					'items'  => array( self::item() ),
+				)
+			)
+		);
+		$part  = RefundEvent::build(
+			self::refund(
+				array(
+					'amount' => 40.0,
+					'items'  => array( self::item() ),
+				)
+			)
+		);
+
+		$this->assertSame( array_keys( $whole ), array_keys( $part ), 'Same keys whatever the amount: the amount is data, never a switch between shapes.' );
+	}
+
+	// ---- Amount, currency and lines ---------------------------------------
 
 	public function test_a_partial_refund_carries_its_own_amount_the_currency_and_its_lines(): void {
 		$event = RefundEvent::build(
@@ -232,7 +205,7 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 		$this->assertSame(
 			100.0,
 			array_sum( $slices ),
-			'The slices add up to the order total, which is exactly the case that must not become one full-refund event.'
+			'The slices add up to the order total - the case the two-shape design once had to special-case, and the one-shape design has nothing to decide about.'
 		);
 	}
 
@@ -454,7 +427,7 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 		$this->assertArrayNotHasKey( 'additionalEventParameters', $event );
 	}
 
-	public function test_a_full_refund_reports_no_shipping_or_tax_because_it_reverses_the_whole_transaction(): void {
+	public function test_a_whole_order_refund_reports_its_shipping_and_tax_like_any_other(): void {
 		$event = RefundEvent::build(
 			self::refund(
 				array(
@@ -465,10 +438,19 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayNotHasKey(
-			'additionalEventParameters',
-			$event,
-			'The full shape carries the transaction id alone; adding amounts to it would describe a partial.'
+		$this->assertSame(
+			array(
+				array(
+					'parameterName' => 'shipping',
+					'value'         => '1.00',
+				),
+				array(
+					'parameterName' => 'tax',
+					'value'         => '20.00',
+				),
+			),
+			$event['additionalEventParameters'],
+			'The purchase incremented the shipping and tax metrics; a whole-order refund has to take them off again like a partial does.'
 		);
 	}
 }

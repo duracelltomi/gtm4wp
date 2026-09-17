@@ -244,7 +244,7 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		);
 	}
 
-	// ---- Amounts and the two shapes ---------------------------------------
+	// ---- Amounts ------------------------------------------------------------
 
 	public function test_a_negated_refund_total_becomes_a_positive_amount(): void {
 		$this->stub_orders( self::order(), self::refund( 40.0 ) );
@@ -253,27 +253,23 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 
 		$this->assertSame( 40.0, $refund->amount );
 		$this->assertSame( 100.0, $refund->order_total );
-		$this->assertFalse( RefundEvent::is_full( $refund ) );
 	}
 
-	public function test_a_refund_of_the_whole_order_is_recognised_as_full(): void {
+	public function test_a_refund_of_the_whole_order_reports_the_whole_amount(): void {
 		$this->stub_orders( self::order(), self::refund( 100.0 ) );
 
-		$this->assertTrue( RefundEvent::is_full( $this->adapter()->load( 12, 34 ) ) );
+		$this->assertSame( 100.0, RefundEvent::build( $this->adapter()->load( 12, 34 ) )['conversionValue'] );
 	}
 
 	/**
-	 * The trap, from the WooCommerce side: the order is fully refunded by the
-	 * time this last slice is issued, but the slice itself returned 40 of 100.
+	 * The former trap, from the WooCommerce side: the order is fully refunded
+	 * by the time this last slice is issued, but the slice itself returned 40
+	 * of 100 - and 40 is what the event says.
 	 */
-	public function test_a_partial_that_completes_the_order_is_still_partial(): void {
+	public function test_a_partial_that_completes_the_order_reports_only_its_own_slice(): void {
 		$this->stub_orders( self::order(), self::refund( 40.0 ) );
 
-		$refund = $this->adapter()->load( 12, 34 );
-		$event  = RefundEvent::build( $refund );
-
-		$this->assertFalse( RefundEvent::is_full( $refund ) );
-		$this->assertSame( 40.0, $event['conversionValue'] );
+		$this->assertSame( 40.0, RefundEvent::build( $this->adapter()->load( 12, 34 ) )['conversionValue'] );
 	}
 
 	public function test_the_currency_comes_from_the_parent_order(): void {

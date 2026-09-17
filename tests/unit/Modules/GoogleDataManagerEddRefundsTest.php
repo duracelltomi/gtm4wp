@@ -266,21 +266,19 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 		$refund = $this->adapter()->load( 12, 34 );
 		$event  = RefundEvent::build( $refund );
 
-		$this->assertFalse(
-			RefundEvent::is_full( $refund ),
-			'EDD would hand this refund $all_refunded = true; deciding from that would reverse the whole transaction on top of the slices already sent.'
-		);
+		// EDD would hand this refund $all_refunded = true. Nothing reads it,
+		// and the event reports the slice's own amount and nothing more.
 		$this->assertSame( 40.0, $event['conversionValue'] );
 		$this->assertSame( 'EUR', $event['currency'] );
 	}
 
-	public function test_one_refund_returning_the_whole_order_is_recognised_as_full(): void {
+	public function test_one_refund_returning_the_whole_order_reports_the_whole_amount(): void {
 		$this->stub_orders( self::order(), self::refund( 100.0 ) );
 
-		$refund = $this->adapter()->load( 12, 34 );
+		$event = RefundEvent::build( $this->adapter()->load( 12, 34 ) );
 
-		$this->assertTrue( RefundEvent::is_full( $refund ) );
-		$this->assertArrayNotHasKey( 'conversionValue', RefundEvent::build( $refund ) );
+		$this->assertSame( 100.0, $event['conversionValue'], 'A whole-order refund is a refund of the whole amount - not a transaction id with the amount left off.' );
+		$this->assertSame( 'EUR', $event['currency'] );
 	}
 
 	// ---- The refund order model (U132) -------------------------------------
