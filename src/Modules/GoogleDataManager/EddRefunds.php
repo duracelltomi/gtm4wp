@@ -193,7 +193,7 @@ final class EddRefunds implements RefundSource {
 	 * by the same code rather than reimplemented next to it.
 	 *
 	 * @param \EDD\Orders\Order $refund The refund order.
-	 * @return array<int, array{itemId: string, unitPrice: float, quantity: int}>
+	 * @return array<int, array<string, mixed>> Items in the API shape, see RefundEvent::item().
 	 */
 	private function items( \EDD\Orders\Order $refund ): array {
 		$download_data = new DownloadData( $this->options );
@@ -234,11 +234,7 @@ final class EddRefunds implements RefundSource {
 				continue;
 			}
 
-			$items[] = array(
-				'itemId'    => (string) $built['item_id'],
-				'unitPrice' => $unit_price,
-				'quantity'  => $quantity,
-			);
+			$items[] = RefundEvent::item( $built, $unit_price, $quantity );
 		}
 
 		return $items;

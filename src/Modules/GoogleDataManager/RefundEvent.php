@@ -53,6 +53,76 @@ final class RefundEvent {
 	public const EVENT_NAME = 'refund';
 
 	/**
+	 * The item parameters a refunded line carries besides its id, price and
+	 * quantity, by their Google Analytics names - the names the Data Manager
+	 * Item object takes in additionalItemParameters (U134), and the same keys
+	 * the purchase event's items use.
+	 *
+	 * @var string[]
+	 */
+	public const ITEM_PARAMETERS = array(
+		'item_name',
+		'item_brand',
+		'item_variant',
+		'item_category',
+		'item_category2',
+		'item_category3',
+		'item_category4',
+		'item_category5',
+	);
+
+	/**
+	 * One refunded line in the API's item shape, from the array the store's
+	 * item builder produced for the purchase event.
+	 *
+	 * The one place the shape is defined, for both platforms. Until 2026-09-19
+	 * the adapters sent the id, price and quantity and dropped everything else
+	 * the builder had made, and the acceptance run showed what that costs:
+	 * Analytics does not enrich a refund's items from the purchase it reverses,
+	 * it reports the item parameters the refund event itself carries, so every
+	 * refunded line showed up as "(not set)" with its amount attributed to no
+	 * product. The name, brand, variant and categories now travel with the id,
+	 * in additionalItemParameters, taken from the very same builder output -
+	 * so a refunded line and the line it refunds are described identically by
+	 * construction, not by a second implementation kept in step by hand.
+	 *
+	 * @param array<string, mixed> $built      The builder's item array (item_id, item_name, ...).
+	 * @param float                $unit_price Refunded unit price, positive.
+	 * @param int                  $quantity   Refunded quantity, positive.
+	 * @return array<string, mixed>
+	 */
+	public static function item( array $built, float $unit_price, int $quantity ): array {
+		$item = array(
+			'itemId'    => (string) $built['item_id'],
+			'unitPrice' => $unit_price,
+			'quantity'  => $quantity,
+		);
+
+		$parameters = array();
+
+		foreach ( self::ITEM_PARAMETERS as $name ) {
+			$value = $built[ $name ] ?? null;
+
+			// Absent stays absent: an empty name or category is not a claim
+			// worth making, and the purchase event omits them the same way.
+			if ( ! is_scalar( $value ) || '' === (string) $value ) {
+				continue;
+			}
+
+			$parameters[] = array(
+				'parameterName' => $name,
+				'value'         => (string) $value,
+			);
+		}
+
+		if ( array() !== $parameters ) {
+			$item['additionalItemParameters'] = $parameters;
+		}
+
+		return $item;
+	}
+
+	/**
 	 * Builds the event body.
 	 *
 	 * Absent values are absent keys, never empty strings or zeroes: the API

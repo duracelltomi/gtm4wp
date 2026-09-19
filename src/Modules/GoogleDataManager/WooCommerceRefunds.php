@@ -191,7 +191,7 @@ final class WooCommerceRefunds implements RefundSource {
 	 * what the store recorded.
 	 *
 	 * @param \WC_Order_Refund $refund The refund.
-	 * @return array<int, array{itemId: string, unitPrice: float, quantity: int}>
+	 * @return array<int, array<string, mixed>> Items in the API shape, see RefundEvent::item().
 	 */
 	private function items( \WC_Order_Refund $refund ): array {
 		$product_data = new ProductData( $this->options );
@@ -237,11 +237,7 @@ final class WooCommerceRefunds implements RefundSource {
 				continue;
 			}
 
-			$items[] = array(
-				'itemId'    => (string) $built['item_id'],
-				'unitPrice' => $unit_price,
-				'quantity'  => $quantity,
-			);
+			$items[] = RefundEvent::item( $built, $unit_price, $quantity );
 		}
 
 		return $items;

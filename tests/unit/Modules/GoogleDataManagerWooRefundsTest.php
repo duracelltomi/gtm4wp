@@ -300,16 +300,61 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 
 		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( $product, 2, 40.0 ) ) ) );
 
-		$this->assertSame(
+		$items = $this->adapter()->load( 12, 34 )->items;
+
+		$this->assertCount( 1, $items );
+		$this->assertSame( '123', $items[0]['itemId'] );
+		$this->assertSame( 20.0, $items[0]['unitPrice'] );
+		$this->assertSame( 2, $items[0]['quantity'] );
+		$this->assertContains(
 			array(
-				array(
-					'itemId'    => '123',
-					'unitPrice' => 20.0,
-					'quantity'  => 2,
-				),
+				'parameterName' => 'item_name',
+				'value'         => 'Test Product',
 			),
-			$this->adapter()->load( 12, 34 )->items
+			$items[0]['additionalItemParameters'],
+			'The refunded line carries the same name the purchase sent for it; without it Analytics files the refund under "(not set)".'
 		);
+	}
+
+	public function test_a_refunded_line_carries_every_item_parameter_the_purchase_builder_produced(): void {
+		$product = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Test Product',
+				'sku'   => 'SKU-1',
+			)
+		);
+
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( $product, 2, 40.0 ) ) ) );
+
+		$refund_item = $this->adapter()->load( 12, 34 )->items[0];
+		$purchase    = $this->product_data()->process_product(
+			$product,
+			array(
+				'quantity' => 2,
+				'price'    => 20.0,
+			),
+			'purchase'
+		);
+
+		$sent = array();
+		foreach ( $refund_item['additionalItemParameters'] as $parameter ) {
+			$sent[ $parameter['parameterName'] ] = $parameter['value'];
+		}
+
+		// Every name the builder gave a non-empty value travels, as the same
+		// string; nothing the builder left empty is invented.
+		foreach ( RefundEvent::ITEM_PARAMETERS as $name ) {
+			$value = $purchase[ $name ] ?? '';
+
+			if ( '' === (string) $value ) {
+				$this->assertArrayNotHasKey( $name, $sent, "An empty {$name} is omitted, not sent as an empty string." );
+			} else {
+				$this->assertSame( (string) $value, $sent[ $name ] ?? null, "The refund's {$name} is the purchase's." );
+			}
+		}
+
+		$this->assertArrayHasKey( 'item_name', $sent, 'At the very least the name travels.' );
 	}
 
 	public function test_the_item_id_is_the_one_the_purchase_builder_produces(): void {

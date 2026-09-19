@@ -32,20 +32,20 @@ final class RefundData {
 	/**
 	 * Constructor.
 	 *
-	 * @param string                                                             $platform        Platform id, one of RefundSource::PLATFORM_*.
-	 * @param int                                                                $order_id        The parent order's id.
-	 * @param int                                                                $refund_id       The refund's own id.
-	 * @param string                                                             $transaction_id  The GA transaction id of the parent order, prefix included - the join key.
-	 * @param string                                                             $currency        ISO 4217 currency of the order.
-	 * @param float                                                              $amount          The refunded amount, positive.
-	 * @param float                                                              $order_total     The parent order's own total, as it was before any refund.
-	 * @param int                                                                $timestamp       Unix time the refund was created.
-	 * @param array<int, array{itemId: string, unitPrice: float, quantity: int}> $items           Refunded lines; empty for a refund the platform recorded as an amount only.
-	 * @param string                                                             $client_id       Stored Google Analytics client id, empty when none was captured.
-	 * @param array<string, mixed>|null                                          $consent_state   Stored consent-mode state, or null when none was captured.
-	 * @param string                                                             $billing_country Two-letter billing country, empty when the order has none.
-	 * @param float                                                              $shipping        Refunded shipping, positive; 0.0 when none was returned or the platform has no shipping.
-	 * @param float                                                              $tax             Refunded tax, positive; 0.0 when none was returned.
+	 * @param string                           $platform        Platform id, one of RefundSource::PLATFORM_*.
+	 * @param int                              $order_id        The parent order's id.
+	 * @param int                              $refund_id       The refund's own id.
+	 * @param string                           $transaction_id  The GA transaction id of the parent order, prefix included - the join key.
+	 * @param string                           $currency        ISO 4217 currency of the order.
+	 * @param float                            $amount          The refunded amount, positive.
+	 * @param float                            $order_total     The parent order's own total, as it was before any refund.
+	 * @param int                              $timestamp       Unix time the refund was created.
+	 * @param array<int, array<string, mixed>> $items           Refunded lines in the API shape (RefundEvent::item()); empty for a refund the platform recorded as an amount only.
+	 * @param string                           $client_id       Stored Google Analytics client id, empty when none was captured.
+	 * @param array<string, mixed>|null        $consent_state   Stored consent-mode state, or null when none was captured.
+	 * @param string                           $billing_country Two-letter billing country, empty when the order has none.
+	 * @param float                            $shipping        Refunded shipping, positive; 0.0 when none was returned or the platform has no shipping.
+	 * @param float                            $tax             Refunded tax, positive; 0.0 when none was returned.
 	 */
 	public function __construct(
 		public string $platform,

@@ -380,17 +380,22 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 
 		$built = $this->download_data( $stored )->process_download( 55, array( 'price' => 20.0 ), 'purchase' );
 
-		$this->assertSame(
-			array(
-				array(
-					'itemId'    => $built['item_id'],
-					'unitPrice' => 20.0,
-					'quantity'  => 2,
-				),
-			),
-			$items
-		);
+		$this->assertCount( 1, $items );
+		$this->assertSame( $built['item_id'], $items[0]['itemId'] );
 		$this->assertSame( '55', $items[0]['itemId'] );
+		$this->assertSame( 20.0, $items[0]['unitPrice'] );
+		$this->assertSame( 2, $items[0]['quantity'] );
+
+		// The line is described the way the purchase described it - same
+		// builder, same name - so Analytics can attribute the refund to the
+		// product instead of to "(not set)".
+		$this->assertContains(
+			array(
+				'parameterName' => 'item_name',
+				'value'         => (string) $built['item_name'],
+			),
+			$items[0]['additionalItemParameters']
+		);
 	}
 
 	public function test_the_unit_price_excludes_tax_when_the_store_option_says_so(): void {

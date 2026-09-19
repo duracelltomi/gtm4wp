@@ -453,4 +453,98 @@ final class GoogleDataManagerRefundEventTest extends TestCase {
 			'The purchase incremented the shipping and tax metrics; a whole-order refund has to take them off again like a partial does.'
 		);
 	}
+
+	// ---- The item shape ----------------------------------------------------
+
+	public function test_an_item_carries_the_builders_parameters_under_their_analytics_names(): void {
+		$item = RefundEvent::item(
+			array(
+				'item_id'                  => 'SKU-1',
+				'item_name'                => 'Hoodie',
+				'item_brand'               => 'Acme',
+				'item_variant'             => 'Blue',
+				'item_category'            => 'Clothing',
+				'item_category2'           => 'Tops',
+				'price'                    => 45.0,
+				'quantity'                 => 1,
+				'google_business_vertical' => 'retail',
+			),
+			45.0,
+			1
+		);
+
+		$this->assertSame(
+			array(
+				'itemId'                   => 'SKU-1',
+				'unitPrice'                => 45.0,
+				'quantity'                 => 1,
+				'additionalItemParameters' => array(
+					array(
+						'parameterName' => 'item_name',
+						'value'         => 'Hoodie',
+					),
+					array(
+						'parameterName' => 'item_brand',
+						'value'         => 'Acme',
+					),
+					array(
+						'parameterName' => 'item_variant',
+						'value'         => 'Blue',
+					),
+					array(
+						'parameterName' => 'item_category',
+						'value'         => 'Clothing',
+					),
+					array(
+						'parameterName' => 'item_category2',
+						'value'         => 'Tops',
+					),
+				),
+			),
+			$item,
+			'Only the item parameters Analytics knows travel; price, quantity and the Ads vertical have their own fields or none.'
+		);
+	}
+
+	public function test_an_item_with_nothing_but_an_id_carries_no_parameter_list(): void {
+		$item = RefundEvent::item( array( 'item_id' => '38' ), 10.0, 2 );
+
+		$this->assertSame(
+			array(
+				'itemId'    => '38',
+				'unitPrice' => 10.0,
+				'quantity'  => 2,
+			),
+			$item,
+			'An empty parameter list is omitted, not sent: a present field is a claim.'
+		);
+	}
+
+	public function test_empty_and_non_scalar_parameter_values_are_left_out(): void {
+		$item = RefundEvent::item(
+			array(
+				'item_id'       => '38',
+				'item_name'     => 'Deal',
+				'item_brand'    => '',
+				'item_variant'  => null,
+				'item_category' => array( 'not', 'a', 'string' ),
+			),
+			10.0,
+			1
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'parameterName' => 'item_name',
+					'value'         => 'Deal',
+				),
+			),
+			$item['additionalItemParameters']
+		);
+	}
+
+	public function test_a_numeric_item_id_travels_as_a_string(): void {
+		$this->assertSame( '38', RefundEvent::item( array( 'item_id' => 38 ), 1.0, 1 )['itemId'] );
+	}
 }
