@@ -52,7 +52,9 @@ final class SendQueue {
 	public const HOOK_STATUS = 'gtm4wp_gdm_poll_status';
 
 	/**
-	 * Every hook this class schedules. Uninstall unschedules each one.
+	 * Every hook this class schedules. uninstall.php unschedules each one by
+	 * name - it writes the names out because it runs without the autoloader,
+	 * and SendQueueTest pins its list against this one.
 	 *
 	 * @var string[]
 	 */
@@ -230,24 +232,5 @@ final class SendQueue {
 		}
 
 		return $pending;
-	}
-
-	/**
-	 * Removes every queued job of this plugin. Called from uninstall, so a
-	 * removed plugin does not leave a cron entry firing at a hook nothing
-	 * listens on any more.
-	 *
-	 * @return void
-	 */
-	public static function unschedule_all(): void {
-		foreach ( self::HOOKS as $hook ) {
-			if ( function_exists( 'as_unschedule_all_actions' ) ) {
-				as_unschedule_all_actions( $hook, array(), self::GROUP );
-			}
-
-			if ( function_exists( 'wp_unschedule_hook' ) ) {
-				wp_unschedule_hook( $hook );
-			}
-		}
 	}
 }

@@ -157,6 +157,25 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 			}
 		);
 
+		// The order by id, for the receipt-link hash branch: the hash is a
+		// digest of the order's own key and e-mail, so the writer has to load
+		// the order the request names to check it.
+		Functions\when( 'edd_get_order' )->alias(
+			static function ( $id ) use ( $payment_key ) {
+				if ( self::ORDER_ID !== (int) $id ) {
+					return false;
+				}
+
+				return new \EDD\Orders\Order(
+					array(
+						'id'          => self::ORDER_ID,
+						'payment_key' => $payment_key,
+						'email'       => 'buyer@example.com',
+					)
+				);
+			}
+		);
+
 		Functions\when( 'edd_get_order_meta' )->alias(
 			fn ( $order_id, $key, $single = false ) => $this->edd_existing[ $key ] ?? ''
 		);
@@ -413,6 +432,63 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * Naming the other platform must not become a way around the first one's
 	 * check.
 	 */
+	/**
+	 * EDD's own receipt links carry the order id plus md5( id . key . email )
+	 * rather than the key, and the receipt page hands that hash over as the
+	 * token so the key never has to be printed (#250). The writer accepts it
+	 * as proof through the same rule the confirmation page applies.
+	 */
+	public function test_a_valid_edd_receipt_hash_writes_the_attribution(): void {
+		$this->given_edd_order( 'edd-payment-key-abc' );
+
+		$response = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => md5( self::ORDER_ID . 'edd-payment-key-abcbuyer@example.com' ),
+				)
+			)
+		);
+
+		$this->assertSame( 204, $response->get_status() );
+		$this->assertContains( AttributionCapture::META_CLIENT_ID, array_column( $this->edd_written, 1 ) );
+	}
+
+	public function test_a_wrong_edd_receipt_hash_is_refused(): void {
+		$this->given_edd_order( 'edd-payment-key-abc' );
+
+		$response = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => md5( self::ORDER_ID . 'some-other-keybuyer@example.com' ),
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( array(), $this->edd_written );
+	}
+
+	public function test_an_edd_receipt_hash_of_another_order_is_refused(): void {
+		$this->given_edd_order( 'edd-payment-key-abc' );
+
+		// The hash is right for order 42, but the request names order 43 - a
+		// guessed id has to fail even alongside somebody else's valid hash.
+		$response = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'order'    => (string) ( self::ORDER_ID + 1 ),
+					'token'    => md5( self::ORDER_ID . 'edd-payment-key-abcbuyer@example.com' ),
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( array(), $this->edd_written );
+	}
+
 	public function test_a_woocommerce_key_cannot_be_spent_on_the_edd_path(): void {
 		$this->given_woocommerce_order();
 		$this->given_edd_order( 'edd-payment-key-abc' );
@@ -535,6 +611,68 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	// ---- Control 4: consent, decided on the server -------------------------
 
 	/**
+	 * The order's STORED consent record wins over whatever the page posts.
+	 *
+	 * A buyer who refused analytics at checkout has that denial recorded with
+	 * the order; a grant on the receipt page, or a POST that simply omits the
+	 * consent map, must not put the identifiers the denial forbids beside it
+	 * (#249). The record itself stays as it was - write-only-if-absent - and it
+	 * is what the send lane reads.
+	 */
+	public function test_a_stored_consent_denial_drops_the_posted_identifiers_on_woocommerce(): void {
+		$order = $this->given_woocommerce_order(
+			array(
+				AttributionCapture::META_CONSENT_STATE => array(
+					'signals'     => array(
+						'analytics_storage' => 'denied',
+						'ad_storage'        => 'denied',
+					),
+					'captured_at' => 1,
+				),
+			)
+		);
+
+		( new BackfillEndpoint() )->backfill( self::request( array( 'consent' => array() ) ) );
+
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_SESSION_IDS, true ) );
+		$this->assertSame( '', (string) $order->get_meta( '_gtm4wp_gclid', true ) );
+		$this->assertSame(
+			'denied',
+			$order->get_meta( AttributionCapture::META_CONSENT_STATE, true )['signals']['analytics_storage'],
+			'The recorded denial is untouched.'
+		);
+	}
+
+	public function test_a_stored_consent_denial_drops_the_posted_identifiers_on_edd(): void {
+		$this->given_edd_order( 'edd-payment-key-abc' );
+		$this->edd_existing = array(
+			AttributionCapture::META_CONSENT_STATE => array(
+				'signals'     => array( 'analytics_storage' => 'denied' ),
+				'captured_at' => 1,
+			),
+		);
+
+		( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => 'edd-payment-key-abc',
+					// A grant posted from the receipt page.
+					'consent'  => array( 'signals' => array( 'analytics_storage' => 'granted' ) ),
+				)
+			)
+		);
+
+		$written_keys = array_column( $this->edd_written, 1 );
+
+		$this->assertNotContains( AttributionCapture::META_CLIENT_ID, $written_keys );
+		$this->assertNotContains( AttributionCapture::META_SESSION_IDS, $written_keys );
+		$this->assertContains( '_gtm4wp_gclid', $written_keys, 'Ad storage was not denied, so the click id still lands.' );
+		$this->assertNotContains( AttributionCapture::META_CONSENT_STATE, $written_keys, 'The posted grant does not replace the recorded denial.' );
+	}
+
+	/**
 	 * The posted consent map is not taken at face value.
 	 *
 	 * The override filter exists for sites where the browser's view of consent
@@ -569,6 +707,63 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 			$order->get_meta( AttributionCapture::META_CONSENT_STATE, true ),
 			"The site's own answer is stored, not the one the browser posted."
 		);
+	}
+
+	/**
+	 * The filter's second argument is the same thing here as at order creation.
+	 *
+	 * A callback is written against what CaptureHooks hands it - the WC_Order
+	 * object on WooCommerce, the order id on Easy Digital Downloads - and it
+	 * used to receive the request's raw string here instead, for both platforms
+	 * (#243). The route is posted to by the plugin's own script with errors
+	 * swallowed, so a callback that fataled on the string silently lost exactly
+	 * the attribution this route exists to rescue.
+	 */
+	public function test_the_consent_filter_receives_the_resolved_order_on_the_woocommerce_path(): void {
+		$order    = $this->given_woocommerce_order();
+		$received = array();
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $hook, $value, $order_reference = null ) use ( &$received ) {
+				if ( GTM4WP_WPFILTER_GDM_ORDER_CONSENT === $hook ) {
+					$received[] = $order_reference;
+				}
+
+				return $value;
+			}
+		);
+
+		( new BackfillEndpoint() )->backfill( self::request() );
+
+		$this->assertCount( 1, $received );
+		$this->assertSame( $order, $received[0], 'The resolved WC_Order object, the very instance the writer holds - never the request string.' );
+	}
+
+	public function test_the_consent_filter_receives_the_resolved_order_id_on_the_edd_path(): void {
+		$this->given_edd_order( 'edd-key' );
+		$received = array();
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $hook, $value, $order_reference = null ) use ( &$received ) {
+				if ( GTM4WP_WPFILTER_GDM_ORDER_CONSENT === $hook ) {
+					$received[] = $order_reference;
+				}
+
+				return $value;
+			}
+		);
+
+		( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => 'edd-key',
+				)
+			)
+		);
+
+		$this->assertCount( 1, $received );
+		$this->assertSame( self::ORDER_ID, $received[0], 'The resolved order id as an int, as capture_edd_order() passes it - never the request string.' );
 	}
 
 	/**

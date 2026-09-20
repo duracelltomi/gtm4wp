@@ -510,13 +510,8 @@ final class PageDataLayer {
 			}
 
 			$order_hash = sanitize_text_field( wp_unslash( $_GET['order'] ) );
-			$expected   = md5(
-				DownloadData::row_prop( $order, 'id' )
-				. DownloadData::row_prop( $order, 'payment_key' )
-				. DownloadData::row_prop( $order, 'email' )
-			);
 
-			return hash_equals( $expected, $order_hash )
+			return self::receipt_hash_matches( $order, $order_hash )
 				? (string) DownloadData::row_prop( $order, 'payment_key' )
 				: '';
 		}
@@ -530,6 +525,33 @@ final class PageDataLayer {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Whether a receipt-link verification hash belongs to an order.
+	 *
+	 * EDD's own receipt links carry `?id=` plus `?order=`, the latter being
+	 * md5( id . payment_key . email ) - the one-way proof the link holder is
+	 * entitled to that receipt (EDD\Blocks\Orders\get_payment_key()). It is
+	 * checked here for the confirmation page, and again by the Data Manager
+	 * backfill route, which accepts this hash as the buyer's proof so that the
+	 * receipt page never has to print the payment key the URL does not carry.
+	 * One definition, so the two checks cannot drift apart.
+	 *
+	 * @param \EDD\Orders\Order $order The order the hash is claimed for.
+	 * @param string            $hash  The hash from the URL or the request.
+	 * @return bool
+	 */
+	public static function receipt_hash_matches( \EDD\Orders\Order $order, string $hash ): bool {
+		$expected = md5(
+			DownloadData::row_prop( $order, 'id' )
+			. DownloadData::row_prop( $order, 'payment_key' )
+			. DownloadData::row_prop( $order, 'email' )
+		);
+
+		// hash_equals(): the comparison is against a secret's digest, so it
+		// must not leak through timing.
+		return '' !== $hash && hash_equals( $expected, $hash );
 	}
 
 	/**

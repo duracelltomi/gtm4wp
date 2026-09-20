@@ -200,6 +200,8 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 			array_merge(
 				array(
 					'id'           => 34,
+					// A refund of the order the fixtures pair it with.
+					'parent_id'    => 12,
 					// WooCommerce stores the total negated.
 					'total'        => -$amount,
 					'amount'       => $amount,
@@ -457,6 +459,18 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 			$this->adapter()->load( 12, 34 ),
 			'A WC_Order_Refund is not a WC_Order; nothing is built from an object that is neither.'
 		);
+	}
+
+	/**
+	 * The refund's parent has to be the order it is paired with, as the EDD
+	 * adapter already required: a mismatched pair would otherwise build an
+	 * event carrying the wrong order's transaction id (#242). A null here is
+	 * recorded as refund_unreadable, a replayable skip.
+	 */
+	public function test_a_refund_of_another_order_is_refused(): void {
+		$this->stub_orders( self::order(), self::refund( 40.0, array(), array( 'parent_id' => 99 ) ) );
+
+		$this->assertNull( $this->adapter()->load( 12, 34 ) );
 	}
 
 	public function test_a_missing_parent_order_is_refused(): void {

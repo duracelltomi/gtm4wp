@@ -349,6 +349,44 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->assertSame( 'PROCESSING', $log->all()[0]['result'] );
 	}
 
+	/**
+	 * The status poll is the one writer that updates an entry in place rather
+	 * than going through record(); it used to cap the value and skip the
+	 * cleaner, so a status string that was not a bare enum name was stored
+	 * verbatim (#244). The value comes from Google's own response, so this is
+	 * the class keeping its own "only sanitized text goes in" promise rather
+	 * than a guard against a visitor - but the promise is what the A4 REST
+	 * route and the settings panel rely on when they show the ring as stored.
+	 */
+	public function test_a_status_result_is_cleaned_and_capped_like_every_other_text_member(): void {
+		$log = $this->log();
+		$log->record(
+			self::entry(
+				array(
+					'request_id'  => 'req-1',
+					'destination' => 'G-ABC123',
+				)
+			)
+		);
+
+		$log->record_status(
+			'req-1',
+			array(
+				array(
+					'measurement' => 'G-ABC123',
+					'status'      => '  <b>SUCCESS</b> ' . str_repeat( 'X', SendLog::REASON_MAX_LENGTH ),
+				),
+			)
+		);
+
+		$stored = $log->all()[0]['result'];
+
+		$this->assertStringStartsWith( 'SUCCESS', $stored, 'The markup is stripped and the whitespace trimmed, as text() does for record().' );
+		$this->assertStringNotContainsString( '<', $stored );
+		$this->assertSame( SendLog::REASON_MAX_LENGTH, mb_strlen( $stored ), 'Capped to the same budget as record(), the ellipsis included.' );
+		$this->assertStringEndsWith( '…', $stored );
+	}
+
 	public function test_a_status_without_a_request_id_writes_nothing(): void {
 		$log = $this->log();
 		$log->record( self::entry( array( 'request_id' => '' ) ) );

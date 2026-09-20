@@ -40,9 +40,18 @@ delete_option( 'gtm4wp_gdm_send_log' );
 // read from SendQueue::HOOKS because this file runs without the plugin's
 // autoloader; the SendQueueTest pins the two lists against each other so they
 // cannot drift apart.
+//
+// Action Scheduler is asked by hook name ALONE. Its as_unschedule_all_actions()
+// takes the bulk cancel-by-hook path only when no group is given; with a group
+// it falls back to matching each action's arguments as well, and an empty
+// argument list there means "actions scheduled with no arguments", which none
+// of ours are - so the call that also named the group cancelled nothing. The
+// hook names are this plugin's own, so the group narrows nothing anyway. This
+// branch is only reached while the commerce plugin bundling the library is
+// still active at delete time; a store that removed it first keeps the rows.
 foreach ( array( 'gtm4wp_gdm_send_refund', 'gtm4wp_gdm_poll_status' ) as $gtm4wp_queue_hook ) {
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
-		as_unschedule_all_actions( $gtm4wp_queue_hook, array(), 'gtm4wp' );
+		as_unschedule_all_actions( $gtm4wp_queue_hook );
 	}
 
 	wp_unschedule_hook( $gtm4wp_queue_hook );

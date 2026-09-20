@@ -255,7 +255,12 @@ final class SendLog {
 				continue;
 			}
 
-			$result   = mb_substr( (string) ( $status['status'] ?? '' ), 0, self::REASON_MAX_LENGTH );
+			// Through the same cleaner every other text member takes, not a
+			// bare cap: this is the one writer that updates an entry in place,
+			// and it was the one member the class doc block's "sanitized"
+			// promise did not cover (#244). Google's status names are plain
+			// upper-case words, so a genuine value passes through unchanged.
+			$result   = $this->text( $status['status'] ?? '', self::REASON_MAX_LENGTH );
 			$errors   = max( 0, (int) ( $status['errors'] ?? 0 ) );
 			$warnings = max( 0, (int) ( $status['warnings'] ?? 0 ) );
 

@@ -179,10 +179,17 @@ final class UninstallTest extends TestCase {
 		// takes its Action Scheduler branch would otherwise depend on test order
 		// (TS-16). With the stub in place the branch is taken deliberately, and
 		// the purge it performs is asserted instead of merely tolerated.
+		//
+		// Every parameter is recorded, not only the hook: the alias that kept
+		// just the hook and the group stayed green while the real call named a
+		// group AND an empty argument list, which Action Scheduler reads as
+		// "actions scheduled with no arguments" and so cancelled nothing (#240).
+		// The library's default values stand in for what was not passed, so the
+		// assertion below is on the exact call shape the library receives.
 		$purged = array();
 		Functions\when( 'as_unschedule_all_actions' )->alias(
-			static function ( $hook, $args, $group ) use ( &$purged ) {
-				$purged[] = $hook . '|' . $group;
+			static function ( $hook, $args = array(), $group = '' ) use ( &$purged ) {
+				$purged[] = array( $hook, $args, $group );
 			}
 		);
 
@@ -209,11 +216,11 @@ final class UninstallTest extends TestCase {
 
 		$this->assertSame(
 			array(
-				'gtm4wp_gdm_send_refund|gtm4wp',
-				'gtm4wp_gdm_poll_status|gtm4wp',
+				array( 'gtm4wp_gdm_send_refund', array(), '' ),
+				array( 'gtm4wp_gdm_poll_status', array(), '' ),
 			),
 			$purged,
-			'On a store with Action Scheduler the queued actions are purged from its own store too, in the group this plugin uses.'
+			'On a store with Action Scheduler the queued actions are cancelled by hook name alone: no group and no argument filter, which is the only call shape that takes the cancel-by-hook path of the library and matches actions scheduled with a payload.'
 		);
 	}
 }

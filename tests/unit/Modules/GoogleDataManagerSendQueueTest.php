@@ -262,35 +262,6 @@ final class GoogleDataManagerSendQueueTest extends TestCase {
 
 	// ---- Cleanup -----------------------------------------------------------
 
-	public function test_uninstall_unschedules_every_hook_on_both_backends(): void {
-		$unscheduled = array();
-
-		Functions\when( 'as_unschedule_all_actions' )->alias(
-			static function ( $hook, $args, $group ) use ( &$unscheduled ) {
-				$unscheduled[] = 'as:' . $hook . ':' . $group;
-			}
-		);
-		Functions\when( 'wp_unschedule_hook' )->alias(
-			static function ( $hook ) use ( &$unscheduled ) {
-				$unscheduled[] = 'cron:' . $hook;
-
-				return 0;
-			}
-		);
-
-		SendQueue::unschedule_all();
-
-		$this->assertSame(
-			array(
-				'as:gtm4wp_gdm_send_refund:gtm4wp',
-				'cron:gtm4wp_gdm_send_refund',
-				'as:gtm4wp_gdm_poll_status:gtm4wp',
-				'cron:gtm4wp_gdm_poll_status',
-			),
-			$unscheduled
-		);
-	}
-
 	/**
 	 * The uninstaller cannot read these constants - it runs without the
 	 * autoloader - so it writes the names out. This is the assertion that keeps

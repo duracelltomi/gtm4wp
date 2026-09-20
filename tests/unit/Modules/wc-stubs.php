@@ -366,6 +366,14 @@ if ( ! class_exists( 'WC_Order_Refund' ) ) {
 			return $this->value( 'id', 0 );
 		}
 
+		// On WC_Abstract_Order since before the 5.0 floor; wc_create_refund()
+		// sets it to the refunded order's id. Defaults to 0 like WC_Data, so a
+		// fixture that forgets it is refused by the adapter's parent check
+		// rather than silently accepted (#242).
+		public function get_parent_id() {
+			return $this->value( 'parent_id', 0 );
+		}
+
 		// WooCommerce stores a refund's total NEGATED (wc_create_refund() sets
 		// it to the amount times -1), so the fixtures pass it negated too.
 		public function get_total() {

@@ -352,9 +352,12 @@ define( 'GTM4WP_WPFILTER_GDM_DESTINATIONS', 'gtm4wp_gdm_destinations' );
 /**
  * Filter (since 2.1) over the consent-mode signal map captured for an order:
  * receives the map parsed from the visitor's own consent cookie (or null when
- * none was captured) and the order reference, and returns the map to store.
- * The escape hatch for consent tools that keep the choice entirely inside the
- * GTM container, where the page carries no reflection of it.
+ * none was captured) and the order - the WC_Order object on WooCommerce, the
+ * order id (int) on Easy Digital Downloads, the same type whether the map
+ * arrives at order creation or from the receipt-page backfill - and returns the
+ * map to store. The escape hatch for consent tools that keep the choice
+ * entirely inside the GTM container, where the page carries no reflection of
+ * it.
  */
 define( 'GTM4WP_WPFILTER_GDM_ORDER_CONSENT', 'gtm4wp_gdm_order_consent' );
 

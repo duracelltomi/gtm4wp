@@ -25,12 +25,15 @@ defined( 'ABSPATH' ) || exit;
  * also why it is not simply "always try" - a backfill POST on every receipt
  * view would be a write attempt per pageview for nothing.
  *
- * What it prints is deliberately minimal: the order id and the purchase secret
- * that is **already in the address bar** of the page being rendered, plus the
- * route and a nonce. Nothing is disclosed that the visitor did not arrive
- * holding, which is why the receipt-visibility rules that govern showing the
- * buyer's name and address do not apply here - this discloses no order data at
- * all.
+ * What it prints is deliberately minimal: the order id and the purchase proof
+ * that is **already in the address bar** of the page being rendered - the
+ * WooCommerce order key, the Easy Digital Downloads payment key, or on EDD's
+ * own receipt links the verification hash those links carry instead of the key
+ * - plus the route and a nonce. Nothing is disclosed that the visitor did not
+ * arrive holding, which is why the receipt-visibility rules that govern showing
+ * the buyer's name and address do not apply here - this discloses no order data
+ * at all. That rule is exact, not approximate: the id-plus-hash branch used to
+ * print the payment key while the URL held only its one-way hash (#250).
  */
 final class ReceiptPage {
 
@@ -120,14 +123,17 @@ final class ReceiptPage {
 			return null;
 		}
 
-		// The chain's third branch resolves the key from the buyer's session,
-		// which means it is NOT in the page URL - and printing it would put a
+		// The token is whichever proof the URL itself carries. The chain's
+		// third branch resolves the key from the buyer's session, which means
+		// nothing secret is in the page URL - and printing the key would put a
 		// durable receipt secret into the HTML where any third-party script on
 		// the page could read it. The flag is only worth having when it costs
 		// no disclosure, so that branch is skipped: such a visitor simply does
 		// not backfill, and the attribution stays whatever order creation
 		// captured.
-		if ( ! self::edd_key_is_in_the_url( $payment_key ) ) {
+		$token = self::edd_url_token( $payment_key );
+
+		if ( '' === $token ) {
 			return null;
 		}
 
@@ -151,29 +157,39 @@ final class ReceiptPage {
 			}
 		}
 
-		return self::config( BackfillEndpoint::PLATFORM_EDD, (string) $order_id, $payment_key );
+		return self::config( BackfillEndpoint::PLATFORM_EDD, (string) $order_id, $token );
 	}
 
 	/**
-	 * Whether the visitor arrived already holding this payment key.
+	 * The purchase proof the page URL carries, or '' when it carries none.
 	 *
-	 * True for the two URL-borne branches of EDD's receipt chain: the key
-	 * itself as `?payment_key=`, or an `?id=` whose accompanying `?order=`
-	 * verification hash matched, which is how EDD's own receipt links carry
-	 * it. False when the key came from the purchase session, where the page
-	 * URL holds nothing secret.
+	 * The two URL-borne branches of EDD's receipt chain each hold a different
+	 * proof: `?payment_key=` holds the key itself; EDD's own receipt links hold
+	 * an `?id=` plus an `?order=` verification hash of the key, never the key.
+	 * Each branch hands over exactly what its URL holds - the backfill route
+	 * accepts either - and the purchase-session branch, whose URL holds
+	 * nothing secret, hands over nothing.
+	 *
+	 * The hash branch is only reached with a key already resolved, which
+	 * means resolve_payment_key() has verified the hash against the order;
+	 * the route verifies it again on the POST.
 	 *
 	 * @param string $payment_key The resolved payment key.
-	 * @return bool
+	 * @return string The key, the verification hash, or ''.
 	 */
-	private static function edd_key_is_in_the_url( string $payment_key ): bool {
+	private static function edd_url_token( string $payment_key ): string {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading the receipt URL of the page being rendered, not acting on a submission.
 		if ( isset( $_GET['payment_key'] ) && sanitize_text_field( wp_unslash( $_GET['payment_key'] ) ) === $payment_key ) {
-			return true;
+			return $payment_key;
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- As above.
-		return ! empty( $_GET['order'] ) && ! empty( $_GET['id'] );
+		if ( ! empty( $_GET['order'] ) && ! empty( $_GET['id'] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- As above.
+			return sanitize_text_field( wp_unslash( $_GET['order'] ) );
+		}
+
+		return '';
 	}
 
 	/**

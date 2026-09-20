@@ -357,7 +357,7 @@ final class AttributionCapture {
 	 * inside the GTM container, where the page carries no reflection of it and
 	 * the capture script has nothing to observe.
 	 *
-	 * @param mixed $order_reference The platform's order object or id, passed to the filter.
+	 * @param \WC_Order|int $order_reference The order, passed to the filter: the WC_Order object on WooCommerce, the order id (int) on Easy Digital Downloads.
 	 * @return array<string, mixed> Meta key to value; absent captures are absent keys.
 	 */
 	public static function meta_for_order( $order_reference ): array {
@@ -398,8 +398,14 @@ final class AttributionCapture {
 	 * verbatim would let a buyer hand us the consent answer the send gate then
 	 * reads.
 	 *
+	 * The order reference has one type per platform on every path that applies
+	 * the filter - order creation and the receipt-page backfill alike: the
+	 * WC_Order object on WooCommerce, the order id as an int on Easy Digital
+	 * Downloads. A callback written against one path must see the same thing on
+	 * the other (RI-31).
+	 *
 	 * @param array<string, mixed>|null $consent         The parsed consent state, or null.
-	 * @param mixed                     $order_reference The order it belongs to.
+	 * @param \WC_Order|int             $order_reference The order it belongs to: the WC_Order object, or the EDD order id.
 	 * @return array<string, mixed>|null
 	 */
 	public static function filter_consent( ?array $consent, $order_reference ): ?array {
@@ -413,8 +419,8 @@ final class AttributionCapture {
 		 *
 		 * @since 2.1.0
 		 *
-		 * @param array|null $consent         The parsed consent state, or null.
-		 * @param mixed      $order_reference The order the state belongs to.
+		 * @param array|null    $consent         The parsed consent state, or null.
+		 * @param \WC_Order|int $order_reference The order the state belongs to: the WC_Order object on WooCommerce, the order id on Easy Digital Downloads - the same type at order creation and on the receipt-page backfill.
 		 */
 		$filtered = apply_filters( GTM4WP_WPFILTER_GDM_ORDER_CONSENT, $consent, $order_reference );
 

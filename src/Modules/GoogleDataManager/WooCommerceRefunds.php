@@ -88,6 +88,17 @@ final class WooCommerceRefunds implements RefundSource {
 			return null;
 		}
 
+		// The refund really has to be a refund of this order, as the Easy
+		// Digital Downloads adapter checks too: wc_get_order() serves both
+		// kinds from one lookup, so without this a mismatched id pair would
+		// build an event reversing the wrong order's transaction. Nothing on a
+		// request path can supply such a pair today - the hook passes both ids
+		// from one argument and a replay only re-queues what the sender wrote -
+		// so this guards the stored references, not a caller (#242).
+		if ( (int) $refund->get_parent_id() !== $order_id ) {
+			return null;
+		}
+
 		$prefix = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX );
 
 		$created   = $refund->get_date_created();

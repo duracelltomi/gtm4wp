@@ -250,9 +250,11 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 	/**
 	 * The id-plus-hash branch does carry its proof in the URL, so it keeps the
 	 * flag - the guard above must not have cost the branch EDD's own receipt
-	 * links use.
+	 * links use. What it hands over is that proof, the hash: the key is NOT in
+	 * that URL, and printing it put a durable receipt secret into HTML any
+	 * third-party script on the page could read (#250).
 	 */
-	public function test_the_edd_receipt_link_branch_still_gets_the_flag(): void {
+	public function test_the_edd_receipt_link_branch_gets_the_flag_with_the_hash_as_its_token(): void {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		$_GET = array(
 			'id'    => (string) self::ORDER_ID,
@@ -272,11 +274,13 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
 
 		// resolve_payment_key() releases the key only when the hash matches.
-		$_GET['order'] = md5( self::ORDER_ID . 'edd-payment-key-abcbuyer@example.com' );
+		$hash          = md5( self::ORDER_ID . 'edd-payment-key-abcbuyer@example.com' );
+		$_GET['order'] = $hash;
 
 		$config = ReceiptPage::backfill_config();
 
-		$this->assertSame( 'edd-payment-key-abc', $config['token'] );
+		$this->assertSame( $hash, $config['token'] );
+		$this->assertNotContains( 'edd-payment-key-abc', $config, 'The payment key the URL does not carry is not printed either.' );
 	}
 
 	public function test_no_flag_when_the_platform_functions_are_absent(): void {

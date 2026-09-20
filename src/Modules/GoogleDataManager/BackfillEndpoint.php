@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Modules\EasyDigitalDownloads\PageDataLayer as EddPageDataLayer;
 use GTM4WP\RequestOrigin;
 use GTM4WP\RestCors;
 
@@ -28,12 +29,18 @@ defined( 'ABSPATH' ) || exit;
  * ones that class needs:
  *
  * - **Authorization is the buyer's own proof of purchase**, the same secret
- *   each platform already trusts to show the receipt: the WooCommerce order key
- *   or the Easy Digital Downloads payment key. The order id alone is never
- *   enough, because it is sequential and guessable.
+ *   each platform already trusts to show the receipt: the WooCommerce order
+ *   key, or on Easy Digital Downloads the payment key - or the verification
+ *   hash of it that EDD's own receipt links carry instead. The order id alone
+ *   is never enough, because it is sequential and guessable.
  * - **Write only if absent.** A field already captured is never overwritten,
  *   so even a caller holding a valid key cannot replace real attribution with
  *   values of their choosing. Backfill can only fill a hole.
+ * - **The stored consent record wins.** Identifiers the order's recorded
+ *   consent state forbids are dropped before writing, whatever the posted map
+ *   says - a denial captured at checkout is not undone by a grant on the
+ *   receipt page, because the record is what the send lane later reads and
+ *   write-only-if-absent keeps that record as it was (#249).
  * - **It discloses nothing.** The response carries no order data at all, so
  *   the route cannot be turned into an oracle for whether an order exists or
  *   what it contains.
@@ -93,12 +100,15 @@ final class BackfillEndpoint {
 	 * Permission callback.
 	 *
 	 * A guest checkout is the normal case, so this cannot be a capability
-	 * gate. The controls are the ones RequestOrigin documents: the REST nonce
-	 * as a malformed-request filter, and the request Origin as the actual gate.
-	 * Whether this particular caller may touch this particular order is a
-	 * separate question, answered in the callback by the platform's own
-	 * purchase proof - a permission callback that returns true for everyone
-	 * must be followed by an identity check in code, and this one is.
+	 * gate. What authorizes the write is the purchase proof checked in the
+	 * callback - a permission callback that returns true for everyone must be
+	 * followed by an identity check in code, and this one is. The two checks
+	 * here are filters in front of that, not the authorization: the REST nonce
+	 * refuses malformed requests, and the Origin check turns away drive-by
+	 * cross-site POSTs from a browser. Neither proves anything about the
+	 * caller on its own (a non-browser client sets Origin freely, and the
+	 * route consults no cookie), which is why the sibling beacons' description
+	 * of Origin as "the gate" does not carry over to this route.
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return bool
@@ -126,11 +136,11 @@ final class BackfillEndpoint {
 		// considered: every refusal has to look the same whatever was posted,
 		// or the status code becomes a way to test whether a guessed order and
 		// key go together.
-		$writer = self::PLATFORM_WC === $platform
+		$verified = self::PLATFORM_WC === $platform
 			? $this->woocommerce_writer( $order, $token )
 			: $this->edd_writer( $order, $token );
 
-		if ( null === $writer ) {
+		if ( null === $verified ) {
 			// One answer for "no such order", "wrong key" and "that platform
 			// is not active here", so the route says nothing about which
 			// orders exist.
@@ -141,6 +151,8 @@ final class BackfillEndpoint {
 			);
 		}
 
+		list( $writer, $order_reference ) = $verified;
+
 		$values = AttributionCapture::parse_payload( (array) $request->get_param( 'values' ) );
 
 		// The posted consent map goes through the site's own override filter,
@@ -148,9 +160,17 @@ final class BackfillEndpoint {
 		// filter exists for sites where the browser's view of consent is not
 		// the trustworthy one, so a route that stored the posted map verbatim
 		// would hand the buyer the answer the send gate later reads.
+		//
+		// The filter gets the RESOLVED order reference - the WooCommerce order
+		// object, the Easy Digital Downloads order id - never the request's
+		// raw string. A callback is written against what order creation hands
+		// it, and it has to see the same thing here (RI-31); this route is
+		// posted to by the plugin's own script, so a callback that fatals on a
+		// string would silently lose the very attribution the route exists to
+		// rescue.
 		$consent = AttributionCapture::filter_consent(
 			AttributionCapture::parse_consent_payload( (array) $request->get_param( 'consent' ) ),
-			$order
+			$order_reference
 		);
 
 		$values = AttributionCapture::apply_consent_gate( $values, $consent );
@@ -167,14 +187,32 @@ final class BackfillEndpoint {
 	}
 
 	/**
+	 * Drops the identifiers the order's STORED consent record forbids.
+	 *
+	 * The gate above ran against the posted map; this one runs against what
+	 * order creation recorded. Without it a buyer who refused analytics at
+	 * checkout and granted it on the receipt page - or simply posted the
+	 * identifiers with no consent map at all - would have them stored beside a
+	 * record that says denied (#249). The record itself is not touched here:
+	 * write-only-if-absent keeps it, and it is the record the send lane reads.
+	 *
+	 * @param array<string, mixed> $values The meta about to be written.
+	 * @param mixed                $stored The order's stored consent state, as read from meta.
+	 * @return array<string, mixed>
+	 */
+	private static function honour_stored_consent( array $values, $stored ): array {
+		return AttributionCapture::apply_consent_gate( $values, is_array( $stored ) ? $stored : null );
+	}
+
+	/**
 	 * A writer for a WooCommerce order, once the caller has proven they hold
 	 * the order key WooCommerce itself uses to authorize the receipt.
 	 *
 	 * @param string $order_id The order id.
 	 * @param string $token    The order key.
-	 * @return callable|null Null when the order cannot be verified.
+	 * @return array{0: callable, 1: \WC_Order}|null The writer and the resolved order, or null when the order cannot be verified.
 	 */
-	private function woocommerce_writer( string $order_id, string $token ): ?callable {
+	private function woocommerce_writer( string $order_id, string $token ): ?array {
 		if ( ! function_exists( 'wc_get_order' ) ) {
 			return null;
 		}
@@ -191,8 +229,9 @@ final class BackfillEndpoint {
 			return null;
 		}
 
-		return static function ( array $values ) use ( $order ): void {
+		$writer = static function ( array $values ) use ( $order ): void {
 			$written = false;
+			$values  = self::honour_stored_consent( $values, $order->get_meta( AttributionCapture::META_CONSENT_STATE, true ) );
 
 			foreach ( $values as $key => $value ) {
 				if ( self::already_present( $order->get_meta( $key, true ) ) ) {
@@ -207,21 +246,29 @@ final class BackfillEndpoint {
 				$order->save();
 			}
 		};
+
+		return array( $writer, $order );
 	}
 
 	/**
 	 * A writer for an Easy Digital Downloads order.
 	 *
-	 * The payment key IS the proof here: it is the secret EDD's own receipt
-	 * links carry, and the order is looked up *by* it rather than by an id the
-	 * request supplies, so an unguessable value is the only way in.
+	 * The proof is whichever secret the receipt URL carried, and EDD has two:
+	 * the payment key (`?payment_key=`), which the order is looked up *by*
+	 * rather than by an id the request supplies; or, on EDD's own receipt
+	 * links, the verification hash (`?id=` + `?order=`) - md5 of the id, the
+	 * key and the buyer's e-mail - which is checked against the order named by
+	 * the id through the same rule the confirmation page applies. Either way
+	 * an unguessable value is the only way in, and the receipt page never has
+	 * to print a secret its URL does not already hold (#250).
 	 *
-	 * @param string $order_id The order id, used only to confirm the key belongs to it.
-	 * @param string $token    The payment key.
-	 * @return callable|null Null when the order cannot be verified.
+	 * @param string $order_id The order id; the record the hash is checked against, or a cross-check on the key.
+	 * @param string $token    The payment key, or the receipt-link verification hash.
+	 * @return array{0: callable, 1: int}|null The writer and the resolved order id, or null when the order cannot be verified.
 	 */
-	private function edd_writer( string $order_id, string $token ): ?callable {
+	private function edd_writer( string $order_id, string $token ): ?array {
 		if ( ! function_exists( 'edd_get_order_by' )
+			|| ! function_exists( 'edd_get_order' )
 			|| ! function_exists( 'edd_get_order_meta' )
 			|| ! function_exists( 'edd_update_order_meta' ) ) {
 			return null;
@@ -231,21 +278,31 @@ final class BackfillEndpoint {
 			return null;
 		}
 
+		$requested_id = absint( $order_id );
+		$resolved_id  = 0;
+
 		$order = edd_get_order_by( 'payment_key', $token );
 
-		if ( ! is_object( $order ) ) {
-			return null;
+		if ( is_object( $order ) ) {
+			$resolved_id = (int) ( $order->id ?? 0 );
+		} elseif ( $requested_id > 0 ) {
+			// Not a payment key: a receipt-link hash, checked against the order
+			// the id names. The hash is a digest of that order's own key, so a
+			// guessed id still needs the key to produce it.
+			$by_id = edd_get_order( $requested_id );
+
+			if ( $by_id instanceof \EDD\Orders\Order && EddPageDataLayer::receipt_hash_matches( $by_id, $token ) ) {
+				$resolved_id = $requested_id;
+			}
 		}
-
-		$resolved_id = (int) ( $order->id ?? 0 );
-
-		$requested_id = absint( $order_id );
 
 		if ( 0 >= $resolved_id || $requested_id !== $resolved_id ) {
 			return null;
 		}
 
-		return static function ( array $values ) use ( $resolved_id ): void {
+		$writer = static function ( array $values ) use ( $resolved_id ): void {
+			$values = self::honour_stored_consent( $values, edd_get_order_meta( $resolved_id, AttributionCapture::META_CONSENT_STATE, true ) );
+
 			foreach ( $values as $key => $value ) {
 				if ( self::already_present( edd_get_order_meta( $resolved_id, $key, true ) ) ) {
 					continue;
@@ -254,6 +311,8 @@ final class BackfillEndpoint {
 				edd_update_order_meta( $resolved_id, $key, $value );
 			}
 		};
+
+		return array( $writer, $resolved_id );
 	}
 
 	/**
