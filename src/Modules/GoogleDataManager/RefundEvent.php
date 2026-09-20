@@ -58,6 +58,13 @@ final class RefundEvent {
 	 * Item object takes in additionalItemParameters (U134), and the same keys
 	 * the purchase event's items use.
 	 *
+	 * Everything the purchase item carries that a refund can carry too. Not
+	 * here on purpose: item_list_name / item_list_id, which the purchase reads
+	 * from the buyer's list-attribution cookie on the order-received page - at
+	 * refund time there is no visitor browser to read; and the Google Ads
+	 * fields (id, google_business_vertical, item_group_id), which are not
+	 * Analytics item parameters.
+	 *
 	 * @var string[]
 	 */
 	public const ITEM_PARAMETERS = array(
@@ -69,6 +76,8 @@ final class RefundEvent {
 		'item_category3',
 		'item_category4',
 		'item_category5',
+		'affiliation',
+		'discount',
 	);
 
 	/**

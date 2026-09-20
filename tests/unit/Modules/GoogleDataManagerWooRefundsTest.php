@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Actions;
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\GoogleDataManager\AttributionCapture;
 use GTM4WP\Modules\GoogleDataManager\RefundEvent;
@@ -98,16 +99,17 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 	 * @param float       $total    Refunded line total, as a positive number.
 	 * @return object
 	 */
-	private static function refund_item( \WC_Product $product, int $quantity, float $total ): object {
-		return new class( $product, $quantity, $total ) {
+	private static function refund_item( \WC_Product $product, int $quantity, float $total, ?float $subtotal = null ): object {
+		return new class( $product, $quantity, $total, $subtotal ?? $total ) {
 			/**
 			 * Builds the refunded line.
 			 *
 			 * @param \WC_Product $product  Product.
 			 * @param int         $quantity Positive quantity.
-			 * @param float       $total    Positive total.
+			 * @param float       $total    Positive total, after any discount.
+			 * @param float       $subtotal Positive pre-discount total; equals the total when nothing was discounted.
 			 */
-			public function __construct( private \WC_Product $product, private int $quantity, private float $total ) {
+			public function __construct( private \WC_Product $product, private int $quantity, private float $total, private float $subtotal ) {
 			}
 
 			public function get_product() {
@@ -120,6 +122,12 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 
 			public function get_total() {
 				return -$this->total;
+			}
+
+			// Negated like the total: WooCommerce stores every refund line
+			// amount that way, and the discount is their difference.
+			public function get_subtotal() {
+				return -$this->subtotal;
 			}
 
 			public function get_total_tax() {
@@ -588,5 +596,103 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		$this->assertArrayHasKey( 'tax', $purchase['ecommerce'] );
 		$this->assertSame( 1.0, $refund->shipping );
 		$this->assertSame( 5.0, $refund->tax );
+	}
+
+	// ---- Parity with the purchase item: discount, affiliation, variations ---
+
+	public function test_a_discounted_line_carries_its_per_unit_discount_like_the_purchase_item(): void {
+		$product = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Test Product',
+			)
+		);
+
+		// Two units, EUR 50 before the coupon, EUR 40 after: EUR 5 off each.
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( $product, 2, 40.0, 50.0 ) ) ) );
+
+		$parameters = $this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters'];
+
+		$this->assertContains(
+			array(
+				'parameterName' => 'discount',
+				'value'         => '5',
+			),
+			$parameters,
+			'The purchase item reported the per-unit discount; the refund of the same line reports the same figure.'
+		);
+	}
+
+	public function test_an_undiscounted_line_carries_no_discount_parameter(): void {
+		$product = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Test Product',
+			)
+		);
+
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( $product, 2, 40.0 ) ) ) );
+
+		$names = array_column( $this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters'], 'parameterName' );
+
+		$this->assertNotContains( 'discount', $names, 'No discount is not a discount of zero; the purchase item omits it too.' );
+	}
+
+	public function test_a_site_supplied_affiliation_travels_with_the_refunded_line(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION )->andReturn( 'Outlet store' );
+
+		$product = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Test Product',
+			)
+		);
+
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( $product, 2, 40.0 ) ) ) );
+
+		$this->assertContains(
+			array(
+				'parameterName' => 'affiliation',
+				'value'         => 'Outlet store',
+			),
+			$this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters']
+		);
+	}
+
+	public function test_a_variation_is_reported_the_way_the_purchase_reports_it(): void {
+		$variation = new \WC_Product_Variation(
+			array(
+				'id'                   => 456,
+				'parent_id'            => 123,
+				'title'                => 'Test Product - Blue, L',
+				'sku'                  => '',
+				'variation_attributes' => array(
+					'attribute_pa_color' => 'Blue',
+					'attribute_pa_size'  => 'L',
+				),
+			)
+		);
+
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( $variation, 1, 40.0 ) ) ) );
+
+		$refund   = $this->adapter()->load( 12, 34 )->items[0];
+		$purchase = $this->product_data()->process_product(
+			$variation,
+			array(
+				'quantity' => 1,
+				'price'    => 40.0,
+			),
+			'purchase'
+		);
+
+		$sent = array_column( $refund['additionalItemParameters'], 'value', 'parameterName' );
+
+		// The variation's own id identifies the line, as at purchase, and the
+		// variant string is the same one the purchase carried.
+		$this->assertSame( (string) $purchase['item_id'], $refund['itemId'] );
+		$this->assertSame( '456', $refund['itemId'] );
+		$this->assertSame( $purchase['item_variant'], $sent['item_variant'] );
+		$this->assertSame( 'Blue,L', $sent['item_variant'] );
+		$this->assertSame( $purchase['item_name'], $sent['item_name'] );
 	}
 }

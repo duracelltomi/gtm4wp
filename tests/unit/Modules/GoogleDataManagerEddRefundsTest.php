@@ -118,7 +118,7 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 	 * @param float $tax      Refunded line tax, positive.
 	 * @return \EDD\Orders\Order_Item
 	 */
-	private static function refund_item( int $quantity, float $total, float $tax = 0.0 ): \EDD\Orders\Order_Item {
+	private static function refund_item( int $quantity, float $total, float $tax = 0.0, float $discount = 0.0 ): \EDD\Orders\Order_Item {
 		return new \EDD\Orders\Order_Item(
 			array(
 				'id'           => 900,
@@ -128,7 +128,8 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 				'product_name' => 'My eBook',
 				'price_id'     => null,
 				'quantity'     => -$quantity,
-				'subtotal'     => -( $total - $tax ),
+				'subtotal'     => -( $total - $tax + $discount ),
+				'discount'     => -$discount,
 				'tax'          => -$tax,
 				'total'        => -$total,
 				'status'       => 'complete',
@@ -500,5 +501,29 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 		// Not an oversight: an EDD order carries no shipping total, and its
 		// purchase event reports none either, so there is nothing to reverse.
 		$this->assertSame( 0.0, $refund->shipping );
+	}
+
+	// ---- Parity with the purchase item: discount -----------------------------
+
+	public function test_a_discounted_line_carries_its_per_unit_discount_like_the_purchase_item(): void {
+		// Two units, EUR 10 off the line: EUR 5 per unit, negated on the refund
+		// order item like the other amounts.
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( 2, 40.0, 0.0, 10.0 ) ) ) );
+
+		$this->assertContains(
+			array(
+				'parameterName' => 'discount',
+				'value'         => '5',
+			),
+			$this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters']
+		);
+	}
+
+	public function test_an_undiscounted_line_carries_no_discount_parameter(): void {
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( 2, 40.0 ) ) ) );
+
+		$names = array_column( $this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters'], 'parameterName' );
+
+		$this->assertNotContains( 'discount', $names );
 	}
 }

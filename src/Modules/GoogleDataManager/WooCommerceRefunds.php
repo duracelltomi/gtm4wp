@@ -223,12 +223,26 @@ final class WooCommerceRefunds implements RefundSource {
 			// only guards against a store that stores it the other way round.
 			$unit_price = round( abs( (float) $refund->get_item_total( $item, $inc_tax ) ), 2 );
 
+			$attributes = array(
+				'quantity' => $quantity,
+				'price'    => $unit_price,
+			);
+
+			// The per-unit discount, the way the purchase item reports it: the
+			// gap between the line's pre-discount subtotal and its total, per
+			// unit, only when there is one. Both are negated on a refund line,
+			// so the difference is taken on their magnitudes.
+			if ( method_exists( $item, 'get_subtotal' ) && method_exists( $item, 'get_total' ) ) {
+				$line_discount = round( ( abs( (float) $item->get_subtotal() ) - abs( (float) $item->get_total() ) ) / $quantity, 2 );
+
+				if ( $line_discount > 0 ) {
+					$attributes['discount'] = $line_discount;
+				}
+			}
+
 			$built = $product_data->process_product(
 				$product,
-				array(
-					'quantity' => $quantity,
-					'price'    => $unit_price,
-				),
+				$attributes,
 				'refund',
 				$item
 			);

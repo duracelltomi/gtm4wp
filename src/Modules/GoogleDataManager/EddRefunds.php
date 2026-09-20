@@ -219,12 +219,22 @@ final class EddRefunds implements RefundSource {
 			$unit_price = round( abs( $line_total ) / $quantity, 2 );
 			$price_id   = DownloadData::row_prop( $item, 'price_id', null );
 
+			$attributes = array(
+				'quantity' => $quantity,
+				'price'    => $unit_price,
+			);
+
+			// The per-unit discount as the purchase item reports it; negated on
+			// the refund order item like every other amount there.
+			$line_discount = round( abs( (float) DownloadData::row_prop( $item, 'discount', 0 ) ) / $quantity, 2 );
+
+			if ( $line_discount > 0 ) {
+				$attributes['discount'] = $line_discount;
+			}
+
 			$built = $download_data->process_download(
 				(int) DownloadData::row_prop( $item, 'product_id', 0 ),
-				array(
-					'quantity' => $quantity,
-					'price'    => $unit_price,
-				),
+				$attributes,
 				'refund',
 				$item,
 				is_numeric( $price_id ) ? (int) $price_id : null
