@@ -321,12 +321,16 @@ for r in "${PLUGIN_ROOTS[@]}"; do grep -h '^tools:' "$r"/agents/*.md 2>/dev/null
 # it the digest reproduced across runs. `.orphaned_at` is the same false-drift class from the
 # other end (R29/#224): the updater stamps it into the SUPERSEDED version's tree at update
 # time, so a digest of a non-active version differs from its recorded pin for a non-content
-# reason — R26's pin only reproduced against 0.10.2.3 once it was excluded.
+# reason — R26's pin only reproduced against 0.10.2.3 once it was excluded. `__pycache__/`
+# is the THIRD class (R33/#247): the plugin's own Python scripts compile `.pyc` files into its
+# tree the first time they run, so the digest of an unchanged 0.11.0 moved from
+# `5db9240d32bee7ca` to `9d0eeba80484beea` after the 2026-09-10 scan with no update at all.
+# PA-19 already named `.pyc` as a file-COUNT trap; it is a digest trap for the same reason.
 # ⛔ STALENESS for this leg is NOT repo-keyed (R29/#224): a marketplace update lands on its
 # own clock, so re-read installed_plugins.json (version + lastUpdated) and re-compute this
 # digest against the recorded pin EVERY run — measured 0.106s, cost never justifies skipping.
 for r in "${PLUGIN_ROOTS[@]}"; do
-  ( cd "$r" && find . -type f -not -path './.in_use/*' -not -name '.orphaned_at' | LC_ALL=C sort \
+  ( cd "$r" && find . -type f -not -path './.in_use/*' -not -name '.orphaned_at' -not -path '*/__pycache__/*' | LC_ALL=C sort \
       | xargs sha256sum | sha256sum | cut -c1-16 )
 done
 cat ~/.claude/plugins/installed_plugins.json                   # version + installPath. NEVER pin by

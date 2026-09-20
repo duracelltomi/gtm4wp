@@ -53,6 +53,45 @@ expresses. Rate findings against it like this:
 - **A4 uploading/deleting/testing their own key is A4 → A4** — not a vulnerability,
   same as the container-ID rule.
 
+### The stored attribution and the send lane (since 2026-09-20)
+
+The Google Data Manager phases 3–4 store three more asset kinds, none of which the
+ladder above or the credential section names (R33, #246 — PA-20's "re-read the scope
+claims in the same change" did not happen when they landed):
+
+- **Pseudonymous visitor identifiers in order meta** — `_gtm4wp_ga_client_id`,
+  `_gtm4wp_ga_session_ids`, `_gtm4wp_gclid` / `_gtm4wp_gbraid` / `_gtm4wp_wbraid`, and
+  the consent map `_gtm4wp_consent_state`, written at order creation from the visitor's
+  own cookies and by the guest-facing backfill route (write-only-if-absent). They are
+  personal data in the GDPR sense (they tie a visit to a person's order), readable by
+  **A3/A4 by design** like every other order field, exported and erased through the
+  WordPress privacy tools (`PrivacyData`), and deliberately left behind by uninstall.
+  Rate a finding against them like any other order field: **reaching an A0-readable
+  page or dataLayer is exposure (RI-11) and at least Medium** — today no reader prints
+  them anywhere on the site, and the receipt-page config prints only what the address
+  bar already holds. A path that lets a caller *replace* a stored value (rather than
+  fill a hole) is an integrity finding rated by the lowest actor who can reach it; the
+  route's write-only-if-absent rule is the control to re-derive.
+- **The send-log ring and the health/capture counters** (`gtm4wp_gdm_send_log`,
+  `gtm4wp_gdm_destination_health`, `gtm4wp_gdm_capture_stats`) — order/refund ids,
+  statuses, counts, reason classes, sanitized error summaries and Google request ids.
+  Admin-only surfaces (an A4 REST read, the settings panel, Site Health). **Site
+  Health's Info section is pasted into public threads**, so the rating question for a
+  new row there is "may a stranger read it": no account address, no key material, no
+  raw third-party error text, no property id. A log row that starts carrying a request
+  or response body is the finding shape to watch, whatever the actor.
+- **Queued job payloads** in Action Scheduler / WP-Cron — platform, order id, refund id,
+  attempt, destination list, account id and request id. Scalars only; no token, no key.
+  A payload that grows a secret would be readable in the Scheduled Actions screen (A3
+  on stores where shop managers hold `manage_woocommerce`) and in the `cron` option.
+
+What leaves the site is the refund event body (transaction id, client id, amounts,
+item names/categories, a consent field) sent to the fixed Data Manager endpoint under
+the site's own service account. That is the feature, not a leak; the consent gate
+(`ConsentPolicy`) is the control that decides whether a given order's event may go,
+and a bypass of it is rated on the visitor whose data crosses (A0/A1 → Google), not on
+who triggers the send.
+
 ---
 
 ## Actors
@@ -170,5 +209,6 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | Date | Action |
 |---|---|
 | 2026-07-17 | Seeded. Actor ladder A0–A4, the lowest-actor severity rule (+ multisite `unfiltered_html` caveat), the two new-surface questions, and the in/out-of-scope list. Codifies the calls previously re-derived ad hoc per review (#30 `wontfix`, #32 Low, #31 exposure, Review 5's "DoS-bounded"). |
+| 2026-09-20 | Added **The stored attribution and the send lane** (R33, #246): phases 3–4 store pseudonymous visitor identifiers in order meta, a diagnostics ring, counters and queued job payloads, and the ladder had no vocabulary for any of them. Exposure rule for the identifiers, the paste-into-public rule for Site Health rows, and how a consent-gate bypass is rated. |
 | 2026-09-03 | Added **The stored credential** (R30, #230): the google-auth module made the old out-of-scope line "the plugin stores no credentials" false, and the off-site pivot a compromised service-account key enables had no rating vocabulary. Custody invariant, the encryption's honest boundary (with the DB-stored-salts caveat), and the A4→A4 rule for the key's own management routes. |
 | 2026-07-29 | Added the **development-time actors D0/D1** and brought the repository's own toolchain into scope (PA-14). A0–A4 rate risk to a *site*; they have no way to express third-party text or branch content causing code to run on the *maintainer's machine*, so findings #76/#77 had no severity vocabulary and, before that, no lens that would prompt for them. Same lowest-actor rule: D0 → D1 is the finding, rated on what the execution reaches, with enforced boundaries distinguished from described ones. |
