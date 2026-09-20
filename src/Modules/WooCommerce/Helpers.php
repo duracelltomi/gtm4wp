@@ -245,6 +245,12 @@ final class Helpers {
 	 * by the line quantity. Used to add GA4's per-item `discount` field where a
 	 * coupon or sale reduced the line (#348).
 	 *
+	 * The tax keys WooCommerce writes onto a cart item are asymmetric:
+	 * `line_subtotal_tax` next to `line_subtotal`, but `line_tax` (not
+	 * `line_total_tax`) next to `line_total` - see WC_Cart_Totals::set_items_tax().
+	 * Reading a key that does not exist silently adds no tax to that side, which
+	 * turned the whole line tax into a phantom discount on tax-inclusive stores (#470).
+	 *
 	 * Returns null when the totals are not available or when there is no discount
 	 * (≤ 0), so the caller can simply omit the field on undiscounted lines rather
 	 * than emit a 0.
@@ -267,7 +273,7 @@ final class Helpers {
 		$total    = (float) $cart_item_data['line_total'];
 		if ( $include_tax ) {
 			$subtotal += (float) ( $cart_item_data['line_subtotal_tax'] ?? 0 );
-			$total    += (float) ( $cart_item_data['line_total_tax'] ?? 0 );
+			$total    += (float) ( $cart_item_data['line_tax'] ?? 0 );
 		}
 
 		$discount = round( ( $subtotal - $total ) / $quantity, 2 );

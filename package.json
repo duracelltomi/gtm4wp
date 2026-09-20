@@ -30,7 +30,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.3",
     "@wordpress/scripts": "^30.0.0",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "~5.3.3"
@@ -39,13 +39,17 @@
     "@babel/core": "^7.29.6",
     "@babel/plugin-transform-modules-systemjs": "^7.29.4",
     "@opentelemetry/core": "^2.8.0",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "brace-expansion": "^5.0.8",
+    "joi": "^18.2.9",
+    "js-yaml@^3.0.0": "^3.15.2",
+    "js-yaml@^4.0.0": "^4.3.2",
     "linkify-it": "^5.0.2",
     "markdown-it": "^14.2.0",
     "minimatch": "^10.0.3",
     "puppeteer-core": "^25.0.0",
     "serialize-javascript": "^7.0.5",
+    "svgo@^3.0.0": "^3.3.5",
     "uuid": "^11.1.1",
     "webpack-dev-server": "^6.0.0"
   }

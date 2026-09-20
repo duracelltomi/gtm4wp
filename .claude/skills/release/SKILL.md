@@ -39,7 +39,11 @@ Read `.claude/RELEASE-STATE.md`. Then classify:
    on its "no release blockers" verdict; advisories go on the follow-up list.
 5. Changelog: the top heading must be this release's section, complete, with the
    `readme.txt` mirror block in sync (invoke the `changelog` skill for the
-   rules). The heading itself does not change at release time.
+   rules). The heading itself does not change at release time. **Count the words of
+   `readme.txt`'s `== Changelog ==` section** (to `== Upgrade Notice ==`,
+   `len(text.split())`): wordpress.org truncates it at 5,000 and only emails the
+   committers afterwards (U124, hit on 2.0.2). Keep it under ~4,000 by summarizing
+   the oldest big section and pointing at `CHANGELOG.md` on GitHub.
 
 ## 2. Version bump
 
@@ -83,6 +87,13 @@ change already carries its own. Then an annotated tag: `git tag -a X.Y.Z -m X.Y.
 
 - `git branch X.Y <release-commit>` and push — the maintenance home for X.Y.z
   bugfixes, which from now on land on BOTH `master` and this branch.
+- **Grep the toolchain for branch-name lists before calling this step done**
+  (`grep -rnE "master|1\.x|[0-9]\.[0-9]" .github/workflows/ .githooks/ .claude/hooks/ tools/`).
+  A workflow trigger or hook that names branches excludes the one just created, and the
+  failure is a run that never happens: `2.0` had no CI from its creation until the 2.0.2
+  pre-flight found `phpcs` red on its tip (security review 32, #235; pattern PA-20).
+  `ci.yml` now uses `branches: [ master, '*.*' ]`, so a dotted maintenance branch needs
+  no edit — but confirm with `gh run list --branch X.Y` after the first push.
 - Decide (with the maintainer) what happens to the *previous* stable branch, and
   record the decision in RELEASE-STATE.md. Precedent: at 2.0.0, `1.x` was frozen
   to reported-security-fixes only.

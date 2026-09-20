@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [ master, 1.x ]
+    # master plus every maintenance branch. The branch model names those after
+    # their line (1.x, 2.0, 2.1, ...), so a dotted name is the rule rather than a
+    # list to extend at every release: the 2.0 branch shipped 2.0.1 and carried
+    # a red phpcs into 2.0.2's pre-flight with no run ever having been triggered.
+    branches: [ master, '*.*' ]
   pull_request:
-    branches: [ master, 1.x ]
+    branches: [ master, '*.*' ]
 
 # Least privilege by default rather than whatever the repository setting happens to
 # be. Nothing here writes to the repo or calls the API; both jobs only need the

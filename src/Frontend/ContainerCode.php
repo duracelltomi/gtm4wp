@@ -488,7 +488,7 @@ final class ContainerCode {
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
 new Date().getTime(),event:\'gtm.js\'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
-\'//' . esc_js( $this->container_domain( $one_container ) ) . '/' . esc_js( $this->container_path( $one_container ) ) . $_gtm_loader_query .
+\'https://' . esc_js( $this->container_domain( $one_container ) ) . '/' . esc_js( $this->container_path( $one_container ) ) . $_gtm_loader_query .
 			( '' !== $_gtm_env ? "+'" . $_gtm_env . "'" : '' ) . ';f.parentNode.insertBefore(j,f);
 })(window,document,\'script\',\'' . esc_js( $datalayer_name ) . '\',\'' . esc_js( $one_gtm_id ) . '\');
 </script>';

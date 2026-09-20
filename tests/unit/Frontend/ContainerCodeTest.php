@@ -332,7 +332,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 
 		$this->assertStringContainsString( 'var dataLayer_content = [];', $output );
 		$this->assertStringContainsString( 'dataLayer.push( dataLayer_content );', $output );
-		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringContainsString( "'https://www.googletagmanager.com/gtm.js?id='+i+dl", $output );
 		$this->assertStringContainsString( "'GTM-AAA111'", $output );
 		$this->assertStringContainsString( "'GTM-BBB222'", $output );
 		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $output );
@@ -615,7 +615,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringContainsString( "'https://www.googletagmanager.com/gtm.js?id='+i+dl", $output );
 		$this->assertStringNotContainsString( 'container code output has been suppressed', $output );
 	}
 
@@ -636,7 +636,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringContainsString( "'https://www.googletagmanager.com/gtm.js?id='+i+dl", $output );
 		$this->assertStringNotContainsString( 'container code output has been suppressed', $output );
 	}
 
@@ -700,7 +700,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//gtm.example.com/gtm.js?id='+i+dl", $output );
+		$this->assertStringContainsString( "'https://gtm.example.com/gtm.js?id='+i+dl", $output );
 		$this->assertStringNotContainsString( 'bad path', $output );
 	}
 
@@ -738,7 +738,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//gtm.example.com/custom/loader.js?id='+i+dl", $output );
+		$this->assertStringContainsString( "'https://gtm.example.com/custom/loader.js?id='+i+dl", $output );
 	}
 
 	public function test_get_tag_uses_per_container_environment_and_domain(): void {
@@ -809,8 +809,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//gtm.example.com/custom/loader.js?id='+i+dl+'&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x'", $output );
-		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl;", $output );
+		$this->assertStringContainsString( "'https://gtm.example.com/custom/loader.js?id='+i+dl+'&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x'", $output );
+		$this->assertStringContainsString( "'https://www.googletagmanager.com/gtm.js?id='+i+dl;", $output );
 		$this->assertStringContainsString( "'GTM-AAA111'", $output );
 		$this->assertStringContainsString( "'GTM-BBB222'", $output );
 	}
@@ -833,7 +833,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//sgtm.example.com/custom/loader.js?'+dl;", $output );
+		$this->assertStringContainsString( "'https://sgtm.example.com/custom/loader.js?'+dl;", $output );
 		$this->assertStringNotContainsString( "?id='+i", $output );
 		// The container ID is still passed to the loader function as its argument.
 		$this->assertStringContainsString( "'GTM-AAA111'", $output );
@@ -859,7 +859,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//sgtm.example.com/custom/loader.js?'+dl+'&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x'", $output );
+		$this->assertStringContainsString( "'https://sgtm.example.com/custom/loader.js?'+dl+'&gtm_auth=authtoken&gtm_preview=env-2&gtm_cookies_win=x'", $output );
 	}
 
 	public function test_header_begin_omit_id_flag_ignored_without_custom_path(): void {
@@ -878,7 +878,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl;", $output );
+		$this->assertStringContainsString( "'https://www.googletagmanager.com/gtm.js?id='+i+dl;", $output );
 	}
 
 	public function test_get_tag_keeps_container_id_in_noscript_when_flagged(): void {

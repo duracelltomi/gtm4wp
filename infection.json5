@@ -6,19 +6,24 @@
     // maintainer machine, so load it via the scan dir (the env var reaches
     // PHPUnit's RunInSeparateProcess children, unlike a -d flag):
     //   PHP_INI_SCAN_DIR=';C:/Users/DuracellTomi/.php-ext/ini'
-    // KNOWN LIMITATION (2026-09-02, re-tested 2026-09-07): on that machine's
-    // PHP 8.4.15 ZTS Windows build, Infection exits silently (code 0, no error)
-    // during "Processing source code files" - mutant generation never
-    // completes. The initial coverage run works (PCOV fine; composer
-    // test:coverage works). Reproduced with default tmpDir, single file,
-    // --dry-run, one thread. **Not a version to wait out:** first seen on
-    // 0.34/0.35, and 0.32.6 - the version pinned here since the PHP 8.2 CI leg
-    // forced it, see U140 - does exactly the same, so this is the ZTS/Windows
-    // environment rather than an Infection regression. Expected to work on an
-    // NTS build or Linux; re-test after the next PHP bump, not the next
-    // Infection one. Until then, targeted mutation testing is done by hand:
-    // break one guard, assert the needle landed, run the matching suite,
-    // restore (the method phases 3 and 4 used).
+    // KNOWN LIMITATION (2026-09-02): on that machine's PHP 8.4.15 ZTS Windows
+    // build, Infection 0.34/0.35 exits silently (code 0, no error) during
+    // "Processing source code files" - mutant generation never completes. The
+    // initial coverage run works (PCOV fine; composer test:coverage works).
+    // Suspected ZTS/Windows environment issue, not config: reproduced with
+    // default tmpDir, single file, --dry-run, one thread. Expected to work on
+    // an NTS build or Linux CI; re-test after the next PHP or Infection bump.
+    // PINNED TO THE 0.31 LINE (2026-09-15): 0.33+ requires PHP 8.3 and its
+    // Symfony 8 dependencies require 8.4, which made composer install fail on
+    // CI's PHP 8.2 job from the day Infection landed (2026-09-07 onward, every
+    // master run red). composer.json now sets config.platform.php to 8.2.0 so
+    // the lock always resolves for the lowest runtime CI tests on; bump the
+    // platform and Infection together when 8.2 leaves the matrix.
+    // Re-tested 2026-09-07 on 0.32.6 as well: identical silent exit, so it is
+    // the ZTS/Windows environment rather than an Infection version - re-test
+    // after the next PHP bump, not the next Infection one. Until then targeted
+    // mutation testing is done by hand: break one guard, assert the needle
+    // landed, run the matching suite, restore (the method phases 3 and 4 used).
     "$schema": "vendor/infection/infection/resources/schema.json",
     "source": {
         "directories": [ "src" ]
