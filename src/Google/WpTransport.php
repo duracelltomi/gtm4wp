@@ -23,11 +23,8 @@ defined( 'ABSPATH' ) || exit;
 final class WpTransport implements Transport {
 
 	/**
-	 * Hosts the plugin is allowed to talk to. Exact match on the URL host,
-	 * https only.
-	 *
-	 * The token endpoint host is asserted against this list by the TokenService
-	 * suite, so the two definitions cannot drift apart unnoticed.
+	 * Hosts the plugin may talk to (exact match, https only); the TokenService
+	 * suite asserts the token endpoint's host against this list.
 	 *
 	 * @var string[]
 	 */
@@ -37,16 +34,13 @@ final class WpTransport implements Transport {
 	);
 
 	/**
-	 * Request timeout in seconds. Google answers a token exchange or an ingest
-	 * call well within this; the value bounds how long an admin action or a
-	 * queued job can hang on a stalled connection.
+	 * Request timeout in seconds; bounds how long an admin action or a queued
+	 * job can hang on a stalled connection.
 	 */
 	public const TIMEOUT = 15;
 
 	/**
-	 * Nesting depth json_decode() accepts for a response body. The deepest
-	 * documented Data Manager response (request status with per-destination
-	 * error lists) is a handful of levels; the limit bounds decoder recursion.
+	 * Nesting depth json_decode() accepts for a response body; bounds decoder recursion.
 	 */
 	private const JSON_MAX_DEPTH = 16;
 

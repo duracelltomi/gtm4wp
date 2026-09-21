@@ -199,10 +199,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: self::GROUP_ATTRIBUTION,
 				phase: Field::PHASE_EXPERIMENTAL,
 				choices: self::consent_policy_choices(),
-				// The chain the feature actually has: a destination gives
-				// capture a measurement ID to ask about, and capture gives this
-				// gate a consent state to read. With capture off nothing is
-				// ever stored for it to decide on.
+				// With capture off nothing is ever stored for this gate to decide on.
 				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
 				doc: self::DOC_PAGE
 			),
@@ -217,9 +214,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				),
 				group: self::GROUP_SENDING,
 				phase: Field::PHASE_EXPERIMENTAL,
-				// The chain in full: a destination to send to, and capture to
-				// have a client id to send with. Without the second one every
-				// refund would be skipped for want of an identifier.
+				// Without capture every refund is skipped for want of a client id.
 				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
 				doc: self::DOC_PAGE
 			),
@@ -252,15 +247,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	}
 
 	/**
-	 * Save-time sanitizer of the destinations table.
-	 *
-	 * Rejecting, not repairing (the container-table discipline): a row that
-	 * cannot send is named with the reason instead of being stored broken or
-	 * silently dropped. Rows where every cell the user fills is empty are
-	 * dropped silently - that is the untouched "Add row" state, which arrives
-	 * with the type select's seeded default and nothing else (RI-28), so the
-	 * emptiness test must ignore the type column. Error messages number rows
-	 * as the screen shows them, dropped rows included.
+	 * Save-time sanitizer of the destinations table: rejecting, not repairing,
+	 * a row that cannot send is named with the reason. Rows where every
+	 * user-filled cell is empty are the untouched "Add row" state (the type
+	 * select arrives seeded, RI-28, so the emptiness test ignores it) and are
+	 * dropped silently; error messages number rows as the screen shows them.
 	 *
 	 * @param mixed $value Raw submitted value.
 	 * @return array<int, array<string, string>>|\WP_Error
@@ -430,10 +421,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		}
 
 		return array(
-			// The test panel belongs to the destinations table it tests, so it
-			// renders inside that tab - not below the attribution-capture one,
-			// where a "Test destination" button has nothing to do with what the
-			// tab is showing.
+			// The test panel renders inside the destinations tab it belongs to.
 			'panelGroup'    => self::GROUP_DESTINATIONS,
 			'testPath'      => RestCors::REST_NAMESPACE . RestController::REST_ROUTE,
 			'optionKey'     => GTM4WP_OPTION_GDM_DESTINATIONS,
@@ -441,9 +429,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'threshold'     => DestinationHealth::FAILURE_THRESHOLD,
 			'logPath'       => RestCors::REST_NAMESPACE . RestController::LOG_ROUTE,
 			'replayPath'    => RestCors::REST_NAMESPACE . RestController::REPLAY_ROUTE,
-			// The send lanes, so the panel can tell an empty log that is
-			// waiting for its first send from one that can never fill up
-			// because nothing is turned on. A new lane joins this list.
+			// The send lanes, so the panel can tell "waiting for the first send"
+			// from "nothing is turned on". A new lane joins this list.
 			'sendKeys'      => array( GTM4WP_OPTION_GDM_SEND_REFUNDS ),
 			'columnChoices' => array(
 				GTM4WP_OPTION_GDM_DESTINATIONS => array(

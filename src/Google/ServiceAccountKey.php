@@ -25,35 +25,27 @@ defined( 'ABSPATH' ) || exit;
 final class ServiceAccountKey {
 
 	/**
-	 * The `type` value a service-account key file carries. Every other key
-	 * type Google Cloud can export (user OAuth client, external account) is
-	 * refused: none of them contains a private key the plugin could sign with.
+	 * The `type` of a service-account key file; every other exportable key
+	 * type is refused, none carries a private key to sign with.
 	 */
 	public const REQUIRED_TYPE = 'service_account';
 
 	/**
-	 * The `token_uri` older key files carry. Google's IAM documentation still
-	 * shows it in the Console-downloaded example next to the current
-	 * TokenService::TOKEN_ENDPOINT, and the two are the same endpoint under an
-	 * older host, so a file naming it is accepted and normalized rather than
-	 * refused.
+	 * The `token_uri` older key files carry (Google's IAM docs still show it):
+	 * the same endpoint under an older host, accepted and normalized.
 	 */
 	public const LEGACY_TOKEN_ENDPOINT = 'https://accounts.google.com/o/oauth2/token';
 
 	/**
-	 * Nesting depth json_decode() accepts for an upload. A key file is a flat
-	 * object, so anything deeper is not one; the limit only bounds decoder
-	 * recursion on a hostile upload.
+	 * Nesting depth json_decode() accepts: a key file is flat; this only bounds
+	 * decoder recursion on a hostile upload.
 	 */
 	private const JSON_MAX_DEPTH = 4;
 
 	/**
-	 * Constructor. Private: the only way in is from_json(), which validates.
-	 *
-	 * The properties are meant to be immutable once built but are not declared
-	 * `readonly`: that keyword is PHP 8.1 syntax and the declared floor is 8.0
-	 * (the CI php-floor job parses every shipped file with a real 8.0 binary).
-	 * Nothing in the plugin writes to them after construction.
+	 * Constructor. Private: the only way in is from_json(). The properties are
+	 * immutable in intent but not `readonly`: that is PHP 8.1 syntax and the
+	 * floor is 8.0.
 	 *
 	 * @param string $client_email   Service-account e-mail address (the JWT issuer).
 	 * @param string $private_key    PEM encoded RSA private key.
@@ -69,17 +61,12 @@ final class ServiceAccountKey {
 	}
 
 	/**
-	 * Builds the value object from the contents of a downloaded key file.
-	 *
-	 * Rejected unless the file is a JSON object with `type` equal to
-	 * "service_account", a non-empty `client_email`, a `private_key` that
-	 * OpenSSL parses as an RSA private key, and a `token_uri` that is the
-	 * Google OAuth token endpoint the plugin talks to (its current or its legacy
-	 * spelling; the legacy one is stored as the current). The last check is not
-	 * pedantry: the plugin only ever posts to its fixed endpoint constant, so a
-	 * key file naming another endpoint would produce a JWT whose audience never
-	 * matches where it is sent - a silent failure at every token mint. Refusing
-	 * it at upload names the problem while the admin is looking.
+	 * Builds the value object from a downloaded key file: `type` must be
+	 * "service_account", `client_email` non-empty, `private_key` an RSA key
+	 * OpenSSL parses, and `token_uri` the endpoint the plugin posts to (the
+	 * legacy spelling is normalized). The last check matters: another
+	 * endpoint would produce a JWT whose audience never matches, a silent
+	 * failure at every mint.
 	 *
 	 * @param string $json Raw contents of the uploaded key file.
 	 * @return self|\WP_Error
@@ -133,9 +120,8 @@ final class ServiceAccountKey {
 	}
 
 	/**
-	 * Reads one string field of the decoded file, or '' when it is missing or
-	 * not a string. A non-string value (an array where a string belongs) is a
-	 * malformed file, never something to stringify.
+	 * Reads one string field of the decoded file, or '' when missing or not a
+	 * string (never stringified: an array there is a malformed file).
 	 *
 	 * @param array<string, mixed> $data The decoded key file.
 	 * @param string               $key  Field name.
@@ -167,11 +153,9 @@ final class ServiceAccountKey {
 	}
 
 	/**
-	 * The one error message for every "this is not a service-account key file"
-	 * case. Deliberately not more specific: which field was missing is of no use
-	 * to the admin (the fix is always the same: download the key file again) and
-	 * the message doubles as the response to a hostile upload, where less detail
-	 * is better.
+	 * The one error for every "not a service-account key file" case:
+	 * deliberately unspecific (the fix is always to download the file again,
+	 * and it doubles as the answer to a hostile upload).
 	 *
 	 * @return \WP_Error
 	 */

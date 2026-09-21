@@ -46,9 +46,7 @@ final class EventsIngest {
 	public const EVENT_SOURCE_WEB = 'WEB';
 
 	/**
-	 * Request-level limits (U125). Not enforced anywhere yet - refund volume
-	 * is orders of magnitude below them - but the send paths of later phases
-	 * chunk against these rather than re-reading the docs.
+	 * Request-level limits (U125); send() chunks destinations against the second.
 	 */
 	public const MAX_EVENTS_PER_REQUEST       = 2000;
 	public const MAX_DESTINATIONS_PER_REQUEST = 10;
@@ -60,10 +58,9 @@ final class EventsIngest {
 	public const STATUS_ENDPOINT = 'https://datamanager.googleapis.com/v1/requestStatus:retrieve';
 
 	/**
-	 * Values of the request-level `consent` field's ConsentStatus enum (U138).
-	 * CONSENT_STATUS_UNSPECIFIED is deliberately absent: an unobserved signal is
-	 * omitted from the request instead, because omitting is the smaller claim
-	 * and "unspecified" is what Google infers anyway.
+	 * ConsentStatus enum values of the request-level `consent` field (U138).
+	 * CONSENT_STATUS_UNSPECIFIED is deliberately absent: an unobserved signal
+	 * is omitted instead, the smaller claim.
 	 */
 	public const CONSENT_GRANTED = 'CONSENT_GRANTED';
 	public const CONSENT_DENIED  = 'CONSENT_DENIED';
@@ -80,14 +77,10 @@ final class EventsIngest {
 	);
 
 	/**
-	 * RequestStatus values that mean processing has finished (U136).
-	 *
-	 * Google's own reference and its diagnostics guide disagree on the name of
-	 * the failure state - the REST enum lists FAILED, the guide's prose says
-	 * FAILURE - so both are accepted. The poller does not decide when to stop
-	 * from this list alone: anything that is neither PROCESSING nor the
-	 * unknown placeholder is treated as terminal, so a status Google adds later
-	 * ends the polling instead of looping until the 24 hour cap.
+	 * RequestStatus values (U136). Google's reference says FAILED, its
+	 * diagnostics guide FAILURE, so both are accepted; anything neither
+	 * PROCESSING nor the unknown placeholder is terminal, so a status Google
+	 * adds later ends the polling instead of looping to the 24 hour cap.
 	 */
 	public const STATUS_SUCCESS         = 'SUCCESS';
 	public const STATUS_PARTIAL_SUCCESS = 'PARTIAL_SUCCESS';
@@ -138,13 +131,9 @@ final class EventsIngest {
 	}
 
 	/**
-	 * Probes one destination with a validateOnly ingest request: nothing is
-	 * applied server-side, only errors return - so a missing property grant, a
-	 * wrong property id or a key Google refuses surfaces synchronously.
-	 *
-	 * The synthetic event mirrors the refund shape the send paths will use,
-	 * so the probe validates the lane the feature actually needs rather than
-	 * an arbitrary payload.
+	 * Probes one destination with a validateOnly ingest request, so a missing
+	 * property grant, a wrong property id or a refused key surfaces
+	 * synchronously. The synthetic event mirrors the refund shape the sends use.
 	 *
 	 * @param array<string, string> $row Validated destination row.
 	 * @return true|\WP_Error True when Google accepted the request.
@@ -191,23 +180,10 @@ final class EventsIngest {
 	}
 
 	/**
-	 * Sends one assembled event to a set of destination rows.
-	 *
-	 * Two axes force the request to be split, and both are real rather than
-	 * defensive:
-	 *
-	 * - **Service account.** One request carries one bearer token, so
-	 *   destinations authenticating with different stored accounts cannot
-	 *   share a request.
-	 * - **Destination count.** The API accepts at most
-	 *   MAX_DESTINATIONS_PER_REQUEST destinations per request (U125). The cap
-	 *   was recorded in phase 2 and left unenforced; this is where it starts to
-	 *   matter.
-	 *
-	 * Every resulting request reports its own outcome, because they genuinely
-	 * differ: one property can accept an event while another refuses it. The
-	 * caller records health, diagnostics and retries per outcome rather than
-	 * collapsing them into one verdict.
+	 * Sends one assembled event to a set of destination rows, split per service
+	 * account (one bearer token per request) and per
+	 * MAX_DESTINATIONS_PER_REQUEST (U125). Every request reports its own
+	 * outcome: one property can accept an event while another refuses it.
 	 *
 	 * @param array<int, array<string, string>> $rows    Validated destination rows.
 	 * @param array<string, mixed>              $event   One assembled event, already in API shape.
@@ -226,10 +202,7 @@ final class EventsIngest {
 
 	/**
 	 * Splits destination rows into the request groups send() makes: one group
-	 * per service account, each no longer than the per-request destination cap.
-	 *
-	 * Rows keep their given order inside a group, so a chunk boundary is
-	 * predictable rather than dependent on array key order.
+	 * per service account, each within the per-request cap, order preserved.
 	 *
 	 * @param array<int, array<string, string>> $rows Validated destination rows.
 	 * @return array<int, array<int, array<string, string>>>
@@ -289,9 +262,7 @@ final class EventsIngest {
 		$token = $this->tokens->access_token( $account, TokenService::SCOPE_DATA_MANAGER );
 
 		if ( $token instanceof \WP_Error ) {
-			// A key that cannot be opened, or that Google refuses, is not fixed
-			// by trying again in five minutes; it needs the admin. The status
-			// stays 0 because no request was made.
+			// Needs the admin, not a retry; status stays 0, no request was made.
 			$result['error']  = $token->get_error_message();
 			$result['reason'] = self::REASON_ACCOUNT;
 
@@ -314,8 +285,7 @@ final class EventsIngest {
 		);
 
 		if ( $response instanceof \WP_Error ) {
-			// A transport-level failure is DNS, TLS or a timeout: the request
-			// may never have reached Google, so it is worth repeating.
+			// DNS, TLS or a timeout: the request may never have reached Google.
 			$result['error']     = $response->get_error_message();
 			$result['reason']    = self::REASON_TRANSPORT;
 			$result['retryable'] = true;
@@ -342,13 +312,10 @@ final class EventsIngest {
 	}
 
 	/**
-	 * The reason class of a refused request: Google's own google.rpc.Code name
-	 * when the standard error envelope carried one, otherwise the HTTP status.
-	 *
-	 * This exists so that the failure can be NAMED somewhere the error text
-	 * itself must not go. Site Health's debug section is pasted into public
-	 * support threads, and an error message from Google can quote fragments of
-	 * the request that caused it; a code name cannot.
+	 * The reason class of a refused request: Google's google.rpc.Code name when
+	 * present, otherwise the HTTP status. Names the failure where the error
+	 * text must not go (Site Health is pasted into public threads, and an error
+	 * message can quote the request).
 	 *
 	 * @param array{status: int, body: array|null} $response The transport response.
 	 * @return string
@@ -364,11 +331,8 @@ final class EventsIngest {
 	}
 
 	/**
-	 * Whether an HTTP status is worth repeating the request for.
-	 *
-	 * Rate limiting and server-side failures are transient by definition;
-	 * everything else in the 4xx range says the request itself is wrong, and
-	 * repeating it would only spend quota on the same rejection.
+	 * Whether an HTTP status is worth repeating the request for: rate limiting
+	 * and server-side failures are transient; any other 4xx says the request is wrong.
 	 *
 	 * @param int $status HTTP status code.
 	 * @return bool
@@ -379,11 +343,8 @@ final class EventsIngest {
 
 	/**
 	 * The request-level `consent` field for a stored consent-mode signal map,
-	 * or an empty array when the map carries neither ads signal.
-	 *
-	 * Only observed signals are mapped. An absent signal is left out of the
-	 * request rather than sent as the enum's unspecified value: the two mean
-	 * the same thing to Google, and omitting does not claim we looked.
+	 * empty when it carries neither ads signal. An absent signal is omitted
+	 * rather than sent as the unspecified value.
 	 *
 	 * @param array<string, mixed> $signals Consent-mode signal map (name => granted|denied).
 	 * @return array<string, string>
@@ -405,12 +366,9 @@ final class EventsIngest {
 	}
 
 	/**
-	 * Asks Google how an accepted ingest request was processed.
-	 *
-	 * Ingestion is asynchronous - Google's own guidance says results appear
-	 * between 30 minutes and 24 hours after the request - so a 200 on the
-	 * ingest call means "accepted", not "applied". This is the only way to
-	 * learn the difference (U136).
+	 * Asks Google how an accepted ingest request was processed (U136):
+	 * ingestion is asynchronous (30 minutes to 24 hours), so a 200 on the
+	 * ingest call means "accepted", not "applied".
 	 *
 	 * @param string $account_id Service account the request was sent with.
 	 * @param string $request_id The requestId the ingest response returned.
@@ -448,13 +406,8 @@ final class EventsIngest {
 
 	/**
 	 * Reduces a requestStatus:retrieve body to the per-destination rows the
-	 * diagnostics ring stores: which data stream, what state, and how many
-	 * records Google objected to.
-	 *
-	 * Only counts and status names are kept. The reasons Google returns are
-	 * left behind on purpose - the log is shown on an admin screen and pasted
-	 * into support threads, and a reason list can name the records it came
-	 * from.
+	 * diagnostics ring stores. Only counts and status names are kept; Google's
+	 * reason lists can name the records they came from and are left behind.
 	 *
 	 * @param array<string, mixed> $body Decoded response body.
 	 * @return array<int, array{measurement: string, status: string, errors: int, warnings: int}>
@@ -509,12 +462,8 @@ final class EventsIngest {
 	}
 
 	/**
-	 * Whether a per-destination status means Google has finished with the
-	 * request.
-	 *
-	 * Written as "anything that is not still running" rather than as a list of
-	 * finished states: a status name Google adds later should stop the polling,
-	 * not keep it looping for 24 hours (UC-5).
+	 * Whether a per-destination status means Google has finished: "anything
+	 * not still running", not a list of finished states (UC-5).
 	 *
 	 * @param string $status A requestStatus value.
 	 * @return bool
@@ -526,15 +475,10 @@ final class EventsIngest {
 	}
 
 	/**
-	 * A short, storable description of a refused ingest request.
-	 *
-	 * Uses the standard Google error envelope (`error.status` and
-	 * `error.message`) when present. Both are Google's own text about our
-	 * request; the summary is sanitized and capped so a raw body fragment
-	 * cannot ride along into a notice or a health record. A status the
-	 * settings screen can act on gets a plain-words explanation in front,
-	 * with Google's own sentence kept in parentheses - "NOT_FOUND: Requested
-	 * entity was not found." alone told the admin nothing to do.
+	 * A short, storable description of a refused request from the standard
+	 * Google error envelope, sanitized and capped so a raw body fragment cannot
+	 * reach a notice. An actionable status gets plain-words wording in front
+	 * ("NOT_FOUND: Requested entity was not found." alone told the admin nothing).
 	 *
 	 * @param array{status: int, body: array|null} $response The transport response.
 	 * @return string
@@ -561,15 +505,10 @@ final class EventsIngest {
 	}
 
 	/**
-	 * Actionable wording for the google.rpc.Code names this probe commonly
-	 * comes back with (U126 in .upstream/upstream-review-checklist.md). An
-	 * unmapped or renamed status degrades to the raw summary alone, never to
-	 * silence.
-	 *
-	 * NOT_FOUND deliberately points at access as well as the IDs: like most
-	 * Google APIs, an entity the caller is not allowed to see is reported as
-	 * not found rather than confirmed to exist, so "check the IDs" alone
-	 * would send an admin with a missing property grant down the wrong path.
+	 * Actionable wording for the common google.rpc.Code names (U126); an
+	 * unmapped status degrades to the raw summary, never to silence. NOT_FOUND
+	 * points at access as well as the IDs: Google reports an entity the caller
+	 * may not see as not found.
 	 *
 	 * @param string $status The `error.status` name.
 	 * @return string Explanation, or '' for a status with no mapped wording.

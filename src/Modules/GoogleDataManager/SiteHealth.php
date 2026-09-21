@@ -17,32 +17,16 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Puts the state of the send lanes where support workflows already look.
+ * Puts the state of the send lanes into Site Health, the page support threads
+ * send people to (the admin notice is about a live gap; this is the standing
+ * answer to "is this working"). The status test is registered here; the Info
+ * rows go through Admin\SiteHealthInfo via this module's AdminSchema, which
+ * asks debug_fields(). Both read STORED records only, never an HTTP call.
  *
- * The admin notice next to this interrupts whoever happens to open wp-admin;
- * Site Health is the page hosts and support threads send people to, and it
- * keeps the state instead of being dismissed. They complement each other
- * rather than duplicating: the notice is about a live gap, the status test is
- * a standing answer to "is this working".
- *
- * Two surfaces, wired differently. The status test is registered here, as
- * this module's own. The Info rows are not: the plugin has ONE section on the
- * Info tab, assembled by Admin\SiteHealthInfo from every module that opts in
- * through SiteHealthInfoInterface, and this module's AdminSchema is the one
- * that opts in - it asks this class for the rows (debug_fields()), which is
- * where the knowledge of what is safe to show stays.
- *
- * Both surfaces read the STORED records only. Neither ever makes an HTTP call:
- * a Site Health page load must not depend on Google being reachable, and the
- * destination panel's Test button remains the one place a live probe happens.
- *
- * ⛔ **What may not appear in the debug section.** Its text is copied wholesale
- * into public support threads by people who have no way to review it first, so
- * it carries statuses, timestamps, counts and bare code names, and nothing
- * else: no service-account address, no key material in any form, no raw error
- * text from Google (which can quote fragments of what we sent), and no GA4
- * property IDs. Destinations are named by the label the site owner chose, and
- * by their measurement ID - which is already in the site's public HTML.
+ * ⛔ The debug section is pasted into public support threads: statuses,
+ * timestamps, counts and bare code names only. No service-account address, no
+ * key material, no raw Google error text, no GA4 property IDs; destinations
+ * are named by their label and measurement ID (already in the public HTML).
  */
 final class SiteHealth {
 
@@ -97,29 +81,13 @@ final class SiteHealth {
 	}
 
 	/**
-	 * Runs the status test.
-	 *
-	 * Three outcomes, in order of severity:
-	 *
-	 * - **critical** when a stored service-account key can no longer be
-	 *   decrypted - that kills every destination using it at once, and it
-	 *   happens without anyone touching the plugin; rotating the security keys
-	 *   in wp-config.php is enough - and when a destination has failed
-	 *   repeatedly. Both are the same outcome for the store: events it was set
-	 *   up to send are being lost, right now, with every refund. The key case
-	 *   is listed first only because it outranks the other when both hold. It
-	 *   was "recommended" once, while the admin notice for the very same
-	 *   condition was red, site-wide and not dismissible; Site Health's
-	 *   "recommended" bucket is for improvements, and a configured lane that
-	 *   is dropping data is not an improvement waiting to be made.
-	 * - **recommended** when attribution capture is on and orders are arriving
-	 *   with nothing being captured. This is the failure the feature is
-	 *   otherwise silent about - a measurement ID that matches no tag in the
-	 *   container produces no error anywhere, and would first be noticed weeks
-	 *   later as refunds that could not be sent - but it is an inference from
-	 *   a run of orders, not a refusal Google answered with, so it asks for a
-	 *   look rather than declaring a breakage.
-	 * - **good** otherwise, including when nothing is turned on.
+	 * Runs the status test. Three outcomes: **critical** when a stored key can
+	 * no longer be decrypted (rotating the wp-config security keys is enough to
+	 * cause it) or a destination has failed repeatedly - both mean events are
+	 * being lost right now, which is not an "improvement waiting to be made";
+	 * **recommended** when capture is on and orders arrive with nothing captured
+	 * (the otherwise silent failure, but an inference, not a refusal); **good**
+	 * otherwise, including when nothing is turned on.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -226,10 +194,7 @@ final class SiteHealth {
 		);
 
 		foreach ( $this->vault->all() as $index => $account ) {
-			// The account is named by the label its owner typed and by nothing
-			// else. Its client_email is an identifier of their Google Cloud
-			// project and has no business in a section built to be pasted in
-			// public.
+			// Named by its label only; the client_email identifies their Cloud project.
 			$fields[ 'gdm_account_' . $index ] = array(
 				'label' => __( 'Google service account', 'duracelltomi-google-tag-manager' ),
 				'value' => sprintf(
@@ -316,12 +281,8 @@ final class SiteHealth {
 	}
 
 	/**
-	 * The stored destination rows, normalized.
-	 *
-	 * The stored list rather than the filtered runtime one, for the reason the
-	 * health notice gives: both surfaces point the admin at the settings table,
-	 * and naming a row a third-party filter injected would send them looking
-	 * for something that is not there.
+	 * The stored destination rows, normalized: the stored list, not the
+	 * filtered runtime one, because this points the admin at the settings table.
 	 *
 	 * @return array<int, array<string, string>>
 	 */

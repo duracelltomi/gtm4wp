@@ -92,13 +92,10 @@ final class TokenService {
 
 		$key = $this->vault->open( $account_id );
 		if ( $key instanceof \WP_Error ) {
-			// The unreadable-key path records its own "re-upload required"
-			// status inside open(); recording a token failure on top would
-			// overwrite it with the weaker "error". Any other open() failure
-			// (stored metadata that no longer passes the key parser - DB-level
-			// damage, no plugin write path produces it) is recorded here, so
-			// the account does not keep showing its last status while every
-			// mint fails. An unknown id records nothing by design.
+			// open() records "re-upload required" itself; recording a token
+			// failure on top would overwrite it with the weaker "error". Other
+			// open() failures (damaged metadata) are recorded here; an unknown
+			// id records nothing.
 			if ( 'gtm4wp_google_key_unreadable' !== $key->get_error_code() ) {
 				$this->vault->record_token_result(
 					$account_id,
@@ -139,9 +136,7 @@ final class TokenService {
 			return new \WP_Error( 'gtm4wp_google_token_refused', $message );
 		}
 
-		// $fresh is the settings screen's Test button: an admin who pressed it has
-		// to see the time move, so that path always writes (see the vault's
-		// is_unchanged_success()).
+		// $fresh is the Test button, which always writes (see is_unchanged_success()).
 		$this->vault->record_token_result( $account_id, true, '', $scope, $fresh );
 
 		$ttl = $expires_in - self::EARLY_EXPIRY;
@@ -234,11 +229,8 @@ final class TokenService {
 	}
 
 	/**
-	 * A short, storable description of a refused token exchange.
-	 *
-	 * Uses Google's `error` code and `error_description` when present. Both
-	 * are Google's own text about our request (never key material), and the
-	 * vault caps and sanitizes what it stores.
+	 * A short, storable description of a refused token exchange from Google's
+	 * `error` and `error_description` (never key material; the vault caps it).
 	 *
 	 * @param array{status: int, body: array|null} $response The transport response.
 	 * @return string

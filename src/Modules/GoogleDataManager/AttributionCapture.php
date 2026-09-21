@@ -14,20 +14,11 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The platform-neutral half of the capture: parse what the browser stored,
- * validate it strictly, and hand the resulting meta pairs to a per-platform
- * writer. Only the hook wiring differs between WooCommerce and Easy Digital
- * Downloads; everything decided here is decided once for both.
- *
- * The parsers reject rather than repair. These cookies are ours by format, but
- * a cookie is attacker-writable whoever defined it, so every field is matched
- * against a grammar and dropped when it does not fit - a "cleaned up" value
- * would be an invented one, and an invented ID produces an event that can
- * never be matched to anything.
- *
- * Absent values are omitted from the meta entirely. There is no empty-string
- * placeholder: a later send has to be able to tell "no client ID was ever
- * resolved" from "the client ID is the empty string", and only an absent key
- * says the first one.
+ * validate it strictly, hand the meta pairs to a per-platform writer. The
+ * parsers reject rather than repair (a cookie is attacker-writable whoever
+ * defined it, and a "cleaned up" ID is an invented one), and absent values
+ * are omitted, never stored as '', so a later send can tell "never resolved"
+ * from "empty".
  */
 final class AttributionCapture {
 
@@ -52,19 +43,14 @@ final class AttributionCapture {
 	public const META_CLICK_ID_PREFIX = '_gtm4wp_';
 
 	/**
-	 * Grammar of a Google Analytics client or session id.
-	 *
-	 * Deliberately generous - a client id looks like `1234567890.1234567890`
-	 * and a session id like `1788522496` today, but pinning those exact shapes
-	 * would turn a future Google format into what looks like a plugin bug
-	 * (UC-5). What this rules out is everything that could matter downstream:
-	 * quotes, angle brackets, whitespace, control characters.
+	 * Grammar of a Google Analytics client or session id. Deliberately generous
+	 * (UC-5): it rules out quotes, brackets, whitespace and control characters,
+	 * not a future Google format.
 	 */
 	public const ID_PATTERN = '/^[A-Za-z0-9._-]{1,64}$/D';
 
 	/**
-	 * Grammar of a click id. Same reasoning, with room for the long opaque
-	 * values Google Ads produces.
+	 * Grammar of a click id, with room for Google Ads' long opaque values.
 	 */
 	public const CLICK_ID_PATTERN = '/^[A-Za-z0-9._-]{1,512}$/D';
 
@@ -96,21 +82,20 @@ final class AttributionCapture {
 	public const SIGNAL_VALUES = array( 'granted', 'denied' );
 
 	/**
-	 * Most consent signals kept for one order. Consent mode v2 defines seven;
-	 * the cap is what keeps a crafted cookie from turning into unbounded meta.
+	 * Most consent signals kept per order (consent mode v2 defines seven); the
+	 * cap keeps a crafted cookie from becoming unbounded meta.
 	 */
 	public const MAX_SIGNALS = 20;
 
 	/**
-	 * Most session ids kept for one order - one per configured data stream.
+	 * Most session ids kept per order, one per configured data stream.
 	 */
 	public const MAX_SESSIONS = 20;
 
 	/**
-	 * All meta keys this feature writes, which is also the list the privacy
-	 * exporter and eraser work from. One definition: a key added here without
-	 * the privacy wiring following would leave personal data behind a request
-	 * that claims to have removed everything.
+	 * All meta keys this feature writes, which is also what the privacy
+	 * exporter and eraser work from - one definition, or an erasure request
+	 * would leave personal data behind.
 	 *
 	 * @return string[]
 	 */
@@ -129,11 +114,8 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Decodes one of the capture cookies.
-	 *
-	 * The size is checked before the decode, so an oversized crafted value
-	 * costs a length comparison instead of a JSON parse, and the format version
-	 * is checked before anything is read out of it.
+	 * Decodes one of the capture cookies: size checked before the parse,
+	 * format version before anything is read.
 	 *
 	 * @param string $cookie_name Cookie to read.
 	 * @return array<string, mixed>|null The decoded payload, or null when absent or unusable.
@@ -143,11 +125,8 @@ final class AttributionCapture {
 			return null;
 		}
 
-		// The raw value is a JSON container, not a value used at any output
-		// sink: it is decoded below and every field extracted from it is
-		// validated individually against a grammar. A blanket sanitizer here
-		// would corrupt valid JSON without adding any protection (the
-		// read_item_list_cookie precedent).
+		// A JSON container, not an output value: every extracted field is
+		// validated against a grammar; a blanket sanitizer would corrupt it.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$raw = wp_unslash( $_COOKIE[ $cookie_name ] );
 
@@ -155,11 +134,8 @@ final class AttributionCapture {
 			return null;
 		}
 
-		// No URL decoding here: the capture script percent-encodes the payload
-		// on the way out (a JSON body contains characters a cookie value may
-		// not carry raw), and PHP has already decoded it on the way in. Doing
-		// it again would be a second decode, which silently rewrites any value
-		// that legitimately contains a percent sign.
+		// No URL decoding: PHP already decoded the percent-encoded payload once,
+		// and a second decode rewrites any value containing a percent sign.
 		$decoded = json_decode( $raw, true, AttributionCookies::MAX_DEPTH );
 
 		if ( ! is_array( $decoded ) ) {
@@ -200,11 +176,8 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Validates an ID payload however it arrived.
-	 *
-	 * Shared by the cookie parser and the backfill route on purpose: values
-	 * posted by a visitor and values stored by a visitor deserve exactly the
-	 * same scrutiny, and one grammar cannot drift against itself (UC-6).
+	 * Validates an ID payload however it arrived; shared by the cookie parser
+	 * and the backfill route so one grammar cannot drift against itself (UC-6).
 	 *
 	 * @param array<string, mixed> $decoded The raw payload.
 	 * @return array<string, mixed> Only the members that passed validation.
@@ -220,16 +193,10 @@ final class AttributionCapture {
 		if ( isset( $decoded[ AttributionCookies::KEY_SESSIONS ] ) && is_array( $decoded[ AttributionCookies::KEY_SESSIONS ] ) ) {
 			$sessions = array();
 
-			// Sliced, not counted while looping: the cap has to bound the work
-			// as well as the result, and counting accepted entries bounds only
-			// the result - a payload of nothing but invalid entries would run
-			// the loop over every one of them. The cookie path is bounded by
-			// the size check above, but the backfill route parses a JSON body
-			// with no such limit.
+			// Sliced, not counted while looping: the cap must bound the work, not
+			// only the result (the backfill route parses an unbounded JSON body).
 			foreach ( array_slice( $decoded[ AttributionCookies::KEY_SESSIONS ], 0, self::MAX_SESSIONS, true ) as $measurement_id => $session_id ) {
-				// The key is a measurement id, held to the same grammar the
-				// settings table validates, so a crafted map cannot introduce
-				// keys of any other shape.
+				// The key is a measurement id, held to the settings table's grammar.
 				if ( ! is_string( $measurement_id )
 					|| 1 !== preg_match( DestinationRows::MEASUREMENT_PATTERN, $measurement_id ) ) {
 					continue;
@@ -309,11 +276,9 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Validates values posted to the backfill route, keyed by meta key.
-	 *
-	 * The same grammar as the cookie, then mapped straight onto the meta keys,
-	 * so the route can only ever write the fields capture itself writes - a
-	 * caller cannot introduce a key of their own choosing into order meta.
+	 * Validates values posted to the backfill route, keyed by meta key: the
+	 * cookie's grammar mapped onto the fixed meta keys, so a caller can never
+	 * introduce a key of their own into order meta.
 	 *
 	 * @param array<string, mixed> $payload The posted values.
 	 * @return array<string, mixed> Meta key to value.
@@ -350,12 +315,9 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Builds the meta pairs to store for one order.
-	 *
-	 * The consent map runs through a filter before it is stored, which is the
-	 * escape hatch for a consent tool that keeps the visitor's choice entirely
-	 * inside the GTM container, where the page carries no reflection of it and
-	 * the capture script has nothing to observe.
+	 * Builds the meta pairs to store for one order. The consent map runs
+	 * through a filter first: the escape hatch for a consent tool that keeps
+	 * the choice entirely inside the GTM container.
 	 *
 	 * @param \WC_Order|int $order_reference The order, passed to the filter: the WC_Order object on WooCommerce, the order id (int) on Easy Digital Downloads.
 	 * @return array<string, mixed> Meta key to value; absent captures are absent keys.
@@ -389,20 +351,12 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Runs a consent state through the site's own override filter.
-	 *
-	 * Every path that stores a consent state goes through here, so a site that
-	 * answers the filter is answering for all of them. That matters most on the
-	 * backfill path: the filter exists precisely for sites where the map the
-	 * browser composed is not trustworthy, and a route that took the posted map
-	 * verbatim would let a buyer hand us the consent answer the send gate then
-	 * reads.
-	 *
-	 * The order reference has one type per platform on every path that applies
-	 * the filter - order creation and the receipt-page backfill alike: the
-	 * WC_Order object on WooCommerce, the order id as an int on Easy Digital
-	 * Downloads. A callback written against one path must see the same thing on
-	 * the other (RI-31).
+	 * Runs a consent state through the site's override filter. Every storing
+	 * path goes through here, the backfill path included: a route taking the
+	 * posted map verbatim would let a buyer hand us the answer the send gate
+	 * reads. The order reference has one type per platform on every path
+	 * (WC_Order on WooCommerce, the order id on EDD), so a callback sees the
+	 * same thing at creation and on backfill (RI-31).
 	 *
 	 * @param array<string, mixed>|null $consent         The parsed consent state, or null.
 	 * @param \WC_Order|int             $order_reference The order it belongs to: the WC_Order object, or the EDD order id.
@@ -410,12 +364,9 @@ final class AttributionCapture {
 	 */
 	public static function filter_consent( ?array $consent, $order_reference ): ?array {
 		/**
-		 * Filters the consent state stored with an order.
-		 *
-		 * Receives the map parsed from the visitor's consent cookie, or null
-		 * when none was captured, together with the order it belongs to.
-		 * Returning null stores nothing, which stays distinguishable from an
-		 * empty map: absent means unknown, never denied.
+		 * Filters the consent state stored with an order. Returning null stores
+		 * nothing, which stays distinguishable from an empty map: absent means
+		 * unknown, never denied.
 		 *
 		 * @since 2.1.0
 		 *
@@ -428,18 +379,11 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Drops the values a consent state does not allow storing.
-	 *
-	 * The browser applies this rule before it writes anything, so on a healthy
-	 * page this changes nothing. It exists for the pages where that half never
-	 * ran: a consent tool that blocks third-party scripts until it has an
-	 * answer stops our bundle from executing at all, and the cookie it left
-	 * behind on an earlier visit would then be read here with no one having
-	 * re-checked it. Expressing the same rule on the side that cannot be
-	 * bypassed costs one pass over an array.
-	 *
-	 * An absent signal is not a denial (the whole design distinguishes unknown
-	 * from denied), so only an observed `denied` drops anything.
+	 * Drops the values a consent state does not allow storing. The browser
+	 * applies the same rule before writing, but a consent tool that blocks our
+	 * bundle leaves an earlier visit's cookie to be read here unchecked, so the
+	 * rule is repeated on the side that cannot be bypassed. Only an observed
+	 * `denied` drops anything: absent means unknown.
 	 *
 	 * @param array<string, mixed>      $meta    The meta built for an order.
 	 * @param array<string, mixed>|null $consent The consent state stored with it.
@@ -466,11 +410,8 @@ final class AttributionCapture {
 	}
 
 	/**
-	 * Whether a set of captured meta carries what a send would need.
-	 *
-	 * Used for the capture-rate counters: without a client id nothing can be
-	 * matched in Google Analytics, so an order that stored only a click id
-	 * counts as seen but not as captured.
+	 * Whether captured meta carries what a send would need (the capture-rate
+	 * counters): without a client id nothing can be matched in Analytics.
 	 *
 	 * @param array<string, mixed> $meta The meta built for an order.
 	 * @return bool

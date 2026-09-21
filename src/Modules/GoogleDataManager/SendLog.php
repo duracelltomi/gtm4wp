@@ -13,40 +13,24 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Remembers the last few sends: what was sent, where to, whether Google took
- * it, and - once the asynchronous processing finishes - what Google did with
- * it.
- *
- * This exists because the send lane is otherwise entirely invisible. A refund
- * is issued in the store admin, a job runs minutes later somewhere in cron, and
- * the result appears in Google Analytics up to a day after that. Without a
- * record, the only question anyone can answer afterwards is "the number looks
- * wrong", which is not a question this plugin can be debugged from.
- *
- * What is deliberately NOT stored: no access token, no key material, no request
- * body, no raw response body. An error body from Google can echo fragments of
- * what we sent, and this log is read on an admin screen and pasted into public
- * support threads. Only a short sanitized summary, status names and counts go
- * in.
- *
- * The ring is a single option row rewritten on each entry, like the health
- * records next to it. Two jobs writing in the same instant can cost one entry;
- * that is acceptable for a diagnostics ring in a way it would not be for the
- * idempotency meta, which is why that lives on the refund object instead.
+ * Remembers the last few sends: what, where to, whether Google took it and,
+ * once the asynchronous processing finishes, what Google did with it. The
+ * send lane is otherwise invisible (a cron job minutes later, a result in
+ * Analytics a day later). Deliberately NOT stored: access tokens, key material,
+ * request or raw response bodies - an error body can echo what we sent, and
+ * this log is pasted into public support threads. A single option row
+ * rewritten per entry; a lost entry under concurrent writes is acceptable here
+ * (the idempotency meta lives on the refund object for that reason).
  */
 final class SendLog {
 
 	/**
-	 * Option row holding the ring. Non-autoloaded: written by queue jobs, read
-	 * on the settings screen, never on a frontend pageview. Deleted by
-	 * uninstall.php.
+	 * Option row holding the ring; non-autoloaded, deleted by uninstall.php.
 	 */
 	public const OPTION_NAME = 'gtm4wp_gdm_send_log';
 
 	/**
-	 * How many entries the ring keeps. Enough to cover a store's recent
-	 * refunds and every retry of them, small enough that the option row stays
-	 * a few kilobytes.
+	 * Ring size: covers a store's recent refunds and their retries in a few kilobytes.
 	 */
 	public const MAX_ENTRIES = 50;
 
@@ -101,11 +85,9 @@ final class SendLog {
 	public const TONE_ERROR = 'error';
 
 	/**
-	 * Skip reasons a later configuration change can put right, so the refund
-	 * is worth queueing again once the admin has acted. The two missing-id
-	 * reasons and the empty refund are deliberately absent: nothing on the
-	 * settings screen can produce an identifier that was never captured, and
-	 * a refund of nothing has nothing to send.
+	 * Skip reasons a configuration change can put right, so the refund is
+	 * worth queueing again. The missing-id reasons and the empty refund are
+	 * deliberately absent: no setting can produce an id that was never captured.
 	 *
 	 * @var string[]
 	 */
@@ -119,19 +101,14 @@ final class SendLog {
 	);
 
 	/**
-	 * Longest stored reason / error summary, in characters.
-	 *
-	 * It was 200, which cut the plugin's own plain-words explanation of a
-	 * NOT_FOUND answer mid-sentence - the one sentence the row exists to
-	 * carry. Fifty rows of 400 is still a few kilobytes, and anything cut is
-	 * now marked as cut rather than left reading as a complete thought.
+	 * Longest stored reason / error summary, in characters (200 cut the
+	 * plugin's own NOT_FOUND explanation mid-sentence; a cut is now marked).
 	 */
 	public const REASON_MAX_LENGTH = 400;
 
 	/**
-	 * Longest stored order or refund reference. These are the store's own
-	 * internal ids, but the cap keeps a crafted order number from stretching
-	 * the row.
+	 * Longest stored order or refund reference; keeps a crafted order number
+	 * from stretching the row.
 	 */
 	private const REFERENCE_MAX_LENGTH = 60;
 
@@ -165,18 +142,10 @@ final class SendLog {
 	}
 
 	/**
-	 * The ring cut back to MAX_ENTRIES, dropping routine sends before problems.
-	 *
-	 * A plain "drop the oldest" is the wrong rule for what this ring is for.
-	 * The rows worth reading are the rare ones - a failure, a deliberate skip -
-	 * and the rows that crowd them out are the successes, which arrive in bulk.
-	 * A store refunding a batch of orders would push this morning's failure out
-	 * of the ring before anybody looked at it, and the failure is the only row
-	 * that could have explained the number in Analytics.
-	 *
-	 * So the oldest routine entry goes first, and a problem is dropped only
-	 * when the ring holds nothing else. Order is preserved either way: this
-	 * removes entries, it never reorders them.
+	 * The ring cut back to MAX_ENTRIES, dropping routine sends before problems:
+	 * a batch of successful refunds must not push this morning's failure out
+	 * before anybody looked at it. A problem is dropped only when the ring holds
+	 * nothing else; order is never changed.
 	 *
 	 * @param array<int, array<string, mixed>> $entries Entries, oldest first.
 	 * @return array<int, array<string, mixed>>
@@ -188,8 +157,7 @@ final class SendLog {
 			return $entries;
 		}
 
-		// Oldest first, and only the routine ones: the newest entry is never a
-		// candidate, because it is the one just recorded.
+		// Oldest first, routine ones only.
 		foreach ( array_keys( $entries ) as $index ) {
 			if ( $excess <= 0 ) {
 				break;
@@ -207,9 +175,7 @@ final class SendLog {
 
 		$entries = array_values( $entries );
 
-		// A ring holding nothing but problems still has to give way to the new
-		// entry, or it would freeze at the first fifty failures and stop
-		// recording what happened next.
+		// A ring of nothing but problems must still give way to the new entry.
 		if ( count( $entries ) > self::MAX_ENTRIES ) {
 			$entries = array_slice( $entries, -self::MAX_ENTRIES );
 		}
@@ -218,12 +184,8 @@ final class SendLog {
 	}
 
 	/**
-	 * Writes the outcome of a status poll back onto the entries of one request.
-	 *
-	 * Keyed by the API's own requestId, which is what ties an asynchronous
-	 * result back to the send that produced it. One request can cover several
-	 * destinations, so every entry carrying that id and that measurement id is
-	 * updated.
+	 * Writes the outcome of a status poll back onto the entries of one request,
+	 * keyed by the API's requestId; one request can cover several destinations.
 	 *
 	 * @param string                                                                             $request_id The requestId of the send.
 	 * @param array<int, array{measurement: string, status: string, errors: int, warnings: int}> $statuses   Per-destination statuses.
@@ -255,18 +217,12 @@ final class SendLog {
 				continue;
 			}
 
-			// Through the same cleaner every other text member takes, not a
-			// bare cap: this is the one writer that updates an entry in place,
-			// and it was the one member the class doc block's "sanitized"
-			// promise did not cover (#244). Google's status names are plain
-			// upper-case words, so a genuine value passes through unchanged.
+			// Through the same cleaner as every other text member (#244).
 			$result   = $this->text( $status['status'] ?? '', self::REASON_MAX_LENGTH );
 			$errors   = max( 0, (int) ( $status['errors'] ?? 0 ) );
 			$warnings = max( 0, (int) ( $status['warnings'] ?? 0 ) );
 
-			// A poll that learns nothing new writes nothing: a request still
-			// processing is asked about repeatedly, and each of those answers
-			// would otherwise rewrite the whole option row for no change.
+			// A poll that learns nothing new writes nothing.
 			if ( ( ( $entry['result'] ?? '' ) === $result )
 				&& ( (int) ( $entry['errors'] ?? 0 ) === $errors )
 				&& ( (int) ( $entry['warnings'] ?? 0 ) === $warnings )
@@ -287,19 +243,10 @@ final class SendLog {
 
 	/**
 	 * How much attention one entry deserves, in four steps the settings screen
-	 * renders as colour.
-	 *
-	 * Decided here rather than in the admin bundle on purpose: the judgement
-	 * rests on Google's requestStatus vocabulary (U136), which already lives in
-	 * EventsIngest and disagrees with itself across Google's own two pages
-	 * (FAILED vs FAILURE). A second copy of that vocabulary in JavaScript would
-	 * be a second thing to keep in step with a moving external contract - and
-	 * the one that silently stops matching, because a colour has no test on the
-	 * screen.
-	 *
-	 * Written as "terminal but not a success deserves a look" rather than as a
-	 * list of failure names, so a status Google adds later is drawn as
-	 * something to look at instead of as a success (UC-5).
+	 * renders as colour. Decided here, not in the admin bundle, so Google's
+	 * requestStatus vocabulary (U136) has one copy, in EventsIngest. Written as
+	 * "terminal but not a success deserves a look", not as a list of failure
+	 * names, so a status Google adds later is never drawn as a success (UC-5).
 	 *
 	 * @param array<string, mixed> $entry One stored entry.
 	 * @return string One of the TONE_* values.
@@ -320,8 +267,7 @@ final class SendLog {
 			return self::TONE_ERROR;
 		}
 
-		// Accepted, and Google has not finished with it: the normal state of a
-		// fresh row, and not something to colour as either good or bad.
+		// Accepted and still processing: the normal state of a fresh row.
 		if ( ! EventsIngest::is_terminal_status( $result ) ) {
 			return self::TONE_PENDING;
 		}
@@ -334,11 +280,8 @@ final class SendLog {
 	}
 
 	/**
-	 * Whether an entry describes something worth queueing again.
-	 *
-	 * A failed send always is: the retry ladder is finite, and once it is used
-	 * up nothing else ever asks about that refund. A skip is, when its reason
-	 * is one a configuration change can fix.
+	 * Whether an entry is worth queueing again: a failed send always (the retry
+	 * ladder is finite), a skip when a configuration change can fix its reason.
 	 *
 	 * @param array<string, mixed> $entry One stored entry.
 	 * @return bool
@@ -355,16 +298,11 @@ final class SendLog {
 	}
 
 	/**
-	 * What a replay would queue, one job per refund.
-	 *
-	 * The ring holds a row per destination per attempt, so thirty failed rows
-	 * are rarely thirty refunds. This reduces them: for each refund only the
-	 * NEWEST row per destination counts (a destination that failed on the
-	 * first attempt and was accepted on the second is fine), and the job that
-	 * comes out names exactly the destinations still failing in `only`, so a
-	 * destination that already took the event is never sent it twice. A
-	 * refund whose newest word is a replayable skip is queued whole - it was
-	 * never sent anywhere.
+	 * What a replay would queue, one job per refund. The ring holds a row per
+	 * destination per attempt, so only the NEWEST row per destination counts,
+	 * and the job names exactly the destinations still failing in `only`, so a
+	 * destination that already took the event is never sent it twice. A refund
+	 * whose newest word is a replayable skip is queued whole.
 	 *
 	 * @param string[] $references Limit to these references; empty means every replayable refund.
 	 * @return array<string, array{platform: string, order_id: int, refund_id: int, only: string[]}> Keyed by reference.
@@ -404,9 +342,8 @@ final class SendLog {
 				}
 			}
 
-			// The refund-level row (a skip carries no destination). It wins
-			// only when it is the newest word about the refund: an older skip
-			// followed by a real send attempt is history.
+			// The refund-level row (a skip carries no destination) wins only
+			// when it is the newest word about the refund.
 			$whole = $by_destination[''] ?? null;
 
 			if ( null !== $whole
@@ -427,15 +364,9 @@ final class SendLog {
 	}
 
 	/**
-	 * Which stored entries a replay would act on, by their index in all().
-	 *
-	 * The per-row answer to the question replay_plan() answers per refund,
-	 * and derived from the plan rather than judged row by row: a failed row
-	 * that a later accepted row for the same destination has overtaken is
-	 * history, and must not advertise a replay the plan would not perform.
-	 * Only the newest row per destination among the plan's targets qualifies;
-	 * a refund the plan queues whole (its newest word is a fixable skip) marks
-	 * that skip row alone.
+	 * Which stored entries a replay would act on, by index in all(). Derived
+	 * from replay_plan() rather than judged row by row, so an overtaken failed
+	 * row never advertises a replay the plan would not perform.
 	 *
 	 * @return array<int, true> Indices of the replayable entries.
 	 */
@@ -458,9 +389,7 @@ final class SendLog {
 				: in_array( $destination, $targets, true );
 
 			if ( $wanted ) {
-				// Oldest first: the last write wins, which is the newest row.
-				// A pipe as the separator: a reference is platform:ids and a destination
-				// a G- id, so neither can contain one.
+				// Last write wins (newest row); neither part can contain a pipe.
 				$newest[ $reference . '|' . $destination ] = $index;
 			}
 		}

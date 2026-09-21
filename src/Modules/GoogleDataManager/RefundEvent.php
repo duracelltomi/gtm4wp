@@ -15,55 +15,32 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Turns one platform-neutral RefundData into the event body the API takes.
  *
- * **One shape.** Every refund carries its own amount, its currency and, where
- * the platform recorded them, the lines it covers. A refund that returns the
- * whole order is simply one that lists every line at its refunded quantity.
+ * ONE shape: every refund carries its own amount, currency and lines; a
+ * whole-order refund lists every line at its refunded quantity. Do NOT
+ * reintroduce the id-only whole-order shape: measured in a live property, the
+ * Data Manager API attributes a refund amount of zero to it (U134 marks the
+ * value required). One shape also removes the "which refund is full" decision,
+ * where the slice completing a sequence of partials (EDD even flags it "all
+ * refunded") would have reversed the purchase twice.
  *
- * It was two shapes until 2026-09-17: a whole-order refund went out as the
- * transaction id alone, on the old gtag contract that Analytics would reverse
- * the entire purchase from the id. The phase 4 acceptance run measured that
- * contract in a live property and it does not hold for the Data Manager API:
- * nine such events were accepted, applied (SUCCESS), counted as refunds - and
- * attributed a refund amount of zero, every one of them. Google's current
- * reference marks the value as required and says to include each refunded
- * item "regardless of whether you issue a full or partial refund" (U134).
- * Partials with a value were attributed correctly in the same run.
- *
- * The single shape also removes the decision the two-shape design had to get
- * right: which refund is "full". A sequence of partials that adds up to the
- * order total was the trap - both platforms make the completing slice easy to
- * mistake for a whole-order refund (Easy Digital Downloads hands it a flag
- * literally named "all refunded"), and treating it as one would have reversed
- * the purchase twice. With every refund reporting its own slice there is
- * nothing to decide, so nothing to get wrong.
- *
- * The amount mirrors the purchase event's value - the platform's own refund
- * total, shipping and tax included unless the store's exclude options say
- * otherwise on the purchase side - so a full refund nets to zero against the
- * purchase it reverses. The refunded shipping and tax also travel as event
- * parameters, which is where Analytics' own shipping and tax metrics are
- * decremented from.
+ * The amount mirrors the purchase event's value (the platform's refund total,
+ * shipping and tax included unless the exclude options say otherwise) so a
+ * full refund nets to zero; refunded shipping and tax also travel as event
+ * parameters, where Analytics decrements its own metrics from.
  */
 final class RefundEvent {
 
 	/**
-	 * The Google Analytics recommended event name. Recommended events need no
-	 * allowlist on the destination (U135).
+	 * The Google Analytics recommended event name; needs no allowlist (U135).
 	 */
 	public const EVENT_NAME = 'refund';
 
 	/**
-	 * The item parameters a refunded line carries besides its id, price and
-	 * quantity, by their Google Analytics names - the names the Data Manager
-	 * Item object takes in additionalItemParameters (U134), and the same keys
-	 * the purchase event's items use.
-	 *
-	 * Everything the purchase item carries that a refund can carry too. Not
-	 * here on purpose: item_list_name / item_list_id, which the purchase reads
-	 * from the buyer's list-attribution cookie on the order-received page - at
-	 * refund time there is no visitor browser to read; and the Google Ads
-	 * fields (id, google_business_vertical, item_group_id), which are not
-	 * Analytics item parameters.
+	 * Item parameters a refunded line carries besides id, price and quantity,
+	 * by their Analytics names (additionalItemParameters, U134): everything
+	 * the purchase item carries that a refund can. Absent on purpose:
+	 * item_list_name / item_list_id (read from the buyer's cookie at purchase;
+	 * no browser at refund time) and the Google Ads fields.
 	 *
 	 * @var string[]
 	 */
@@ -81,19 +58,11 @@ final class RefundEvent {
 	);
 
 	/**
-	 * One refunded line in the API's item shape, from the array the store's
-	 * item builder produced for the purchase event.
-	 *
-	 * The one place the shape is defined, for both platforms. Until 2026-09-19
-	 * the adapters sent the id, price and quantity and dropped everything else
-	 * the builder had made, and the acceptance run showed what that costs:
-	 * Analytics does not enrich a refund's items from the purchase it reverses,
-	 * it reports the item parameters the refund event itself carries, so every
-	 * refunded line showed up as "(not set)" with its amount attributed to no
-	 * product. The name, brand, variant and categories now travel with the id,
-	 * in additionalItemParameters, taken from the very same builder output -
-	 * so a refunded line and the line it refunds are described identically by
-	 * construction, not by a second implementation kept in step by hand.
+	 * One refunded line in the API's item shape, from the store's own purchase
+	 * item builder output (the one definition for both platforms). Analytics
+	 * does not enrich a refund's items from the purchase it reverses: without
+	 * the name, brand, variant and categories every refunded line reported as
+	 * "(not set)" with its amount attributed to no product.
 	 *
 	 * @param array<string, mixed> $built      The builder's item array (item_id, item_name, ...).
 	 * @param float                $unit_price Refunded unit price, positive.
@@ -173,17 +142,9 @@ final class RefundEvent {
 	}
 
 	/**
-	 * The refunded shipping and tax, in the API's event-parameter shape.
-	 *
-	 * Neither has a field of its own on the event: the recommended-events
-	 * reference puts both in additionalEventParameters, under the Google
-	 * Analytics parameter names, with string values. Without them Analytics
-	 * increments its shipping and tax metrics at the purchase and never
-	 * decrements them, because the purchase event reports both (see the
-	 * WooCommerce purchase builder) while the refund would not.
-	 *
-	 * A zero amount is omitted rather than sent as "0", for the same reason
-	 * the items are - a present field is a claim, and nothing was returned.
+	 * The refunded shipping and tax as additionalEventParameters (neither has
+	 * a field of its own); without them Analytics never decrements the metrics
+	 * the purchase incremented. A zero amount is omitted, not sent as "0".
 	 *
 	 * @param RefundData $refund The refund.
 	 * @return array<int, array{parameterName: string, value: string}>
@@ -211,13 +172,9 @@ final class RefundEvent {
 	}
 
 	/**
-	 * Runs an assembled event through the site's own last-chance filter.
-	 *
-	 * Returning anything that is not a non-empty array cancels the send, which
-	 * is the documented veto. A filtered event is checked against the same
-	 * minimum the built-in assembly always satisfies, so a site that removes
-	 * the transaction id gets nothing sent rather than an event Analytics
-	 * cannot join to anything.
+	 * Runs an assembled event through the site's last-chance filter. Anything
+	 * but a non-empty array cancels the send (the documented veto), and a
+	 * filtered event without a transaction id is not sent either.
 	 *
 	 * @param array<string, mixed> $event         The assembled event.
 	 * @param RefundData           $refund        The refund it describes.
@@ -227,11 +184,8 @@ final class RefundEvent {
 	 */
 	public static function filter( array $event, RefundData $refund, $refund_object, $order_object ): ?array {
 		/**
-		 * Filters one assembled Google Data Manager refund event.
-		 *
-		 * Receives the event exactly as it would be sent, the RefundData it was
-		 * built from, and the platform's own refund and order objects. Return
-		 * an empty array to cancel the send for this refund.
+		 * Filters one assembled Google Data Manager refund event, exactly as it
+		 * would be sent. Return an empty array to cancel the send.
 		 *
 		 * @since 2.1.0
 		 *

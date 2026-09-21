@@ -145,12 +145,9 @@ final class RestController {
 	}
 
 	/**
-	 * POST handler: parses and stores an uploaded key file.
-	 *
-	 * The file contents arrive as the `key_file` string of the JSON body,
-	 * which WordPress does not slash (unlike $_POST), so no wp_unslash() here.
-	 * The raw upload is parsed once and discarded; only the four fields the
-	 * plugin needs are kept, the key encrypted.
+	 * POST handler: parses and stores an uploaded key file. The contents arrive
+	 * as the `key_file` string of the JSON body (not slashed, unlike $_POST);
+	 * the raw upload is parsed once and discarded.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -196,9 +193,8 @@ final class RestController {
 	}
 
 	/**
-	 * Relabel handler: changes an account's label, the one stored field that is
-	 * plain admin-chosen text. Everything else - the key, the e-mail, the id a
-	 * destination references - is immutable per upload.
+	 * Relabel handler: the label is the one mutable stored field; everything
+	 * else is immutable per upload.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error

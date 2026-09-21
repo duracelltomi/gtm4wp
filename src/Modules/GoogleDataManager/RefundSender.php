@@ -15,26 +15,13 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Turns a refund issued in the store into a Google Analytics refund event.
- *
- * This is the flagship of the Data Manager integration and the reason the
- * capture of phase 3 exists: a refund happens in the store admin, where no
- * browser and no Google tag is involved, so the browser-side tracking that
- * reports every purchase cannot report a single refund. Analytics keeps
- * counting revenue that was given back.
- *
- * The lane is deliberately unhurried. The platform hook only queues a job; the
- * job runs a minute later, decides once whether the send is allowed, sends,
- * writes down what happened, and either retries or stops. Nothing about it
- * happens inside the request that issued the refund.
- *
- * Every path that does not send says why, in the diagnostics ring: an absent
- * client id, a consent state that does not permit the send, a veto from the
- * site's own filter, no destination configured. That is the difference between
- * a feature that can be supported and one that can only be guessed at - and
- * none of those cases is ever papered over with an invented value, because a
- * refund event Analytics cannot join to its purchase is worse than an honest
- * gap.
+ * Turns a refund issued in the store admin, where no browser and no Google
+ * tag is involved, into a Google Analytics refund event. The platform hook
+ * only queues a job; the job runs a minute later, decides once whether the
+ * send is allowed, sends, records what happened, and retries or stops. Every
+ * path that does not send says why in the diagnostics ring, and no case is
+ * papered over with an invented value: a refund Analytics cannot join to its
+ * purchase is worse than an honest gap.
  */
 final class RefundSender {
 
@@ -60,15 +47,9 @@ final class RefundSender {
 	public const REASON_NO_CLIENT_ID = 'no_client_id';
 
 	/**
-	 * Skip reason: no client id was captured BECAUSE the buyer refused
-	 * analytics storage. The same missing identifier as above, told apart from
-	 * it because the two are answered differently: one is a setup question
-	 * (was capture on, did the Google tag fire), the other is the visitor's own
-	 * decision, which no setting on this screen overrides.
-	 *
-	 * Reported instead of the bare missing-id reason whenever the order's own
-	 * stored consent state says analytics storage was not granted. It is the
-	 * cause; the missing id is the symptom.
+	 * Skip reason: no client id BECAUSE the buyer refused analytics storage.
+	 * Told apart from the bare missing id since one is a setup question and
+	 * the other the visitor's decision, which no setting overrides.
 	 */
 	public const REASON_CONSENT_NO_CLIENT_ID = 'consent_no_client_id';
 
@@ -101,10 +82,8 @@ final class RefundSender {
 	}
 
 	/**
-	 * Registers the queue handler and the refund hook of every active platform.
-	 *
-	 * The caller decides whether the feature is on; run() checks the option
-	 * again for the job that was queued before it was turned off.
+	 * Registers the queue handler and the refund hook of every active platform;
+	 * run() re-checks the option for a job queued before it was turned off.
 	 *
 	 * @return void
 	 */
@@ -127,12 +106,8 @@ final class RefundSender {
 	}
 
 	/**
-	 * Queues one refund for sending.
-	 *
-	 * Deliberately does no checking beyond the ids: every decision belongs in
-	 * run(), so that each refund produces exactly one entry in the diagnostics
-	 * ring saying what became of it. A refund silently dropped here would be
-	 * indistinguishable from one that was never noticed.
+	 * Queues one refund for sending. No checking beyond the ids: every decision
+	 * belongs in run(), so each refund gets exactly one diagnostics entry.
 	 *
 	 * @param string $platform  Platform id.
 	 * @param int    $order_id  The parent order.
@@ -184,20 +159,11 @@ final class RefundSender {
 			return;
 		}
 
-		// A refund that has already been sent is not sent again, whatever put
-		// this job in the queue. This is the guarantee the per-refund meta
-		// exists for: several partial refunds of one order each send once, and
-		// a duplicate job for any of them sends nothing.
-		//
-		// A job naming destinations in `only` is the exception, and a narrow
-		// one: the marker is per refund, and a refund that one destination
-		// accepted while another exhausted its retries carries it although the
-		// second destination never got the event. Such a job is a retry or a
-		// replay aimed at the destinations still missing it, so the guard
-		// moves down a level: each named destination is checked against the
-		// ring, and one whose newest row says accepted is dropped from the
-		// list. Two replays queued before the first has run therefore send
-		// once, not twice.
+		// An already-sent refund is never sent again (the per-refund marker).
+		// A job naming destinations in `only` is a retry/replay for the ones
+		// still missing the event, so the guard moves down a level: a named
+		// destination whose newest ring row says accepted is dropped, and two
+		// replays queued before the first ran send once.
 		if ( array() === $only ) {
 			if ( $source->is_sent( $refund_id ) ) {
 				return;
@@ -223,12 +189,9 @@ final class RefundSender {
 			return;
 		}
 
-		// Ahead of the per-order refusals on purpose. With no destination
-		// configured, nothing about this site can send anything at all, and
-		// that is one fix in one place; telling the reader instead that this
-		// particular order has no client id sends them auditing orders while
-		// the whole lane is pointed at nowhere. A site-wide fault outranks a
-		// per-order one whenever both are true.
+		// Ahead of the per-order refusals: a site-wide fault (no destination)
+		// outranks a per-order one, or the reader audits orders while the whole
+		// lane points at nowhere.
 		$rows = $this->destinations( $only );
 
 		if ( array() === $rows ) {
@@ -287,10 +250,8 @@ final class RefundSender {
 			}
 
 			if ( $result['retryable'] ) {
-				// Only the destinations that failed are retried. Repeating the
-				// request for a destination that already took the event would
-				// send it twice, and Analytics has no documented rule that
-				// would collapse two refunds of one transaction back into one.
+				// Only the failed destinations: Analytics has no documented rule
+				// collapsing two refunds of one transaction into one.
 				$retry = array_merge( $retry, $result['measurements'] );
 			}
 		}
@@ -367,13 +328,10 @@ final class RefundSender {
 	}
 
 	/**
-	 * Why this refund may not be sent, or null when it may.
-	 *
-	 * The consent decision is the gate phase 3 built and this is its first
-	 * consumer: where the site's policy applies, analytics storage has to have
-	 * been granted at order time. Beyond the legal reading that also protects
-	 * the data - with analytics storage denied, the captured client id can be
-	 * an ephemeral one, and an event sent with it is permanently unmatchable.
+	 * Why this refund may not be sent, or null when it may. Where the site's
+	 * consent policy applies, analytics storage must have been granted at
+	 * order time; with it denied the client id is ephemeral and the event
+	 * permanently unmatchable anyway.
 	 *
 	 * @param RefundData $refund The refund.
 	 * @return string|null A reason code, or null to proceed.
@@ -384,13 +342,8 @@ final class RefundSender {
 		}
 
 		if ( '' === $refund->client_id ) {
-			// Deliberately ahead of the policy check below, and unaffected by
-			// it: a "Never" policy waives the transfer rule for data the site
-			// holds, and cannot conjure an identifier that was never captured.
-			// It could not usefully do so either - with analytics storage
-			// denied, Google's tag runs cookieless and hands out a fresh client
-			// id on every page view, so a value captured then would match no
-			// purchase in Analytics.
+			// Ahead of the policy check and unaffected by it: a "Never" policy
+			// cannot conjure an identifier that was never captured.
 			$signals = $refund->consent_signals();
 
 			if ( is_array( $signals )

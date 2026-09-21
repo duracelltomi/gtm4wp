@@ -13,20 +13,11 @@ namespace GTM4WP\Google;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The countries whose visitors Google's EU user consent policy covers: the
- * European Economic Area (the EU member states plus Iceland, Liechtenstein and
- * Norway), the United Kingdom and Switzerland.
- *
- * This is a copy of a list somebody else maintains, so it is a snapshot that
- * looks correct long after the source has moved - which is why it has exactly
- * one definition here (WooCommerce carries an EU helper and Easy Digital
- * Downloads carries none, so owning the list keeps both platforms on the same
- * answer), a registry row naming the policy page, and a test pinning the exact
- * set rather than a spot check.
- *
- * Switzerland is deliberately part of the set: the policy was extended to it
- * on 2024-07-31, and the point of the list is to match what Google enforces,
- * not the narrower "EEA" reading of the name.
+ * The countries Google's EU user consent policy covers: the EEA, the United
+ * Kingdom and Switzerland (extended to it 2024-07-31; the list matches what
+ * Google enforces, not the "EEA" name). A mirror of somebody else's list
+ * (UD-1): one definition here for both platforms, a registry row naming the
+ * policy page, and a test pinning the exact set.
  */
 final class ConsentRegions {
 
@@ -73,11 +64,8 @@ final class ConsentRegions {
 
 	/**
 	 * Whether a billing country falls under Google's EU user consent policy.
-	 *
-	 * An empty or unknown country answers false: this decides whether consent
-	 * signals are *required*, and an order with no country recorded is not
-	 * evidence of an EEA buyer. The "always" consent policy is how a site owner
-	 * asks for the gate regardless of country.
+	 * Empty or unknown answers false: no country recorded is not evidence of
+	 * an EEA buyer; the "always" policy gates regardless of country.
 	 *
 	 * @param string $country Two-letter country code, any case.
 	 * @return bool

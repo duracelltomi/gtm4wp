@@ -14,18 +14,9 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Everything the refund lane needs to know about one refund, read from the
- * platform once and then handled without asking the platform anything again.
- *
- * This is what makes WooCommerce and Easy Digital Downloads share the whole
- * lane rather than half of it: the two adapters differ only in how they fill
- * this object. Event assembly, the consent gate, the send, the retries, the
- * diagnostics and the tests below them all work on this shape.
- *
- * The amounts are positive here. Both platforms model a refund with negative
- * numbers - WooCommerce stores the refund's total as the negated amount, EDD
- * negates subtotal, tax and total on the refund order - and the API wants a
- * positive value, so the sign is dealt with once, in the adapter, instead of
- * at every later reader.
+ * platform once; the two adapters differ only in how they fill it, so the
+ * whole lane is shared. Amounts are positive here: both platforms store a
+ * refund negated, and the sign is dealt with once, in the adapter.
  */
 final class RefundData {
 
@@ -80,14 +71,9 @@ final class RefundData {
 	}
 
 	/**
-	 * The consent-mode signal map inside the stored consent state, or null when
-	 * no state was captured for this order at all.
-	 *
-	 * The nullable return is the whole point: an absent state is unknown, and
-	 * unknown is not denied. A captured state whose map came back empty is
-	 * still unknown for any particular signal, which is what the gate below
-	 * decides on - so both cases reach ConsentPolicy::decide() distinguishable
-	 * from a map that genuinely says "denied".
+	 * The consent-mode signal map inside the stored state, or null when none
+	 * was captured: an absent state is unknown, and unknown is not denied, so
+	 * ConsentPolicy::decide() can tell it from a map that says "denied".
 	 *
 	 * @return array<string, string>|null
 	 */

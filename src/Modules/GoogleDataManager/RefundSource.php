@@ -13,17 +13,11 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The thin per-platform half of the refund lane.
- *
- * Everything a refund event needs is expressed as RefundData, so an adapter
- * only answers four questions: which hook says a refund happened, what does
- * that refund look like, has it been sent already, and how do I remember that
- * it has. Nothing about the API, the queue, the consent gate or the two event
- * shapes lives on this side.
- *
- * Adding a third commerce platform is therefore one class, and the standing
- * parity rule (WooCommerce and Easy Digital Downloads land together, never one
- * as a fast-follow) costs a hook and a reader rather than a second lane.
+ * The thin per-platform half of the refund lane: which hook says a refund
+ * happened, what it looks like (RefundData), whether it was sent, and how to
+ * remember that. Nothing about the API, the queue or the consent gate lives
+ * here, so a third platform is one class and WC/EDD parity costs a hook and a
+ * reader.
  */
 interface RefundSource {
 

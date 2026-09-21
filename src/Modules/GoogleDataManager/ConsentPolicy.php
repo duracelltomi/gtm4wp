@@ -16,20 +16,11 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Decides whether an order's stored consent state allows sending an event
- * about it, given the site's consent policy and the order's billing country.
- *
- * Two properties of this class are deliberate and tested:
- *
- * - **Unknown is not denied.** An order with no stored consent state was
- *   placed on a site that runs no consent mode, or before capture was turned
- *   on. Where the policy applies that still refuses the send (see below); where
- *   it does not, an absent state is no reason to withhold anything.
- * - **Where the policy applies, only a granted analytics_storage passes.**
- *   Beyond the legal reading, this is what protects the data: with analytics
- *   storage denied, a cookieless gtag run can hand out an *ephemeral* client
- *   id, and an event sent with one is permanently unmatchable in Google
- *   Analytics. Refusing cleanly and saying why beats sending something that
- *   silently never joins its purchase.
+ * about it, given the site's policy and the billing country. Two tested
+ * properties: **unknown is not denied** (an absent state withholds nothing
+ * where the policy does not apply), and **where the policy applies only a
+ * granted analytics_storage passes** (with it denied the client id can be
+ * ephemeral and the event permanently unmatchable).
  */
 final class ConsentPolicy {
 

@@ -14,22 +14,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Names, format version, lifetime and size caps of the two first-party cookies
- * the capture script writes and the order-creation hooks read back.
- *
- * Both ends of this contract are ours, so it gets exactly one definition: the
- * capture bundle receives these values in its printed config rather than
- * repeating them as literals, and the server-side parser validates against the
- * same constants. A value written by the browser and read by PHP is the RI-14
- * class of bug - the two ends silently disagreeing - and a shared definition is
- * what keeps that from happening.
- *
- * The IDs and the consent map are deliberately two separate cookies: the
- * consent map is written even when nothing else may be (it is the record of
- * the visitor's choice, on the same strictly-necessary basis a consent tool
- * stores its own answer), while the IDs are written only when that choice
- * allows it. One cookie could not express that.
- *
- * Loaded on frontend requests, so no translated strings here.
+ * the capture script writes and the order-creation hooks read back. One
+ * definition for both ends (RI-14): the bundle gets these values in its
+ * printed config. The IDs and the consent map are separate cookies on
+ * purpose: the map is written even when nothing else may be (the record of
+ * the choice, on a strictly-necessary basis), the IDs only when it allows.
+ * Loaded on frontend requests: no translated strings here.
  */
 final class AttributionCookies {
 
@@ -44,30 +34,18 @@ final class AttributionCookies {
 	public const CONSENT_COOKIE = 'gtm4wp_gdm_consent';
 
 	/**
-	 * Format version of both cookie payloads, stored as the `v` member.
-	 *
-	 * A payload without this exact value is discarded unread: it is either a
-	 * leftover from an older format or something a visitor wrote by hand, and
-	 * neither is worth a compatibility branch.
+	 * Format version of both payloads (`v`); anything else is discarded unread.
 	 */
 	public const FORMAT_VERSION = 1;
 
 	/**
-	 * Lifetime of both cookies, in days.
-	 *
-	 * Long enough to cover the gap between an ad click and the purchase it
-	 * leads to, short enough that stale attribution expires on its own. The
-	 * values are refreshed on every page that resolves them, so an active
-	 * visitor never runs into the limit.
+	 * Lifetime of both cookies, in days: covers the click-to-purchase gap,
+	 * refreshed on every page that resolves them.
 	 */
 	public const LIFETIME_DAYS = 90;
 
 	/**
-	 * Longest cookie payload the parser will look at, in bytes.
-	 *
-	 * Checked before any decode, so a multi-kilobyte crafted value costs a
-	 * length comparison rather than a JSON parse (the read_item_list_cookie
-	 * precedent).
+	 * Longest cookie payload the parser looks at, in bytes; checked before any decode.
 	 */
 	public const MAX_BYTES = 2048;
 
@@ -99,11 +77,9 @@ final class AttributionCookies {
 	public const KEY_SIGNALS = 'signals';
 
 	/**
-	 * The click id parameters captured from the landing URL, in the order they
-	 * are looked for. These are Google's parameter names, registered upstream:
-	 * `gclid` for Google Ads, `gbraid` and `wbraid` for the iOS app-to-web and
-	 * web-to-app journeys. Google's own `_gcl_*` cookies are deliberately not
-	 * read - their format carries no stability promise.
+	 * The click id parameters captured from the landing URL (Google's names,
+	 * registered upstream). Google's own `_gcl_*` cookies are deliberately not
+	 * read: their format carries no stability promise.
 	 *
 	 * @var string[]
 	 */

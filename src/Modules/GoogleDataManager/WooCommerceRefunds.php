@@ -16,22 +16,12 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Reads WooCommerce refunds into the platform-neutral shape.
- *
- * WooCommerce models a refund as a WC_Order_Refund: its own order-ish object
- * whose parent is the order, carrying the refunded lines as items with negated
- * quantities and totals. `woocommerce_order_refunded` fires for both kinds -
- * a full refund and a per-line or by-amount partial one - which is why the
- * full-versus-partial question is answered from the amounts here rather than
- * from which hook fired.
- *
- * Item ids come from ProductData::process_product(), the very builder that
- * produced the purchase event's items. That is not a convenience: the item id
- * is the join key Google Analytics matches a refunded line against the line it
- * is refunding, and it depends on store settings (the "use SKU" option, the
- * master-language consolidation) that a second implementation would have to
- * mirror forever. Calling the same builder makes them identical by
- * construction, and a test asserts it rather than assuming it.
+ * Reads WooCommerce refunds (WC_Order_Refund: an order-ish child object with
+ * negated line quantities and totals) into the platform-neutral shape. Item
+ * ids come from ProductData::process_product(), the purchase event's own
+ * builder: the id is the join key Analytics matches a refunded line by, and
+ * it depends on store settings (use SKU, master language) a second
+ * implementation would have to mirror forever.
  */
 final class WooCommerceRefunds implements RefundSource {
 
@@ -88,13 +78,9 @@ final class WooCommerceRefunds implements RefundSource {
 			return null;
 		}
 
-		// The refund really has to be a refund of this order, as the Easy
-		// Digital Downloads adapter checks too: wc_get_order() serves both
-		// kinds from one lookup, so without this a mismatched id pair would
-		// build an event reversing the wrong order's transaction. Nothing on a
-		// request path can supply such a pair today - the hook passes both ids
-		// from one argument and a replay only re-queues what the sender wrote -
-		// so this guards the stored references, not a caller (#242).
+		// The refund must belong to this order: wc_get_order() serves both
+		// kinds, and a mismatched pair would reverse the wrong transaction.
+		// Guards the stored references, not a caller (#242).
 		if ( (int) $refund->get_parent_id() !== $order_id ) {
 			return null;
 		}
@@ -112,10 +98,8 @@ final class WooCommerceRefunds implements RefundSource {
 			$this->platform(),
 			$order_id,
 			$refund_id,
-			// The PARENT order's number, prefix included: this is the
-			// transaction the purchase event reported, and reversing it is the
-			// whole point. The refund has an order number of its own, which
-			// Analytics has never seen.
+			// The PARENT order's number, prefix included: the transaction the
+			// purchase reported. The refund's own number Analytics has never seen.
 			$prefix . $order->get_order_number(),
 			(string) $order->get_currency(),
 			abs( (float) $refund->get_total() ),
@@ -125,9 +109,8 @@ final class WooCommerceRefunds implements RefundSource {
 			(string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ),
 			is_array( $consent ) ? $consent : null,
 			(string) $order->get_billing_country(),
-			// The same two totals the purchase event reports, read off the
-			// refund instead of the order and turned positive. get_total_tax()
-			// covers the shipping tax as well, exactly as it does there.
+			// The purchase event's two totals, read off the refund and made
+			// positive; get_total_tax() covers the shipping tax too.
 			abs( (float) $refund->get_shipping_total() ),
 			abs( (float) $refund->get_total_tax() )
 		);
@@ -184,22 +167,15 @@ final class WooCommerceRefunds implements RefundSource {
 			return;
 		}
 
-		// A request id when there is one, otherwise a plain marker: the meta's
-		// job is to say "sent", and an empty string would read as "not sent"
-		// to is_sent() above.
+		// The request id, or a plain marker: '' would read as "not sent" to is_sent().
 		$refund->update_meta_data( self::META_SENT, ( '' !== $request_id ) ? $request_id : '1' );
 		$refund->save();
 	}
 
 	/**
-	 * The refunded lines, as positive quantities and unit prices.
-	 *
-	 * Lines whose quantity is zero are left out. WooCommerce records a
-	 * by-amount refund that way - money returned against a line without
-	 * returning any of it - and the API's item shape has no way to express
-	 * that. Those refunds still report their full value through
-	 * conversionValue; only the per-item breakdown is unavailable, which is
-	 * what the store recorded.
+	 * The refunded lines, as positive quantities and unit prices. Zero-quantity
+	 * lines (a by-amount refund) are left out: the API's item shape cannot
+	 * express them, and the value still travels in conversionValue.
 	 *
 	 * @param \WC_Order_Refund $refund The refund.
 	 * @return array<int, array<string, mixed>> Items in the API shape, see RefundEvent::item().
@@ -229,9 +205,8 @@ final class WooCommerceRefunds implements RefundSource {
 
 			$product = method_exists( $item, 'get_product' ) ? $item->get_product() : null;
 
-			// get_item_total() divides the line by its quantity, and both are
-			// negative on a refund, so the result is already positive; abs()
-			// only guards against a store that stores it the other way round.
+			// Line and quantity are both negative on a refund, so the quotient
+			// is already positive; abs() guards a store storing it the other way.
 			$unit_price = round( abs( (float) $refund->get_item_total( $item, $inc_tax ) ), 2 );
 
 			$attributes = array(
@@ -239,10 +214,8 @@ final class WooCommerceRefunds implements RefundSource {
 				'price'    => $unit_price,
 			);
 
-			// The per-unit discount, the way the purchase item reports it: the
-			// gap between the line's pre-discount subtotal and its total, per
-			// unit, only when there is one. Both are negated on a refund line,
-			// so the difference is taken on their magnitudes.
+			// The per-unit discount as the purchase item reports it, on the
+			// magnitudes since both are negated on a refund line.
 			if ( method_exists( $item, 'get_subtotal' ) && method_exists( $item, 'get_total' ) ) {
 				$line_discount = round( ( abs( (float) $item->get_subtotal() ) - abs( (float) $item->get_total() ) ) / $quantity, 2 );
 

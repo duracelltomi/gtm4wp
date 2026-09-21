@@ -17,23 +17,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Decides whether the page being rendered is a confirmation page for an order
- * whose attribution is still missing, and if so what the capture script needs
- * in order to post it.
- *
- * The flag has to come from the server because the client cannot see order
- * meta: only this side knows whether the capture already succeeded. That is
- * also why it is not simply "always try" - a backfill POST on every receipt
- * view would be a write attempt per pageview for nothing.
- *
- * What it prints is deliberately minimal: the order id and the purchase proof
- * that is **already in the address bar** of the page being rendered - the
- * WooCommerce order key, the Easy Digital Downloads payment key, or on EDD's
- * own receipt links the verification hash those links carry instead of the key
- * - plus the route and a nonce. Nothing is disclosed that the visitor did not
- * arrive holding, which is why the receipt-visibility rules that govern showing
- * the buyer's name and address do not apply here - this discloses no order data
- * at all. That rule is exact, not approximate: the id-plus-hash branch used to
- * print the payment key while the URL held only its one-way hash (#250).
+ * whose attribution is still missing (only the server can see order meta),
+ * and what the capture script needs to post it: the order id, the route, a
+ * nonce and the purchase proof ALREADY IN THE ADDRESS BAR (the WooCommerce
+ * order key, the EDD payment key, or the verification hash EDD's own receipt
+ * links carry instead). Nothing the visitor did not arrive holding is
+ * printed; the rule is exact, the hash branch once printed the key (#250).
  */
 final class ReceiptPage {
 
@@ -114,23 +103,16 @@ final class ReceiptPage {
 			return null;
 		}
 
-		// Resolved through EDD's own verified receipt chain rather than from a
-		// bare id: the payment key, or an id plus the matching receipt hash,
-		// or the buyer's own purchase session.
+		// Through EDD's own verified receipt chain, never a bare id.
 		$payment_key = EddPageDataLayer::resolve_payment_key();
 
 		if ( '' === $payment_key ) {
 			return null;
 		}
 
-		// The token is whichever proof the URL itself carries. The chain's
-		// third branch resolves the key from the buyer's session, which means
-		// nothing secret is in the page URL - and printing the key would put a
-		// durable receipt secret into the HTML where any third-party script on
-		// the page could read it. The flag is only worth having when it costs
-		// no disclosure, so that branch is skipped: such a visitor simply does
-		// not backfill, and the attribution stays whatever order creation
-		// captured.
+		// Whichever proof the URL itself carries. A key resolved from the
+		// buyer's session is NOT printed (a durable secret in the HTML for any
+		// third-party script); that visitor simply does not backfill.
 		$token = self::edd_url_token( $payment_key );
 
 		if ( '' === $token ) {
@@ -161,18 +143,10 @@ final class ReceiptPage {
 	}
 
 	/**
-	 * The purchase proof the page URL carries, or '' when it carries none.
-	 *
-	 * The two URL-borne branches of EDD's receipt chain each hold a different
-	 * proof: `?payment_key=` holds the key itself; EDD's own receipt links hold
-	 * an `?id=` plus an `?order=` verification hash of the key, never the key.
-	 * Each branch hands over exactly what its URL holds - the backfill route
-	 * accepts either - and the purchase-session branch, whose URL holds
-	 * nothing secret, hands over nothing.
-	 *
-	 * The hash branch is only reached with a key already resolved, which
-	 * means resolve_payment_key() has verified the hash against the order;
-	 * the route verifies it again on the POST.
+	 * The purchase proof the page URL carries, or '': `?payment_key=` holds the
+	 * key, EDD's receipt links hold `?id=` plus the `?order=` hash of it. Each
+	 * branch hands over exactly what its URL holds; the hash is only reached
+	 * once resolve_payment_key() verified it, and the route verifies it again.
 	 *
 	 * @param string $payment_key The resolved payment key.
 	 * @return string The key, the verification hash, or ''.

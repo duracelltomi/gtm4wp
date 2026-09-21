@@ -13,18 +13,11 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Writes the captured attribution into order meta the moment an order is
- * created, on both commerce platforms.
- *
- * Order creation is the right moment rather than payment or thank-you: it
- * still happens inside the buyer's own request, so their cookies are there to
- * be read, and it happens exactly once per order. A payment-status hook can
- * fire from a gateway callback with no visitor in sight.
- *
- * Everything about *what* to store is decided in AttributionCapture, shared by
- * both platforms; this class is only the wiring plus the two writers, because
- * the two platforms store meta through different APIs (WooCommerce through the
- * order CRUD, Easy Digital Downloads through its own order-meta functions).
+ * Writes the captured attribution into order meta at order creation, on both
+ * platforms: the one moment inside the buyer's own request (cookies readable)
+ * that happens exactly once; a payment hook can fire from a gateway callback.
+ * What to store is decided in AttributionCapture; this is the wiring plus the
+ * two platform-specific writers.
  */
 final class CaptureHooks {
 
@@ -43,10 +36,8 @@ final class CaptureHooks {
 	 */
 	public function register_hooks(): void {
 		if ( function_exists( 'WC' ) ) {
-			// Classic checkout, and the Store API the block checkout posts to.
-			// The Store API hook is newer than the plugin's WooCommerce floor,
-			// which costs nothing: on an older release it simply never fires,
-			// and such a store has no block checkout to miss.
+			// Classic checkout, and the Store API the block checkout posts to
+			// (a hook newer than the WooCommerce floor; it simply never fires there).
 			add_action( 'woocommerce_checkout_order_created', array( $this, 'capture_woocommerce_order' ) );
 			add_action( 'woocommerce_store_api_checkout_order_processed', array( $this, 'capture_woocommerce_order' ) );
 		}
@@ -67,10 +58,8 @@ final class CaptureHooks {
 			return;
 		}
 
-		// The two hooks are alternatives, never both for one order, but an
-		// order that already carries capture is left alone either way: this
-		// runs once, at creation, and a second pass could only overwrite good
-		// data with whatever the current request happens to hold.
+		// An order that already carries capture is left alone: a second pass
+		// could only overwrite good data.
 		if ( method_exists( $order, 'get_meta' ) && '' !== (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) ) {
 			return;
 		}

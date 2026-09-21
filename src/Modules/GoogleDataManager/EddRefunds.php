@@ -16,21 +16,15 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Reads Easy Digital Downloads refunds into the platform-neutral shape.
- *
- * EDD 3.x models a refund as a **child order**: a row of type `refund` whose
- * parent is the original order, with its own order number and with subtotal,
- * tax and total negated. Its items are copies of the original lines with the
- * quantity and the amounts negated, so the same abs()-once rule as WooCommerce
+ * Reads Easy Digital Downloads refunds into the platform-neutral shape. EDD
+ * 3.x models a refund as a child order of type `refund` with negated
+ * amounts and negated item copies, so the same abs()-once rule as WooCommerce
  * applies (U132).
  *
- * ⚠ **The `$all_refunded` trap.** `edd_refund_order` passes a third argument
- * named `$all_refunded`, and it does NOT answer the question the two event
- * shapes ask. It means "the parent order is now fully refunded", which is true
- * for the last partial refund of a sequence - exactly the case that must stay
- * partial. Deciding the shape from it would tell Analytics to reverse the
- * whole transaction again on top of the slices already reversed. The argument
- * is therefore not read at all: RefundEvent decides from amounts.
+ * ⚠ Do NOT read `edd_refund_order`'s third argument `$all_refunded`: it means
+ * "the parent is now fully refunded", true for the last slice of a sequence,
+ * and deciding from it would reverse the whole transaction on top of the
+ * slices already reversed. RefundEvent decides from amounts.
  */
 final class EddRefunds implements RefundSource {
 
@@ -62,12 +56,8 @@ final class EddRefunds implements RefundSource {
 	}
 
 	/**
-	 * Registers the refund hook.
-	 *
-	 * The callback deliberately takes only the two arguments it uses. The
-	 * hook's third one is the trap described in the class doc block; not
-	 * accepting it is the cheapest way to make sure no later edit starts
-	 * reading it.
+	 * Registers the refund hook. The callback takes only two arguments on
+	 * purpose: the third is the trap in the class docblock.
 	 *
 	 * @param callable $enqueue Receives ( int $order_id, int $refund_id ).
 	 * @return void
@@ -97,9 +87,7 @@ final class EddRefunds implements RefundSource {
 			return null;
 		}
 
-		// The refund really has to be a refund of this order. Both objects come
-		// from the same table, so without this a mistaken id pair would produce
-		// an event reversing the wrong transaction.
+		// The refund must belong to this order (both come from the same table).
 		if ( self::ORDER_TYPE_REFUND !== (string) DownloadData::row_prop( $refund, 'type' ) ) {
 			return null;
 		}
@@ -125,10 +113,7 @@ final class EddRefunds implements RefundSource {
 			(string) edd_get_order_meta( $order_id, AttributionCapture::META_CLIENT_ID, true ),
 			is_array( $consent ) ? $consent : null,
 			self::billing_country( $order ),
-			// Easy Digital Downloads has no shipping on an order, and its
-			// purchase event reports none either, so there is nothing to
-			// reverse. The tax is negated on the refund order like every other
-			// amount.
+			// EDD has no shipping; the tax is negated on the refund order.
 			0.0,
 			abs( (float) DownloadData::row_prop( $refund, 'tax', 0 ) )
 		);
@@ -185,12 +170,9 @@ final class EddRefunds implements RefundSource {
 	}
 
 	/**
-	 * The refunded lines, as positive quantities and unit prices.
-	 *
-	 * Item ids come from DownloadData::process_download(), the builder the
-	 * purchase event uses, for the reason its WooCommerce sibling documents:
-	 * the id is the join key and depends on store settings, so it is produced
-	 * by the same code rather than reimplemented next to it.
+	 * The refunded lines, as positive quantities and unit prices. Item ids come
+	 * from DownloadData::process_download(), the purchase event's builder (see
+	 * the WooCommerce sibling for why).
 	 *
 	 * @param \EDD\Orders\Order $refund The refund order.
 	 * @return array<int, array<string, mixed>> Items in the API shape, see RefundEvent::item().
@@ -207,9 +189,8 @@ final class EddRefunds implements RefundSource {
 				continue;
 			}
 
-			// Negated on both members, so subtracting the tax before taking the
-			// absolute value is what removes it - the same order of operations
-			// the purchase builder performs on the positive originals.
+			// Both negated, so subtract the tax BEFORE abs(), as the purchase
+			// builder does on the positive originals.
 			$line_total = (float) DownloadData::row_prop( $item, 'total', 0 );
 
 			if ( $exclude_tax ) {
@@ -251,12 +232,8 @@ final class EddRefunds implements RefundSource {
 	}
 
 	/**
-	 * Unix time of an EDD order row.
-	 *
-	 * EDD stores `date_created` as a MySQL datetime in UTC, so the zone is
-	 * stated explicitly rather than left to the server's. An unreadable value
-	 * falls back to now, which is within seconds of the truth on the hook this
-	 * runs from.
+	 * Unix time of an EDD order row (`date_created` is a UTC MySQL datetime, so
+	 * the zone is stated explicitly); an unreadable value falls back to now.
 	 *
 	 * @param \EDD\Orders\Order $order The order row.
 	 * @return int

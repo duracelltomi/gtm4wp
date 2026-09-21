@@ -13,48 +13,30 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Remembers how each configured destination has been doing: last successful
- * send, last error, and how many sends in a row have failed. The records are
- * written by the send paths and read by the admin notice (HealthNotice) and,
- * in a later phase, the Site Health surfaces - never by a live HTTP call on
- * page load.
- *
- * Records are keyed by the destination's measurement id: it is the one cell
- * the save-time sanitizer keeps unique across rows, and it is a value already
- * public in the site's own HTML, so keying on it stores nothing new. A record
- * whose measurement id no longer matches a configured destination is simply
- * never shown; the readers join against the configured rows.
- *
- * Only error summaries are stored - a short, sanitized reason. No tokens, no
- * key material, no raw API response bodies (an error body can echo request
- * fragments).
- *
- * Each failure also records a **reason class** next to the summary: a bare
- * code name such as PERMISSION_DENIED. The two are not redundant. The summary
- * is what an admin reads on the settings screen, and it can quote Google's
- * own sentence about our request; the class is what may be shown where that
- * sentence must not go, which is Site Health's debug section.
+ * Remembers how each configured destination has been doing (last success,
+ * last error, consecutive failures), written by the send paths and read by
+ * HealthNotice and Site Health, never via a live HTTP call. Keyed by
+ * measurement id, the one cell the sanitizer keeps unique and a value already
+ * public in the site's HTML; readers join against the configured rows. Only a
+ * short sanitized error summary is stored, plus a bare **reason class**
+ * (PERMISSION_DENIED) for Site Health, where Google's own sentence about our
+ * request must not appear.
  */
 final class DestinationHealth {
 
 	/**
-	 * Option row holding every record. Non-autoloaded: it is read on admin
-	 * pageviews and at send time, never on a frontend pageview. Deleted by
-	 * uninstall.php.
+	 * Option row holding every record; non-autoloaded, deleted by uninstall.php.
 	 */
 	public const OPTION_NAME = 'gtm4wp_gdm_destination_health';
 
 	/**
-	 * Consecutive failures after which a destination counts as failing and the
-	 * admin notice names it. One failure is a blip Google's own guidance says
-	 * to retry through; three in a row is a configuration problem (revoked
-	 * grant, deleted property, broken key) that will not fix itself.
+	 * Consecutive failures after which a destination counts as failing: one is
+	 * a blip to retry through, three in a row is a configuration problem.
 	 */
 	public const FAILURE_THRESHOLD = 3;
 
 	/**
-	 * Longest stored error summary. The text is shown on the settings screen
-	 * and in the admin notice; the cap keeps a verbose upstream error from
+	 * Longest stored error summary; keeps a verbose upstream error from
 	 * bloating the option row.
 	 */
 	private const ERROR_MAX_LENGTH = 200;
@@ -107,14 +89,9 @@ final class DestinationHealth {
 	}
 
 	/**
-	 * Ends a destination's failure streak without claiming a send succeeded.
-	 *
-	 * For the Test button: a validation probe that passes after the admin has
-	 * corrected the destination exercises the same chain a send does - the
-	 * key, the API being enabled, the account's access to the property - and
-	 * is the moment the site-wide notice should stop. It is not a send, so
-	 * last_success stays what it was; if the next real send fails, the streak
-	 * starts counting again from there.
+	 * Ends a destination's failure streak without claiming a send succeeded:
+	 * for the Test button, whose passing probe exercises the same chain a send
+	 * does and is the moment the notice should stop. last_success is untouched.
 	 *
 	 * @param string $measurement_id The destination's measurement id.
 	 * @return void
@@ -244,9 +221,8 @@ final class DestinationHealth {
 	}
 
 	/**
-	 * Writes the option row, non-autoloaded (the KeyVault pattern: the
-	 * autoload flag only applies when the row is created, so the first write
-	 * goes through add_option()).
+	 * Writes the option row, non-autoloaded (the autoload flag only applies
+	 * when the row is created, so the first write goes through add_option()).
 	 *
 	 * @param array<string, array<string, mixed>> $records Every record.
 	 * @return void

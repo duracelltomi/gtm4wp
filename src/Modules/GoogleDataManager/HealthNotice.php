@@ -16,17 +16,11 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Names every configured destination whose sends have failed repeatedly, so
- * the admin learns about a revoked grant or a deleted property before weeks
- * of data quietly go missing. Not dismissible: it describes a live gap and
- * clears itself once a send succeeds again or the destination is removed
- * (the self-clearing configuration-gap pattern of Admin\Notices).
- *
- * Reads the STORED destination rows, not the filtered runtime list: the
- * notice deep-links to the settings table, and telling the admin to fix a
- * row a third-party filter injected would point them at a table that does
- * not contain it. A health record whose measurement id matches no stored
- * row is ignored the same way - stale records are invisible, not alarming.
+ * Names every configured destination whose sends keep failing. Not
+ * dismissible: a live gap that clears itself once a send succeeds or the
+ * destination is removed. Reads the STORED rows, not the filtered runtime
+ * list, because it deep-links to the settings table; a stale health record
+ * is invisible, not alarming.
  */
 final class HealthNotice {
 

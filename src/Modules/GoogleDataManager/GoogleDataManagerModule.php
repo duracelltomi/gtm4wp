@@ -17,24 +17,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Sends e-commerce signals from the server to Google through the Data Manager
- * API: the destination list (which GA4 property and data stream to send to,
- * with which stored GoogleAuth service account), the attribution capture that
- * lets a later server-side event be matched to its purchase, and the refund
- * events themselves - the signal a browser never sees, because a refund is
- * issued in the store admin.
- *
- * The send lane itself is not registered from here. It has to exist on cron,
- * WP-CLI and admin requests as well as frontend ones - a refund is issued in
- * wp-admin and sent from a background job - so Plugin::boot() registers it
- * before the admin/frontend split, next to the privacy wiring that needs the
- * same reach.
- *
- * The is_available() answer stays unconditional on purpose (the inherited true): "no
- * service account uploaded yet" is an onboarding state, not an environment
- * dependency, and a vault check here would both hide the settings panel
- * behind a disabled card and re-add the per-pageview option read the
- * autoload=false choice exists to avoid. Gating is per feature instead,
- * inside the paths that need a key.
+ * API: the destination list, the attribution capture that lets a server-side
+ * event be matched to its purchase, and the refund events a browser never
+ * sees. The send lane is registered in Plugin::boot(), not here, because it
+ * must exist on cron and admin requests too. is_available() stays the
+ * inherited true on purpose: "no service account yet" is an onboarding state,
+ * and a vault check here would re-add the per-pageview read autoload=false avoids.
  */
 final class GoogleDataManagerModule extends AbstractModule {
 
@@ -68,15 +56,10 @@ final class GoogleDataManagerModule extends AbstractModule {
 	}
 
 	/**
-	 * Registers the attribution capture, when it is on and can work.
-	 *
-	 * Three conditions, not one: the option, a commerce platform to have
-	 * orders at all, and at least one destination to take a measurement ID
-	 * from. The last one is also declared as the field's depends_on, but that
-	 * only greys the checkbox in the admin - a site that saved the option
-	 * while a destination existed and deleted the destination afterwards
-	 * arrives here with capture on and nothing to ask for (the UserEvents
-	 * module carries the same reminder).
+	 * Registers the attribution capture when it is on AND can work: a commerce
+	 * platform and at least one destination. depends_on only greys the admin
+	 * checkbox; a destination deleted after saving leaves capture on with
+	 * nothing to ask for.
 	 *
 	 * @return void
 	 */
@@ -95,14 +78,9 @@ final class GoogleDataManagerModule extends AbstractModule {
 	}
 
 	/**
-	 * Loads the capture bundle with the values it needs to speak both
-	 * contracts: which measurement IDs to ask Google about, and the cookie
-	 * format the server-side parser expects.
-	 *
-	 * The config is printed as a `var` so that it really becomes a window
-	 * property - a top-level `const` binds lexically and would never reach the
-	 * script (RI-14) - and JSON-encoded with the full hex flag set, since it
-	 * lands inside a script block.
+	 * Loads the capture bundle with the measurement IDs to ask Google about
+	 * and the cookie contract the server-side parser expects. Printed as a
+	 * `var` so it really is a window property (RI-14), hex-flag encoded.
 	 *
 	 * @return void
 	 */

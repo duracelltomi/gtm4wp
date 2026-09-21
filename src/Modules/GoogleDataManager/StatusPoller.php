@@ -13,18 +13,11 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Asks Google what became of a request it already accepted.
- *
- * The ingest call answers within a second, and its answer means only that the
- * request was well-formed and authorised. Whether the events were applied is
- * decided asynchronously, somewhere between half an hour and a day later. A
- * 200 is therefore not evidence that anything reached Google Analytics, and a
- * plugin that treated it as such would report success for events that were
- * silently dropped.
- *
- * The schedule is Google's own published guidance (U136): first ask after 30
- * minutes, then multiply the wait by 1.3 each time, never wait longer than an
- * hour between asks, and stop after 24 hours.
+ * Asks Google what became of a request it already accepted: a 200 on ingest
+ * means well-formed and authorised, not applied, which is decided
+ * asynchronously up to a day later. The schedule is Google's own guidance
+ * (U136): first ask after 30 minutes, multiply the wait by 1.3, never more
+ * than an hour between asks, stop after 24 hours.
  */
 final class StatusPoller {
 
@@ -127,18 +120,14 @@ final class StatusPoller {
 		$statuses = $this->ingest->request_status( $account, $request_id );
 
 		if ( $statuses instanceof \WP_Error ) {
-			// A refused or unreachable status request says nothing about the
-			// send itself, so it is not written into the log as a result. It is
-			// simply asked again, within the same overall window.
+			// A failed status request says nothing about the send: not logged,
+			// just asked again within the same window.
 			$this->reschedule( $payload, $interval, $elapsed );
 
 			return;
 		}
 
-		// Everything Google answered is written down, including "still
-		// processing": the log's job is to show what is known right now, and
-		// "we asked and it is not finished" is different from "we never heard
-		// back".
+		// "Still processing" is recorded too: it differs from "never heard back".
 		$this->log->record_status( $request_id, $statuses );
 
 		if ( self::is_finished( $statuses ) ) {
@@ -149,11 +138,9 @@ final class StatusPoller {
 	}
 
 	/**
-	 * Whether every destination of a request has reached a final state.
-	 *
-	 * An answer with no destinations in it is not treated as finished: that is
-	 * a shape we did not expect, and the polling window bounds how long the
-	 * uncertainty can last anyway.
+	 * Whether every destination of a request has reached a final state. An
+	 * answer with no destinations is not finished (an unexpected shape; the
+	 * window bounds it anyway).
 	 *
 	 * @param array<int, array{measurement: string, status: string, errors: int, warnings: int}> $statuses Per-destination statuses.
 	 * @return bool

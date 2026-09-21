@@ -13,25 +13,12 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Wires the `_gtm4wp_*` attribution meta into WordPress' own personal-data
- * export and erasure requests, for both commerce platforms.
- *
- * The reasoning is short: the plugin stores identifiers tied to a person's
- * visit against their orders, so a person asking what is held about them, or
- * asking for it to be removed, has to reach this data through the same door as
- * everything else. Uninstalling deliberately leaves the meta behind (sweeping
- * every order of a store is expensive, and the existing purchase-tracking flag
- * sets that precedent), which makes the eraser the per-person removal path
- * rather than a nicety.
- *
- * Registered unconditionally rather than behind the capture option: a request
- * has to find data captured while the feature was on, even after it is turned
- * off again. Registering costs two `add_filter` calls; nothing reads an order
- * until a request actually runs.
- *
- * The key list comes from AttributionCapture::meta_keys(), the same one the
- * writers use, so a field added to the capture cannot quietly escape an
- * erasure that reported success.
+ * Wires the `_gtm4wp_*` attribution meta into WordPress' personal-data export
+ * and erasure requests, for both platforms. Uninstall leaves the meta behind,
+ * so the eraser is the per-person removal path. Registered unconditionally: a
+ * request must find data captured while the feature was on. The key list is
+ * AttributionCapture::meta_keys(), the writers' own, so a new field cannot
+ * escape an erasure that reported success.
  */
 final class PrivacyData {
 
@@ -292,13 +279,8 @@ final class PrivacyData {
 	}
 
 	/**
-	 * Writes an order's staged deletions to the database, once per order.
-	 *
-	 * The WooCommerce CRUD stages delete_meta_data() on the object; nothing
-	 * reaches the database until save(). Saving once after the whole key loop
-	 * rather than per key keeps an erasure at one write per order instead of
-	 * one per captured field. EDD's edd_delete_order_meta() writes directly,
-	 * so there is nothing to persist on that platform.
+	 * Writes an order's staged deletions once per order (WooCommerce stages
+	 * delete_meta_data() until save(); EDD writes directly).
 	 *
 	 * @param array{platform: string, id: int, object: mixed} $order The order.
 	 * @return void

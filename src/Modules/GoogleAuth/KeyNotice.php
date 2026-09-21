@@ -16,15 +16,11 @@ use GTM4WP\Google\KeyVault;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Names the accounts whose stored key stopped decrypting - after a salt
- * rotation, typically - so the admin learns about it before a consumer's
- * sends start failing quietly. Not dismissible: it describes a live gap and
- * clears itself once the key file is uploaded again or the account removed.
- *
- * The vault row is not autoloaded, so this costs one option read per admin
- * pageview for users who hold the settings capability. That is the price of
- * a notice that is actually seen; a notice shown only on the plugin's own
- * screen would be seen by whoever already knows something is wrong.
+ * Names the accounts whose stored key stopped decrypting (a salt rotation,
+ * typically). Not dismissible: a live gap that clears itself once the key is
+ * re-uploaded or the account removed. Costs one non-autoloaded option read
+ * per admin pageview for settings-capable users, the price of a notice that
+ * is actually seen.
  */
 final class KeyNotice {
 
@@ -74,9 +70,7 @@ final class KeyNotice {
 				)
 			),
 			esc_html( implode( ', ', $labels ) ),
-			// The fragment is the settings app's bookmark for a module, so the
-			// link lands on the service-accounts panel rather than on the
-			// first module of the page.
+			// The fragment is the settings app's module bookmark.
 			'<a href="' . esc_url( SettingsPage::url() . '#' . GoogleAuthModule::ID ) . '">',
 			'</a>'
 		);

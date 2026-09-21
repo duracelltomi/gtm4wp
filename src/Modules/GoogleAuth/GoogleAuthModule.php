@@ -15,15 +15,11 @@ use GTM4WP\Module\AbstractModule;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Owns the Google Cloud service accounts an admin uploads so that other
- * modules (the Data Manager API integration first) can call Google APIs on
- * the site's behalf. Identity only: which APIs an account may use, and the
- * targets it is used against, belong to the consuming module.
- *
- * The module has no options in the settings row: the accounts live in their
- * own encrypted, non-autoloaded option (\GTM4WP\Google\KeyVault) and are
- * managed over dedicated REST routes (RestController) by a custom panel of
- * the settings app. Nothing here runs on a frontend pageview.
+ * Owns the Google Cloud service accounts an admin uploads so other modules
+ * can call Google APIs. Identity only: scopes and targets belong to the
+ * consuming module. No options in the settings row: the accounts live in the
+ * encrypted, non-autoloaded \GTM4WP\Google\KeyVault, managed over dedicated
+ * REST routes by a custom panel. Nothing runs on a frontend pageview.
  */
 final class GoogleAuthModule extends AbstractModule {
 

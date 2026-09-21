@@ -13,27 +13,15 @@ namespace GTM4WP\Google;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Stores uploaded service-account keys in their own, non-autoloaded option
- * row, with the private key encrypted at rest.
- *
- * Why a dedicated row and not a field in `gtm4wp-options`: that row is
- * returned wholesale to the settings screen, written by the settings POST,
- * and included in the settings export file. A private key must never travel
- * any of those paths, and keeping it out of the row makes that true by
- * construction rather than by filtering - the custody tests pin each path.
- *
- * Encryption: AES-256-GCM, key derived with HKDF from the wp-config.php
- * salts. This exists to make a database-only leak (SQL injection, a stray
- * backup) non-fatal: the attacker gets ciphertext. It does NOT protect
- * against an attacker who has both the database and the files - wp-config.php
- * holds the salts - and the settings screen says so. Rotating the salts
- * makes every stored key unreadable; that case flips the account to the
- * "re-upload required" status and raises an admin notice, it never fatals.
- *
- * The private key is write-only: nothing this class returns to a caller other
- * than open() carries key material, and open() is only called by the
- * TokenService at signing time. The ciphertext is not returned either - a
- * blob an admin can copy out is a blob that ends up in a support thread.
+ * Stores uploaded service-account keys in their own non-autoloaded option row
+ * (never in `gtm4wp-options`, which travels to the settings screen and the
+ * export file; the custody tests pin each path), with the private key
+ * encrypted at rest: AES-256-GCM, key HKDF-derived from the wp-config.php
+ * salts. That makes a database-only leak non-fatal; it does NOT protect
+ * against an attacker holding the files too, and the settings screen says
+ * so. Rotated salts flip the account to "re-upload required" with a notice,
+ * never a fatal. The private key is write-only: only open() returns key
+ * material, and only TokenService calls it; the ciphertext is never returned either.
  */
 final class KeyVault {
 
@@ -43,14 +31,13 @@ final class KeyVault {
 	public const OPTION_NAME = 'gtm4wp_google_service_accounts';
 
 	/**
-	 * Prefix of every generated account id. Destination rows and any other
-	 * consumer reference an account by this id, so a relabel is never a rename.
+	 * Prefix of every generated account id; consumers reference an account by
+	 * this id, so a relabel is never a rename.
 	 */
 	public const ID_PREFIX = 'sa_';
 
 	/**
-	 * Regex a route pattern or a lookup can use to recognise an id. Ours to
-	 * define, so pinning the format is not the UC-5 mistake.
+	 * Regex recognising an id; ours to define, so pinning it is not UC-5.
 	 */
 	public const ID_PATTERN = 'sa_[a-f0-9]{12}';
 
@@ -63,29 +50,24 @@ final class KeyVault {
 	public const STATUS_REUPLOAD   = 'reupload-required';
 
 	/**
-	 * Longest label kept. Long enough for "Production GA4 property (Acme)",
-	 * short enough that a label is never a place to stash data.
+	 * Longest label kept; a label is never a place to stash data.
 	 */
 	public const LABEL_MAX_LENGTH = 100;
 
 	/**
-	 * How stale the "last checked" timestamp of a working account may get before
-	 * an otherwise unchanged successful mint writes the row again. Shorter than
-	 * an access token's lifetime, so on a normally busy site the timestamp still
-	 * moves with every real mint; see is_unchanged_success().
+	 * How stale a working account's "last checked" may get before an otherwise
+	 * unchanged successful mint writes the row again; see is_unchanged_success().
 	 */
 	public const STATUS_REFRESH_INTERVAL = 900;
 
 	/**
-	 * Longest last-error text kept per account. The text comes from Google's
-	 * OAuth error response and is shown on the settings screen; the cap keeps a
-	 * verbose upstream error from bloating the option row.
+	 * Longest last-error text kept per account (shown on the settings screen).
 	 */
 	private const ERROR_MAX_LENGTH = 200;
 
 	/**
-	 * Cipher and its parameters. GCM authenticates the ciphertext, so a
-	 * tampered or foreign blob fails to decrypt instead of decrypting to junk.
+	 * Cipher and its parameters; GCM authenticates the ciphertext, so a tampered
+	 * blob fails to decrypt instead of decrypting to junk.
 	 */
 	private const CIPHER    = 'aes-256-gcm';
 	private const IV_BYTES  = 12;
@@ -93,8 +75,7 @@ final class KeyVault {
 	private const KEY_BYTES = 32;
 
 	/**
-	 * HKDF info string. Binds the derived key to this one purpose so that any
-	 * other derivation from the same salts yields an unrelated key.
+	 * HKDF info string, binding the derived key to this one purpose.
 	 */
 	private const HKDF_INFO = 'gtm4wp/google-service-accounts/v1';
 
@@ -167,12 +148,9 @@ final class KeyVault {
 			'key'            => $sealed,
 		);
 
-		// A refused write must not produce a phantom id the next read cannot
-		// find. Only this path treats false as fatal: the array always carries
-		// a fresh random id and a fresh IV, so update_option()'s "unchanged
-		// value" false cannot occur here - false genuinely means the store
-		// refused the write. On the status/delete paths it can mean either,
-		// which is why they do not check.
+		// Only this path treats false as fatal: a fresh id and IV mean
+		// update_option()'s "unchanged" false cannot occur, so false is a
+		// refused write and must not produce a phantom id.
 		if ( ! $this->write( $accounts ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_key_store_failed',
@@ -200,13 +178,8 @@ final class KeyVault {
 		}
 
 		/**
-		 * Filters whether a Google service account is still referenced somewhere
-		 * and therefore must not be deleted.
-		 *
-		 * Any feature that stores an account id (a Data Manager destination, for
-		 * example) returns true here while the reference exists, so that the
-		 * settings screen refuses the deletion with an explanation instead of
-		 * leaving the feature pointing at a key that is gone.
+		 * Filters whether a Google service account is still referenced (e.g. by
+		 * a Data Manager destination) and therefore must not be deleted.
 		 *
 		 * @since 2.1.0
 		 *
@@ -220,12 +193,8 @@ final class KeyVault {
 			);
 		}
 
-		// A token minted from this key must not outlive it on this site. The
-		// purge lives here rather than in the REST controller so that every
-		// deletion path drops the cached token of every scope the account was
-		// actually minted for - a scope added later is covered without anyone
-		// remembering another forget call. Deleting the transient cannot
-		// revoke the token at Google; it stops this site reusing it.
+		// A cached token must not outlive its key on this site; purged here so
+		// every deletion path covers every scope the account was minted for.
 		foreach ( self::minted_scopes( $accounts[ $id ] ) as $scope ) {
 			TokenService::forget( $id, $scope );
 		}
@@ -237,11 +206,8 @@ final class KeyVault {
 	}
 
 	/**
-	 * Changes an account's label and nothing else.
-	 *
-	 * Safe by construction: consumers reference an account by its id (see
-	 * ID_PREFIX), so a relabel never invalidates a destination or a cached
-	 * token, and the sealed key is not touched.
+	 * Changes an account's label and nothing else (consumers reference the id,
+	 * so nothing is invalidated).
 	 *
 	 * @param string $id    Account id.
 	 * @param string $label New label; the account e-mail when empty, as on add().
@@ -321,11 +287,9 @@ final class KeyVault {
 	}
 
 	/**
-	 * Decrypts and returns the key of an account for signing.
-	 *
-	 * The only method that hands out key material. A key that no longer
-	 * decrypts (rotated salts, a tampered row) marks the account as needing a
-	 * fresh upload and returns an error; the admin notice picks the status up.
+	 * Decrypts and returns the key of an account for signing: the only method
+	 * that hands out key material. A key that no longer decrypts marks the
+	 * account as needing a fresh upload.
 	 *
 	 * @param string $id Account id.
 	 * @return ServiceAccountKey|\WP_Error
@@ -354,9 +318,8 @@ final class KeyVault {
 			);
 		}
 
-		// The stored metadata was validated on upload; ServiceAccountKey is
-		// rebuilt through the same parser so the decrypted key is checked again
-		// rather than trusted because it came from our own row.
+		// Rebuilt through the same parser, so the decrypted key is checked
+		// again rather than trusted because it came from our own row.
 		return ServiceAccountKey::from_json(
 			(string) wp_json_encode(
 				array(
@@ -376,11 +339,8 @@ final class KeyVault {
 	 * @param string $id      Account id.
 	 * @param bool   $ok      Whether Google issued a token.
 	 * @param string $message Error summary from Google when it did not; ignored on success.
-	 * @param string $scope   OAuth scope the mint was for; remembered on success so
-	 *                        delete() can purge that scope's cached token (#226).
-	 * @param bool   $force   Write even when nothing about the outcome changed. The
-	 *                        settings screen's Test button passes this: an admin who
-	 *                        pressed Test has to see the time move.
+	 * @param string $scope   OAuth scope the mint was for; remembered so delete() can purge its token (#226).
+	 * @param bool   $force   Write even when nothing changed (the Test button: the admin must see the time move).
 	 * @return void
 	 */
 	public function record_token_result( string $id, bool $ok, string $message = '', string $scope = '', bool $force = false ): void {
@@ -412,19 +372,12 @@ final class KeyVault {
 	}
 
 	/**
-	 * Whether a successful mint would record nothing this row does not already
-	 * say, and recently enough that the timestamp is not worth a write.
-	 *
-	 * This is the concurrency mitigation the send lanes made worth having. The
-	 * account row is read, modified and written whole, with no compare-and-swap
-	 * anywhere in the WordPress options API - so two writers in the same instant
-	 * can lose one another's change. That was an accepted risk while the only
-	 * writers were an admin pressing buttons; background send jobs can genuinely
-	 * run at once, and a cache miss can send several of them to the token
-	 * endpoint together. Skipping the write when it would change nothing but the
-	 * timestamp collapses that herd to a single writer without giving up the
-	 * signal: a failure always writes, a status change always writes, a newly
-	 * used scope always writes, and the settings screen's Test button forces one.
+	 * Whether a successful mint would record nothing new, recently enough that
+	 * the timestamp is not worth a write. The concurrency mitigation: the row
+	 * is read-modify-written whole with no compare-and-swap, and concurrent
+	 * send jobs can lose each other's change, so a write that would only move
+	 * the timestamp is skipped. A failure, a status change, a new scope and
+	 * the Test button always write.
 	 *
 	 * @param array<string, mixed> $account The stored account.
 	 * @param bool                 $ok      Whether Google issued a token.
@@ -572,13 +525,10 @@ final class KeyVault {
 	}
 
 	/**
-	 * Derives the AES key from the site secret.
-	 *
-	 * The salt function, wp_salt(), reads the wp-config.php keys when they are defined and falls
-	 * back to values it generates and stores in the database otherwise. On such
-	 * a site the derived key lives next to the ciphertext, and the encryption
-	 * protects against nothing - which is why the settings screen tells the
-	 * admin to define the keys in wp-config.php.
+	 * Derives the AES key from the site secret. wp_salt() falls back to
+	 * database-stored values when wp-config.php defines no keys; on such a
+	 * site the key lives next to the ciphertext, which is why the settings
+	 * screen tells the admin to define them.
 	 *
 	 * @return string 32 raw bytes.
 	 */

@@ -17,35 +17,19 @@ use GTM4WP\RestCors;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The safety net for the buyer whose only pageview was the checkout.
+ * The safety net for a buyer whose only pageview was the checkout: the Google
+ * tag answers the ID lookups asynchronously, so the receipt page resolves
+ * once more and posts what it has here. A guest-facing mutation, so:
  *
- * The Google tag answers the ID lookups asynchronously, so a visitor who lands
- * straight on the checkout and submits quickly can create an order before the
- * callbacks ever fire. The confirmation page is the second chance: the script
- * resolves once more there and posts what it has, and this route writes it
- * into the order.
- *
- * It is a mutation exposed to logged-out visitors, so the guardrails are the
- * ones that class needs:
- *
- * - **Authorization is the buyer's own proof of purchase**, the same secret
- *   each platform already trusts to show the receipt: the WooCommerce order
- *   key, or on Easy Digital Downloads the payment key - or the verification
- *   hash of it that EDD's own receipt links carry instead. The order id alone
- *   is never enough, because it is sequential and guessable.
- * - **Write only if absent.** A field already captured is never overwritten,
- *   so even a caller holding a valid key cannot replace real attribution with
- *   values of their choosing. Backfill can only fill a hole.
- * - **The stored consent record wins.** Identifiers the order's recorded
- *   consent state forbids are dropped before writing, whatever the posted map
- *   says - a denial captured at checkout is not undone by a grant on the
- *   receipt page, because the record is what the send lane later reads and
- *   write-only-if-absent keeps that record as it was (#249).
- * - **It discloses nothing.** The response carries no order data at all, so
- *   the route cannot be turned into an oracle for whether an order exists or
- *   what it contains.
- * - Values pass the same parser the cookies do, so there is one grammar for
- *   attribution however it arrives.
+ * - **Authorization is the buyer's proof of purchase**: the WooCommerce order
+ *   key, or EDD's payment key / its verification hash. The order id alone is
+ *   sequential and guessable.
+ * - **Write only if absent**: a valid key cannot replace real attribution.
+ * - **The stored consent record wins**: identifiers it forbids are dropped
+ *   whatever the posted map says (#249).
+ * - **It discloses nothing**: the response carries no order data, so the
+ *   route is no oracle for whether an order exists.
+ * - Values pass the same parser the cookies do (one grammar).
  */
 final class BackfillEndpoint {
 
@@ -97,18 +81,11 @@ final class BackfillEndpoint {
 	}
 
 	/**
-	 * Permission callback.
-	 *
-	 * A guest checkout is the normal case, so this cannot be a capability
-	 * gate. What authorizes the write is the purchase proof checked in the
-	 * callback - a permission callback that returns true for everyone must be
-	 * followed by an identity check in code, and this one is. The two checks
-	 * here are filters in front of that, not the authorization: the REST nonce
-	 * refuses malformed requests, and the Origin check turns away drive-by
-	 * cross-site POSTs from a browser. Neither proves anything about the
-	 * caller on its own (a non-browser client sets Origin freely, and the
-	 * route consults no cookie), which is why the sibling beacons' description
-	 * of Origin as "the gate" does not carry over to this route.
+	 * Permission callback. Not a capability gate (guest checkout); the
+	 * authorization is the purchase proof checked in the callback (PA-10). The
+	 * nonce and Origin checks are filters in front of it, not the gate: this
+	 * route consults no cookie, so a non-browser client setting Origin freely
+	 * proves nothing.
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return bool
@@ -132,18 +109,14 @@ final class BackfillEndpoint {
 		$order    = (string) $request->get_param( 'order' );
 		$token    = (string) $request->get_param( 'token' );
 
-		// Verification first, and before anything about the payload is
-		// considered: every refusal has to look the same whatever was posted,
-		// or the status code becomes a way to test whether a guessed order and
-		// key go together.
+		// Verification first, before the payload is considered: every refusal
+		// must look the same, or the status code tests guessed order/key pairs.
 		$verified = self::PLATFORM_WC === $platform
 			? $this->woocommerce_writer( $order, $token )
 			: $this->edd_writer( $order, $token );
 
 		if ( null === $verified ) {
-			// One answer for "no such order", "wrong key" and "that platform
-			// is not active here", so the route says nothing about which
-			// orders exist.
+			// One answer for no such order, wrong key and inactive platform.
 			return new \WP_Error(
 				'gtm4wp_gdm_backfill_denied',
 				__( 'This order could not be verified.', 'duracelltomi-google-tag-manager' ),
@@ -155,19 +128,9 @@ final class BackfillEndpoint {
 
 		$values = AttributionCapture::parse_payload( (array) $request->get_param( 'values' ) );
 
-		// The posted consent map goes through the site's own override filter,
-		// exactly as the one read from the cookie at order creation does. The
-		// filter exists for sites where the browser's view of consent is not
-		// the trustworthy one, so a route that stored the posted map verbatim
-		// would hand the buyer the answer the send gate later reads.
-		//
-		// The filter gets the RESOLVED order reference - the WooCommerce order
-		// object, the Easy Digital Downloads order id - never the request's
-		// raw string. A callback is written against what order creation hands
-		// it, and it has to see the same thing here (RI-31); this route is
-		// posted to by the plugin's own script, so a callback that fatals on a
-		// string would silently lose the very attribution the route exists to
-		// rescue.
+		// The posted consent map goes through the site's override filter like
+		// the cookie one at order creation (see AttributionCapture::filter_consent),
+		// with the RESOLVED order reference, never the request's raw string (RI-31).
 		$consent = AttributionCapture::filter_consent(
 			AttributionCapture::parse_consent_payload( (array) $request->get_param( 'consent' ) ),
 			$order_reference
@@ -187,14 +150,10 @@ final class BackfillEndpoint {
 	}
 
 	/**
-	 * Drops the identifiers the order's STORED consent record forbids.
-	 *
-	 * The gate above ran against the posted map; this one runs against what
-	 * order creation recorded. Without it a buyer who refused analytics at
-	 * checkout and granted it on the receipt page - or simply posted the
-	 * identifiers with no consent map at all - would have them stored beside a
-	 * record that says denied (#249). The record itself is not touched here:
-	 * write-only-if-absent keeps it, and it is the record the send lane reads.
+	 * Drops the identifiers the order's STORED consent record forbids (the gate
+	 * in backfill() ran against the posted map): a buyer who refused at
+	 * checkout and posted identifiers on the receipt page must not have them
+	 * stored beside a record that says denied (#249).
 	 *
 	 * @param array<string, mixed> $values The meta about to be written.
 	 * @param mixed                $stored The order's stored consent state, as read from meta.
@@ -251,16 +210,11 @@ final class BackfillEndpoint {
 	}
 
 	/**
-	 * A writer for an Easy Digital Downloads order.
-	 *
-	 * The proof is whichever secret the receipt URL carried, and EDD has two:
-	 * the payment key (`?payment_key=`), which the order is looked up *by*
-	 * rather than by an id the request supplies; or, on EDD's own receipt
-	 * links, the verification hash (`?id=` + `?order=`) - md5 of the id, the
-	 * key and the buyer's e-mail - which is checked against the order named by
-	 * the id through the same rule the confirmation page applies. Either way
-	 * an unguessable value is the only way in, and the receipt page never has
-	 * to print a secret its URL does not already hold (#250).
+	 * A writer for an Easy Digital Downloads order. The proof is whichever
+	 * secret the receipt URL carried: the payment key (the order is looked up
+	 * BY it) or, on EDD's own receipt links, the verification hash checked
+	 * against the order the id names. The receipt page never prints a secret
+	 * its URL does not already hold (#250).
 	 *
 	 * @param string $order_id The order id; the record the hash is checked against, or a cross-check on the key.
 	 * @param string $token    The payment key, or the receipt-link verification hash.
@@ -286,9 +240,8 @@ final class BackfillEndpoint {
 		if ( is_object( $order ) ) {
 			$resolved_id = (int) ( $order->id ?? 0 );
 		} elseif ( $requested_id > 0 ) {
-			// Not a payment key: a receipt-link hash, checked against the order
-			// the id names. The hash is a digest of that order's own key, so a
-			// guessed id still needs the key to produce it.
+			// A receipt-link hash: a digest of the order's own key, so a guessed
+			// id still needs the key.
 			$by_id = edd_get_order( $requested_id );
 
 			if ( $by_id instanceof \EDD\Orders\Order && EddPageDataLayer::receipt_hash_matches( $by_id, $token ) ) {
@@ -316,13 +269,8 @@ final class BackfillEndpoint {
 	}
 
 	/**
-	 * Whether a stored meta value counts as already captured.
-	 *
-	 * The write-only-if-absent rule has to hold for every value shape the
-	 * capture writes, and two of them are arrays (the session map and the
-	 * consent state). Casting those to a string to test for emptiness both
-	 * warns and answers the wrong question, so the shapes are handled
-	 * explicitly.
+	 * Whether a stored meta value counts as already captured; two of the
+	 * shapes are arrays (session map, consent state), handled explicitly.
 	 *
 	 * @param mixed $existing The stored value.
 	 * @return bool

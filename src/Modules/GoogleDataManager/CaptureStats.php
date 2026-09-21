@@ -13,21 +13,12 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Counts how many orders capture saw and on how many of them it actually
- * resolved a client id.
- *
- * This exists because the feature's characteristic failure is silent. Capture
- * needs a Google Analytics tag that really fires for the configured
- * measurement ID; when the ID is mistyped, or the tag was removed from the
- * container, or consent is denied site-wide, the lookups are simply never
- * answered - no error anywhere, and the first symptom would be a refund that
- * cannot be sent weeks later. Two counters turn that into something the
- * settings screen and Site Health can state plainly ("attribution captured on
- * 0 of the last N orders").
- *
- * Deliberately counters and timestamps only: no order references, nothing
- * per-visitor. The record answers "is this working", not "what happened to
- * order 1234".
+ * Counts how many orders capture saw and on how many it resolved a client id.
+ * The feature's characteristic failure is silent (a mistyped measurement ID,
+ * a tag removed from the container: the lookups are simply never answered),
+ * so two counters let the settings screen and Site Health say "captured on 0
+ * of the last N orders". Counters and timestamps only, nothing per order or
+ * per visitor.
  */
 final class CaptureStats {
 

@@ -16,19 +16,11 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Value helper for the GTM4WP_OPTION_GDM_DESTINATIONS option: an array of
- * rows where every row names a place the Data Manager API integration sends
- * events to - a Google Analytics 4 property and web data stream - together
- * with the stored service account (GoogleAuth) that authenticates the send.
- *
- * The destination list is user configuration verified empirically: the API
- * has no "list my destinations" call, and what a service account can reach is
- * a function of key, API and role that only an actual (validateOnly) request
- * can answer. This module owns its destinations, their validation probe and
- * their health records; GoogleAuth owns identity only.
- *
- * Loaded on frontend requests by the Options service, therefore this class
- * must not contain translated strings or other admin-only code.
+ * Value helper for the GTM4WP_OPTION_GDM_DESTINATIONS option: rows naming a
+ * GA4 property and web data stream plus the GoogleAuth service account that
+ * authenticates the send. User configuration verified empirically: the API
+ * has no "list my destinations" call, only a validateOnly request can answer.
+ * Loaded on frontend requests: no translated strings here.
  */
 final class DestinationRows {
 
@@ -60,23 +52,12 @@ final class DestinationRows {
 	public const LABEL_MAX_LENGTH = 100;
 
 	/**
-	 * The D modifier on all three patterns anchors to the true end of the
-	 * subject: without it PCRE lets `$` match before one trailing newline, so
-	 * "value\n" passes a pattern that reads as though it could not (the
-	 * ContainerRows lesson).
-	 *
-	 * The account pattern is the vault's own id format (ours to define, so
-	 * pinning it is not the UC-5 mistake). The property id is numeric per the
-	 * confirmed Destination shape (accountId = the GA4 property id); the
-	 * measurement id grammar (G- plus uppercase alphanumerics) is Google's -
-	 * both registered as U124 in .upstream/upstream-review-checklist.md, with
-	 * generous length caps so a longer future id is not refused as user error.
-	 *
-	 * The *_BODY constants are the delimiter-free middles, shared with the
-	 * settings table's inline cell validation: the admin schema hands
-	 * '^<body>$' to the client as the column's `pattern`, so the rule the
-	 * table marks while typing and the rule this class enforces are one
-	 * definition, never a JS copy that can drift (PA-2/UC-6).
+	 * The D modifier anchors to the true end of the subject (the ContainerRows
+	 * lesson). The account pattern is the vault's own id format (ours to pin);
+	 * the property and measurement id grammars are Google's (U124), with
+	 * generous length caps (UC-5). The *_BODY constants are the delimiter-free
+	 * middles the admin schema hands to the client as the column `pattern`, so
+	 * the table's inline validation and this class share one definition (PA-2).
 	 */
 	public const PROPERTY_PATTERN_BODY    = '[0-9]{1,20}';
 	public const MEASUREMENT_PATTERN_BODY = 'G-[A-Z0-9]{1,30}';
@@ -86,10 +67,8 @@ final class DestinationRows {
 	public const MEASUREMENT_PATTERN = '/^' . self::MEASUREMENT_PATTERN_BODY . '$/D';
 
 	/**
-	 * Returns one row with every column present as a trimmed string. The
-	 * measurement id is uppercased: the grammar is uppercase and the value is
-	 * pasted from the GA admin either way, so a stray lowercase paste is
-	 * repaired rather than refused.
+	 * Returns one row with every column present as a trimmed string; the
+	 * measurement id is uppercased so a lowercase paste is repaired, not refused.
 	 *
 	 * @param array<string, mixed> $row Raw row.
 	 * @return array<string, string>
@@ -109,12 +88,9 @@ final class DestinationRows {
 	}
 
 	/**
-	 * Whether a normalized row is a complete, well-formed destination.
-	 *
-	 * The single predicate shared by the save-time sanitizer (which turns each
-	 * failing aspect into its own WP_Error), the runtime accessor below and
-	 * the test route - one rule, never copies of it (PA-2). The label is not
-	 * part of validity: it is display only and may be empty.
+	 * Whether a normalized row is a complete, well-formed destination: the
+	 * single predicate shared by the sanitizer, rows() and the test route
+	 * (PA-2). The label is display only and may be empty.
 	 *
 	 * @param array<string, string> $row Normalized row.
 	 * @return bool
@@ -128,14 +104,9 @@ final class DestinationRows {
 
 	/**
 	 * The runtime destination list: the stored rows through the public filter,
-	 * every surviving row re-validated.
-	 *
-	 * Consumers of the runtime list (the send paths, the capture script's
-	 * measurement ids) read destinations only through this method, so a third
-	 * party sees one extension point and an invalid filtered row is dropped
-	 * here instead of reaching a request body. The two deliberate exceptions
-	 * read the STORED rows instead, for the reason each documents: the delete
-	 * veto (references_account() below) and the health notice's join.
+	 * every surviving row re-validated so an invalid filtered row never
+	 * reaches a request body. Every consumer reads through here except the
+	 * delete veto and the health notice, which read the STORED rows on purpose.
 	 *
 	 * @param Options $options The plugin options service.
 	 * @return array<int, array<string, string>>
@@ -144,12 +115,9 @@ final class DestinationRows {
 		$stored = $options->get( GTM4WP_OPTION_GDM_DESTINATIONS );
 
 		/**
-		 * Filters the runtime list of Google Data Manager destinations.
-		 *
-		 * Receives the validated rows of the gdm-destinations option; each row
-		 * is an array with the DestinationRows column keys. Rows added or
-		 * changed here are re-validated before use - an invalid row is
-		 * dropped, never sent.
+		 * Filters the runtime list of Google Data Manager destinations (arrays
+		 * with the DestinationRows column keys). Rows added or changed here are
+		 * re-validated; an invalid row is dropped, never sent.
 		 *
 		 * @since 2.1.0
 		 *
@@ -179,14 +147,10 @@ final class DestinationRows {
 	}
 
 	/**
-	 * Whether any stored destination row references a service account.
-	 *
-	 * Backs the GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE veto: deleting a
-	 * key that a destination still points at would leave that destination
-	 * failing quietly, so the settings screen refuses it with an explanation
-	 * instead. Deliberately reads the STORED rows, not the filtered runtime
-	 * list - the veto protects stored configuration; a destination a third
-	 * party adds at runtime is that party's to keep consistent.
+	 * Whether any stored destination row references a service account (the
+	 * GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE veto). Reads the STORED
+	 * rows on purpose: a runtime-injected destination is its author's to keep
+	 * consistent.
 	 *
 	 * @param Options $options    The plugin options service.
 	 * @param string  $account_id Service-account id about to be deleted.

@@ -13,36 +13,18 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Schedules the work that must not happen inside the request that triggered it.
- *
- * A refund is issued by a human waiting on an admin screen, or by a payment
- * gateway callback that will retry if we make it slow. Neither may be made to
- * wait on a round trip to Google, so every send is queued and every retry is
- * queued again.
- *
- * Two backends, because the plugin serves two commerce platforms:
- *
- * - **Action Scheduler**, which both commerce platforms bundle - WooCommerce
- *   always, Easy Digital Downloads since 3.6.5 (U139). It is the better one -
- *   durable, visible in an admin screen, with its own retry and concurrency
- *   handling - so it is used whenever it is loaded.
- * - **WP-Cron**, everywhere else: a store on an older Easy Digital Downloads,
- *   or any site where the library is not loaded for a reason of its own.
- *
- * Which of the two is in front of a given store is therefore not something
- * this class may assume - it was assumed once, and the assumption was wrong
- * for every current EDD store (measured on an EDD-only site, 2026-09-08).
- * Both are reached only through the functions Action Scheduler documents as
- * its public API, each behind function_exists (UC-2), so a store that
- * deactivates its commerce plugin mid-flight falls back to WP-Cron rather
- * than fataling, and a store that gains the library starts using it.
+ * Schedules the work that must not happen inside the request that triggered
+ * it (an admin screen, or a gateway callback that retries if made slow). Two
+ * backends: Action Scheduler when loaded (WooCommerce always, EDD since 3.6.5,
+ * U139), WP-Cron otherwise. Never assume which one is in front of a store -
+ * that assumption was wrong for every current EDD store. Both are reached
+ * only through documented functions behind function_exists (UC-2).
  */
 final class SendQueue {
 
 	/**
-	 * Hook of a queued refund send. The payload is a single associative array,
-	 * because both backends pass the scheduled arguments through as a list and
-	 * one array argument keeps the callback signature identical on both.
+	 * Hook of a queued refund send. The payload is one associative array, which
+	 * keeps the callback signature identical on both backends.
 	 */
 	public const HOOK_SEND = 'gtm4wp_gdm_send_refund';
 
@@ -52,38 +34,29 @@ final class SendQueue {
 	public const HOOK_STATUS = 'gtm4wp_gdm_poll_status';
 
 	/**
-	 * Every hook this class schedules. uninstall.php unschedules each one by
-	 * name - it writes the names out because it runs without the autoloader,
-	 * and SendQueueTest pins its list against this one.
+	 * Every hook this class schedules; uninstall.php writes the names out
+	 * (no autoloader there) and SendQueueTest pins its list against this one.
 	 *
 	 * @var string[]
 	 */
 	public const HOOKS = array( self::HOOK_SEND, self::HOOK_STATUS );
 
 	/**
-	 * Action Scheduler group of every action this plugin queues, so a site
-	 * owner can tell them apart from WooCommerce's own in the Scheduled
-	 * Actions screen.
+	 * Action Scheduler group, so the actions stand out on the Scheduled Actions screen.
 	 */
 	public const GROUP = 'gtm4wp';
 
 	/**
-	 * Delay before each retry, in seconds: one minute, five minutes, half an
-	 * hour, two hours, twelve hours. A rate limit or a Google-side outage is
-	 * usually over within the first two; the long tail exists so a send is not
-	 * given up on during a night-long incident.
-	 *
-	 * The number of entries is also the number of retries: an attempt with no
-	 * delay left is the last one.
+	 * Delay before each retry, in seconds; the count is the number of retries.
+	 * The long tail exists so a send survives a night-long incident.
 	 *
 	 * @var int[]
 	 */
 	public const BACKOFF = array( 60, 300, 1800, 7200, 43200 );
 
 	/**
-	 * Delay before the first send attempt. Not zero: the platform hooks fire
-	 * while the refund is being written, and a job that starts a second later
-	 * reads a refund that is fully saved.
+	 * Delay before the first attempt. Not zero: the platform hooks fire while
+	 * the refund is still being written.
 	 */
 	public const INITIAL_DELAY = 60;
 
@@ -113,13 +86,9 @@ final class SendQueue {
 	}
 
 	/**
-	 * Queues one job with Action Scheduler.
-	 *
-	 * Public, and named for what it does, because the choice between the two
-	 * backends is made from function_exists() - which no test can make false
-	 * again once a stub has defined the function process-wide. Each backend is
-	 * therefore exercised directly, and has_action_scheduler() is asserted on
-	 * its own as the discriminator between them.
+	 * Queues one job with Action Scheduler. Public so each backend can be
+	 * tested directly: a stub defines function_exists() process-wide, so the
+	 * discriminator is asserted on its own.
 	 *
 	 * @param string               $hook    One of the HOOKS.
 	 * @param array<string, mixed> $payload Job payload.
@@ -132,11 +101,9 @@ final class SendQueue {
 	}
 
 	/**
-	 * Queues one job with WP-Cron.
-	 *
-	 * WP-Cron refuses a duplicate of the same hook and arguments scheduled
-	 * within ten minutes. Every payload carries its attempt number, so a retry
-	 * is never a duplicate of the attempt that produced it.
+	 * Queues one job with WP-Cron, which refuses a duplicate hook+arguments
+	 * within ten minutes; every payload carries its attempt number, so a retry
+	 * is never a duplicate.
 	 *
 	 * @param string               $hook    One of the HOOKS.
 	 * @param array<string, mixed> $payload Job payload.
@@ -148,11 +115,8 @@ final class SendQueue {
 	}
 
 	/**
-	 * The delay before the retry that follows a given attempt, or null when
-	 * the retries are used up.
-	 *
-	 * Attempts are one-based: attempt 1 is the first send, so it is followed
-	 * by the first backoff step.
+	 * The delay before the retry that follows a given (one-based) attempt, or
+	 * null when the retries are used up.
 	 *
 	 * @param int $attempt The attempt that just failed.
 	 * @return int|null Seconds to wait, or null to give up.
@@ -168,10 +132,8 @@ final class SendQueue {
 	}
 
 	/**
-	 * How many jobs of one hook are waiting.
-	 *
-	 * Read-only and best effort: it feeds a Site Health row, so a backend that
-	 * cannot answer reports zero rather than raising anything.
+	 * How many jobs of one hook are waiting; best effort for a Site Health row,
+	 * zero when the backend cannot answer.
 	 *
 	 * @param string $hook One of the HOOKS.
 	 * @return int
@@ -194,9 +156,7 @@ final class SendQueue {
 		$actions = as_get_scheduled_actions(
 			array(
 				'hook'     => $hook,
-				// The literal Action Scheduler stores, rather than its
-				// ActionScheduler_Store::STATUS_PENDING constant: the function
-				// is documented, the class is an internal.
+				// The literal, not ActionScheduler_Store::STATUS_PENDING: the class is internal.
 				'status'   => 'pending',
 				'per_page' => -1,
 			),

@@ -22,13 +22,10 @@ defined( 'ABSPATH' ) || exit;
  * - POST destinations/test  probe one destination with a validateOnly ingest
  * - GET  send-log           read the diagnostics ring of the send lanes
  *
- * The test route takes the destination's values from the request rather than a
- * stored row index, so the settings screen can test an edit before saving
- * it. Every value is validated against the same DestinationRows rules the
- * save-time sanitizer enforces before anything leaves the site, and the only
- * URL ever contacted is the fixed ingest endpoint. Requires the settings
- * capability and the REST nonce; the response reports success or Google's
- * error summary, never a token.
+ * The test route takes the destination's values from the request so an edit
+ * can be tested before saving; every value passes the DestinationRows rules
+ * first, and the only URL contacted is the fixed ingest endpoint. Requires the
+ * settings capability and the REST nonce; the response never carries a token.
  */
 final class RestController {
 
@@ -125,13 +122,9 @@ final class RestController {
 	}
 
 	/**
-	 * POST handler: queues every replayable refund again, or only the named ones.
-	 *
-	 * Nothing is sent from inside this request. Each refund goes back onto the
-	 * queue as a fresh first attempt, aimed only at the destinations still
-	 * missing it, and the sender applies every gate again when it runs - so a
-	 * refund that was skipped for want of a destination is skipped once more,
-	 * with the same reason, if the admin has not actually added one.
+	 * POST handler: queues every replayable refund again, or only the named
+	 * ones, as fresh first attempts aimed at the destinations still missing
+	 * them. Nothing is sent from this request; the sender applies every gate again.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -181,18 +174,10 @@ final class RestController {
 	}
 
 	/**
-	 * GET handler: the diagnostics ring, newest entry first.
-	 *
-	 * The ring is returned as stored. What may be in it is decided where it is
-	 * written (SendLog): statuses, counts, reason codes and the store's own
-	 * order and refund ids - never a token, key material or a response body
-	 * from Google.
-	 *
-	 * Two added fields, both derived rather than stored: `tone`, how much
-	 * attention the row deserves, and `replayable`, whether the row is one the
-	 * replay route would act on. The second is answered from the replay plan
-	 * itself, not from the row alone, so a failure that a later success has
-	 * overtaken does not keep offering a replay that would queue nothing.
+	 * GET handler: the diagnostics ring, newest first, as stored (what may be
+	 * in it is decided in SendLog), plus two derived fields: `tone` and
+	 * `replayable`, the latter from the replay plan, so an overtaken failure
+	 * does not offer a replay that would queue nothing.
 	 *
 	 * @return \WP_REST_Response
 	 */
@@ -261,10 +246,8 @@ final class RestController {
 		$result = $this->ingest->validate_destination( $row );
 		$ok     = ! ( $result instanceof \WP_Error );
 
-		// A probe that passes after the admin corrected the destination is the
-		// moment the failure streak - and the site-wide notice it raises - has
-		// served its purpose. Without this the notice stayed until the next
-		// customer happened to ask for a refund.
+		// A passing probe ends the failure streak and the notice it raises;
+		// otherwise the notice stayed until the next refund.
 		if ( $ok ) {
 			( $this->health ?? new DestinationHealth() )->clear_failures( $row[ DestinationRows::COLUMN_MEASUREMENT ] );
 		}
@@ -281,13 +264,8 @@ final class RestController {
 
 	/**
 	 * Every reason a submitted destination cannot be probed, one sentence per
-	 * failing field so the panel can say which cell to fix - the lump "not
-	 * complete or not valid" wording answered every mistake identically.
-	 *
-	 * The rules are DestinationRows' own (the single is_valid_row() predicate
-	 * uses the same patterns); only the wording lives here, because
-	 * DestinationRows is loaded on frontend requests and must stay free of
-	 * translated strings.
+	 * failing field. The rules are DestinationRows' own; only the wording lives
+	 * here, since that class is loaded on frontend requests.
 	 *
 	 * @param array<string, string> $row Normalized row.
 	 * @return string[] Problem sentences; empty when the row is valid.
