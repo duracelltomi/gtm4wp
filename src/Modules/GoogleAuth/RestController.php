@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleAuth;
 
+use GTM4WP\Capability;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Google\ServiceAccountKey;
 use GTM4WP\Google\TokenService;
@@ -131,8 +132,7 @@ final class RestController {
 	 * @return bool
 	 */
 	public function can_manage(): bool {
-		/** This filter is documented in src/Plugin.php */
-		return current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) );
+		return Capability::can_manage_settings();
 	}
 
 	/**

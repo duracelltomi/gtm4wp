@@ -85,6 +85,7 @@ the doc block on the constants in `src/Options/Field.php` — in short:
 ### Key directories
 
 - `src/` — OOP source (PSR-4 `GTM4WP\`)
+  - `src/Abilities/` — the WordPress Abilities API surface (WordPress 6.9+): one `Registrar`, one `Meta` builder, one provider class per feature area; every ability is gated on `Capability::can_manage_settings()` and pinned by `tests/unit/Abilities/ContractTest.php`; the plan and ledger live in the git-ignored `.roadmap/abilities-api-plan.md`
   - `src/Admin/` — settings page, REST controller, notices, plugin-row links
   - `src/Frontend/` — container code, data layer, script tag, consent defaults, visitor IP
   - `src/Module/` — module framework (`ModuleInterface`, `AbstractModule`, `AdminSchemaInterface`, `Registry`)

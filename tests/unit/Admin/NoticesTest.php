@@ -75,6 +75,8 @@ final class NoticesTest extends TestCase {
 		// Escaping/i18n helpers used by show_notices() output.
 		Functions\when( 'esc_html__' )->returnArg();
 		Functions\when( 'esc_html' )->returnArg();
+		Functions\stubTranslationFunctions();
+		Functions\when( 'esc_attr' )->returnArg();
 		Functions\when( 'esc_url' )->returnArg();
 		Functions\when( 'menu_page_url' )->justReturn( 'options-general.php?page=gtm4wp' );
 		// Reached through SettingsPage::url(), which every notice anchor below

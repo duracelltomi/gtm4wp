@@ -135,15 +135,15 @@ final class Plugin {
 			}
 		);
 
+		// The Abilities API surface (WordPress 6.9+): registered on every request,
+		// before the split below, because an ability runs on REST, MCP and WP-CLI
+		// requests where neither branch is taken. Two add_action() calls; the
+		// providers run only when core builds its registry.
+		( new Abilities\Registrar( $this->registry ) )->register_hooks();
+
 		if ( is_admin() ) {
-			/**
-			 * Filters the capability needed to see and manage the GTM4WP settings page.
-			 *
-			 * @since 1.20
-			 *
-			 * @param string $capability The required capability. Default 'manage_options'.
-			 */
-			if ( current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) ) ) {
+			// The filter is documented in src/Capability.php.
+			if ( Capability::can_manage_settings() ) {
 				$this->boot_admin();
 			}
 

@@ -92,6 +92,30 @@ the site's own service account. That is the feature, not a leak; the consent gat
 and a bypass of it is rated on the visitor whose data crosses (A0/A1 → Google), not on
 who triggers the send.
 
+### The ability surface (since 2026-09-21)
+
+The Abilities API layer (`src/Abilities/`, WordPress 6.9+) is one more reader of A4
+data, and its reader is not a person: the client is an AI assistant, so
+**everything an ability returns leaves the site in a transcript held by a third
+party**. Rate it as an **A4 delegate whose reach ends where the settings screen's
+does**: an ability may return what the settings screen or the Site Health Info
+section already shows to the same capability, and nothing more - no key material,
+no service-account e-mail, no raw third-party error text, no GA4 property id, no
+visitor data. Two questions for a new ability or a new output field:
+
+1. would the settings screen show it to this capability, and
+2. does an assistant need it to do the job the ability's description promises.
+
+A field that fails (1) is exposure (RI-11), rated on the lowest actor who can call
+the ability - A4 today, but the `gtm4wp_admin_page_capability` filter delegates
+every ability along with the settings screen, so a site that widened that filter
+has widened this too. A field that passes (1) and fails (2) is a review lead, not a
+finding. A write ability goes through the same `SettingsStore` sanitizers as the
+settings REST route and is rated exactly like that route; the
+`gtm4wp_abilities_allow_write` and `gtm4wp_abilities_enabled` filters are
+site-wide controls, never an authorization gate. The disclosure property is pinned
+by the serialised-answer assertions in `tests/unit/Abilities/StatusAbilitiesTest.php`.
+
 ---
 
 ## Actors

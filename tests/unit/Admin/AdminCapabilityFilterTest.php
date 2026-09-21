@@ -19,7 +19,7 @@ use GTM4WP\Tests\unit\TestCase;
  * The capability needed to see and manage the GTM4WP settings is a single
  * filterable value - gtm4wp_admin_page_capability, default 'manage_options'
  * (since 1.20) - so an admin can delegate the settings to a non-admin role
- * (issue #143). These tests pin ALL FOUR enforcement sites:
+ * (issue #143). These tests pin the enforcement sites (the shared helper they all call, Capability, is pinned in CapabilityTest; the abilities are its fifth caller):
  *
  * - Plugin::boot() - the gate that decides whether the admin code path loads at
  *   all, so it is the outermost of the four;

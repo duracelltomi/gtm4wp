@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Capability;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Options\Options;
 use GTM4WP\RestCors;
@@ -174,27 +175,17 @@ final class RestController {
 	}
 
 	/**
-	 * GET handler: the diagnostics ring, newest first, as stored (what may be
-	 * in it is decided in SendLog), plus two derived fields: `tone` and
-	 * `replayable`, the latter from the replay plan, so an overtaken failure
-	 * does not offer a replay that would queue nothing.
+	 * GET handler: the diagnostics ring as the settings screen shows it -
+	 * newest first, with `tone` and `replayable` derived per row. The shaping
+	 * lives in SendLog, shared with the gtm4wp/get-google-data-manager-log
+	 * ability.
 	 *
 	 * @return \WP_REST_Response
 	 */
 	public function send_log(): \WP_REST_Response {
-		$entries = array();
-
-		$replayable = $this->log->replayable_entries();
-
-		foreach ( array_reverse( $this->log->all(), true ) as $index => $entry ) {
-			$entry['tone']       = SendLog::tone( $entry );
-			$entry['replayable'] = isset( $replayable[ $index ] );
-			$entries[]           = $entry;
-		}
-
 		return new \WP_REST_Response(
 			array(
-				'entries' => $entries,
+				'entries' => $this->log->entries_for_display(),
 			)
 		);
 	}
@@ -205,8 +196,7 @@ final class RestController {
 	 * @return bool
 	 */
 	public function can_manage(): bool {
-		/** This filter is documented in src/Plugin.php */
-		return current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) );
+		return Capability::can_manage_settings();
 	}
 
 	/**

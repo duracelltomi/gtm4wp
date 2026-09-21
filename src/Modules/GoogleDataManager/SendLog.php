@@ -453,6 +453,30 @@ final class SendLog {
 	}
 
 	/**
+	 * The ring as a reader wants it: newest first, as stored (what may be in
+	 * it is decided where it is written), plus two derived fields - `tone`,
+	 * how much attention the row deserves, and `replayable`, whether a replay
+	 * would act on it. The second is answered from the replay plan rather than
+	 * from the row alone, so a failure a later success has overtaken does not
+	 * offer a replay that would queue nothing. The one shaping shared by the
+	 * settings screen's REST route and the ability.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function entries_for_display(): array {
+		$entries    = array();
+		$replayable = $this->replayable_entries();
+
+		foreach ( array_reverse( $this->all(), true ) as $index => $entry ) {
+			$entry['tone']       = self::tone( $entry );
+			$entry['replayable'] = isset( $replayable[ $index ] );
+			$entries[]           = $entry;
+		}
+
+		return $entries;
+	}
+
+	/**
 	 * Empties the ring.
 	 *
 	 * @return void

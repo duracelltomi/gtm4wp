@@ -349,3 +349,20 @@ define( 'GTM4WP_WPFILTER_GDM_ORDER_CONSENT', 'gtm4wp_gdm_order_consent' );
  * assembly is before it leaves the site.
  */
 define( 'GTM4WP_WPFILTER_GDM_REFUND_EVENT', 'gtm4wp_gdm_refund_event' );
+
+/**
+ * Filter deciding whether the plugin registers its abilities with the
+ * WordPress Abilities API (WordPress 6.9+); default true. Return false to
+ * hide the whole surface from every client, the WordPress MCP Adapter
+ * included. The abilities are gated on the settings capability in any case;
+ * this is for a site that wants no AI-agent surface at all.
+ */
+define( 'GTM4WP_WPFILTER_ABILITIES_ENABLED', 'gtm4wp_abilities_enabled' );
+
+/**
+ * Filter deciding whether the plugin's abilities may change anything; default
+ * true. Return false to keep the surface read-only: the abilities that read
+ * the status, the settings and the logs stay, the ones that change settings
+ * or contact Google are not registered and refuse to run.
+ */
+define( 'GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE', 'gtm4wp_abilities_allow_write' );

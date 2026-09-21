@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Admin;
 
+use GTM4WP\Capability;
 use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\PanelSchemaInterface;
@@ -87,8 +88,7 @@ final class SettingsPage {
 	 * @return void
 	 */
 	public function add_admin_page(): void {
-		/** This filter is documented in src/Plugin.php */
-		$capability = apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' );
+		$capability = Capability::settings();
 
 		add_options_page(
 			esc_html__( 'Google Tag Manager for WordPress settings', 'duracelltomi-google-tag-manager' ),
