@@ -1562,7 +1562,7 @@ every class the tracker expects.
   the actual source of both arms, listing every output difference, then grep our tree for
   each one. The diff that matters is theirs, not ours.
 - **A fix that depends on somebody else's detection heuristic is a coupling** and gets a
-  registry row in `.upstream/` in the same change (UD-20), whichever direction it runs in.
+  registry row in `.upstream/` in the same change (UD-21), whichever direction it runs in.
 - **The silence is total.** No error, no failing test, and the feature's settings screen
   still says it is on. See `.testing` TC-17 for why the suite stayed green: every fixture
   encoded the render mode that the fix had just stopped producing.

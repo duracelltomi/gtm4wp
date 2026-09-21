@@ -180,7 +180,7 @@ build time:
   An admin script with the prefix would be blocked and its screen blank again.
 
 If a future change genuinely needs to break either invariant, the change ships a
-new easylist issue *before* the release, not a rename. Registry row: U125 in
+new easylist issue *before* the release, not a rename. Registry row: U151 in
 `.upstream/upstream-review-checklist.md`.
 
 ## Changelog policy

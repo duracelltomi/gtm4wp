@@ -32,7 +32,8 @@ Each row is `ID — one-line litmus`.
 | ID | Litmus |
 |----|--------|
 | UD-1 ⭐ | A hand-maintained mirror of an upstream list carries no expiry date; it looks equally correct on the day it goes stale. |
-| UD-20 | Our own output can be an input to *their* render decision, so both branches of that decision are our problem. |
+| UD-21 | Our own output can be an input to *their* render decision, so both branches of that decision are our problem. |
+| UD-22 ⭐ | Registry ids are assigned from `max(id on master)+1` at the moment of writing, and a merge touching a ledger re-runs the duplicate-id check first; when it has happened, the earliest row keeps its id and every cross-reference is re-pointed by meaning. |
 | UD-2 ⭐ | Silent failure needs a canary, not a comment. A code comment recording the last manual sync does not fire when the sync goes stale. |
 | UD-3 | A documentation page is a spec with no version and no changelog; diff the *claim*, never the page. |
 | UD-4 | An upstream deprecation notice is a dated obligation, not news — it belongs in the ledger with the removal release as its due date. |
@@ -282,6 +283,15 @@ suspect the transport before the source. Real spec removals are scattered.
 **Third:** ask the fetch to state explicitly whether the content was truncated and
 where. It will often say so, as it did here — but only when asked.
 
+**Corollary (S3, 2026-09-21): ask for tokens, never for the block.** The fetch tool's
+summariser refused a request to print Google's install snippet verbatim ("proprietary
+code") — a public snippet every site copies — and the same page answered a *token*
+request (the `j.src` URL, the `gtm.start` expression, the `dataLayer` literal, the
+`&l=` fragment, the insertion call, the noscript URL) on the next attempt. A refusal is
+an unshaped extraction, so it is `fetch-failed`, not "changed"; and a probe that names
+the tokens it expects is also the one that can be compared against a contract test
+literal instead of against the ledger's own prose.
+
 ### UD-15: One finding per upstream ⭐
 
 **Never bundle two upstreams into one finding, even when a vendor relationship makes it
@@ -439,7 +449,7 @@ An exclusivity inference breaks in the **appear** direction, which nothing watch
 
 ## Upstream Coupling anti-patterns
 
-### UD-20: Our output is an input to their render decision
+### UD-21: Our output is an input to their render decision
 
 The couplings this file usually tracks run one way: we read a string, a selector or a
 version that upstream publishes. This one runs the other way. What GTM4WP prints into
@@ -460,6 +470,30 @@ every block store rendered the legacy form, and when the input was changed to a 
 - The tell in a diff is a hook callback whose output shape changes: an `<input>` becoming a
   `<span>` is invisible as a *value* change and total as a *mode* change.
 - Register the element **kind**, not the markup. What the scan tests for is the tag name.
+
+### UD-22: Registry ids are assigned on `master`, and a branch merge re-runs the duplicate check ⭐
+
+The registry's `U#` and the patterns file's `UD-#` are the *only* handles every other
+ledger, code comment, skill and CLAUDE.md line uses to point at a claim. Two sessions
+that each take "the next free number" on different branches produce two claims with one
+name, and the merge commit carries both without conflict — a table row is just a line.
+**Sweep 3 (2026-09-21) found eleven of them**: U23 (a merge-duplicated row) and U97,
+U115, U116, U119–U125, plus a duplicated `UD-20` in this very file. Every cross-reference
+to those ids — `CLAUDE.md`'s block-list rule, the release skill's readme-cap pointer, the
+security ledger's scaffolding dismissals, a test docblock, the forum ledger — was
+ambiguous, and one (`consent-roadmap.md`) had planned a *third* U115.
+
+**Rules:**
+- **The next id is `max(id on master) + 1`, read at the moment of writing**, never
+  remembered from earlier in a session and never taken from a feature branch's own tail.
+- **A merge that touches any ledger re-runs the duplicate-id check before the merge
+  commit** (`grep -oE '^\| U[0-9]+ ' <file> | sort | uniq -d`; same for `UD-`/`UC-`/`UB-`,
+  `T#`, `D#`, `#NNN`). An empty result is the merge's precondition.
+- **Resolution when it has already happened: the earliest row keeps its id** (git-date
+  each duplicate by a distinctive phrase, `git log -S`), the later one moves to a fresh
+  id, and every cross-reference is re-pointed by *meaning*, line by line — a blanket
+  replace re-points the wrong half.
+- A retired id is never reused (`~~U111~~` stays a tombstone), for the same reason.
 
 ### UC-1: A version floor written in N places drifts ⭐
 
@@ -655,6 +689,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-09-21 (S3) | Renumbered the duplicated **UD-20** (the 2026-09-05 "our output is an input to their render decision" entry → **UD-21**; the 2026-09-01 presence-check entry keeps UD-20; `.security/code-review-patterns.md`'s citation re-pointed). Added **UD-22** (⭐ registry ids are assigned on `master` at the moment of writing; a merge touching a ledger re-runs the duplicate-id check; the earliest row keeps its id when it has already happened) after Sweep 3 found eleven duplicated `U#` ids across the WP/WC, EDD and Google sections plus this file's own UD-20. Added the **UD-14 corollary** (ask for tokens, never for the block — the fetch summariser refused a verbatim public snippet and answered a token probe). Sweep 3 itself: registry renumbered (U142–U151), two unregistered couplings rowed (U152 WC refund model, U153 EDD order-meta API + `__isset`), three anchors moved to `src/Ecommerce/`, Release Radar fully refreshed (WP 7.1.1, WC 11.1.1 → D14, CF7 6.1.7 packaging-only, Gutenberg 24.0.0, EDD 3.7.0, AS 4.2.0). |
 | 2026-08-05 | Seeded: UD-1..UD-10, UC-1..UC-7, UB-1..UB-3 from the initial dependency inventory (88 couplings across WordPress core, WooCommerce, third-party plugins, Google specs, media SDKs and the toolchain). |
 | 2026-08-05 | Added **UD-14** (⭐ a truncated fetch of an ordered page reads as deletion) after Sweep 1 produced exactly that false positive on U54: five core GA4 e-commerce events reported undocumented because the alphabetical page truncated mid-`refund`. Caught by the maintainer. Countermeasure: every long-page probe carries a sentinel (the known-last item); no sentinel in the extraction → `fetch-failed`. |
 | 2026-08-05 | Added UD-11 (⭐ "it evidently works" is not evidence — from `.security/` #121, filed Low @0.5 and re-rated High after ten minutes of measurement), UD-12 (a 200 proves the host is up, nothing more), UD-13 (a copied number is already wrong — this file's own seeding produced 69/94 where the source said 71/97). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UC-1, UC-3. |

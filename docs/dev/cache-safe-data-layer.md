@@ -145,7 +145,7 @@ same `gtm4wp-visitor-data` runtime, with **no** new per-page request. The
      the gap covered both stores with no legacy mini-cart widget **and** the cart and
      checkout pages of stores that have one. The handle itself is registered on every
      frontend request by `WC_Frontend_Scripts::load_scripts()`, and that class's docblock
-     explicitly supports third-party enqueueing under WooCommerce's L-1 policy (U97).
+     explicitly supports third-party enqueueing under WooCommerce's L-1 policy (U144).
    - **What this costs**, on a store that did not already load the script: WooCommerce's
      `wc-ajax=get_refreshed_fragments` request fires **once per browser tab** — its cache
      is `sessionStorage`, so a new tab refetches — including for an empty cart, after

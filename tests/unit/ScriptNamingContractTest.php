@@ -26,7 +26,7 @@ namespace GTM4WP\Tests\unit;
  * test reads the source tree the way the build does. `webpack.config.js`
  * refuses the same names at build time; this is the half that runs without
  * node. Rule text: "Script file naming" in .claude/CLAUDE.md; registry row
- * U125 in .upstream/upstream-review-checklist.md.
+ * U151 in .upstream/upstream-review-checklist.md.
  */
 final class ScriptNamingContractTest extends TestCase {
 
