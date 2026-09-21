@@ -129,15 +129,9 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 	}
 
 	/**
-	 * Function to be called on the gtm4wp_add_global_vars_array hook to output
-	 * EDD related global JavaScript variables.
-	 *
-	 * The shared variable names (currency, chunk size, clear-ecommerce flag,
-	 * select_item timeout, console logging) are the same ones the WooCommerce
-	 * module sets, because gtm4wp-ecommerce-generic.js and the trackers read
-	 * them under these names. In the unusual case that both store plugins are
-	 * active with both integrations enabled, the module registered later (this
-	 * one) wins - noted in the admin field descriptions.
+	 * Outputs the EDD global JavaScript variables on gtm4wp_add_global_vars_array.
+	 * The shared names are the ones the WooCommerce module sets (the generic
+	 * tracker reads them); with both integrations on, this later module wins.
 	 *
 	 * @param array $return_vars The already added variables as key-value pairs in an associative array.
 	 * @return array The parameter with added global JavaScript variables as key-value pairs.
@@ -150,22 +144,16 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 		$return_vars['gtm4wp_clear_ecommerce']        = (bool) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL );
 		$return_vars['gtm4wp_datalayer_max_timeout']  = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT );
 
-		// Mirror the site-wide "Do not use console.log() messages on frontend"
-		// option so the ecommerce tracker can log the events it pushes only when
-		// the admin has left console output enabled.
+		// Mirrors the site-wide "Do not use console.log()" option.
 		$return_vars['gtm4wp_console_log'] = ! (bool) $this->opt( GTM4WP_OPTION_NOCONSOLELOG );
 
 		return $return_vars;
 	}
 
 	/**
-	 * Loads the ecommerce frontend scripts on every page: EDD buy buttons and
-	 * the [downloads] grid can appear anywhere via shortcodes, so per-page
-	 * gating is not possible. The tracker keeps a jQuery dependency on
-	 * purpose: EDD core fires its cart and gateway events
-	 * (edd_cart_item_added, edd_cart_item_removed, edd_gateway_loaded) through
-	 * jQuery's own event system which vanilla listeners can not observe, and
-	 * EDD loads jQuery on those pages anyway.
+	 * Loads the ecommerce scripts on every page (buy buttons and grids can
+	 * appear anywhere via shortcodes). The jQuery dependency is on purpose:
+	 * EDD's cart and gateway events are jQuery-only.
 	 *
 	 * @return void
 	 */

@@ -51,12 +51,9 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		// Under the cache-safe data layer (issue #398) the customer details and
-		// the cart are visitor/session specific, so they must not be baked into
-		// cacheable page HTML and are simply omitted. The content-driven events
-		// below (view_item / view_cart / begin_checkout / purchase) are
-		// URL-scoped or fire only on cache-excluded pages, so they stay
-		// server-side.
+		// Cache-safe data layer (issue #398): customer details and the cart are
+		// visitor-specific and omitted; the content-driven events below are
+		// URL-scoped or fire on cache-excluded pages, so they stay server-side.
 		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
 
 		if ( ! $cache_safe ) {
@@ -76,13 +73,10 @@ final class PageDataLayer {
 			$this->add_cart_view();
 		}
 
-		// Reliable purchase tracking: when the buyer never reached the
-		// confirmation page (an abandoned offsite payment redirect), deliver
-		// the purchase on their next visit instead, resolved from their own
-		// purchase session. Skipped under cache-safe mode (visitor-specific
-		// data must not be baked into cacheable HTML) and while order-tracked
-		// flags are disabled (without the server-side flag the event would
-		// repeat on every page view).
+		// Reliable purchase tracking: a purchase whose confirmation page was
+		// never reached is delivered on the buyer's next visit from their own
+		// purchase session. Skipped under cache-safe mode and while order-tracked
+		// flags are disabled (the event would repeat on every page view).
 		if (
 			! $is_success_page
 			&& ! $cache_safe
@@ -322,12 +316,9 @@ final class PageDataLayer {
 		$data_layer['productType']              = (string) $download->get_type();
 		$data_layer['productHasVariablePrices'] = $download->has_variable_prices() ? 1 : 0;
 
-		// GA4 list attribution (#405): a download page is full-page cacheable,
-		// so the list the visitor came from must never be baked into this HTML
-		// server-side. Instead the push is wrapped in a JS call that merges it
-		// from the first-party cookie in the browser - the payload below stays
-		// identical for every visitor. The cookie is keyed by the download id,
-		// which is what internal_id carries here.
+		// GA4 list attribution (#405): the download page is cacheable, so the
+		// push is wrapped in a JS call that merges the list from the first-party
+		// cookie, keyed by the download id internal_id carries.
 		$list_wrapper      = '';
 		$list_wrapper_args = array();
 		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION ) ) {
@@ -422,21 +413,12 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Builds the purchase confirmation (success) page data layer: the raw
-	 * order data plus the GA4 purchase event, queued together with the
-	 * browser-side duplicate-tracking guard.
-	 *
-	 * The order is resolved through EDD's own receipt fallback chain - the
-	 * payment_key query arg, then the order id validated against the ?order=
-	 * verification hash (resolve_payment_key()), then the buyer's own purchase
-	 * session. Two things authorize what is emitted, and they are separate: the
-	 * payment key (or a matching hash/session) decides WHICH order, and
-	 * edd_can_view_receipt() decides whether THIS visitor may see the buyer's
-	 * identity - the gate EDD's own receipt applies after key resolution. The
-	 * purchase EVENT fires on key possession (so a buyer arriving straight from
-	 * checkout keeps the conversion); the customer identity blocks are withheld
-	 * whenever EDD itself would not render the receipt, e.g. a leaked or shared
-	 * success URL opened by someone with no matching login or session.
+	 * Builds the purchase confirmation (success) page data layer. The order is
+	 * resolved through EDD's own receipt chain (resolve_payment_key()), which
+	 * decides WHICH order; edd_can_view_receipt() decides whether THIS visitor
+	 * may see the buyer's identity. The purchase event fires on key possession;
+	 * the identity blocks are withheld whenever EDD itself would not render the
+	 * receipt (a leaked or shared success URL).
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -452,14 +434,9 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		// Withhold the customer identity blocks unless EDD itself would show this
-		// visitor the receipt. edd_can_view_receipt() is true for the buyer
-		// (logged-in owner, matching email, the view_shop_sensitive_data
-		// capability, or a matching purchase session) and false for anyone holding
-		// a leaked or shared success URL. Mirrors the WooCommerce module's
-		// $withhold_customer_data, and where the gate cannot be read the direction
-		// is withhold (the safe one) - upstream parity in both directions, never
-		// publishing more than upstream would.
+		// Identity blocks withheld unless EDD itself would show this visitor the
+		// receipt (edd_can_view_receipt()); where the gate cannot be read the
+		// direction is withhold. Mirrors the WooCommerce module (upstream parity).
 		$withhold_customer_data = ! function_exists( 'edd_can_view_receipt' )
 			|| ! edd_can_view_receipt( $payment_key );
 
@@ -467,22 +444,12 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Resolves the payment key of the order being confirmed, mirroring the
-	 * fallback chain of EDD's own receipt shortcode: the payment_key query
-	 * argument, then the order id EDD's receipt links carry - but only when the
-	 * accompanying ?order= verification hash matches (see the branch below;
-	 * releasing the key from a bare id would be an IDOR), then the buyer's own
-	 * purchase session.
-	 *
-	 * This resolves WHICH order only. Whether the current visitor may see the
-	 * buyer's identity is a separate decision made by the caller via
-	 * edd_can_view_receipt().
-	 *
-	 * Static and shared rather than copied: the Data Manager module's receipt
-	 * detection needs the same chain, and this is exactly the kind of
-	 * resolution logic that must not exist twice - the hash check below was
-	 * added once, and a second copy would be the version that silently lacks
-	 * it.
+	 * Resolves the payment key of the order being confirmed, mirroring EDD's
+	 * own receipt chain: the payment_key query arg, then the order id only when
+	 * the ?order= verification hash matches (a bare id would be an IDOR), then
+	 * the buyer's own purchase session. WHICH order only; the identity gate is
+	 * the caller's. Static and shared with the Data Manager receipt detection
+	 * so the hash check exists once.
 	 *
 	 * @return string The payment key, or an empty string when none is present or the hash does not match.
 	 */
@@ -496,14 +463,9 @@ final class PageDataLayer {
 		}
 
 		if ( ! empty( $_GET['order'] ) && ! empty( $_GET['id'] ) && function_exists( 'edd_get_order' ) ) {
-			// EDD's receipt links carry an ?order= VERIFICATION HASH beside the
-			// order ?id=, and EDD's own resolver releases the payment key only when
-			// that hash matches (EDD\Blocks\Orders\get_payment_key():
-			// hash_equals( $hash, md5( id . payment_key . email ) )). Resolving the
-			// key from the bare id alone - as a plain edd_get_payment_key( $id )
-			// would - lets anyone map a guessable, sequential order id to that
-			// order's key, so the hash is re-checked here. hash_equals() is
-			// constant-time; the id is a hex md5 so sanitize_text_field is lossless.
+			// The key is released only when the ?order= verification hash matches,
+			// as EDD's own resolver does (EDD\Blocks\Orders\get_payment_key());
+			// a bare edd_get_payment_key( $id ) would map sequential ids to keys.
 			$order = edd_get_order( absint( wp_unslash( $_GET['id'] ) ) );
 			if ( ! ( $order instanceof \EDD\Orders\Order ) ) {
 				return '';
@@ -528,15 +490,10 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Whether a receipt-link verification hash belongs to an order.
-	 *
-	 * EDD's own receipt links carry `?id=` plus `?order=`, the latter being
-	 * md5( id . payment_key . email ) - the one-way proof the link holder is
-	 * entitled to that receipt (EDD\Blocks\Orders\get_payment_key()). It is
-	 * checked here for the confirmation page, and again by the Data Manager
-	 * backfill route, which accepts this hash as the buyer's proof so that the
-	 * receipt page never has to print the payment key the URL does not carry.
-	 * One definition, so the two checks cannot drift apart.
+	 * Whether a receipt-link verification hash (`?order=`, md5 of id, payment
+	 * key and email, per EDD\Blocks\Orders\get_payment_key()) belongs to an
+	 * order. One definition for the confirmation page and the Data Manager
+	 * backfill route.
 	 *
 	 * @param \EDD\Orders\Order $order The order the hash is claimed for.
 	 * @param string            $hash  The hash from the URL or the request.
@@ -555,13 +512,10 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Reliable purchase tracking fallback. Resolves the buyer's most recent
-	 * order from their own EDD purchase session and runs it through the same
-	 * eligibility gauntlet as the confirmation page, so an order whose
-	 * confirmation page was never viewed is measured on the buyer's next
-	 * visit instead. The session is the browser's own state - no request
-	 * parameter is trusted - and the raw order data block is left to the
-	 * confirmation page.
+	 * Reliable purchase tracking fallback: the buyer's most recent order from
+	 * their own EDD purchase session (no request parameter is trusted), through
+	 * the same gauntlet as the confirmation page; the raw order data block is
+	 * left to the confirmation page.
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -592,7 +546,7 @@ final class PageDataLayer {
 	 * @param array<string, mixed> $data_layer             The data layer collected so far.
 	 * @param \EDD\Orders\Order    $order                  The resolved order.
 	 * @param bool                 $with_raw_order_data    Whether the raw orderData block may be added (confirmation page only).
-	 * @param bool                 $withhold_customer_data Whether to leave out the customer identity blocks (orderData.customer, new_customer/customer_type, the purchase event's user_data) because EDD itself would not show this visitor the receipt.
+	 * @param bool                 $withhold_customer_data Whether to leave out the customer identity blocks (EDD would not show this visitor the receipt).
 	 * @return array<string, mixed>
 	 */
 	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $with_raw_order_data = true, bool $withhold_customer_data = false ): array {
@@ -608,13 +562,8 @@ final class PageDataLayer {
 			$order_items             = $this->download_data->process_order_items( $order );
 			$data_layer['orderData'] = $this->download_data->get_raw_order_datalayer( $order, $order_items );
 
-			// Identity line, mirroring the WooCommerce module: when EDD would not
-			// show this visitor the receipt (a leaked or shared success URL), the
-			// customer identity block is withheld while the order and totals stay -
-			// the visitor is already being told about the order by the purchase
-			// event that keeps firing. Dropped after get_raw_order_datalayer()'s
-			// filter so third-party code still sees the shape it always got; the
-			// line drawn is IDENTITY, not sensitivity.
+			// Identity line, as in the WooCommerce module: dropped after the filter
+			// so third-party code sees the usual shape; only 'customer' is withheld.
 			if ( $withhold_customer_data ) {
 				unset( $data_layer['orderData']['customer'] );
 			}
@@ -628,29 +577,20 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		// new_customer / customer_type are facts about the BUYER, not the order, so
-		// they are withheld with the identity block - omitted entirely rather than
-		// emitted falsy (RI-13 omit-don't-invent, since a consumer's GTM trigger may
-		// test for key presence). Mirrors the WooCommerce module.
+		// new_customer / customer_type describe the BUYER: withheld with the
+		// identity block, omitted rather than emitted falsy (RI-13).
 		if ( ! $withhold_customer_data ) {
 			$data_layer = array_merge( $data_layer, $this->download_data->customer_signals( $order ) );
 		}
 
 		$purchase_data_layer = $this->download_data->get_purchase_datalayer( $order, $order_items );
 
-		// The Enhanced Conversions user_data block is the purchase event's own copy
-		// of the customer identity (hashed email/phone + the plaintext address
-		// Google expects), so it is withheld with orderData.customer, for the same
-		// reason. The event itself (transaction id, value, items) is untouched.
+		// user_data is the purchase event's own copy of the customer identity.
 		if ( $withhold_customer_data ) {
 			unset( $purchase_data_layer['user_data'] );
 		}
 
-		// The browser-side duplicate guard records this order in the
-		// gtm4wp_orderid_tracked cookie / localStorage. When the "Do not flag
-		// orders as being tracked" option is on, the admin has asked the plugin
-		// not to remember tracked orders anywhere, so the browser guard is
-		// skipped as well - matching the server-side short-circuits.
+		// "Do not flag orders as being tracked" skips the browser guard as well.
 		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG ) ) {
 			$before_purchase_dl_push = '';
 			$after_purchase_dl_push  = '';

@@ -99,9 +99,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		);
 		if ( function_exists( 'get_object_taxonomies' ) ) {
 			foreach ( get_object_taxonomies( 'download', 'objects' ) as $taxonomy_slug => $taxonomy_object ) {
-				// Only offer taxonomies a store owner would use as a brand: those
-				// with a public archive and an admin UI, matching the WooCommerce
-				// module's filter ( public + show_ui + non-builtin ).
+				// Brand-usable taxonomies only (public + show_ui + non-builtin).
 				if ( ! $taxonomy_object->public || ! $taxonomy_object->show_ui || $taxonomy_object->_builtin ) {
 					continue;
 				}
@@ -110,9 +108,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			}
 		}
 
-		// Order-status choices for the "statuses that trigger the purchase event"
-		// field, from EDD's own status registry. Fall back to the core EDD 3.x
-		// statuses when EDD is not loaded so the field stays usable in the admin.
+		// Order statuses from EDD's registry; core EDD 3.x statuses as the fallback.
 		$order_status_choices = array();
 		if ( function_exists( 'edd_get_payment_statuses' ) ) {
 			foreach ( edd_get_payment_statuses() as $status_key => $status_label ) {
@@ -185,13 +181,9 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: 'products',
 				phase: Field::PHASE_BETA,
 				choices: $taxonomy_choices,
-				// Replaces the SELECT default on purpose: the choice list is built
-				// from the taxonomies registered on THIS request, so the default's
-				// allow-list reset would silently blank a stored brand taxonomy
-				// whenever its plugin is momentarily inactive during a save/import.
-				// Field::to_string() keeps the cast warning-free on non-scalar
-				// import values (Field::sanitize() runs a custom sanitizer INSTEAD
-				// of the type-defensive default, never before it).
+				// Replaces the SELECT default on purpose: its allow-list reset would
+				// blank a stored brand taxonomy whenever its plugin is momentarily
+				// inactive during a save/import (see the WooCommerce schema).
 				sanitizer: static function ( $value ) {
 					return sanitize_text_field( Field::to_string( $value ) );
 				},

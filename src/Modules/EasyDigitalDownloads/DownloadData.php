@@ -38,12 +38,9 @@ final class DownloadData {
 	public const ORDER_TRACKED_META = '_ga_tracked';
 
 	/**
-	 * The item contexts the server-side list-attribution merge applies to
-	 * (#405). Only never-cached contexts belong here: the cart and checkout
-	 * pages are excluded from full-page caches by the store and the purchase
-	 * data layer renders for a per-order URL. The cacheable download-detail
-	 * page and the purchase-form/list markup are enriched client-side instead,
-	 * so their HTML stays identical for every visitor.
+	 * The never-cached item contexts the server-side list-attribution merge
+	 * applies to (#405); the cacheable detail page and list markup are
+	 * enriched client-side instead.
 	 *
 	 * @var string[]
 	 */
@@ -65,11 +62,8 @@ final class DownloadData {
 	}
 
 	/**
-	 * Reads a property of an EDD row object (Order, Order_Item,
-	 * Order_Adjustment, Order_Address). These expose data through magic
-	 * getters, and a class implementing __get() without __isset() makes
-	 * isset()/?? report false even when a value exists - so the read goes
-	 * through __get() directly, gated on property_exists()/__get presence.
+	 * Reads a property of an EDD row object, which exposes data through __get()
+	 * without __isset(), so isset()/?? report false (RI-12).
 	 *
 	 * @param mixed  $row_object    The row object to read.
 	 * @param string $property_name The property to read.
@@ -113,7 +107,7 @@ final class DownloadData {
 	 * @param mixed    $download   An EDD_Download instance or a download id.
 	 * @param array    $additional_product_attributes Any key-value pair that needs to be added into the ecommerce item object.
 	 * @param string   $attributes_used_for The placement ID of the product passed to the item filters so 3rd party code knows where the data is used (productdetail, productlist, addtocartsingle, cart, checkout, purchase).
-	 * @param mixed    $source_item Optional. The raw source the item is built from - the EDD cart content details array on the cart/checkout paths or the EDD\Orders\Order_Item on the purchase path - passed only to the GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE filter. Default null.
+	 * @param mixed    $source_item Optional. The raw cart content details array or Order_Item the item is built from, passed only to the GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE filter. Default null.
 	 * @param int|null $price_id   Optional. The selected variable price id, used for the price and the item_variant. Default null.
 	 * @return array|false The ecommerce item object of the download, or false if the download does not exist.
 	 */
@@ -130,12 +124,9 @@ final class DownloadData {
 
 		$download_id = (int) $download->get_ID();
 
-		// Master-language reporting (#145): with the option on, the GA4 item
-		// identity/text (item_id, item_name, sku, categories, brand,
-		// item_variant) is built from the download's default-language
-		// equivalent, so a download sold in several languages reports as one
-		// GA4 item. The price and the internal list-attribution id stay per
-		// language, mirroring the WooCommerce module's behavior.
+		// Master-language reporting (#145): item identity/text from the
+		// default-language download, price and internal id per language, as
+		// in the WooCommerce module.
 		$data_download    = $download;
 		$data_download_id = $download_id;
 
@@ -185,12 +176,10 @@ final class DownloadData {
 			'google_business_vertical' => $this->business_vertical(),
 		);
 
-		// EDD variable prices are options on the same download, not separate
-		// products, so the option's name becomes the GA4 item_variant while the
-		// item_id stays the download id (or SKU). Under master-language
-		// reporting the option name is read from the master download at the
-		// same price id, falling back to the current download's name when the
-		// master has no option there (translations can differ in option count).
+		// Variable prices are options on one download: the option name is the
+		// item_variant, item_id stays the download id (or SKU). Under master
+		// language the master's option at the same price id, falling back to
+		// the current name (translations can differ in option count).
 		$variant_name = $this->price_option_name( $data_download_id, $price_id );
 		if ( '' === $variant_name && $data_download_id !== $download_id ) {
 			$variant_name = $this->price_option_name( $download_id, $price_id );
@@ -230,11 +219,9 @@ final class DownloadData {
 			$_temp_productdata['item_list_id'] = sanitize_title( (string) $_temp_productdata['item_list_name'] );
 		}
 
-		// GA4 list attribution carried across the funnel (#405): when the
-		// opt-in option is on and this item is not already part of a rendered
-		// list, fill item_list_name / item_list_id from the first-party cookie
-		// the tracker wrote on the originating select_item click. Restricted
-		// to the never-cached contexts (see LIST_ATTRIBUTION_CONTEXTS).
+		// GA4 list attribution across the funnel (#405): fill item_list_name / id
+		// from the cookie the tracker wrote on select_item, in the never-cached
+		// contexts only (see LIST_ATTRIBUTION_CONTEXTS).
 		if (
 			! isset( $_temp_productdata['item_list_name'] )
 			&& in_array( $attributes_used_for, self::LIST_ATTRIBUTION_CONTEXTS, true )
@@ -248,9 +235,8 @@ final class DownloadData {
 			}
 		}
 
-		// GA4 item-level affiliation: empty by default and only added when 3rd
-		// party code supplies one, keeping the item payload free of empty
-		// affiliation strings. Shared filter with the WooCommerce module.
+		// GA4 affiliation, added only when third party code supplies one
+		// (the filter shared with the WooCommerce module).
 		if ( ! isset( $_temp_productdata['affiliation'] ) ) {
 			/**
 			 * Filters the GA4 item-level affiliation for a download.
@@ -266,13 +252,9 @@ final class DownloadData {
 		}
 
 		/**
-		 * Filters the ecommerce item array before using it for tracking.
-		 *
-		 * The same source-aware filter the WooCommerce module applies, so
-		 * store-agnostic extensions work on both integrations. On the EDD paths
-		 * the source is the cart content details array (cart/checkout), the
-		 * EDD\Orders\Order_Item (purchase), or null when there is no per-line
-		 * source (download detail page, download lists).
+		 * Filters the ecommerce item array before using it for tracking: the
+		 * same source-aware filter the WooCommerce module applies. On EDD the
+		 * source is the cart content details array, the Order_Item, or null.
 		 *
 		 * @param array  $_temp_productdata   An associative array containing all GA4 product attributes as well as any custom attribute.
 		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used.
@@ -521,9 +503,7 @@ final class DownloadData {
 		$first_name = (string) self::row_prop( $address, 'first_name' );
 		$last_name  = (string) self::row_prop( $address, 'last_name' );
 
-		// Values are passed raw: the single output sink (the data layer) runs
-		// everything through wp_json_encode() with the full hex flag set, which
-		// is the correct escaper for an inline-script context.
+		// Values are passed raw: the sink escapes with wp_json_encode() + hex flags.
 		$order_data = array(
 			'attributes' => array(
 				'date'            => (string) self::row_prop( $order, 'date_created' ),
@@ -585,10 +565,7 @@ final class DownloadData {
 				$order_revenue -= (float) self::row_prop( $order, 'tax', 0 );
 			}
 
-			// Optional fixed prefix in front of the transaction id, e.g. to tell
-			// several stores apart in one GA4 property. Only this event is
-			// affected: orderData and the duplicate-tracking guards keep using
-			// the raw order number.
+			// Optional transaction id prefix; only this event is affected.
 			$transaction_id_prefix = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX );
 
 			$data_layer['event']     = 'purchase';
@@ -609,10 +586,8 @@ final class DownloadData {
 
 			$data_layer['ecommerce']['items'] = $_order_items;
 
-			// Google Ads / GA4 Enhanced Conversions user-provided data, built from
-			// the order (so guest checkouts are covered too). Opt-in via the same
-			// "Customer data in data layer" option; only attached when it carries
-			// at least one identifier.
+			// Enhanced Conversions user data, built from the order so guest
+			// checkouts are covered; attached only when it carries an identifier.
 			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA ) ) {
 				$user_data = $this->get_enhanced_conversion_user_data( $order );
 				if ( array() !== $user_data ) {
@@ -648,12 +623,7 @@ final class DownloadData {
 
 		$email = (string) self::row_prop( $order, 'email' );
 		if ( '' !== $email ) {
-			// Omitted rather than sent empty: the helper returns '' when folding
-			// leaves no address to hash - a gmail.com address whose local part is
-			// nothing but a "+" tag - and a present-but-empty identifier is the
-			// consumer's call to interpret, not ours (RI-13). The guard belongs
-			// here rather than in the helper: '' is the honest answer to "hash
-			// this", and only the caller knows the key is optional. Mirrors the
+			// Omitted when folding leaves nothing to hash (RI-13), as in the
 			// WooCommerce module's user_data block.
 			$email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $email );
 			if ( '' !== $email_hash ) {
@@ -665,10 +635,7 @@ final class DownloadData {
 
 		$phone = $this->order_phone( $order );
 		if ( '' !== $phone ) {
-			// Same omission rule as the email above: '' from the normalizer
-			// means the number could not be placed in E.164, and a
-			// present-but-empty identifier is the consumer's call to
-			// interpret, not ours (RI-13).
+			// Omitted when the number cannot be placed in E.164 (RI-13).
 			$phone_hash = Helpers::normalize_and_hash_phone_number( 'sha256', $phone, (string) self::row_prop( $address_row, 'country' ) );
 			if ( '' !== $phone_hash ) {
 				$user_data['sha256_phone_number'] = $phone_hash;
@@ -711,16 +678,10 @@ final class DownloadData {
 	}
 
 	/**
-	 * Returns the buyer's phone number for an order, or '' when none is
-	 * stored. EDD core's own opt-in checkout Phone field (since EDD 3.3.8,
-	 * enabled via the checkout address fields setting) stores the number as
-	 * order meta '_edd_phone', so that is read first. After it come the
-	 * de-facto community conventions: EDD 3 order meta under the key 'phone',
-	 * then the 'phone' entry of the legacy payment meta array - the storage
-	 * EDD's own documented checkout-phone-field recipe uses - and finally
-	 * site code can supply or override the number through the
-	 * gtm4wp_edd_order_phone filter (e.g. mapping a Checkout Fields Manager
-	 * field).
+	 * The buyer's phone number for an order, or '': EDD core's opt-in checkout
+	 * Phone field (order meta '_edd_phone', EDD 3.3.8+) first, then the
+	 * community conventions (order meta 'phone', the legacy payment meta
+	 * 'phone'), then the gtm4wp_edd_order_phone filter.
 	 *
 	 * @param \EDD\Orders\Order $order The order to read the phone number from.
 	 * @return string
@@ -790,13 +751,10 @@ final class DownloadData {
 	}
 
 	/**
-	 * Whether the order's current status makes it eligible for the GA4
-	 * purchase event. The status list is the EDDPURCHASESTATUSES option
-	 * (default: pending, processing, complete - offsite gateways can land the
-	 * buyer on the confirmation page while the order is still pending) and is
-	 * filterable. An empty list falls back to tracking any order that did not
-	 * outright fail, so a misconfiguration can never silently disable all
-	 * purchase tracking.
+	 * Whether the order's status makes it eligible for the purchase event: the
+	 * filterable EDDPURCHASESTATUSES option (pending is in the default because
+	 * an offsite gateway can land the buyer on the confirmation page early);
+	 * an empty list tracks any order that did not fail.
 	 *
 	 * @param \EDD\Orders\Order $order The order to check.
 	 * @return bool
@@ -893,14 +851,9 @@ final class DownloadData {
 	}
 
 	/**
-	 * Both new/returning customer signals for the purchase event.
-	 *
-	 * Google names the same idea differently on two surfaces: Google Ads
-	 * customer acquisition reads the boolean `new_customer`, while the GA4
-	 * e-commerce reference documents a `customer_type` string of `new` or
-	 * `returning`. Both are sent - they are not alternatives, and dropping
-	 * either breaks one integration while the other keeps working. Mirrors
-	 * the WooCommerce module's ProductData::customer_signals().
+	 * Both new/returning customer signals for the purchase event (Google Ads
+	 * reads `new_customer`, GA4 `customer_type`; dropping either breaks one
+	 * integration). Mirrors ProductData::customer_signals().
 	 *
 	 * @see https://support.google.com/google-ads/answer/12077475 Google Ads: the new_customer parameter.
 	 * @see https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtm GA4: the customer_type parameter on purchase.
