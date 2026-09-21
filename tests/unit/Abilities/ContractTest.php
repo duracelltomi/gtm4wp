@@ -7,11 +7,11 @@
 
 namespace GTM4WP\Tests\unit\Abilities;
 
-use GTM4WP\Abilities\DataManagerAbilities;
 use GTM4WP\Abilities\Registrar;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Abilities\StatusAbilities;
 use GTM4WP\Capability;
+use GTM4WP\Modules\GoogleDataManager\Abilities;
 
 /**
  * The ability catalogue is a public contract: a client written against it
@@ -34,7 +34,7 @@ final class ContractTest extends AbilitiesTestCase {
 		StatusAbilities::GET_STATUS,
 		StatusAbilities::GET_SITE_HEALTH,
 		SettingsAbilities::GET_SETTINGS,
-		DataManagerAbilities::GET_LOG,
+		Abilities::GET_LOG,
 	);
 
 	/**

@@ -10,7 +10,9 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Abilities\ProviderInterface;
 use GTM4WP\Google\KeyVault;
+use GTM4WP\Module\AbilitiesInterface;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\PanelSchemaInterface;
@@ -32,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
  * through panel_data() instead (columnChoices), which only runs when the
  * settings page itself is rendered - the same cost class as the key notice.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, SiteHealthInfoInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, SiteHealthInfoInterface, AbilitiesInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -404,6 +406,19 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function site_health_info( Options $options ): array {
 		return ( new SiteHealth( $options, new DestinationHealth(), new CaptureStats(), new KeyVault() ) )->debug_fields();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The abilities live in Abilities, next to the REST controller serving
+	 * the same rows. Runs only inside wp_abilities_api_init, so the SendLog
+	 * it builds is in the same cost class as site_health_info().
+	 *
+	 * @return ProviderInterface
+	 */
+	public function abilities(): ProviderInterface {
+		return new Abilities( new SendLog() );
 	}
 
 	/**

@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Abilities;
 
+use GTM4WP\Module\AbilitiesInterface;
 use GTM4WP\Module\Registry;
 
 defined( 'ABSPATH' ) || exit;
@@ -27,10 +28,15 @@ defined( 'ABSPATH' ) || exit;
  * only then do the providers run. Below WordPress 6.9 the two actions never
  * fire, so nothing here needs a version check (U155).
  *
- * Every ability is gated on the settings capability and registered under the
- * one `gtm4wp` category, which third-party modules may register into as well.
- * Two filters let a site opt out: GTM4WP_WPFILTER_ABILITIES_ENABLED switches
- * the whole surface off, GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE keeps the
+ * Two kinds of provider register under the one `gtm4wp` category: the
+ * plugin-wide ones named here (status and settings, which belong to no
+ * module, like Admin\RestController), and one per module whose admin schema
+ * opts in through Module\AbilitiesInterface - the collector-plus-opt-in
+ * shape of Admin\SiteHealthInfo, so a third-party module registered through
+ * 'gtm4wp_register_modules' contributes under the same category and the
+ * same switches. Every ability is gated on the settings capability. Two
+ * filters let a site opt out: GTM4WP_WPFILTER_ABILITIES_ENABLED switches the
+ * whole surface off, GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE keeps the
  * read-only abilities and withholds the ones that change anything.
  */
 final class Registrar {
@@ -135,7 +141,8 @@ final class Registrar {
 	}
 
 	/**
-	 * Registers every provider's abilities.
+	 * Registers every provider's abilities: the plugin-wide ones first, then
+	 * each module's, in registry order.
 	 *
 	 * @return void
 	 */
@@ -144,21 +151,25 @@ final class Registrar {
 			return;
 		}
 
-		foreach ( $this->providers() as $provider ) {
-			$provider->register();
-		}
-	}
+		( new StatusAbilities( $this->registry ) )->register();
+		( new SettingsAbilities( $this->registry ) )->register();
 
-	/**
-	 * The providers, one per feature area.
-	 *
-	 * @return ProviderInterface[]
-	 */
-	private function providers(): array {
-		return array(
-			new StatusAbilities( $this->registry ),
-			new SettingsAbilities( $this->registry ),
-			new DataManagerAbilities(),
-		);
+		foreach ( $this->registry->all() as $module ) {
+			$schema_class = $module->admin_schema();
+
+			if ( ! class_exists( $schema_class ) ) {
+				continue;
+			}
+
+			$schema = new $schema_class();
+
+			// instanceof, not method_exists(): a third party schema predating
+			// the interface stays valid and simply contributes nothing.
+			if ( ! $schema instanceof AbilitiesInterface ) {
+				continue;
+			}
+
+			$schema->abilities()->register();
+		}
 	}
 }

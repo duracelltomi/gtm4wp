@@ -1,6 +1,6 @@
 <?php
 /**
- * Abilities of the Google Data Manager integration.
+ * Abilities of the Google Data Manager module.
  *
  * @package GTM4WP
  * @author Thomas Geiger
@@ -8,22 +8,26 @@
  * @license GNU General Public License, version 3
  */
 
-namespace GTM4WP\Abilities;
+namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Abilities\Meta;
+use GTM4WP\Abilities\ProviderInterface;
+use GTM4WP\Abilities\Registrar;
 use GTM4WP\Capability;
-use GTM4WP\Modules\GoogleDataManager\SendLog;
-use GTM4WP\Modules\GoogleDataManager\SendQueue;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The gtm4wp/get-google-data-manager-log ability: the recent server-side sends and what
+ * The module's abilities, handed to the plugin-wide Registrar through
+ * AdminSchema::abilities() (Module\AbilitiesInterface) the way the module's
+ * Site Health rows travel through SiteHealthInfoInterface. Phase 1 registers
+ * gtm4wp/get-google-data-manager-log: the recent server-side sends and what
  * became of them, the same rows the settings screen lists under the
  * destinations table. What a row may carry is decided where it is written
  * (SendLog): statuses, counts, reason codes and the store's own order and
  * refund ids - never a token, key material or a response body from Google.
  */
-final class DataManagerAbilities implements ProviderInterface {
+final class Abilities implements ProviderInterface {
 
 	public const GET_LOG = Registrar::NAMESPACE_PREFIX . 'get-google-data-manager-log';
 

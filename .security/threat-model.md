@@ -94,7 +94,7 @@ who triggers the send.
 
 ### The ability surface (since 2026-09-21)
 
-The Abilities API layer (`src/Abilities/`, WordPress 6.9+) is one more reader of A4
+The Abilities API layer (`src/Abilities/` plus each module's `Abilities.php` provider, WordPress 6.9+) is one more reader of A4
 data, and its reader is not a person: the client is an AI assistant, so
 **everything an ability returns leaves the site in a transcript held by a third
 party**. Rate it as an **A4 delegate whose reach ends where the settings screen's
