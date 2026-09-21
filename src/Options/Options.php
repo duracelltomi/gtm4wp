@@ -42,11 +42,8 @@ final class Options {
 
 	/**
 	 * Names of the GTM4WP_HARDCODED_* wp-config constants that were defined but
-	 * malformed, and were therefore ignored while building the container rows.
-	 *
-	 * A silently discarded constant is very hard to diagnose from the outside -
-	 * the site operator sees a container that ignores their wp-config - so the
-	 * admin notices read this list and tell them exactly which constant is wrong.
+	 * malformed and therefore ignored; the admin notices name them so a
+	 * discarded constant is never silent.
 	 *
 	 * @var string[]
 	 */
@@ -78,10 +75,9 @@ final class Options {
 			$rows = ContainerRows::from_legacy( $values );
 		}
 
-		// The GTM4WP_HARDCODED_* wp-config.php constants override the stored
-		// container setup. Both the override itself and the read-only state of the
-		// settings screen are resolved by HardcodedContainers, so the screen can
-		// never disagree with what the frontend loads.
+		// The GTM4WP_HARDCODED_* constants override the stored setup; the same
+		// class also drives the settings screen's read-only state, so the two
+		// cannot disagree.
 		list( $rows, $this->hardcoded_errors ) = HardcodedContainers::apply( $rows );
 
 		$values[ GTM4WP_OPTION_GTM_CONTAINERS ] = $rows;

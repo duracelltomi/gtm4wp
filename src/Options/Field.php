@@ -38,33 +38,22 @@ final class Field {
 	public const TYPE_AXEPTIO_VERSION = 'axeptio-version';
 
 	/**
-	 * Option maturity phases.
+	 * Option maturity phases: a per-Field signal (a stable module can expose an
+	 * experimental option), rendered as a badge in the admin UI; STABLE shows
+	 * none. Choose by these criteria:
 	 *
-	 * A phase is a per-option (per Field) maturity signal, not a module-wide
-	 * status — a stable module can still expose an experimental option. It is
-	 * rendered as a badge next to the field label in the admin UI; STABLE shows
-	 * no badge. When adding a Field, choose the phase by these criteria:
-	 *
-	 * - EXPERIMENTAL: correctness depends on factors GTM4WP cannot verify on
-	 *   every site — the active theme, a third-party embed/player API, external
-	 *   infrastructure (e.g. Cloudflare), or timing/logic that still needs
-	 *   real-world validation. May not work, or work inconsistently, on some
-	 *   installs. Keep it off by default and spell out the caveat in the field
-	 *   description.
-	 * - BETA: implementation is complete and expected to work on any standard
-	 *   WP/WC install with no known environment dependency; held in beta only
-	 *   until it has accumulated enough real-world usage to be declared stable.
-	 * - STABLE (default): proven in the field with no open reproducible issues.
-	 *   Promote an experimental/beta option here only after it has shipped for a
-	 *   meaningful period (~5 months / a few release cycles) AND has real
-	 *   adoption AND has no confirmed reproducible defect. Promotion is a
-	 *   deliberate act — change the constant and add a CHANGELOG bullet; it is
-	 *   never automatic, and "no reports" on an unused option is not evidence of
-	 *   stability.
-	 * - DEPRECATED: still works but is superseded (e.g. a native GTM trigger) and
-	 *   receives no new development. Discourage new use and name the recommended
-	 *   replacement in the field description; kept for backward compatibility,
-	 *   not removed yet.
+	 * - EXPERIMENTAL: correctness depends on things GTM4WP cannot verify on every
+	 *   site (theme, third-party embed/player API, external infrastructure such
+	 *   as Cloudflare, or logic still needing real-world validation). Off by
+	 *   default, caveat in the field description.
+	 * - BETA: complete and expected to work on any standard WP/WC install; held
+	 *   here only until it has enough real-world usage to be called stable.
+	 * - STABLE (default): proven in the field, no open reproducible issues.
+	 *   Promote deliberately (change the constant + CHANGELOG bullet) after
+	 *   ~5 months / a few release cycles WITH real adoption AND no confirmed
+	 *   defect; "no reports" on an unused option is not evidence.
+	 * - DEPRECATED: still works but superseded; no new development, replacement
+	 *   named in the description, kept for backward compatibility.
 	 */
 	public const PHASE_STABLE       = 'stable';
 	public const PHASE_BETA         = 'beta';
@@ -89,37 +78,21 @@ final class Field {
 	 * @param callable|null $derive        Optional fn( mixed $sanitized ): array returning additional
 	 *                                     option key => value pairs stored alongside this field
 	 *                                     (used to keep 1.x mirror options in sync).
-	 * @param string        $depends_on    Optional option key of another field this one depends on:
-	 *                                     the admin UI disables this field's control while that field
-	 *                                     is empty/off. Purely an admin-UX affordance — the frontend
-	 *                                     module is still responsible for ignoring the value when the
-	 *                                     dependency is not met. Mirrors the per-column 'depends_on'
-	 *                                     used inside TYPE_TABLE checkbox columns.
-	 * @param bool          $rows_locked   TYPE_TABLE only: the row set is decided outside the settings
-	 *                                     screen (a wp-config.php constant), so the admin UI renders the
-	 *                                     whole table read-only and offers no add/remove row action.
-	 *                                     A single column whose value is fixed that way is marked with
-	 *                                     a 'readonly' entry in $columns instead.
-	 * @param array         $choice_sections TYPE_MULTISELECT only: an ordered list of arrays with a
+	 * @param string        $depends_on    Optional key of a field this one depends on: the admin UI
+	 *                                     disables the control while that field is empty/off. UX only;
+	 *                                     the frontend module still ignores the value itself.
+	 * @param bool          $rows_locked   TYPE_TABLE only: the row set comes from a wp-config.php
+	 *                                     constant, so the table renders read-only with no add/remove.
+	 *                                     A single fixed column uses a 'readonly' entry in $columns.
+	 * @param array         $choice_sections TYPE_MULTISELECT only: ordered list of arrays with a
 	 *                                     translated 'label' and a 'choices' list of $choices KEYS,
-	 *                                     rendered as labelled sections instead of one flat checkbox
-	 *                                     list. Purely presentational - the stored value stays the
-	 *                                     same flat list, so sanitize(), rest_type() and the REST
-	 *                                     schema never see the sections. A section carries ids only,
-	 *                                     so the labels keep their single definition in $choices; a
-	 *                                     choice no section claims is still rendered (after the
-	 *                                     sections), because a choice that exists but cannot be seen
-	 *                                     is the worse failure. Last in the signature so adding it
-	 *                                     cannot shift a positional argument of an existing caller.
-	 * @param string        $doc           Documentation path on gtm4wp.com, relative to the base URL in
-	 *                                     \GTM4WP\Admin\Docs and WITHOUT a fragment: the anchor is always
-	 *                                     this field's own $key, appended by Docs::url(). Storing only the
-	 *                                     path keeps the domain in one place, and deriving the anchor from
-	 *                                     the key means the deep link cannot drift out of step with the
-	 *                                     option it points at - the key is frozen public API, the heading
-	 *                                     wording on the page is not. Empty for an option with no page yet,
-	 *                                     which renders no help icon rather than a broken one. Same
-	 *                                     end-of-signature rule as $choice_sections above.
+	 *                                     rendered as labelled sections. Presentational only; the stored
+	 *                                     value stays a flat list. A choice no section claims is still
+	 *                                     rendered after the sections.
+	 * @param string        $doc           Documentation path on gtm4wp.com relative to \GTM4WP\Admin\Docs,
+	 *                                     WITHOUT a fragment: the anchor is always this field's $key
+	 *                                     (frozen public API), appended by Docs::url(). Empty renders no
+	 *                                     help icon.
 	 */
 	public function __construct(
 		public string $key,
@@ -219,20 +192,11 @@ final class Field {
 	}
 
 	/**
-	 * Casts a submitted value to a string without emitting a PHP "Array to
-	 * string conversion" warning (or a fatal on an object without __toString).
-	 *
-	 * The settings save route type-normalizes each value at the REST layer
-	 * before it reaches sanitize(); the settings import route decodes the raw
-	 * file itself and reaches sanitize() without that coercion, so a crafted
-	 * file can hand an array to a scalar field. Non-scalar values collapse to
-	 * an empty string here, so every entry point into sanitize() behaves
-	 * identically (null already casts to '' - kept for parity).
-	 *
-	 * Public because a CUSTOM field sanitizer sits in front of the type-based
-	 * branches (sanitize() returns its result immediately), so the guard here
-	 * never protects it: every custom sanitizer that needs a string must run
-	 * its own cast through this helper instead of a bare (string) cast.
+	 * Casts a submitted value to a string without an "Array to string
+	 * conversion" warning: the import route reaches sanitize() without the REST
+	 * layer's type coercion, so a crafted file can hand an array to a scalar
+	 * field. Public because a custom sanitizer REPLACES the type-based branches,
+	 * so it must run its own cast through this helper, never a bare (string).
 	 *
 	 * @param mixed $value Raw value of any type.
 	 * @return string

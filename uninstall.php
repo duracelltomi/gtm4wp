@@ -26,29 +26,20 @@ delete_option( 'gtm4wp_google_service_accounts' );
 // destination rows themselves live in gtm4wp-options and go with it).
 delete_option( 'gtm4wp_gdm_destination_health' );
 
-// Capture-rate counters of the attribution capture. The attribution meta on
-// the orders themselves is deliberately left behind: sweeping every order of a
-// store is expensive, the existing purchase-tracking flag sets the same
-// precedent, and the WordPress personal-data eraser is the per-person removal
-// path for it.
+// Capture-rate counters. The attribution meta on the orders is deliberately
+// left behind (sweeping every order is expensive; the personal-data eraser is
+// the per-person removal path).
 delete_option( 'gtm4wp_gdm_capture_stats' );
 
 // Diagnostics ring of the server-side send lanes.
 delete_option( 'gtm4wp_gdm_send_log' );
 
-// Queued sends and status checks. The hook names are written out rather than
-// read from SendQueue::HOOKS because this file runs without the plugin's
-// autoloader; the SendQueueTest pins the two lists against each other so they
-// cannot drift apart.
-//
-// Action Scheduler is asked by hook name ALONE. Its as_unschedule_all_actions()
-// takes the bulk cancel-by-hook path only when no group is given; with a group
-// it falls back to matching each action's arguments as well, and an empty
-// argument list there means "actions scheduled with no arguments", which none
-// of ours are - so the call that also named the group cancelled nothing. The
-// hook names are this plugin's own, so the group narrows nothing anyway. This
-// branch is only reached while the commerce plugin bundling the library is
-// still active at delete time; a store that removed it first keeps the rows.
+// Queued sends and status checks. Hook names written out because this file
+// runs without the autoloader; SendQueueTest pins them to SendQueue::HOOKS.
+// Action Scheduler is asked by hook name ALONE: with a group,
+// as_unschedule_all_actions() also matches arguments and cancels nothing for
+// actions scheduled with arguments. Only reached while the commerce plugin
+// bundling the library is still active.
 foreach ( array( 'gtm4wp_gdm_send_refund', 'gtm4wp_gdm_poll_status' ) as $gtm4wp_queue_hook ) {
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
 		as_unschedule_all_actions( $gtm4wp_queue_hook );

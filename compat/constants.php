@@ -60,19 +60,11 @@ define( 'GTM4WP_OPTION_INCLUDE_POSTCOUNT', 'include-postcount' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTID', 'include-postid' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTFORMAT', 'include-postformat' );
 define( 'GTM4WP_OPTION_INCLUDE_POSTTERMLIST', 'include-postterms' );
-/**
- * Split out of GTM4WP_OPTION_INCLUDE_POSTTERMLIST in 2.0: that single option used to
- * emit BOTH the taxonomy terms and every non-underscore-prefixed post meta value, while
- * describing only the former. The meta half now has its own opt-in; Migration seeds it
- * from the legacy option so an upgrading site keeps the data it was already sending.
- */
+// Split out of GTM4WP_OPTION_INCLUDE_POSTTERMLIST in 2.0 (that option emitted
+// BOTH terms and post meta); Migration seeds it from the legacy option.
 define( 'GTM4WP_OPTION_INCLUDE_POSTMETA', 'include-postmeta' );
-/**
- * Optional allow-list for the option above: a newline separated list of meta keys.
- * While it is empty (the default) every non-protected key is published, exactly as
- * in 1.x - so neither the 2.0 split nor its migration seeding can change what an
- * upgrading site already sends. Filling it in narrows the dump to the named keys.
- */
+// Optional allow-list of meta keys for the option above; empty (the default)
+// publishes every non-protected key, exactly as in 1.x.
 define( 'GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS', 'include-postmeta-keys' );
 define( 'GTM4WP_OPTION_INCLUDE_SEARCHDATA', 'include-searchdata' );
 define( 'GTM4WP_OPTION_INCLUDE_BROWSERDATA', 'include-browserdata' );
@@ -250,13 +242,9 @@ define( 'GTM4WP_WPACTION_AFTER_DATALAYER', 'gtm4wp_output_after_datalayer' );
 define( 'GTM4WP_WPACTION_AFTER_CONTAINER_CODE', 'gtm4wp_after_container_code' );
 
 /**
- * Constant used by GTM4WP as a WordPress filter to decide whether the GTM
- * container code (the <head> loader and the <noscript> iframe) is output on
- * the current request. Defaults to true. Returning false from an mu-plugin or
- * wp-config snippet suppresses the container - based on the host name,
- * WP_ENVIRONMENT_TYPE or any custom condition - while the data layer stays
- * active, so a cloned/staging copy of a site does not send hits to the
- * production container without deactivating the plugin.
+ * Filter deciding whether the container code (head loader + noscript iframe)
+ * is output on the current request; default true. Return false (e.g. from an
+ * mu-plugin on a staging copy) to suppress it while the data layer stays active.
  */
 define( 'GTM4WP_WPFILTER_OUTPUT_CONTAINER', 'gtm4wp_output_container' );
 
@@ -267,12 +255,9 @@ define( 'GTM4WP_WPFILTER_OUTPUT_CONTAINER', 'gtm4wp_output_container' );
 define( 'GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY', 'gtm4wp_add_global_vars_array' );
 
 /**
- * Constant used by the cache-safe data layer (issue #398) to collect the
- * "visitor-scoped" fields a module wants delivered outside the cacheable page
- * HTML. Filter callbacks receive an array and append GTM4WP\Modules\VisitorData\VisitorField
- * objects (each carrying a delivery tier). Phase 1 consumes the Tier 1 (client
- * knows it) fields to build the gtm4wp.visitorData client push; Phase 2 will
- * consume Tier 2/3 fields for the session endpoint.
+ * Filter of the cache-safe data layer (issue #398) collecting the
+ * visitor-scoped fields a module wants delivered outside the cacheable HTML:
+ * callbacks append GTM4WP\Modules\VisitorData\VisitorField objects.
  */
 define( 'GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS', 'gtm4wp_visitor_scoped_fields' );
 
@@ -301,16 +286,10 @@ define( 'GTM4WP_WPFILTER_AXEPTIO_CONSENT_MODE_DEFAULT', 'gtm4wp_axeptio_consent_
 define( 'GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY', 'gtm4wp_eec_product_array' );
 
 /**
- * Source-aware successor of GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY (since 2.0).
- *
- * Behaves like the deprecated gtm4wp_eec_product_array filter but receives a
- * third argument: the raw source object the GA4 item was built from - the
- * WooCommerce cart item array on the cart/checkout paths, or the WC_Order_Item
- * on the purchase path (null when there is no per-line source, e.g. a product
- * detail page or product list). This lets extensions read custom cart/order
- * item meta - which never lives on the WC_Product/variation - and attach only
- * the fields they need, instead of bloating every GA4 event with the whole
- * source array. The source object itself is never merged into the item array.
+ * Source-aware successor of GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY (since 2.0): the
+ * same filter plus a third argument, the raw cart item array / WC_Order_Item
+ * the GA4 item was built from (null without a per-line source), so extensions
+ * can read custom item meta. The source is never merged into the item.
  */
 define( 'GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE', 'gtm4wp_eec_item_with_source' );
 define( 'GTM4WP_WPFILTER_EEC_CART_ITEM', 'gtm4wp_eec_cart_item' );

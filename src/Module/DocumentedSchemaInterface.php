@@ -13,27 +13,18 @@ namespace GTM4WP\Module;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Declares where the documentation of a whole module lives, which the settings
- * screen renders as a link in the module panel header.
- *
- * Separate from AdminSchemaInterface on purpose. Adding a method to that
- * interface would be a fatal at class-load time for any third party schema
- * written against an earlier build - a class that implements an interface
- * without one of its methods does not fail when it is called, it fails when it
- * is loaded. SettingsPage checks for this one with instanceof, so an existing
- * schema keeps working untouched and opts in when it wants a header link.
- *
- * The per-option links need nothing here: they travel on the Field's $doc.
+ * Declares where a module's documentation lives, rendered as a link in the
+ * panel header. Separate from AdminSchemaInterface on purpose: a method added
+ * there is a load-time fatal for every third party schema written before it,
+ * so optional capabilities are separate interfaces checked with instanceof.
+ * Per-option links travel on the Field's $doc.
  */
 interface DocumentedSchemaInterface {
 
 	/**
 	 * Documentation path of the module, relative to the base URL in
-	 * \GTM4WP\Admin\Docs and without a fragment - a module link points at the
-	 * whole page, not at one option's section.
-	 *
-	 * Return an empty string for a module that has no page yet; the panel then
-	 * shows no header link rather than a broken one.
+	 * \GTM4WP\Admin\Docs, without a fragment. Empty for no page yet (no link
+	 * rather than a broken one).
 	 *
 	 * @return string
 	 */

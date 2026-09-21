@@ -65,32 +65,15 @@ final class ScriptTag {
 	}
 
 	/**
-	 * Encodes one value as a JavaScript literal, never returning an empty string.
-	 *
-	 * The encoder returns FALSE for a value it cannot encode, and PHP renders
-	 * FALSE as '' in string concatenation - so a sink that writes
-	 * `'var x = ' . wp_json_encode( $v, $f ) . ';'` emits `var x = ;`, a SyntaxError
-	 * that takes down the WHOLE <script> block rather than the one value. The
-	 * reachable triggers are INF/NAN, a resource, and nesting past the encoder's
-	 * depth limit; invalid UTF-8 is NOT one, because wp_json_encode() repairs that
-	 * itself (_wp_json_sanity_check), which is why no request-sourced string can get
-	 * here. It takes a value supplied by a third party through one of the public
-	 * filters - which is exactly the input this plugin is built to accept.
-	 *
-	 * Falling back to the `null` literal keeps the block parseable and confines the
-	 * failure to one value. Every JS reader of these globals already copes with the
-	 * value being absent (`window.x || {}`, `typeof x === 'string' ? …`), and `null`
-	 * takes the same branch as absent at each of them.
-	 *
-	 * This lives here, next to the wp_kses/ampersand contract, because it is the same
-	 * question those answer: what has to be true for a string to be safe to put in a
-	 * <script> body. It was private to ContainerCode until 2026-08-10 with a single
-	 * caller, so eight sibling sinks kept the defect it was written to fix (#141).
-	 *
-	 * Use this where the assignment MUST exist. Where the whole statement can simply
-	 * be left out, prefer that: call wp_json_encode() directly, test `false ===`, and
-	 * omit - an absent key is honest where an invented `null` is not (RI-13).
-	 * DataLayer::wrapper_fragments() is the reference for that shape.
+	 * Encodes one value as a JavaScript literal, never returning an empty string
+	 * (RI-21, #141). wp_json_encode() returns FALSE for INF/NAN, a resource or
+	 * over-deep nesting (a filter-supplied value; invalid UTF-8 is repaired by
+	 * the encoder itself), and PHP renders FALSE as '', so `var x = ;` would be a
+	 * SyntaxError taking the whole block. The `null` fallback confines the
+	 * failure to one value; every JS reader treats null like absent. Use this
+	 * where the assignment MUST exist; where the statement can be left out,
+	 * prefer testing `false ===` and omitting (RI-13; see
+	 * DataLayer::wrapper_fragments()).
 	 *
 	 * @param mixed $value The value to encode.
 	 * @param int   $flags wp_json_encode() flags for this value's context.
@@ -103,22 +86,12 @@ final class ScriptTag {
 	}
 
 	/**
-	 * Safely outputs an inline script block.
-	 *
-	 * The block is sanitized with wp_kses() so only the allow-listed <script>
-	 * tag and its attributes survive. wp_kses() also entity-encodes every bare
-	 * ampersand (& becomes &amp;), which would break JavaScript operators such
-	 * as && and query string separators such as &l=, so the ampersand — and
-	 * only the ampersand — is restored afterwards.
-	 *
-	 * Earlier versions ran htmlspecialchars_decode() over the whole block, which
-	 * also turned &quot;, &lt;, &gt; and &#039; back into raw ", <, > and '
-	 * characters. Inside a <script> element the browser never HTML-decodes
-	 * entities, so those escaped sequences are already inert and decoding them
-	 * only re-enabled string/tag break-outs from values escaped with esc_js() or
-	 * esc_attr() (e.g. the site search term reaching the data layer as &quot;).
-	 * Leaving everything but the ampersand encoded keeps such values safe while
-	 * the trusted JavaScript still runs.
+	 * Safely outputs an inline script block: wp_kses() with the <script>
+	 * allow-list, then the ampersand - and ONLY the ampersand - restored, since
+	 * wp_kses() encodes it and that breaks && and &l=. Never widen this to a
+	 * blanket htmlspecialchars_decode() (RI-3): the browser never HTML-decodes
+	 * inside <script>, so &quot;/&lt; are inert as they are, and decoding them
+	 * re-enabled break-outs from esc_attr'd values.
 	 *
 	 * @param string     $block The full script block including the <script> tags.
 	 * @param array|null $rules Optional wp_kses() rule set override.
@@ -134,24 +107,11 @@ final class ScriptTag {
 	}
 
 	/**
-	 * Safely outputs a block that MIXES HTML markup with inline <script> elements.
-	 *
-	 * Same sanitizer as print_script_block(), different ampersand rule, and the
-	 * difference is the whole reason this method exists. wp_kses() entity-encodes
-	 * every bare ampersand, which is
-	 *
-	 * - wrong inside a <script> body: `console.warn && console.warn(…)` becomes
-	 *   `console.warn &amp;&amp; console.warn(…)`, a SyntaxError that kills the
-	 *   entire block, because the browser never HTML-decodes inside <script>; but
-	 * - right inside an HTML attribute: `ns.html?id=X&amp;gtm_auth=Y` is the
-	 *   correct spelling of that URL and is what both 2.0 and 1.x have always
-	 *   emitted for the noscript iframe.
-	 *
-	 * So the ampersand is restored ONLY within script elements, leaving attributes
-	 * as wp_kses() left them. Blanket-restoring (print_script_block) would corrupt
-	 * the iframe URL; not restoring at all is the defect this fixes - the
-	 * container placement OFF, kill-switch and excluded-user-role console warnings
-	 * all reach the page through here.
+	 * Safely outputs a block that MIXES HTML markup with inline <script>
+	 * elements. Same sanitizer as print_script_block(), but the ampersand is
+	 * restored ONLY inside script bodies: an encoded && is a SyntaxError there,
+	 * while `ns.html?id=X&amp;gtm_auth=Y` is the correct spelling of the iframe
+	 * attribute (and the 1.x byte form).
 	 *
 	 * @param string     $block The markup block, possibly containing <script> elements.
 	 * @param array|null $rules Optional wp_kses() rule set override.
@@ -167,20 +127,11 @@ final class ScriptTag {
 	}
 
 	/**
-	 * Turns &amp; back into & inside every <script> element of an
-	 * already-sanitized block, leaving the rest of the markup untouched.
-	 *
-	 * Safe by the same argument as print_script_block()'s blanket restore: the only
-	 * way out of a <script> body is a literal `</script`, and this transform can
-	 * only ever produce an ampersand - never `<`, `>`, `"` or `'`. Every other
-	 * entity stays inert exactly as RI-3 requires.
-	 *
-	 * preg_replace_callback(), not preg_replace(): a callback RETURNS the
-	 * replacement, so a `$1`/`\1` sequence occurring in the script body is never
-	 * expanded as a backreference (PA-7). On a PCRE failure the callback returns
-	 * null, in which case the sanitized input is emitted unchanged rather than the
-	 * empty string - the same "degrade, never blank the output" rule as
-	 * self::json_literal() (#85).
+	 * Turns &amp; back into & inside every <script> element of a sanitized block.
+	 * Safe because the transform can only produce an ampersand, never `<` or a
+	 * quote (RI-3). preg_replace_callback(), not preg_replace(), so a `$1` in the
+	 * script body is never expanded as a backreference (PA-7); on a PCRE failure
+	 * the input is emitted unchanged rather than blanked (#85).
 	 *
 	 * @param string $markup wp_kses()-sanitized markup.
 	 * @return string

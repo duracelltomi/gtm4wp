@@ -13,15 +13,10 @@ namespace GTM4WP\Module;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Declares that a module's settings screen is not (only) a list of Field
- * controls but a dedicated React component with its own REST routes - the
- * service-accounts manager is the first one.
- *
- * Opt-in through a separate interface for the reason DocumentedSchemaInterface
- * gives: a method added to AdminSchemaInterface is a load-time fatal for every
- * third party schema written before it. SettingsPage checks this one with
- * instanceof and hands the panel id and its data to the app alongside the
- * fields, so a schema can mix both.
+ * Declares that a module's settings screen is (also) a dedicated React panel
+ * with its own REST routes. A separate opt-in interface for the reason
+ * DocumentedSchemaInterface gives; SettingsPage checks it with instanceof and
+ * a schema can mix a panel with fields.
  */
 interface PanelSchemaInterface {
 
@@ -34,23 +29,15 @@ interface PanelSchemaInterface {
 	public function panel(): string;
 
 	/**
-	 * Data the panel component needs at boot: REST paths, limits, labels.
-	 * Scalars and arrays only - it travels as JSON.
+	 * Data the panel component needs at boot (REST paths, limits, labels);
+	 * scalars and arrays only, it travels as JSON. Called only when the settings
+	 * page renders (unlike fields(), walked on every REST request), so this is
+	 * the one place a schema may afford a database read.
 	 *
-	 * Called only when the settings page itself is rendered - unlike fields(),
-	 * which the settings REST controller walks on every REST request - so this
-	 * is the one place a schema may afford a database read.
-	 *
-	 * Reserved key `columnChoices`: a map of option key => column key =>
-	 * choices that SettingsPage merges into the matching table columns of this
-	 * module's fields, for select columns whose choices only exist at
-	 * page-render time (the Data Manager destinations' service-account list).
-	 *
-	 * Reserved key `panelGroup`: the id of the accordion group this panel
-	 * belongs under. A panel is about one group's settings, so on a module with
-	 * several tabs it renders inside that tab rather than below whichever one
-	 * happens to be open. Omit it when the panel is the whole screen, or when
-	 * the module has a single group.
+	 * Reserved keys: `columnChoices` (option key => column key => choices,
+	 * merged into table columns whose choices exist only at render time) and
+	 * `panelGroup` (the accordion group this panel renders inside; omit when
+	 * the panel is the whole screen or the module has one group).
 	 *
 	 * @return array<string, mixed>
 	 */

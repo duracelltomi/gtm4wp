@@ -79,31 +79,21 @@ final class Plugin {
 
 		Globals::populate( $this->options );
 
-		// Personal-data requests run from wp-admin, from cron and from WP-CLI,
-		// so this cannot sit in either the admin or the frontend branch below.
-		// It is registered whatever the capture setting says: a request has to
-		// find data captured while the feature was on, including after it has
-		// been turned off again.
+		// Personal-data requests run from wp-admin, cron and WP-CLI, so this sits
+		// outside both branches below, and it is registered whatever the capture
+		// setting says: a request must find data captured while the feature was on.
 		( new Modules\GoogleDataManager\PrivacyData() )->register_hooks();
 
-		// The refund send lane, for the same reason: a refund is issued in
-		// wp-admin or by a gateway callback, and the send that follows it runs
-		// from Action Scheduler or WP-Cron, where neither the admin nor the
-		// frontend branch below is taken. Registered only when the feature is
-		// on, so a store that does not use it pays nothing for it.
+		// The refund send lane runs from Action Scheduler / WP-Cron, so it sits
+		// outside both branches too; gated so an unused feature costs nothing.
 		if ( $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ) {
 			$this->boot_refund_lane();
 		}
 
-		// The settings REST endpoint must be reachable on REST requests where
-		// is_admin() is false; the controller class only loads when a REST
-		// request actually initializes.
-		//
-		// RestCors is registered in the same place and with no condition on
-		// purpose: it withdraws core's reflected cross-origin grant for the WHOLE
-		// gtm4wp/v2 namespace, and the namespace exists on every install because
-		// of the settings routes right above. Registering it from a module (as it
-		// was) tied a namespace-wide control to that module's feature flag (#97).
+		// REST routes must exist on REST requests, where is_admin() is false.
+		// RestCors is registered here unconditionally on purpose: it withdraws
+		// core's reflected cross-origin grant for the WHOLE gtm4wp/v2 namespace,
+		// and registering it from a module tied that to a feature flag (#97).
 		add_action(
 			'rest_api_init',
 			function () {
@@ -111,18 +101,14 @@ final class Plugin {
 
 				( new Admin\RestController( $this->registry ) )->register_routes();
 
-				// The service-accounts routes are registered here for the same
-				// reason as the settings routes: they must exist on REST requests,
-				// where no admin code path is taken. Registering them is cheap (no
-				// option read until a route actually runs), so there is no gate.
+				// Cheap to register (no option read until a route runs), so no gate.
 				$vault     = new Google\KeyVault();
 				$transport = new Google\WpTransport();
 				$tokens    = new Google\TokenService( $vault, $transport );
 				( new Modules\GoogleAuth\RestController( $vault, $tokens ) )->register_routes();
 
-				// The destinations test route rides the same registration; its
-				// probe reuses the token service and transport above, so the
-				// endpoint and scope keep their single definitions.
+				// The destinations test route reuses the token service and
+				// transport so the endpoint and scope keep single definitions.
 				( new Modules\GoogleDataManager\RestController(
 					$vault,
 					new Modules\GoogleDataManager\EventsIngest( $tokens, $transport ),
@@ -131,19 +117,14 @@ final class Plugin {
 					new Modules\GoogleDataManager\DestinationHealth()
 				) )->register_routes();
 
-				// The attribution backfill is guest-facing, so it registers only
-				// while capture is on: an endpoint nobody needs should not
-				// exist. It is gated on the option alone, not on a commerce
-				// platform - the callback resolves the order through whichever
-				// platform the request names and refuses when that platform is
-				// absent.
+				// Guest-facing, so it exists only while capture is on. Gated on the
+				// option alone: the callback resolves the platform per request.
 				if ( $this->options->get( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION ) ) {
 					( new Modules\GoogleDataManager\BackfillEndpoint() )->register_routes();
 				}
 
-				// A service account a destination row still references must not
-				// be deletable: the delete route runs over REST, so the veto is
-				// wired here, next to the routes it protects.
+				// A service account a destination row references must not be
+				// deletable; the veto is wired next to the routes it protects.
 				add_filter(
 					GTM4WP_WPFILTER_GOOGLE_SERVICE_ACCOUNT_IN_USE,
 					fn ( $in_use, $account_id ) => ( true === $in_use )
@@ -173,11 +154,8 @@ final class Plugin {
 	}
 
 	/**
-	 * Returns the module registry, or null before boot() has run.
-	 *
-	 * Nullable like frontend() below: both are built in boot(), so a caller that
-	 * runs earlier than plugins_loaded would otherwise get a TypeError from the
-	 * return type instead of a value it can test.
+	 * Returns the module registry, or null before boot() has run (a caller
+	 * earlier than plugins_loaded gets a testable value, not a TypeError).
 	 *
 	 * @return Registry|null
 	 */
@@ -195,12 +173,9 @@ final class Plugin {
 	}
 
 	/**
-	 * Registers the server-side refund send lane and its status polling.
-	 *
-	 * Both commerce platforms are wired unconditionally; each adapter decides
-	 * for itself whether its platform is active, which keeps the parity rule
-	 * (WooCommerce and Easy Digital Downloads land together) a property of the
-	 * adapter list rather than of this method.
+	 * Registers the server-side refund send lane and its status polling. Both
+	 * commerce adapters are wired unconditionally and decide for themselves
+	 * whether their platform is active (the WC/EDD parity rule).
 	 *
 	 * @return void
 	 */

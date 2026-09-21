@@ -52,12 +52,9 @@ final class DataLayer {
 	}
 
 	/**
-	 * Returns the name of the data layer JavaScript global variable.
-	 *
-	 * Resolution (including the re-validation of a stored value that the save
-	 * side would no longer accept) lives in ContainerRows so that this reader,
-	 * Compat\Globals, the option sanitizer and the admin notice all share one
-	 * definition - see ContainerRows::datalayer_name().
+	 * Returns the name of the data layer JavaScript global variable. Resolution
+	 * and re-validation live in ContainerRows::datalayer_name(), shared with
+	 * Compat\Globals, the sanitizer and the admin notice.
 	 *
 	 * @return string
 	 */
@@ -121,14 +118,9 @@ final class DataLayer {
 
 	/**
 	 * Declares that $handle must be printed before the queued pushes, so a
-	 * function a push wraps its payload in is already defined when the inline
-	 * push runs (the push handle carries no src, so its inline script executes
-	 * at parse time - ahead of every deferred bundle).
-	 *
-	 * Both handles must already be registered: adding a dependency on an
-	 * unregistered handle makes WordPress drop the dependent script entirely,
-	 * which would silently remove every data layer push on the page. Callers
-	 * therefore hook this after the enqueue pass that registers both.
+	 * wrapper function is defined when the inline push runs at parse time. Both
+	 * handles must already be registered: a dependency on an unregistered handle
+	 * makes WordPress drop the dependent script and every push with it.
 	 *
 	 * @param string $handle The script handle to print first.
 	 * @return bool True when the dependency was added or already present.
@@ -155,8 +147,8 @@ final class DataLayer {
 	 * @param array  $event_data      Additional event parameters to be passed after the event. Optional.
 	 * @param string $js_before       Inline JS code to be added before the dataLayer.push() line.
 	 * @param string $js_after        Inline JS code to be added after the dataLayer.push() line.
-	 * @param string $js_wrapper      Optional. Name of a JavaScript function on `window` the pushed object is passed through before it reaches the data layer, e.g. to add visitor specific data that must not be baked into cacheable HTML. Must be a plain identifier; anything else is dropped and the object is pushed unwrapped. The emitted call falls back to an identity function when the named function is not loaded, so an unavailable wrapper can never cost the event.
-	 * @param array  $js_wrapper_args Optional. Extra arguments passed to $js_wrapper after the pushed object. JSON encoded, so only scalars/arrays.
+	 * @param string $js_wrapper      Optional. Name of a `window` function the pushed object passes through first (e.g. to merge visitor data client-side). Must be a plain identifier or it is dropped; an unloaded wrapper falls back to identity.
+	 * @param array  $js_wrapper_args Optional. Extra JSON-encoded arguments passed to $js_wrapper after the object.
 	 * @return bool True when the event was successfully queued.
 	 */
 	public function queue_push( $event_name, $event_data = array(), $js_before = '', $js_after = '', $js_wrapper = '', $js_wrapper_args = array() ): bool {
@@ -173,11 +165,8 @@ final class DataLayer {
 		}
 
 		$GLOBALS['gtm4wp_additional_datalayer_pushes'][] = array(
-			// Serialize `event` first so server-pushed events match what the
-			// client-side gtm4wp_push_ecommerce() already emits (event before
-			// ecommerce). Key order is irrelevant to GTM/GA4; this is consistency
-			// only. array_merge keeps an existing `event` key (e.g. the purchase
-			// data layer already sets it first) in place (#348).
+			// `event` first, matching the client-side gtm4wp_push_ecommerce();
+			// array_merge keeps an existing `event` key in place (#348).
 			'datalayer_object' => array_merge(
 				array(
 					'event' => $event_name,
@@ -194,22 +183,13 @@ final class DataLayer {
 	}
 
 	/**
-	 * Builds the "(" ... ")" pair that wraps a pushed object in a JavaScript
-	 * function call, or two empty strings when the queue entry asks for no
-	 * wrapper or names something that is not a plain identifier.
-	 *
-	 * The opening half resolves the function off `window` with an identity
-	 * fallback, so a wrapper that is not loaded yet - or not loaded at all -
-	 * degrades to an unwrapped push instead of a ReferenceError that would
-	 * take the whole event with it.
-	 *
-	 * The name is written unquoted into a <script> body, so what keeps this
-	 * parameter from being a script-injection sink is the identifier grammar -
-	 * and that grammar has exactly ONE definition in this plugin
-	 * (ContainerRows::is_valid_js_identifier(), PA-2). It is deliberately not
-	 * re-stated here: this class held its own copy until 2026-08-10 and the two
-	 * had already drifted apart in the modifier that anchors the pattern, which
-	 * is the drift PA-2 exists to stop.
+	 * Builds the "(" ... ")" pair that wraps a pushed object in a function call,
+	 * or two empty strings for no wrapper / not a plain identifier. The opening
+	 * half resolves off `window` with an identity fallback so an unloaded
+	 * wrapper degrades to an unwrapped push, not a ReferenceError. The name is
+	 * written unquoted into a <script> body: the identifier grammar
+	 * (ContainerRows::is_valid_js_identifier(), the ONE definition, PA-2) is what
+	 * keeps this from being an injection sink.
 	 *
 	 * @param array $one_event A single entry of the push queue.
 	 * @return string[] The opening and closing fragment, in that order.
@@ -263,13 +243,8 @@ final class DataLayer {
 			}
 
 			if ( array_key_exists( 'datalayer_object', $one_event ) ) {
-				// Same false-return guard wrapper_fragments() applies to the wrapper
-				// ARGUMENTS a few lines above, which is where this one was missing
-				// until 2026-08-10 (#141): an unencodable object emitted `.push()`,
-				// a call with no arguments that silently pushes nothing - or, with a
-				// wrapper, pushes undefined into the data layer. Skip the statement
-				// instead, so a queued event that cannot be serialized is absent
-				// rather than present-and-meaningless (RI-13).
+				// Skip the statement on an encode failure (#141, RI-21): false would
+				// emit `.push()`, present-and-meaningless rather than absent (RI-13).
 				$encoded_object = wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
 				if ( false !== $encoded_object ) {

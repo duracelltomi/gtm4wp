@@ -49,10 +49,8 @@ if ( ! function_exists( 'gtm4wp_get_user_ip' ) ) {
 	 */
 	function gtm4wp_get_user_ip( $use_custom_header = '', $trusted_proxies = null ) {
 		if ( null === $trusted_proxies ) {
-			// options() is nullable by design (#64): it is built in boot(), and this is
-			// a public function a theme could call earlier. Falling back to '' means an
-			// early caller gets the same reading it got before this parameter existed,
-			// never a fatal.
+			// options() is null before boot() (#64); an early caller gets the
+			// pre-parameter reading, never a fatal.
 			$options         = Plugin::instance()->options();
 			$trusted_proxies = ( null === $options )
 				? ''

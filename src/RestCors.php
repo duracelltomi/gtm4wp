@@ -14,33 +14,15 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Stops WordPress handing this plugin's REST responses to third-party origins.
- *
- * WordPress registers rest_send_cors_headers() on rest_pre_serve_request by
- * default, and it REFLECTS the request Origin while sending
- * Access-Control-Allow-Credentials: true. On a public route that is a standing
- * invitation: any page on the internet can fetch these routes with the visitor's
- * own cookies attached and read the response. For this namespace that would mean
- * a visitor's WooCommerce-session-derived data (a pending order, cart contents)
- * readable by whatever site they happen to be on, and any token these routes
- * issue being harvestable and replayable (#78).
- *
- * Browser cookie defaults (SameSite=Lax) probably block most of that today, but a
- * browser default is not a control this plugin owns. Removing the headers makes
- * the browser refuse the cross-origin read outright. Same-origin requests are
- * unaffected: they either send no Origin or send this site's own.
- *
- * Scoped strictly to this plugin's namespace - other plugins' routes keep core's
- * behavior.
- *
- * This lives at plugin level, not inside a module, because the policy protects a
- * NAMESPACE and the namespace outlives any one feature. gtm4wp/v2 carries the
- * admin settings routes (registered unconditionally in Plugin::boot()), the
- * public visitor-data GET and the WooCommerce confirm beacons. It used to be
- * registered from VisitorDataEndpoint::register_routes(), which the VisitorData
- * module only reaches when the cache-safe data layer option is on - so a control
- * covering the whole namespace was owned by one module's feature flag, and the
- * next route registered here from anywhere else would silently have inherited
- * core's reflected grant (#97).
+ * Core's rest_send_cors_headers() REFLECTS the request Origin with
+ * Access-Control-Allow-Credentials: true, so any page could read a visitor's
+ * session-derived data from the public routes with their cookies attached, and
+ * harvest any token they issue (#78); SameSite=Lax is a browser default, not a
+ * control this plugin owns. Removing the headers makes the browser refuse the
+ * cross-origin read; same-origin requests are unaffected. Scoped to this
+ * namespace only. Lives at plugin level because the policy protects a
+ * NAMESPACE that outlives any one feature; registering it from a module tied
+ * it to that module's feature flag (#97).
  */
 final class RestCors {
 
@@ -58,9 +40,7 @@ final class RestCors {
 	 * @return void
 	 */
 	public static function register(): void {
-		// Priority 11: core registers rest_send_cors_headers() on this filter at
-		// the default 10, so this runs after it and undoes what it did for this
-		// namespace.
+		// Priority 11: after core's rest_send_cors_headers() at 10.
 		add_filter( 'rest_pre_serve_request', array( self::class, 'restrict_cors' ), 11, 3 );
 	}
 
@@ -84,9 +64,8 @@ final class RestCors {
 			return $served;
 		}
 
-		// header() replaces a previously sent header of the same name, but removing
-		// is what we want: with no Access-Control-Allow-Origin at all the browser
-		// blocks the read rather than being told which origin is permitted.
+		// Removed, not replaced: with no Access-Control-Allow-Origin at all the
+		// browser blocks the read.
 		header_remove( 'Access-Control-Allow-Origin' );
 		header_remove( 'Access-Control-Allow-Credentials' );
 		header_remove( 'Access-Control-Allow-Methods' );
@@ -95,11 +74,8 @@ final class RestCors {
 	}
 
 	/**
-	 * Whether the reflected CORS headers must be stripped for this route and origin.
-	 *
-	 * Split out from restrict_cors() so the decision is testable without sending
-	 * headers: the header calls have no return value and no observable effect in a
-	 * unit test, but this predicate is the whole of the logic.
+	 * Whether the reflected CORS headers must be stripped for this route and
+	 * origin. Split out so the decision is testable without sending headers.
 	 *
 	 * @param string $route  The REST route being served (e.g. /gtm4wp/v2/visitor-data).
 	 * @param string $origin The request Origin header, empty when absent.
@@ -111,26 +87,12 @@ final class RestCors {
 			return false;
 		}
 
-		// Two shapes have to match, and only one of them is a route this plugin
-		// registers. WordPress auto-registers an index route for every namespace
-		// the first time it sees one (WP_REST_Server::register_route() adds
-		// '/' . $namespace -> get_namespace_index), so /gtm4wp/v2 answers requests
-		// as surely as /gtm4wp/v2/settings does. A prefix test alone therefore
-		// left the namespace's own index outside the policy that is named after
-		// the namespace - it returns only route metadata, but "every route in
-		// this namespace" has to mean every route.
-		//
-		// The trailing slash in the prefix stays: without it, a future
-		// gtm4wp/v22 namespace would be swept in by a plain strpos().
-		//
-		// Lowercased first, because the route arrives exactly as the URL spelled
-		// it while WordPress resolves it case-INSENSITIVELY:
-		// WP_REST_Server::match_request_to_handler() matches every registered
-		// route with preg_match( '@^' . $route . '$@i', $path ). The same callback
-		// therefore answers the namespace in any casing, and a case-sensitive
-		// comparison here would leave those requests outside the policy while
-		// still serving them. The namespace is lowercase ASCII, so strtolower()
-		// normalizes it exactly the way that match does.
+		// Two shapes: the namespace's auto-registered index route (/gtm4wp/v2)
+		// and everything under it. The trailing slash keeps a future gtm4wp/v22
+		// out. Lowercased because WordPress matches routes case-INSENSITIVELY
+		// (WP_REST_Server::match_request_to_handler() uses the i modifier), so a
+		// case-sensitive test would serve the request while leaving it outside
+		// the policy.
 		$path = strtolower( ltrim( $route, '/' ) );
 
 		if ( self::REST_NAMESPACE !== $path
@@ -141,8 +103,7 @@ final class RestCors {
 
 		$site = wp_parse_url( home_url() );
 		if ( ! is_array( $site ) || empty( $site['host'] ) ) {
-			// Cannot establish what this site's origin is, so cannot vouch for any
-			// third-party one either. Strip.
+			// Cannot establish this site's origin, so cannot vouch for any. Strip.
 			return true;
 		}
 

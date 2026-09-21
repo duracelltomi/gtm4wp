@@ -23,10 +23,8 @@ defined( 'ABSPATH' ) || exit;
 final class ConsentDefaults {
 
 	/**
-	 * Internal filter that lets a CMP integration suppress the GTM4WP consent
-	 * mode default block when the CMP fires the "default" command itself (so
-	 * it is not sent twice). The Axeptio module returns false here when it
-	 * drives Google Consent Mode v2.
+	 * Filter letting a CMP integration (Axeptio) suppress the consent default
+	 * block when it fires the "default" command itself.
 	 *
 	 * @since 2.0.0
 	 */
@@ -50,9 +48,7 @@ final class ConsentDefaults {
 
 		/**
 		 * Filters whether GTM4WP outputs its own Google Consent Mode "default"
-		 * command. A CMP integration that fires the consent default itself
-		 * (e.g. Axeptio driving Consent Mode v2) returns false here so the
-		 * default is not sent twice.
+		 * command; a CMP that fires it itself returns false here.
 		 *
 		 * @since 2.0.0
 		 *

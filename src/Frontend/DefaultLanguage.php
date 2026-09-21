@@ -13,19 +13,11 @@ namespace GTM4WP\Frontend;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Resolves a post or term to its default (master) language equivalent using
- * whichever multilingual plugin is active (WPML or Polylang), so modules can
- * output data layer values in the site's default language and let Google
- * Analytics combine reports across languages instead of splitting the same
- * content per translation (issue #145).
- *
- * Detection mirrors the PageVariables pageLanguage detection: WPML through its
- * wpml_current_language filter, Polylang through its pll_* functions. When
- * neither plugin is active - or an object has no default-language translation
- * - the given id is returned unchanged so callers keep their current behavior.
- * The resolved id is always filterable (gtm4wp_master_language_post_id /
- * gtm4wp_master_language_term_id) so integrators can support other multilingual
- * plugins or override the WPML/Polylang resolution.
+ * Resolves a post or term to its default (master) language equivalent via WPML
+ * or Polylang, so data layer values report in one language (issue #145).
+ * Detection mirrors the PageVariables pageLanguage detection. Unresolvable ids
+ * are returned unchanged; the result is filterable
+ * (gtm4wp_master_language_post_id / gtm4wp_master_language_term_id).
  */
 final class DefaultLanguage {
 
@@ -62,15 +54,9 @@ final class DefaultLanguage {
 	}
 
 	/**
-	 * Shared WPML/Polylang resolution for a post or term id.
-	 *
-	 * WPML is detected through its wpml_current_language filter and resolved
-	 * with wpml_object_id (the `true` argument returns the original id when no
-	 * translation exists); Polylang is detected through its pll_* functions and
-	 * resolved with pll_get_post()/pll_get_term() (both return 0 when there is
-	 * no translation). When neither plugin is active - or no default-language
-	 * object is found - the given id is returned unchanged. The result is always
-	 * filterable.
+	 * Shared WPML/Polylang resolution for a post or term id: wpml_object_id (the
+	 * `true` argument returns the original id without a translation) or
+	 * pll_get_post()/pll_get_term() (0 without one). Filterable.
 	 *
 	 * @param int    $id      Post or term id in the current language.
 	 * @param string $type    WPML element type: the post type for posts, the taxonomy for terms.
@@ -108,11 +94,9 @@ final class DefaultLanguage {
 		}
 
 		/**
-		 * Filters the id resolved to the site's default (master) language.
-		 *
-		 * Lets integrators support other multilingual plugins, or override the
-		 * WPML/Polylang resolution, for the master-language data layer values.
-		 * Fires as gtm4wp_master_language_post_id for posts and
+		 * Filters the id resolved to the site's default (master) language, so
+		 * integrators can support other multilingual plugins. Fires as
+		 * gtm4wp_master_language_post_id for posts and
 		 * gtm4wp_master_language_term_id for terms.
 		 *
 		 * @since 2.0

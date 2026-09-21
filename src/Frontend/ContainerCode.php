@@ -124,16 +124,11 @@ final class ContainerCode {
 	public function header_top( $echo_output = true ) {
 		$datalayer_name = $this->datalayer->name();
 
-		// The data layer initialization has to use 'var' instead of 'let' since 'let' can break related browser extensions and 3rd party scripts.
-		//
-		// Two different jobs on two adjacent lines, which is why the encoders differ
-		// (RI-4's two piles). The first is a string VALUE, so it takes json_literal()
-		// with the hex flags and supplies its own quotes - byte-identical output for
-		// any real name. The second and third are the bare IDENTIFIER, which must not
-		// be quoted or encoded at all; what makes those safe is not an escaper but
-		// ContainerRows::datalayer_name(), which will not return anything that is not
-		// a valid JavaScript identifier (esc_js() could not help here - see the
-		// comment on the global-vars allow-list below, which makes the same point).
+		// 'var', not 'let': 'let' breaks related browser extensions and third party
+		// scripts. The name appears as a string VALUE (json_literal with hex flags)
+		// and as a bare IDENTIFIER, which no escaper can protect; what makes the
+		// latter safe is ContainerRows::datalayer_name() only ever returning a valid
+		// JavaScript identifier (RI-4).
 		$_gtm_top_content = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 ' . $this->script_tag->opening_tag() . '
@@ -143,17 +138,10 @@ final class ContainerCode {
 		// Load in the global variables from the gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter.
 		$added_global_js_vars = (array) apply_filters( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array() );
 		foreach ( $added_global_js_vars as $js_var_name => $js_var_value ) {
-			// The name becomes a `const <name>` declaration, so anything that is not
-			// a valid JavaScript identifier is a syntax error that would kill this
-			// whole <script> block - including the data layer initialization above
-			// it. esc_js() does not validate identifiers (it would happily emit
-			// `const foo\' = ...`), so the name is allow-listed here instead and a
-			// non-conforming entry is skipped rather than allowed to break the page.
-			//
-			// The shared constant, not a retyped copy (PA-2): this is the same
-			// grammar the data layer name has to satisfy, and the two rules were
-			// written independently and disagreed - the option's admitted '-'
-			// while this one, correctly, never did.
+			// The name becomes a `const <name>` declaration: anything that is not a
+			// valid identifier would be a SyntaxError killing the whole block, and
+			// esc_js() does not validate identifiers, so a non-conforming entry is
+			// skipped. Shared grammar with the data layer name, not a copy (PA-2).
 			$js_var_name = (string) $js_var_name;
 			if ( ! ContainerRows::is_valid_js_identifier( $js_var_name ) ) {
 				continue;
@@ -181,13 +169,9 @@ final class ContainerCode {
 
 		if ( ! apply_filters( self::FILTER_AMP_RUNNING, false ) ) {
 			if ( $echo_output ) {
-				// Emit through print_script_block() - the same sanitizer the
-				// container code in header_begin() uses - so consent-tool JS added
-				// via FILTER_HEADER_TOP_JS is sanitized identically and, crucially,
-				// gets the ampersand restored. wp_kses() alone turns every bare &
-				// into &amp; with no restore step, which would silently break JS
-				// operators like && and &-joined loader URLs in the head block.
-				// See ScriptTag::print_script_block() (RI-3) for the contract.
+				// Through print_script_block(), like header_begin(): wp_kses() alone
+				// would turn every bare & into &amp; and break && in the consent JS
+				// added via FILTER_HEADER_TOP_JS (RI-3).
 				$this->script_tag->print_script_block( $_gtm_top_content );
 			} else {
 				return $_gtm_top_content;
@@ -196,16 +180,9 @@ final class ContainerCode {
 	}
 
 	/**
-	 * Renders one GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY value as a JavaScript literal.
-	 *
-	 * Dispatches on the ACTUAL type, in order. The previous chain of independent
-	 * `if`s tested `empty( $value ) && 0 !== $value` before the array and null
-	 * branches, which swallowed three types and rewrote them all to `false`:
-	 * null (should be `null`), an empty array (should be `[]`) and the float 0.0
-	 * (should be `0`, since `0 !== 0.0` is true under strict comparison). That
-	 * also made the trailing is_null() branch unreachable - it could never see a
-	 * null, because the empty() test had already turned it into the string
-	 * 'false'. Third-party integrators use this filter, so those were live bugs.
+	 * Renders one GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY value as a JavaScript
+	 * literal, dispatching on the ACTUAL type in order - an empty() test first
+	 * used to rewrite null, [] and 0.0 to `false`.
 	 *
 	 * @param mixed $value The filter-supplied value.
 	 * @return string A JavaScript literal, safe for an inline <script> body.
@@ -227,14 +204,9 @@ final class ContainerCode {
 			return ScriptTag::json_literal( $value, 0 );
 		}
 
-		// Everything else is rendered as a JSON string literal, with the SAME hex
-		// flags as the array branch above. It used to use esc_js() in single quotes
-		// for 1.x output parity, three lines below a branch that had already broken
-		// that parity - and esc_js is an HTML-attribute escaper, so `"`, `<` and `>`
-		// reached the integrator as &quot;/&lt;/&gt; text instead of characters
-		// (RI-4/PA-4, #72). Verified inert, never a break-out: esc_js backslashed
-		// the quotes. This is a data-correctness fix, and it makes every branch of
-		// this function agree on one encoder.
+		// Everything else is a JSON string literal with the same hex flags. Not
+		// esc_js(): an HTML-attribute escaper that handed the integrator
+		// &quot;/&lt;/&gt; text instead of characters (RI-4/PA-4, #72).
 		return ScriptTag::json_literal(
 			is_scalar( $value ) ? (string) $value : '',
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
@@ -249,12 +221,9 @@ final class ContainerCode {
 	 * @return void
 	 */
 	public function header_begin() {
-		// On an AMP page the standard GTM container <script> is invalid AMP markup
-		// and is stripped by the AMP sanitizer; the AMP module injects an
-		// amp-analytics tag instead. Still compile the data layer (so its values,
-		// the AFTER_DATALAYER hook and the backward-compatible global stay
-		// available to the AMP integration and third-party consumers), then skip
-		// emitting the container code.
+		// On an AMP page the container <script> would be stripped by the AMP
+		// sanitizer; the AMP module injects amp-analytics instead. The data layer
+		// is still compiled so its values, the hook and the global stay available.
 		if ( apply_filters( self::FILTER_AMP_RUNNING, false ) ) {
 			$this->datalayer->compile();
 
@@ -277,10 +246,8 @@ final class ContainerCode {
 			$this->script_tag->print_script_block( $this->console_off_warning() );
 		}
 
-		// Kill switch: the production-only option or the gtm4wp_output_container
-		// filter can suppress the container on a cloned/staging copy. Mirrors the
-		// placement-OFF behavior above - the data layer stays active, only the
-		// container loader below is skipped.
+		// Kill switch (production-only option / gtm4wp_output_container filter):
+		// like placement OFF, the data layer stays active, only the loader is skipped.
 		if ( $output_container_code && ! $this->should_output_container() ) {
 			$output_container_code = false;
 
@@ -339,30 +306,17 @@ final class ContainerCode {
 		if ( array() !== $containers ) {
 			$gtm4wp_datalayer_data = $this->datalayer->compile();
 
-			// Encode <, >, &, " and ' as \uXXXX so the data layer JSON is safe in
-			// any inline-script context. This is defense in depth on top of
-			// ScriptTag::print_script_block(): even a value that arrives here already
-			// HTML-entity encoded (e.g. get_search_query() returns esc_attr'd output,
-			// so a " becomes &quot;) can never break out of the JS string literal.
-			// No JSON_NUMERIC_CHECK here: it coerced every numeric-looking string
-			// anywhere in the structure into a JSON number, silently corrupting
-			// identifier-like values (a SKU of "000035180" lost its leading zeros;
-			// order numbers, postcodes and phone numbers changed type). Values that
-			// really are numbers (prices, totals, counts) are typed at their source
-			// instead - the same contract the additional-push and cart-fragments
-			// sinks have always had, so all sinks now agree on types.
+			// The hex flags encode <, >, &, " and ' as \uXXXX so the JSON can never
+			// break out of the script, whatever print_script_block() does. Do NOT
+			// add JSON_NUMERIC_CHECK: it coerced identifier-like strings (a SKU of
+			// "000035180", postcodes, phone numbers) into numbers; real numbers are
+			// typed at their source instead, like every other sink.
 			$datalayer_json = wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
-			// Omit BOTH lines rather than emit a literal we do not have (#141).
-			// wp_json_encode() returns false for a value it cannot encode - INF/NAN,
-			// a resource, or nesting past its depth limit, all of which reach the
-			// data layer only through the public compile filter - and PHP renders
-			// false as '', so concatenating it here would emit
-			// `var dataLayer_content = ;`: a SyntaxError that takes this whole block,
-			// the data layer initialization in it, and every container loader after
-			// it. Dropping the push instead costs one page's data layer content and
-			// leaves the container loading. See ScriptTag::json_literal() for the
-			// assignment-position half of this rule.
+			// Omit BOTH lines on an encode failure (#141, RI-21): false renders as
+			// '' and `var dataLayer_content = ;` is a SyntaxError that would take
+			// every container loader after it. Dropping the push costs one page's
+			// data layer content and leaves the container loading.
 			if ( false !== $datalayer_json ) {
 				$script_tag .= '
 	var dataLayer_content = ' . $datalayer_json . ';';
@@ -400,17 +354,9 @@ final class ContainerCode {
 	 * @return string
 	 */
 	private function disabled_role_warning( string $user_role ): string {
-		// json_literal(), not esc_js(): this is a string VALUE in a raw <script>
-		// body, where esc_js() emits &quot;/&amp;/&lt; entities the browser never
-		// decodes, so a role slug containing one of those characters reached the
-		// console as an entity instead of the character (PA-4/RI-4). The same swap
-		// was made in global_var_literal() for the same reason; this was the last
-		// esc_js'd string value left in a script body.
-		//
-		// The WHOLE message is encoded, not just the role, so the literal supplies
-		// its own quotes and the emitted line stays byte-identical to the previous
-		// output for an ordinary role slug - which is what keeps 1.x parity and the
-		// existing byte assertions (BE-1) meaningful.
+		// json_literal(), not esc_js(), for a string VALUE in a <script> body
+		// (PA-4/RI-4). The WHOLE message is encoded so the literal supplies its own
+		// quotes and the line stays byte-identical to 1.x for an ordinary slug (BE-1).
 		$role_message = ScriptTag::json_literal(
 			'[GTM4WP] Google Tag Manager container code was disabled for this user role: ' . $user_role . ' !!!',
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
@@ -452,37 +398,16 @@ final class ContainerCode {
 
 		$_gtm_env = $this->container_environment( $one_container );
 
-		// Server side GTM containers can be configured to serve a
-		// single container from the loader path itself; in that case the
-		// container ID is omitted from the query string ("?" instead of
-		// "?id=") so no ID leaks into the request.
+		// A server-side container serving one container from the loader path
+		// omits the ID from the query string ("?" instead of "?id=").
 		$_gtm_loader_query = $this->container_omit_id( $one_container ) ? '?\'+dl' : '?id=\'+i+dl';
 
-		/*
-		 * The four esc_js() calls below are string VALUES inside single-quoted JS
-		 * literals, so by RI-4's two-pile rule they belong in pile (b) - the pile
-		 * whose members normally get migrated to json_literal(). These four stay,
-		 * deliberately, and the reason is recorded here so the next re-derivation of
-		 * that ledger finds an answer rather than re-deciding:
-		 *
-		 * - json_literal() emits DOUBLE quotes. This block is Google's own container
-		 *   snippet reproduced byte for byte (single quotes throughout, matching 1.x
-		 *   and every copy of it Google publishes), and BE-1 keeps byte-exact tests
-		 *   over it. Migrating would change the emitted snippet for every site to buy
-		 *   nothing.
-		 * - Nothing is being reasoned about here on the basis of what the values
-		 *   "happen to" contain - which is the filing #110 ruled out. Each of the four
-		 *   passes an enforced allow-list on the way to this line, and none of those
-		 *   allow-lists admits a quote: the container ID via ContainerRows::GTM_ID_PATTERN
-		 *   in header_begin() before this method is called, the domain via
-		 *   FILTER_VALIDATE_DOMAIN in container_domain(), the path via
-		 *   ContainerRows::PATH_PATTERN in container_path(), and the data layer name via
-		 *   ContainerRows::datalayer_name() at the reader. esc_js() is therefore a
-		 *   provable no-op on all four, and the allow-lists are the actual control.
-		 *
-		 * If any of those four allow-lists is ever widened to admit a quote, this
-		 * block has to move to json_literal() and the byte-exact tests updated with it.
-		 */
+		// The four esc_js() calls below stay on purpose (RI-4 pile b): this is
+		// Google's snippet byte for byte, single-quoted, under BE-1 byte-exact
+		// tests, and each value passes an allow-list that admits no quote before
+		// reaching here (GTM_ID_PATTERN, FILTER_VALIDATE_DOMAIN, PATH_PATTERN,
+		// ContainerRows::datalayer_name()). Those allow-lists are the control; if
+		// one is ever widened to admit a quote, move this block to json_literal().
 		return '
 ' . $this->script_tag->opening_tag() . '
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({\'gtm.start\':
@@ -511,12 +436,8 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 <!-- Google Tag Manager (noscript) -->';
 
 		if ( GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) ) {
-			// Placement OFF means the container code (both the head loader and
-			// this noscript iframe) is never auto-emitted; only the data layer
-			// stays active. Mark the code as "written" regardless of the
-			// console-log setting so the iframe block below is always skipped -
-			// otherwise, with console logging disabled, the iframe would still
-			// be output despite the OFF placement.
+			// Placement OFF: mark the code "written" regardless of the console-log
+			// setting so the iframe block below is always skipped.
 			$GLOBALS['gtm4wp_container_code_written'] = true;
 
 			if ( ! $no_console_log ) {
@@ -527,24 +448,16 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 </script>';
 			}
 		} elseif ( ! $this->should_output_container() ) {
-			// Kill switch (production-only option / gtm4wp_output_container
-			// filter): suppress the noscript iframe exactly like placement OFF -
-			// mark the code as "written" so the iframe block below is skipped
-			// while the data layer stays active.
+			// Kill switch: same as placement OFF.
 			$GLOBALS['gtm4wp_container_code_written'] = true;
 
 			if ( ! $no_console_log ) {
 				$_gtm_tag .= $this->container_suppressed_warning();
 			}
 		} elseif ( '' !== $excluded_role ) {
-			// The user-role exclusion suppresses the <head> container loader in
-			// header_begin(); this iframe is the same container by another route,
-			// so it has to go with it. It used to be emitted regardless, which
-			// meant an excluded user still loaded the container (and was counted
-			// in the reports) whenever JavaScript was unavailable - the exact
-			// case the noscript iframe exists for. Mark the code as "written" so
-			// the iframe block below is skipped, exactly like placement OFF and
-			// the kill switch above; the data layer stays active.
+			// The role exclusion must cover this iframe too: it is the same
+			// container by another route, and it used to load for an excluded user
+			// whenever JavaScript was unavailable.
 			$GLOBALS['gtm4wp_container_code_written'] = true;
 
 			if ( ! $no_console_log ) {
@@ -556,17 +469,12 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			foreach ( $containers as $one_container ) {
 				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
 
-				// esc_attr() per PART below, at the point of injection (#225). Each part
-				// is already allow-list validated - the id by the pattern one line down,
-				// the domain by container_domain()'s FILTER_VALIDATE_DOMAIN fallback, the
-				// environment values inside container_environment() - so esc_attr() is
-				// the identity function on everything the validators pass today and
-				// exists for the day a pattern is widened. NOT esc_attr()/esc_url() over
-				// the whole src: the environment fragment joins with raw '&' on purpose
-				// (wp_kses encodes it to &amp; at output, the 1.x byte form), and
-				// gtm4wp_get_the_gtm_tag() returns this string as public 1.x API -
-				// pre-encoding it would change those bytes and hand third-party
-				// consumers an already-escaped value to double-escape (RI-4).
+				// esc_attr() per PART at the point of injection (#225); each part is
+				// allow-list validated already, so it exists for the day a pattern is
+				// widened. NOT over the whole src: the environment fragment joins with
+				// a raw '&' on purpose (wp_kses encodes it at output, the 1.x byte
+				// form) and gtm4wp_get_the_gtm_tag() returns this string as public
+				// 1.x API (RI-4).
 				if ( preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
 					$_gtm_tag .= '
 				<noscript><iframe src="https://' . esc_attr( $this->container_domain( $one_container ) ) . '/ns.html?id=' . esc_attr( $one_gtm_id ) . $this->container_environment( $one_container ) . '"
@@ -589,30 +497,18 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 * @return void
 	 */
 	public function the_tag(): void {
-		// The iframe's inline style needs `display` and `visibility`. Whether
-		// safecss_filter_attr() strips those depends on the WordPress version:
-		// core added `display` to the safe_style_css default list in 7.0 and
-		// `visibility` in 7.1, so on 6.3-6.9 both are stripped and on 7.0
-		// `visibility` still is. While the floor is 6.3 this filter is
-		// load-bearing, not belt-and-braces - drop it only in the change that
-		// raises the floor past 7.1, never as a "core allows it now" cleanup.
-		//
-		// Widen the CSS allow-list around THIS wp_kses() call only, then put it back:
-		// safe_style_css is a global WordPress control, so a filter left
-		// registered would relax it for every other wp_kses()/wp_kses_post() call
-		// in the same request - including wp_filter_post_kses on content saved by
-		// users without unfiltered_html, and a REST save is not is_admin(). One
-		// line of our own markup is not a reason to loosen the rule site-wide.
+		// The iframe style needs `display` and `visibility`; core's safe_style_css
+		// list gained `display` in 7.0 and `visibility` in 7.1, so while the floor
+		// is 6.3 this filter is load-bearing. Drop it only when the floor passes
+		// 7.1. Widened around THIS call only: safe_style_css is a global control,
+		// and a filter left registered would relax wp_kses() for every other call
+		// in the request, including content saved without unfiltered_html.
 		add_filter( 'safe_style_css', array( self::class, 'allow_iframe_hiding_styles' ) );
 
 		try {
-			// print_markup_block(), not a bare wp_kses(): this block mixes the noscript
-			// iframe (whose src must keep its &amp; entity form) with the console
-			// warning <script> blocks that get_tag() prepends for placement OFF, the
-			// kill switch and an excluded user role. wp_kses() encodes every bare
-			// ampersand, so a raw echo shipped `console.warn &amp;&amp; console.warn(…)`
-			// - a SyntaxError that took out the whole warning block. Only script bodies
-			// get the ampersand back; the attribute is left alone.
+			// print_markup_block(), not bare wp_kses(): the block mixes the iframe
+			// (whose src must keep &amp;) with console-warning <script> blocks, where
+			// an encoded && is a SyntaxError. Only script bodies get the & back.
 			$this->script_tag->print_markup_block(
 				$this->get_tag(),
 				array_merge(
@@ -630,21 +526,15 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 				)
 			);
 		} finally {
-			// finally, so an exception inside the sink cannot leave the site's CSS
-			// allow-list widened for the rest of the request.
+			// So an exception in the sink cannot leave the allow-list widened.
 			remove_filter( 'safe_style_css', array( self::class, 'allow_iframe_hiding_styles' ) );
 		}
 	}
 
 	/**
-	 * Adds the two declarations the noscript iframe's inline style needs to the
-	 * wp_kses() CSS allow-list.
-	 *
-	 * Public and static only because add_filter()/remove_filter() must be handed
-	 * the same callable, and WordPress invokes it from outside this class. It is
-	 * NOT a hook to register anywhere: the_tag() adds it immediately before its
-	 * own wp_kses() call and removes it immediately after, which is the whole
-	 * point - see the comment there.
+	 * Adds `display` and `visibility` to the wp_kses() CSS allow-list. Public and
+	 * static only so add_filter()/remove_filter() get the same callable; NOT a
+	 * hook to register anywhere - the_tag() adds and removes it around one call.
 	 *
 	 * @param mixed $styles The CSS property allow-list wp_kses() is about to use.
 	 * @return array The allow-list plus `display` and `visibility`.
@@ -707,28 +597,19 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	/**
-	 * Kill switch: decides whether the GTM container code (the <head> loader
-	 * and the <noscript> iframe) may be emitted on the current request. Two
-	 * independent gates can suppress it while keeping the data layer active
-	 * (like placement OFF), so a cloned/staging copy of a site does not send
-	 * hits to the production container without deactivating the plugin:
-	 *
-	 * 1. The gtm4wp_output_container filter (default true): return false from
-	 *    an mu-plugin or wp-config snippet to suppress the container based on
-	 *    the host name, WP_ENVIRONMENT_TYPE or any custom condition.
-	 * 2. The "Only output on production environments" option: when enabled the
-	 *    container is emitted only when wp_get_environment_type() is
-	 *    'production' (WordPress derives it from the WP_ENVIRONMENT_TYPE
-	 *    constant / environment variable, defaulting to 'production').
+	 * Kill switch: whether the container code (head loader and noscript iframe)
+	 * may be emitted on this request, so a staging copy does not send hits to the
+	 * production container. Two independent gates, both keeping the data layer
+	 * active: the gtm4wp_output_container filter, and the "Only output on
+	 * production environments" option (wp_get_environment_type() === 'production').
 	 *
 	 * @return bool
 	 */
 	private function should_output_container(): bool {
 		/**
-		 * Filters whether the Google Tag Manager container code is output on
-		 * the current request. Return false to suppress the container <script>
-		 * and the noscript iframe while keeping the data layer active - e.g.
-		 * from an mu-plugin on a staging/clone copy of the site.
+		 * Filters whether the Google Tag Manager container code is output on the
+		 * current request. Return false (e.g. from an mu-plugin on a staging copy)
+		 * to suppress the container while keeping the data layer active.
 		 *
 		 * @since 2.0.0
 		 *
@@ -739,8 +620,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 		}
 
 		if ( $this->options->get( GTM4WP_OPTION_PRODUCTIONONLY ) ) {
-			// wp_get_environment_type() ships with WordPress 5.5+; the guard
-			// keeps the unit tests (which never load WordPress) working.
+			// The guard keeps the unit tests (no WordPress loaded) working.
 			$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
 
 			if ( 'production' !== $environment ) {
@@ -752,15 +632,10 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	/**
-	 * Returns the first role of the current user that the "Exclude user roles"
-	 * option turns the container code off for, or an empty string when the
-	 * container may be emitted for this user.
-	 *
-	 * Both container sinks ask this - the <head> loader in header_begin() and
-	 * the <noscript> iframe in get_tag() - so an excluded role suppresses the
-	 * whole container. The check used to live inline in header_begin() only,
-	 * which left the iframe (the very fallback that loads GTM when JavaScript
-	 * does not run) firing for an excluded user.
+	 * The first role of the current user that the "Exclude user roles" option
+	 * turns the container off for, or ''. Both container sinks ask this (the
+	 * head loader and the noscript iframe) so an excluded role suppresses the
+	 * whole container.
 	 *
 	 * @return string The matching excluded role, or '' when none matches.
 	 */
@@ -792,13 +667,10 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			return '';
 		}
 
-		// Re-validate at the output sink (PA-2), not just on save: these values
-		// also reach the row from a 1.x migration and from the
-		// GTM4WP_HARDCODED_GTM_ENV_* wp-config constants, neither of which went
-		// through the admin schema sanitizer. A stray & would otherwise inject
-		// extra query parameters into the container loader URL and the noscript
-		// iframe src. Malformed values are dropped whole (both parameters are
-		// meaningless alone) - Notices warns the admin so this is never silent.
+		// Re-validated at the sink (PA-2): the values also arrive from a 1.x
+		// migration and the GTM4WP_HARDCODED_GTM_ENV_* constants, bypassing the
+		// admin sanitizer, and a stray & would inject query parameters. Malformed
+		// values are dropped whole; Notices warns the admin.
 		if ( ! preg_match( ContainerRows::AUTH_PATTERN, $gtm_auth )
 			|| ! preg_match( ContainerRows::PREVIEW_PATTERN, $gtm_preview )
 		) {
@@ -809,14 +681,9 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	}
 
 	/**
-	 * Tells whether the GTM container ID must be left out of the container
-	 * loader URL of one container row.
-	 *
-	 * This is only honored together with a custom loader path: it targets
-	 * server side GTM setups where the container is selected by the request
-	 * path/domain and the ID is configured on the server. Without a custom
-	 * path the checkbox has no effect, so the default www.googletagmanager.com
-	 * loader never ends up without an ID.
+	 * Whether the container ID is left out of the loader URL. Honored only with a
+	 * custom loader path (server-side GTM selecting the container by path), so
+	 * the default www.googletagmanager.com loader never ends up without an ID.
 	 *
 	 * @param array<string, string> $container One container row.
 	 * @return bool
@@ -858,8 +725,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 		$custom_path      = (string) ( $container[ ContainerRows::COLUMN_PATH ] ?? '' );
 		$_gtm_domain_path = ( '' === $custom_path ) ? 'gtm.js' : $custom_path;
 
-		// Use the shared constant rather than a retyped copy: this allow-list is
-		// security relevant, and the inline duplicate had already drifted from it.
+		// The shared constant, not a retyped copy: the inline duplicate had drifted.
 		if ( ! preg_match( ContainerRows::PATH_PATTERN, $_gtm_domain_path ) ) {
 			return 'gtm.js';
 		}
