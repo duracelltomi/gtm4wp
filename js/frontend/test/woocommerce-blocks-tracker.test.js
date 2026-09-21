@@ -706,6 +706,117 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		);
 	} );
 
+	/**
+	 * Two sync events while one read is still in flight: the second is
+	 * coalesced into one more read AFTER the first lands, never a second read
+	 * racing the first against the same cart. The discriminator is WHEN the
+	 * reads are issued - one in flight at a time - not how many pushes result:
+	 * even two racing reads resolve one after the other in JS, so the push
+	 * count alone stays green without the guard. Every other case here settles
+	 * between syncs, so nothing else can see it (T88).
+	 */
+	it( 'coalesces a sync that arrives while a read is in flight', async () => {
+		respondWith( [
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+			cartOf( [] ),
+			cartOf( [] ),
+		] );
+		loadTracker();
+
+		syncCart(); // baseline
+		await settle();
+		expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+
+		syncCart();
+		syncCart(); // arrives while the read above is in flight
+		expect( window.fetch ).toHaveBeenCalledTimes( 2 ); // not 3: the second waits
+
+		await settle();
+		await settle();
+
+		expect( window.fetch ).toHaveBeenCalledTimes( 3 ); // the coalesced read, once the first landed
+		expect( pushedEvents( 'remove_from_cart' ) ).toHaveLength( 1 );
+	} );
+
+	it( 'keeps the baseline when a read fails, so the change is caught by the next one', async () => {
+		respondWith( [
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+		] );
+		loadTracker();
+
+		syncCart(); // baseline: one item
+		await settle();
+
+		window.fetch = jest.fn( () =>
+			Promise.reject( new Error( 'offline' ) )
+		);
+		syncCart();
+		await settle();
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+		respondWith( [ cartOf( [] ) ] );
+		syncCart(); // the item is gone, and the baseline still knows it was there
+		await settle();
+
+		expect( pushedEvents( 'remove_from_cart' ) ).toHaveLength( 1 );
+	} );
+
+	it( 'treats a refused or malformed cart response as no reading', async () => {
+		respondWith( [
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+		] );
+		loadTracker();
+
+		syncCart();
+		await settle();
+
+		window.fetch = jest.fn( () =>
+			Promise.resolve( { ok: false, json: () => Promise.resolve( {} ) } )
+		);
+		syncCart();
+		await settle();
+
+		window.fetch = jest.fn( () =>
+			Promise.resolve( {
+				ok: true,
+				json: () => Promise.resolve( { items: 'not-a-list' } ),
+			} )
+		);
+		syncCart();
+		await settle();
+
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	/**
+	 * The REST cart, unlike the data store, carries the extension item as a
+	 * JSON STRING (pinned against a live store in the classic tracker suite);
+	 * the fixtures above use the data store's object shape, so this is the
+	 * one case on the path that actually consumes the REST form (T95d).
+	 */
+	it( 'reads the extension item in the string form the REST cart carries', async () => {
+		const line = {
+			key: 'A',
+			quantity: 1,
+			extensions: {
+				gtm4wp: { item: JSON.stringify( { item_id: 7, price: 10 } ) },
+			},
+		};
+		respondWith( [ cartOf( [ line ] ), cartOf( [] ) ] );
+		loadTracker();
+
+		syncCart();
+		await settle();
+		syncCart();
+		await settle();
+
+		const removed = pushedEvents( 'remove_from_cart' );
+		expect( removed ).toHaveLength( 1 );
+		expect( removed[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 7 } )
+		);
+	} );
+
 	it( 'stays out of the way once the data store has answered', async () => {
 		mockHasCartStore = true;
 		mockCartData = cartOf( [
