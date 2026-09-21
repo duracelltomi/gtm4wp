@@ -50,16 +50,21 @@ final class ServiceAccountKey {
 	/**
 	 * Constructor. Private: the only way in is from_json(), which validates.
 	 *
+	 * The properties are meant to be immutable once built but are not declared
+	 * `readonly`: that keyword is PHP 8.1 syntax and the declared floor is 8.0
+	 * (the CI php-floor job parses every shipped file with a real 8.0 binary).
+	 * Nothing in the plugin writes to them after construction.
+	 *
 	 * @param string $client_email   Service-account e-mail address (the JWT issuer).
 	 * @param string $private_key    PEM encoded RSA private key.
 	 * @param string $private_key_id Key id, sent as the JWT `kid` header.
 	 * @param string $token_uri      Token endpoint (the JWT audience).
 	 */
 	private function __construct(
-		public readonly string $client_email,
-		public readonly string $private_key,
-		public readonly string $private_key_id,
-		public readonly string $token_uri
+		public string $client_email,
+		public string $private_key,
+		public string $private_key_id,
+		public string $token_uri
 	) {
 	}
 

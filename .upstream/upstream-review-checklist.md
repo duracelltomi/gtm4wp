@@ -796,6 +796,14 @@ unambiguous — *"Passing `__next40pxDefaultSize` is ignored at runtime."*
     - `phpcs` with PHPCompatibility `testVersion 8.0-` → catches newer **function/API**
       use. Note this is static, so it already runs correctly on the 8.4 job; the PHP
       version of the *runner* does not change what `testVersion` checks.
+      **Measured 2026-09-21: only up to PHP 8.0.** The locked `9.3.5` (2019) carries
+      no 8.1+ sniffs at all - it passed `public readonly string` promoted properties
+      (PHP 8.1) that the real 8.0 parser then rejected in CI. The `php -l` job is
+      therefore the *only* guard for anything newer than 8.0 until PHPCompatibility 10
+      ships (still `10.0.0-alpha2` on Packagist; a pre-release bump is a separate
+      decision, D7a chain applies). The same run showed the bare `xargs php -l` form
+      aborting at the first parse error and skipping the rest of the tree; fixed in
+      `ci.yml` the same day so every offender is listed in one run.
   - Resolving the install itself needs `--ignore-platform-reqs` or a separate minimal
     dependency set, because phpunit's `>=8.2` blocks resolution regardless of whether
     the job intends to run it.

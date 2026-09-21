@@ -83,8 +83,14 @@ jobs:
       # upstream-drift job runs tools/generate-phone-table.php on this same 8.0,
       # so 8.1+ syntax there would surface as a monthly red build rather than at
       # the commit that introduced it. Nothing else in tools/ is PHP today.
+      #
+      # `php -l` exits 255 on a parse error, and xargs treats 255 as "abort now",
+      # so the bare form stops at the first offender and never parses the rest of
+      # the tree (a 2026-09-21 run reported one file and skipped ~60). The wrapper
+      # maps the failure to exit 1, which xargs collects: every failing file is
+      # reported and the step still fails (xargs exits 123).
       - name: Lint every shipped PHP file against the declared floor
-        run: find duracelltomi-google-tag-manager-for-wordpress.php uninstall.php compat src tools -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+        run: find duracelltomi-google-tag-manager-for-wordpress.php uninstall.php compat src tools -name '*.php' -print0 | xargs -0 -n1 -P4 sh -c 'php -l "$1" || exit 1' sh
 
   js:
     name: JS — build + lint + unit tests
