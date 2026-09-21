@@ -1,20 +1,11 @@
 /*
- * The globals the PHP side prints into the page as top-level `const` declarations,
- * via GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY and ContainerCode::header_top()
- * (WooCommerceModule::add_global_vars() is the only contributor). One list, used
- * twice below: to declare them, so `no-undef` catches a misspelled read, and to
- * forbid the `window.` spelling of the same names.
- *
- * A top-level `const` in a classic (non-module) script binds in the global LEXICAL
- * environment record and never becomes a property of `window`, so
- * `window.gtm4wp_list_attribution` is permanently undefined in a browser. A jsdom
- * unit test cannot catch that on its own - there `global === window`, so setting the
- * window property satisfies a bare read too - which is exactly how three of these
- * shipped dead. Hence the lint rule; js/frontend/test/inline-head-globals.test.js is
- * the runtime half of the same guard.
- *
- * gtm4wp_datalayer_name is deliberately NOT here: it is emitted as `var`, which DOES
- * create a window property, and several trackers read it that way.
+ * The globals PHP prints as top-level `const` (GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY
+ * via ContainerCode::header_top()). Used twice: declared so `no-undef` catches a
+ * misspelled read, and the `window.` spelling forbidden, because a top-level
+ * `const` never becomes a window property (permanently undefined in a browser, but
+ * satisfied in jsdom where `global === window`, which is how three shipped dead).
+ * js/frontend/test/inline-head-globals.test.js is the runtime half of the guard.
+ * gtm4wp_datalayer_name is NOT here: emitted as `var`, a real window property.
  */
 const inlineConstGlobals = [
 	'gtm4wp_currency',
@@ -39,11 +30,9 @@ module.exports = {
 		},
 		{
 			/*
-			 * Frontend trackers ported from 1.x. They run as plain browser
-			 * scripts (no modules): they read inline globals printed by the
-			 * PHP side and talk to each other through the window object,
-			 * and their gtm4wp_* snake_case identifiers are the public JS
-			 * API third party code relies on.
+			 * Frontend trackers: plain browser scripts reading inline globals
+			 * and sharing state via window; gtm4wp_* snake_case is the public
+			 * 1.x JS API.
 			 */
 			files: [ 'js/frontend/**/*.js' ],
 			env: {
@@ -111,11 +100,9 @@ module.exports = {
 		},
 		{
 			/*
-			 * Production trackers only. The unit tests deliberately set
-			 * `window.<name>` - both as a stand-in for the real declaration
-			 * (jsdom makes a window property visible to a bare read) and, in
-			 * inline-head-globals.test.js, as the WRONG value a `window.` read
-			 * would pick up.
+			 * Production trackers only: the unit tests deliberately set
+			 * `window.<name>` (as a stand-in, and in inline-head-globals.test.js
+			 * as the WRONG value a `window.` read would pick up).
 			 */
 			files: [ 'js/frontend/**/*.js' ],
 			excludedFiles: [ 'js/frontend/test/**/*.js' ],

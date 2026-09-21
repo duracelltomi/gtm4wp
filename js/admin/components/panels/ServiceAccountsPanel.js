@@ -1,13 +1,9 @@
 /**
- * Google service accounts panel: the custody UI of the google-auth module.
- *
- * Lists the stored accounts, uploads a key file, renames an account, tests one
- * against Google's token endpoint and deletes one. The key file is read here
- * only to be posted; the server parses and encrypts it and answers with the
- * public view of the account, which is all this panel ever renders. There is
- * deliberately no way to read a key back, so nothing here shows, stores or
- * logs one - and the label is the only stored field that can be edited, since
- * everything else describes the immutable uploaded key.
+ * Google service accounts panel, the custody UI of the google-auth module:
+ * list, upload a key file, rename, test, delete. The key file is read only
+ * to be posted; the server answers with the public view, which is all this
+ * panel renders. No way to read a key back; the label is the only editable
+ * stored field.
  */
 
 import apiFetch from '@wordpress/api-fetch';
@@ -16,10 +12,8 @@ import { useEffect, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 
 /**
- * Human wording of a stored account status. The status strings are the
- * server's KeyVault::STATUS_* constants; an unknown one is shown verbatim
- * rather than hidden, so a new server status is visible before this map
- * learns it.
+ * Human wording of a KeyVault::STATUS_* value; an unknown one is shown
+ * verbatim, not hidden.
  *
  * @param {string} status Account status.
  * @return {string} Translated status text.
@@ -112,8 +106,7 @@ export default function ServiceAccountsPanel( { data } ) {
 		};
 	}, [ restPath ] );
 
-	// Selecting a file only keeps it for the Add button: nothing is sent yet,
-	// so the label stays editable in either order (file first or label first).
+	// Kept for the Add button; nothing is sent yet.
 	const onFileChange = ( event ) => {
 		const file = event.target.files && event.target.files[ 0 ];
 
@@ -124,8 +117,7 @@ export default function ServiceAccountsPanel( { data } ) {
 			return;
 		}
 
-		// Mirrors the server's cap. A real key file is around 2 KB; anything
-		// over the cap is not one, and refusing it here spares the round trip.
+		// Mirrors the server's cap (a real key file is ~2 KB).
 		if ( file.size > keyFileMaxBytes ) {
 			setNotice( {
 				status: 'error',
@@ -142,10 +134,8 @@ export default function ServiceAccountsPanel( { data } ) {
 	};
 
 	const onUpload = async () => {
-		// The disabled={isBusy} prop reaches the controls through the component
-		// library's pass-through and cannot be trusted across the supported WP
-		// range, so every mutation handler re-checks - the TableControl
-		// isCellLocked() pattern. One request at a time.
+		// The disabled prop pass-through cannot be trusted across the supported
+		// WP range, so every mutation handler re-checks. One request at a time.
 		if ( ! pendingFile || isBusy ) {
 			return;
 		}
@@ -590,8 +580,8 @@ function AccountsTable( {
 	);
 }
 
-// The action buttons of one account row, in one of three mutually exclusive
-// states: editing the label, confirming a delete, or the resting set.
+// The action buttons of one row: editing the label, confirming a delete,
+// or the resting set.
 function RowActions( {
 	account,
 	isBusy,

@@ -14,17 +14,13 @@ import { sprintf, __ } from '@wordpress/i18n';
 
 import { isCellLocked } from '../utils';
 
-// A stored checkbox cell is the canonical string '1' (on) or '' (off); older
-// or programmatic values may arrive as booleans, so normalize them all.
+// A stored checkbox cell is '1' or ''; booleans may arrive too.
 function isChecked( value ) {
 	return value === true || value === '1' || value === 1;
 }
 
-// Repeats the column header inside the cell. It is hidden while the header row
-// is on screen and takes over from it in the stacked mobile layout, where a
-// six-column grid does not fit. Hidden from assistive tech either way: the
-// control it labels already names its column and row in its `aria-label`, and
-// the header row is what carries the column for a screen reader on desktop.
+// Repeats the column header inside the cell for the stacked mobile layout;
+// hidden from assistive tech (the control's `aria-label` already names it).
 function CellLabel( { column } ) {
 	return (
 		<span className="gtm4wp-table__cell-label" aria-hidden="true">
@@ -33,15 +29,11 @@ function CellLabel( { column } ) {
 	);
 }
 
-// Whether a text cell breaks its column's `pattern` - an anchored regex source
-// string the PHP schema builds from the same constant its save-time sanitizer
-// enforces, so this marks a value while typing without a second copy of the
-// rule. Matching is trimmed and case-insensitive because the sanitizers
-// normalize whitespace and letter case before validating: everything accepted
-// here is exactly what a save would accept. An empty cell is never marked
-// (emptiness is the sanitizer's call - it may drop the row or refuse the
-// save), and a pattern the browser cannot compile disables the hint rather
-// than break the table - the server still validates.
+// Whether a text cell breaks its column's `pattern`, the anchored regex the
+// PHP schema builds from the same constant its sanitizer enforces (no second
+// copy of the rule). Trimmed and case-insensitive like the sanitizers. An
+// empty cell is never marked (the sanitizer's call); an uncompilable pattern
+// disables the hint, the server still validates.
 function violatesPattern( column, value ) {
 	const trimmed = value.trim();
 
@@ -57,12 +49,8 @@ function violatesPattern( column, value ) {
 }
 
 /**
- * Whether a row still holds only what a fresh one starts with.
- *
- * Such a row is the "Add row" state nobody typed into, and removing it throws
- * nothing away - so it needs no confirmation. The same rule the save-time
- * sanitizer uses when it drops an untouched row silently, applied here so the
- * two ends agree on what an empty row is.
+ * Whether a row still holds only what a fresh one starts with (removing it
+ * needs no confirmation); the same rule the sanitizer uses to drop one.
  *
  * @param {Object} row     The row to judge.
  * @param {Array}  columns Column definitions.
@@ -80,8 +68,7 @@ function emptyRow( columns ) {
 	const row = {};
 
 	columns.forEach( ( column ) => {
-		// A select column may name the value a fresh row starts with (a type
-		// column with one meaningful choice); everything else starts empty.
+		// A select column may name a fresh row's starting value.
 		row[ column.key ] =
 			'string' === typeof column.default ? column.default : '';
 	} );
@@ -89,9 +76,8 @@ function emptyRow( columns ) {
 	return row;
 }
 
-// Options of a select column: its choices map plus a leading empty choice so
-// an unset cell shows as "pick one" instead of silently displaying (and then
-// saving) the first choice.
+// Choices plus a leading empty option, so an unset cell is not silently
+// shown (and saved) as the first choice.
 function selectOptions( column ) {
 	const choices = column.choices || {};
 
@@ -118,15 +104,12 @@ export default function TableControl( {
 	const columns = Array.isArray( field.columns ) ? field.columns : [];
 	const rows = Array.isArray( value ) ? value : [];
 
-	// The row set is fixed outside this screen (a wp-config.php constant), so the
-	// list cannot be added to or thinned out here — the field description names
-	// the constant that decides it.
+	// The row set is fixed by a wp-config.php constant (named in the field
+	// description).
 	const rowsLocked = Boolean( field.rows_locked );
 
-	// A locked cell is rejected here as well, not only rendered read-only:
-	// `readOnly` reaches the input through the component library's prop
-	// pass-through, and this screen runs against every WordPress version the
-	// plugin supports — the lock must not depend on that.
+	// Rejected here too, not only rendered read-only: the `readOnly` prop
+	// pass-through cannot be trusted across the supported WordPress range.
 	const updateCell = ( rowIndex, column, next ) => {
 		if ( isCellLocked( field, column ) ) {
 			return;
@@ -139,9 +122,7 @@ export default function TableControl( {
 		);
 	};
 
-	// Index of the row whose removal is waiting for a second click, or null.
-	// Only ever one: asking about a second row replaces the question rather
-	// than stacking two of them.
+	// Row whose removal awaits a second click, or null; only ever one.
 	const [ pendingRemoval, setPendingRemoval ] = useState( null );
 
 	const addRow = () => {
@@ -161,13 +142,8 @@ export default function TableControl( {
 		onChange( rows.filter( ( row, index ) => index !== rowIndex ) );
 	};
 
-	// A row someone filled in is a piece of configuration - a container id, a
-	// destination and the service account it authenticates with - and the
-	// trash icon sits at the end of the row the pointer is already travelling
-	// along. Asking once costs a click; not asking costs whatever was typed,
-	// with no undo on the screen. A row nobody typed into is removed straight
-	// away: there is nothing to lose and confirming it would only train the
-	// habit of dismissing the question.
+	// A filled row is configuration with no undo, so ask once; an untouched
+	// row is removed straight away (confirming it would train dismissal).
 	const requestRemoval = ( rowIndex ) => {
 		if ( rowsLocked ) {
 			return;
@@ -238,10 +214,8 @@ export default function TableControl( {
 									);
 
 									if ( 'checkbox' === column.type ) {
-										// A checkbox column can depend on another
-										// cell (e.g. omitting the container ID
-										// only makes sense with a custom path):
-										// keep it disabled and unchecked until
+										// A checkbox column depending on another
+										// cell stays disabled and unchecked until
 										// that cell is filled in.
 										const enabled =
 											! column.depends_on ||

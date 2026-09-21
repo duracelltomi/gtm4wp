@@ -1,45 +1,18 @@
 #!/usr/bin/env node
 /**
  * Reports whether the checked-out branch changes anything this project's own tooling
- * later EXECUTES.
+ * later EXECUTES: `composer test`, `npm run build` and `vendor/bin/phpcs` run code the
+ * branch supplies (bootstrap, webpack/ESLint configs, lifecycle scripts, rulesets), so
+ * reviewing a contributor's branch locally can run their code as you (#101; same class
+ * as #77, #81). It prints the wiring the branch changed, so you read those files first.
  *
- * Why this exists
- * ---------------
- * Running `composer test`, `npm run build` or `vendor/bin/phpcs` on a branch does not
- * merely read that branch - it executes code the branch supplies. PHPUnit executes
- * `tests/bootstrap.php` and every test file; webpack executes `webpack.config.js`;
- * ESLint executes `.eslintrc.js`; Composer and npm execute lifecycle scripts and
- * plugins; PHP_CodeSniffer loads whatever `phpcs.xml` names. So reviewing a
- * contributor's branch locally can run that contributor's code as you, before you have
- * read a line of it. That is finding #101 in `.security/code-review-checklist.md`, and
- * the same class as #77 and #81.
- *
- * This script prints the wiring the branch changed, so you can read those files first.
- *
- * WHAT THIS IS NOT
- * ----------------
- * It is NOT a security control, and it must not be recorded as one.
- *
- *   1. It cannot defend against a hostile branch, because the branch supplies THIS
- *      FILE too - a hostile version simply prints "clean". Against a branch you
- *      actually distrust, run the git command from a checkout you control, or do not
- *      check the branch out at all.
- *   2. A clean report does NOT mean nothing branch-supplied will execute. PHPUnit runs
- *      every file under `tests/`, and the JS runner every file under `js/**\/test/`,
- *      whether or not the wiring changed. Those are executed by design and are far too
- *      noisy to diff usefully, so the report names them explicitly instead.
- *   3. Git-ignored files inside a watched directory are outside the uncommitted-changes
- *      leg: `git status` does not list them. `.claude/settings.json` and
- *      `.claude/settings.local.json` (both ignored) are the ones that matter here, so
- *      read those on disk. The branch-comparison leg is unaffected - an ignored file
- *      cannot arrive on a branch without being force-added, and the `.claude/`
- *      pathspec catches it once it is tracked.
- *
- * What it IS: a cheap prompt for the ordinary case - an honest contributor's branch
- * that happens to touch the build or test wiring, which is exactly the change you want
- * to read before running anything. Per the threat model's own rule, that makes it a
- * *described* boundary rather than an *enforced* one. Only isolation (running the
- * tooling in a container) or not checking the branch out is enforced.
+ * NOT a security control, never to be recorded as one: a hostile branch supplies THIS
+ * FILE too (run the git command from a checkout you control, or do not check out); a
+ * clean report still executes every file under `tests/` and `js/**\/test/` (named
+ * explicitly instead of diffed); and git-ignored files in a watched directory
+ * (`.claude/settings.json`, `.claude/settings.local.json`) are outside the
+ * uncommitted-changes leg, so read those on disk. Per the threat model it is a
+ * *described* boundary; only isolation or not checking out is enforced.
  *
  * Usage:
  *   npm run check-branch            # compare against origin/master
@@ -47,11 +20,8 @@
  *   node tools/check-branch.js origin/1.x
  *
  * Exit codes: 0 = no wiring changed · 1 = wiring changed (read it) · 2 = could not run.
- *
- * Exit 1 is a finding, not a failure - but Composer reports any non-zero script as
- * "returned with error code 1" after the output. That line is expected here and means
- * the report above it listed something; the exit code is kept meaningful so this can be
- * used in a script or a CI step.
+ * Exit 1 is a finding, not a failure; Composer's "returned with error code 1" after the
+ * report is expected.
  *
  * @package GTM4WP
  */
@@ -61,32 +31,17 @@
 const { spawnSync } = require( 'child_process' );
 
 /**
- * Every path whose contents are executed - directly or as configuration that names
- * code to load - by a command this project's docs tell a developer to run.
+ * Every path whose contents a documented command executes, directly or as
+ * configuration naming code to load. Keep in step with the tool entry points: a new
+ * linter, formatter, runner or git hook means its config goes here (#101: a config file
+ * reads as inert data until its format can reference code).
  *
- * Keep this list in step with the tool entry points. Adding a linter, formatter, task
- * runner or git hook means adding its config here: the recurring lesson behind #101 is
- * that a tool's config file reads as inert data right up until you notice its format
- * can reference code.
- *
- * Watch the SHAPE, not the one filename in the tree today. These are git pathspecs, and
- * the branch supplies the filename as surely as it supplies the contents - so listing
- * only the file this repo happens to use lets a branch bring its own under a name the
- * tool prefers. PHP_CodeSniffer reads `.phpcs.xml` BEFORE `phpcs.xml`
- * (Config::$defaultRulesetFiles), so a branch adding the dotfile overrides the tracked
- * ruleset while a `phpcs.xml`-only pathspec reports "no executable wiring changed" -
- * finding #101's own file, missed by the script written to prompt about it. Every tool
- * below therefore has each of its accepted config names listed, present or not.
- *
- * That covers the configs a tool DISCOVERS. The other half is a config a documented
- * command PASSES: `phpunit -c phpunit-network.xml` reaches a file under no name PHPUnit
- * would ever look for, so a discovery-shaped list has no reason to contain it (#148).
- * Those are the more dangerous of the two, because such a file usually arrives as
- * somebody's side project rather than as project wiring. So: read the project's own
- * script definitions - `composer.json` and `package.json` scripts, the CI steps, the
- * copy-paste commands in the docs - and make sure every path that appears after a
- * config flag is matched by something below. Globbing the family is cheaper than
- * chasing each new file, which is why the PHPUnit entries are patterns.
+ * Watch the SHAPE, not today's filename: these are pathspecs and the branch supplies
+ * the name too. PHP_CodeSniffer reads `.phpcs.xml` BEFORE `phpcs.xml`, so every tool
+ * has each accepted config name listed, present or not. A config a command PASSES
+ * (`phpunit -c phpunit-network.xml`, #148) is discovered under no name at all: check
+ * the `composer.json`/`package.json` scripts, CI steps and documented commands, and
+ * glob the family (the PHPUnit entries are patterns).
  */
 const EXECUTED_PATHS = [
 	// PHP toolchain.
@@ -115,12 +70,9 @@ const EXECUTED_PATHS = [
 	'postcss.config.js', // Executed by postcss-loader when it resolves a project config.
 	'jest.config.js', // Executed by the JS test runner when present.
 
-	// Repo tooling that runs on your machine.
-	// Runs on commit for anyone using the tracked setup (core.hooksPath=.githooks).
-	// Still watched even where core.hooksPath points at a fixed out-of-tree runner
-	// (#77's fix), because this list has to hold for every clone rather than for
-	// the one it was written in - and over-reporting is the safe direction for a
-	// prompt.
+	// Repo tooling that runs on your machine. .githooks/ runs on commit with
+	// core.hooksPath=.githooks; watched even where the path is out of tree
+	// (#77's fix), since this list must hold for every clone.
 	'.githooks/',
 	'.claude/', // Agent hooks and pre-approved tool permissions (see caveat 3 above).
 	'.github/workflows/', // Runs in CI; read it before it runs with any token.
@@ -169,8 +121,7 @@ function main() {
 		process.exit( 2 );
 	}
 
-	// Three dots: compare against the merge base, so commits that landed on the base
-	// branch since this one forked are not reported as the branch's doing.
+	// Three dots: against the merge base, so base-branch commits are not reported.
 	const out = git( [ 'diff', '--name-only', `${ base }...HEAD`, '--', ...EXECUTED_PATHS ] );
 
 	if ( null === out ) {
@@ -180,10 +131,8 @@ function main() {
 
 	const changed = out.split( '\n' ).filter( ( line ) => '' !== line );
 
-	// The diff above compares COMMITS, which is what a pull request is - but it says
-	// nothing about uncommitted edits, and "no executable wiring changed" would
-	// otherwise read as reassurance while a watched file sat modified in the working
-	// tree. Report that separately rather than letting it hide behind a clean diff.
+	// The diff compares COMMITS; uncommitted edits to a watched file are reported
+	// separately so they cannot hide behind a clean diff.
 	const dirty = ( git( [ 'status', '--porcelain', '--', ...EXECUTED_PATHS ] ) || '' )
 		.split( '\n' )
 		.filter( ( line ) => '' !== line );

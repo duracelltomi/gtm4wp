@@ -48,11 +48,8 @@ const BUILD_SANITY_FILES = [
 
 /**
  * Files produced by a generator from an external source, each carrying a
- * `Generated: YYYY-MM-DD` stamp in its header.
- *
- * Adding one here is what makes its staleness break something. The alternative -
- * a note in a registry row saying "regenerate before a release" - is a comment,
- * and a comment does not fire.
+ * `Generated: YYYY-MM-DD` stamp. Listing one here is what makes its staleness
+ * break something (a registry note does not fire).
  */
 const GENERATED_DATA = [
 	{
@@ -61,8 +58,7 @@ const GENERATED_DATA = [
 		what: 'per-country phone dialling rules (national numbering plans)',
 	},
 	{
-		// Not shipped, but generated from the same parse as the table above, so a
-		// stamp mismatch between the two means one of them was hand-edited.
+		// Not shipped, but generated from the same parse as the table above.
 		file: 'tests/unit/Modules/phone-corpus.php',
 		command: 'composer generate:phone-table',
 		what: 'phone normalization test corpus',
@@ -78,18 +74,10 @@ function fail( message ) {
 }
 
 /**
- * Refuses to package data mirrored from an external source that has not been
- * refreshed in a year, and says so out loud after six months.
- *
- * Deliberately NOT a regeneration. Regenerating here would need the network, so
- * packaging would stop being reproducible from a checkout; it would change what
- * ships after the test suite has run and after the changelog was written; and it
- * would produce a zip whose contents match no commit. Refreshing the data is a
- * code change and belongs in a commit with the suite green. This only refuses to
- * ship a copy old enough that nobody can say whether it is still true.
- *
- * Reads the stamp rather than the file mtime: a checkout, a copy or a rebase
- * rewrites mtimes and would report every fresh clone as newly generated.
+ * Refuses to package mirrored external data not refreshed in a year, and warns
+ * after six months. Deliberately NOT a regeneration: that needs the network,
+ * would change what ships after the suite ran, and would produce a zip matching
+ * no commit. Reads the stamp, not the mtime (a clone rewrites mtimes).
  */
 function checkGeneratedData() {
 	const today = new Date();
@@ -106,9 +94,7 @@ function checkGeneratedData() {
 			.readFileSync( full, 'utf8' )
 			.match( /^\s*\*\s*Generated:\s*(\d{4}-\d{2}-\d{2})\s*$/m );
 
-		// A missing stamp is worse than a stale one: it means the file was edited
-		// by hand, or the generator changed shape and this check silently stopped
-		// checking anything.
+		// A missing stamp means a hand edit, or a generator whose shape changed.
 		if ( ! match ) {
 			fail(
 				`No "Generated:" stamp in ${ entry.file }.\n` +
@@ -139,9 +125,8 @@ function checkGeneratedData() {
 		}
 	} );
 
-	// Generated together, so they date together. Different stamps mean one of
-	// them was regenerated alone or edited, and the test corpus would then be
-	// pinning a table it was not derived from.
+	// Generated together, so they date together; otherwise the test corpus
+	// pins a table it was not derived from.
 	const distinct = new Set( stamps.values() );
 	if ( distinct.size > 1 ) {
 		fail(
@@ -190,8 +175,7 @@ function main() {
 		);
 	}
 
-	// Before the build rather than after: this needs no network and no toolchain,
-	// so a stale mirror should not cost a webpack run to discover.
+	// Before the build: a stale mirror should not cost a webpack run.
 	checkGeneratedData();
 
 	console.log( '\n1/3 Running production build…' );

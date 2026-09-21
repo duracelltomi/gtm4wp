@@ -1,14 +1,8 @@
 /**
- * Recent sends of the Google Data Manager module.
- *
- * The send lane runs in the background, minutes to a day after the refund that
- * started it, so without this list the only thing anyone could say about it is
- * "the number in Analytics looks wrong". Every attempt is shown with what
- * became of it, including the ones that deliberately sent nothing and why.
- *
- * The entries are read from the server as stored; what may be in them is
- * decided where they are written. No token, no key material, no request or
- * response body ever reaches this component.
+ * Recent sends of the Google Data Manager module: every background attempt
+ * with what became of it, including the ones that deliberately sent nothing.
+ * Entries are shown as stored; what may be in them is decided where they are
+ * written (no token, key material or request/response body).
  */
 
 import apiFetch from '@wordpress/api-fetch';
@@ -17,9 +11,8 @@ import { useCallback, useEffect, useState } from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
 /**
- * Plain-words label of a stored outcome. An outcome this bundle does not know -
- * a newer server than the built JavaScript - falls back to the stored word
- * rather than to a blank cell.
+ * Plain-words label of a stored outcome; an unknown one (newer server) falls
+ * back to the stored word.
  *
  * @param {string} outcome Stored outcome.
  * @return {string} Label to show.
@@ -136,12 +129,8 @@ function resultLabel( entry ) {
 }
 
 /**
- * The CSS suffix for an entry's tone.
- *
- * The judgement itself is the server's (SendLog::tone), because it rests on
- * Google's status vocabulary. This only decides that an unknown word - a newer
- * server than this bundle - is drawn as the neutral state rather than as a
- * missing class, and never as a success.
+ * The CSS suffix for an entry's tone. The judgement is the server's
+ * (SendLog::tone); an unknown word draws as neutral, never as a success.
  *
  * @param {Object} entry Stored entry.
  * @return {string} One of ok, pending, warn, error.
@@ -184,9 +173,8 @@ export default function SendLogList( {
 	const [ replayNotice, setReplayNotice ] = useState( null );
 
 	const load = useCallback( async () => {
-		// The effect below is registered before the early return further down,
-		// so a panel rendered without a log path would otherwise still reach
-		// the network on mount.
+		// The effect is registered before the early return below: no network
+		// without a log path.
 		if ( ! logPath ) {
 			return;
 		}
@@ -197,9 +185,8 @@ export default function SendLogList( {
 		try {
 			const response = await apiFetch( { path: logPath } );
 
-			// Built defensively: a proxy or an exhausted worker can answer with
-			// something that is not the envelope, and that must read as "no
-			// entries", not as a TypeError inside React's render.
+			// A non-envelope answer (proxy, exhausted worker) reads as "no
+			// entries", not as a TypeError in render.
 			setEntries(
 				Array.isArray( response && response.entries )
 					? response.entries
@@ -223,12 +210,9 @@ export default function SendLogList( {
 		load();
 	}, [ load ] );
 
-	// Queues the failed and fixable refunds again - every one of them, or the
-	// ones named. Nothing is sent from here: the server puts each refund back
-	// on the queue aimed at the destinations still missing it, and the sender
-	// applies every gate again when it runs a minute later. The reload
-	// afterwards therefore shows the same rows; what changes is what the
-	// queue does next, which the next Refresh will show.
+	// Re-queues the failed and fixable refunds (all, or the ones named).
+	// Nothing is sent from here; the sender applies every gate again a minute
+	// later, so the reload shows the same rows until the next Refresh.
 	const replay = async ( references ) => {
 		if ( ! replayPath || replaying ) {
 			return;
@@ -283,15 +267,10 @@ export default function SendLogList( {
 		return null;
 	}
 
-	// Nothing has ever been sent AND no send lane is on: there is no reading
-	// of "Nothing has been sent yet" that tells the admin anything, because
-	// nothing is waiting to happen. The heading, the explanation and the
-	// Refresh button would be a block about a feature that is off. Once an
-	// entry exists the list is shown whatever the lanes say - turning a lane
-	// off must not hide what it did while it was on. This also covers the
-	// still-loading state, so an empty log never flashes the block on mount,
-	// and a log that failed to load: with every lane off, silence is the
-	// honest answer.
+	// Nothing ever sent AND no send lane on: a block about a feature that is
+	// off says nothing. Once an entry exists the list shows whatever the
+	// lanes say (turning a lane off must not hide what it did). Also covers
+	// the still-loading and failed-to-load states.
 	if ( hideWhenEmpty && ( null === entries || 0 === entries.length ) ) {
 		return null;
 	}
@@ -304,10 +283,8 @@ export default function SendLogList( {
 	} );
 	const shown = problemsOnly ? problems : all;
 
-	// Distinct refunds the bulk action would touch. Counting rows would
-	// overstate it - a refund that failed six times over two destinations is
-	// twelve rows and one job - and the server decides what is replayable, so
-	// this only ever says how many of ITS answers are in view.
+	// Distinct refunds the bulk action would touch (a refund is many rows and
+	// one job); the server decides what is replayable.
 	const replayable = new Set(
 		all
 			.filter( ( entry ) => entry.replayable )

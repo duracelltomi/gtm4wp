@@ -3,85 +3,38 @@
  * Regenerates the country phone table and its regression corpus from Google's
  * libphonenumber metadata.
  *
- * WHY THIS IS GENERATED
- * ---------------------
- * Turning a locally-typed phone number into E.164 needs two facts per country:
- * its calling code, and its national (trunk) prefix - the digits a caller dials
- * before the number domestically and which must NOT survive into E.164.
+ * WHY GENERATED: E.164 conversion needs each country's calling code and its
+ * national (trunk) prefix, numbering-plan facts nothing here can verify (UD-1
+ * mirror). A hand-kept table was wrong for 15 territories: the domain has THREE
+ * cases ("0", something else, or no trunk prefix with a leading zero that is
+ * part of the number, as in Italy), and a default can only express two.
  *
- * Both are national numbering-plan facts that nothing in this plugin can verify,
- * so they are a mirror (upstream UD-1). Hand-maintaining that mirror was tried
- * and does not work: a five-entry table of "trunk prefixes that are not 0" plus
- * a "0" default was wrong for 15 territories, because the domain has THREE
- * categories and a default can only express two - a country may use "0", or use
- * something else, or have no trunk prefix at all and carry a leading zero that
- * is part of the number (Italy is the well-known case, and there are six more).
+ * THE THIRD COLUMN: two readings of the same digits are often both well-formed
+ * ("34 612 345 678" is an international form without "+", "391 234 5678" an
+ * Italian mobile starting with Italy's own code). Lengths do not settle it; the
+ * general national-number pattern does (~32 bytes per territory, ~11 KB total).
+ * It is a tie-breaker ONLY, never a validator: a stale pattern can fail to
+ * improve a number but never REJECT one (UC-5). An unrecognised number falls
+ * through to positional rules applied UNIFORMLY, including the 101 territories
+ * without a trunk prefix that used to return early; measured under a fully
+ * stale pattern that is right in 6,060 sampled cases and wrong in 7. Do not
+ * "restore" the old asymmetry on the strength of the 7.
  *
- * So the table is mechanically generated from the same source a phone library
- * would use, and regenerating is a script rather than a research session.
- *
- * THE THIRD COLUMN, AND WHY IT IS NOT THE ONE WE SAID WE WOULD NOT ADD
- * --------------------------------------------------------------------
- * Those two facts are enough to take a number apart. They are NOT enough to
- * decide which way to take it apart, because two readings of the same digits are
- * often both well-formed: "34 612 345 678" from a Spanish address is the
- * international form with the "+" left off, while "391 234 5678" from an Italian
- * one is a national mobile that merely begins with Italy's own calling code.
- *
- * The note that used to sit here said telling those apart needs per-country
- * possible lengths. Measured, that is wrong twice over: lengths do not settle
- * Italy (both readings are possible Italian lengths), and what does settle it -
- * the general national-number pattern - is one compact regex per territory,
- * 32 bytes on average, in the file we already download. So the third column is
- * shape, not length, and it costs ~11 KB against the ~1.9 MB of adopting the
- * library.
- *
- * It is used ONLY as a tie-breaker, never as a validator. A stale pattern can
- * therefore fail to improve a number but can never REJECT one - measured across
- * 558,103 inputs, there is no value the pattern column causes to be refused that
- * the previous code accepted - which is what keeps this inside upstream UC-5
- * ("do not encode the future as a validator").
- *
- * What it is NOT is a no-op when the pattern misses. An unrecognised number falls
- * through to the positional rules, and those are now applied UNIFORMLY: before
- * this column existed, a territory with no trunk prefix returned early ("anchor
- * and stop") and never reached the calling-code test, so for the 101 such
- * territories the fall-through differs from the older behaviour. The trade was
- * measured rather than assumed - under a fully stale pattern it is right in 6,060
- * sampled cases and wrong in 7, because a national number beginning with its own
- * calling code is far rarer than someone typing that calling code without a "+".
- * Do not "restore" the old asymmetry on the strength of the 7.
- *
- * WHAT IT STILL DELIBERATELY DOES NOT CARRY
- * -----------------------------------------
- * libphonenumber additionally models nationalPrefixForParsing,
- * nationalPrefixTransformRule and per-country international prefixes, which is
- * what it needs to handle Argentina's mobile "9", Brazil's carrier-selection
- * codes, and a caller who dials a foreign number using their own international
- * access code. Those stay unhandled on purpose, and THEY are the trigger: the
- * next time this table needs a column, it needs transform RULES rather than
- * facts, which is reimplementing the library one field at a time. That is the
- * point to adopt it instead. See the local review report for the measurement.
+ * NOT CARRIED: nationalPrefixForParsing, nationalPrefixTransformRule and
+ * per-country international prefixes (Argentina's mobile "9", Brazil's carrier
+ * codes, foreign access codes). Needing transform RULES rather than facts is
+ * the trigger to adopt the library instead of reimplementing it field by field.
  *
  * USAGE
- * -----
  *     composer generate:phone-table
  *     php tools/generate-phone-table.php [path-or-url-to-PhoneNumberMetadata.xml]
  *
- * The composer script takes no argument, so it always fetches over the network and
- * there is no offline path through it. To work from a local copy - on a plane, or
- * to re-run a generation against the exact bytes a previous one used - pass the
- * path directly:
- *
- *     php tools/generate-phone-table.php /path/to/PhoneNumberMetadata.xml
- *
- * Note what that argument is, though: it chooses the source this script turns into
- * shipped PHP, so a file somebody sent you is a supply-chain decision, not a
- * convenience (PA-18). The validation below is written on that basis - it checks
- * the SHAPE of what it read rather than trusting where it came from.
- *
- * Then run the test suite: tests/unit/Modules/phone-corpus.php is regenerated
- * alongside the table from the same parse, so the two cannot disagree.
+ * The composer script always fetches; pass a local path to work offline or to
+ * re-run against the exact bytes of a previous generation. That argument picks
+ * the source this script turns into shipped PHP, so a file somebody sent you is
+ * a supply-chain decision (PA-18): the validation checks the SHAPE of what it
+ * read, not where it came from. tests/unit/Modules/phone-corpus.php is
+ * regenerated from the same parse, so the two cannot disagree.
  *
  * @package GTM4WP
  */
@@ -126,11 +79,8 @@ function read_source( string $source ): string {
 	return $xml;
 }
 
-// Stated rather than assumed. SimpleXML is enabled on most builds and this script
-// is also run by a CI job on a runner whose default extension set is not
-// something this repository controls or can check - so the requirement is
-// asserted here, where the message can name the fix, instead of arriving as an
-// undefined-function fatal several lines later.
+// Asserted where the message can name the fix: the CI runner's extension
+// set is not this repository's to check.
 if ( ! function_exists( 'simplexml_load_string' ) ) {
 	fwrite( STDERR, "This script needs the SimpleXML extension (php -m | grep -i simplexml).\n" );
 	exit( 1 );
@@ -149,11 +99,9 @@ if ( false === $doc ) {
 }
 
 /**
- * Refuses to continue, naming the territory and the field.
- *
- * Every check below is fatal rather than a skip. A generator that quietly drops
- * a territory writes a smaller table that still looks generated, and the release
- * gate reads its fresh date stamp as "checked recently" (PA-18).
+ * Refuses to continue, naming the territory and the field. Every check is
+ * fatal, not a skip: a quietly smaller table still looks generated and the
+ * release gate reads its fresh stamp as "checked recently" (PA-18).
  *
  * @param string $message What is wrong.
  * @return never
@@ -164,12 +112,8 @@ function refuse( string $message ) {
 }
 
 /**
- * Writes a generated file, or refuses.
- *
- * file_put_contents() returns false on a read-only target and a short count on a
- * full disk, and the script used to print "Wrote ..." either way - so a run that
- * wrote nothing looked exactly like a run that worked, and the previous copy
- * kept its old date stamp while the operator believed it had been refreshed.
+ * Writes a generated file, or refuses: file_put_contents() returns false or a
+ * short count, and a run that wrote nothing must not look like one that worked.
  *
  * @param string $path     Destination.
  * @param string $contents Generated source.
@@ -184,14 +128,10 @@ function write_or_refuse( string $path, string $contents ): void {
 }
 
 /**
- * The characters a national-number pattern is allowed to contain.
- *
- * Measured across all 245 territories: digits, the regex metacharacters of a
- * digit grammar, and backslash. Anything outside it - a quote, a slash, a
- * character class we do not expect - would either break the preg delimiter at
- * runtime or the PHP literal at generation time, so it stops the run here rather
- * than shipping. This is a floor on the SHAPE of upstream data, not a validator
- * on phone numbers.
+ * The characters a national-number pattern may contain (measured across all
+ * 245 territories). Anything else could break the preg delimiter or the PHP
+ * literal, so it stops the run. A floor on the SHAPE of upstream data, not a
+ * validator on phone numbers.
  */
 const PATTERN_GRAMMAR = '#^[0-9A-Za-z\[\]\(\)\?\:\|\{\}\,\-\\\\]+$#';
 
@@ -205,8 +145,8 @@ $ambiguous = array();
 foreach ( $doc->xpath( '//territory' ) as $territory ) {
 	$id = (string) $territory['id'];
 
-	// Two-letter ids only: the metadata also carries non-geographic entries
-	// keyed by calling code (800, 808, 870, ...), which no billing address has.
+	// Two-letter ids only: non-geographic entries (800, 808, 870, ...) have
+	// no billing address.
 	if ( 2 !== strlen( $id ) || 1 !== preg_match( '/^[A-Z]{2}$/', $id ) ) {
 		continue;
 	}
@@ -218,8 +158,7 @@ foreach ( $doc->xpath( '//territory' ) as $territory ) {
 		continue;
 	}
 
-	// Both are dialled digits. Anything else is upstream changing shape, which is
-	// a thing to look at rather than to interpolate into a source file.
+	// Both are dialled digits; anything else is upstream changing shape.
 	if ( 1 !== preg_match( '/^\d+$/', $calling_code ) ) {
 		refuse( "{$id} has a non-numeric calling code" );
 	}
@@ -255,8 +194,7 @@ foreach ( $doc->xpath( '//territory' ) as $territory ) {
 
 		$e164 = '+' . $calling_code . $nsn;
 
-		// (a) The country's own example number spelled the way somebody there
-		// would type it - national prefix where one exists.
+		// (a) The example number as somebody there would type it.
 		$corpus[] = array(
 			'country'  => $id,
 			'type'     => $type,
@@ -265,15 +203,10 @@ foreach ( $doc->xpath( '//territory' ) as $territory ) {
 			'expected' => $e164,
 		);
 
-		// (b) The same number with the calling code and no "+". This is the
-		// spelling the third column exists for, and it is the one the previous
-		// two-column table got wrong for every territory without a trunk prefix.
-		//
-		// Excluded where the calling code followed by the national number is
-		// ITSELF a valid national number here: both readings are then genuinely
-		// correct, nothing in the metadata prefers one, and a fixture that picked
-		// one would be asserting a guess (upstream UC-3). Counted, not silently
-		// dropped.
+		// (b) The same number with the calling code and no "+", the spelling
+		// the third column exists for. Excluded (and counted) where that is
+		// ITSELF a valid national number: a fixture picking one reading would
+		// assert a guess (UC-3).
 		if ( 1 === preg_match( '#^(?:' . $pattern . ')$#', $calling_code . $nsn ) ) {
 			$ambiguous[] = $id . ' ' . $type;
 			continue;
@@ -300,11 +233,9 @@ $without_prefix = count( $countries ) - $with_prefix;
 
 // ---------------------------------------------------------------- table file.
 
-// var_export(), never "'" . $value . "'": this writes PHP source from a file
-// somebody else controls, so an unescaped quote or a trailing backslash in an
-// upstream value would break the literal - or worse, close it (PA-18). The
-// grammar checks above make that unreachable today; this makes it unreachable
-// by construction, which is the difference between a check and a guarantee.
+// var_export(), never "'" . $value . "'": this writes PHP source from a
+// file somebody else controls, and a quote or trailing backslash would
+// close the literal (PA-18).
 $rows = '';
 foreach ( $countries as $code => list( $calling_code, $national_prefix, $pattern ) ) {
 	$rows .= sprintf(
@@ -386,9 +317,7 @@ write_or_refuse( TABLE_FILE, $table );
 
 // --------------------------------------------------------------- corpus file.
 
-// Keys padded to a common width: WPCS aligns the double arrows of an array
-// block, so an unpadded generated file fails the project's own linter and the
-// next person has to decide whether that is their fault.
+// Keys padded: WPCS aligns the double arrows of an array block.
 $key_width = 0;
 foreach ( $corpus as $case ) {
 	$key_width = max( $key_width, strlen( $case['country'] . ' ' . $case['type'] . ' ' . $case['spelling'] ) + 2 );

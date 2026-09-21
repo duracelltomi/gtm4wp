@@ -13,9 +13,8 @@ import { panelComponent } from './panels';
 import { groupsWithFields } from '../utils';
 
 /**
- * Accessible name of a help link. The target is named rather than left as a
- * bare "Help", because a screen reader user listing the links on this screen
- * would otherwise hear the same word up to thirty times in a row.
+ * Accessible name of a help link: the target is named, so a screen reader
+ * listing the links does not hear "Help" thirty times.
  *
  * @param {string} name Label of the option, or title of the module.
  * @return {string} Translated link text.
@@ -104,15 +103,10 @@ export default function ModulePanel( {
 	onGroupSelect,
 	onChange,
 } ) {
-	// Brings the deep-linked field into view and hands it the keyboard focus, so
-	// arriving from a notice ends on the control rather than merely on the tab
-	// that holds it. A callback ref rather than an effect: it runs exactly when
-	// the node appears, which is also the only moment the tab switch has settled.
-	//
-	// Once only. The tint stays for as long as the deep link is live, but leaving
-	// the tab and coming back is the visitor moving around under their own steam
-	// and it must not yank the focus out from under them a second time. The flag
-	// lives here rather than in GroupFields, which is remounted per tab switch.
+	// Reveals and focuses the deep-linked field. A callback ref, not an
+	// effect: it runs exactly when the node appears, after the tab switch has
+	// settled. Once only (the flag lives here, GroupFields is remounted per
+	// tab): coming back to the tab must not yank the focus again.
 	const revealed = useRef( false );
 	const revealFocused = useCallback( ( node ) => {
 		if ( ! node || revealed.current ) {
@@ -121,8 +115,7 @@ export default function ModulePanel( {
 
 		revealed.current = true;
 
-		// Guarded because jsdom has no layout engine and therefore no
-		// scrollIntoView; the highlight and the focus below still assert.
+		// jsdom has no scrollIntoView.
 		if ( 'function' === typeof node.scrollIntoView ) {
 			node.scrollIntoView( { block: 'center' } );
 		}
@@ -134,16 +127,10 @@ export default function ModulePanel( {
 		}
 	}, [] );
 
-	// Keeps the selected tab inside the visible part of the tab strip. A module
-	// with more tabs than fit across the panel - Consent mode anywhere, any
-	// multi-tab module on a phone - scrolls its strip sideways, so a tab opened
-	// from a bookmark or an admin notice can start out beyond its edge: the
-	// panel below shows the right settings while the strip still appears to be
-	// on its first tab, with nothing marking where you actually are.
-	//
-	// The scroll offset is set directly rather than through scrollIntoView,
-	// which would also scroll the page vertically and undo the deep-link reveal
-	// above - that has just brought a field further down the page into view.
+	// Keeps the selected tab inside the visible part of a sideways-scrolling
+	// strip (a tab opened from a bookmark can start beyond its edge). The
+	// offset is set directly: scrollIntoView would also scroll vertically and
+	// undo the deep-link reveal above.
 	const tabStrip = useRef( null );
 
 	useEffect( () => {
@@ -161,15 +148,12 @@ export default function ModulePanel( {
 		const stripBox = strip.getBoundingClientRect();
 		const tabBox = selected.getBoundingClientRect();
 
-		// Centred where there is room; the browser clamps the first and last
-		// tab back to the respective end of the strip.
+		// Centred; the browser clamps the ends.
 		strip.scrollLeft +=
 			tabBox.left - stripBox.left - ( stripBox.width - tabBox.width ) / 2;
 	}, [ module.id, activeGroupId ] );
 
-	// One definition for both branches below: an unavailable module is exactly
-	// when its documentation is most worth reaching, because the panel says the
-	// module cannot run and the page says what it needs.
+	// Shared by both branches: an unavailable module's docs matter most.
 	const moduleDoc = (
 		<DocLink
 			className="gtm4wp-panel__doc"
@@ -214,16 +198,10 @@ export default function ModulePanel( {
 		</div>
 	);
 
-	// A module with a custom panel (a UI that is not a list of options, such
-	// as the service-account custody screen) renders it in place of its
-	// fields when it has none, and below them when it has both (the Data
-	// Manager destinations table with its test panel).
-	//
-	// Once such a module has tabs, "below them" is no longer a location: the
-	// panel is about one group's settings, so a schema names that group and the
-	// panel travels with its tab. Without it a Test button for destinations
-	// would keep sitting under the attribution-capture tab, which reads as a
-	// control belonging to whatever is on screen.
+	// A custom panel (service-account custody, the destinations test panel)
+	// renders in place of the fields when there are none, below them
+	// otherwise. With tabs, the schema names the panel's group so it travels
+	// with its tab instead of sitting under whatever tab is open.
 	const CustomPanel = module.panel ? panelComponent( module.panel ) : null;
 	const hasFields =
 		Array.isArray( module.fields ) && 0 < module.fields.length;
@@ -232,13 +210,11 @@ export default function ModulePanel( {
 	const customPanel = CustomPanel ? (
 		<div className="gtm4wp-panel__body">
 			<CustomPanel
-				// Remount per module so a panel's own state (its
-				// loaded list, a pending confirmation) never carries
-				// over to another module using the same component.
+				// Remount per module: a panel's own state never
+				// carries over.
 				key={ module.id }
 				data={ module.panelData || {} }
-				// The current editor state of this module's options, so a
-				// panel can act on unsaved rows (the per-row Test button).
+				// Unsaved editor state, for the per-row Test button.
 				values={ values }
 			/>
 		</div>
@@ -256,23 +232,19 @@ export default function ModulePanel( {
 	const groups = groupsWithFields( module );
 	const hasTabs = groups.length > 1;
 
-	// The panel goes inside a tab only when that tab is actually rendered.
-	// groupsWithFields() drops a group whose fields are all gone, so a panel
-	// naming one would otherwise disappear with it - it falls back to sitting
-	// below, which is where it lived before any of this.
+	// Inside a tab only when that tab is rendered (groupsWithFields() drops
+	// an empty group); otherwise it falls back to sitting below.
 	const panelInTab =
 		hasTabs && groups.some( ( group ) => group.id === panelGroup );
 
-	// Only honour a requested tab that still holds fields; an initialTabName
-	// TabPanel cannot match would leave it with nothing selected.
+	// An initialTabName TabPanel cannot match leaves nothing selected.
 	const initialTabName = groups.some(
 		( group ) => group.id === activeGroupId
 	)
 		? activeGroupId
 		: undefined;
 
-	// Single group: render its fields flat. No matching group at all: fall
-	// back to every field so nothing is silently dropped.
+	// Single group: flat. No matching group: every field, nothing dropped.
 	const flatFields = 1 === groups.length ? groups[ 0 ].fields : module.fields;
 
 	return (
@@ -282,15 +254,13 @@ export default function ModulePanel( {
 			{ hasTabs ? (
 				<div ref={ tabStrip }>
 					<TabPanel
-						// Remount per module so the selected tab never carries over
-						// to a module that has no such group.
+						// Remount per module: the selected tab never carries over.
 						key={ module.id }
 						className="gtm4wp-tabs"
 						initialTabName={ initialTabName }
 						onSelect={ onGroupSelect }
 						tabs={ groups.map( ( group ) => {
-							// Flag groups holding a rejected field so a hidden tab's
-							// error stays visible (dot) and announced (SR text).
+							// A hidden tab's error stays visible (dot) and announced.
 							const hasError = group.fields.some( ( field ) =>
 								Boolean( errors[ field.key ] )
 							);

@@ -38,13 +38,9 @@ function FieldLabel( { field } ) {
 }
 
 /**
- * Explains a control that is greyed out because of `depends_on`.
- *
- * The stored value is always shown as it is, so a setting saved as ON but
- * unable to run appears as a greyed-on control - which on its own reads as
- * "active, you just cannot change it here", the opposite of what is true. The
- * two states therefore get different sentences: one says the setting is not in
- * effect despite being on, the other says what to do first.
+ * Explains a control greyed out by `depends_on`: a setting saved ON but
+ * unable to run would otherwise read as active, so the two states get
+ * different sentences.
  *
  * @param {Object}  props           Component props.
  * @param {boolean} props.disabled  Whether the control is disabled by a dependency.
@@ -117,17 +113,9 @@ export default function FieldControl( {
 	allFields,
 	onChange,
 } ) {
-	// When a field declares `depends_on`, its control is disabled while the
-	// field it points at is off/empty (e.g. "Include parent categories"
-	// depends on "Category list"). The stored value is shown as-is (greyed),
-	// never forced off, so the display never disagrees with what would be
-	// saved, and re-satisfying the dependency does not appear to flip the
-	// setting on by itself. The frontend module still guards the value
-	// independently.
-	//
-	// Greying alone is not enough to be honest about it, though: a setting
-	// saved as ON that cannot run looks identical to one that is running, so
-	// the note below says which of the two it is.
+	// `depends_on`: disabled while the target is off/empty, stored value
+	// shown as-is (greyed, never forced off); the module still guards it.
+	// The note below says whether a greyed-on setting is in effect.
 	const disabled = isFieldDisabled( field, values );
 
 	const help = (
@@ -202,9 +190,7 @@ export default function FieldControl( {
 		case 'multiselect': {
 			const selected = Array.isArray( value ) ? value : [];
 
-			// Toggling always rewrites the WHOLE selection, so a choice in one
-			// section can never drop the choices of another: the sections are a
-			// rendering of one flat option value, not four values.
+			// Rewrites the WHOLE selection: the sections render one flat value.
 			const toggle = ( choiceValue, checked ) => {
 				const next = checked
 					? [ ...selected, choiceValue ]
@@ -234,8 +220,7 @@ export default function FieldControl( {
 					<legend className="gtm4wp-field-label">{ label }</legend>
 					{ help }
 					{ choiceSections( field ).map( ( section, index ) => {
-						// An unlabelled section is the whole list of a field that
-						// declares no sections - render it bare, exactly as before.
+						// No sections declared: render the list bare.
 						if ( '' === section.label ) {
 							return (
 								<Fragment key={ `section-${ index }` }>
@@ -249,8 +234,7 @@ export default function FieldControl( {
 								selected.includes( choiceValue )
 						).length;
 
-						// Open by default: collapsing is there to let somebody put
-						// a section away, not to hide options behind a click.
+						// Open by default: never hide options behind a click.
 						return (
 							<details
 								className="gtm4wp-multiselect__section"

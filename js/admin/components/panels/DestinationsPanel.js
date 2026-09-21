@@ -1,11 +1,8 @@
 /**
- * Data Manager destinations test panel, rendered below the destinations
- * table of the google-data-manager module.
- *
- * Lists the rows currently in the editor - saved or not - and probes each one
- * with the validateOnly test route, so a missing property grant or a typo'd
- * ID surfaces before anything is saved or sent. Also shows the stored health
- * record of a destination once real sends have run against it.
+ * Data Manager destinations test panel, below the destinations table: probes
+ * each editor row (saved or not) with the validateOnly test route, so a
+ * missing grant or a typo'd ID surfaces before anything is saved, and shows
+ * a destination's stored health record.
  */
 
 import apiFetch from '@wordpress/api-fetch';
@@ -15,8 +12,8 @@ import { __, sprintf } from '@wordpress/i18n';
 
 import SendLogList from './SendLogList';
 
-// Column keys of a destination row. They double as the parameter names of the
-// test route, which validates them server side against the same rules.
+// Column keys of a destination row, doubling as the test route's
+// parameter names.
 const COLUMN_ACCOUNT = 'service_account';
 const COLUMN_TYPE = 'type';
 const COLUMN_PROPERTY = 'property_id';
@@ -62,12 +59,10 @@ function rowName( row ) {
 }
 
 /**
- * The request body of a probe for one row. Its JSON form doubles as the
- * result's identity: a stored result is shown only while the row at that
- * index still probes the same values, so an edited row - or a different
- * row shifted into the index by a removal above - never wears another
- * probe's verdict, and never has its own failing-health warning hidden
- * behind one. The label is display-only and deliberately not part of it.
+ * The request body of a probe for one row. Its JSON form is the result's
+ * identity: a result shows only while the row at that index still probes
+ * the same values, so an edited or shifted row never wears another probe's
+ * verdict. The label is display-only and not part of it.
  *
  * @param {Object} row Destination row.
  * @return {Object} Probe payload.
@@ -85,10 +80,8 @@ export default function DestinationsPanel( { data, values } ) {
 	const { testPath, optionKey, health, threshold, logPath, replayPath } =
 		data;
 
-	// Whether any server-side send lane is on, read from the CURRENT editor
-	// state so switching the refund option hides or shows the log without a
-	// save. The lane option keys come from the server (panel_data) rather
-	// than being spelled out here, so the two ends cannot drift.
+	// Whether any send lane is on, from the CURRENT editor state (no save
+	// needed); the lane option keys come from the server (panel_data).
 	const sendingEnabled = ( data.sendKeys || [] ).some(
 		( key ) => !! ( values && values[ key ] )
 	);
@@ -108,15 +101,13 @@ export default function DestinationsPanel( { data, values } ) {
 	const [ busyIndex, setBusyIndex ] = useState( null );
 
 	const onTest = async ( row, index ) => {
-		// Handler-level twin of disabled={busy} - the ServiceAccountsPanel
-		// pattern: the disabled prop cannot be trusted across the supported
-		// WP range.
+		// Handler-level twin of disabled={busy} (ServiceAccountsPanel pattern).
 		if ( null !== busyIndex ) {
 			return;
 		}
 
 		// Captured at request time: the table stays editable while a probe is
-		// in flight, and the fingerprint decides which row may show the result.
+		// in flight.
 		const payload = probePayload( row );
 		const fingerprint = JSON.stringify( payload );
 
@@ -135,9 +126,8 @@ export default function DestinationsPanel( { data, values } ) {
 				data: payload,
 			} );
 
-			// Built before setResults so a malformed response (no envelope
-			// from a proxy or an exhausted worker) is a failure verdict here,
-			// not a TypeError inside React's render.
+			// A malformed response is a failure verdict, not a TypeError in
+			// render.
 			const verdict = {
 				ok: Boolean( response && response.ok ),
 				text: ( response && response.message ) || fallbackText,
@@ -181,9 +171,8 @@ export default function DestinationsPanel( { data, values } ) {
 		.map( ( row, index ) => ( { row, index } ) )
 		.filter( ( { row } ) => isTestable( row ) );
 
-	// The send log is shown even when no row is testable yet: its most useful
-	// entries are the ones that explain why nothing was sent, and "no
-	// destination configured" is one of them.
+	// Shown even with no testable row: "no destination configured" is one
+	// of the entries worth reading.
 	if ( 0 === testable.length ) {
 		return (
 			<SendLogList

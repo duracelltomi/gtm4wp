@@ -23,13 +23,10 @@ import {
 export default function App( { settings } ) {
 	const modules = settings.modules;
 
-	// Where on the screen we are: which module, which tab of it, and whether a
-	// deep link's highlight is still live. One object rather than three pieces
-	// of state because they always move together - every navigation decides all
-	// three - and because it is exactly what the location fragment encodes.
-	//
-	// Resolved once at mount: a `?gtm4wp-focus=<option key>` link from an admin
-	// notice first, then a `#module/tab` bookmark, then the first module.
+	// Position on the screen (module, tab, live deep-link highlight): one
+	// object because every navigation decides all three. Resolved once at
+	// mount: `?gtm4wp-focus=` link, then `#module/tab` bookmark, then the
+	// first module.
 	const [ position, setPosition ] = useState( () =>
 		openingPosition( modules, window.location, settings.focusArg )
 	);
@@ -47,13 +44,9 @@ export default function App( { settings } ) {
 		( module ) => module.id === position.moduleId
 	);
 
-	// Keep the address bar pointing at where we are, so the URL can be copied or
-	// bookmarked at any moment. replaceState, never pushState: the back button
-	// keeps meaning "leave this screen" rather than silently becoming a tab
-	// stepper, and nothing here needs a popstate handler to stay consistent.
-	//
-	// Only the fragment is rewritten, so `?page=…` (and the `gtm4wp-focus`
-	// argument that may have brought us here) is left exactly as it was.
+	// Keeps the address bar bookmarkable. replaceState, never pushState: the
+	// back button keeps meaning "leave this screen". Only the fragment is
+	// rewritten; the query string stays as it was.
 	useEffect( () => {
 		const hash = locationHash( position.moduleId, position.groupId );
 
@@ -68,12 +61,9 @@ export default function App( { settings } ) {
 	);
 	const isDirty = Object.keys( changed ).length > 0;
 
-	// Nothing on this screen is written until Save, and some edits look final
-	// enough to be mistaken for done - a removed table row above all, which now
-	// asks for confirmation and then still only changes the editor. So the
-	// browser asks before the tab carries the change away. Registered only
-	// while there is something to lose: a permanent handler would make every
-	// reload of an untouched screen prompt.
+	// Nothing is written until Save, and a removed table row looks final, so
+	// the browser asks before the tab is left. Registered only while there
+	// is something to lose.
 	useEffect( () => {
 		if ( ! isDirty ) {
 			return undefined;
@@ -82,8 +72,7 @@ export default function App( { settings } ) {
 		const warn = ( event ) => {
 			event.preventDefault();
 
-			// Browsers show their own wording and ignore ours; what they need
-			// is returnValue set. Kept for the ones that still read it.
+			// Browsers ignore the wording; returnValue is what they need.
 			event.returnValue = '';
 
 			return '';
@@ -113,8 +102,7 @@ export default function App( { settings } ) {
 		setValues( ( previous ) => ( { ...previous, [ key ]: next } ) );
 	};
 
-	// Picking a module opens it on its own first tab and drops any deep-link
-	// highlight: from here on the visitor is steering.
+	// Opens the module on its first tab and drops the deep-link highlight.
 	const onModuleSelect = ( moduleId ) => {
 		setPosition( {
 			moduleId,
@@ -125,15 +113,12 @@ export default function App( { settings } ) {
 		} );
 	};
 
-	// Reported by the tab bar. The highlight is deliberately kept: the linked
-	// field is still what the visitor came for, they have just looked elsewhere.
+	// From the tab bar; the deep-link highlight is deliberately kept.
 	const onGroupSelect = ( groupId ) => {
 		setPosition( ( previous ) => ( { ...previous, groupId } ) );
 	};
 
-	// After an import the server returns the freshly stored, sanitized values;
-	// adopt them as the new baseline so nothing shows up as unsaved and the
-	// panels reflect exactly what was persisted.
+	// After an import the server's stored values become the new baseline.
 	const onImported = ( serverValues ) => {
 		const next = buildValueMap( modules, serverValues );
 		setInitialValues( next );

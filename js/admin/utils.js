@@ -51,10 +51,8 @@ export function coerceValue( field, raw ) {
 }
 
 /**
- * Builds the option key => UI value map for every field of every module,
- * coercing each raw value into the shape its control expects. Used both for
- * the initial load (no overrides) and after an import, where the freshly
- * stored values returned by the server replace the current UI state.
+ * Builds the option key => coerced UI value map for every field of every
+ * module; `overrides` carries the freshly stored values after an import.
  *
  * @param {Array}  modules   Module descriptions from the bootstrap data.
  * @param {Object} overrides Optional option key => raw value map that takes
@@ -82,25 +80,15 @@ export function buildValueMap( modules, overrides = {} ) {
 
 /**
  * Splits a multiselect field's choices into the labelled sections its schema
- * declares (`field.sections`, from the Field's `choice_sections`), so a long
- * checkbox list can be rendered as several titled groups.
- *
- * The stored value is a flat list either way: sections are presentation only,
- * and a section carries choice KEYS, never labels, so the labels keep their
- * single definition in `field.choices`.
- *
- * Two rules exist so that no choice can disappear from the screen — an option an
- * admin cannot see is an option they cannot set, and nothing would report it:
- * a key no section claims is returned in a trailing unlabelled section, and a key
- * a section claims but `choices` does not define is skipped.
- *
- * Lives here rather than in FieldControl for the same reason `groupsWithFields`
- * does: it is arithmetic over the schema, and it is worth testing without a DOM.
+ * declares (`field.sections`, the Field's `choice_sections`). Presentation
+ * only: the stored value stays flat and a section carries choice KEYS, so
+ * labels keep their single definition in `field.choices`. No choice may
+ * disappear from the screen: an unclaimed key lands in a trailing unlabelled
+ * section, a claimed key `choices` does not define is skipped.
  *
  * @param {Object} field Field description from the bootstrap data.
  * @return {Array} `{ label, entries: [ [ value, label ], … ] }` list, in declared
- *                 order. Sections that end up empty are dropped; a field with no
- *                 sections yields a single unlabelled one holding every choice.
+ *                 order; empty sections dropped, no sections = one unlabelled.
  */
 export function choiceSections( field ) {
 	const choices = field && field.choices ? field.choices : {};
@@ -150,13 +138,9 @@ export function choiceSections( field ) {
 }
 
 /**
- * Whether an option value counts as set, for the purpose of a dependency.
- *
- * A plain truthiness test is wrong here and was wrong silently for a while: an
- * empty array is truthy in JavaScript, so a field depending on an emptied table
- * or multiselect stayed enabled while the thing it needs did not exist. Every
- * dependency predating the Data Manager pointed at a checkbox, where `false` is
- * falsy and the bug could not show.
+ * Whether an option value counts as set for a dependency. Not plain
+ * truthiness: an empty array is truthy, so a field depending on an emptied
+ * table or multiselect stayed enabled.
  *
  * @param {*} value The current UI value of the dependency.
  * @return {boolean} True when the dependency is satisfied.
@@ -174,14 +158,10 @@ function isValueSet( value ) {
 }
 
 /**
- * Whether a field's control should be disabled because the field it depends on
- * (`field.depends_on`, an option key) is currently off/empty. Fields without a
- * dependency are never disabled by this. Mirrors the per-column `depends_on`
- * handling in TableControl at the whole-field level.
- *
- * Admin affordance only, in both directions: the module still guards the value
- * itself at runtime, and the stored value is shown greyed rather than forced
- * off, so the screen never disagrees with what would be saved.
+ * Whether a field's control is disabled because its `depends_on` option is
+ * off/empty (the whole-field twin of TableControl's per-column handling).
+ * Admin affordance only: the module still guards at runtime, and the stored
+ * value is greyed, never forced off.
  *
  * @param {Object} field  Field description from the bootstrap data.
  * @param {Object} values Option key => current UI value map.
@@ -198,9 +178,8 @@ export function isFieldDisabled( field, values ) {
 }
 
 /**
- * The label of the field a field depends on, for explaining why a control is
- * disabled. A dependency often lives in another tab, so naming it is the only
- * way the message can point anywhere useful.
+ * The label of the field a field depends on, for the disabled explanation
+ * (the dependency often lives in another tab).
  *
  * @param {Object}   field     Field description from the bootstrap data.
  * @param {Object[]} allFields Every field of the module, across its groups.
@@ -221,11 +200,9 @@ export function dependencyLabel( field, allFields ) {
 }
 
 /**
- * Whether a table cell is read-only because its value is controlled outside the
- * settings screen — a `GTM4WP_HARDCODED_*` constant in wp-config.php fixing part
- * of the container setup. A locked row set locks every cell of the table: with
- * the row list itself decided by wp-config.php, an edit to any other cell has no
- * row of the admin's own left to be saved into.
+ * Whether a table cell is read-only because a `GTM4WP_HARDCODED_*` constant
+ * controls it. A locked row set locks every cell: no row of the admin's own
+ * is left to save into.
  *
  * @param {Object} field  Field description from the bootstrap data.
  * @param {Object} column Column description of that field.
@@ -277,18 +254,10 @@ export function changedValues( initialValues, currentValues ) {
 }
 
 /**
- * Resolves a deep link into the settings screen: `?<queryArg>=<option key>`,
- * where the query argument name is the one the server put in the bootstrap data
- * (`focusArg`), so the contract has a single definition on our side.
- *
- * The address is the option key alone. Which module and which group tab hold
- * that option is looked up here, in the schema the server just sent, so a link
- * printed in an admin notice or in the documentation keeps working when a field
- * is regrouped or moves to another module.
- *
- * Nothing from the URL is returned: the key is matched against the known fields
- * and it is the FIELD's own values that come back, so a hand-crafted URL can
- * only ever select an existing field or nothing at all.
+ * Resolves a deep link `?<queryArg>=<option key>` (the argument name comes
+ * from the bootstrap data, `focusArg`). The module and group are looked up in
+ * the schema, so a link survives a field moving. Nothing from the URL is
+ * returned: only an existing FIELD's own values, or null.
  *
  * @param {Array}  modules  Module descriptions from the bootstrap data.
  * @param {string} search   Query string, e.g. `window.location.search`.
@@ -327,13 +296,8 @@ export function focusTarget( modules, search, queryArg ) {
 }
 
 /**
- * The groups of a module that actually hold fields, each with its own fields
- * attached. Groups are declared independently of fields, so a declared group
- * can end up empty; those are dropped rather than shown as an empty tab.
- *
- * Lives here rather than in ModulePanel because the panel is not the only thing
- * that has to know which tab a module opens on - the URL does too, and two
- * copies of this arithmetic would disagree the first time either changed.
+ * The groups of a module that hold fields, with their fields attached; an
+ * empty declared group is dropped. Shared by ModulePanel and the URL logic.
  *
  * @param {Object} module Module description from the bootstrap data.
  * @return {Array} Groups holding at least one field, in declared order.
@@ -351,9 +315,8 @@ export function groupsWithFields( module ) {
 }
 
 /**
- * The group a module opens on, or null when it has no tab bar at all: a module
- * with a single populated group renders its fields flat, so naming that group
- * in the URL would promise a tab the screen does not have.
+ * The group a module opens on, or null when it has no tab bar (a single
+ * populated group renders flat).
  *
  * @param {Object} module Module description from the bootstrap data.
  * @return {?string} Group id, or null.
@@ -365,12 +328,9 @@ export function defaultGroupId( module ) {
 }
 
 /**
- * The location fragment for a position on the screen: `#<module>/<group>`, or
- * `#<module>` for a module with no tabs.
- *
- * A fragment rather than a query argument because this is in-page position, not
- * a request: it never reaches the server, and it cannot collide with anything
- * WordPress puts in the query string of its own admin URLs.
+ * The location fragment for a position on the screen: `#<module>/<group>`,
+ * or `#<module>` for a module with no tabs. A fragment, not a query argument:
+ * in-page position never reaches the server.
  *
  * @param {string}  moduleId Active module id.
  * @param {?string} groupId  Active group id, if the module has tabs.
@@ -386,13 +346,9 @@ export function locationHash( moduleId, groupId ) {
 }
 
 /**
- * Resolves a `#<module>/<group>` fragment back to a position on the screen.
- *
- * Every value returned comes from the schema, never from the fragment, so a
- * hand-edited URL can only ever name a real module and a real tab or be
- * rejected outright. A module that no longer exists yields null (open normally);
- * a group that no longer holds fields falls back to the module's own first tab,
- * because the module part of the bookmark is still good information.
+ * Resolves a `#<module>/<group>` fragment back to a position. Every value
+ * comes from the schema, never the fragment. An unknown module yields null;
+ * an unknown group falls back to the module's first tab.
  *
  * @param {Array}  modules Module descriptions from the bootstrap data.
  * @param {string} hash    Fragment, e.g. `window.location.hash`.
@@ -428,12 +384,8 @@ export function locationTarget( modules, hash ) {
 }
 
 /**
- * Where the screen opens, in precedence order: a `?gtm4wp-focus=` deep link
- * from an admin notice, then a `#module/tab` bookmark, then the first module.
- *
- * The notice wins because it was clicked deliberately and says something about
- * the site's current state, whereas a bookmark only says where somebody was
- * standing last time.
+ * Where the screen opens: a `?gtm4wp-focus=` deep link (clicked
+ * deliberately), then a `#module/tab` bookmark, then the first module.
  *
  * @param {Array}  modules  Module descriptions from the bootstrap data.
  * @param {Object} location Location-like object with `search` and `hash`.
@@ -512,10 +464,9 @@ export function stripTags( html ) {
 }
 
 /**
- * Builds the SelectControl option list for the Axeptio cookies-version field
- * from the versions fetched from the Axeptio project, keeping the currently
- * saved value representable even when the fetch fails or the version was
- * removed from the project (so a save never silently drops it).
+ * Builds the SelectControl options for the Axeptio cookies-version field,
+ * keeping the saved value representable when the fetch fails or the version
+ * was removed (so a save never drops it).
  *
  * @param {Array}  cookies          The `cookies` array of the Axeptio project JSON.
  * @param {string} currentValue     The currently saved cookies version.
@@ -555,8 +506,7 @@ export function axeptioVersionOptions(
 		} );
 	} );
 
-	// Preserve a saved value that is no longer published (or that could not be
-	// loaded) so submitting the form does not wipe it.
+	// A saved value no longer published (or not loaded) must survive a save.
 	if ( '' !== current && ! names.has( current ) ) {
 		options.push( { value: current, label: current } );
 	}

@@ -1,14 +1,8 @@
 /**
- * Cookies-version field for the Axeptio integration.
- *
- * The published versions of an Axeptio project cannot be known server side, so
- * the option list is fetched from the Axeptio project API using the Project ID
- * entered in the sibling field. When that list loads, the field is a dropdown;
- * when it cannot be loaded (no versions published, or the request is blocked by
- * a strict admin CSP / ad blocker / offline wp-admin), the field degrades to a
- * free-text input so the version can still be entered manually. The currently
- * saved value is always kept selectable (see axeptioVersionOptions) so a save
- * survives a failed fetch either way.
+ * Cookies-version field for the Axeptio integration: a dropdown of the
+ * versions fetched from the Axeptio project API by Project ID, degrading to
+ * a free-text input when the list cannot be loaded (none published, CSP, ad
+ * blocker, offline). The saved value is always kept selectable.
  */
 
 import { SelectControl, TextControl } from '@wordpress/components';
@@ -34,8 +28,7 @@ export default function AxeptioVersionControl( {
 	const [ fetchError, setFetchError ] = useState( '' );
 	const [ isLoading, setIsLoading ] = useState( false );
 
-	// Re-fetch whenever the Project ID changes. The saved value is merged into
-	// the option list at render time, so this effect only depends on projectId.
+	// Re-fetch on Project ID change; the saved value is merged at render.
 	useEffect( () => {
 		if ( '' === projectId ) {
 			setCookies( [] );
@@ -106,8 +99,7 @@ export default function AxeptioVersionControl( {
 		};
 	}, [ projectId ] );
 
-	// Fall back to manual entry once a Project ID is set but its version list
-	// could not be loaded, so a locked-down or offline admin is never stuck.
+	// Manual entry when a Project ID is set but its list could not load.
 	const manualEntry = '' !== projectId && ! isLoading && '' !== fetchError;
 
 	if ( manualEntry ) {

@@ -1,18 +1,8 @@
 /**
- * Navigation of the GTM4WP admin app on a phone.
- *
- * The left pane the desktop screen navigates with is a column of twelve items:
- * laid out above the panel on a narrow screen it fills the viewport, so every
- * visit starts by scrolling past the whole module list to reach the settings.
- * This renders the same navigation as a search field and a dropdown, and it is
- * the one that gets pinned to the top of the screen - it stays roughly one
- * control tall, which the left pane never could.
- *
- * Rendered next to `Sidebar` rather than instead of it, with the stylesheet
- * showing exactly one of the two: which navigation fits is a question about the
- * viewport, and a media query answers it without this screen having to watch
- * the window and re-render on resize. Only one is ever in the accessibility
- * tree, because the other is `display: none`.
+ * Navigation of the admin app on a phone: the left pane's module list as a
+ * search field and a dropdown, pinned to the top. Rendered next to `Sidebar`
+ * with the stylesheet showing exactly one (`display: none` keeps the other
+ * out of the accessibility tree), so nothing watches the window for resizes.
  */
 
 import { SearchControl, SelectControl } from '@wordpress/components';
@@ -32,10 +22,8 @@ export default function MobileNav( {
 		moduleMatchesSearch( module, search )
 	);
 
-	// The open module stays in the list even when the search term no longer
-	// matches it. A `select` whose value is not among its options shows blank in
-	// most browsers, so dropping it would leave the navigation claiming to be
-	// nowhere while the panel below it is plainly showing a module.
+	// The open module stays listed when the search no longer matches it: a
+	// `select` whose value is not an option shows blank.
 	const options = modules.filter(
 		( module ) =>
 			module.id === activeModuleId ||
@@ -72,9 +60,7 @@ export default function MobileNav( {
 				value={ activeModuleId }
 				options={ options.map( ( module ) => ( {
 					value: module.id,
-					// The left pane marks unsaved changes with a coloured dot
-					// and an `aria-label`; an option can hold neither, so the
-					// marker has to be part of the text itself.
+					// An option can hold no dot or `aria-label`: the marker is text.
 					label: dirtyModules.includes( module.id )
 						? sprintf(
 								/* translators: %s: name of a settings section. */
