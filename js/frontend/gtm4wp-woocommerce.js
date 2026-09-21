@@ -894,6 +894,13 @@ function gtm4wp_woocommerce_process_pages() {
 					'.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .product_type_bundle_input_required, .single_add_to_cart_button)'
 				)
 			) {
+				// A list add is reported on the click, and WooCommerce confirms
+				// it with the same wc-blocks_added_to_cart the product form's
+				// held-back event waits for. That confirmation carries no
+				// product, so a product-form add refused moments earlier would
+				// be released by this one and reported twice. The click here
+				// supersedes whatever was still waiting.
+				gtm4wp_clear_pending_block_add_to_cart();
 				gtm4wp_track_list_add_to_cart( event_target_element );
 			}
 

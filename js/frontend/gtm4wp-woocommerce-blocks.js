@@ -260,6 +260,15 @@ function gtm4wp_blocks_fetch_cart() {
 		.then( function ( response ) {
 			return response && response.ok ? response.json() : null;
 		} )
+		.then( function ( cart_data ) {
+			// A body that is not a cart is no reading, not an empty cart: an
+			// empty list diffed against the baseline would report every item
+			// as removed, and a lost request is meant to cost an event, never
+			// to invent one.
+			return cart_data && Array.isArray( cart_data.items )
+				? cart_data
+				: null;
+		} )
 		.catch( function () {
 			return null;
 		} );

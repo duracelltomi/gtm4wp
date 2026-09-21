@@ -2196,6 +2196,48 @@ describe( 'gtm4wp-woocommerce Interactivity API add_to_cart', () => {
 		);
 	} );
 
+	/**
+	 * The confirmation carries no product, so any producer's confirmation
+	 * inside the window releases whatever is held. The timeout case above is
+	 * only half the pin: a refused product-form add followed, within the
+	 * window, by a related-products add would be confirmed by THAT add and
+	 * reported twice - once for the grid product, once for the stale form.
+	 */
+	it( 'does not release a held-back form add when a list add is confirmed instead', () => {
+		const GRID_DATA = {
+			item_id: 77,
+			item_name: 'Related Product',
+			price: 9,
+		};
+
+		boot(
+			INTERACTIVE_FORM +
+				'<ul class="products"><li class="product">' +
+				'<a href="#" class="button add_to_cart_button ajax_add_to_cart product_type_simple">Add to cart</a>' +
+				'</li></ul>'
+		);
+		document
+			.querySelector( '.add_to_cart_button' )
+			.setAttribute(
+				'data-gtm4wp_product_data',
+				JSON.stringify( GRID_DATA )
+			);
+
+		clickAdd(); // the product form; suppose the store refuses this one
+		document
+			.querySelector( '.add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+		confirmAdd(); // WooCommerce confirming the grid add
+
+		const calls = addToCartCalls();
+		expect( calls ).toHaveLength( 1 );
+		expect( calls[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 77 } )
+		);
+	} );
+
 	it( 'still reports the classic form on the click, with no confirmation', () => {
 		boot( CLASSIC_FORM );
 
@@ -2382,6 +2424,85 @@ describe( 'gtm4wp-woocommerce Interactivity API variable product', () => {
 		boot();
 
 		clickAdd();
+		await settle();
+
+		expect( window.fetch ).not.toHaveBeenCalled();
+		expect( addToCartCalls() ).toHaveLength( 0 );
+	} );
+
+	/**
+	 * The error legs of the cart read, each asserted as the ABSENCE of a push
+	 * (TS-17 v3: this bundle is strict now, so "does not throw" would measure
+	 * the harness) - a lost or refused read costs the event, never invents one
+	 * (T95e / T55 parse-bail lesson).
+	 */
+	it.each( [
+		[ 'a rejected fetch', () => Promise.reject( new Error( 'offline' ) ) ],
+		[
+			'a refused response',
+			() =>
+				Promise.resolve( {
+					ok: false,
+					json: () => Promise.resolve( { items: [] } ),
+				} ),
+		],
+		[
+			'a body whose items are not a list',
+			() =>
+				Promise.resolve( {
+					ok: true,
+					json: () => Promise.resolve( { items: 'nope' } ),
+				} ),
+		],
+		[
+			'a cart line whose item does not parse',
+			() =>
+				Promise.resolve( {
+					ok: true,
+					json: () =>
+						Promise.resolve( {
+							items: [
+								{
+									key: 'abc',
+									id: 71,
+									quantity: 5,
+									extensions: {
+										gtm4wp: { item: '{ not json' },
+									},
+								},
+							],
+						} ),
+				} ),
+		],
+	] )( 'reports nothing on %s', async ( _label, fetchImpl ) => {
+		window.fetch = jest.fn( fetchImpl );
+		boot();
+
+		clickAdd();
+		confirmAdd();
+		await settle();
+
+		expect( addToCartCalls() ).toHaveLength( 0 );
+	} );
+
+	it( 'queues nothing for an interactive form whose variation is not chosen yet', async () => {
+		document.querySelector( '[name=variation_id]' ).value = '';
+		boot();
+
+		clickAdd();
+		confirmAdd();
+		await settle();
+
+		expect( window.fetch ).not.toHaveBeenCalled();
+		expect( addToCartCalls() ).toHaveLength( 0 );
+	} );
+
+	it( 'reads nothing when the page was never told where the cart is', async () => {
+		delete window.gtm4wp_store_api_cart_url;
+		boot();
+
+		clickAdd();
+		confirmAdd();
 		await settle();
 
 		expect( window.fetch ).not.toHaveBeenCalled();
