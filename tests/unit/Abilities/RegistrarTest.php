@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Abilities;
 
 use Brain\Monkey\Filters;
+use Brain\Monkey\Functions;
 use GTM4WP\Abilities\Registrar;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Abilities\StatusAbilities;
@@ -37,6 +38,7 @@ final class RegistrarTest extends AbilitiesTestCase {
 		SettingsAbilities::GET_SETTINGS,
 		StatusAbilities::GET_SITE_HEALTH,
 		StatusAbilities::GET_STATUS,
+		SettingsAbilities::UPDATE_SETTINGS,
 	);
 
 	protected function setUp(): void {
@@ -175,5 +177,72 @@ final class RegistrarTest extends AbilitiesTestCase {
 		( new Registrar( $this->registry() ) )->register_abilities();
 
 		$this->assertArrayHasKey( Abilities::GET_LOG, $this->registered, 'The built-in module opts in the same way a third party does; the Registrar names no module.' );
+	}
+
+	// ---- The write switch (TS-12: both halves of the gate) -----------------
+
+	public function test_the_write_switch_withholds_every_write_and_keeps_every_read(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE )->atLeast()->once()->with( true )->andReturn( false );
+
+		( new Registrar( $this->registry() ) )->register_abilities();
+
+		$this->assertArrayNotHasKey( SettingsAbilities::UPDATE_SETTINGS, $this->registered, 'A read-only site never lists the write, so a client cannot discover an ability it may not run.' );
+		$this->assertArrayHasKey( SettingsAbilities::GET_SETTINGS, $this->registered );
+		$this->assertArrayHasKey( StatusAbilities::GET_STATUS, $this->registered );
+		$this->assertNotEmpty( $this->registered );
+
+		// The generic half: whatever the catalogue grows to, nothing registered
+		// on a read-only site claims to write - a provider that forgets to check
+		// the switch fails here.
+		foreach ( $this->registered as $name => $args ) {
+			$this->assertTrue( $args['meta']['annotations']['readonly'], "$name is registered on a read-only site, so it must be a read." );
+		}
+	}
+
+	public function test_can_write_needs_the_switch_and_the_capability(): void {
+		Functions\expect( 'current_user_can' )->once()->with( 'manage_options' )->andReturn( true );
+
+		$this->assertTrue( Registrar::can_write(), 'Switch on (default) and capability held.' );
+	}
+
+	public function test_can_write_denies_a_user_without_the_capability_even_with_the_switch_on(): void {
+		Functions\expect( 'current_user_can' )->once()->with( 'manage_options' )->andReturn( false );
+
+		$this->assertFalse( Registrar::can_write() );
+	}
+
+	public function test_can_write_denies_when_the_switch_is_off_without_asking_for_the_capability(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE )->once()->with( true )->andReturn( false );
+		Functions\expect( 'current_user_can' )->never();
+
+		$this->assertFalse( Registrar::can_write() );
+	}
+
+	public function test_can_write_ignores_the_input_core_hands_over(): void {
+		Functions\expect( 'current_user_can' )->once()->with( 'manage_options' )->andReturn( true );
+
+		$this->assertTrue( call_user_func( array( Registrar::class, 'can_write' ), array( 'values' => array() ) ), 'Core passes the ability input; a TypeError here would deny every write.' );
+	}
+
+	public function test_a_write_run_after_the_switch_flipped_is_denied_and_refuses_with_403(): void {
+		// Registered while writes were allowed - the ability exists and a client
+		// may still hold its name - then the site turns writes off.
+		( new Registrar( $this->registry() ) )->register_abilities();
+		$this->assertArrayHasKey( SettingsAbilities::UPDATE_SETTINGS, $this->registered );
+
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
+
+		Filters\expectApplied( GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE )->atLeast()->once()->with( true )->andReturn( false );
+		Functions\when( 'current_user_can' )->justReturn( true );
+
+		$this->assertFalse( call_user_func( $this->registered[ SettingsAbilities::UPDATE_SETTINGS ]['permission_callback'], array() ), 'The permission callback core consults denies first.' );
+
+		$result = $this->execute( SettingsAbilities::UPDATE_SETTINGS, array( 'values' => array( GTM4WP_OPTION_DATALAYER_NAME => 'changed' ) ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_abilities_write_disabled', $result->get_error_code() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ], 'Nothing was written.' );
+		$this->assertSame( 0, $this->settings_writes() );
 	}
 }

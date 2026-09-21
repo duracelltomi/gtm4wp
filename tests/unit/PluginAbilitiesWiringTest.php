@@ -162,15 +162,23 @@ final class PluginAbilitiesWiringTest extends TestCase {
 				'gtm4wp/get-status',
 				'gtm4wp/get-site-health',
 				'gtm4wp/get-settings',
+				'gtm4wp/update-settings',
 				'gtm4wp/get-google-data-manager-log',
 			),
 			array_keys( $this->registered ),
-			'The phase 1 catalogue, in registration order.'
+			'The catalogue of phases 1 and 2, in registration order.'
 		);
 
 		foreach ( $this->registered as $name => $args ) {
 			$this->assertSame( Registrar::CATEGORY, $args['category'], $name );
-			$this->assertSame( array( Capability::class, 'can_manage_settings' ), $args['permission_callback'], "$name is gated at the attachment, not only in the provider's own test." );
+			$this->assertContains(
+				$args['permission_callback'],
+				array(
+					array( Capability::class, 'can_manage_settings' ),
+					array( Registrar::class, 'can_write' ),
+				),
+				"$name is gated at the attachment, not only in the provider's own test (ContractTest pins which gate each ability has)."
+			);
 		}
 	}
 

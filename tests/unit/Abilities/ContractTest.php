@@ -38,9 +38,18 @@ final class ContractTest extends AbilitiesTestCase {
 	);
 
 	/**
-	 * Abilities that change settings or contact Google. Empty in phase 1.
+	 * Abilities that change settings or contact Google, each with the
+	 * annotations it has to carry: destructive when the change can switch
+	 * tracking off site-wide, idempotent when repeating the same call changes
+	 * nothing further. An MCP client acts on these (it asks before a
+	 * destructive call), so they are pinned to behaviour here.
 	 */
-	private const WRITES = array();
+	private const WRITES = array(
+		SettingsAbilities::UPDATE_SETTINGS => array(
+			'destructive' => true,
+			'idempotent'  => true,
+		),
+	);
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -49,7 +58,7 @@ final class ContractTest extends AbilitiesTestCase {
 	}
 
 	public function test_the_catalogue_is_registered_exactly(): void {
-		$expected = array_merge( self::READS, self::WRITES );
+		$expected = array_merge( self::READS, array_keys( self::WRITES ) );
 		sort( $expected );
 
 		$actual = array_keys( $this->registered );
@@ -79,11 +88,19 @@ final class ContractTest extends AbilitiesTestCase {
 	}
 
 	public function test_every_ability_is_gated_on_the_settings_capability(): void {
-		foreach ( $this->registered as $name => $args ) {
+		foreach ( self::READS as $name ) {
 			$this->assertSame(
 				array( Capability::class, 'can_manage_settings' ),
-				$args['permission_callback'],
+				$this->registered[ $name ]['permission_callback'],
 				"$name is gated on the same capability as the settings screen."
+			);
+		}
+
+		foreach ( array_keys( self::WRITES ) as $name ) {
+			$this->assertSame(
+				array( Registrar::class, 'can_write' ),
+				$this->registered[ $name ]['permission_callback'],
+				"$name is gated on the write switch and, through it, on the same capability (RegistrarTest pins can_write() to both)."
 			);
 		}
 	}
@@ -135,8 +152,12 @@ final class ContractTest extends AbilitiesTestCase {
 			$this->assertTrue( $annotations['idempotent'], "$name is idempotent." );
 		}
 
-		foreach ( self::WRITES as $name ) {
-			$this->assertFalse( $this->registered[ $name ]['meta']['annotations']['readonly'], "$name is a write and must not claim to be read-only." );
+		foreach ( self::WRITES as $name => $expected ) {
+			$annotations = $this->registered[ $name ]['meta']['annotations'];
+
+			$this->assertFalse( $annotations['readonly'], "$name is a write and must not claim to be read-only." );
+			$this->assertSame( $expected['destructive'], $annotations['destructive'], "$name destructive" );
+			$this->assertSame( $expected['idempotent'], $annotations['idempotent'], "$name idempotent" );
 		}
 	}
 

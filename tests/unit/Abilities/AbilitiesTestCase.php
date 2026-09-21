@@ -137,6 +137,27 @@ abstract class AbilitiesTestCase extends TestCase {
 	}
 
 	/**
+	 * The settings row as the option table holds it now - what a write
+	 * ability left behind. The trait's table is private to this class, so a
+	 * subclass reads it through here.
+	 *
+	 * @return array<string, mixed>|null Null when no row exists.
+	 */
+	protected function stored_settings(): ?array {
+		return $this->options[ GTM4WP_OPTIONS ] ?? null;
+	}
+
+	/**
+	 * How many times the settings row was written (update_option() calls
+	 * for it), unchanged writes included.
+	 *
+	 * @return int
+	 */
+	protected function settings_writes(): int {
+		return count( array_filter( $this->option_writes, static fn ( array $write ): bool => GTM4WP_OPTIONS === $write['key'] ) );
+	}
+
+	/**
 	 * A registered ability's execute callback, run with the given input.
 	 *
 	 * @param string $name  Ability name.

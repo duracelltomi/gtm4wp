@@ -113,7 +113,13 @@ has widened this too. A field that passes (1) and fails (2) is a review lead, no
 finding. A write ability goes through the same `SettingsStore` sanitizers as the
 settings REST route and is rated exactly like that route; the
 `gtm4wp_abilities_allow_write` and `gtm4wp_abilities_enabled` filters are
-site-wide controls, never an authorization gate. The disclosure property is pinned
+site-wide controls, never an authorization gate, and the `expected_hash` stale
+guard of `update-settings` is a lost-update guard between two A4 writers, never a
+security control (an A4 who omits it overwrites what an A4 may overwrite). The
+confirmation protocol in a write's description and the `destructive` annotation
+are the delegate's leash, not ours: the site's protection against a wrong write is
+the same as against a wrong click on the settings screen, which is why a write
+ability never gets a lower gate than that screen. The disclosure property is pinned
 by the serialised-answer assertions in `tests/unit/Abilities/StatusAbilitiesTest.php`.
 
 ---

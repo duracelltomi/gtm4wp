@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Abilities;
 
+use GTM4WP\Capability;
 use GTM4WP\Module\AbilitiesInterface;
 use GTM4WP\Module\Registry;
 
@@ -37,7 +38,12 @@ defined( 'ABSPATH' ) || exit;
  * same switches. Every ability is gated on the settings capability. Two
  * filters let a site opt out: GTM4WP_WPFILTER_ABILITIES_ENABLED switches the
  * whole surface off, GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE keeps the
- * read-only abilities and withholds the ones that change anything.
+ * read-only abilities and withholds the ones that change anything. The
+ * write switch is enforced at both ends: a provider registers a write only
+ * while writes_allowed() says so, and every write names can_write() as its
+ * permission callback and refuses with write_disabled_error() when run
+ * after the switch flipped. ContractTest pins both for every write in the
+ * catalogue.
  */
 final class Registrar {
 
@@ -118,6 +124,40 @@ final class Registrar {
 		 * @param bool $allowed Default true.
 		 */
 		return (bool) apply_filters( GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE, true );
+	}
+
+	/**
+	 * The permission callback of every ability that changes something: the
+	 * write switch first (a filter that flipped since registration still
+	 * denies), then the same settings capability as the reads.
+	 *
+	 * Returns a bool and never a WP_Error on purpose: core discards a WP_Error
+	 * from a permission callback (it becomes a generic permission denial plus
+	 * a _doing_it_wrong() notice, U155), so the named refusal a client can act
+	 * on - gtm4wp_abilities_write_disabled, 403 - is issued by the write's
+	 * execute callback, which re-checks writes_allowed() itself. No parameter
+	 * declared, like Capability::can_manage_settings(): core hands the input
+	 * over and the decision never depends on it.
+	 *
+	 * @return bool
+	 */
+	public static function can_write(): bool {
+		return self::writes_allowed() && Capability::can_manage_settings();
+	}
+
+	/**
+	 * The refusal a write ability returns when it runs while writes are
+	 * switched off: one definition, so every write refuses with the same
+	 * stable code and status.
+	 *
+	 * @return \WP_Error
+	 */
+	public static function write_disabled_error(): \WP_Error {
+		return new \WP_Error(
+			'gtm4wp_abilities_write_disabled',
+			__( 'Changing settings through the Abilities API is switched off on this site (gtm4wp_abilities_allow_write).', 'duracelltomi-google-tag-manager' ),
+			array( 'status' => 403 )
+		);
 	}
 
 	/**

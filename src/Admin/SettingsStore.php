@@ -85,6 +85,20 @@ final class SettingsStore {
 	}
 
 	/**
+	 * A fingerprint of the stored option row as it is right now: the same
+	 * value for the same row, a different one after any write to it, whoever
+	 * made it (the settings screen, an import, an assistant). A writer that
+	 * read the settings first sends it back as its expectation, so two editors
+	 * cannot overwrite each other without noticing - a lost-update guard, not
+	 * an authorization control.
+	 *
+	 * @return string 32 hex characters.
+	 */
+	public function values_hash(): string {
+		return md5( (string) wp_json_encode( $this->stored_row() ) );
+	}
+
+	/**
 	 * The values the settings screen renders: the current values with the
 	 * container rows replaced by the ones actually loaded under a
 	 * GTM4WP_HARDCODED_* constant (recomputed here, since the Options service

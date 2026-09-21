@@ -118,6 +118,35 @@ final class SettingsStoreTest extends TestCase {
 		$this->assertSame( '', $this->options[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_DATALAYER_NAME ], 'A key missing from the input falls back to its default, not to the old value.' );
 	}
 
+	public function test_values_hash_is_a_function_of_the_stored_row_alone(): void {
+		$this->options[ GTM4WP_OPTIONS ] = array( GTM4WP_OPTION_DATALAYER_NAME => 'one' );
+
+		$one = $this->store()->values_hash();
+
+		$this->assertMatchesRegularExpression( '/^[0-9a-f]{32}$/', $one );
+		$this->assertSame( $one, $this->store()->values_hash(), 'Stable while the row is.' );
+
+		$this->store()->save( array( GTM4WP_OPTION_DATALAYER_NAME => 'two' ) );
+
+		$this->assertNotSame( $one, $this->store()->values_hash(), 'Any write to the row changes it.' );
+
+		$this->options[ GTM4WP_OPTIONS ] = array( GTM4WP_OPTION_DATALAYER_NAME => 'one' );
+
+		$this->assertSame( $one, $this->store()->values_hash(), 'The same row gives the same hash, whoever wrote it and whenever.' );
+	}
+
+	public function test_values_hash_is_defined_for_a_missing_row(): void {
+		unset( $this->options[ GTM4WP_OPTIONS ] );
+
+		$missing = $this->store()->values_hash();
+
+		$this->assertMatchesRegularExpression( '/^[0-9a-f]{32}$/', $missing );
+
+		$this->options[ GTM4WP_OPTIONS ] = array( GTM4WP_OPTION_LOADEARLY => true );
+
+		$this->assertNotSame( $missing, $this->store()->values_hash(), 'A fresh install and a configured one never share a hash.' );
+	}
+
 	public function test_decode_import_refuses_an_empty_payload(): void {
 		$result = $this->store()->decode_import( '' );
 
