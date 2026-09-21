@@ -10,20 +10,29 @@ namespace GTM4WP\Tests\unit\Abilities;
 use GTM4WP\Abilities\StatusAbilities;
 use GTM4WP\Admin\ConfigurationChecks;
 use GTM4WP\Google\KeyVault;
+use GTM4WP\Module\Registry;
 use GTM4WP\Modules\Container\ContainerRows;
+use GTM4WP\Modules\Container\StatusReport;
 use GTM4WP\Modules\GoogleDataManager\CaptureStats;
 use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Modules\GoogleDataManager\SiteHealth;
+use GTM4WP\Options\Options;
+use GTM4WP\Tests\unit\Admin\UndocumentedThirdPartyModule;
 use GTM4WP\Tests\unit\Google\KeyFileFixture;
 
 /**
  * The gtm4wp/get-status ability is the first thing an assistant calls, so its shape is
- * pinned field by field; gtm4wp/get-site-health is the one whose output goes
- * verbatim into a transcript on somebody else's servers, so what is NOT in it
- * is the property worth pinning (TS-2 both directions, over the whole
- * serialised answer rather than field by field, so a row added later is
- * caught by the same test).
+ * pinned field by field - except the Container module's slice, which is
+ * pinned where the module builds it (ContainerStatusReportTest) and only
+ * checked here for arriving intact. The per-module rows are the ability's
+ * own: they come from the registry walk over StatusInfoInterface, so a
+ * third-party module gets the same treatment as a built-in one.
+ * gtm4wp/get-site-health is the one whose output goes verbatim into a
+ * transcript on somebody else's servers, so what is NOT in it is the
+ * property worth pinning (TS-2 both directions, over the whole serialised
+ * answer rather than field by field, so a row added later is caught by the
+ * same test).
  */
 final class StatusAbilitiesTest extends AbilitiesTestCase {
 
@@ -45,12 +54,33 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->health = new DestinationHealth( static fn () => self::NOW );
 		$this->stats  = new CaptureStats( static fn () => self::NOW );
 
+		StatusReportingThirdPartySchema::$received = null;
+
 		( new StatusAbilities( $this->registry(), $this->vault, $this->health, $this->stats ) )->register();
+	}
+
+	/**
+	 * The status of a registry holding the given modules only.
+	 *
+	 * @param array<int, object> $modules Modules to register.
+	 * @return array<string, mixed>
+	 */
+	private function status_over( array $modules ): array {
+		$registry = new Registry();
+
+		foreach ( $modules as $module ) {
+			$registry->add( $module );
+		}
+
+		$this->registered = array();
+		( new StatusAbilities( $registry, $this->vault, $this->health, $this->stats ) )->register();
+
+		return $this->execute( StatusAbilities::GET_STATUS );
 	}
 
 	// ---- get-status --------------------------------------------------------
 
-	public function test_the_status_reports_the_containers_as_loaded(): void {
+	public function test_the_status_carries_the_container_modules_report_intact(): void {
 		$this->store_settings(
 			array(
 				GTM4WP_OPTION_GTM_CONTAINERS => array(
@@ -58,41 +88,31 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 						ContainerRows::COLUMN_ID      => 'GTM-ABC123',
 						ContainerRows::COLUMN_AUTH    => 'auth-token',
 						ContainerRows::COLUMN_PREVIEW => 'env-3',
-						ContainerRows::COLUMN_DOMAIN  => 'gtm.example.com',
-						ContainerRows::COLUMN_PATH    => 'loader.js',
-						ContainerRows::COLUMN_NO_ID   => '1',
 					),
-					array( ContainerRows::COLUMN_ID => 'GTM-DEF456' ),
 				),
+				GTM4WP_OPTION_GTM_PLACEMENT  => GTM4WP_PLACEMENT_BODYOPEN,
+				GTM4WP_OPTION_DATALAYER_NAME => 'my-layer',
 			)
 		);
 
 		$status = $this->execute( StatusAbilities::GET_STATUS );
+		$report = ( new StatusReport( new Options( $this->registry()->defaults() ) ) )->report();
 
 		$this->assertSame( GTM4WP_VERSION, $status['plugin_version'] );
+		$this->assertSame( $report, array_intersect_key( $status, $report ), 'The module\'s report arrives as the module built it - nothing added, nothing reshaped.' );
 		$this->assertSame(
-			array(
-				array(
-					'id'          => 'GTM-ABC123',
-					'environment' => true,
-					'domain'      => 'gtm.example.com',
-					'path'        => 'loader.js',
-					'omit_id'     => true,
-				),
-				array(
-					'id'          => 'GTM-DEF456',
-					'environment' => false,
-					'domain'      => '',
-					'path'        => '',
-					'omit_id'     => false,
-				),
-			),
-			$status['containers']
+			array( 'plugin_version', 'containers', 'placement', 'container_code_output', 'datalayer_name', 'hardcoded', 'modules', 'problems' ),
+			array_keys( $status ),
+			'The key order of the contract.'
 		);
 		$this->assertStringNotContainsString( 'auth-token', (string) json_encode( $status ), 'The environment parameters travel to the browser in the loader URL, but an assistant only needs to know they are set.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	}
 
-	public function test_the_status_reports_the_placement_and_whether_the_container_code_is_emitted(): void {
+	public function test_the_placement_enum_of_the_schema_is_the_modules(): void {
+		$this->assertSame( StatusReport::PLACEMENTS, $this->registered[ StatusAbilities::GET_STATUS ]['output_schema']['properties']['placement']['enum'], 'One definition: the module names the words, the schema declares them.' );
+	}
+
+	public function test_placement_off_is_not_reported_as_a_missing_container_problem(): void {
 		$this->store_settings(
 			array(
 				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
@@ -107,42 +127,7 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( array(), $status['problems'], 'Placement off is the deliberate data-layer-only setup: no container ID is not a problem there.' );
 	}
 
-	/**
-	 * One placement, one word.
-	 *
-	 * @param int    $stored   The stored placement.
-	 * @param string $expected The word.
-	 */
-	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_placements' )]
-	public function test_every_placement_has_a_word( int $stored, string $expected ): void {
-		$this->store_settings(
-			array(
-				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
-				GTM4WP_OPTION_GTM_PLACEMENT  => $stored,
-			)
-		);
-
-		$status = $this->execute( StatusAbilities::GET_STATUS );
-
-		$this->assertSame( $expected, $status['placement'] );
-		$this->assertSame( 'off' !== $expected, $status['container_code_output'] );
-	}
-
-	/**
-	 * Every placement value with its word.
-	 *
-	 * @return array<string, array{0: int, 1: string}>
-	 */
-	public static function provide_placements(): array {
-		return array(
-			'footer'         => array( GTM4WP_PLACEMENT_FOOTER, 'footer' ),
-			'body open'      => array( GTM4WP_PLACEMENT_BODYOPEN, 'body_open_manual' ),
-			'body open auto' => array( GTM4WP_PLACEMENT_BODYOPEN_AUTO, 'body_open_auto' ),
-			'off'            => array( GTM4WP_PLACEMENT_OFF, 'off' ),
-		);
-	}
-
-	public function test_the_status_names_an_unusable_data_layer_name_and_the_fallback(): void {
+	public function test_an_unusable_data_layer_name_is_also_a_reported_problem(): void {
 		$this->store_settings(
 			array(
 				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
@@ -152,33 +137,14 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 
 		$status = $this->execute( StatusAbilities::GET_STATUS );
 
-		$this->assertSame(
-			array(
-				'configured' => 'my-layer',
-				'effective'  => 'dataLayer',
-				'valid'      => false,
-			),
-			$status['datalayer_name']
-		);
-
-		$codes = array_column( $status['problems'], 'code' );
-		$this->assertContains( ConfigurationChecks::CODE_INVALID_DATALAYER_NAME, $codes, 'The same problem the admin notice reports.' );
+		$this->assertFalse( $status['datalayer_name']['valid'] );
+		$this->assertContains( ConfigurationChecks::CODE_INVALID_DATALAYER_NAME, array_column( $status['problems'], 'code' ), 'The same problem the admin notice reports.' );
 	}
 
-	public function test_a_usable_data_layer_name_is_valid_and_empty_means_the_default(): void {
+	public function test_a_clean_setup_reports_no_problem(): void {
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
 
-		$status = $this->execute( StatusAbilities::GET_STATUS );
-
-		$this->assertSame(
-			array(
-				'configured' => '',
-				'effective'  => 'dataLayer',
-				'valid'      => true,
-			),
-			$status['datalayer_name']
-		);
-		$this->assertSame( array(), $status['problems'] );
+		$this->assertSame( array(), $this->execute( StatusAbilities::GET_STATUS )['problems'] );
 	}
 
 	public function test_the_status_reports_the_problems_the_notices_report(): void {
@@ -194,7 +160,7 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertNotSame( '', $problems[0]['message'] );
 	}
 
-	public function test_the_status_lists_every_module_with_its_master_switch(): void {
+	public function test_the_status_lists_every_module_with_what_its_schema_reports(): void {
 		$this->store_settings(
 			array(
 				GTM4WP_OPTION_GTM_CONTAINERS             => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
@@ -205,54 +171,72 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$modules = array_column( $this->execute( StatusAbilities::GET_STATUS )['modules'], null, 'id' );
 
 		$this->assertSame( array_keys( $this->registry()->all() ), array_keys( $modules ), 'Every registered module, in registry order.' );
+		$this->assertSame( array( 'id', 'title', 'available', 'enabled', 'integration' ), array_keys( $modules['container'] ) );
 		$this->assertNull( $modules['container']['enabled'], 'A module with no single switch reports null, not false.' );
+		$this->assertNull( $modules['container']['integration'], 'A module integrating nothing reports null, not an inactive entry.' );
 		$this->assertTrue( $modules['woocommerce']['enabled'] );
 		$this->assertFalse( $modules['woocommerce']['available'], 'No WooCommerce in this process.' );
 		$this->assertFalse( $modules['edd']['enabled'] );
+		$this->assertFalse( $modules['contact-form-7']['enabled'] );
 		$this->assertNotSame( '', $modules['woocommerce']['title'] );
 	}
 
 	/**
-	 * The integrations are read from the plugins' version constants, which are
-	 * process-global: the EDD and WooCommerce stub files of other suites define
-	 * them, so under a random order any of the three may be "present" here.
-	 * What is pinned is therefore the mapping - active exactly when the constant
-	 * is defined, the version exactly its value, null otherwise - against the
+	 * The host plugins' version constants are process-global: the EDD and
+	 * WooCommerce stub files of other suites define them, so under a random
+	 * order any of the three may be "present" here. What is pinned is the
+	 * mapping the schemas promise - active exactly when the constant is
+	 * defined, the version exactly its value, null otherwise - against the
 	 * process state at the time of the call (TS-16).
 	 */
-	public function test_the_status_reports_each_integration_from_its_version_constant(): void {
+	public function test_the_integrating_modules_report_their_host_plugin_in_their_own_row(): void {
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
 
-		$integrations = $this->execute( StatusAbilities::GET_STATUS )['integrations'];
+		$modules = array_column( $this->execute( StatusAbilities::GET_STATUS )['modules'], 'integration', 'id' );
 
 		$constants = array(
-			'woocommerce'            => 'WC_VERSION',
-			'easy_digital_downloads' => 'EDD_VERSION',
-			'contact_form_7'         => 'WPCF7_VERSION',
+			'woocommerce'    => 'WC_VERSION',
+			'edd'            => 'EDD_VERSION',
+			'contact-form-7' => 'WPCF7_VERSION',
 		);
 
-		$this->assertSame( array_keys( $constants ), array_keys( $integrations ) );
-
-		foreach ( $constants as $integration => $constant ) {
+		foreach ( $constants as $module_id => $constant ) {
 			$defined = defined( $constant );
 
-			$this->assertSame( $defined, $integrations[ $integration ]['active'], $integration );
-			$this->assertSame( $defined ? (string) constant( $constant ) : null, $integrations[ $integration ]['version'], $integration );
+			$this->assertSame( array( 'active', 'version' ), array_keys( $modules[ $module_id ] ), $module_id );
+			$this->assertSame( $defined, $modules[ $module_id ]['active'], $module_id );
+			$this->assertSame( $defined ? (string) constant( $constant ) : null, $modules[ $module_id ]['version'], $module_id );
 		}
 	}
 
-	public function test_the_status_reports_no_hardcoded_override_when_no_constant_is_defined(): void {
-		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
+	public function test_a_third_party_module_whose_schema_opts_in_reports_its_switch_and_host(): void {
+		$this->store_settings( array( 'acme-status-switch' => true ) );
 
+		$rows = array_column( $this->status_over( array( new StatusReportingThirdPartyModule() ) )['modules'], null, 'id' );
+
+		$this->assertSame( array( 'acme-status' ), array_keys( $rows ) );
+		$this->assertTrue( $rows['acme-status']['enabled'], 'The switch state the schema read from the options it was given.' );
 		$this->assertSame(
 			array(
-				'active'         => false,
-				'locked_columns' => array(),
-				'locked_rows'    => false,
-				'errors'         => array(),
+				'active'  => true,
+				'version' => '9.9.0',
 			),
-			$this->execute( StatusAbilities::GET_STATUS )['hardcoded']
+			$rows['acme-status']['integration']
 		);
+		$this->assertInstanceOf( Options::class, StatusReportingThirdPartySchema::$received );
+		$this->assertTrue( StatusReportingThirdPartySchema::$received->get( 'acme-status-switch' ), 'The schema reads the fresh Options service the ability built, so it sees the stored value merged over its own default.' );
+	}
+
+	public function test_a_third_party_module_without_the_interface_reports_unknown_not_off(): void {
+		$rows = array_column( $this->status_over( array( new UndocumentedThirdPartyModule() ) )['modules'], null, 'id' );
+
+		// The same guarantee the settings page and Site Health give an old
+		// third party schema: instanceof, never a method call that would fatal.
+		$this->assertSame( array( 'third-party' ), array_keys( $rows ) );
+		$this->assertSame( 'Third party', $rows['third-party']['title'] );
+		$this->assertTrue( $rows['third-party']['available'] );
+		$this->assertNull( $rows['third-party']['enabled'] );
+		$this->assertNull( $rows['third-party']['integration'] );
 	}
 
 	// ---- get-site-health ---------------------------------------------------

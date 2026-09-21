@@ -15,8 +15,8 @@ use GTM4WP\Admin\SiteHealthInfo;
 use GTM4WP\Capability;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Module\Registry;
-use GTM4WP\Modules\Container\ContainerRows;
-use GTM4WP\Modules\Container\HardcodedContainers;
+use GTM4WP\Module\StatusInfoInterface;
+use GTM4WP\Modules\Container\StatusReport;
 use GTM4WP\Modules\GoogleDataManager\CaptureStats;
 use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
 use GTM4WP\Modules\GoogleDataManager\SiteHealth;
@@ -31,6 +31,12 @@ defined( 'ABSPATH' ) || exit;
  * Both are read-only and both answer from the option row afresh (a new
  * Options service per call, never the request-scoped one), so a change made
  * earlier in the same session is reflected.
+ *
+ * Both are thin adapters. Every module-specific part of the answer comes
+ * from the module that owns the fact: the Container module's StatusReport,
+ * each schema's StatusInfoInterface (master switch, host plugin), the Data
+ * Manager's SiteHealth and the SiteHealthInfo collector. This class
+ * assembles; it keeps no per-module list of its own.
  *
  * ⛔ **What may not appear in the output.** Everything an ability returns
  * ends up in an AI assistant's transcript, on somebody else's servers. The
@@ -72,7 +78,7 @@ final class StatusAbilities implements ProviderInterface {
 			self::GET_STATUS,
 			array(
 				'label'               => __( 'Get the Google Tag Manager status', 'duracelltomi-google-tag-manager' ),
-				'description'         => __( 'Call this first. Reports what Google Tag Manager for WordPress loads on this site and what is wrong with it: the plugin version, every container that loads (with the wp-config.php overrides applied), where the container code is placed, the data layer variable name, which modules are available and switched on, which supported plugins are installed, and the configuration problems the plugin reports as admin notices. Read-only. Use gtm4wp/get-settings for option values and gtm4wp/get-site-health for the Site Health state.', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Call this first. Reports what Google Tag Manager for WordPress loads on this site and what is wrong with it: the plugin version, every container that loads (with the wp-config.php overrides applied), where the container code is placed, the data layer variable name, which modules are available and switched on (and, for a module that integrates another plugin, whether that plugin is installed and in which version), and the configuration problems the plugin reports as admin notices. Read-only. Use gtm4wp/get-settings for option values and gtm4wp/get-site-health for the Site Health state.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
 				'input_schema'        => self::no_input_schema(),
 				'output_schema'       => array(
@@ -98,7 +104,7 @@ final class StatusAbilities implements ProviderInterface {
 						),
 						'placement'             => array(
 							'type' => 'string',
-							'enum' => array( 'footer', 'body_open_manual', 'body_open_auto', 'off' ),
+							'enum' => StatusReport::PLACEMENTS,
 						),
 						'container_code_output' => array(
 							'type'        => 'boolean',
@@ -134,22 +140,15 @@ final class StatusAbilities implements ProviderInterface {
 							'items' => array(
 								'type'       => 'object',
 								'properties' => array(
-									'id'        => array( 'type' => 'string' ),
-									'title'     => array( 'type' => 'string' ),
-									'available' => array( 'type' => 'boolean' ),
-									'enabled'   => array(
+									'id'          => array( 'type' => 'string' ),
+									'title'       => array( 'type' => 'string' ),
+									'available'   => array( 'type' => 'boolean' ),
+									'enabled'     => array(
 										'type'        => array( 'boolean', 'null' ),
 										'description' => 'The module\'s master switch, or null for a module that has none.',
 									),
+									'integration' => self::integration_schema(),
 								),
-							),
-						),
-						'integrations'          => array(
-							'type'       => 'object',
-							'properties' => array(
-								'woocommerce'            => self::integration_schema(),
-								'easy_digital_downloads' => self::integration_schema(),
-								'contact_form_7'         => self::integration_schema(),
 							),
 						),
 						'problems'              => array(
@@ -232,47 +231,13 @@ final class StatusAbilities implements ProviderInterface {
 	public function get_status(): array {
 		$options = $this->options();
 
-		$rows       = ContainerRows::normalize( $options->get( GTM4WP_OPTION_GTM_CONTAINERS ) );
-		$containers = array();
-
-		foreach ( $rows as $row ) {
-			$containers[] = array(
-				'id'          => $row[ ContainerRows::COLUMN_ID ],
-				'environment' => ( '' !== $row[ ContainerRows::COLUMN_AUTH ] ) && ( '' !== $row[ ContainerRows::COLUMN_PREVIEW ] ),
-				'domain'      => $row[ ContainerRows::COLUMN_DOMAIN ],
-				'path'        => $row[ ContainerRows::COLUMN_PATH ],
-				'omit_id'     => ( '' !== $row[ ContainerRows::COLUMN_NO_ID ] ) && ( '0' !== $row[ ContainerRows::COLUMN_NO_ID ] ),
-			);
-		}
-
-		$placement  = self::placement_name( $options->get( GTM4WP_OPTION_GTM_PLACEMENT ) );
-		$configured = trim( (string) $options->get( GTM4WP_OPTION_DATALAYER_NAME ) );
-		$effective  = ContainerRows::datalayer_name( $configured );
-		$locks      = HardcodedContainers::locks();
-
-		return array(
-			'plugin_version'        => defined( 'GTM4WP_VERSION' ) ? (string) GTM4WP_VERSION : '',
-			'containers'            => $containers,
-			'placement'             => $placement,
-			'container_code_output' => 'off' !== $placement,
-			'datalayer_name'        => array(
-				'configured' => $configured,
-				'effective'  => $effective,
-				'valid'      => ( '' === $configured ) || ( $configured === $effective ),
-			),
-			'hardcoded'             => array(
-				'active'         => array() !== $locks['columns'],
-				'locked_columns' => array_keys( $locks['columns'] ),
-				'locked_rows'    => array() !== $locks['rows'],
-				'errors'         => $options->hardcoded_errors(),
-			),
-			'modules'               => $this->modules( $options ),
-			'integrations'          => array(
-				'woocommerce'            => self::integration( 'WC_VERSION' ),
-				'easy_digital_downloads' => self::integration( 'EDD_VERSION' ),
-				'contact_form_7'         => self::integration( 'WPCF7_VERSION' ),
-			),
-			'problems'              => ( new ConfigurationChecks( $options ) )->problems(),
+		return array_merge(
+			array( 'plugin_version' => defined( 'GTM4WP_VERSION' ) ? (string) GTM4WP_VERSION : '' ),
+			( new StatusReport( $options ) )->report(),
+			array(
+				'modules'  => $this->modules( $options ),
+				'problems' => ( new ConfigurationChecks( $options ) )->problems(),
+			)
 		);
 	}
 
@@ -339,32 +304,30 @@ final class StatusAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * One row per registered module: whether it can run here and whether its
-	 * master switch is on, for the modules that have one.
+	 * One row per registered module: whether it can run here, and what the
+	 * module says about its master switch and its host plugin through
+	 * StatusInfoInterface. A module that says nothing reports null for both.
 	 *
 	 * @param Options $options The plugin options service.
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function modules( Options $options ): array {
-		$master_switches = array(
-			'woocommerce'    => GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE,
-			'edd'            => GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE,
-			'contact-form-7' => GTM4WP_OPTION_INTEGRATE_WPCF7,
-		);
-
 		$rows = array();
 
 		foreach ( $this->registry->all() as $module ) {
 			$schema_class = $module->admin_schema();
-			$title        = class_exists( $schema_class ) ? (string) ( new $schema_class() )->title() : $module->id();
+			$schema       = class_exists( $schema_class ) ? new $schema_class() : null;
+
+			// instanceof, not method_exists(): a schema predating the interface
+			// is a module with nothing to add, not an error.
+			$info = $schema instanceof StatusInfoInterface ? $schema->status_info( $options ) : array();
 
 			$rows[] = array(
-				'id'        => $module->id(),
-				'title'     => $title,
-				'available' => $module->is_available(),
-				'enabled'   => isset( $master_switches[ $module->id() ] )
-					? (bool) $options->get( $master_switches[ $module->id() ] )
-					: null,
+				'id'          => $module->id(),
+				'title'       => null !== $schema ? (string) $schema->title() : $module->id(),
+				'available'   => $module->is_available(),
+				'enabled'     => isset( $info['enabled'] ) && is_bool( $info['enabled'] ) ? $info['enabled'] : null,
+				'integration' => self::integration( $info['integration'] ?? null ),
 			);
 		}
 
@@ -372,48 +335,33 @@ final class StatusAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * Whether a supported plugin is present, and its version.
+	 * A module's host-plugin entry in the shape the schema promises, or null
+	 * for a module that integrates nothing.
 	 *
-	 * @param string $version_constant The plugin's version constant.
-	 * @return array{active: bool, version: string|null}
+	 * @param mixed $integration What the schema reported.
+	 * @return array{active: bool, version: string|null}|null
 	 */
-	private static function integration( string $version_constant ): array {
-		$active = defined( $version_constant );
+	private static function integration( $integration ): ?array {
+		if ( ! is_array( $integration ) ) {
+			return null;
+		}
 
 		return array(
-			'active'  => $active,
-			'version' => $active ? (string) constant( $version_constant ) : null,
+			'active'  => ! empty( $integration['active'] ),
+			'version' => isset( $integration['version'] ) ? (string) $integration['version'] : null,
 		);
 	}
 
 	/**
-	 * The placement option as a word.
-	 *
-	 * @param mixed $stored The stored placement value.
-	 * @return string
-	 */
-	private static function placement_name( $stored ): string {
-		switch ( (int) $stored ) {
-			case GTM4WP_PLACEMENT_OFF:
-				return 'off';
-			case GTM4WP_PLACEMENT_BODYOPEN:
-				return 'body_open_manual';
-			case GTM4WP_PLACEMENT_BODYOPEN_AUTO:
-				return 'body_open_auto';
-			default:
-				return 'footer';
-		}
-	}
-
-	/**
-	 * Schema of an integration entry.
+	 * Schema of a module's integration entry.
 	 *
 	 * @return array<string, mixed>
 	 */
 	private static function integration_schema(): array {
 		return array(
-			'type'       => 'object',
-			'properties' => array(
+			'type'        => array( 'object', 'null' ),
+			'description' => 'The plugin this module integrates: whether it is installed, and its version. Null for a module that integrates nothing.',
+			'properties'  => array(
 				'active'  => array( 'type' => 'boolean' ),
 				'version' => array( 'type' => array( 'string', 'null' ) ),
 			),

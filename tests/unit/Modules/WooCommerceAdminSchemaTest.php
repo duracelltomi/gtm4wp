@@ -8,7 +8,10 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
+use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Modules\WooCommerce\AdminSchema;
+use GTM4WP\Modules\WooCommerce\WooCommerceModule;
+use GTM4WP\Options\Options;
 use GTM4WP\Options\Field;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -206,5 +209,28 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 		$this->assertSame( 'x', $field->sanitize( '  x  ' ), 'Leading/trailing whitespace is trimmed from the product ID prefix.' );
 		$this->assertSame( '42', $field->sanitize( 42 ), 'A non-string value is coerced to a string.' );
 		$this->assertSame( '', $field->sanitize( array( 'x' ) ), 'A non-scalar import value must collapse to "", never "Array" plus a PHP warning.' );
+	}
+	// ---- Status info -------------------------------------------------------
+
+	/**
+	 * What the schema tells the status ability about the module. The host's
+	 * version constant is process-global (the WooCommerce stub file of other suites defines it),
+	 * so under a random order it may or may not be present here: what is
+	 * pinned is the mapping against the process state at the time of the
+	 * call (TS-16).
+	 */
+	public function test_the_schema_reports_its_master_switch_and_host_plugin(): void {
+		$schema = new AdminSchema();
+		$this->assertInstanceOf( StatusInfoInterface::class, $schema );
+
+		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$info = $schema->status_info( new Options( ( new WooCommerceModule() )->defaults() ) );
+
+		$this->assertTrue( $info['enabled'], 'The one switch of the module.' );
+		$this->assertSame( defined( 'WC_VERSION' ), $info['integration']['active'] );
+		$this->assertSame( defined( 'WC_VERSION' ) ? (string) constant( 'WC_VERSION' ) : null, $info['integration']['version'] );
+
+		Functions\when( 'get_option' )->justReturn( array() );
+		$this->assertFalse( $schema->status_info( new Options( ( new WooCommerceModule() )->defaults() ) )['enabled'], 'Off by default.' );
 	}
 }

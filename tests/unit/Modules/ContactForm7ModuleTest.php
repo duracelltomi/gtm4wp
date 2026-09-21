@@ -9,6 +9,8 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
+use GTM4WP\Module\StatusInfoInterface;
+use GTM4WP\Modules\ContactForm7\AdminSchema;
 use GTM4WP\Modules\ContactForm7\ContactForm7Module;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
@@ -252,5 +254,28 @@ final class ContactForm7ModuleTest extends TestCase {
 		$atts = $module->add_form_name_attribute( array() );
 
 		$this->assertSame( 'Devis', $atts['data-gtm4wp-form-name'], 'With the option off the translated form title is kept.' );
+	}
+	// ---- Status info -------------------------------------------------------
+
+	/**
+	 * What the schema tells the status ability about the module. The host's
+	 * version constant is process-global (the CF7 stub file of this suite defines it),
+	 * so under a random order it may or may not be present here: what is
+	 * pinned is the mapping against the process state at the time of the
+	 * call (TS-16).
+	 */
+	public function test_the_schema_reports_its_master_switch_and_host_plugin(): void {
+		$schema = new AdminSchema();
+		$this->assertInstanceOf( StatusInfoInterface::class, $schema );
+
+		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
+		$info = $schema->status_info( new Options( ( new ContactForm7Module() )->defaults() ) );
+
+		$this->assertTrue( $info['enabled'], 'The one switch of the module.' );
+		$this->assertSame( defined( 'WPCF7_VERSION' ), $info['integration']['active'] );
+		$this->assertSame( defined( 'WPCF7_VERSION' ) ? (string) constant( 'WPCF7_VERSION' ) : null, $info['integration']['version'] );
+
+		Functions\when( 'get_option' )->justReturn( array() );
+		$this->assertFalse( $schema->status_info( new Options( ( new ContactForm7Module() )->defaults() ) )['enabled'], 'Off by default.' );
 	}
 }

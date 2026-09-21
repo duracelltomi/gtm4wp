@@ -12,7 +12,9 @@ namespace GTM4WP\Modules\EasyDigitalDownloads;
 
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * starts at beta (or experimental) per the option maturity policy: a brand
  * new integration has no field usage yet, so nothing may claim stable.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface {
 
 	/**
 	 * Documentation hub of this module on gtm4wp.com. The page does not exist
@@ -377,5 +379,24 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return __( 'Easy Digital Downloads 3.0 or newer needs to be installed and activated to use this module.', 'duracelltomi-google-tag-manager' );
+	}
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The master switch is the e-commerce tracking option; the host is Easy Digital Downloads,
+	 * reported from its version constant. Present says nothing about the
+	 * version floor, which the module's is_available() enforces.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, mixed>
+	 */
+	public function status_info( Options $options ): array {
+		return array(
+			'enabled'     => (bool) $options->get( GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE ),
+			'integration' => array(
+				'active'  => defined( 'EDD_VERSION' ),
+				'version' => defined( 'EDD_VERSION' ) ? (string) constant( 'EDD_VERSION' ) : null,
+			),
+		);
 	}
 }

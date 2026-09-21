@@ -12,7 +12,9 @@ namespace GTM4WP\Modules\ContactForm7;
 
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the Contact Form 7 module, ported from the 1.x
  * Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com. One page covers all three
@@ -126,5 +128,24 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The master switch is the integration option; the host is Contact Form 7,
+	 * reported from its version constant. Present says nothing about the
+	 * version floor, which the module's is_available() enforces.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, mixed>
+	 */
+	public function status_info( Options $options ): array {
+		return array(
+			'enabled'     => (bool) $options->get( GTM4WP_OPTION_INTEGRATE_WPCF7 ),
+			'integration' => array(
+				'active'  => defined( 'WPCF7_VERSION' ),
+				'version' => defined( 'WPCF7_VERSION' ) ? (string) constant( 'WPCF7_VERSION' ) : null,
+			),
+		);
 	}
 }
