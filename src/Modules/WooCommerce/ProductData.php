@@ -33,46 +33,20 @@ final class ProductData {
 	public const PENDING_PURCHASE_SESSION_KEY = 'gtm4wp_pending_purchase';
 
 	/**
-	 * Name of the browser-side duplicate-purchase guard, stored in localStorage
-	 * (falling back to a cookie) and read back here.
-	 *
-	 * THE VALUE IS THE ORDER NUMBER, VERBATIM - not the order id, and not escaped.
-	 * Three places touch this key and they must agree byte for byte, or the guard
-	 * silently stops matching and a purchase is counted twice:
-	 *
-	 * 1. PageDataLayer::purchase_dedupe_guard() - the inline JS on the
-	 *    order-received page (writes it with wp_json_encode, so the value is raw).
-	 * 2. js/frontend/gtm4wp-visitor-data.js (ORDER_TRACKED_KEY) - the cache-safe
-	 *    reliable-purchase fallback (writes String(payload.orderNumber), raw).
-	 * 3. is_purchase_already_tracked() below - the server-side read.
-	 *
-	 * On a default WooCommerce install the order number IS the numeric order id, so
-	 * every spelling coincides and a mismatch stays invisible; it only surfaces on
-	 * stores using a sequential/prefixed order-number plugin, or an order number
-	 * containing a character an escaper would rewrite.
-	 *
-	 * Since the guard is shared by every store integration, the key is defined
-	 * once on GTM4WP\Ecommerce\Helpers (site 1 above lives there too); this
-	 * delegating constant only keeps the 2.0 name alive for existing consumers
-	 * of this class.
+	 * Name of the browser-side duplicate-purchase guard (localStorage, cookie
+	 * fallback). Defined once on GTM4WP\Ecommerce\Helpers, where the byte-for-byte
+	 * contract between its three writers/readers is documented; this delegating
+	 * constant keeps the 2.0 name alive for existing consumers.
 	 */
 	public const ORDER_TRACKED_COOKIE = \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_COOKIE;
 
 	/**
-	 * Contexts (process_product $attributes_used_for values) whose output is
-	 * built on pages/requests that are never full-page cached, so the list
-	 * attribution cookie may be merged server-side there without making cacheable
-	 * HTML visitor-specific. The product-detail / product-list contexts are
-	 * excluded on purpose and enriched client-side instead (#405).
-	 *
-	 * "Client-side instead" is a real path, not an aspiration - if it is ever
-	 * removed, the product-detail view_item silently loses its attribution rather
-	 * than falling back to a server merge. It has three ends, all opt-in behind
-	 * GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION: the server-rendered view_item is
-	 * wrapped in Helpers::LIST_ATTRIBUTION_JS_WRAPPER by
-	 * PageDataLayer::add_product_view(), a selected variation is enriched in the
-	 * found_variation handler of gtm4wp-woocommerce.js, and Quick View is enriched
-	 * where that same file pushes the payload it read off the AJAX fragment.
+	 * The process_product() contexts built on never-cached pages/requests, where
+	 * the list attribution cookie may be merged server-side. Product detail / list are
+	 * excluded on purpose and enriched client-side instead (#405): the view_item
+	 * wrapper in PageDataLayer::add_product_view(), the found_variation handler
+	 * and the Quick View push in gtm4wp-woocommerce.js. Removing that client path
+	 * silently loses the attribution; there is no server fallback.
 	 *
 	 * @var string[]
 	 */
@@ -80,19 +54,15 @@ final class ProductData {
 
 	/**
 	 * Per-request cache of the parsed list-attribution cookie (product id => list
-	 * data), or null before it is first read. Avoids re-decoding the cookie for
-	 * every item built in a request.
+	 * data); null before the first read.
 	 *
 	 * @var array<int, array{item_list_name: string, item_list_id: string}>|null
 	 */
 	private ?array $list_attribution_map = null;
 
 	/**
-	 * Whether the gtm4wp_eec_product_array deprecation notice has already been
-	 * emitted this request. apply_filters_deprecated() calls _deprecated_hook() on
-	 * every invocation, so on a page with many products it would otherwise emit one
-	 * notice per product; this builder is instantiated once per request, so a single
-	 * instance flag bounds the notice to once per request.
+	 * Whether the gtm4wp_eec_product_array deprecation notice was emitted this
+	 * request; apply_filters_deprecated() would otherwise notify once per product.
 	 *
 	 * @var bool
 	 */
@@ -130,7 +100,7 @@ final class ProductData {
 	 * @param mixed  $product An instance of WC_Product that needs to be transformed into an ecommerce item object.
 	 * @param array  $additional_product_attributes Any key-value pair that needs to be added into the ecommerce item object.
 	 * @param string $attributes_used_for The placement ID of the product that is passed to the apply_filters hook so that 3rd party code can be notified where this product data is being used.
-	 * @param mixed  $source_item Optional. The raw source object the item is built from - the WooCommerce cart item array on the cart/checkout paths or the WC_Order_Item on the purchase path - passed only to the GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE filter so extensions can read custom cart/order item meta. NOT merged into the returned item array. Null when there is no per-line source (product detail, product lists). Default null.
+	 * @param mixed  $source_item Optional. The raw cart item array or WC_Order_Item the item is built from, passed only to the GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE filter (never merged into the item). Null when there is no per-line source.
 	 * @return array|false The ecommerce item object of the WooCommerce product, or false if the product does not exist.
 	 */
 	public function process_product( $product, array $additional_product_attributes, string $attributes_used_for, $source_item = null ) {
@@ -148,27 +118,18 @@ final class ProductData {
 		$product_type = $product->get_type();
 		$product_sku  = $product->get_sku();
 
-		// Detect variations structurally: WooCommerce Subscriptions (and similar
-		// extensions) report a type other than "variation" - e.g.
-		// "subscription_variation" - yet their product object still extends
-		// WC_Product_Variation, so the variant / parent-category / item_group_id
-		// handling below must apply to them as well (#264).
+		// Detect variations structurally: WooCommerce Subscriptions reports
+		// "subscription_variation" but still extends WC_Product_Variation (#264).
 		$is_variation = ( 'variation' === $product_type ) || ( $product instanceof \WC_Product_Variation );
 
 		if ( $is_variation ) {
 			$parent_product_id = $product->get_parent_id();
 		}
 
-		// Master-language consolidation (#145): on a multilingual store with the
-		// option on, resolve this product (and, for a variation, its parent) to
-		// the store's default-language equivalent and build the GA4 item identity
-		// and text - item_id, item_name, sku, item_category*, item_brand and
-		// item_variant - from that product, so the same product sold in several
-		// languages reports as one item to GA4 (which groups items by item_id).
-		// Price, stock and the internal list-attribution id stay on the current
-		// product. Falls back to the current product when the option is off, no
-		// multilingual plugin is active, or the product has no default-language
-		// translation.
+		// Master-language consolidation (#145): item identity and text (item_id,
+		// item_name, sku, item_category*, item_brand, item_variant) come from the
+		// default-language product so one product sold in several languages is one
+		// GA4 item; price, stock and internal_id stay on the current product.
 		$data_product     = $product;
 		$data_product_id  = $product_id;
 		$data_product_sku = $product_sku;
@@ -207,11 +168,8 @@ final class ProductData {
 			$remarketing_id = $data_product_sku;
 		}
 
-		// wc_get_price_to_display() is expensive in the cart/checkout context. Skip it
-		// when the caller already supplies a price - the order line total on the purchase
-		// path, and the cart line price the cart callers now pass - which array_merge()
-		// applies below anyway. This avoids one costly call per cart item, the cause of
-		// the reported memory exhaustion on cart/checkout pages (#436).
+		// wc_get_price_to_display() is expensive; skip it when the caller supplies a
+		// price, which array_merge() applies below anyway (#436, memory exhaustion).
 		if ( array_key_exists( 'price', $additional_product_attributes ) ) {
 			$display_price = (float) $additional_product_attributes['price'];
 		} else {
@@ -220,13 +178,10 @@ final class ProductData {
 
 		$_temp_productdata = array(
 			'internal_id'              => $product_id,
-			// Always a string: Merchant Center feed ids are strings, and GA4
-			// matches item_id against them - a product without a SKU used to
-			// serialize its numeric id as a JSON number here while a SKU'd
-			// sibling was a string, so the same feed matched only half a store.
+			// Always a string: Merchant Center feed ids are strings and GA4 matches
+			// item_id against them, so a numeric id must not become a JSON number.
 			'item_id'                  => (string) $remarketing_id,
 			'item_name'                => $data_product->get_title(),
-			// The same rule for the SKU field, which falls back to that id.
 			'sku'                      => (string) ( $data_product_sku ? $data_product_sku : $data_product_id ),
 			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
 			'stocklevel'               => $product->get_stock_quantity(),
@@ -279,14 +234,10 @@ final class ProductData {
 			$_temp_productdata['item_list_id'] = sanitize_title( (string) $_temp_productdata['item_list_name'] );
 		}
 
-		// GA4 list attribution carried across the funnel (#405): when the opt-in
-		// option is on and this item is not already part of a rendered list, fill
-		// item_list_name / item_list_id from the first-party cookie the tracker wrote
-		// on the originating select_item click. Restricted to the never-cached
-		// contexts (cart / checkout / purchase / re-added / block); the cacheable
-		// product-detail and list pages are enriched client-side instead, so their
-		// HTML stays cacheable. The cookie was keyed by the list item's product id,
-		// which is the parent id for a variation, so a variation matches on either.
+		// GA4 list attribution across the funnel (#405): fill item_list_name / id
+		// from the cookie the tracker wrote on select_item, in the never-cached
+		// contexts only (see LIST_ATTRIBUTION_CONTEXTS). The cookie is keyed by the
+		// list item's product id, the parent for a variation, so both are tried.
 		if (
 			! isset( $_temp_productdata['item_list_name'] )
 			&& in_array( $attributes_used_for, self::LIST_ATTRIBUTION_CONTEXTS, true )
@@ -301,10 +252,8 @@ final class ProductData {
 			}
 		}
 
-		// GA4 item-level affiliation (the storefront/marketplace the item was sold
-		// through). WooCommerce has no native value for this, so it stays empty by
-		// default and is only added when 3rd party code supplies one - keeping the
-		// item payload free of empty affiliation strings (#348).
+		// GA4 affiliation has no native WooCommerce value; added only when third
+		// party code supplies one, so the payload carries no empty string (#348).
 		if ( ! isset( $_temp_productdata['affiliation'] ) ) {
 			/**
 			 * Filters the GA4 item-level affiliation for a product.
@@ -342,10 +291,7 @@ final class ProductData {
 		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used
 		 */
 		if ( ! $this->deprecated_filter_notified ) {
-			// First product this request: apply_filters_deprecated() emits the
-			// E_USER_DEPRECATED notice (only when a listener is attached, and only under
-			// WP_DEBUG) and applies the filter. Gate it so the notice fires at most once
-			// per request instead of once per product.
+			// First product this request: the deprecation notice fires once, not per product.
 			$_temp_productdata                = apply_filters_deprecated(
 				GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY,
 				array( $_temp_productdata, $attributes_used_for ),
@@ -354,9 +300,6 @@ final class ProductData {
 			);
 			$this->deprecated_filter_notified = true;
 		} else {
-			// Later products this request: apply the still-supported deprecated filter
-			// directly, so its listeners keep running on every product but the
-			// deprecation notice is not repeated.
 			/** This filter is documented above (deprecated in favor of gtm4wp_eec_item_with_source). */
 			$_temp_productdata = apply_filters( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY, $_temp_productdata, $attributes_used_for );
 		}
@@ -364,20 +307,10 @@ final class ProductData {
 		/**
 		 * Filters the ecommerce item array before using it for tracking.
 		 *
-		 * Source-aware successor of the deprecated gtm4wp_eec_product_array filter: it
-		 * receives the same item array and placement context, plus the raw source object
-		 * the item was built from. That source is the WooCommerce cart item array on the
-		 * cart/checkout paths and the WC_Order_Item on the purchase path (null when there
-		 * is no per-line source, e.g. a product detail page or a product list). Use it to
-		 * read custom cart/order item meta - which is not present on the WC_Product or its
-		 * variation - and attach only the specific fields you need, so the GA4 item payload
-		 * is not bloated with the whole source array. The source object is never merged
-		 * into the item array; adding data from it is entirely up to the callback.
-		 *
-		 * Runs after the deprecated gtm4wp_eec_product_array filter, so both filters can
-		 * still modify the array and a callback here sees the deprecated filter's changes.
-		 *
-		 * The placement context values are the same as for gtm4wp_eec_product_array (see above).
+		 * Source-aware successor of the deprecated gtm4wp_eec_product_array filter
+		 * (same placement context values, runs after it): the extra argument is the
+		 * raw cart item array / WC_Order_Item the item was built from, so a callback
+		 * can read custom item meta. The source is never merged into the item.
 		 *
 		 * @param array  $_temp_productdata   An associative array containing all GA4 product attributes as well as any custom attribute.
 		 * @param string $attributes_used_for The name of the ecommerce action where this product will be used.
@@ -392,9 +325,8 @@ final class ProductData {
 	}
 
 	/**
-	 * Returns the parsed list-attribution cookie map, reading and validating it
-	 * once per request (see Helpers::read_item_list_cookie()) and caching the
-	 * result so building many items in one request does not re-decode the cookie.
+	 * The parsed list-attribution cookie map, read and validated once per request
+	 * (Helpers::read_item_list_cookie()).
 	 *
 	 * @return array<int, array{item_list_name: string, item_list_id: string}>
 	 */
@@ -441,12 +373,8 @@ final class ProductData {
 
 				$product = $order_item->get_product();
 
-				// Report the per-item price on the same tax basis as the transaction
-				// value so GA4 item-level revenue (product performance) reconciles with
-				// the transaction total (sales performance). By default this follows the
-				// shop's price-display setting, but when the admin excludes tax from
-				// purchase revenue (WCEXCLUDETAX) the item price is reported excluding tax
-				// too - otherwise the items stay tax-inclusive while the total is not (#176).
+				// Item price on the same tax basis as the transaction value, so GA4
+				// item revenue reconciles with the total (#176).
 				if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ) ) {
 					$inc_tax = false;
 				} else {
@@ -510,17 +438,12 @@ final class ProductData {
 		$billing_email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $order->get_billing_email() );
 		$billing_first_hash = Helpers::normalize_and_hash( 'sha256', $order->get_billing_first_name(), false );
 		$billing_last_hash  = Helpers::normalize_and_hash( 'sha256', $order->get_billing_last_name(), false );
-		// The phone is normalized to E.164 against the billing country before
-		// hashing, which is what Google matches on; the name fields only want
-		// lowercase + trim, so they keep the generic helper.
+		// The phone is normalized to E.164 against the billing country, which is
+		// what Google matches on.
 		$billing_phone_hash = Helpers::normalize_and_hash_phone_number( 'sha256', (string) $order->get_billing_phone(), (string) $order->get_billing_country() );
 
-		// Values are passed raw: the single output sink (the purchase data
-		// layer) runs everything through wp_json_encode() with the full hex
-		// flag set, which is the correct escaper for an inline-script context.
-		// Pre-escaping with esc_js() here would corrupt the data instead
-		// (e.g. "Marks & Spencer" -> "Marks &amp; Spencer") because
-		// ScriptTag::print_script_block() no longer HTML-decodes the block.
+		// Values are passed raw: the output sink escapes with wp_json_encode() +
+		// hex flags. Do NOT pre-escape with esc_js(); it would corrupt the data.
 		$order_data = array(
 			'attributes' => array(
 				'date'                 => $order->get_date_created()->date( 'c' ),
@@ -537,12 +460,9 @@ final class ProductData {
 
 				'coupons'              => implode( ', ', $order->get_coupon_codes() ),
 			),
-			// The money totals are cast to float because several WC_Order getters
-			// return wc_format_decimal() STRINGS ("35.90"). The data layer encode
-			// no longer numeric-coerces (JSON_NUMERIC_CHECK mangled leading-zero
-			// SKUs/order numbers), so the totals must be typed here to keep
-			// reaching GTM as real JSON numbers. The order number stays a string
-			// on purpose - it is an identifier, like the purchase transaction_id.
+			// Totals cast to float: several WC_Order getters return decimal STRINGS
+			// and the encode no longer numeric-coerces (JSON_NUMERIC_CHECK mangled
+			// leading-zero SKUs). The order number stays a string: it is an identifier.
 			'totals'     => array(
 				'currency'       => $order->get_currency(),
 				'discount_total' => (float) $order->get_discount_total(),
@@ -629,11 +549,9 @@ final class ProductData {
 
 			$order_currency = $order->get_currency();
 
-			// Optional fixed prefix in front of the transaction id, e.g. to tell
-			// several stores apart in one GA4 property. Empty by default, in which
-			// case the plain WooCommerce order number is sent as before. Only this
-			// event is affected: orderData and the duplicate-tracking guards keep
-			// using the raw order number.
+			// Optional transaction id prefix (several stores in one GA4 property).
+			// Only this event is affected; orderData and the duplicate guards keep
+			// the raw order number.
 			$transaction_id_prefix = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX );
 
 			$data_layer['event']     = 'purchase';
@@ -657,10 +575,8 @@ final class ProductData {
 				$data_layer['ecommerce']['items'] = $_order_items;
 			}
 
-			// Google Ads / GA4 Enhanced Conversions user-provided data, built from
-			// the order (so guest checkouts are covered too). Opt-in via the same
-			// "Customer data in data layer" option; only attached when it carries
-			// at least one identifier.
+			// Enhanced Conversions user data, built from the order so guest
+			// checkouts are covered; attached only when it carries an identifier.
 			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA ) ) {
 				$user_data = $this->get_enhanced_conversion_user_data( $order );
 				if ( array() !== $user_data ) {
@@ -695,13 +611,8 @@ final class ProductData {
 
 		$email = (string) $order->get_billing_email();
 		if ( '' !== $email ) {
-			// Omitted rather than sent empty, for the same reason as the phone
-			// below: the helper returns '' when folding leaves no address to hash
-			// - a gmail.com address whose local part is nothing but a "+" tag -
-			// and a present-but-empty identifier is the consumer's call to
-			// interpret, not ours (RI-13). The guard belongs here rather than in
-			// the helper: '' is the honest answer to "hash this", and only the
-			// caller knows the key is optional.
+			// Omitted when folding leaves nothing to hash (a gmail local part that is
+			// only a "+" tag): a present-but-empty identifier is not ours to send (RI-13).
 			$email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $email );
 			if ( '' !== $email_hash ) {
 				$user_data['sha256_email_address'] = $email_hash;
@@ -710,9 +621,7 @@ final class ProductData {
 
 		$phone = (string) $order->get_billing_phone();
 		if ( '' !== $phone ) {
-			// Omitted rather than sent empty when the number cannot be placed in
-			// E.164: this object is Google's user_data, where a present-but-empty
-			// identifier is the consumer's call to interpret, not ours (RI-13).
+			// Omitted when the number cannot be placed in E.164 (RI-13).
 			$phone_hash = Helpers::normalize_and_hash_phone_number( 'sha256', $phone, (string) $order->get_billing_country() );
 			if ( '' !== $phone_hash ) {
 				$user_data['sha256_phone_number'] = $phone_hash;
@@ -755,10 +664,8 @@ final class ProductData {
 	}
 
 	/**
-	 * Whether the order is older than the configured maximum tracking age.
-	 * Returns false when no maximum age is configured. The timezone passed to
-	 * "now" does not change the computed difference (DateTime::diff compares
-	 * instants), so the paid/created reference date is used directly.
+	 * Whether the order is older than the configured maximum tracking age
+	 * (false when none is configured).
 	 *
 	 * @param \WC_Order $order The order to check.
 	 * @return bool
@@ -783,17 +690,11 @@ final class ProductData {
 	}
 
 	/**
-	 * Whether the order's current status makes it eligible for the GA4 purchase
-	 * event. The purchase fires at order *placement* - whenever the order reaches
-	 * one of the configured statuses - not when payment physically clears. So a
-	 * Cash on Delivery order (processing) or a bank-transfer order (on-hold) is
-	 * tracked at checkout even though the money arrives later, while a failed or
-	 * still-pending order is not.
-	 *
-	 * The status list is the WCPURCHASESTATUSES option (default: processing,
-	 * on-hold, completed) and is filterable. An empty list falls back to tracking
-	 * any order that did not outright fail, so a misconfiguration can never
-	 * silently disable all purchase tracking.
+	 * Whether the order's status makes it eligible for the purchase event. The
+	 * purchase fires at placement (a COD or bank-transfer order is tracked at
+	 * checkout), not when payment clears. The list is the filterable
+	 * WCPURCHASESTATUSES option; an empty list tracks any order that did not fail,
+	 * so a misconfiguration cannot silently disable all purchase tracking.
 	 *
 	 * @param \WC_Order $order The order to check.
 	 * @return bool
@@ -836,13 +737,8 @@ final class ProductData {
 		}
 
 		if ( isset( $_COOKIE[ self::ORDER_TRACKED_COOKIE ] ) ) {
-			// The browser writes the order NUMBER here (see the constant's doc
-			// block), so compare against that. The previous FILTER_VALIDATE_INT
-			// read compared it to the order ID instead, which silently never
-			// matched on any store whose order numbers are not the plain id
-			// (sequential/prefixed order-number plugins). The order id is still
-			// accepted as a fallback so guards written by an older version - and
-			// the default install where number == id - keep working.
+			// The browser writes the order NUMBER (see the constant); the id is
+			// still accepted so guards written by an older version keep working.
 			$tracked = sanitize_text_field( wp_unslash( $_COOKIE[ self::ORDER_TRACKED_COOKIE ] ) );
 
 			if ( '' !== $tracked
@@ -856,14 +752,9 @@ final class ProductData {
 	}
 
 	/**
-	 * The full purchase-eligibility gauntlet in its canonical order: not too
-	 * old, not already tracked, status trackable. This is THE definition of
-	 * "this order gets a purchase event" - the order-received page, the
-	 * reliable-purchase session fallback and the thank-you hook all call it, so
-	 * the sequence and its short-circuits cannot drift apart per call site.
-	 * (A caller may still run is_order_older_than_max_age() separately first
-	 * when it must position other output, e.g. orderData, between the age check
-	 * and the rest; the re-check here is a pure date comparison.)
+	 * The canonical purchase-eligibility gauntlet: not too old, not already
+	 * tracked, status trackable. Every purchase emitter calls this so the
+	 * sequence cannot drift per call site.
 	 *
 	 * @param \WC_Order $order    The order to check.
 	 * @param int       $order_id The order id of the current request (cookie dedupe).
@@ -906,18 +797,10 @@ final class ProductData {
 	}
 
 	/**
-	 * Both new/returning customer signals for the purchase event.
-	 *
-	 * Google names the same idea differently on two surfaces: Google Ads
-	 * customer acquisition reads the boolean `new_customer`, while the GA4
-	 * e-commerce reference documents a `customer_type` string of `new` or
-	 * `returning`. Both are sent - they are not alternatives, and dropping
-	 * either breaks one integration while the other keeps working.
-	 *
-	 * Returned together so the two key names and the new/returning vocabulary
-	 * live in one place rather than being repeated at each emission site, and
-	 * so is_new_customer() - which queries the WooCommerce analytics store - is
-	 * called once per purchase.
+	 * Both new/returning customer signals for the purchase event: Google Ads
+	 * reads the boolean `new_customer`, GA4 the `customer_type` string. Both are
+	 * sent; dropping either breaks one integration. Returned together so
+	 * is_new_customer() (an analytics-store query) runs once per purchase.
 	 *
 	 * @see https://support.google.com/google-ads/answer/12077475 Google Ads: the new_customer parameter.
 	 * @see https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtm GA4: the customer_type parameter on purchase.

@@ -28,14 +28,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	private const DOC_PAGE = 'google-tag-manager-for-woocommerce';
 
 	/**
-	 * The per-option reference every field of this module deep links into. It
-	 * already carries an `<a name="…">` anchor per option key, which is where
-	 * the convention the rest of the plugin now follows came from.
-	 *
-	 * Separate from the setup guides linked out of the descriptions below: a
-	 * guide answers "how do I build this in Google Tag Manager", the reference
-	 * answers "what does this one switch do", and the help icon asks the second
-	 * question.
+	 * The per-option reference every field deep links into (one `<a name>` anchor
+	 * per option key); distinct from the setup guides linked in the descriptions.
 	 */
 	private const DOC_REFERENCE = self::DOC_PAGE . '/woocommerce-settings-reference';
 
@@ -102,12 +96,9 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		);
 		if ( function_exists( 'get_object_taxonomies' ) ) {
 			foreach ( get_object_taxonomies( 'product', 'objects' ) as $taxonomy_slug => $taxonomy_object ) {
-				// Only offer taxonomies a store owner would use as a brand: those
-				// with a public archive and an admin UI, matching the 1.x filter
-				// ( public + show_ui + non-builtin ). This drops WooCommerce's
-				// internal product_type / product_visibility taxonomies and
-				// cross-cutting ones other plugins attach to the product post
-				// type (e.g. WPML's non-public "translation_priority").
+				// Only taxonomies a store owner would use as a brand (public +
+				// show_ui + non-builtin, the 1.x filter): drops WooCommerce's internal
+				// product_type / product_visibility and WPML's translation_priority.
 				if ( ! $taxonomy_object->public || ! $taxonomy_object->show_ui || $taxonomy_object->_builtin ) {
 					continue;
 				}
@@ -116,11 +107,9 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			}
 		}
 
-		// Order-status choices for the "statuses that trigger the purchase event"
-		// field. wc_get_order_statuses() keys are prefixed with "wc-" while
-		// WC_Order::get_status() returns the bare slug, so strip the prefix to
-		// keep the stored values comparable. Fall back to the core statuses when
-		// WooCommerce is not loaded (so the field is always usable in the admin).
+		// wc_get_order_statuses() keys carry the "wc-" prefix while
+		// WC_Order::get_status() returns the bare slug, so strip it. Core statuses
+		// as the fallback when WooCommerce is not loaded.
 		$order_status_choices = array();
 		if ( function_exists( 'wc_get_order_statuses' ) ) {
 			foreach ( wc_get_order_statuses() as $status_key => $status_label ) {
@@ -199,13 +188,10 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				description: esc_html__( 'Select which custom taxonomy is being used to add the brand of products', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				choices: $taxonomy_choices,
-				// Replaces the SELECT default on purpose: the choice list is built
-				// from the taxonomies registered on THIS request, so the default's
-				// allow-list reset would silently blank a stored brand taxonomy
-				// whenever its plugin is momentarily inactive during a save/import.
-				// Field::to_string() keeps the cast warning-free on non-scalar
-				// import values (Field::sanitize() runs a custom sanitizer INSTEAD
-				// of the type-defensive default, never before it).
+				// Replaces the SELECT default on purpose: its allow-list reset would
+				// blank a stored brand taxonomy whenever its plugin is momentarily
+				// inactive during a save/import. Field::to_string() keeps the cast
+				// warning-free (a custom sanitizer replaces the type-defensive default).
 				sanitizer: static function ( $value ) {
 					return sanitize_text_field( Field::to_string( $value ) );
 				},

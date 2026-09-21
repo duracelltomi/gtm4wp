@@ -13,18 +13,11 @@ namespace GTM4WP\Modules\WooCommerce;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Exposes the plugin's GA4 ecommerce item array on the WooCommerce Store API
- * so the React-based Cart & Checkout blocks carry the exact same product data
- * the classic (server-rendered) path builds.
- *
- * Every product and cart-item the block UI fetches gains a
- * `extensions.gtm4wp.item` field, read by the gtm4wp-woocommerce-blocks tracker
- * to fire add_to_cart / remove_from_cart / add_shipping_info / add_payment_info
- * from the block data stores (which never fire the classic jQuery events).
- *
- * The item price comes from ProductData::process_product() as a real float, so
- * the block tracker never has to divide minor units and stays correct for
- * zero-decimal (JPY) and 3-decimal currencies.
+ * Exposes the GA4 item array on the WooCommerce Store API as
+ * `extensions.gtm4wp.item` on every product and cart item, so the
+ * gtm4wp-woocommerce-blocks tracker fires the block events with the same
+ * product data as the classic path. The price is a real float from
+ * ProductData::process_product(), so the tracker never divides minor units.
  */
 final class StoreApiData {
 

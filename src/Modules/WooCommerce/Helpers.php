@@ -66,28 +66,13 @@ final class Helpers {
 	private const WC_SESSION_COOKIE_PREFIX = 'wp_woocommerce_session_';
 
 	/**
-	 * Whether this browser plausibly has WooCommerce state worth delivering.
-	 *
-	 * A presence check over cookies and the login state - never a value read,
-	 * never a session or cart load. That restraint is the whole point: the
-	 * caller (WooCommerceModule::enqueue_visitor_cart_channel()) runs on every
-	 * front-end page of a store in cache-safe mode, and touching WC()->cart
-	 * there would perform exactly the session + cart load this gate exists to
-	 * avoid, handing a session cookie to a visitor who has none.
-	 *
-	 * This is PageDataLayer::oneshot_wc()'s rule applied to the second delivery
-	 * channel. That method's docblock states the consequence for the REST
-	 * endpoint - "page caches routinely bypass the cache for any visitor
-	 * carrying one, which would defeat the very mode this code serves" - and the
-	 * cart-fragments channel added later did not inherit it. Verified 2026-08-10
-	 * against WooCommerce's own client/legacy/js/frontend/cart-fragments.js: it
-	 * has NO empty-cart bail-out, so an ungated enqueue costs every visitor one
-	 * uncached wc-ajax round trip per browser tab. WooCommerce itself stopped
-	 * enqueuing that script on all routes in 7.8 for this reason.
-	 *
-	 * Logged-in counts on its own: the customer half of the payload is populated
-	 * for a logged-in visitor with an empty cart and no session cookie, and that
-	 * is precisely the visitor a cart-only gate would silently drop.
+	 * Whether this browser plausibly has WooCommerce state worth delivering: a
+	 * presence check over cookies and the login state. Never a value read and
+	 * never a session or cart load - touching WC()->cart here would hand a session
+	 * cookie to a visitor who has none, on every page of a cache-safe store
+	 * (PageDataLayer::oneshot_wc()'s rule on the second delivery channel).
+	 * Logged-in counts on its own: the customer half is populated for a logged-in
+	 * visitor with an empty cart.
 	 *
 	 * @return bool
 	 */
@@ -113,33 +98,21 @@ final class Helpers {
 	}
 
 	/**
-	 * Name of the short-lived, JS-readable event cookie the cache-safe data layer
-	 * (issue #398, Phase 3) sets when a WooCommerce one-shot event is queued in the
-	 * session — a product re-added to the cart ("Undo") or a placed order awaiting
-	 * its reliable-purchase fallback. Its mere presence tells the client runtime to
-	 * fetch the session endpoint on the next page; the client fires the event once,
-	 * de-dupes it and then clears this cookie. An anonymous visitor on a cached page,
-	 * who never has it, never fetches. Must match the literal the client clears in
-	 * js/frontend/gtm4wp-visitor-data.js and the cookie_gate declared in
+	 * JS-readable event cookie the cache-safe data layer (issue #398) sets when a
+	 * WooCommerce one-shot event is queued in the session; its presence tells the
+	 * client runtime to fetch the session endpoint on the next page, and the client
+	 * clears it after delivery. Must match the literal in
+	 * js/frontend/gtm4wp-visitor-data.js and the cookie_gate in
 	 * PageDataLayer::declare_visitor_scoped_fields().
 	 */
 	public const ONESHOT_EVENT_COOKIE = 'gtm4wp_woo_event';
 
 	/**
-	 * Flags that a WooCommerce one-shot event is pending for this session by
-	 * setting the short-lived event cookie (self::ONESHOT_EVENT_COOKIE) — but only
-	 * when the cache-safe data layer is on, since that is the only mode in which the
-	 * one-shots are delivered client-side (otherwise they render server-side as
-	 * before and no cookie is needed). Called from the same hooks that seed the
-	 * session markers (ListTracking::cart_item_restored,
-	 * PurchaseTracking::remember_order). Skipped silently once headers are sent
-	 * (a cookie cannot be set then) and never lands on a cacheable response, because
-	 * those hooks run only on non-cached cart/checkout requests.
-	 *
-	 * The cookie is deliberately NOT HttpOnly (the client must read it) and carries
-	 * no visitor value — only the fact that a fetch is due. The client clears it
-	 * after delivery; the 2-day expiry only bounds the case where delivery never
-	 * happened, and comfortably covers a WooCommerce session.
+	 * Flags a pending one-shot event by setting ONESHOT_EVENT_COOKIE, only when the
+	 * cache-safe data layer is on (otherwise the event renders server-side). Called
+	 * from the hooks that seed the session markers, which run only on non-cached
+	 * requests. Not HttpOnly on purpose (the client reads it); it carries no
+	 * visitor value. The 2-day expiry only bounds an undelivered event.
 	 *
 	 * @param bool $cache_safe_enabled Whether GTM4WP_OPTION_CACHE_SAFE_DATALAYER is on.
 	 * @return void
@@ -167,15 +140,10 @@ final class Helpers {
 	}
 
 	/**
-	 * Replace only the first occurrence of the search string with the replacement string.
-	 *
-	 * Both arguments are treated as literal strings. This deliberately does NOT use
-	 * preg_replace(): its replacement argument expands $0/$1/${1}/\1 as backreferences,
-	 * so a replacement carrying product data would have such a sequence substituted with
-	 * the matched text. Where the matched text contains a quote (the cart remove-link
-	 * injects at `href="`), that expansion lands a raw quote inside an already-esc_attr'd
-	 * attribute and terminates it - the escaping runs before the substitution, so it
-	 * cannot defend against it. See PA-7 / RI-17 in .security/code-review-patterns.md.
+	 * Replace only the first occurrence of the search string, both treated as
+	 * literals. Deliberately NOT preg_replace(): its replacement expands $0/\1
+	 * backreferences, which would let product data break out of an already
+	 * esc_attr'd attribute (PA-7 / RI-17).
 	 *
 	 * @param string $search The value being searched for, otherwise known as the needle.
 	 * @param string $replace The replacement value that replaces found search values.
@@ -207,14 +175,10 @@ final class Helpers {
 	}
 
 	/**
-	 * Per-unit display price for a WooCommerce cart line, taken from the line
-	 * totals WooCommerce has already calculated (line_subtotal / line_subtotal_tax)
-	 * instead of recomputing wc_get_price_to_display() per item. That call is
-	 * expensive in the cart/checkout context and, run once per cart item, caused
-	 * memory exhaustion on carts after a WooCommerce update (#436).
-	 *
-	 * Returns null when the line totals are not available (e.g. before the cart is
-	 * calculated), so the caller can fall back to wc_get_price_to_display().
+	 * Per-unit display price for a cart line, from the already-calculated line
+	 * totals instead of wc_get_price_to_display() per item (#436, memory
+	 * exhaustion). Null when the totals are not available yet, so the caller can
+	 * fall back.
 	 *
 	 * @param array<string, mixed> $cart_item_data A WooCommerce cart item.
 	 * @param bool                 $include_tax    Whether to include tax (the shop's price-display setting).
@@ -239,21 +203,12 @@ final class Helpers {
 	}
 
 	/**
-	 * Per-unit discount for a WooCommerce cart line: the gap between the
-	 * pre-discount subtotal (line_subtotal) and the post-discount total
-	 * (line_total), on the same tax basis as cart_line_display_price(), divided
-	 * by the line quantity. Used to add GA4's per-item `discount` field where a
-	 * coupon or sale reduced the line (#348).
-	 *
-	 * The tax keys WooCommerce writes onto a cart item are asymmetric:
-	 * `line_subtotal_tax` next to `line_subtotal`, but `line_tax` (not
-	 * `line_total_tax`) next to `line_total` - see WC_Cart_Totals::set_items_tax().
-	 * Reading a key that does not exist silently adds no tax to that side, which
-	 * turned the whole line tax into a phantom discount on tax-inclusive stores (#470).
-	 *
-	 * Returns null when the totals are not available or when there is no discount
-	 * (≤ 0), so the caller can simply omit the field on undiscounted lines rather
-	 * than emit a 0.
+	 * Per-unit discount for a cart line (line_subtotal minus line_total, same tax
+	 * basis as cart_line_display_price()) for GA4's per-item `discount` (#348).
+	 * The tax keys are asymmetric: `line_subtotal_tax` but `line_tax`, not
+	 * `line_total_tax` - reading a missing key turned the whole line tax into a
+	 * phantom discount (#470). Null when unavailable or not discounted, so the
+	 * caller omits the field rather than emitting 0.
 	 *
 	 * @param array<string, mixed> $cart_item_data A WooCommerce cart item.
 	 * @param bool                 $include_tax    Whether to include tax (the shop's price-display setting).
@@ -357,12 +312,8 @@ final class Helpers {
 	}
 
 	/**
-	 * Returns the result of normalizing and hashing an email address.
-	 *
-	 * The gmail/googlemail folding rules and the deliberate deviations from
-	 * Google's PHP sample (the plus rule, the first-'@' split) are documented on
-	 * the shared implementation in GTM4WP\Ecommerce\Helpers - read that docblock
-	 * before changing anything; the regression test pins both directions.
+	 * Returns the result of normalizing and hashing an email address; the folding
+	 * rules are documented on GTM4WP\Ecommerce\Helpers.
 	 *
 	 * @param string $hash_algorithm the hash algorithm to use.
 	 * @param string $email_address the email address to normalize and hash.
@@ -373,9 +324,7 @@ final class Helpers {
 	}
 
 	/**
-	 * Converts a billing phone number into E.164 format. Delegates to the
-	 * shared store-agnostic implementation - the E.164 anchoring rules,
-	 * CountryPhoneData columns and their deliberate limits are documented on
+	 * Converts a billing phone number into E.164 format; rules documented on
 	 * \GTM4WP\Ecommerce\Helpers::normalize_phone_number().
 	 *
 	 * @param string $phone_number The phone number as the customer typed it.

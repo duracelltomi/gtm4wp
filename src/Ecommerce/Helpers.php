@@ -53,79 +53,50 @@ final class Helpers {
 	);
 
 	/**
-	 * Name of the browser-side duplicate-purchase guard, stored in localStorage
-	 * (falling back to a cookie). Shared by every store integration so all
-	 * purchase events consult the same browser guard.
+	 * Name of the browser-side duplicate-purchase guard (localStorage, cookie
+	 * fallback), shared by every store integration.
 	 *
-	 * THE VALUE IS THE ORDER NUMBER, VERBATIM - not the order id, and not escaped.
-	 * Every site touching this key must agree byte for byte, or the guard
-	 * silently stops matching and a purchase is counted twice:
-	 *
-	 * 1. self::purchase_dedupe_guard() below - the inline JS on the
-	 *    order-received page (writes it with wp_json_encode, so the value is raw).
-	 * 2. js/frontend/gtm4wp-visitor-data.js (ORDER_TRACKED_KEY) - the cache-safe
-	 *    reliable-purchase fallback (writes String(payload.orderNumber), raw).
-	 * 3. WooCommerce ProductData::is_purchase_already_tracked() - the
-	 *    server-side read (via the delegating ProductData::ORDER_TRACKED_COOKIE).
-	 *
-	 * On a default install the order number IS the numeric order id, so every
-	 * spelling coincides and a mismatch stays invisible; it only surfaces on
-	 * stores using a sequential/prefixed order-number plugin, or an order number
-	 * containing a character an escaper would rewrite.
+	 * THE VALUE IS THE ORDER NUMBER, VERBATIM - not the order id, not escaped.
+	 * Three sites must agree byte for byte or the guard silently stops matching:
+	 * self::purchase_dedupe_guard() (writes it raw via wp_json_encode),
+	 * js/frontend/gtm4wp-visitor-data.js ORDER_TRACKED_KEY (String(orderNumber))
+	 * and WooCommerce ProductData::is_purchase_already_tracked() (the read). On a
+	 * default install number == id, so a mismatch only surfaces with a
+	 * sequential/prefixed order-number plugin.
 	 */
 	public const ORDER_TRACKED_COOKIE = 'gtm4wp_orderid_tracked';
 
 	/**
-	 * Name of the first-party cookie that carries GA4 list attribution
-	 * (item_list_name / item_list_id keyed by product/download id) across the
-	 * funnel (#405). Written client-side by the store trackers on a
-	 * select_item list click; must match the literal used in
+	 * First-party cookie carrying GA4 list attribution across the funnel (#405),
+	 * written client-side on select_item; must match the literal in
 	 * js/frontend/gtm4wp-ecommerce-generic.js.
 	 */
 	public const LIST_ATTRIBUTION_COOKIE = 'gtm4wp_item_list_attr';
 
 	/**
-	 * Name of the JavaScript function the server-rendered product-detail
-	 * view_item push is wrapped in so the list attribution is merged in the
-	 * browser instead of being baked into cacheable HTML (#405).
-	 *
-	 * PHP writes this identifier into a <script> body and JS has to define it
-	 * under exactly this name: it must match the window export at the bottom of
-	 * js/frontend/gtm4wp-ecommerce-generic.js. A mismatch is silent - the
-	 * emitted call falls back to an identity function, so the event still fires,
-	 * just without the attribution.
+	 * JavaScript function the server-rendered view_item push is wrapped in so the
+	 * list attribution is merged in the browser (#405). Must match the window
+	 * export in js/frontend/gtm4wp-ecommerce-generic.js; a mismatch is silent
+	 * (identity fallback, event fires without attribution).
 	 */
 	public const LIST_ATTRIBUTION_JS_WRAPPER = 'gtm4wp_apply_stored_item_list_to_event';
 
 	/**
-	 * Hard caps on the list-attribution cookie so a crafted or bloated cookie
-	 * can never make the reader do unbounded work: entries beyond the limit are
-	 * dropped and an oversized cookie is ignored wholesale.
-	 *
-	 * The byte cap is measured on the DECODED value, because PHP URL-decodes
-	 * $_COOKIE before we see it, while the writer's own budget
-	 * (GTM4WP_LIST_ATTR_MAX_BYTES in js/frontend/gtm4wp-ecommerce-generic.js) is
-	 * measured on the encoded bytes a browser counts against its ~4096-byte
-	 * per-cookie limit. The same number therefore means different things on the
-	 * two sides and they are not a pair to keep in sync: anything a browser
-	 * accepted decodes to well under this cap, so this one only ever rejects a
-	 * cookie no browser wrote.
+	 * Hard caps so a crafted cookie never makes the reader do unbounded work. The
+	 * byte cap is measured on the DECODED value ($_COOKIE is URL-decoded), while
+	 * the writer's GTM4WP_LIST_ATTR_MAX_BYTES counts encoded bytes; they are not a
+	 * pair to keep in sync - this one only rejects a cookie no browser wrote.
 	 */
 	public const LIST_ATTRIBUTION_MAX_ENTRIES      = 20;
 	public const LIST_ATTRIBUTION_COOKIE_MAX_BYTES = 4096;
 
 	/**
-	 * Reads and validates the first-party list-attribution cookie (#405) into a
-	 * map of product id => array( item_list_name, item_list_id ). The cookie is
-	 * untrusted client input, so every part is sanitized here: the id via absint,
-	 * the list name via sanitize_text_field and the id via sanitize_title. The
-	 * sanitized values are returned RAW (not entity-encoded) so the downstream
-	 * wp_json_encode() dataLayer sink can escape them once and correctly. A
-	 * malformed, non-JSON or oversized cookie yields an empty map, and no more
-	 * than LIST_ATTRIBUTION_MAX_ENTRIES entries are ever ACCEPTED. Note that the
-	 * loop still visits every decoded entry, so the bound on the work done is the
-	 * LIST_ATTRIBUTION_COOKIE_MAX_BYTES cap above (a few hundred entries at most),
-	 * not the entry cap - keep that byte cap if you ever relax the entry cap.
+	 * Reads and validates the list-attribution cookie (#405) into a map of
+	 * product id => array( item_list_name, item_list_id ). Untrusted input: absint
+	 * on ids, sanitize_text_field on names, sanitize_title on list ids, returned
+	 * RAW so the wp_json_encode() sink escapes once. Malformed or oversized yields
+	 * an empty map. The loop visits every decoded entry, so the work bound is the
+	 * byte cap, not the entry cap - keep the byte cap if the entry cap is relaxed.
 	 *
 	 * @return array<int, array{item_list_name: string, item_list_id: string}>
 	 */
@@ -134,11 +105,8 @@ final class Helpers {
 			return array();
 		}
 
-		// The raw value is a JSON container, not a value used at any output sink; it
-		// is json_decode'd below and every extracted field is individually sanitized
-		// (absint on ids, sanitize_text_field on names, sanitize_title on ids). A
-		// blanket sanitizer here would corrupt valid multi-entry JSON, so it is
-		// unslashed only and each field is sanitized after decoding.
+		// A JSON container, not an output value: a blanket sanitizer would corrupt
+		// it, so it is unslashed only and each field is sanitized after decoding.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$raw = wp_unslash( $_COOKIE[ self::LIST_ATTRIBUTION_COOKIE ] );
 		if ( ! is_string( $raw ) || strlen( $raw ) > self::LIST_ATTRIBUTION_COOKIE_MAX_BYTES ) {
@@ -200,24 +168,13 @@ final class Helpers {
 	}
 
 	/**
-	 * Undoes the HTML encoding WordPress applies to a term name when it is saved.
-	 *
-	 * WordPress runs every term name through `_wp_specialchars()` on save (the
-	 * `pre_term_name` filter, `wp-includes/default-filters.php`), so a category
-	 * called "Shirts & Ties" is stored, and read back, as "Shirts &amp; Ties".
-	 * Written into the data layer unchanged, that is what GA4 reports and what a
-	 * GTM trigger has to be written against.
-	 *
-	 * `wp_specialchars_decode()` with ENT_QUOTES is the exact inverse of what was
-	 * applied, so it reverses that encoding and nothing else. The decoded value is
-	 * a data value, not markup: every sink it reaches escapes for its own context
-	 * afterwards (the data layer through `wp_json_encode()` with the hex flags,
-	 * the product-data attribute through `esc_attr()`), which is why decoding here
-	 * is safe and is not the blanket decode of script output RI-3 warns about.
-	 *
-	 * Lives here rather than beside either integration, so a WooCommerce product
-	 * category and an Easy Digital Downloads download category are reported the
-	 * same way.
+	 * Undoes the HTML encoding WordPress applies to a term name on save
+	 * (`pre_term_name` runs `_wp_specialchars()`, so "Shirts & Ties" is stored as
+	 * "Shirts &amp; Ties"). `wp_specialchars_decode()` with ENT_QUOTES is the
+	 * exact inverse. Safe because the result is a data value every sink escapes
+	 * for its own context afterwards (wp_json_encode hex flags, esc_attr) - not
+	 * the blanket decode of script output RI-3 warns about. Shared so WooCommerce
+	 * and EDD categories are reported the same way.
 	 *
 	 * @param string $name A term name as WordPress stored it.
 	 * @return string The name as it was typed.
@@ -248,9 +205,8 @@ final class Helpers {
 		);
 
 		if ( is_string( $category_parent_list ) ) {
-			// Decoded after the path is joined, never before: the encoding
-			// WordPress applies does not touch the separator, so no decoded name
-			// can introduce a level boundary that was not there.
+			// Decoded after joining: the encoding never touches the separator, so
+			// no decoded name can introduce a level boundary.
 			$cat_hierarchy = self::decode_term_name( trim( $category_parent_list, '/' ) );
 		}
 
@@ -379,25 +335,13 @@ final class Helpers {
 	}
 
 	/**
-	 * Returns the result of normalizing and hashing an email address.
-	 *
-	 * For gmail.com and googlemail.com Google folds the local part the way those
-	 * mailboxes actually resolve, before hashing: all '.' characters removed, and
-	 * a '+' together with everything after it discarded. Both rules apply to
-	 * those two domains ONLY - everywhere else "jane.doe" and "janedoe" are
-	 * different mailboxes, and stripping either would hash the wrong person.
-	 *
-	 * Note which of Google's two artifacts this follows. Their prose documents
-	 * both rules; the PHP sample on the same page implements only the dot rule,
-	 * and this function was originally ported from that sample (#321), which is
-	 * how the plus rule went missing. Do not "restore" this to match the sample.
-	 *
-	 * The split below deviates from that sample a second time, deliberately:
-	 * everything after the FIRST '@' is the domain (explode limit 2), so a
-	 * string carrying more than one '@' is never treated as a foldable
-	 * mailbox - it is hashed exactly as typed. Ordinary addresses split
-	 * identically either way. Do not "restore" the sample's unlimited split;
-	 * the regression test pins both directions.
+	 * Returns the result of normalizing and hashing an email address. For
+	 * gmail.com / googlemail.com ONLY, the local part is folded the way those
+	 * mailboxes resolve: dots removed, '+' and everything after it dropped. Two
+	 * deliberate deviations from Google's PHP sample, pinned by the regression
+	 * test - do NOT "restore" either: the sample implements only the dot rule
+	 * (the plus rule went missing that way, #321), and the split here is on the
+	 * FIRST '@' so a string with several '@' is hashed as typed.
 	 *
 	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: the normalization rules, in prose.
 	 *
@@ -410,10 +354,8 @@ final class Helpers {
 		$email_parts      = explode( '@', $normalized_email, 2 );
 		if (
 			count( $email_parts ) > 1
-			// Anchored at both ends on purpose: an unanchored match also accepts
-			// "gmail.com.example.com", and folding a third party's local part
-			// would silently hash a value that can never match. The \s* absorbs
-			// trailing whitespace, which normalize_and_hash() strips afterwards.
+			// Anchored at both ends: unanchored also matches "gmail.com.example.com".
+			// \s* absorbs trailing whitespace normalize_and_hash() strips later.
 			&& preg_match( '/^(gmail|googlemail)\.com\s*$/', $email_parts[1] )
 		) {
 			$email_parts[0] = str_replace( '.', '', $email_parts[0] );
@@ -423,9 +365,7 @@ final class Helpers {
 				$email_parts[0] = substr( $email_parts[0], 0, $plus_position );
 			}
 
-			// A local part that was nothing but a tag leaves no address behind,
-			// and hashing a bare "@gmail.com" would be a value no lookup can
-			// ever match - so there is nothing honest to return but ''.
+			// A local part that was only a tag leaves nothing to hash.
 			if ( '' === $email_parts[0] ) {
 				return '';
 			}
@@ -437,42 +377,25 @@ final class Helpers {
 	}
 
 	/**
-	 * Builds the browser-side duplicate-tracking guard wrapped around a purchase
-	 * push: a "before" fragment that only pushes when this order number is not
-	 * already recorded in the cookie / local storage, and an "after" fragment
-	 * that records it. Shared by every store integration so all purchase events
-	 * consult the same browser guard.
-	 *
-	 * The cookie read/write idiom emitted below is the PHP-side copy of the
-	 * shared helpers in js/frontend/lib/gtm4wp-cookies.js (this inline script
-	 * cannot import a bundle module); the storage key and byte format must stay
-	 * compatible with that lib and with gtm4wp-visitor-data.js, which reuses the
-	 * same guard for the fallback purchase. See the contract on
-	 * self::ORDER_TRACKED_COOKIE - all sites store the order number verbatim.
+	 * Builds the browser-side duplicate-tracking guard around a purchase push: a
+	 * "before" fragment that pushes only when the order number is not yet
+	 * recorded in localStorage / the cookie, and an "after" fragment that records
+	 * it. The cookie idiom is the PHP-side copy of js/frontend/lib/gtm4wp-cookies.js
+	 * (an inline script cannot import a module); key and format must stay
+	 * compatible with it and with gtm4wp-visitor-data.js (see ORDER_TRACKED_COOKIE).
 	 *
 	 * @param string $order_number The order number to guard on (raw; escaped here).
 	 * @return array{0:string,1:string} The before and after JavaScript fragments.
 	 */
 	public static function purchase_dedupe_guard( string $order_number ): array {
-		// Emitted as a JSON string literal (quotes included, so it is NOT wrapped
-		// in quotes below) with the full hex flag set - the RI-2 escaper for an
-		// inline-script context. It replaces an esc_js() call, which was wrong on
-		// two counts: esc_js() is for HTML-attribute JS, not a raw <script> body
-		// (PA-4), and it is an ENCODING - it rewrote &, " and < in the order
-		// number to &amp;/&quot;/&lt;, which this inline-script path never decodes.
-		// The value stored here therefore differed from the raw order number that
-		// gtm4wp-visitor-data.js writes to the very same key, so the two guards
-		// stopped recognising each other's entries.
-		// json_literal(), not a bare wp_json_encode(): the result is interpolated
-		// into three JavaScript EXPRESSION positions below, and the encoder returns
-		// false - which PHP renders as '' - for a value it cannot encode, leaving
-		// `( == gtm4wp_orderid_tracked )`. That is a SyntaxError taking the whole
-		// duplicate-purchase guard with it (RI-21/#141).
-		//
-		// The value is a (string) cast scalar, so today the encoder cannot actually
-		// fail on it. Routed through the shared helper anyway, because an
-		// undocumented exemption is indistinguishable from an oversight, and the
-		// next person to widen this line should not have to re-derive the argument.
+		// A JSON string literal (quotes included) with the hex flags: the RI-2
+		// escaper for a <script> body. Do NOT use esc_js(): it is an HTML-attribute
+		// ENCODING that rewrote &/"/< in the order number, so this guard and the one
+		// gtm4wp-visitor-data.js writes to the same key stopped matching (PA-4).
+		// json_literal(), not bare wp_json_encode(): a false return would render as
+		// '' inside an expression and take the whole guard down as a SyntaxError
+		// (RI-21/#141) - it cannot fail on a string today, but the exemption is not
+		// worth documenting.
 		$order_number_literal = ScriptTag::json_literal(
 			$order_number,
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
@@ -522,53 +445,33 @@ final class Helpers {
 	}
 
 	/**
-	 * Digit-count bounds of an E.164 number, excluding the leading "+".
-	 *
-	 * The maximum is the standard's own hard limit. The minimum is deliberately
-	 * below the shortest real number (Saint Helena, +290 plus four digits) so it
-	 * only ever rejects junk like "-" or "n/a", never a valid number: a validator
-	 * that encodes today's formats rejects tomorrow's (upstream UC-5).
+	 * Digit-count bounds of an E.164 number, excluding the "+". The maximum is the
+	 * standard's limit; the minimum is deliberately below the shortest real number
+	 * (Saint Helena, +290 plus four digits) so it only rejects junk (UC-5).
 	 */
 	private const E164_MAX_DIGITS = 15;
 	private const E164_MIN_DIGITS = 5;
 
 	/**
-	 * Matches a phone extension written after the number itself.
-	 *
-	 * Cut before the digits are harvested, or the extension is absorbed into the
-	 * subscriber number and the result is a well-formed number nobody has. No
-	 * leading \b: "0121 234 5678x22" has no word boundary before the "x".
+	 * A phone extension after the number, cut before the digits are harvested.
+	 * No leading \b: "0121 234 5678x22" has no word boundary before the "x".
 	 */
 	private const EXTENSION_PATTERN = '/(?:extension|ext|x|#)\W*\d+\s*$/i';
 
 	/**
-	 * Matches the trunk prefix printed in parentheses inside an international
-	 * number - "+49 (0) 30 12345678".
-	 *
-	 * The convention means "dial this digit only from inside the country", so it
-	 * is exactly the digit E.164 must not carry. Removed unconditionally: the
-	 * pattern is a lone zero in brackets, so an area code in brackets - "(030)"
-	 * - does not match and is left alone. Standard on business stationery across
-	 * the German-speaking countries and the Netherlands, and taking the "+" form
-	 * at face value silently mangled every one of them.
+	 * The trunk prefix printed in parentheses inside an international number,
+	 * "+49 (0) 30 12345678" - exactly the digit E.164 must not carry. A lone zero
+	 * only, so an area code in brackets "(030)" is left alone.
 	 */
 	private const COURTESY_ZERO_PATTERN = '/\(\s*0\s*\)/';
 
 	/**
 	 * Whether a string of digits is a number this country's numbering plan has.
-	 *
-	 * Used ONLY to choose between two readings of the same digits, never to
-	 * reject one. A number the plan does not recognise is not refused here - the
-	 * caller falls through to positional rules that predate this test - so a
-	 * pattern that has gone stale can fail to improve a number but can never
-	 * throw one away (upstream UC-5).
-	 *
-	 * "#" is the delimiter because a national-number pattern is a digit grammar
-	 * that cannot contain one, and tools/generate-phone-table.php refuses to write
-	 * a pattern outside that grammar rather than leaving it to be discovered here.
-	 * A pattern that somehow fails to compile makes preg_match() return false,
-	 * which is not 1, so the answer is "cannot tell" and the caller falls through
-	 * - the same direction as an unrecognised number.
+	 * Used ONLY to choose between two readings, never to reject one: the caller
+	 * falls through to positional rules, so a stale pattern can fail to improve a
+	 * number but never throws one away (UC-5). "#" delimits because a digit
+	 * grammar cannot contain it (tools/generate-phone-table.php enforces that); a
+	 * pattern that fails to compile returns false, i.e. "cannot tell".
 	 *
 	 * @param string $digits         Bare digits, no "+" and no separators.
 	 * @param string $number_pattern The country's general national-number pattern.
@@ -598,50 +501,23 @@ final class Helpers {
 	}
 
 	/**
-	 * Converts a store billing phone number into E.164 format.
+	 * Converts a store billing phone number into E.164, which Google requires
+	 * before hashing. An explicit international form is taken at face value;
+	 * everything else is anchored to the order's country via the three
+	 * CountryPhoneData columns, GENERATED from libphonenumber
+	 * (tools/generate-phone-table.php): the calling code; the trunk prefix, or
+	 * null when the country has none (Italy: a leading zero is part of the
+	 * number); and the general national-number pattern, the only thing that can
+	 * separate "34 612 345 678" (Spanish, "+" left off) from "391 234 5678"
+	 * (Italian mobile beginning with Italy's own calling code). The pattern is a
+	 * tie-breaker, never a validator (UC-5).
 	 *
-	 * Google requires this exact format before hashing: "Format phone numbers
-	 * according to the E164 standard." A number that is merely lowercased and
-	 * stripped of spaces still fails to match, silently, because a hash either
-	 * matches or does not and nothing reports which.
+	 * Deliberately not modelled (each needs transform rules, not facts):
+	 * Argentina's mobile "9" and Brazil's carrier codes; international-access
+	 * codes other than "00" (US "011", JP "010", AU "0011", RU "810").
 	 *
-	 * An explicit international form is taken at face value. Everything else is
-	 * anchored to the order's country using the three columns of
-	 * CountryPhoneData, which is GENERATED from libphonenumber's metadata
-	 * (tools/generate-phone-table.php):
-	 *
-	 * - the **calling code**;
-	 * - the **national (trunk) prefix, or null** - null meaning the country has
-	 *   none at all, so a leading zero is part of the number rather than
-	 *   something to strip. Italy is the commercially important case: reading
-	 *   "no trunk prefix" as "uses 0" made every Italian landline hash to a value
-	 *   Google could never match;
-	 * - the **general national-number pattern**, which is what decides between
-	 *   two readings of the same digits. Positional rules cannot: "34 612 345
-	 *   678" from a Spanish address is the international form with the "+" left
-	 *   off, while "391 234 5678" from an Italian one is a national mobile that
-	 *   happens to begin with Italy's own calling code, and no amount of counting
-	 *   digits separates those two. Neither do possible lengths, which is what an
-	 *   earlier version of this comment claimed was needed - both Italian
-	 *   readings are possible Italian lengths.
-	 *
-	 * The pattern is a tie-breaker, never a validator: a number it does not
-	 * recognise falls through to the positional rules rather than being refused,
-	 * so a pattern that has gone stale can fail to improve a number but cannot
-	 * throw one away (upstream UC-5).
-	 *
-	 * Not modelled, deliberately - each returns a wrong number rather than none,
-	 * and each needs TRANSFORM RULES rather than facts, which is where the line
-	 * is drawn. See tools/generate-phone-table.php.
-	 *
-	 * - Argentina's mobile "9" and Brazil's carrier selection codes, which need
-	 *   libphonenumber's nationalPrefixTransformRule.
-	 * - Dialling a foreign number with a national international-access code other
-	 *   than "00" (US "011", JP "010", AU "0011", RU "810").
-	 *
-	 * Returns '' whenever the number cannot be placed with confidence. The caller
-	 * decides what to do with that; inventing a country would produce a hash that
-	 * can never match, which is worse than sending nothing.
+	 * Returns '' when the number cannot be placed with confidence: an invented
+	 * country would produce a hash that can never match.
 	 *
 	 * @link https://developers.google.com/google-ads/api/docs/conversions/enhanced-conversions/web Google Ads: normalization rules before hashing.
 	 *
@@ -655,9 +531,7 @@ final class Helpers {
 			return '';
 		}
 
-		// Both run BEFORE the digits are harvested: an extension and a courtesy
-		// zero are digits, and once they are in the string nothing downstream can
-		// tell them from the number.
+		// Both BEFORE the digits are harvested; afterwards they are just digits.
 		$phone_number = (string) preg_replace( self::EXTENSION_PATTERN, '', $phone_number );
 		$phone_number = (string) preg_replace( self::COURTESY_ZERO_PATTERN, '', $phone_number );
 
@@ -683,21 +557,17 @@ final class Helpers {
 
 		list( $calling_code, $trunk_prefix, $number_pattern ) = $dialling;
 
-		// 1. A trunk prefix the plan confirms. Stripping is only right when what
-		// is left is a number this country actually has - which is also what stops
-		// a number that merely begins with the trunk digit from being cut.
+		// 1. A trunk prefix the plan confirms: strip only when what is left is a
+		// number this country has.
 		if ( null !== $trunk_prefix && str_starts_with( $digits, $trunk_prefix )
 			&& self::is_national_number( substr( $digits, strlen( $trunk_prefix ) ), $number_pattern ) ) {
 			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );
 		}
 
-		// 2. The international form with the "+" left off, decided the way
-		// libphonenumber decides it: the whole string is NOT a national number
-		// here, and the remainder after the calling code IS. Both halves matter.
-		// Without the first, an Italian mobile in the 39x range - which begins
-		// with Italy's own calling code - would be cut down to a number one
-		// operator short. Without the second, a Spanish number typed as
-		// "34 612 345 678" would have "34" prepended a second time.
+		// 2. The international form with the "+" left off, decided as libphonenumber
+		// does: the whole string is NOT a national number and the remainder after
+		// the calling code IS. Both halves matter (Italian 39x mobiles; Spanish
+		// "34 612 345 678").
 		if ( str_starts_with( $digits, $calling_code )
 			&& ! self::is_national_number( $digits, $number_pattern )
 			&& self::is_national_number( substr( $digits, strlen( $calling_code ) ), $number_pattern ) ) {
@@ -709,18 +579,9 @@ final class Helpers {
 			return self::to_e164( $calling_code . $digits );
 		}
 
-		// 4. The plan recognises neither reading: a typo, a range it has not
-		// caught up with, or a pattern of ours that has gone stale. Fall back to
-		// the positional rules that predate the pattern column, so the worst this
-		// column can do is fail to improve a number.
-		//
-		// Deliberately uniform across countries, including the ones with no trunk
-		// prefix. The asymmetry that used to live here - anchor and stop, without
-		// trying the calling code - existed only because the trunk column carried
-		// a default that could not say "this country has none"; it is not a rule
-		// anybody chose. For input the plan rejects either way no reading is
-		// defensible, so this applies one set of rules rather than preserving a
-		// historical accident in the one branch nothing tests.
+		// 4. The plan recognises neither reading (typo, new range, stale pattern):
+		// fall back to the positional rules, uniform across countries, so the
+		// worst the pattern column can do is fail to improve a number.
 		if ( null !== $trunk_prefix && str_starts_with( $digits, $trunk_prefix )
 			&& strlen( $digits ) - strlen( $trunk_prefix ) >= 4 ) {
 			return self::to_e164( $calling_code . substr( $digits, strlen( $trunk_prefix ) ) );

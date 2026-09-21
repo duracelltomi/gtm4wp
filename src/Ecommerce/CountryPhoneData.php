@@ -18,29 +18,18 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Per-country dialling facts, used to turn a locally typed phone number into
- * E.164 before hashing it for Enhanced Conversions.
+ * E.164 before hashing it for Enhanced Conversions. Three columns:
  *
- * Three columns, and the third is the one that decides between two readings of
- * the same digits:
+ * 1. **Calling code**, without the "+".
+ * 2. **National (trunk) prefix, or null.** Null is NOT "unknown": the country
+ *    has no trunk prefix, so a leading zero is part of the number (101 of
+ *    245 entries; Italy is the commercially important one).
+ * 3. **General national-number pattern.** Used ONLY to choose between "a
+ *    national number" and "the international form with the + left off", never
+ *    to reject a number (UC-5); an unrecognised number falls through to the
+ *    positional rules.
  *
- * 1. **Calling code.** The country's international prefix, without the "+".
- * 2. **National (trunk) prefix, or null.** Null is NOT "unknown" - it means the
- *    country has no trunk prefix at all, so a leading zero is part of the number
- *    and must be kept. 101 of the 245 entries are null; of those, Italy
- *    is the commercially important one, because conflating "no trunk prefix"
- *    with "uses 0" made every Italian landline hash to a value Google could
- *    never match.
- * 3. **General national-number pattern.** What a number of this country looks
- *    like. Used ONLY to choose between "this is a national number" and "this is
- *    the international form with the + left off" - never to reject a number, so a
- *    stale pattern can fail to improve a number but cannot refuse one (upstream
- *    UC-5). A number it does not recognise falls through to the positional rules,
- *    which are applied uniformly across all territories - not to the behaviour
- *    that predated this column, which returned early for the ones with no trunk
- *    prefix. See tools/generate-phone-table.php for the measurement behind that.
- *
- * See tools/generate-phone-table.php for why this is generated rather than
- * written, and what it deliberately does not model.
+ * See tools/generate-phone-table.php for what it deliberately does not model.
  */
 final class CountryPhoneData {
 

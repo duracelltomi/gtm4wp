@@ -30,24 +30,18 @@ defined( 'ABSPATH' ) || exit;
 final class PageDataLayer {
 
 	/**
-	 * REST route (relative to VisitorDataEndpoint::REST_NAMESPACE) of the
-	 * authenticated POST that confirms the reliable-purchase fallback was delivered
-	 * (issue #398): it consumes the session delivery marker and flags the order
-	 * _ga_tracked. The session endpoint is a public GET, so it must not mutate
-	 * anything — it only READS the marker and returns the payload; this companion
-	 * POST (nonce protected, order id taken only from the session marker, never the
-	 * request body, so no IDOR) performs every state change. Must match the client
-	 * beacon target baked into the visitor-data config (the pendingPurchase
-	 * VisitorField's confirm_url).
+	 * REST route (relative to VisitorDataEndpoint::REST_NAMESPACE) of the nonce-protected
+	 * POST that confirms the reliable-purchase fallback was delivered (issue #398): it
+	 * consumes the session marker and flags the order _ga_tracked. The public GET session
+	 * endpoint stays read-only; every state change happens here, and the order id comes
+	 * from the session marker only, never the request. Must match the pendingPurchase
+	 * VisitorField's confirm_url.
 	 */
 	public const REST_ROUTE_CONFIRM_PURCHASE = '/confirm-purchase-tracked';
 
 	/**
-	 * REST route (relative to VisitorDataEndpoint::REST_NAMESPACE) of the
-	 * authenticated POST that confirms the re-added-to-cart one-shot was delivered
-	 * (issue #398), consuming its session marker. The sibling of
-	 * REST_ROUTE_CONFIRM_PURCHASE, and for the same reason: the GET that delivers the
-	 * event stays read-only, so every state change happens here, behind a nonce.
+	 * Sibling of REST_ROUTE_CONFIRM_PURCHASE for the re-added-to-cart one-shot
+	 * (issue #398): the POST that consumes its session marker.
 	 */
 	public const REST_ROUTE_CONFIRM_READD = '/confirm-readd-tracked';
 
@@ -90,24 +84,14 @@ final class PageDataLayer {
 
 		$woo = WC();
 
-		// Under the cache-safe data layer (issue #398) the customer details and the
-		// cart are visitor/session specific, so they must not be baked into
-		// cacheable page HTML. They are omitted here and delivered client-side on
-		// WooCommerce's cart-fragments response instead (see visitor_cart_datalayer()),
-		// where they arrive as the gtm4wp.customerData and gtm4wp.cartData events.
-		//
-		// That response is one WooCommerce already makes on a store showing a mini-cart;
-		// on a store that is not, WooCommerceModule::enqueue_visitor_cart_channel() loads
-		// the script itself and the store therefore does pay one uncached wc-ajax round
-		// trip per browser tab. Only for a visitor who already has WooCommerce state -
-		// the enqueue is gated on that, because the script has no empty-cart bail-out of
-		// its own. This comment used to say "no new per-page request is added", which was
-		// true before that enqueue existed and is the sort of promise worth correcting
-		// rather than leaving for someone to trust.
-		//
-		// The content-driven events below (view_item / view_cart / begin_checkout /
-		// purchase) are URL-scoped or fire only on cache-excluded pages, so they stay
-		// server-side.
+		// Cache-safe data layer (issue #398): customer details and the cart are
+		// visitor-specific, so they are not baked into cacheable HTML but delivered
+		// on WooCommerce's cart-fragments response (visitor_cart_datalayer()) as the
+		// gtm4wp.customerData / gtm4wp.cartData events. On a store without a
+		// mini-cart WooCommerceModule::enqueue_visitor_cart_channel() loads that
+		// script itself, gated on the visitor having WooCommerce state. The
+		// content-driven events below are URL-scoped or fire only on cache-excluded
+		// pages, so they stay server-side.
 		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
 
 		if ( ! $cache_safe ) {
@@ -115,20 +99,11 @@ final class PageDataLayer {
 			$data_layer = $this->add_cart_content( $data_layer, $woo );
 		}
 
-		// Product detail view data layer content.
-		//
-		// The order of the cart/checkout arms matters, because WooCommerce answers
-		// both is_cart() and is_checkout() with true on some stores: a plugin or a
-		// theme can define WOOCOMMERCE_CART or answer the woocommerce_is_cart
-		// filter while the checkout page renders, and a leftover cart shortcode in
-		// the checkout page content does the same. The checkout arm is therefore
-		// tested first, matching WooCommerceModule::block_cart_or_checkout_context(),
-		// which resolves the tracker's context the same way. When the two disagreed,
-		// such a page emitted view_cart from here while the block tracker fired the
-		// checkout steps, and begin_checkout could never fire at all. The
-		// order-received endpoint keeps its place ahead of both: is_checkout() is
-		// true there as well, and that page reports a purchase rather than a
-		// checkout start.
+		// Arm order matters: is_cart() and is_checkout() can both be true (a theme
+		// defining WOOCOMMERCE_CART or a cart shortcode on the checkout page), so
+		// checkout is tested before cart, matching
+		// WooCommerceModule::block_cart_or_checkout_context(); order-received stays
+		// ahead of both because is_checkout() is true there too.
 		if ( is_product() ) {
 			$data_layer = $this->add_product_view( $data_layer );
 		} elseif ( is_order_received_page() ) {
@@ -139,15 +114,13 @@ final class PageDataLayer {
 			$this->add_cart_view( $woo );
 		}
 
-		// The one-shot cookie/session events are visitor/session specific, so they
-		// are also withheld from cacheable HTML under the cache-safe data layer.
+		// The one-shot session events are visitor-specific too, so they are also
+		// withheld from cacheable HTML under the cache-safe data layer.
 		if ( ! $cache_safe ) {
 			$this->maybe_add_readded_to_cart( $woo );
 
-			// Reliable purchase tracking: if the order-received page was missed (custom
-			// thank-you page, order-pay landing, a gateway that never reached it), emit
-			// the purchase for the order remembered in this session on whatever page the
-			// customer views next. No-op unless the feature is enabled.
+			// Reliable purchase tracking: a purchase whose order-received page was
+			// missed is emitted on the next page the customer views.
 			$data_layer = $this->maybe_add_pending_purchase( $data_layer );
 		}
 
@@ -214,12 +187,10 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Builds the process_product() attributes for a cart line, adding the display
-	 * price derived from WooCommerce's already-calculated line totals so
-	 * process_product() does not recompute wc_get_price_to_display() for every cart
-	 * item - the cause of the reported cart/checkout memory exhaustion (#436). The
-	 * price is omitted (and process_product() computes it) when the line totals are
-	 * not yet available.
+	 * Builds the process_product() attributes for a cart line. The display price is
+	 * derived from WooCommerce's already-calculated line totals so process_product()
+	 * does not recompute wc_get_price_to_display() per item (#436, memory
+	 * exhaustion); omitted when the totals are not available yet.
 	 *
 	 * @param array<string, mixed> $cart_item_data The WooCommerce cart item.
 	 * @return array<string, mixed>
@@ -265,11 +236,9 @@ final class PageDataLayer {
 
 		$current_cart = $woo->cart;
 
-		// The money totals are cast to float: the WC_Cart getters pass through
-		// woocommerce_cart_* filters that third-party code may answer with decimal
-		// strings, and the data layer encode no longer numeric-coerces
-		// (JSON_NUMERIC_CHECK removed), so the totals are typed here to stay real
-		// JSON numbers. Coupon codes are identifiers and stay strings.
+		// Totals are cast to float: the WC_Cart getters pass through filters that may
+		// answer with decimal strings, and the encode no longer numeric-coerces
+		// (JSON_NUMERIC_CHECK removed). Coupon codes are identifiers and stay strings.
 		$data_layer['cartContent'] = array(
 			'totals' => array(
 				'applied_coupons' => $current_cart->get_applied_coupons(),
@@ -346,12 +315,10 @@ final class PageDataLayer {
 		$data_layer['productReviewCount']   = (int) $product->get_review_count();
 		$data_layer['productType']          = $product->get_type();
 
-		// GA4 list attribution (#405): a product page is full-page cacheable, so the
-		// list the visitor came from must never be baked into this HTML server-side.
-		// Instead the push is wrapped in a JS call that merges it from the first-party
-		// cookie in the browser - the payload below stays identical for every visitor.
-		// The cookie is keyed by the list item's product id, which is what internal_id
-		// carries here (the same value the client-side variation path looks up).
+		// GA4 list attribution (#405): the product page is cacheable, so the list the
+		// visitor came from is never baked into the HTML; the push is wrapped in a JS
+		// call that merges it from the first-party cookie, keyed by the product id
+		// internal_id carries (the same value the client-side variation path uses).
 		$list_product_id   = $eec_product_array['internal_id'] ?? $postid;
 		$list_wrapper      = '';
 		$list_wrapper_args = array();
@@ -586,47 +553,23 @@ final class PageDataLayer {
 			window.gtm4wp_checkout_products = ' . ScriptTag::json_literal( $gtm4wp_checkout_products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
 			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';';
 
-		/*
-		 * Nothing on the page reads these globals unless the classic tracker is on
-		 * it, so "the handle is not there" is not a missed attach - it means there
-		 * is no reader. That is the ordinary state of a BLOCK-based checkout:
-		 * WooCommerceModule::enqueue_scripts() deliberately loads
-		 * gtm4wp-woocommerce-blocks INSTEAD of gtm4wp-woocommerce there (the block
-		 * tracker reads the wc/store data registry, never these globals) while
-		 * is_checkout() is still true here, so this method still runs. Emitting the
-		 * fallback in that case would print a payload with no reader, duplicating
-		 * the items already queued into the begin_checkout push above.
-		 *
-		 * 'enqueued' rather than 'registered': a handle another plugin has dequeued
-		 * stays registered but is never printed, so it has no reader either. It
-		 * stays true after the script is printed (WP_Dependencies::do_items() clears
-		 * to_do, not queue), so the already-done case below is still reached.
-		 */
+		// Only the classic tracker reads these globals. On a block checkout
+		// WooCommerceModule::enqueue_scripts() loads gtm4wp-woocommerce-blocks instead
+		// (it reads the wc/store registry), so no handle means no reader, not a missed
+		// attach. 'enqueued' rather than 'registered': a dequeued handle has no reader
+		// either, and 'enqueued' stays true after printing so the done case below is
+		// still reached.
 		if ( ! wp_script_is( 'gtm4wp-woocommerce', 'enqueued' ) ) {
 			return;
 		}
 
-		/*
-		 * Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4, PA-8). The two
-		 * window.* assignments never needed jQuery; 'before' placement emits them
-		 * just ahead of the gtm4wp-woocommerce tracker that reads them.
-		 *
-		 * An inline script can only be attached while its handle is still pending.
-		 * This runs on the data layer compile filter fired from wp_head priority 10,
-		 * after wp_print_head_scripts() (priority 9), so on a site that filters the
-		 * tracker into the <head> instead of the footer the handle is already done
-		 * and the attach would silently drop the checkout data - leaving
-		 * add_shipping_info / add_payment_info to report an empty item list and a
-		 * value of 0. Print the block ourselves in the footer in that case; it is
-		 * the same placement the WooCommerce queue used to give us, without the
-		 * deprecated call.
-		 *
-		 * The return value of wp_add_inline_script() is still honoured as a second
-		 * leg. With the enqueued check above, core can only return false here for
-		 * an empty payload, which this one never is - but the documented contract
-		 * of the function is what this depends on, not the internals of
-		 * WP_Scripts::add_data().
-		 */
+		// Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4, PA-8). An inline
+		// script can only attach while its handle is pending; this runs from wp_head
+		// priority 10, after wp_print_head_scripts() (9), so a site that filters the
+		// tracker into the <head> already has the handle done and the attach would
+		// silently drop the checkout data (add_shipping_info / add_payment_info with
+		// empty items). Print the block in the footer ourselves in that case. The
+		// wp_add_inline_script() return value is honoured per its documented contract.
 		if (
 			wp_script_is( 'gtm4wp-woocommerce', 'done' )
 			|| ! wp_add_inline_script( 'gtm4wp-woocommerce', $checkout_js, 'before' )
@@ -640,10 +583,8 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Prints the checkout globals that could not be attached to the tracker
-	 * handle, as a standalone inline script block in the footer. Registered on
-	 * wp_footer by add_begin_checkout() only in that fallback case; a no-op
-	 * otherwise.
+	 * Prints the checkout globals that could not be attached to the tracker handle
+	 * as a standalone footer script block (the add_begin_checkout() fallback).
 	 *
 	 * @return void
 	 */
@@ -697,14 +638,9 @@ final class PageDataLayer {
 			$order = wc_get_order( $order_id );
 
 			if ( $order instanceof \WC_Order ) {
-				// hash_equals(), not !==: this compares a secret the request supplies
-				// against the stored one, and it guards the very same URL as the check
-				// in WC_Shortcode_Checkout::order_received(), which has always used
-				// hash_equals(). Against a long random key over HTTP the timing channel
-				// is not a practical attack; the two checks simply should not differ in
-				// kind. Both sides are cast because the value reaching the comparison
-				// has passed through a public filter (see above) and hash_equals()
-				// throws on a non-string.
+				// hash_equals(), matching WC_Shortcode_Checkout::order_received() on the
+				// same URL; both sides cast because the key passed a public filter and
+				// hash_equals() throws on a non-string.
 				if ( ! hash_equals( (string) $order->get_order_key(), (string) $order_key ) ) {
 					$order = null;
 				}
@@ -713,17 +649,13 @@ final class PageDataLayer {
 			}
 		}
 
-		// Whether the order was resolved from the REQUEST - the ?order= id plus a
-		// matching ?key=. Anyone holding that URL is "the request", which is what
-		// woocommerce_hides_order_from_visitor() below reasons about; the session
-		// fallback that follows resolves the buyer's own order instead, so it is
-		// deliberately exempt.
+		// Resolved from the REQUEST (?order= plus a matching ?key=) is what
+		// woocommerce_hides_order_from_visitor() reasons about; the session fallback
+		// below resolves the buyer's own order and is deliberately exempt.
 		$from_request = $order instanceof \WC_Order;
 
-		// Custom order-received page: a bespoke thank-you page (selected in the
-		// "Custom order received page" option) carries no order id or key in its
-		// URL, so resolve the order from this browser's session instead. The
-		// session belongs to the buyer, so no order-key check is possible or needed.
+		// Custom order-received page: no order id or key in the URL, so resolve the
+		// order from this browser's session (the buyer's own, so no key check).
 		if ( ! ( $order instanceof \WC_Order ) ) {
 			$session_order_id = $this->pending_session_order_id();
 
@@ -737,115 +669,71 @@ final class PageDataLayer {
 			}
 		}
 
-		/**
-		 * From this point if for any reason purchase data is not pushed
-		 * that is because for a specific reason.
-		 * In any other case the woocommerce_thankyou hook will be the fallback if
-		 * is_order_received_page does not work.
-		 */
+		// From here on, purchase data not being pushed is deliberate; otherwise the
+		// woocommerce_thankyou hook is the fallback when is_order_received_page()
+		// does not work.
 		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
 
 		if ( ! ( $order instanceof \WC_Order ) ) {
 			return $data_layer;
 		}
 
-		// A forwarded or otherwise leaked order-received URL still carries a valid
-		// order key, so the checks above cannot tell it apart from the buyer's own
-		// visit - but WooCommerce may already have decided not to show that visitor
-		// the order (see woocommerce_hides_order_from_visitor()). The purchase event
-		// keeps firing on the key alone, since the buyer arriving straight from
-		// checkout is logged in or well inside the verification grace period and
-		// would otherwise lose the conversion; only the customer identity blocks are
-		// withheld, in exactly the cases WooCommerce itself would have declined to
-		// render the order.
+		// A forwarded order-received URL still carries a valid key. The purchase
+		// event fires on the key alone (the buyer arriving from checkout must not
+		// lose the conversion); only the customer identity blocks are withheld, in
+		// exactly the cases WooCommerce itself would not render the order.
 		$withhold_customer_data = $from_request && $this->woocommerce_hides_order_from_visitor( $order );
 
 		return $this->add_purchase_for_order( $data_layer, $order, (int) $order_id, $withhold_customer_data );
 	}
 
 	/**
-	 * Whether WooCommerce itself would refuse to render this order to whoever is
-	 * making the current request, in which case the data layer withholds the
-	 * customer identity blocks (orderData.customer, new_customer / customer_type
-	 * and the purchase event's user_data) even though the purchase event still
-	 * fires.
+	 * Whether WooCommerce itself would refuse to render this order to the current
+	 * request, in which case the customer identity blocks (orderData.customer,
+	 * new_customer / customer_type, the purchase event's user_data) are withheld
+	 * while the purchase event still fires.
 	 *
-	 * WooCommerce grew two gates in WC_Shortcode_Checkout::order_received() that
-	 * run AFTER the order-key check and return before woocommerce_thankyou, so
-	 * nothing on this side observes them; the decision is re-derived instead, and
-	 * the rule is upstream PARITY in both directions. Withholding more than
-	 * upstream is not safety: wherever order_received() renders, the page body is
-	 * already showing this visitor the order, so extra withholding only deletes
-	 * tracking data. Publishing more than upstream is the real failure. Where a
-	 * term of upstream's decision cannot be read from here, the mirror therefore
-	 * drops it in the withhold direction - a guarantee that holds for every
-	 * monotone callback on the filters below (a passthrough, a constant, or one
-	 * that only ANDs its own conditions onto the value it was handed); the one
-	 * shape it cannot cover is a strictly value-inverting callback on the
-	 * final-say filter, named as the fourth accepted residual at that call.
+	 * The two gates in WC_Shortcode_Checkout::order_received() run after the
+	 * order-key check and return before woocommerce_thankyou, so the decision is
+	 * re-derived here. The rule is upstream PARITY: withholding more than upstream
+	 * only deletes tracking data (the page body already shows the order),
+	 * publishing more is the real failure, so any term that cannot be read from
+	 * here is dropped in the withhold direction. Version surface (measured at the
+	 * release tags, registry row U113):
 	 *
-	 * The version surface, measured at the release tags rather than remembered
-	 * (registry rows: .upstream U113):
+	 * - 5.0-7.8.x: no gates; nothing withheld. Detected by probing the symbol both
+	 *   gates arrived with (guest_should_verify_email, 7.9.0), never by version.
+	 * - 7.9.0+: a non-guest order requires being logged in as its customer;
+	 *   filterable via woocommerce_order_received_verify_known_shoppers since 8.4.0.
+	 * - 7.9.0+: a guest order requires billing-email verification, decided inline
+	 *   by guest_should_verify_email() through 8.5.x (10-minute filterable grace
+	 *   from 8.0.0) and by Users::should_user_verify_order_email() from 8.6.0,
+	 *   which is asked directly when present (Internal namespace, UC-2 guard).
 	 *
-	 * - 5.0-7.8.x: NO gates. order_received() renders the full order to any
-	 *   holder of a valid key link, so there is no upstream decision to mirror
-	 *   and nothing is withheld. Decided by probing the symbol both gates
-	 *   arrived with (guest_should_verify_email, 7.9.0, still present on
-	 *   11.0.0), so no version number is compared anywhere.
-	 * - 7.9.0+: a non-guest order requires being logged in as its customer.
-	 *   Unconditional until 8.4.0, which wrapped it in the
-	 *   woocommerce_order_received_verify_known_shoppers filter read below.
-	 * - 7.9.0+: a guest order requires billing-email verification, decided by
-	 *   guest_should_verify_email() in the shortcode through 8.5.x - 7.9.x has
-	 *   no grace period; the 10-minute filterable grace arrived in 8.0.0 - and
-	 *   by Users::should_user_verify_order_email() from 8.6.0, which is asked
-	 *   directly when it exists. That helper lives in an Internal namespace
-	 *   with no compatibility promise (UC-2), hence the guard around the
-	 *   delegation.
-	 *
-	 * Between the two (7.9.0-8.5.x, or any future WooCommerce that moves the
-	 * helper while keeping the gates) the fallback mirrors the shortcode's own
-	 * guest_should_verify_email() term by term, for every order shape that
-	 * reaches it - upstream applies it to a known shopper's order too once the
-	 * site filters the login gate off. Three terms identify the REQUEST rather
-	 * than the order and are deliberately not modelled: the WooCommerce session
-	 * email match, the POSTed-email escape hatch (it needs upstream's own nonce
-	 * and field names), and read_private_shop_orders. Each omission makes the
-	 * mirror withhold where upstream renders, never the reverse - for any
-	 * monotone callback on the final-say filter; only a strictly value-inverting
-	 * callback there can compose with these omissions into publishing where
-	 * upstream hides (see that filter's comment). The purchase event is
-	 * unaffected either way.
+	 * The 7.9.0-8.5.x fallback mirrors guest_should_verify_email() term by term.
+	 * Three request-identity terms are deliberately not modelled: the session
+	 * email match, the POSTed-email escape hatch and read_private_shop_orders;
+	 * each omission withholds where upstream renders, never the reverse, for any
+	 * monotone filter callback. The accepted residuals are named at their lines.
 	 *
 	 * @param \WC_Order $order The order resolved from the request.
 	 * @return bool True when the order data must not be attributed to this visitor.
 	 */
 	private function woocommerce_hides_order_from_visitor( \WC_Order $order ): bool {
-		// Feature-detect the release that introduced both gates: absent means a
-		// WooCommerce (5.0-7.8.x, measured at the 7.8.0 and 7.9.0 tags) that
-		// renders the order to any holder of a valid key link, so publishing
-		// matches upstream exactly. The probe is accurate even before the class
-		// is loaded - method_exists() triggers WC_Autoloader, which has mapped
-		// the wc_shortcode_ prefix to includes/shortcodes/ since before 5.0, and
-		// it sees the member through its private visibility (probed). Residual:
-		// were the class ever unloadable while WooCommerce still served this
-		// page, this publishes - accepted, because that site's order-received
-		// page fatals on its own before this code matters, and U113's Release
-		// Radar watches the symbol so an upstream rename is caught at RC time.
+		// Absent means 5.0-7.8.x, which renders the order to any valid key holder.
+		// method_exists() triggers WC_Autoloader and sees private members, so the
+		// probe works before the class is loaded. Residual 1: an unloadable class
+		// publishes - accepted, that site's order-received page fatals first, and
+		// U113 watches the symbol.
 		if ( ! method_exists( 'WC_Shortcode_Checkout', 'guest_should_verify_email' ) ) {
 			return false;
 		}
 
 		/**
-		 * Indicates if known (non-guest) shoppers need to be logged in before we let
-		 * them access the order received page. Documented and applied by WooCommerce
-		 * itself; read here so the data layer follows the same decision.
-		 *
-		 * The gate is older than its filter: order_received() requires the login
-		 * unconditionally from 7.9.0 and 8.4.0 only made it filterable. A site
-		 * callback returning false is honoured here on 7.9.0-8.3.x too, where
-		 * upstream ignores it - the callback is the admin asking for the gate to
-		 * be off, and the mirror follows the admin.
+		 * Whether known (non-guest) shoppers must be logged in to see the order.
+		 * The gate is unconditional from 7.9.0 and filterable from 8.4.0; a false
+		 * from a site callback is honoured on 7.9.0-8.3.x too (residual 2: the
+		 * admin asked for the gate to be off, the mirror follows the admin).
 		 *
 		 * @since WooCommerce 8.4.0 (the login requirement itself: 7.9.0)
 		 *
@@ -861,54 +749,32 @@ final class PageDataLayer {
 		$users_class = 'Automattic\WooCommerce\Internal\Utilities\Users';
 
 		if ( class_exists( $users_class ) && method_exists( $users_class, 'should_user_verify_order_email' ) ) {
-			// WooCommerce 8.6.0+: ask the decision's current owner directly. The
-			// supplied email stays null because the POSTed-email escape hatch is
-			// deliberately not reproduced (see the method docblock); a null can
-			// only make the helper withhold more, never less.
+			// WooCommerce 8.6.0+: ask the decision's owner. Email stays null (the
+			// POSTed-email escape hatch is not reproduced); null only withholds more.
 			return (bool) $users_class::should_user_verify_order_email( $order->get_id(), null, 'order-received' );
 		}
 
-		// 7.9.0-8.5.x: the decision still lives inline in the shortcode, so what
-		// follows mirrors guest_should_verify_email() as it shipped there (read
-		// at the 7.9.0, 8.0.0 and 8.5.2 tags), term by term, for every order
-		// shape that reaches this point - upstream runs it for a known shopper's
-		// order too when the login gate above is filtered off, and its only
-		// customer-id term is the owner short-circuit below.
+		// 7.9.0-8.5.x: mirror of the inline guest_should_verify_email(), which
+		// upstream also runs for a known shopper's order once the login gate is
+		// filtered off.
 
-		// Upstream renders an order with no billing email on every gated version:
-		// there is nothing to verify a visitor against (an admin-created phone
-		// order is the common shape).
+		// No billing email: nothing to verify against, upstream renders.
 		if ( empty( $order->get_billing_email() ) ) {
 			return false;
 		}
 
-		// Upstream renders for the logged-in owner. With the known-shopper gate
-		// on, this is the only way a customer order reaches here; with the gate
-		// filtered off, it keeps the buyer reading their own order exempt no
-		// matter what the filter said.
+		// Logged-in owner: upstream renders, whatever the known-shopper filter said.
 		if ( $order_customer_id > 0 && get_current_user_id() === $order_customer_id ) {
 			return false;
 		}
 
 		/**
-		 * Documented and applied by WooCommerce itself; read here so the
-		 * fallback uses the site's own grace period rather than a second
-		 * hardcoded one.
-		 *
-		 * All three arguments are passed because WooCommerce passes three, in
-		 * both homes this filter has had - the shortcode on 8.0.0-8.5.x and
-		 * Users::should_user_verify_order_email() from 8.6.0. WP_Hook hands a
-		 * callback exactly the list the caller supplied and never pads it, so
-		 * a site callback written to the documented three-parameter signature
-		 * raises an uncaught ArgumentCountError if we pass fewer. Passing all
-		 * three is safe in the other direction: WP_Hook slices the list down
-		 * to each callback's own accepted_args.
-		 *
-		 * On 7.9.x itself neither this filter nor any grace period exists, so
-		 * within these ten minutes the mirror publishes where 7.9.x would
-		 * already demand verification - the one window where it is laxer than
-		 * upstream. Bounded by the order max-age gate, and it is the exact
-		 * behaviour 8.0.0 (the next release, same summer 2023) adopted.
+		 * The site's own grace period. All three arguments are passed because
+		 * WooCommerce passes three (RI-25): WP_Hook never pads the list, so a
+		 * callback written to the documented signature would raise an
+		 * ArgumentCountError. Residual 3: 7.9.x has no grace period, so for ten
+		 * minutes the mirror publishes where 7.9.x demands verification -
+		 * bounded by the order max-age gate, and the behaviour 8.0.0 adopted.
 		 *
 		 * @since WooCommerce 8.0.0
 		 *
@@ -919,31 +785,20 @@ final class PageDataLayer {
 		$grace_period = (int) apply_filters( 'woocommerce_order_email_verification_grace_period', 10 * MINUTE_IN_SECONDS, $order, 'order-received' );
 		$created      = $order->get_date_created();
 
-		// <= rather than <: upstream's own comparison, so the boundary second
-		// matches too. No creation date skips this short-circuit exactly like
-		// upstream's is_a() check does, and the decision falls to the filter
-		// below - which withholds unless the site opted out.
+		// <= is upstream's own comparison. No creation date falls through to the
+		// filter below, like upstream's is_a() check.
 		if ( $created && ( time() - $created->getTimestamp() ) <= $grace_period ) {
 			return false;
 		}
 
 		/**
-		 * The final say upstream gives a site over the verification requirement,
-		 * and its documented opt-out ("the filter primarily exists as a way to
-		 * *remove* the email verification step") - honoured so a store that
-		 * disabled verification keeps a complete data layer. Three arguments for
-		 * the same WP_Hook reason as above (RI-25). Because the request-identity
-		 * terms are not modelled, the value passed in is true in cases where
-		 * upstream would have computed false - so a passthrough callback changes
-		 * nothing, and only an explicit false publishes. That approximation is
-		 * fail-closed for every monotone callback; the residual is a strictly
-		 * value-inverting callback (false on true, true on false), which would
-		 * publish here in exactly the request-identity states upstream computed
-		 * false for - states that identify the visitor as the buyer or a
-		 * read_private_shop_orders holder. Accepted as the fourth residual,
-		 * alongside the probe, known-shoppers and 7.9.x-grace laxities above.
-		 * Upstream applies it after the grace short-circuit, never inside it,
-		 * which is why it is not consulted for a fresh order above.
+		 * Upstream's final say, honoured so a store that disabled verification
+		 * keeps a complete data layer; three arguments per RI-25. The value passed
+		 * in is true where upstream may have computed false (unmodelled
+		 * request-identity terms), so a passthrough changes nothing and only an
+		 * explicit false publishes. Residual 4: a strictly value-inverting
+		 * callback would publish in exactly those states. Applied after the grace
+		 * short-circuit, as upstream does.
 		 *
 		 * @since WooCommerce 7.9.0
 		 *
@@ -955,13 +810,11 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Reliable purchase tracking fallback. When the "purchase on any page" option
-	 * is on and the order-received page did not already fire the purchase this
-	 * request, emit the purchase for the order remembered in this browser's
-	 * session (seeded by PurchaseTracking::remember_order() at payment/status
-	 * time). This fires on whatever page the customer views next - so a customized
-	 * thank-you page, or landing on the order-pay page, no longer loses the sale.
-	 * The order-tracked flag, age gate and browser cookie prevent double counting.
+	 * Reliable purchase tracking fallback: when "purchase on any page" is on and the
+	 * order-received page did not fire the purchase this request, emit it for the
+	 * order remembered in the session (PurchaseTracking::remember_order()) on the
+	 * next page the customer views. The tracked flag, age gate and browser cookie
+	 * prevent double counting.
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -995,11 +848,10 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Runs the purchase eligibility gauntlet on a resolved order and, when it
-	 * passes, adds the raw order data, queues the GA4 purchase event wrapped in the
-	 * browser-side duplicate guard and flags the order as tracked. Shared by the
-	 * standard order-received page and the session fallback so both apply the same
-	 * age / already-tracked / trackable-status rules and produce identical output.
+	 * Runs the purchase eligibility gauntlet on a resolved order and, when it passes,
+	 * adds the raw order data, queues the GA4 purchase event inside the browser-side
+	 * duplicate guard and flags the order as tracked. Shared by the order-received
+	 * page and the session fallback so both produce identical output.
 	 *
 	 * @param array<string, mixed> $data_layer             The data layer collected so far.
 	 * @param \WC_Order            $order                  The resolved order.
@@ -1020,79 +872,42 @@ final class PageDataLayer {
 			$order_items             = $this->product_data->process_order_items( $order );
 			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 
-			// Dropped after the GTM4WP_WPFILTER_EEC_ORDER_DATA filter rather than
-			// never built, so the filter keeps seeing the shape it has always been
-			// handed. Be precise about what that ordering buys: this is the last
-			// write to the 'customer' KEY, not to orderData as a whole, so a filter
-			// that copies billing details onto a key of its own survives this unset.
-			// The gate has the final say over the key it names and no say over
-			// anything else a third party writes.
-			//
-			// The line drawn here is IDENTITY, not sensitivity. 'customer' holds the
-			// names, addresses, email, phone and their hashes, and that is the whole
-			// of what is withheld; everything else in orderData describes the ORDER
-			// rather than the buyer, and this visitor is already being told about the
-			// order by the purchase event that deliberately keeps firing.
-			//
-			// Do NOT extend this unset to 'attributes' or 'totals' on the theory that
-			// the purchase event duplicates them. Measured, it does not: it carries
-			// neither the creation date, the payment method, the payment method title,
-			// the shipping method nor the status, and it omits six of the ten totals.
-			// Extending it would also delete values this visitor demonstrably already
-			// holds - the order key they supplied in the URL, and the order number the
-			// duplicate guard prints beside this block - and orderData.attributes.order_number
-			// is named in readme.txt as a variable containers read, so removing it
-			// breaks them with no error.
-			//
-			// No is_array() guard: get_raw_order_datalayer() declares an array return,
-			// so a filter handing back a scalar is a TypeError there, not here.
+			// Dropped after the GTM4WP_WPFILTER_EEC_ORDER_DATA filter so the filter
+			// keeps seeing its usual shape; a filter that copied billing details onto
+			// its own key survives this. The line is IDENTITY, not sensitivity: only
+			// 'customer' is withheld. Do NOT extend the unset to 'attributes' or
+			// 'totals' - the purchase event does not duplicate them, and
+			// orderData.attributes.order_number is named in readme.txt as a variable
+			// containers read.
 			if ( $withhold_customer_data ) {
 				unset( $data_layer['orderData']['customer'] );
 			}
 		}
 
-		// The canonical eligibility gauntlet (age / already-tracked / status).
-		// The separate age check above only exists so orderData is skipped for
-		// too-old orders as well; the composite re-runs it for free.
+		// The canonical eligibility gauntlet (age / already-tracked / status); the
+		// separate age check above only keeps orderData off too-old orders as well.
 		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
 			return $data_layer;
 		}
 
-		// new_customer / customer_type are derived from the BUYER's order history,
-		// which makes them a fact about the person rather than about the order -
-		// the same side of the line 'customer' and user_data sit on - so they are
-		// withheld with them. They are the only retained values that were on the
-		// identity side of that line.
-		//
-		// Omitted entirely rather than emitted falsy: a consumer's GTM trigger may
-		// test for key presence, so inventing a 'returning' would be a behaviour
-		// change where an absent key is honest (RI-13's omit-don't-invent, and #121
-		// is the recorded case of emitting both keys with one meaningless).
-		//
-		// The two sibling call sites are deliberately NOT gated. resolve_pending_purchase()
-		// resolves the order from the caller's own WC session, and
-		// PurchaseTracking::on_thankyou() only runs once WooCommerce has already
-		// rendered the order - in both, the visitor is the buyer by construction.
+		// new_customer / customer_type describe the BUYER, so they are withheld with
+		// 'customer' and user_data - omitted, not emitted falsy (RI-13, #121). The
+		// sibling call sites (resolve_pending_purchase(), PurchaseTracking::on_thankyou())
+		// are deliberately not gated: there the visitor is the buyer by construction.
 		if ( ! $withhold_customer_data ) {
 			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
 		}
 
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
 
-		// The Enhanced Conversions block is the purchase event's own copy of the
-		// customer identity - hashed email and phone, plus the plaintext address
-		// Google expects - so it is withheld with orderData.customer, and for the
-		// same reason. The event itself (transaction id, value, items) is untouched.
+		// user_data is the purchase event's own copy of the customer identity, so it
+		// is withheld with orderData.customer; the event itself is untouched.
 		if ( $withhold_customer_data ) {
 			unset( $purchase_data_layer['user_data'] );
 		}
 
-		// The browser-side duplicate guard records this order in the
-		// gtm4wp_orderid_tracked cookie / localStorage. When the "Do not flag orders
-		// as being tracked" option is on, the admin has asked the plugin not to
-		// remember tracked orders anywhere, so the browser guard is skipped as well -
-		// matching the server-side is_purchase_already_tracked() / flag_order_tracked()
-		// short-circuits, which otherwise leave a stale localStorage flag behind (#369).
+		// "Do not flag orders as being tracked" skips the browser guard as well as
+		// the server-side flag, or a stale localStorage flag is left behind (#369).
 		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ) ) {
 			$before_purchase_dl_push = '';
 			$after_purchase_dl_push  = '';
@@ -1114,17 +929,10 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Builds the browser-side duplicate-tracking guard wrapped around the purchase
-	 * push: a "before" fragment that only pushes when this order id is not already
-	 * recorded in the cookie / local storage, and an "after" fragment that records
-	 * it. Extracted so the order-received page and the session fallback share the
-	 * exact same guard.
-	 *
-	 * The implementation lives in GTM4WP\Ecommerce\Helpers so every store
-	 * integration consults the same browser guard; the escaping rationale
-	 * (json_literal, not esc_js) and the storage-key contract with
-	 * js/frontend/lib/gtm4wp-cookies.js and gtm4wp-visitor-data.js are
-	 * documented there and on Ecommerce\Helpers::ORDER_TRACKED_COOKIE.
+	 * The browser-side duplicate-tracking guard around the purchase push (a "before"
+	 * fragment that pushes only when the order is not yet recorded, an "after" one
+	 * that records it). Implemented in GTM4WP\Ecommerce\Helpers so every store
+	 * integration shares it; escaping and storage-key contract documented there.
 	 *
 	 * @param \WC_Order $order The order being tracked.
 	 * @return array{0:string,1:string} The before and after JavaScript fragments.
@@ -1134,12 +942,10 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Returns the id of the order remembered in this browser's WooCommerce session
-	 * waiting for its purchase event, or 0 when there is none. Prefers the marker
-	 * seeded by PurchaseTracking::remember_order() and falls back to WooCommerce's
-	 * own "order awaiting payment" value (useful for a custom thank-you page where
-	 * the seed hooks did not run). The eligibility gauntlet still gates whether the
-	 * resolved order is actually tracked.
+	 * Id of the order remembered in this browser's WooCommerce session, or 0.
+	 * Prefers the PurchaseTracking::remember_order() marker and falls back to
+	 * WooCommerce's own "order awaiting payment" value; the eligibility gauntlet
+	 * still decides whether it is tracked.
 	 *
 	 * @return int
 	 */
@@ -1172,17 +978,11 @@ final class PageDataLayer {
 
 	/**
 	 * Returns WooCommerce with its session and cart loaded for the CURRENT request,
-	 * or null when WooCommerce cannot provide them.
-	 *
-	 * WooCommerce does NOT initialize its session on a REST request: WooCommerce::init()
-	 * calls initialize_session() only when is_request( 'frontend' ) is true, and that
-	 * check ends in `&& ! $this->is_rest_api_request()`. So on the cache-safe session
-	 * endpoint WC()->session is null, every one-shot resolver takes its "no session"
-	 * guard and silently returns null — and because the cache-safe mode ALSO omits
-	 * these events from the page HTML, the purchase / add_to_cart would be lost
-	 * outright rather than merely delayed. wc_load_cart() is WooCommerce's own remedy
-	 * for exactly this context; its Store API calls it per request
-	 * (StoreApi AbstractCartRoute::load_cart_session()).
+	 * or null. WooCommerce does not initialize its session on a REST request
+	 * (WooCommerce::init() skips it when is_rest_api_request()), so on the session
+	 * endpoint every one-shot resolver would silently return null and the event
+	 * would be lost; wc_load_cart() is WooCommerce's own remedy (its Store API calls
+	 * it per request).
 	 *
 	 * @return object|null WooCommerce, or null when it is unavailable.
 	 */
@@ -1208,24 +1008,15 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Same as load_wc(), but only when a WooCommerce one-shot event is actually
-	 * pending for this browser — used by the read-only GET resolvers.
-	 *
-	 * The gate matters for more than speed. Loading the session + cart on EVERY
-	 * session-endpoint request would make WooCommerce hand a fresh session cookie to
-	 * visitors who have none, and page caches routinely bypass the cache for any
-	 * visitor carrying one — which would defeat the very mode this code serves. The
-	 * client only fetches a one-shot while its event cookie is present, so honouring
-	 * the same gate server-side keeps the common path (an anonymous visitor fetching
-	 * Tier 2 once per session) free of any WooCommerce session work.
-	 *
-	 * Only the cookie's PRESENCE is read, never its value: PurchaseTracking and
-	 * ListTracking set it (to a constant '1') alongside the session marker, so
-	 * "marker pending" and "cookie present" are written together. The one exception is
-	 * pending_session_order_id()'s WooCommerce `order_awaiting_payment` fallback, which
-	 * WooCommerce sets without our cookie; under the cache-safe mode that fallback
-	 * therefore only resolves once a real one-shot has flagged the cookie — acceptable,
-	 * because remember_order()'s three hooks already cover every payment method.
+	 * Same as load_wc(), but only when a one-shot event is pending for this browser
+	 * (used by the read-only GET resolvers). The gate is not just speed: loading the
+	 * session on every endpoint request would hand a fresh WooCommerce session
+	 * cookie to visitors who have none, and page caches bypass for any visitor
+	 * carrying one, defeating the cache-safe mode. Only the cookie's PRESENCE is
+	 * read; PurchaseTracking and ListTracking set it together with the session
+	 * marker. The order_awaiting_payment fallback in pending_session_order_id()
+	 * therefore only resolves once a real one-shot flagged the cookie - acceptable,
+	 * remember_order()'s hooks cover every payment method.
 	 *
 	 * @return object|null WooCommerce with a live session, or null.
 	 */
@@ -1239,19 +1030,12 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Whether the WooCommerce customer/cart data layer block is delivered
-	 * client-side over the cart-fragments AJAX (cache-safe data layer, issue #398):
-	 * the mode is on and at least one of the customer-data / cart-content features
-	 * is enabled. When on, add_datalayer_data() omits the same block from the
-	 * cacheable page HTML and it rides the fragments response instead.
-	 *
-	 * Static, and taking the Options service rather than reading $this, because four
-	 * separate behaviours have to agree on this one answer — the wp_footer
-	 * placeholder, the fragments filter, the gtm4wp-visitor-data runtime and the
-	 * wc-cart-fragments enqueue — and two of them are wired from WooCommerceModule,
-	 * which holds no PageDataLayer instance. A second copy of the condition there
-	 * would break the delivery silently the first time the two drifted. Mirrors
-	 * VisitorDataModule::is_enabled(), the same kind of shared read.
+	 * Whether the customer/cart block is delivered client-side over the
+	 * cart-fragments AJAX (cache-safe data layer, issue #398): the mode is on and at
+	 * least one of customer data / cart content is enabled. Static and Options-based
+	 * because four behaviours (footer placeholder, fragments filter, visitor-data
+	 * runtime, wc-cart-fragments enqueue) must agree, two of them wired from
+	 * WooCommerceModule; a second copy of the condition would drift silently.
 	 *
 	 * @param Options $options The plugin options service.
 	 * @return bool
@@ -1265,28 +1049,14 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Builds the customer + cart data layer block for the current session, reusing
-	 * the exact server-path builders so the client receives identical values under
-	 * identical key names. Empty when neither feature is enabled or WooCommerce is
-	 * unavailable. Derives everything from the current request's WC session/customer
-	 * — no id parameter — so a caller only ever gets its own data.
-	 *
-	 * The two families are returned as SEPARATE parts rather than one flat array
-	 * because each is delivered as its own data layer event (gtm4wp.customerData /
-	 * gtm4wp.cartData), so a Google Tag Manager setup can tell from the event name
-	 * alone which keys arrived. The split is made here, where the builder that
-	 * produced each key is known, so the client never has to classify keys by their
-	 * name prefix — that would freeze today's naming into a client-side validator and
-	 * mis-file the first key that does not match it.
-	 *
-	 * A part is omitted when its builder wrote no keys at all (its feature is off, or
-	 * there is no WC_Customer on this request). Note that this is deliberately NOT a
-	 * test of the part's contents: an EMPTY CART still produces a cart part (with
-	 * items: [] and zeroed totals), because "the cart is now empty" is exactly the
-	 * signal a tag reads after the last remove_from_cart. Likewise an anonymous
-	 * visitor still produces a customer part, with the same blank values the
-	 * server-rendered path emits for them — the contract of the cache-safe mode is the
-	 * same keys with the same values, only delivered differently.
+	 * Builds the customer + cart block for the current session with the same
+	 * builders as the server path, so the client gets identical keys and values.
+	 * No id parameter: a caller only ever gets its own data. The two families are
+	 * separate parts because each is its own event (gtm4wp.customerData /
+	 * gtm4wp.cartData), split here where the producing builder is known rather
+	 * than by key prefix on the client. A part is omitted only when its builder
+	 * wrote no keys (feature off, no WC_Customer) - an empty cart still produces a
+	 * cart part, since "now empty" is the signal after the last remove_from_cart.
 	 *
 	 * @return array<string, array<string, mixed>> The 'customer' and/or 'cart' part.
 	 */
@@ -1314,11 +1084,9 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Outputs the empty, cache-safe placeholder element the cart-fragments AJAX
-	 * fills with the customer/cart block. It carries no visitor data itself, so it
-	 * is safe to bake into the cached HTML; WooCommerce replaces it with the filled
-	 * version (from the fragments response and its sessionStorage cache) on every
-	 * page. Hooked to wp_footer.
+	 * Outputs the empty placeholder the cart-fragments AJAX fills with the
+	 * customer/cart block; carries no visitor data, so safe in cached HTML.
+	 * Hooked to wp_footer.
 	 *
 	 * @return void
 	 */
@@ -1327,20 +1095,13 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Carries the two-part customer/cart data layer block on the WooCommerce
-	 * cart-fragments response, so it is delivered — and refreshed on every cart
-	 * change — without any new per-page request (the fragments AJAX already fires on
-	 * cart mutation). The block is JSON encoded into a data attribute of the
-	 * placeholder; esc_attr() is the correct escaper for the attribute context (the
-	 * client reads it back via dataset and JSON.parse, and the JSON_HEX_* flags keep
-	 * any hostile customer field free of a raw break-out). JSON_FORCE_OBJECT must NOT
-	 * be added to the flag set: it would turn cartContent.items and
-	 * totals.applied_coupons into objects and break every setup that iterates them.
-	 * Hooked to woocommerce_add_to_cart_fragments.
-	 *
-	 * The fragment key is emitted even when the payload is empty, so WooCommerce
-	 * always replaces the placeholder: dropping the key would leave the previously
-	 * cached fragment — with its stale customer/cart data — in the DOM.
+	 * Carries the customer/cart block on the cart-fragments response, JSON encoded
+	 * into a data attribute of the placeholder (esc_attr() for the attribute
+	 * context; the client reads it via dataset + JSON.parse). Do NOT add
+	 * JSON_FORCE_OBJECT: it would turn cartContent.items and applied_coupons into
+	 * objects. The key is emitted even for an empty payload, or WooCommerce would
+	 * leave the stale cached fragment in the DOM. Hooked to
+	 * woocommerce_add_to_cart_fragments.
 	 *
 	 * @param mixed $fragments The cart fragments map (selector => HTML).
 	 * @return array<string, string>
@@ -1361,23 +1122,13 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Declares the two WooCommerce one-shot EVENTS the cache-safe data layer
-	 * delivers client-side in Phase 3 (issue #398): the add_to_cart fired after a
-	 * product is re-added to the cart (the cart "Undo"), and the reliable-purchase
-	 * fallback for a missed order-received page. Both are omitted from the cacheable
-	 * HTML (see add_datalayer_data) and delivered via the session endpoint instead.
-	 *
-	 * Each is a Tier 3 one-shot field gated by the shared event cookie
-	 * (Helpers::ONESHOT_EVENT_COOKIE): PHP sets that cookie when the event is queued
-	 * in the session, and the client fetches, fires once + de-dupes, then clears it.
-	 * They are declared whenever the cache-safe mode is on (the fallback additionally
-	 * requires the "purchase on any page" option) and independent of the current
-	 * marker/cookie state, because the delivering fetch happens on a LATER page than
-	 * the one that queued the event — so the client config must always advertise the
-	 * event cookie to watch. When nothing is pending the resolvers return null and
-	 * the event is simply not delivered.
-	 *
-	 * Hooked to GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS.
+	 * Declares the two WooCommerce one-shot events the cache-safe data layer
+	 * delivers via the session endpoint (issue #398): the add_to_cart after the cart
+	 * "Undo", and the reliable-purchase fallback. Both are Tier 3 one-shots gated by
+	 * Helpers::ONESHOT_EVENT_COOKIE, declared whenever the mode is on regardless of
+	 * the current marker state, because the delivering fetch happens on a LATER page
+	 * than the one that queued the event; a resolver returns null when nothing is
+	 * pending. Hooked to GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS.
 	 *
 	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
 	 * @return array<int, VisitorField>
@@ -1396,9 +1147,7 @@ final class PageDataLayer {
 			array( $this, 'resolve_readded_to_cart' ),
 			$event_cookie,
 			true,
-			// The client fires this authenticated POST beacon after delivering the
-			// re-add, so the GET stays read-only while the session marker is still
-			// consumed server-side (issue #398).
+			// POST beacon fired after delivery, so the GET stays read-only (issue #398).
 			rest_url( VisitorDataEndpoint::REST_NAMESPACE . self::REST_ROUTE_CONFIRM_READD )
 		);
 
@@ -1410,9 +1159,8 @@ final class PageDataLayer {
 				array( $this, 'resolve_pending_purchase' ),
 				$event_cookie,
 				true,
-				// The client fires this authenticated POST beacon after delivering the
-				// fallback purchase, so the GET stays read-only while _ga_tracked is
-				// still written server-side — closing the cross-device double-count.
+				// POST beacon fired after delivery; it writes _ga_tracked, closing the
+				// cross-device double-count while the GET stays read-only.
 				rest_url( VisitorDataEndpoint::REST_NAMESPACE . self::REST_ROUTE_CONFIRM_PURCHASE )
 			);
 		}
@@ -1421,20 +1169,15 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Session-endpoint resolver for the re-added-to-cart one-shot (Phase 3). Mirrors
-	 * maybe_add_readded_to_cart() but RETURNS the add_to_cart payload for the client
-	 * to push (under the same event name the server path used) instead of rendering
-	 * it into cacheable HTML, and carries the session cart-item key as the per-event
-	 * de-dupe token so a page reload does not re-fire it. Derives everything from the
-	 * current request's WC session/cart — no id parameter, so a caller only ever gets
-	 * its own re-add. Returns null when nothing is pending.
+	 * Session-endpoint resolver for the re-added-to-cart one-shot: mirrors
+	 * maybe_add_readded_to_cart() but RETURNS the add_to_cart payload, with the
+	 * session cart-item key as the de-dupe token. No id parameter, so a caller only
+	 * gets its own re-add; null when nothing is pending.
 	 *
-	 * READ-ONLY: this runs on a public, unauthenticated GET, so it must not change
-	 * state — otherwise any cross-site top-level navigation to the endpoint (which
-	 * carries the visitor's SameSite=Lax cookies) would consume a real visitor's
-	 * pending event and destroy it. The marker is consumed by the authenticated POST
-	 * beacon (confirm_readded_to_cart_tracked) once the client has actually delivered
-	 * the event; until then the client's own per-token guard stops a re-push.
+	 * READ-ONLY: runs on a public GET, so it must not change state - a cross-site
+	 * top-level navigation (SameSite=Lax cookies attached) could otherwise destroy a
+	 * real visitor's pending event. The marker is consumed by the POST beacon
+	 * (confirm_readded_to_cart_tracked).
 	 *
 	 * @return array<string, mixed>|null
 	 */
@@ -1476,35 +1219,23 @@ final class PageDataLayer {
 					'items'    => array( $eec_product_array ),
 				),
 			),
-			// The de-dupe token: the WC session re-add key. Recorded in localStorage
-			// after the push so a reload with the same token does not re-fire.
+			// De-dupe token, recorded in localStorage after the push.
 			'token' => (string) $cart_readded_hash,
 		);
 	}
 
 	/**
-	 * Session-endpoint resolver for the reliable-purchase fallback one-shot (Phase 3).
-	 * Mirrors maybe_add_pending_purchase()/add_purchase_for_order() but RETURNS the GA4
-	 * purchase event payload for the client to push (under the same event name the
-	 * server path used) instead of rendering it into cacheable HTML, and carries the
-	 * order NUMBER so the client de-dupes against the SAME gtm4wp_orderid_tracked guard
-	 * the order-received page's inline block writes — so a fallback fire on one page and
-	 * a real order-received purchase for the same order can never both count.
+	 * Session-endpoint resolver for the reliable-purchase fallback one-shot: mirrors
+	 * maybe_add_pending_purchase()/add_purchase_for_order() but RETURNS the purchase
+	 * payload, with the order NUMBER so the client de-dupes against the same
+	 * gtm4wp_orderid_tracked guard the order-received page writes. The order comes
+	 * from the current session (no id parameter, no IDOR) and runs the same
+	 * gauntlet; null when nothing is eligible.
 	 *
-	 * The order is resolved from the CURRENT request's WC session (no id parameter, no
-	 * IDOR) and runs the same age / already-tracked / trackable-status gauntlet as the
-	 * page path. Returns null when nothing is eligible.
-	 *
-	 * READ-ONLY: this runs on a public, unauthenticated GET, so it changes nothing —
-	 * no _ga_tracked order meta, and (since issue #398's review) no session write
-	 * either. A GET that consumed the delivery marker could be fired by any cross-site
-	 * top-level navigation, which carries the visitor's SameSite=Lax cookies, and would
-	 * silently destroy a real buyer's purchase event. Every state change happens in the
-	 * authenticated POST beacon (confirm_pending_purchase_tracked), which consumes the
-	 * marker and writes _ga_tracked once the client has actually delivered the event.
-	 * Until the beacon lands the marker stays put, so a repeat fetch simply re-resolves
-	 * the same order and the shared client-side gtm4wp_orderid_tracked guard (keyed on
-	 * the order number) stops it being pushed twice.
+	 * READ-ONLY: runs on a public GET, so no _ga_tracked write and no session write
+	 * (see resolve_readded_to_cart for why). Both happen in the POST beacon
+	 * (confirm_pending_purchase_tracked); until it lands a repeat fetch re-resolves
+	 * the same order and the client-side guard stops a second push.
 	 *
 	 * @return array<string, mixed>|null
 	 */
@@ -1538,10 +1269,8 @@ final class PageDataLayer {
 			$this->product_data->customer_signals( $order )
 		);
 
-		// Whether the client should consult/record the gtm4wp_orderid_tracked browser
-		// guard. When "Do not flag orders as being tracked" is on the plugin writes no
-		// order-tracked state anywhere - server meta OR browser - so the client pushes
-		// without the guard, matching the page path (#369).
+		// Whether the client consults/records the browser guard; off under "Do not
+		// flag orders as being tracked", matching the page path (#369).
 		$flag = ! (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG );
 
 		return array(
@@ -1552,21 +1281,15 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Registers the authenticated POST routes that confirm a one-shot event was
-	 * delivered (issue #398) and perform every state change the read-only GET session
-	 * endpoint deliberately does not: consuming the session delivery marker and, for
-	 * the purchase fallback, writing the _ga_tracked order meta so a later
-	 * order-received render on ANOTHER device is suppressed. Registered by
-	 * WooCommerceModule on rest_api_init only when the cache-safe mode is on (the
-	 * purchase route additionally requires the reliable-purchase feature). Hooked to
-	 * rest_api_init.
+	 * Registers the POST routes that confirm a one-shot event was delivered (issue
+	 * #398) and perform the state changes the read-only GET does not: consuming the
+	 * session marker and, for the purchase fallback, writing _ga_tracked. Hooked to
+	 * rest_api_init by WooCommerceModule only when the cache-safe mode is on.
 	 *
 	 * @return void
 	 */
 	public function register_confirm_purchase_route(): void {
-		// Unlike the read-only GET session endpoint, these routes change state, so they
-		// must reject a cross-origin request: the wp_rest REST nonce is verified (PA-1).
-		// They are POSTs, so the HTTP semantics are correct.
+		// These routes change state, so a cross-origin request is rejected (PA-1).
 		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
 			register_rest_route(
 				VisitorDataEndpoint::REST_NAMESPACE,
@@ -1591,29 +1314,15 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Permission callback for the confirm-purchase POST. A guest checkout is common, so
-	 * this cannot be a capability gate — the request only ever flags the caller's own
-	 * session order (FP-5). Two checks, and it matters which one is load bearing:
-	 *
-	 * 1. The wp_rest nonce (X-WP-Nonce header for fetch keepalive, or the _wpnonce
-	 *    parameter for the navigator.sendBeacon fallback, which cannot set headers).
-	 *    This is a malformed-request FILTER, not the gate: for a logged-out caller
-	 *    WordPress derives wp_rest from uid 0 with an empty session token, so the value
-	 *    is identical for every guest on the site for the whole nonce tick — and this
-	 *    plugin hands one out from its own public GET endpoint. It proves the caller
-	 *    obtained a site-wide constant. It authenticates nobody (#78, FP-5 cond. 3).
-	 * 2. The request Origin. THIS is the gate. A browser sets Origin on every POST and
-	 *    a page cannot forge it, so a cross-site request fails here.
-	 *
-	 * Binding the token to the WC session instead was considered and does NOT work:
-	 * WordPress registers rest_send_cors_headers() on rest_pre_serve_request by default,
-	 * which reflects the request Origin and sends Access-Control-Allow-Credentials: true
-	 * — so a third-party page can read any token this site hands out, with the visitor's
-	 * own cookies attached, and replay it here. A session-bound nonce would look like a
-	 * fix and would not be one. (GTM4WP\RestCors::restrict_cors() now stops that
-	 * reflection for this plugin's namespace, but the Origin check does not depend on
-	 * it - which is the point: the two controls are independent, so neither one being
-	 * moved, disabled or missed can quietly take the other with it.)
+	 * Permission callback for the confirm POSTs. Guest checkout is common, so this is
+	 * not a capability gate; the request only flags the caller's own session order
+	 * (FP-5). Two checks: the wp_rest nonce (header, or _wpnonce for sendBeacon) is
+	 * only a malformed-request filter - for a logged-out caller it is a site-wide
+	 * constant per tick and authenticates nobody (#78, FP-5 cond. 3); the request
+	 * Origin is the gate, since a page cannot forge it. Do NOT replace the Origin
+	 * check with a session-bound token: WordPress's default CORS reflection lets a
+	 * third-party page read any token this site hands out. RestCors::restrict_cors()
+	 * now stops that reflection, but the two controls stay independent on purpose.
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return bool
@@ -1627,19 +1336,11 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * POST callback: confirms the client delivered the reliable-purchase fallback for
-	 * the order this browser's session queued (issue #398). It consumes the delivery
-	 * marker and flags the order tracked, so a later order-received render on another
-	 * device is suppressed by is_purchase_already_tracked().
-	 *
-	 * This is where the fallback's state changes happen, because the GET that delivers
-	 * it is public and unauthenticated (see resolve_pending_purchase). The order id
-	 * comes ONLY from the session marker — never from the request body, so a forged
-	 * order id flags nothing (no IDOR) — and the marker is consumed unconditionally so
-	 * the write happens at most once (a second POST finds no marker and no-ops).
-	 * flag_order_tracked() itself no-ops when "Do not flag orders as being tracked" is
-	 * on, so that option is honoured here too. The request body is intentionally not
-	 * read.
+	 * POST callback: confirms the client delivered the reliable-purchase fallback
+	 * (issue #398). Consumes the session marker and flags the order tracked, so a
+	 * later order-received render on another device is suppressed. The order id
+	 * comes ONLY from the session marker, never the request body (no IDOR); the
+	 * marker is consumed unconditionally so the write happens at most once.
 	 *
 	 * @return \WP_REST_Response A 204 No Content response.
 	 */
@@ -1666,13 +1367,9 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * POST callback: confirms the client delivered the re-added-to-cart one-shot, so
-	 * its session marker can be consumed (issue #398). The sibling of
-	 * confirm_pending_purchase_tracked() and, for the same reason, the only place that
-	 * re-add's state change happens — the GET that delivers it is public and
-	 * unauthenticated. Takes nothing from the request body: the marker is this
-	 * browser's own session key, so a caller can only ever consume its own re-add.
-	 * Idempotent — a second POST finds no marker and no-ops.
+	 * POST callback: consumes the re-added-to-cart session marker (issue #398).
+	 * Sibling of confirm_pending_purchase_tracked(); reads nothing from the request
+	 * body, so a caller can only consume its own re-add. Idempotent.
 	 *
 	 * @return \WP_REST_Response A 204 No Content response.
 	 */
