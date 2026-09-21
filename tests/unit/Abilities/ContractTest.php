@@ -95,7 +95,12 @@ final class ContractTest extends AbilitiesTestCase {
 			$this->assertSame( 'object', $schema['type'], "$name input is an object." );
 			$this->assertFalse( $schema['additionalProperties'], "$name refuses unknown input keys." );
 			$this->assertSame( array(), $schema['default'], "$name takes an empty default so a client sending no input at all validates (core applies the schema default to a null input)." );
-			$this->assertArrayHasKey( 'properties', $schema );
+			if ( ! array_key_exists( 'properties', $schema ) ) {
+				// An ability that takes no input omits the key: an empty array would be published as `[]` (U155).
+				continue;
+			}
+
+			$this->assertNotEmpty( $schema['properties'], "$name input either names its properties or omits the key - an empty properties array is published as [] on the REST route, which is not a JSON Schema object." );
 
 			foreach ( $schema['properties'] as $property => $definition ) {
 				$this->assertArrayHasKey( 'type', $definition, "$name input property $property is typed." );
