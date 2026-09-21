@@ -218,18 +218,9 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	}
 
 	/**
-	 * Field definitions.
-	 *
-	 * Every selected entity - tag, trigger, variable and group class alike -
-	 * is stored in the single 1.x compatible blacklist-status option. The
-	 * four entity types are a presentation concern only: the multiselect
-	 * declares them as choice sections, so the admin UI renders four labelled
-	 * lists while the stored value stays one flat list.
-	 *
-	 * The section id lists are derived from the same four label tables that
-	 * build the choices, so an entity can never be labelled in one place and
-	 * sorted in another. BlacklistAdminSchemaTest pins that the sections cover
-	 * every choice exactly once.
+	 * Field definitions. Every entity type is stored in the single 1.x
+	 * blacklist-status option; the four types are choice sections (presentation
+	 * only), derived from the same label tables that build the choices.
 	 *
 	 * @return Field[]
 	 */
@@ -244,10 +235,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				label: __( 'Restriction mode', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__( 'Select whether the checked entities below should be blocklisted (blocked) or allowlisted (everything else blocked).', 'duracelltomi-google-tag-manager' ),
 				group: 'mode',
-				// The stored VALUES are part of the contract: 1 is blocklist mode
-				// in BlacklistModule::add_datalayer_data(). Only the labels moved
-				// to Google's current wording - renumbering these would silently
-				// invert the restriction mode of every site that already saved one.
+				// The stored VALUES are the contract (1 = blocklist mode in
+				// BlacklistModule); renumbering would invert every saved restriction.
 				choices: array(
 					'0' => __( 'Disabled', 'duracelltomi-google-tag-manager' ),
 					'1' => __( 'Blocklist selected entities', 'duracelltomi-google-tag-manager' ),

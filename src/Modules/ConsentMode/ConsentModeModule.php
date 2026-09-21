@@ -128,22 +128,11 @@ final class ConsentModeModule extends AbstractModule {
 	}
 
 	/**
-	 * Bridges CookieYes' documented consent events to a data layer
-	 * cookie_consent_update push, so the GTM container gets a defined consent
-	 * signal to sequence tags on (the same event name the WebToffee and
-	 * Cookiebot paths emit).
-	 *
-	 * Based on CookieYes' public Consent Banner Action API, not the WebToffee
-	 * global-callback override: CookieYes dispatches DOM events on document —
-	 * cookieyes_consent_update (detail: { accepted:[…], rejected:[…] }) when the
-	 * visitor sets or changes consent, and cookieyes_banner_load (detail:
-	 * { categories, isUserActionCompleted, … }) on every load. This mirrors the
-	 * Axeptio cookies:complete bridge rather than add_webtoffee_header_js().
-	 *
-	 * Only the data layer variable name is interpolated from PHP (escaped with
-	 * esc_js exactly like the sibling consent bridges); the consent payload is
-	 * read from the browser event, never from PHP, so there is no server-side
-	 * script sink here.
+	 * Bridges CookieYes' public Consent Banner Action API (the DOM events
+	 * cookieyes_consent_update and cookieyes_banner_load on document) to a
+	 * cookie_consent_update push, the same event name the WebToffee and
+	 * Cookiebot paths emit. Only the data layer name comes from PHP; the consent
+	 * payload is read from the browser event.
 	 *
 	 * @param string $inline_js      Inline JS collected so far.
 	 * @param string $datalayer_name Name of the data layer JS variable.

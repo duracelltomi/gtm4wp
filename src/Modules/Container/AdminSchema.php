@@ -86,10 +86,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * @return Field[]
 	 */
 	public function fields(): array {
-		// Build the list of user roles as checkboxes, as in 1.x. wp_roles()
-		// lives in wp-includes so it is available both on the settings page
-		// and during REST saves; the guard keeps unit tests (which never load
-		// WordPress) working with an empty choice list.
+		// User role choices as in 1.x; the guard keeps the unit tests working.
 		$role_choices = array();
 		if ( function_exists( 'wp_roles' ) ) {
 			foreach ( wp_roles()->get_names() as $role_slug => $role_name ) {
@@ -97,10 +94,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			}
 		}
 
-		// Every column a valid GTM4WP_HARDCODED_* constant takes over is rendered
-		// read-only, and the row set is frozen when the constants also decide
-		// which containers are loaded. Without this the screen would show - and
-		// happily save - a container setup the frontend silently overrides.
+		// Columns a valid GTM4WP_HARDCODED_* constant takes over render
+		// read-only, so the screen never saves a setup the frontend overrides.
 		$locks   = HardcodedContainers::locks();
 		$columns = array(
 			array(
@@ -309,18 +304,12 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				description: esc_html__( 'In some cases you need to rename the dataLayer variable. You can enter your name here. Leave blank for default name: dataLayer', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
 				sanitizer: static function ( $value ) {
-					// Field::to_string() keeps the cast warning-free on non-scalar
-					// import values (a custom sanitizer replaces the type-defensive
-					// default in Field::sanitize(), it does not run in front of it).
+					// A custom sanitizer replaces the type-defensive default.
 					$value = trim( Field::to_string( $value ) );
 
-					// The reader's own predicate, not a second copy of the rule
-					// (PA-2). The name is emitted UNQUOTED into a <script> body,
-					// so this allow-list has to be the JavaScript identifier
-					// grammar - no escaper can rescue a bare identifier. The 1.x
-					// rule this replaces admitted '-', which JavaScript reads as
-					// the subtraction operator: the settings screen accepted a
-					// name that made every GTM4WP script block a SyntaxError.
+					// The reader's own predicate (PA-2): the name is emitted UNQUOTED
+					// into a <script> body, so the JS identifier grammar is the only
+					// control (the 1.x rule admitted '-', a SyntaxError).
 					if ( ( '' !== $value ) && ! ContainerRows::is_valid_js_identifier( $value ) ) {
 						return new \WP_Error(
 							'gtm4wp_invalid_datalayer_name',
@@ -369,9 +358,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: 'advanced',
 				choices: $role_choices,
 				sanitizer: static function ( $value ) {
-					// The admin UI submits an array of role ids; stored as comma separated string as in 1.x.
-					// Field::to_string() per element: a crafted import can nest arrays
-					// inside the list, and sanitize_key() warns on a non-string.
+					// Array of role ids from the UI, stored comma separated as in 1.x.
+					// Field::to_string() per element: an import can nest arrays.
 					if ( is_array( $value ) ) {
 						return implode( ',', array_map( static fn ( $one ) => sanitize_key( Field::to_string( $one ) ), $value ) );
 					}
@@ -384,19 +372,10 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	}
 
 	/**
-	 * Description of the container table.
-	 *
-	 * The static part is followed by a live readout whenever a GTM4WP_HARDCODED_*
-	 * constant is in effect: a wp-config.php file is invisible from the admin, so
-	 * a read-only control on its own would leave the admin wondering why the
-	 * table cannot be edited. The readout names every constant that is actually
-	 * being applied (a malformed one overrides nothing and is reported by the
-	 * admin notice instead), and promises what the save route enforces - the
-	 * stored container setup is kept and used again once the constants are gone.
-	 *
-	 * Rendered as HTML in the settings app (FieldControl's help slot, an
-	 * innerHTML sink - PA-13); the constant names are class constants of
-	 * HardcodedContainers, never user input.
+	 * Description of the container table, followed by a live readout naming
+	 * every GTM4WP_HARDCODED_* constant in effect (wp-config.php is invisible
+	 * from the admin). Rendered as HTML (an innerHTML sink, PA-13); the constant
+	 * names are class constants, never user input.
 	 *
 	 * @param array{columns: array<string, string>, rows: string[]} $locks Lock report of HardcodedContainers::locks().
 	 * @return string
@@ -441,34 +420,21 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	}
 
 	/**
-	 * Description of the "only output on production environments" option.
-	 *
-	 * The effect of this option depends entirely on WP_ENVIRONMENT_TYPE, which
-	 * lives in wp-config.php / the server config and is invisible from the
-	 * admin - so the static explanation is followed by a live readout of what
-	 * THIS instance actually reports, and what turning the option on would do
-	 * here. The common trap is a staging copy with no WP_ENVIRONMENT_TYPE set:
-	 * WordPress then reports "production" and the container keeps loading.
-	 *
-	 * The readout is rendered as HTML in the settings app (FieldControl's help
-	 * slot, an innerHTML sink - PA-13), so the environment value is escaped even
-	 * though wp_get_environment_type() can only return one of the four values
-	 * whitelisted by WordPress core.
+	 * Description of the "only output on production environments" option,
+	 * followed by a live readout of what THIS instance reports, since
+	 * WP_ENVIRONMENT_TYPE is invisible from the admin and an unset value
+	 * silently means "production". Rendered as HTML (innerHTML sink, PA-13), so
+	 * the value is escaped although core whitelists it.
 	 *
 	 * @return string
 	 */
 	private function production_only_description(): string {
 		$intro = esc_html__( 'When turned on, the GTM container code is only output when WordPress reports the environment type as "production". On any other environment (local, development, staging) the container is suppressed while the data layer stays active - so a cloned or staging copy of your site does not send hits to your live Google Tag Manager container without deactivating the plugin. This relies on the WP_ENVIRONMENT_TYPE constant (or WP_ENVIRONMENT_TYPE environment variable) being set on non-production copies; it defaults to "production" when unset. For host-based control without an option, return false from the gtm4wp_output_container filter.', 'duracelltomi-google-tag-manager' );
 
-		// Resolved exactly as ContainerCode::should_output_container() does, so
-		// the readout can never disagree with the gate it describes.
-		// wp_get_environment_type() ships with WordPress 5.5+; the guard mirrors
-		// that sibling and falls back to core's own default.
+		// Resolved exactly as ContainerCode::should_output_container() does.
 		$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
 
-		// Whether the value was set at all, looked up the same way core does.
-		// An unset WP_ENVIRONMENT_TYPE silently resolves to "production", which
-		// is worth calling out separately from an explicit "production".
+		// Whether the value was set at all, looked up the way core does.
 		$is_configured = defined( 'WP_ENVIRONMENT_TYPE' ) || false !== getenv( 'WP_ENVIRONMENT_TYPE' );
 
 		if ( 'production' !== $environment ) {

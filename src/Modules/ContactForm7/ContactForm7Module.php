@@ -111,11 +111,8 @@ final class ContactForm7Module extends AbstractModule {
 		if ( $form ) {
 			$form_name = $form->title();
 
-			// With the master-language option on, report the form title in the
-			// site's default language, so submissions of the same form in
-			// several languages combine in GA reports (issue #145). Falls back
-			// to the current-language title when no multilingual plugin is
-			// active or the form has no default-language translation.
+			// Master language (issue #145): the default-language title when a
+			// distinct master form exists.
 			if ( $this->opt( GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE ) ) {
 				$form_id   = (int) $form->id();
 				$master_id = DefaultLanguage::post_id( $form_id, 'wpcf7_contact_form' );

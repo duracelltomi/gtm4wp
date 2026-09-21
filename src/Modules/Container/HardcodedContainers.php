@@ -13,19 +13,12 @@ namespace GTM4WP\Modules\Container;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Single authority on the GTM4WP_HARDCODED_* wp-config.php constants: it
- * validates them, applies them onto the container rows (apply(), used by the
- * Options service on every request) and reports which parts of the container
- * table they take over (locks(), used by the admin).
- *
- * Both answers come from the same resolve() pass on purpose. A constant that
- * overrides the container setup at output time but leaves the settings screen
- * editable is exactly the 1.x regression this class exists to prevent: the
- * admin could save a container ID that never loads, with nothing on screen
- * explaining why.
- *
- * Loaded on frontend requests through the Options service, therefore this class
- * must not contain translated strings or other admin-only code.
+ * Single authority on the GTM4WP_HARDCODED_* wp-config.php constants: validates
+ * them, applies them onto the container rows (apply(), every request) and
+ * reports which parts of the table they lock (locks(), admin). Both answers
+ * come from the same resolve() pass so the settings screen can never disagree
+ * with what the frontend loads. Loaded on frontend requests: no translated
+ * strings here.
  */
 final class HardcodedContainers {
 
@@ -34,13 +27,9 @@ final class HardcodedContainers {
 	public const CONSTANT_PREVIEW = 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW';
 
 	/**
-	 * Reads and validates the three constants.
-	 *
-	 * A malformed constant is rejected (it would otherwise put an unvalidated
-	 * value into every container's loader URL) and its name is collected so the
-	 * admin notices can name it instead of leaving the operator to debug a
-	 * silently discarded wp-config setting. A rejected constant overrides
-	 * nothing, so it must not lock anything on the settings screen either.
+	 * Reads and validates the three constants. A malformed one is rejected and
+	 * its name collected for the admin notices; a rejected constant overrides
+	 * nothing and locks nothing.
 	 *
 	 * @return array{ids: string[]|null, auth: string|null, preview: string|null, errors: string[]}
 	 */
@@ -95,12 +84,9 @@ final class HardcodedContainers {
 	}
 
 	/**
-	 * Returns the value of a constant as a string, or null when it is not usable
-	 * at all. An array constant is legal in PHP, so wp-config.php can hand a
-	 * non-scalar to any of these constants: null keeps it away from
-	 * explode()/preg_match() (which would fatal or warn on a frontend request)
-	 * and, unlike an empty string, is never mistaken for the deliberate
-	 * "clear the environment" value.
+	 * The value of a constant as a string, or null for a non-scalar (an array
+	 * constant is legal PHP): null keeps it away from explode()/preg_match() and
+	 * is never mistaken for the deliberate empty "clear the environment" value.
 	 *
 	 * @param string $name Constant name.
 	 * @return string|null
@@ -161,18 +147,10 @@ final class HardcodedContainers {
 	}
 
 	/**
-	 * Reports which parts of the container table wp-config.php takes over, so
-	 * the settings screen can render them read-only and the save route can keep
-	 * the admin's own stored values out of harm's way:
-	 *
-	 * - 'columns': column key => name of the constant that fixes that column.
-	 * - 'rows': names of the constants that decide WHICH containers are loaded.
-	 *   Non-empty means the whole table is read-only - with the row set fixed
-	 *   there is no row of the admin's own left for an edit to be saved into.
-	 *
-	 * Only constants that survived validation are listed: a rejected one changes
-	 * nothing at output time, so the field must stay editable (the admin notice
-	 * names it separately).
+	 * Reports which parts of the container table wp-config.php takes over:
+	 * 'columns' (column key => constant) and 'rows' (constants deciding WHICH
+	 * containers load; non-empty means the whole table is read-only). Only
+	 * constants that survived validation are listed.
 	 *
 	 * @return array{columns: array<string, string>, rows: string[]}
 	 */

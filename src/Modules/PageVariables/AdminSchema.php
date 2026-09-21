@@ -220,24 +220,14 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: 'post',
 				depends_on: GTM4WP_OPTION_INCLUDE_POSTMETA,
 				sanitizer: static function ( $value ) {
-					// Type-defensive: a custom sanitizer REPLACES Field::sanitize()'s
-					// type-based branches, so it never sits behind to_string() (RI-6).
+					// A custom sanitizer REPLACES the type-defensive default (RI-6).
 					$value = Field::to_string( $value );
 
-					// Normalized with the READER's own parser, so what is stored is
-					// exactly the list PageVariablesModule will honour - one rule, one
-					// place (PA-2). Stored one key per line, which is how the textarea
-					// renders it back.
-					//
-					// There is deliberately NO per-entry validator here, unlike the two
-					// sanitizers below: a WordPress meta key has no grammar to validate
-					// against - core's add_metadata()/update_metadata() only unslash it,
-					// never sanitize it - so any pattern would be inventing one (UC-5).
-					// sanitize_textarea_field() is not the missing piece either: it
-					// keeps control characters and STRIPS %xx sequences, so a legitimate
-					// key such as my%2ffield would be stored as myfield and then match
-					// nothing. The value reaches no output sink; it is only ever
-					// compared with in_array().
+					// Normalized with the READER's own parser (PA-2), one key per line.
+					// Deliberately NO per-entry validator: a meta key has no grammar
+					// (core never sanitizes it), so a pattern would invent one (UC-5),
+					// and sanitize_textarea_field() would strip %xx from a legitimate
+					// key. The value reaches no output sink, only in_array().
 					return implode( "\n", PageVariablesModule::parse_meta_key_list( $value ) );
 				},
 				doc: self::DOC_POST
@@ -432,14 +422,9 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: 'visitor',
 				depends_on: GTM4WP_OPTION_INCLUDE_VISITOR_IP,
 				sanitizer: static function ( $value ) {
-					// Field::to_string() keeps the cast warning-free on non-scalar
-					// import values (a custom sanitizer replaces the type-defensive
-					// default in Field::sanitize(), it does not run in front of it).
-					// The name is then validated with the READER's own predicate, so
-					// what is stored is exactly what VisitorIp::get() will honor -
-					// #62 anchored the read end and #89 the save end, each with its
-					// own copy of the pattern, and two copies of an allow-list is a
-					// divergence waiting for the next tightening (PA-2). One rule now.
+					// Field::to_string() keeps the cast warning-free; then the READER's
+					// own predicate, so what is stored is what VisitorIp::get() honours
+					// (PA-2, #62/#89).
 					return VisitorIp::normalize_header_name( Field::to_string( $value ) );
 				},
 				doc: self::DOC_VISITOR
@@ -454,17 +439,12 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				phase: Field::PHASE_BETA,
 				depends_on: GTM4WP_OPTION_INCLUDE_VISITOR_IP,
 				sanitizer: static function ( $value ) {
-					// Type-defensive: a custom sanitizer REPLACES Field::sanitize()'s
-					// type-based branches, so it never sits behind to_string() (RI-6).
+					// A custom sanitizer REPLACES the type-defensive default (RI-6).
 					$value = Field::to_string( $value );
 
-					// Parsed AND validated with the reader's own method, so what is
-					// stored is exactly what VisitorIp::get() will honor - splitting
-					// rule included. An entry the reader would quietly skip is worse
-					// than a rejected one: the admin believes that proxy is covered
-					// when it is not. This used to keep its own copy of the split
-					// while sharing only the validator, which is the divergence PA-2
-					// is about.
+					// Parsed AND validated with the reader's own method, split rule
+					// included (PA-2): an entry the reader would skip makes the admin
+					// believe that proxy is covered.
 					return implode( "\n", VisitorIp::parse_trusted_proxies( $value ) );
 				},
 				doc: self::DOC_VISITOR

@@ -84,13 +84,8 @@ final class UserEventsModule extends AbstractModule {
 			$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_EVENTS_FORMMOVE, true );
 			$this->enqueue_script( 'gtm4wp-form-move-tracker', 'gtm4wp-form-move-tracker.js', array(), $in_footer );
 
-			// The sub-option is meaningless without its parent, and the parent is
-			// what gates the enqueue above, so the config only ever ships with the
-			// tracker it configures (the Field's depends_on is admin UX only).
-			//
-			// Declared with `var` so it really is a window property: the tracker
-			// reads it as window.gtm4wp_form_move_config, and a top-level `const`
-			// would bind lexically and never appear on window (RI-14).
+			// `var`, so it really is a window property the tracker can read as
+			// window.gtm4wp_form_move_config; a top-level `const` never is (RI-14).
 			$config = array(
 				'filledOnly' => (bool) $this->opt( GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY ),
 			);

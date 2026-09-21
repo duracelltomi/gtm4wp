@@ -15,26 +15,13 @@ use GTM4WP\Module\AbstractModule;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Adds gtm.allowlist / gtm.blocklist to the main data layer to control
- * which tag, trigger and variable types are allowed to execute on the site.
- * Port of the blacklist part of gtm4wp_add_basic_datalayer_data() from 1.x,
- * which wrote the undocumented legacy gtm.whitelist / gtm.blacklist names.
- *
- * The entity ID list below is refreshed from Google's restriction
- * documentation (https://developers.google.com/tag-platform/tag-manager/restrict)
- * and contains individual entity IDs only. Compared to 1.x: added gaawc,
- * gaawe (tags) and gas (variable); removed ua (Universal Analytics), which
- * Google no longer documents. Group classes (which have no individual entity
- * ID) live in the separate GROUP_CLASS_IDS list; `sandboxedScripts` is
- * supported there to control GTM community templates.
- *
- * Last verified against the source page: 2026-08-05 — 72 tag, 9 trigger and
- * 16 variable IDs, matching this table exactly. The list is tracked as entry
- * U53 in .upstream/upstream-review-checklist.md; this comment is a record,
- * not a control, so re-derive rather than trust it.
- *
- * Only the plain ID list lives here (needed for frontend validation);
- * the human readable labels live in the admin-only AdminSchema class.
+ * Adds gtm.allowlist / gtm.blocklist to the main data layer to control which
+ * tag, trigger and variable types may execute. The entity ID lists mirror
+ * Google's restriction documentation
+ * (https://developers.google.com/tag-platform/tag-manager/restrict), registry
+ * row U53 - re-derive rather than trust this comment. Group classes live in
+ * GROUP_CLASS_IDS (`sandboxedScripts` controls community templates). Only the
+ * plain ID lists live here; the labels are in the admin-only AdminSchema.
  */
 final class BlacklistModule extends AbstractModule {
 
@@ -184,14 +171,9 @@ final class BlacklistModule extends AbstractModule {
 	}
 
 	/**
-	 * Option defaults, 1.x compatible.
-	 *
-	 * The standalone blacklist-sandboxed option of 1.x is intentionally not
-	 * carried over: it was stored but never emitted on the frontend (a
-	 * non-functional checkbox). Its purpose - restricting the sandboxed
-	 * scripts of custom tag/variable templates - is now served properly by
-	 * the `sandboxedScripts` group class, selectable in the same
-	 * blacklist-status list as the individual entity IDs.
+	 * Option defaults, 1.x compatible. The 1.x blacklist-sandboxed option is
+	 * not carried over: it was never emitted; the `sandboxedScripts` group class
+	 * serves its purpose.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -265,8 +247,7 @@ final class BlacklistModule extends AbstractModule {
 	public function add_datalayer_data( $data_layer ) {
 		$_gtmrestrictlistitems = array();
 
-		// Because of security reasons, we loop through each stored entity in the options and validate them
-		// to make sure nobody has entered some 'funny' item manually.
+		// Re-validated against the allow-list at the sink.
 		$valid_restrictions = self::valid_restrictions();
 		$stored_entities    = $this->opt( GTM4WP_OPTION_BLACKLIST_STATUS );
 		if ( ! is_array( $stored_entities ) ) {
@@ -279,38 +260,12 @@ final class BlacklistModule extends AbstractModule {
 			}
 		}
 
-		/*
-		 * gtm.allowlist / gtm.blocklist are the key names Google documents. The
-		 * gtm.whitelist / gtm.blacklist pair this replaces appears nowhere in the
-		 * current documentation, nor in the older tag-manager/web/restrict page -
-		 * neither states that the legacy names are supported, deprecated, or
-		 * anything at all. The runtime has historically read both pairs, but
-		 * "undocumented and observed to work once" is a weaker guarantee than
-		 * "documented", and the failure mode if a legacy name is ever dropped is
-		 * silent: the plugin writes the key, nothing reads it, and every tag runs
-		 * unrestricted while the settings screen still shows the restriction.
-		 *
-		 * Emit ONE key, for the selected mode only, and never an empty companion.
-		 * That is not a style choice - it is the bug this method used to have.
-		 * 1.x and pre-fix 2.0 wrote both keys and left the unselected one as an
-		 * empty array. Google Tag Manager's runtime reads the allowlist as:
-		 *
-		 *     var a = SA("gtm.allowlist") || SA("gtm.whitelist");
-		 *     ...
-		 *     a && (k = k && $A(g, h, b));
-		 *
-		 * An empty array is TRUTHY in JavaScript, so an empty allowlist is an
-		 * allowlist that "has been set" - and $A() then returns false for every
-		 * entity, because nothing is in an empty list. In blocklist mode the
-		 * plugin was therefore blocking the WHOLE container rather than the
-		 * selected entities. It fails closed, so it reads as an over-eager
-		 * restriction rather than as a defect, which is why it survived so long.
-		 * (Allowlist mode was unaffected: an empty blocklist blocks nothing.)
-		 *
-		 * Verified by replaying the runtime's own YA()/$A()/Tb()/Lb() against
-		 * this method's output, not inferred from the documentation - which
-		 * describes neither empty lists nor these key names.
-		 */
+		// gtm.allowlist / gtm.blocklist are the documented key names (the legacy
+		// gtm.whitelist / gtm.blacklist pair is documented nowhere). Emit ONE key
+		// for the selected mode and NEVER an empty companion: an empty array is
+		// truthy in JavaScript, so an empty allowlist "has been set" and the GTM
+		// runtime blocks the WHOLE container (verified against the runtime's own
+		// code, not the documentation).
 		$mode_key = ( 1 === (int) $this->opt( GTM4WP_OPTION_BLACKLIST_ENABLE ) )
 			? 'gtm.blocklist'
 			: 'gtm.allowlist';

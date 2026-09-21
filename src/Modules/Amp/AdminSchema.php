@@ -87,9 +87,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				),
 				group: 'amp',
 				sanitizer: static function ( $value ) {
-					// Field::to_string() keeps the cast warning-free on non-scalar
-					// import values (a custom sanitizer replaces the type-defensive
-					// default in Field::sanitize(), it does not run in front of it).
+					// A custom sanitizer replaces the type-defensive default.
 					$value = trim( Field::to_string( $value ) );
 
 					if ( '' === $value ) {

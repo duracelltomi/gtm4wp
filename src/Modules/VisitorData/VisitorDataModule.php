@@ -17,56 +17,35 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Master switch for the cache-safe data layer (issue #398).
- *
- * On full-page-cached sites the HTML built for one visitor is served to every
- * visitor, so any visitor/session specific value baked into the data layer HTML
- * leaks (a logged-in editor's page cached with their email, then served to
- * anonymous visitors). When this module's option is on, other modules stop
- * rendering those values into the cacheable HTML and instead the browser pushes
- * what it can compute itself as a gtm4wp.visitorData data layer event — no
- * network request, no leak (Phase 1). Server-only visitor fields (IP, country,
- * user, cart) are omitted in Phase 1 and delivered client-side in Phase 2 via a
- * once-per-session / cookie-gated endpoint (see docs/dev/cache-safe-data-layer.md).
- *
- * Mirrors the ClientDeviceData module pattern: a small client script pushes the
- * values shortly after page load with the same data layer variable names 1.x /
- * the server path used, so existing Google Tag Manager setups keep working.
+ * Master switch for the cache-safe data layer (issue #398). On a full-page
+ * cached site the HTML built for one visitor is served to every visitor, so a
+ * visitor/session value baked into the data layer leaks. With the option on,
+ * modules stop rendering those values; the browser pushes what it can compute
+ * itself as gtm4wp.visitorData, and server-only fields arrive via the
+ * once-per-session / cookie-gated endpoint (docs/dev/cache-safe-data-layer.md),
+ * under the same variable names, so existing GTM setups keep working.
  */
 final class VisitorDataModule extends AbstractModule {
 
 	/**
-	 * Name of the JS-readable companion cookie that mirrors the (HttpOnly, so
-	 * JS-invisible) WordPress logged-in state. The client runtime uses it as the
-	 * Tier 3 gate for the logged-in-user fields: it re-fetches only when this
-	 * cookie changed, so an anonymous visitor — who never has it — never fetches
-	 * user data. Set on login, cleared on logout by maintain_login_gate_cookie().
+	 * JS-readable companion cookie mirroring the HttpOnly WordPress logged-in
+	 * state: the Tier 3 gate, so an anonymous visitor never fetches user data.
+	 * Maintained by maintain_login_gate_cookie().
 	 */
 	public const LOGIN_GATE_COOKIE = 'gtm4wp_login';
 
 	/**
-	 * Storage key shared with the client runtime: the sessionStorage entry under
-	 * which the client caches the Tier 2 (once-per-session) values and the Tier 3
-	 * cookie-gate bookkeeping. Kept here only so PHP and the client agree on the name.
+	 * The sessionStorage key the client caches the Tier 2 values and the Tier 3
+	 * gate bookkeeping under; here only so PHP and the client agree.
 	 */
 	public const SESSION_STORAGE_KEY = 'gtm4wp_visitor_session';
 
 	/**
-	 * The data layer event names the client runtime pushes under, one per data
-	 * family, baked into the client config by build_config().
-	 *
-	 * One name per family — rather than one name for everything the runtime
-	 * delivers — because the families arrive on different channels at different
-	 * moments and can never be merged into a single push: the visitor fields come
-	 * from the session endpoint, while the WooCommerce customer/cart block only
-	 * exists once WooCommerce has applied its cart fragment, which is always later.
-	 * A Google Tag Manager setup therefore has to be able to tell from the event
-	 * name alone which keys arrived, and a plain Custom Event trigger has to be
-	 * enough. Their values are part of the public data layer contract: a site
-	 * owner's triggers are written against them, so they must not change.
-	 *
-	 * These are the authority; js/frontend/gtm4wp-visitor-data.js carries the same
-	 * three strings only as a fallback for the (config-less) load path.
+	 * Data layer event names, one per data family, because the families arrive
+	 * on different channels at different moments and a GTM setup must tell from
+	 * the event name alone which keys arrived. Public contract: never change.
+	 * These are the authority; gtm4wp-visitor-data.js carries them only as the
+	 * config-less fallback.
 	 */
 	public const EVENT_VISITOR_DATA  = 'gtm4wp.visitorData';
 	public const EVENT_CUSTOMER_DATA = 'gtm4wp.customerData';
@@ -118,14 +97,10 @@ final class VisitorDataModule extends AbstractModule {
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
-		// The session endpoint that delivers the Tier 2/3 fields (registered on REST
-		// requests, which run this frontend code path — is_admin() is false there).
+		// REST requests run this frontend code path (is_admin() is false there).
 		add_action( 'rest_api_init', array( $this, 'register_endpoint' ) );
 
-		// Maintain the JS-readable login gate cookie so the client can tell logged-in
-		// from anonymous without reading the HttpOnly WordPress auth cookie. init runs
-		// before output (cookies settable) and for logged-in users the page is not
-		// cached, so the Set-Cookie never lands on a cacheable response.
+		// init runs before output (cookies settable); a logged-in page is not cached.
 		add_action( 'init', array( $this, 'maintain_login_gate_cookie' ) );
 	}
 
@@ -148,14 +123,10 @@ final class VisitorDataModule extends AbstractModule {
 	}
 
 	/**
-	 * Loads the client-side visitor-data runtime with its per-request field
-	 * config, but only when at least one field is active on this request. The
-	 * config carries only cache-safe (content/URL-derived, not visitor) information
-	 * — the data layer event name of each data family (the EVENT_* constants), which
-	 * data layer keys the browser computes and from which source (Tier 1), plus the
-	 * session-endpoint URL, its nonce and the field/cookie-gate metadata for Tier
-	 * 2/3 — so it is safe to bake into cached HTML. No visitor value is in the
-	 * config; those come from the endpoint at runtime.
+	 * Loads the client runtime with its per-request field config when at least
+	 * one field is active. The config holds only cache-safe metadata (event
+	 * names, Tier 1 sources, endpoint URL, nonce, gate metadata), never a
+	 * visitor value, so it is safe in cached HTML.
 	 *
 	 * @return void
 	 */
@@ -212,18 +183,12 @@ final class VisitorDataModule extends AbstractModule {
 				} elseif ( VisitorField::TIER_SESSION === $field->tier ) {
 					$session_keys[] = $field->key;
 				} elseif ( VisitorField::TIER_ACTION === $field->tier && '' !== $field->cookie_gate ) {
-					// One-shot events (Phase 3) are delivered differently from a
-					// persistent gate: fetched only while the event cookie is present,
-					// pushed once with a de-dupe guard, then the cookie is cleared and
-					// the value is never cached. Route them to the `actions` list so the
-					// client runtime handles them separately from the replayed gates.
+					// One-shots go to the `actions` list: fetched only while the event
+					// cookie is present, pushed once, never cached or replayed.
 					if ( $field->one_shot ) {
 						$actions[ $field->cookie_gate ][] = $field->key;
 
-						// A one-shot may carry an authenticated POST-beacon URL the client
-						// fires after delivery (e.g. the reliable-purchase fallback flagging
-						// its order tracked, issue #398). Surface it per key so the client
-						// keeps the GET read-only.
+						// The POST beacon fired after delivery, per key, keeps the GET read-only.
 						if ( '' !== $field->confirm_url ) {
 							$action_confirm[ $field->cookie_gate ][ $field->key ] = $field->confirm_url;
 						}
@@ -240,10 +205,8 @@ final class VisitorDataModule extends AbstractModule {
 			return null;
 		}
 
-		// One event name per data family (see the EVENT_* constants). Built here, after
-		// the early return above, so the map can never on its own make this method
-		// return a non-null config: a request with nothing to deliver must still load
-		// no runtime at all.
+		// Built after the early return so the event map alone can never produce a
+		// non-null config.
 		$config = array(
 			'events' => array(
 				'visitor'  => self::EVENT_VISITOR_DATA,
@@ -280,9 +243,7 @@ final class VisitorDataModule extends AbstractModule {
 						'keys'   => array_values( array_unique( $keys ) ),
 					);
 
-					// The client fires each mapped key's beacon (key => URL) after
-					// delivering that one-shot event; absent when no one-shot on this
-					// cookie declared a confirm URL.
+					// key => beacon URL, absent when no one-shot declared one.
 					if ( ! empty( $action_confirm[ $cookie ] ) ) {
 						$entry['confirm'] = $action_confirm[ $cookie ];
 					}
@@ -296,18 +257,14 @@ final class VisitorDataModule extends AbstractModule {
 	}
 
 	/**
-	 * Keeps the JS-readable login gate cookie (self::LOGIN_GATE_COOKIE) in sync with
-	 * the WordPress login state so the client runtime can gate the Tier 3 user-data
-	 * fetch on it: it is set (to an opaque per-session token) for a logged-in user
-	 * and cleared for a logged-out one. The client re-fetches only when the value
-	 * changed, so an anonymous visitor — who never has the cookie — never fetches
-	 * user data. Hooked to init; only runs when the cache-safe mode is on.
+	 * Keeps LOGIN_GATE_COOKIE in sync with the WordPress login state: set to an
+	 * opaque per-session token for a logged-in user, cleared for a logged-out
+	 * one. Hooked to init.
 	 *
 	 * @return void
 	 */
 	public function maintain_login_gate_cookie(): void {
-		// Cookies can only be set before output. If a plugin already sent headers by
-		// init, skip silently — the next (logged-in, non-cached) request corrects it.
+		// Headers already sent by another plugin: the next logged-in request corrects it.
 		if ( headers_sent() ) {
 			return;
 		}
@@ -324,14 +281,9 @@ final class VisitorDataModule extends AbstractModule {
 				$_COOKIE[ self::LOGIN_GATE_COOKIE ] = $desired;
 			}
 		} elseif ( '' !== $current ) {
-			// Logged out (or an expired auth cookie): clear the cookie so the client
-			// stops treating the visitor as logged in and does not push stale user data.
-			// This branch runs for an ANONYMOUS request that still carries the gate
-			// cookie, so — unlike the logged-in set branch above, whose page is never
-			// full-page cached — its response could be. It carries a Set-Cookie that
-			// must never be replayed to other visitors from a cache, so mark it
-			// no-store (finding #44). nocache_headers() sends no-store; headers are not
-			// yet sent here (init runs before output).
+			// An ANONYMOUS request clearing a stale gate cookie: unlike the logged-in
+			// branch its response could be cached, and a Set-Cookie must never be
+			// replayed to other visitors, so mark it no-store (#44).
 			nocache_headers();
 			$this->set_login_gate_cookie( '', time() - DAY_IN_SECONDS );
 			unset( $_COOKIE[ self::LOGIN_GATE_COOKIE ] );
@@ -339,10 +291,9 @@ final class VisitorDataModule extends AbstractModule {
 	}
 
 	/**
-	 * The opaque, stable-per-session value of the login gate cookie. Derived with
-	 * wp_hash() from the current user id and session token so it (a) differs between
-	 * users and login sessions — a re-login triggers a re-fetch — and (b) is not the
-	 * session token itself, so it cannot be used to authenticate.
+	 * The opaque, stable-per-session value of the login gate cookie: wp_hash() of
+	 * user id + session token, so a re-login triggers a re-fetch and the value
+	 * cannot authenticate.
 	 *
 	 * @return string
 	 */

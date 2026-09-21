@@ -13,65 +13,28 @@ namespace GTM4WP\Modules\VisitorData;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Describes one data layer value that is specific to the current visitor or
- * session rather than to the URL, so it must not be baked into full-page-cached
- * HTML (issue #398). A module declares such a field through the
- * GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS filter together with its delivery tier;
- * the VisitorData module + client runtime decide how it is delivered.
+ * Describes one data layer value specific to the visitor or session rather
+ * than the URL, so it must not be baked into full-page-cached HTML (issue
+ * #398). Declared through GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS with a tier:
  *
- * The delivery tiers form the framework the cache-safe data layer is built on:
+ * - TIER_CLIENT: the browser knows the value; pushed client-side with no
+ *   request ($client_source names the producer in gtm4wp-visitor-data.js).
+ * - TIER_SESSION: server-only but constant per session (IP, country); fetched
+ *   once per session from the endpoint, cached in sessionStorage.
+ * - TIER_ACTION: server-only, changes on an action (user data, one-shots);
+ *   fetched when $cookie_gate (a JS-readable companion cookie, never the
+ *   HttpOnly auth cookie) changes. A $one_shot fires EXACTLY once: fetched only
+ *   while its event cookie exists, pushed as its own event with a de-dupe
+ *   guard, never cached or replayed (config `actions`, not `gates`), with an
+ *   optional $confirm_url POST beacon so the GET stays side-effect-free.
  *
- * - TIER_CLIENT (1): the browser already knows the value, so it is pushed
- *   client-side with no network request and can never leak between visitors.
- *   Delivered in Phase 1 via the gtm4wp.visitorData push; $client_source names
- *   the producer the js/frontend/gtm4wp-visitor-data.js runtime uses to compute
- *   it (e.g. 'referrer', 'searchTerm').
- * - TIER_SESSION (2): server-only but constant for the whole session (e.g. the
- *   visitor IP, the Cloudflare country). Phase 2 fetches it once per session and
- *   caches it in sessionStorage — never an unconditional per-page fetch.
- * - TIER_ACTION (3): server-only and changes on an action (logged-in user data,
- *   the cart, one-shot events). Phase 2 fetches it gated by an existing cookie
- *   (the WP logged-in cookie, a cart-version cookie, an event cookie).
+ * $resolver is the field's own identity gate: it returns null to omit the
+ * field (a user field on an anonymous request).
  *
- * Phase 1 implemented Tier 1. Phase 2 adds the Tier 2/3 delivery inputs — a
- * server resolver callable and a cookie gate — as further constructor arguments
- * with defaults, so every Phase 1 caller is unaffected:
- *
- * - $resolver runs on the first-party session endpoint (VisitorDataEndpoint) for
- *   the CURRENT request and returns the field value, or null to omit it. It is
- *   the field's own identity/capability gate: a logged-in-user field's resolver
- *   returns null for an anonymous request, so a logged-out caller never receives
- *   user data.
- * - $cookie_gate names the JS-readable cookie whose change tells the client
- *   runtime to re-fetch this field (Tier 3). An empty gate means Tier 2 delivery:
- *   fetched once per session and cached in sessionStorage. The gate is never the
- *   HttpOnly WordPress auth cookie (JS cannot read it) but a JS-visible companion
- *   cookie the VisitorData module maintains alongside it.
- *
- * Phase 3 adds two further constructor arguments for the WooCommerce one-shot
- * events (an add_to_cart after the cart "Undo"; the reliable-purchase fallback):
- *
- * - $one_shot marks a Tier 3 field as a one-shot EVENT rather than a persistent
- *   session value. Unlike a regular gate (which is cached and replayed on every
- *   later page view), a one-shot must fire EXACTLY once: the client fetches it
- *   only while its event cookie is present, pushes it as its own data layer event
- *   with a per-event de-dupe guard, then clears the event cookie — it is never
- *   cached or replayed. The VisitorData module routes one-shot fields into the
- *   config `actions` list instead of `gates`.
- * - $confirm_url is the optional URL of an authenticated POST beacon the client
- *   fires AFTER delivering a one-shot event, so the read-only GET session endpoint
- *   can stay side-effect-free while a state change (e.g. the reliable-purchase
- *   fallback flagging its order _ga_tracked to close a cross-device double-count,
- *   issue #398) still happens. Surfaced per one-shot key in the config `actions`
- *   entry; empty means no beacon.
- *
- * (WooCommerce customer & cart data are session-scoped and delivered on the
- * existing cart-fragments AJAX instead — see WooCommerce\PageDataLayer — so they
- * are not declared as VisitorField resolvers here. They must STAY that way: every
- * non-one-shot field declared here is merged into the single
- * VisitorDataModule::EVENT_VISITOR_DATA push, so declaring a customer* key or
- * cartContent as a VisitorField would silently move it off its own event and break
- * the guarantee that the event name tells a GTM setup which keys arrived.)
+ * WooCommerce customer/cart data ride the cart-fragments AJAX instead (see
+ * WooCommerce\PageDataLayer) and must STAY off this list: every non-one-shot
+ * field here merges into the single EVENT_VISITOR_DATA push, which would move
+ * them off their own event.
  */
 final class VisitorField {
 
@@ -81,38 +44,28 @@ final class VisitorField {
 	public const TIER_CLIENT = 1;
 
 	/**
-	 * Server-only but constant per session; Phase 2 once-per-session endpoint.
+	 * Server-only but constant per session; once-per-session endpoint fetch.
 	 */
 	public const TIER_SESSION = 2;
 
 	/**
-	 * Server-only, changes on an action; Phase 2 cookie-gated endpoint.
+	 * Server-only, changes on an action; cookie-gated endpoint fetch.
 	 */
 	public const TIER_ACTION = 3;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param string $key           Data layer variable name (kept identical to the
-	 *                              server-rendered name so existing GTM setups keep working).
+	 * @param string $key           Data layer variable name (identical to the server-rendered name).
 	 * @param int    $tier          One of the TIER_* constants.
-	 * @param string $client_source Tier 1 only: the producer token the client runtime
-	 *                              uses to compute the value (empty for Tier 2/3).
-	 * @param mixed  $resolver      Tier 2/3 only: a callable resolving the field value for
-	 *                              the current request on the session endpoint, or null to
-	 *                              omit it. Untyped so both closures and [$obj,'method']
-	 *                              array callables are accepted (null for Tier 1).
-	 * @param string $cookie_gate   Tier 3 only: the JS-readable cookie whose change makes
-	 *                              the client re-fetch this field (empty = Tier 2, once per
-	 *                              session).
-	 * @param bool   $one_shot      Tier 3 only: whether this field is a one-shot EVENT
-	 *                              (Phase 3) — fetched only while its event cookie is
-	 *                              present, pushed once with a de-dupe guard, then the
-	 *                              cookie is cleared; never cached/replayed.
-	 * @param string $confirm_url   One-shot only: optional URL of an authenticated POST
-	 *                              beacon the client fires after delivering this event,
-	 *                              so a state change can happen without the read-only
-	 *                              GET endpoint mutating anything (empty = no beacon).
+	 * @param string $client_source Tier 1 only: the producer token the client runtime uses.
+	 * @param mixed  $resolver      Tier 2/3 only: callable resolving the value on the endpoint,
+	 *                              null to omit. Untyped so array callables are accepted.
+	 * @param string $cookie_gate   Tier 3 only: the JS-readable cookie whose change triggers a
+	 *                              re-fetch (empty = Tier 2).
+	 * @param bool   $one_shot      Tier 3 only: a one-shot EVENT (see the class docblock).
+	 * @param string $confirm_url   One-shot only: URL of the POST beacon fired after delivery
+	 *                              (empty = no beacon).
 	 */
 	public function __construct(
 		public string $key,

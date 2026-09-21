@@ -27,13 +27,8 @@ defined( 'ABSPATH' ) || exit;
 final class MediaEventsModule extends AbstractModule {
 
 	/**
-	 * Memoized result of the gtm4wp_media_sdk_blocked filter.
-	 *
-	 * The DECISION is made once per request - the filter runs a single time,
-	 * so a third-party callback is not consulted once per tracker - while the
-	 * flag it produces is PRINTED per tracker handle. See the note in
-	 * enqueue_media_tracker() on why a page-wide fact must never ride a single
-	 * handle's tag.
+	 * Memoized result of the gtm4wp_media_sdk_blocked filter: decided once per
+	 * request, printed per tracker handle (see enqueue_media_tracker()).
 	 *
 	 * @var bool|null
 	 */
@@ -47,23 +42,13 @@ final class MediaEventsModule extends AbstractModule {
 	private bool $gate_enqueued = false;
 
 	/**
-	 * Handle of the consent gate every SDK-FETCHING media tracker depends on.
-	 *
-	 * Public because *blocking* it - rewriting or removing its <script src> tag,
-	 * which is what a consent manager does through script_loader_tag - is a
-	 * documented way for a site to withhold every media provider's SDK request,
-	 * so the name is part of the plugin's contract rather than an internal detail.
-	 *
-	 * Not every tracker: four of them fetch nothing (HTML5 media, Wistia, JW
-	 * Player, VideoPress), so they neither enqueue the gate nor depend on it, and
-	 * a site running only those never receives it at all - there would be no
-	 * vendor request for it to withhold (#143).
-	 *
-	 * NOT dequeuing: see the note in enqueue_media_tracker(). Each SDK-fetching
-	 * tracker declares this handle as a dependency, and WordPress re-adds a
-	 * registered dependency to the print queue whether or not it was dequeued, so
-	 * wp_dequeue_script() on this handle has no effect at all. The server-side
-	 * switch is the gtm4wp_media_sdk_blocked filter.
+	 * Handle of the consent gate every SDK-FETCHING tracker depends on. Public
+	 * because BLOCKING its tag (what a consent manager does via
+	 * script_loader_tag) is a documented lever, so the name is a contract. The
+	 * four trackers that fetch nothing (HTML5, Wistia, JW Player, VideoPress)
+	 * neither enqueue nor depend on it (#143). Dequeuing it does nothing:
+	 * WordPress re-adds a registered dependency to the print queue; the
+	 * server-side switch is the gtm4wp_media_sdk_blocked filter.
 	 */
 	public const GATE_HANDLE = 'gtm4wp-media-gate';
 
@@ -143,34 +128,17 @@ final class MediaEventsModule extends AbstractModule {
 		$scheme = (string) ( $site_url_parts['scheme'] ?? '' );
 		$host   = (string) ( $site_url_parts['host'] ?? '' );
 
-		// A site URL WordPress cannot resolve into a scheme and a host cannot
-		// produce a usable origin, and the YouTube JS API rejects a malformed one
-		// anyway. Leave the embed exactly as the oEmbed handler returned it rather
-		// than splicing in a half-built value (and rather than reading array keys
-		// that are not there).
+		// No usable origin: leave the embed as the oEmbed handler returned it.
 		if ( '' === $scheme || '' === $host ) {
 			return $return_value;
 		}
 
-		// esc_url() AT the point of injection (RI-17). $return_value is markup the
-		// oEmbed handler has already escaped, and this splice runs after that
-		// escaping finished - so whatever is put back here is unescaped by
-		// definition and the earlier escaping cannot defend the attribute. The
-		// value is A4-set today (wp_parse_url over site_url()) and a hostname
-		// cannot carry a quote, which is why nothing was exploitable; an escape
-		// that is only correct because of where its value happens to come from is
-		// not an escape.
-		//
-		// The separators stay as raw & rather than &#038;: browsers parse both
-		// identically here, and 1.x emits this byte-for-byte.
+		// esc_url() AT the point of injection (RI-17): the splice runs after the
+		// oEmbed handler's escaping finished. Separators stay raw & (1.x bytes).
 		$origin = esc_url( $scheme . '://' . $host );
 
-		// The scheme/host gate above runs BEFORE the escaper, so it cannot see the
-		// escaper's own failure mode: esc_url() returns '' for a scheme outside
-		// wp_allowed_protocols(), which the kses_allowed_protocols filter lets any
-		// plugin narrow. Without this second check that would splice in the same
-		// half-built `origin=` the first gate exists to prevent - a guard is only a
-		// guard for the steps that come after it (RI-17, read backwards).
+		// esc_url() returns '' for a scheme a plugin narrowed out of
+		// wp_allowed_protocols(); the gate above cannot see that.
 		if ( '' === $origin ) {
 			return $return_value;
 		}
@@ -183,113 +151,55 @@ final class MediaEventsModule extends AbstractModule {
 	}
 
 	/**
-	 * Enqueues a built media tracker script and, on the first call, publishes the
-	 * runtime-observer opt-in flag.
-	 *
-	 * The flag is a single boolean read by js/frontend/lib/native-video-params.js
-	 * (gtm4wpObserveMedia): when true, every enabled tracker also watches
-	 * document.body for players inserted after page load (popups/AJAX). It is off
-	 * unless the site enabled GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC, so the shared
-	 * MutationObserver is never created on sites that do not need it.
-	 *
-	 * On the first call it also enqueues the consent gate every tracker depends on
-	 * (see enqueue_gate()) and publishes the third-party SDK veto, when the site
-	 * has set one - see sdk_blocked().
+	 * Enqueues a built media tracker script together with the inline flags it
+	 * reads: the runtime-observer opt-in (GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC, read
+	 * by gtm4wpObserveMedia in native-video-params.js), and for an SDK-fetching
+	 * tracker the consent gate dependency, the gate-expected flag and the SDK veto.
 	 *
 	 * @param string $handle      Script handle.
 	 * @param string $file        File name inside the build directory.
 	 * @param array  $deps        Script dependencies.
 	 * @param bool   $in_footer   Whether to print the script in the footer.
-	 * @param bool   $fetches_sdk Whether this tracker requests a third-party player
-	 *                            SDK at runtime. False for the trackers that have
-	 *                            nothing to fetch (see enqueue_scripts()); they get
-	 *                            no consent gate, because there is no vendor request
-	 *                            for one to withhold. Flip this the moment such a
-	 *                            tracker gains an SDK.
+	 * @param bool   $fetches_sdk Whether this tracker requests a third-party SDK at
+	 *                            runtime. False for the fetch-nothing trackers, which
+	 *                            get no gate (#143); flip it the moment one gains an SDK.
 	 * @return void
 	 */
 	private function enqueue_media_tracker( string $handle, string $file, array $deps, bool $in_footer, bool $fetches_sdk = true ): void {
-		// The gate only has a job where a vendor request exists to refuse. Four of
-		// the twelve trackers fetch nothing at all, so on a site running only those
-		// - self-hosted HTML5 video is the ordinary case - the gate would be an
-		// extra <script src> on every page that gates nothing, and "block
-		// gtm4wp-media-gate to stop every SDK request" would read as a lever that
-		// works while doing nothing at all (#143).
+		// The gate only has a job where a vendor request exists to refuse (#143).
 		if ( $fetches_sdk ) {
 			$this->enqueue_gate( $in_footer );
 		}
 
-		// Declared as a dependency of every SDK-fetching tracker, not merely
-		// enqueued beside them: WordPress then guarantees the gate is printed
-		// first, so a tracker can never read the flag before the gate has had the
-		// chance to set it. That ordering is load-bearing rather than defensive -
-		// the bundles are enqueued with strategy 'defer', so at the moment a
-		// tracker runs document.readyState is already 'interactive' and
-		// gtm4wpOnReady() calls the init synchronously, reading the flag right
-		// then.
-		//
-		// The 'defer' half of that was verified against core rather than assumed
-		// (PA-16: name the WordPress function that carries the claim and read it).
-		// WP_Scripts::filter_eligible_strategies() demotes a handle to blocking for
-		// an inline script attached in the 'after' position only - "Handles with
-		// inline scripts attached in the 'after' position cannot be delayed",
-		// because an 'after' inline would run before the delayed script. Every
-		// inline script this module attaches uses 'before', so the trackers keep
-		// their deferred strategy and the reasoning above stands. Re-check this if
-		// any of them ever moves to 'after'.
-		//
-		// The edge has a consequence worth stating where it is created, because
-		// it is the opposite of what it looks like: it makes this handle
-		// IMMUNE to wp_dequeue_script(). WP_Dependencies::dequeue() only unsets
-		// from the queue, while all_deps() appends any still-REGISTERED
-		// dependency to $to_do regardless - so a dequeued gate is printed anyway,
-		// sets its flag, and every SDK loads. Do not document dequeuing this
-		// handle as a lever, and do not reach for wp_deregister_script() instead:
-		// a missing dependency makes all_deps() drop every tracker that names it
-		// (and emits _doing_it_wrong on WP 6.9.1+). Blocking the tag works;
-		// the gtm4wp_media_sdk_blocked filter works.
+		// A DEPENDENCY, not merely enqueued beside: WordPress then prints the gate
+		// first, which is load-bearing because the deferred tracker reads the flag
+		// synchronously in gtm4wpOnReady(). The trackers stay deferred only while
+		// every inline script here uses 'before' (an 'after' inline demotes the
+		// handle to blocking, WP_Scripts::filter_eligible_strategies(), PA-16).
+		// The edge also makes the gate IMMUNE to wp_dequeue_script() (all_deps()
+		// re-adds a registered dependency); never document dequeuing as a lever,
+		// and never wp_deregister_script() it (a missing dependency drops every
+		// tracker naming it). Blocking the tag and the filter both work.
 		if ( $fetches_sdk ) {
 			$deps[] = self::GATE_HANDLE;
 		}
 
 		$this->enqueue_script( $handle, $file, $deps, $in_footer );
 
-		// The "a gate was printed for this page" flag rides on every TRACKER
-		// handle, never on the gate's own. It is what lets a tracker read a gate
-		// that did not run as "refused" rather than "absent", so it has to
-		// outlive the gate - and on the gate's handle it cannot:
-		// WP_Scripts::do_item() builds $tag from the 'before' inline AND the src
-		// tag and only then applies script_loader_tag, so both reach a consent
-		// manager as ONE string. A blocker that rewrites the src in place leaves
-		// the flag standing, but one that replaces or empties the whole string
-		// takes the expectation with the gate, and the trackers then fetch as
-		// though no gate existed - failing open in the one case the flag exists
-		// for.
-		//
-		// Deliberately per tracker: blocking any single tracker must not take
-		// the expectation away from the others. The assignment is idempotent,
-		// so repeating it costs a few bytes and nothing else.
-		//
-		// It tracks the gate EXACTLY, which is why it sits under the same
-		// condition: announcing an expectation no gate was enqueued for would make
-		// an SDK-fetching tracker loaded some other way read "expected but never
-		// ran" as a refusal, failing closed on a page where nothing was refused.
+		// The gate-expected flag rides every TRACKER handle, never the gate's own:
+		// WP_Scripts::do_item() hands the 'before' inline and the src tag to
+		// script_loader_tag as ONE string, so a blocker that empties the gate's
+		// tag would take the expectation with it and the trackers would fail
+		// open. Per tracker so blocking one tracker cannot remove it for the
+		// others; under the same condition as the gate so a tracker loaded some
+		// other way never reads "expected but never ran" as a refusal.
 		if ( $fetches_sdk ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_gate_expected = true;', 'before' );
 		}
 
-		// The same one-string mechanism makes these two page-wide flags
-		// per-tracker as well. They used to be printed once, on whichever
-		// tracker happened to enqueue first - so a consent manager blocking
-		// exactly that tracker's handle (a documented per-provider lever)
-		// deleted the flag together with the bundle it was riding on. For the
-		// veto that failed OPEN: the site's server-side "no media SDKs at all"
-		// decision vanished for every remaining tracker the moment one
-		// provider's tag was refused. The observer opt-in is read by every
-		// tracker, so it rides them all; the veto is only consulted on the SDK
-		// fetch path, so it rides the SDK-fetching handles. The filter behind
-		// sdk_blocked() still runs once per request (memoized) - only the
-		// printing is repeated.
+		// Same one-string mechanism: both page-wide flags ride every tracker they
+		// apply to, or blocking the first-enqueued tracker's tag deleted them (the
+		// veto failed OPEN). The filter itself still runs once (memoized).
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ) {
 			wp_add_inline_script( $handle, 'window.gtm4wp_media_observe_dynamic = true;', 'before' );
 		}
@@ -300,41 +210,15 @@ final class MediaEventsModule extends AbstractModule {
 	}
 
 	/**
-	 * Enqueues the consent gate once, and tells the trackers to expect it.
-	 *
-	 * Only reached from a tracker that actually fetches an SDK, so a site running
-	 * only the four fetch-nothing trackers never pays for a gate with nothing to
-	 * gate (#143). A tracker that gains an SDK must flip its $fetches_sdk argument.
-	 *
-	 * The gate (js/frontend/gtm4wp-media-gate.js) carries no logic. It exists to
-	 * be a real, enqueued `<script src>` that a consent manager can refuse by
-	 * rewriting or removing its tag through script_loader_tag - because the SDK
-	 * requests themselves are made from JavaScript and therefore pass through no
-	 * server-side control at all. Blocking the gate withholds every media SDK
-	 * request while leaving the trackers running for the players already on the
-	 * page. wp_dequeue_script() is NOT one of the ways to refuse it - see the
-	 * note in enqueue_media_tracker() - and the server-side equivalent is the
-	 * gtm4wp_media_sdk_blocked filter.
-	 *
-	 * Note what the gate is NOT. It is served from this site's own domain, so a
-	 * consent manager's third-party-domain blocklist will never match it: pulling
-	 * this lever takes a rule naming this handle, i.e. deliberate configuration.
-	 * Zero-configuration blocking comes from somewhere else entirely and already
-	 * works - every SDK-fetching tracker selects on `iframe[src*="<vendor>"]` and
-	 * reaches ensureSdk() only once such an embed is found, so a consent manager
-	 * that blocks the EMBED by domain (moving src to data-src, or swapping in a
-	 * placeholder) leaves nothing for the selector to match and the vendor is
-	 * never contacted. That property is the one to protect; this gate is the
-	 * lever for a site that wants to act without relying on it.
-	 *
-	 * The companion inline flag is what makes a blocked gate distinguishable from
-	 * no gate at all. It is attached to the gate's own handle with position
-	 * 'before', so WordPress prints it in a SEPARATE <script> tag ahead of the
-	 * gate's src tag: a consent manager that rewrites the src tag therefore
-	 * suppresses the gate while leaving the expectation standing, which is
-	 * exactly the state that has to mean "refused". Were the flag inside the gate
-	 * file, blocking it would erase the evidence that it was ever expected, and
-	 * the trackers would fetch as though no gate existed.
+	 * Enqueues the consent gate once (js/frontend/gtm4wp-media-gate.js, whose
+	 * header documents the levers). It carries no logic: it exists to be a real
+	 * `<script src>` a consent manager can refuse via script_loader_tag, since
+	 * the SDK requests themselves are made from JavaScript and pass no
+	 * server-side control. It is first-party, so a third-party-domain blocklist
+	 * never matches it; the zero-configuration protection is that every tracker
+	 * selects on `iframe[src*="<vendor>"]` and fetches only once such an embed
+	 * exists - protect that property, never widen a selector to match a
+	 * consent-blocked embed.
 	 *
 	 * @param bool $in_footer Whether to print the script in the footer.
 	 * @return void
@@ -350,25 +234,10 @@ final class MediaEventsModule extends AbstractModule {
 	}
 
 	/**
-	 * Whether the site has vetoed every third-party media SDK request.
-	 *
-	 * The trackers fetch their provider SDK from JavaScript, only on a page that
-	 * actually contains that provider's embed. That is a large privacy and
-	 * performance win over enqueuing eight SDKs on every page, and it costs one
-	 * thing: no <script src="https://vendor…"> tag is ever served, so the request
-	 * never passes through `script_loader_tag` and a consent manager whose rule
-	 * names the vendor's domain has nothing to match. This filter is that lever,
-	 * given back.
-	 *
-	 * Per-provider control needs nothing new: each tracker is its own script
-	 * handle, so `wp_dequeue_script( 'gtm4wp-vimeo' )` - or a consent manager
-	 * blocking that handle - stops Vimeo's SDK request by stopping the bundle
-	 * that would make it. This filter is the all-providers switch for the case
-	 * where consent has not been given yet and the answer is not per provider.
-	 *
-	 * Returning true does not disable tracking of players the page already
-	 * carries; it only withholds the vendor request, which is what a blocked
-	 * <script> tag used to do.
+	 * Whether the site has vetoed every third-party media SDK request: the
+	 * server-side, all-providers lever (per provider, dequeue or block that
+	 * tracker's own handle). Returning true withholds the vendor request only;
+	 * players already on the page are still tracked.
 	 *
 	 * @since 2.0.0
 	 *
@@ -390,26 +259,13 @@ final class MediaEventsModule extends AbstractModule {
 	}
 
 	/**
-	 * Loads the media tracking scripts based on the enabled options.
-	 *
-	 * Only the plugin's own tracker bundles are enqueued here. The provider SDKs
-	 * deliberately are not: each tracker hands its SDK URL to
-	 * gtm4wpObserveMedia() in js/frontend/lib/native-video-params.js, which
-	 * fetches it only after finding a matching embed in the DOM.
-	 *
-	 * Enqueuing them from PHP meant every enabled provider's SDK was requested on
-	 * every front-end page - 288 KB across the seven of them, measured 2026-08-07,
-	 * of which Mixcloud alone is 190 KB - including pages with no player at all,
-	 * which also handed the visitor's IP, User-Agent and Referer to seven third
-	 * parties for nothing.
-	 *
-	 * PHP cannot make this decision. At wp_enqueue_scripts the page has not been
-	 * rendered, so widget content, block templates, page-builder output and
-	 * shortcodes are all still invisible; the DOM is the only place the answer
-	 * exists, and the only place that stays correct for an embed inserted after
-	 * load (GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC). That is also why the YouTube
-	 * tracker no longer gates on $GLOBALS['post']->post_content: the gate dropped
-	 * tracking for every YouTube embed that did not live in the main post body.
+	 * Loads the media tracking scripts based on the enabled options. Only the
+	 * tracker bundles are enqueued; each hands its SDK URL to gtm4wpObserveMedia()
+	 * (native-video-params.js), which fetches it only after finding a matching
+	 * embed in the DOM. Do NOT enqueue the SDKs from PHP: that requested ~288 KB
+	 * and handed the visitor's IP to seven vendors on every page, and PHP cannot
+	 * decide at wp_enqueue_scripts what the rendered DOM will contain (widgets,
+	 * blocks, builders, embeds inserted after load).
 	 *
 	 * @return void
 	 */
@@ -445,23 +301,12 @@ final class MediaEventsModule extends AbstractModule {
 
 			$this->enqueue_media_tracker( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', array(), $in_footer );
 
-			// Dailymotion is the one media tracker whose library URL is not a
-			// fixed literal in the JS: a site can name the player configuration
-			// its embeds use, and each player has its own generated library. So
-			// the URL is built here and handed to the tracker, which passes it
-			// straight to gtm4wpObserveMedia(). The Player ID itself never
-			// reaches JavaScript and no URL is ever assembled client side.
-			//
-			// rawurlencode() AT the point of injection (RI-17), not a format
-			// regex. The scheme and host are literals, so the configured value
-			// can only ever land in ONE path segment, and rawurlencode() cannot
-			// emit '/', ':', '?' or '#' - which makes a stored "../../evil" a 404
-			// on geo.dailymotion.com rather than a different URL. A validating
-			// regex is the wrong tool here: it would encode Dailymotion's CURRENT
-			// Player ID grammar as a gate and reject their next one, with the
-			// failure presenting as user error rather than a plugin bug (.upstream
-			// UC-5). The encoder is the identity function for every id Dailymotion
-			// actually issues, so it costs nothing on the legitimate path.
+			// Dailymotion's library URL depends on the configured Player ID, so it
+			// is built here and handed to the tracker; the id never reaches JS.
+			// rawurlencode() AT the point of injection (RI-17), not a format regex
+			// (which would encode Dailymotion's current id grammar and reject the
+			// next one, UC-5): the value can only land in ONE path segment, so a
+			// stored "../../evil" is a 404 on geo.dailymotion.com, never another URL.
 			$player_id = trim( (string) $this->opt( GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID ) );
 
 			$config = array(
@@ -492,10 +337,8 @@ final class MediaEventsModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_WISTIA ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_wistia', true );
 
-			// Nothing to fetch on demand either: Wistia's embed loads its own
-			// player runtime and the tracker binds through the global
-			// `window._wq` ready queue, so it works whether that runtime is
-			// already present or arrives later.
+			// Nothing to fetch: Wistia's embed loads its own runtime and the
+			// tracker binds through the `window._wq` ready queue.
 			$this->enqueue_media_tracker( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer, false );
 		}
 

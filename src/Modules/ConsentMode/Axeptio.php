@@ -18,20 +18,11 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Loads the Axeptio CMP SDK directly (no separate Axeptio plugin needed),
- * optionally drives Google Consent Mode v2 and bridges consent choices to
- * the data layer.
- *
- * Axeptio is one of the consent management tools owned by the consent module,
- * so this is a plain frontend handler the ConsentModeModule wires up (like the
- * WooCommerce module delegates to its helpers) rather than a module of its own.
- *
- * The SDK loader, the consent default and the data layer bridge are appended
- * to the GTM4WP head block via ContainerCode::FILTER_HEADER_TOP_JS — the same
- * extension point the WebToffee consent integration uses — so the settings are
- * emitted before the GTM container loader (wp_head priority 1 vs. >= 2) and the
- * script goes through the core ScriptTag sanitizer instead of a raw echo. Port
- * of integration/axeptio.php from the 1.x pull request.
+ * Loads the Axeptio CMP SDK directly, optionally drives Google Consent Mode v2
+ * and bridges consent choices to the data layer. A plain handler wired by
+ * ConsentModeModule, appended to the head block via
+ * ContainerCode::FILTER_HEADER_TOP_JS so it prints before the container loader
+ * and goes through the ScriptTag sanitizer. Port of the 1.x integration/axeptio.php.
  */
 final class Axeptio {
 
@@ -67,21 +58,13 @@ final class Axeptio {
 	 * Appends the Axeptio settings object, SDK loader and the data layer
 	 * consent bridge to the GTM4WP head block.
 	 *
-	 * The settings object is JSON encoded with the full hex flag set so no
-	 * value can break out of the inline script; the ampersand hex flag also
-	 * keeps the block safe when the head block is printed without the
-	 * ampersand-restore that ScriptTag::print_script_block() applies.
-	 *
 	 * @param string $inline_js      Inline JS collected so far.
 	 * @param string $datalayer_name Name of the data layer JS variable.
 	 * @return string
 	 */
 	public function add_head_js( $inline_js, $datalayer_name ) {
-		// json_literal(), not a bare wp_json_encode(): the result is concatenated
-		// into an assignment in the head <script>, and the encoder returns false -
-		// which PHP renders as '' - for a value it cannot encode, giving
-		// `window.axeptioSettings = ;`. That is a SyntaxError, and it would take the
-		// SDK loader below it and the rest of the head block with it (#141).
+		// json_literal(), not bare wp_json_encode(): a false return would emit
+		// `window.axeptioSettings = ;` and take the whole head block (#141, RI-21).
 		$axeptio_settings = ScriptTag::json_literal(
 			$this->settings(),
 			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS

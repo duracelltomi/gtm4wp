@@ -36,16 +36,11 @@ final class ContainerRows {
 	public const COLUMN_NO_ID   = 'no_id';
 
 	/**
-	 * The D modifier on all four patterns is the same control the
-	 * JS_IDENTIFIER_PATTERN docblock below explains: without it PCRE lets `$`
-	 * match before one trailing newline, so "value\n" passes a pattern that
-	 * reads as though it could not. The stored-options path is immune (every
-	 * row value is trimmed by normalize_row() before any check), but the
-	 * GTM4WP_HARDCODED_* wp-config constants are validated untrimmed - and an
-	 * accepted trailing newline in the auth/preview values used to reach the
-	 * container loader snippet raw, turning the whole <script> block into a
-	 * SyntaxError. Rejecting is the class contract: the admin notice names the
-	 * constant instead of the container silently not loading.
+	 * The D modifier on every pattern is load-bearing: without it PCRE lets `$`
+	 * match before a trailing newline, and the GTM4WP_HARDCODED_* constants are
+	 * validated untrimmed - an accepted "value\n" reached the loader snippet raw
+	 * and made the whole <script> block a SyntaxError. Rejecting is the
+	 * contract: the admin notice names the constant.
 	 */
 	public const GTM_ID_PATTERN  = '/^GTM-[A-Z0-9]+$/D';
 	public const AUTH_PATTERN    = '/^[a-zA-Z0-9\-_]+$/D';
@@ -53,42 +48,20 @@ final class ContainerRows {
 	public const PATH_PATTERN    = '/^[a-zA-Z0-9\.\-\_\/]*$/D';
 
 	/**
-	 * A valid JavaScript identifier (the ASCII subset the plugin supports).
-	 *
-	 * This is not a cosmetic allow-list: the data layer variable name and the
-	 * GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY variable names are both emitted
-	 * UNQUOTED into a <script> body - `var <name> = <name> || [];`,
-	 * `window.<name>.push(…)`, `const <name> = …`. There is no escaping fix
-	 * available for that position, because escaping is exactly what a bare
-	 * identifier must not have, so this pattern IS the control and it has to
-	 * encode the grammar the sink parses rather than merely constrain the
-	 * value. `-` is the character that makes the difference: it is a perfectly
-	 * ordinary thing to type into a settings field and JavaScript reads it as
-	 * the subtraction operator, so a name containing one turns the whole
-	 * <script> block into a SyntaxError.
-	 *
-	 * Deliberately narrower than the ECMAScript grammar (which allows most
-	 * Unicode letters): staying ASCII keeps the emitted snippet byte-identical
-	 * to 1.x for every name 1.x accepted except the hyphenated ones, which
-	 * never worked in either line.
-	 *
-	 * The D modifier is not decoration. Without it PCRE lets `$` match before a
-	 * trailing newline, so "name\n" passes a pattern that reads as though it
-	 * could not - and this pattern is the whole control for an unquoted sink, so
-	 * "reads as though it could not" is not good enough. Anchoring to the true
-	 * end of the subject is what makes the paragraphs above true.
+	 * A valid JavaScript identifier (ASCII subset). Not cosmetic: the data layer
+	 * name and the GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY names are emitted UNQUOTED
+	 * into a <script> body, where no escaping is possible, so this pattern IS
+	 * the control and must encode the grammar the sink parses (a `-` is the
+	 * subtraction operator). Narrower than ECMAScript on purpose, keeping the
+	 * snippet byte-identical to 1.x. The D modifier anchors to the true end of
+	 * the subject (see above).
 	 */
 	public const JS_IDENTIFIER_PATTERN = '/^[A-Za-z_$][A-Za-z0-9_$]*$/D';
 
 	/**
-	 * Whether a string is usable as a bare JavaScript identifier.
-	 *
-	 * The single predicate shared by the save side (the data layer name
-	 * sanitizer in this module's AdminSchema), the read side
-	 * (DataLayer::name(), Compat\Globals) and the admin notice that reports a
-	 * rejected stored value - PA-2: one function, never two copies of a rule,
-	 * because a value the sanitizer stores and the reader then discards is
-	 * worse than one that was rejected outright.
+	 * Whether a string is usable as a bare JavaScript identifier: the single
+	 * predicate shared by the save side, the read side (DataLayer::name(),
+	 * Compat\Globals) and the admin notice (PA-2).
 	 *
 	 * @param string $value The candidate identifier.
 	 * @return bool
@@ -98,23 +71,16 @@ final class ContainerRows {
 	}
 
 	/**
-	 * Resolves the data layer JavaScript variable name from its stored option
-	 * value, falling back to the GTM default.
-	 *
-	 * Re-validated here rather than trusted because it was sanitized on save
-	 * (PA-2): the row also reaches this point from a 1.x install, whose own
-	 * validation accepted names this one does not, and 1.x's are stored
-	 * verbatim by the migration. An unusable name falls back to `dataLayer` so
-	 * the container keeps working; Admin\Notices tells the admin their
-	 * configured name was ignored, because silently substituting a different
-	 * global is the same hard-to-diagnose failure the value itself would cause.
+	 * Resolves the data layer variable name from its stored value, falling back
+	 * to `dataLayer`. Re-validated at the reader (PA-2) because a 1.x install
+	 * stored names this rule rejects; Admin\Notices tells the admin when the
+	 * configured name was ignored.
 	 *
 	 * @param mixed $stored The stored option value.
 	 * @return string A name that is safe to emit unquoted.
 	 */
 	public static function datalayer_name( $stored ): string {
-		// The empty check is also what keeps WP CLI working (bugfix by
-		// Patrick Holberg Hesselberg, carried over from 1.x).
+		// Also what keeps WP CLI working (Patrick Holberg Hesselberg, 1.x).
 		if ( ! is_string( $stored ) ) {
 			return 'dataLayer';
 		}
@@ -174,14 +140,10 @@ final class ContainerRows {
 	}
 
 	/**
-	 * Builds container rows from the flat 1.x options: every container ID
-	 * of the comma separated gtm-code inherits the shared environment,
-	 * domain and path values.
-	 *
-	 * Note: 1.x only loaded the first container when both environment
-	 * parameters were configured. Since environments are per-row now, that
-	 * workaround is gone - every ID is kept and gets the shared environment
-	 * values, so all containers load after the migration.
+	 * Builds container rows from the flat 1.x options: every ID of the comma
+	 * separated gtm-code inherits the shared environment, domain and path. 1.x
+	 * loaded only the first container when an environment was set; that
+	 * workaround is gone, every ID is kept.
 	 *
 	 * @param array<string, mixed> $options Flat option values (stored row or merged values).
 	 * @return array<int, array<string, string>>

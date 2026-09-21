@@ -115,19 +115,13 @@ final class PageVariablesModule extends AbstractModule {
 	public function add_datalayer_data( $data_layer ) {
 		global $wp_query;
 
-		// When the cache-safe data layer is on (issue #398), visitor/session
-		// specific values must not be baked into the cacheable page HTML: they are
-		// omitted here and, where the browser can compute them itself, delivered
-		// client-side instead (see declare_visitor_scoped_fields() and the
-		// gtm4wp-visitor-data script). Content/URL/site data is unaffected.
+		// Cache-safe data layer (issue #398): visitor/session values are omitted
+		// from the cacheable HTML and delivered client-side where possible (see
+		// declare_visitor_scoped_fields()). Content/URL/site data is unaffected.
 		$cache_safe = (bool) $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
 
-		// When on, post/term derived values (title, category, tags, taxonomy
-		// terms) are output in the site's default (master) language instead of
-		// the current translation, so GA reports combine across languages.
-		// Read once here; each call site short-circuits on it so the default
-		// (off) path stays byte-for-byte the current behavior. See
-		// resolve_default_language_object_id() for the WPML/Polylang branching.
+		// Post/term derived values in the site's default language (#145); each
+		// call site short-circuits on it so the off path is byte-identical.
 		$use_master_language = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE );
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_SITEID ) || $this->opt( GTM4WP_OPTION_INCLUDE_SITENAME ) ) {
@@ -137,9 +131,7 @@ final class PageVariablesModule extends AbstractModule {
 			if ( function_exists( 'get_blog_details' ) ) {
 				$gtm4wp_blogdetails = get_blog_details();
 
-				// WP_Site exposes blog_id as a numeric STRING; typed here so it keeps
-				// reaching GTM as a JSON number now that the data layer encode no
-				// longer numeric-coerces (JSON_NUMERIC_CHECK removed).
+				// blog_id is a numeric STRING; typed since the encode no longer coerces.
 				$data_layer['siteID']   = (int) $gtm4wp_blogdetails->blog_id;
 				$data_layer['siteName'] = $gtm4wp_blogdetails->blogname;
 			}
@@ -182,10 +174,8 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
-			// Passed raw: the data layer output sink runs every value through
-			// wp_json_encode() with the full hex flag set, which is the correct
-			// escaper for the inline-script context. VisitorIp::get() already
-			// validates the value with filter_var( FILTER_VALIDATE_IP ).
+			// Passed raw: the sink escapes via wp_json_encode() + hex flags, and
+			// VisitorIp::get() already validates it as an IP.
 			$data_layer['visitorIP'] = VisitorIp::get(
 				(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ),
 				(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )
@@ -195,11 +185,8 @@ final class PageVariablesModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTTITLE ) ) {
 			$page_title = wp_title( '|', false, 'right' );
 
-			// On a singular page with the master-language option on, report the
-			// post's title in the site's default language. Only overridden when
-			// an actual translation exists (a distinct master post id), so a
-			// monolingual site, an untranslated post, or no active multilingual
-			// plugin all keep the current wp_title() output unchanged.
+			// Master language: overridden only when a distinct master post exists,
+			// so an untranslated post keeps the wp_title() output.
 			if ( $use_master_language && is_singular() ) {
 				$_post_id        = (int) get_the_ID();
 				$_master_post_id = DefaultLanguage::post_id( $_post_id, (string) get_post_type() );
@@ -244,12 +231,9 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['pageLanguage'] = (string) apply_filters( 'gtm4wp_page_language', $page_language );
 		}
 
-		// is_singular() does not guarantee the global post object is set up
-		// (unusual template routing, a plugin resetting the global), so the
-		// singular blocks below resolve it once into this nullable local, gate
-		// every post-derived variable on it and simply OMIT those variables
-		// when it is null - never ''/0/false placeholders, because a GTM
-		// trigger may test for key presence.
+		// is_singular() does not guarantee the global post (RI-13): resolve once,
+		// gate every post-derived variable on it and OMIT them when null - never
+		// placeholders, a GTM trigger may test for key presence.
 		$post = get_post();
 
 		if ( is_singular() ) {
@@ -278,32 +262,19 @@ final class PageVariablesModule extends AbstractModule {
 			}
 
 			if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) || $this->opt( GTM4WP_OPTION_INCLUDE_AUTHOR ) ) && null !== $post ) {
-				// PublishPress Authors lets a post have several authors (co-authors,
-				// guest authors), which matters for E-E-A-T. When it is active, the
-				// single-value vars are sourced from its primary (first) author - this
-				// also covers a single GUEST author, whose name is not the WordPress
-				// user in $post->post_author that get_userdata() would return. Only when
-				// there is MORE than one author are the array vars (pagePostAuthors /
-				// pagePostAuthorIDs) added alongside them. When PublishPress is not
-				// active (or returns no author), the get_userdata() fallback is unchanged.
+				// PublishPress Authors (co-authors, guest authors): the single-value
+				// vars come from its primary author (also covers a single GUEST
+				// author, who is not the user in $post->post_author); the array vars
+				// are added only with MORE than one author. Otherwise the
+				// get_userdata() fallback is unchanged.
 				$multiple_authors = array();
 				if ( function_exists( 'get_multiple_authors' ) ) {
 					$ppress_authors = get_multiple_authors( $post->ID );
 					if ( is_array( $ppress_authors ) ) {
-						// PublishPress puts a false into that array in place of an
-						// author it cannot resolve - deleting the author's user
-						// account, or a page never associated with one, produces it -
-						// and the array can hold that false next to real authors.
-						// read_author_prop() declares object, so passing one through
-						// is a fatal TypeError that takes the whole page down.
-						//
-						// Non-objects are dropped HERE rather than skipped inside the
-						// loop below, because the loop is not the only reader: the
-						// count decides whether the array variables are emitted at all
-						// and whether $author_names[0] exists. Filtering first keeps
-						// both honest, and a list of nothing but unresolvable authors
-						// becomes an empty array, which takes the get_userdata()
-						// fallback below exactly as an inactive PublishPress does.
+						// PublishPress puts a false in place of an author it cannot
+						// resolve, and read_author_prop() declares object. Filtered
+						// HERE, not in the loop, because the count decides whether the
+						// array vars are emitted; all-unresolvable takes the fallback.
 						$multiple_authors = array_values( array_filter( $ppress_authors, 'is_object' ) );
 					}
 				}
@@ -312,14 +283,8 @@ final class PageVariablesModule extends AbstractModule {
 					$author_names = array();
 					$author_ids   = array();
 
-					// Author display names and IDs are passed RAW to the data layer:
-					// the single output sink (wp_json_encode with the full hex flag
-					// set) is the correct escaper for the inline-script context, so
-					// pre-escaping here would only corrupt the values (RI-2/RI-4).
-					// The IDs are typed (int) - PublishPress may expose them as
-					// numeric strings, and the data layer encode no longer
-					// numeric-coerces (JSON_NUMERIC_CHECK removed), so without the
-					// cast the array would mix strings with the int fallback 0.
+					// Passed RAW (the sink escapes, RI-2/RI-4); IDs typed (int) since
+					// PublishPress may expose numeric strings.
 					foreach ( $multiple_authors as $one_author ) {
 						$author_names[] = self::read_author_prop( $one_author, 'display_name', '' );
 						$author_ids[]   = (int) self::read_author_prop( $one_author, 'ID', 0 );
@@ -388,22 +353,13 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pagePostDateHour']    = get_the_date( 'H' );
 				$data_layer['pagePostDateMinute']  = get_the_date( 'i' );
 				$data_layer['pagePostDateIso']     = get_the_date( 'c' );
-				// Typed (int): a pure numeric timestamp has no leading-zero risk and
-				// consumers do arithmetic on it, so it keeps reaching GTM as a JSON
-				// number now that the data layer encode no longer numeric-coerces
-				// (JSON_NUMERIC_CHECK removed). The zero-padded date parts above
-				// stay strings on purpose ("07" must not become 7).
+				// Typed (int); the zero-padded parts above stay strings ("07" != 7).
 				$data_layer['pagePostDateUnix'] = (int) get_the_date( 'U' );
 			}
 
-			// Taxonomy terms and post meta are two separate opt-ins since 2.0: the
-			// single "Post Terms" option used to emit both while its description
-			// named only the taxonomies, so enabling taxonomy tracking silently
-			// published every public custom field to the page. They still share the
-			// pagePostTerms container so existing GTM setups keep their variable
-			// paths (taxonomies at pagePostTerms.<taxonomy>, meta at
-			// pagePostTerms.meta); Migration seeds the meta option from the legacy
-			// one, so an upgrading site keeps sending exactly what it sent before.
+			// Terms and meta are separate opt-ins since 2.0 but share the
+			// pagePostTerms container (pagePostTerms.<taxonomy> / pagePostTerms.meta)
+			// so existing GTM variable paths keep working.
 			$include_post_terms = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST );
 			$include_post_meta  = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA );
 
@@ -418,10 +374,8 @@ final class PageVariablesModule extends AbstractModule {
 						if ( is_array( $post_taxonomy_values ) ) {
 							$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
 							foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
-								// As typed, not as stored: WordPress keeps a term name
-								// entity-encoded ("Shirts &amp; Ties"), and the e-commerce
-								// items already report the typed form - one shared decode,
-								// so a GTM trigger matches the same string on every variable.
+								// As typed, not as stored ("Shirts &amp; Ties"): the same
+								// decode the e-commerce items use.
 								$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = EcommerceHelpers::decode_term_name(
 									$use_master_language
 										? $this->localized_term_field( (int) $one_taxonomy_value->term_id, $one_object_taxonomy, 'name', (string) $one_taxonomy_value->name )
@@ -433,43 +387,26 @@ final class PageVariablesModule extends AbstractModule {
 				}
 
 				if ( $include_post_meta ) {
-					// get_post_meta() WITHOUT a key is the one branch of the core
-					// meta API that does NOT unserialize: get_metadata_raw() returns
-					// the meta cache verbatim as soon as $meta_key is empty, and
-					// update_meta_cache() stores the raw DB column. Every value that
-					// was stored as an array therefore arrives here as a serialized
-					// PHP string - see the is_serialized() skip below.
+					// get_post_meta() WITHOUT a key does NOT unserialize, so every
+					// array value arrives as a serialized string (dropped below).
 					$post_meta = get_post_meta( $post->ID );
 					if ( is_array( $post_meta ) ) {
 						$allowed_meta_keys = self::parse_meta_key_list( Field::to_string( $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS ) ) );
 
 						$meta_values = array();
 						foreach ( $post_meta as $post_meta_key => $post_meta_value ) {
-							// An allow-list, once filled in, is the whole rule for what
-							// may be CONSIDERED - nothing outside it is published,
-							// whatever the key looks like. It is NOT a grant: the
-							// protected gate and the filter below still decide what is
-							// actually published, which is what the field description
-							// promises ("Protected fields and the
-							// gtm4wp_post_meta_in_datalayer filter still apply on top of
-							// this list"). Only the order of these three guards enforces
-							// that, so both interactions are pinned by tests.
-							// Empty (the default) keeps the 1.x "everything that is not
-							// protected" behaviour so an upgraded site is unaffected.
+							// The allow-list narrows what may be CONSIDERED; it is not a
+							// grant, the protected gate and the filter below still apply
+							// (the order of the three guards is pinned by tests). Empty
+							// keeps the 1.x "everything not protected" behaviour.
 							if ( array() !== $allowed_meta_keys && ! in_array( $post_meta_key, $allowed_meta_keys, true ) ) {
 								continue;
 							}
 
-							// The underscore test is the FLOOR and is_protected_meta()
-							// only ever adds to it. Both halves are load-bearing:
-							// is_protected_meta() honours a plugin or site that declares
-							// a non-underscore key protected through the core filter, but
-							// that filter's return value IS the function's return value,
-							// so on its own it also lets a callback UNPROTECT an
-							// underscore key - and that key would then be published to
-							// the public page. The filter's ecosystem purpose is admin-UI
-							// visibility, not public-output privacy, so it may only widen
-							// what we withhold, never narrow it.
+							// The underscore test is the FLOOR; is_protected_meta() only
+							// adds to it. Do NOT rely on is_protected_meta() alone: its
+							// filter can UNPROTECT an underscore key, and its purpose is
+							// admin-UI visibility, not public-output privacy.
 							if (
 								'_' === substr( $post_meta_key, 0, 1 )
 								|| is_protected_meta( $post_meta_key, 'post' )
@@ -478,9 +415,7 @@ final class PageVariablesModule extends AbstractModule {
 							}
 
 							/**
-							 * Applies a filter to determine if post meta should be included in the data layer.
-							 * This allows other plugins or themes to modify whether post meta should be included
-							 * in the data layer.
+							 * Filters whether a post meta key is included in the data layer.
 							 *
 							 * @since 1.17
 							 *
@@ -495,24 +430,17 @@ final class PageVariablesModule extends AbstractModule {
 								continue;
 							}
 
-							// Filter FIRST, then collapse a surviving single value to a
-							// scalar. The other order makes the emitted JSON type depend
-							// on whether a serialized sibling happened to be dropped -
-							// a key left with one value would emit a one-element array
-							// while a natively single-valued key emits a bare string,
-							// and a GTM Custom JS variable sees a different type for the
-							// same key. The second call covers the one case the collapse
-							// can expose: a single value that is itself an array still
-							// carrying packed entries.
+							// Filter FIRST, then collapse a surviving single value, or the
+							// JSON type would depend on whether a serialized sibling was
+							// dropped. The second call covers a single value that is
+							// itself an array with packed entries.
 							$post_meta_dl_value = self::drop_serialized_meta_values( $post_meta_value );
 
 							if ( is_array( $post_meta_dl_value ) && ( 1 === count( $post_meta_dl_value ) ) ) {
 								$post_meta_dl_value = self::drop_serialized_meta_values( array_values( $post_meta_dl_value )[0] );
 							}
 
-							// Nothing usable left: OMIT the key rather than emit null
-							// or an empty array, since a GTM trigger may test for key
-							// presence (RI-13).
+							// Nothing usable: OMIT the key (RI-13).
 							if ( null === $post_meta_dl_value ) {
 								continue;
 							}
@@ -520,13 +448,8 @@ final class PageVariablesModule extends AbstractModule {
 							$meta_values[ $post_meta_key ] = $post_meta_dl_value;
 						}
 
-						// Omit the container rather than ship an empty one. PHP's
-						// array() encodes as a JSON [], which is TRUTHY in JavaScript
-						// and a different type from the object the populated form
-						// produces - so a GTM variable reading pagePostTerms.meta sees
-						// the type flip depending on whether anything survived. This is
-						// the same omit-don't-invent rule the per-key branch above
-						// already follows (RI-13/RI-20), applied to the container.
+						// Omit an empty container: [] is truthy in JavaScript and a
+						// different type from the populated object (RI-13/RI-20).
 						if ( array() !== $meta_values ) {
 							$data_layer['pagePostTerms']['meta'] = $meta_values;
 						}
@@ -631,10 +554,8 @@ final class PageVariablesModule extends AbstractModule {
 				}
 
 				/**
-				 * Filters the term id used as the primary category of the current post.
-				 *
-				 * Allows integrators to override the detected primary category, for
-				 * example when a different SEO plugin or a custom taxonomy is used.
+				 * Filters the term id used as the primary category of the current post
+				 * (e.g. for another SEO plugin or a custom taxonomy).
 				 *
 				 * @since 2.0
 				 *
@@ -646,8 +567,6 @@ final class PageVariablesModule extends AbstractModule {
 				$primary_category_id = (int) apply_filters( 'gtm4wp_primary_category_term_id', $primary_category_id, get_the_ID() );
 
 				if ( $primary_category_id > 0 ) {
-					// With the master-language option on, report the primary
-					// category in the site's default language too (issue #145).
 					if ( $use_master_language ) {
 						$primary_category_id = DefaultLanguage::term_id( $primary_category_id, 'category' );
 					}
@@ -713,25 +632,18 @@ final class PageVariablesModule extends AbstractModule {
 				$data_layer['pageCategory'] = $this->build_category_slugs( get_the_category() );
 			}
 
-			// is_author() reports what the main query matched, not that $authordata
-			// was set up (RI-13) - so resolve it once here and OMIT both keys when
-			// it is unavailable, instead of emitting a 0 / '' placeholder a GTM
-			// trigger would read as a real author. This mirrors how the singular
-			// author block above handles a null $post.
+			// is_author() does not guarantee $authordata (RI-13): resolve once and
+			// OMIT both keys when unavailable, like the singular block above.
 			if ( is_author() ) {
 				global $authordata;
 
-				// Read through the RI-12-safe accessor rather than isset(): the
-				// object may expose ID through __get() without __isset(). Any object
-				// carrying an id is accepted, matching the previous behavior; only
-				// the "no author at all" case changes, and it now omits.
+				// Through the RI-12-safe accessor, not isset(): the object may expose
+				// ID via __get() without __isset().
 				$author_id = is_object( $authordata )
 					? self::read_author_prop( $authordata, 'ID', null )
 					: null;
 
 				if ( null !== $author_id && $this->opt( GTM4WP_OPTION_INCLUDE_AUTHORID ) ) {
-					// Typed (int) for parity with the singular path: the data layer
-					// encode no longer numeric-coerces (JSON_NUMERIC_CHECK removed).
 					$data_layer['pagePostAuthorID'] = (int) $author_id;
 				}
 
@@ -745,12 +657,9 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['pagePostType'] = 'search-results';
 
 			if ( $this->opt( GTM4WP_OPTION_INCLUDE_SEARCHDATA ) ) {
-				// siteSearchTerm (from the URL) and siteSearchFrom (from the
-				// referrer) are things the browser can compute itself, so under the
-				// cache-safe data layer they are delivered client-side (see
-				// declare_visitor_scoped_fields()) rather than rendered here — which
-				// also removes their server-side reflected-XSS surface.
-				// siteSearchResults stays server-side: only the server knows it.
+				// siteSearchTerm / siteSearchFrom are browser-computable, so under
+				// the cache-safe data layer they are delivered client-side (see
+				// declare_visitor_scoped_fields()); siteSearchResults stays server-side.
 				if ( ! $cache_safe ) {
 					$data_layer['siteSearchTerm'] = get_search_query();
 					$data_layer['siteSearchFrom'] = '';
@@ -763,8 +672,6 @@ final class PageVariablesModule extends AbstractModule {
 						}
 					}
 				}
-				// Typed (int) like postCountOnPage/postCountTotal below: all counts
-				// agree on reaching GTM as a JSON number (RI-2, type at source).
 				$data_layer['siteSearchResults'] = (int) $wp_query->post_count;
 			}
 		}
@@ -781,10 +688,7 @@ final class PageVariablesModule extends AbstractModule {
 			$data_layer['pagePostType'] = '404-error';
 		}
 
-		// The main query global is not guaranteed either (a plugin resetting it,
-		// the compile fired before the main query exists), so the counts are
-		// gated the same way as the post-derived variables above: omitted, not
-		// emitted as placeholders, when the global cannot answer.
+		// The main query global is not guaranteed either: omitted when it cannot answer.
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTCOUNT ) && isset( $wp_query->post_count, $wp_query->found_posts ) ) {
 			$data_layer['postCountOnPage'] = (int) $wp_query->post_count;
 			$data_layer['postCountTotal']  = (int) $wp_query->found_posts;
@@ -795,18 +699,13 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_POSTFORMAT ) && is_singular() === true && null !== $post ) {
-			// get_post_format() returns the format slug, or false for a standard
-			// post. Emit the slug itself ('aside', 'gallery', ...), falling back
-			// to 'standard' - the inherited short-ternary variant emitted '' for
-			// every post that HAD a format, making the variable unusable.
+			// get_post_format() returns false for a standard post.
 			$post_format              = get_post_format();
 			$data_layer['postFormat'] = $post_format ? $post_format : 'standard';
 		}
 
 		if ( ! $cache_safe && $this->opt( GTM4WP_OPTION_INCLUDE_MISCGEOCF ) && isset( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
-			// Sanitized but not esc_js'd: the data layer output sink hex-encodes
-			// every value via wp_json_encode(), so pre-escaping would only
-			// corrupt the country code for special-character inputs.
+			// Sanitized but not esc_js'd: the sink hex-encodes via wp_json_encode().
 			$data_layer['geoCloudflareCountryCode'] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) );
 		}
 
@@ -814,24 +713,12 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Counts the words of a plain-text string in a UTF-8 aware way.
-	 *
-	 * PHP's str_word_count() only recognizes ASCII letters plus whatever the
-	 * current locale adds, so it returns 0 for Cyrillic, Greek, Hebrew, Arabic and
-	 * CJK content and MIS-counts Latin text with diacritics ("Größe Straße Übung"
-	 * counted 5 instead of 3, because each multi-byte character split a word).
-	 * That silently made pageContentWordCount 0 and collapsed pageReadingTime to a
-	 * constant 1 minute on every non-English site.
-	 *
-	 * Two scripts are counted differently because they delimit words differently:
-	 *
-	 * - Space-delimited scripts (Latin, Cyrillic, Greek, Arabic, ...) are split on
-	 *   Unicode whitespace.
-	 * - CJK (Han, Hiragana, Katakana, Hangul) does not put spaces between words, so
-	 *   a whitespace split would report a whole Japanese article as one word. Each
-	 *   CJK character is counted as one word instead - the same approximation
-	 *   word processors use - and those characters are removed before the
-	 *   whitespace split so mixed-script content is not counted twice.
+	 * Counts the words of a plain-text string in a UTF-8 aware way. Not
+	 * str_word_count(): it recognizes ASCII letters only, so it returned 0 for
+	 * Cyrillic/Greek/Arabic/CJK and mis-counted Latin diacritics. Space-delimited
+	 * scripts are split on Unicode whitespace; each CJK character counts as one
+	 * word (the word-processor approximation) and is removed before the split so
+	 * mixed content is not counted twice.
 	 *
 	 * @param string $text Plain text (tags and shortcodes already stripped).
 	 * @return int Number of words, 0 for empty/whitespace-only input.
@@ -857,18 +744,11 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Reads a property from a PublishPress author object without depending on the
-	 * magic __isset() method (finding #43).
-	 *
-	 * PublishPress's Author objects resolve display_name/ID through __get(). isset(),
-	 * ?? and empty() all consult __isset() first, which a class exposing __get() need
-	 * not implement — and if it does not, isset() reports false even though __get()
-	 * would return a real value, so every author name/ID would silently blank out.
-	 * Reading through __get() directly (guarded by property_exists() for a plain
-	 * object and method_exists('__get') for a magic one) avoids that trap without
-	 * risking an "undefined property" warning for an object exposing the value in
-	 * neither way. A null value falls back to the default, matching the old isset()
-	 * semantics.
+	 * Reads a property from a PublishPress author object without depending on
+	 * __isset() (#43, RI-12): the Author objects resolve display_name/ID through
+	 * __get(), and isset()/??/empty() consult __isset() first, which they need
+	 * not implement, so every author would silently blank out. Guarded by
+	 * property_exists() / method_exists('__get') so no undefined-property warning.
 	 *
 	 * @param object $author   The author object (PublishPress Author or a plain object).
 	 * @param string $prop     The property name to read.
@@ -887,19 +767,11 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Declares the page-variables fields that must be delivered outside the
-	 * cacheable HTML when the cache-safe data layer is on (issue #398).
-	 *
-	 * Tier 1 — the site search term (from the URL) and the referring page
-	 * (siteSearchFrom) — is only declared on a search results page (the only place
-	 * these two fields are output) because the browser computes it with no request.
-	 *
-	 * Tier 2/3 — the visitor IP, Cloudflare country and the logged-in-user fields —
-	 * is declared independent of the page type and gated only on its own option,
-	 * because the session endpoint resolves it for the current request, which has no
-	 * page context. Each carries a server resolver (run only on the endpoint) so the
-	 * value is delivered client-side, once per session (Tier 2) or when the logged-in
-	 * cookie changed (Tier 3), instead of baked into cacheable HTML.
+	 * Declares the page-variables fields delivered outside the cacheable HTML
+	 * under the cache-safe data layer (issue #398). Tier 1 (search term and
+	 * referrer) only on a search results page, where they are output; Tier 2/3
+	 * (visitor IP, Cloudflare country, logged-in-user fields) independent of the
+	 * page type, because the session endpoint has no page context.
 	 *
 	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
 	 * @return array<int, VisitorField>
@@ -918,11 +790,9 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Declares the Tier 2 (session) and Tier 3 (logged-in user) fields the session
-	 * endpoint delivers client-side. Each field is added only when its own option
-	 * is on, and carries a resolver that runs for the current request on the
-	 * endpoint; the resolver is the field's identity gate (the user resolvers return
-	 * null for an anonymous request, so a logged-out caller never receives user data).
+	 * Declares the Tier 2 (session) and Tier 3 (logged-in user) fields, each
+	 * gated on its own option. The resolver is the field's identity gate: the
+	 * user resolvers return null for an anonymous request.
 	 *
 	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
 	 * @return array<int, VisitorField>
@@ -969,9 +839,7 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Tier 2 resolver: the validated visitor IP for the current request, or null
-	 * when it cannot be determined. VisitorIp::get() already wp_unslash+validates
-	 * the value with filter_var( FILTER_VALIDATE_IP ), so it is a plain IP string.
+	 * Tier 2 resolver: the validated visitor IP, or null.
 	 *
 	 * @return string|null
 	 */
@@ -985,9 +853,8 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Tier 2 resolver: the Cloudflare country code from the current request header,
-	 * or null when absent. The value is wp_unslash+sanitized on the way in; the
-	 * endpoint hex-encodes it on the way out, so it is passed raw (RI-4).
+	 * Tier 2 resolver: the Cloudflare country code header, or null. Sanitized on
+	 * the way in, hex-encoded by the endpoint on the way out (RI-4).
 	 *
 	 * @return string|null
 	 */
@@ -1002,9 +869,8 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Tier 3 resolver: 'logged-in' for an authenticated request, null otherwise.
-	 * Returning null for an anonymous request is the identity gate — a logged-out
-	 * caller receives no login-state field at all.
+	 * Tier 3 resolver: 'logged-in' for an authenticated request, null otherwise
+	 * (the identity gate).
 	 *
 	 * @return string|null
 	 */
@@ -1102,13 +968,9 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Parses the post-meta allow-list option into a list of meta keys.
-	 *
-	 * Accepts one key per line or a comma separated list, in any mix. Shared by
-	 * the AdminSchema sanitizer and the frontend read above so that what is
-	 * stored is exactly what the reader honours - two copies of the same parsing
-	 * rule is a divergence waiting for the next tightening (PA-2, the pattern the
-	 * trusted-proxy list already follows).
+	 * Parses the post-meta allow-list option (one key per line or comma
+	 * separated). Shared by the AdminSchema sanitizer and the read above so what
+	 * is stored is what the reader honours (PA-2).
 	 *
 	 * @param string $value Raw option value.
 	 * @return array<int, string> De-duplicated meta keys, empty when the option is blank.
@@ -1131,16 +993,10 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Removes serialized values from a post meta value before it reaches the
-	 * data layer.
-	 *
-	 * A serialized string is a plugin's internal storage format by definition -
-	 * it reaches the browser as an opaque a:8:{...} blob that no Google Tag
-	 * Manager variable can read, while publishing the whole nested structure the
-	 * plugin keeps behind that key. Skipping is deliberate rather than
-	 * unserializing: no working GTM setup can be consuming such a value today,
-	 * and unserializing would run object instantiation over every custom field
-	 * on the post for data nobody asked for.
+	 * Removes serialized values from a post meta value: an a:8:{...} blob is a
+	 * plugin's internal storage no GTM variable can read, while publishing its
+	 * whole structure. Skipped rather than unserialized on purpose (object
+	 * instantiation over every custom field, for data nobody asked for).
 	 *
 	 * @param mixed $value Single meta value, or the list of values for a multi-value key.
 	 * @return mixed The value with serialized entries removed, or null when nothing usable is left.
@@ -1165,14 +1021,9 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Builds the pageCategory slug list for a set of category terms.
-	 *
-	 * With the "include parent categories" option off (the default) this returns
-	 * just the immediate category slugs, keeping the 1.x output unchanged. With
-	 * it on, each category's ancestor slugs (from get_ancestors(): immediate
-	 * parent first, up to the top-level category) are appended after the
-	 * category's own slug and the final list is de-duplicated while preserving
-	 * order.
+	 * Builds the pageCategory slug list. With "include parent categories" on,
+	 * each category's ancestor slugs (nearest first) follow its own slug and the
+	 * list is de-duplicated in order; off keeps the 1.x output.
 	 *
 	 * @param array<int, \WP_Term> $categories Category term objects, as returned by get_the_category().
 	 * @return array<int, string> List of category slugs.
@@ -1203,15 +1054,8 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
-	 * Returns a field (slug or name) of the default (master) language
-	 * equivalent of a taxonomy term.
-	 *
-	 * Used to output category/tag/taxonomy values in the site's default
-	 * language (issue #145). When the term has a distinct translation in the
-	 * default language, that term's slug/name is returned; otherwise (no active
-	 * multilingual plugin, an untranslated term, or the term already being the
-	 * master one) the supplied fallback - the term's own value in the current
-	 * language - is returned unchanged.
+	 * Returns the slug or name of a term's default-language equivalent (issue
+	 * #145), or the supplied fallback when no distinct master term resolves.
 	 *
 	 * @param int    $term_id  Term id in the current language.
 	 * @param string $taxonomy Taxonomy of the term ('category', 'post_tag' or a custom taxonomy).
