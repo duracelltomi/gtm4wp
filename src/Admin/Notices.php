@@ -83,18 +83,11 @@ final class Notices {
 	public function show_notices(): void {
 		$dismisses = $this->user_dismisses();
 
-		// Every anchor below deep links to the option it is about
-		// (SettingsPage::url()), not to the settings page as a whole: a notice
-		// that names a setting and then drops the admin on a screen where they
-		// have to guess which module and which tab it sits behind is only half a
-		// pointer. The link addresses the option key, so it survives regrouping.
+		// Every anchor deep links to the option it is about (SettingsPage::url()).
 
-		// Placement OFF is the deliberate "data layer only" setup: the container
-		// code is never emitted, so the site needs no container ID at all and the
-		// prompt below is advice no setting can act on - the admin can only
-		// dismiss it, per user, forever. Compared strictly against the int
-		// constant, exactly the way ContainerCode decides the same thing, so the
-		// notice cannot disagree with what the frontend actually emits.
+		// Placement OFF is the deliberate "data layer only" setup, so the missing
+		// container ID prompt would be advice no setting can act on; compared
+		// exactly as ContainerCode decides it.
 		$container_code_off = ( GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) );
 
 		if ( ! $container_code_off && ( '' === trim( (string) $this->options->get( GTM4WP_OPTION_GTM_CODE ) ) ) && ( false === $dismisses['enter-gtm-code'] ) ) {
@@ -131,12 +124,8 @@ final class Notices {
 			}
 		}
 
-		// A malformed GTM4WP_HARDCODED_* constant in wp-config.php is ignored while
-		// the options are built, which is invisible from the outside: the operator
-		// sees a container that quietly disregards their wp-config and has nothing
-		// to search for. Name the offending constant instead. Not dismissible - it
-		// stays until wp-config is fixed, exactly like the incomplete-environment
-		// notice above.
+		// A malformed GTM4WP_HARDCODED_* constant is ignored while the options
+		// are built, invisibly; name it. Not dismissible, stays until fixed.
 		$hardcoded_errors = $this->options->hardcoded_errors();
 		if ( array() !== $hardcoded_errors ) {
 			echo '<div class="gtm4wp-notice notice notice-error" data-href="?invalid-hardcoded-constant"><p><strong>';
@@ -155,12 +144,9 @@ final class Notices {
 			echo '</strong></p></div>';
 		}
 
-		// A custom visitor-IP header with no trusted proxies declared is read exactly as
-		// it always was, and that reading cannot be authenticated: an HTTP header is
-		// sent by the client. The admin has no way to see this from the settings screen
-		// - both states look identical there - so name it, the same way a discarded
-		// wp-config constant is named above. Not dismissible: it describes a live
-		// configuration gap and goes away by itself once the list is filled in.
+		// A custom visitor-IP header with no trusted proxies is read
+		// unauthenticated, which the settings screen cannot show; name it. Not
+		// dismissible, clears itself once the list is filled in.
 		if (
 			$this->options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP )
 			&& ( '' !== trim( (string) $this->options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) ) )
@@ -179,14 +165,10 @@ final class Notices {
 			echo '</strong></p></div>';
 		}
 
-		// A stored data layer variable name that is not a usable JavaScript
-		// identifier is ignored by the frontend, which falls back to dataLayer.
-		// 1.x accepted names containing a hyphen, and those are stored verbatim by
-		// the migration, so an upgrading site can reach this state without ever
-		// having done anything wrong. Silently substituting a different global
-		// would be the same undiagnosable failure the name itself caused, so name
-		// it (PA-2: validation without a signal is half a fix). Not dismissible -
-		// it describes a live configuration gap and clears itself on the next save.
+		// A stored data layer name that is not a JavaScript identifier (1.x
+		// accepted hyphens, stored verbatim by the migration) is ignored by the
+		// frontend; name it rather than silently substitute dataLayer (PA-2).
+		// Not dismissible, clears itself on the next save.
 		$stored_datalayer_name = trim( (string) $this->options->get( GTM4WP_OPTION_DATALAYER_NAME ) );
 		if ( ( '' !== $stored_datalayer_name ) && ! ContainerRows::is_valid_js_identifier( $stored_datalayer_name ) ) {
 			echo '<div class="gtm4wp-notice notice notice-error" data-href="?invalid-datalayer-name"><p><strong>';
@@ -221,25 +203,10 @@ final class Notices {
 	 * @return void
 	 */
 	public function print_dismiss_script(): void {
-		// wp_json_encode() with the hex flags, not esc_js(): this is a string VALUE
-		// in a raw <script> body (no wp_kses sink, no entity decode anywhere on this
-		// path), and esc_js() emits &quot;/&amp;/&lt; entities the browser never
-		// decodes inside <script> - the same swap made in global_var_literal() and
-		// disabled_role_warning() (PA-4/RI-4).
-		//
-		// The literal supplies its own quotes, so it is NOT wrapped below and the
-		// emitted line stays byte-identical for an ordinary nonce.
-		//
-		// No false-return fallback here, unlike ScriptTag::json_literal(): that
-		// guards values supplied by a public filter, whereas wp_create_nonce()
-		// always returns 10 ASCII characters, which wp_json_encode() cannot fail on.
-		//
-		// Encoded INSIDE the echo rather than into a variable first. That is RI-17's
-		// own rule - an escape is only valid at the instant of output - and WPCS
-		// enforces it: it credits an escaping function only where the call is part of
-		// the echoed expression, so assigning the result first is reported as
-		// unescaped output. Taking the phpcs:ignore instead would have suppressed a
-		// warning that was pointing at the right thing.
+		// wp_json_encode() + hex flags, not esc_js(), for a string VALUE in a raw
+		// <script> body (PA-4/RI-4); the literal supplies its own quotes. No
+		// false fallback: a nonce is 10 ASCII characters. Encoded INSIDE the echo
+		// (RI-17), which is also what WPCS credits as escaped output.
 		echo '<script>
 	document.addEventListener( "click", function ( event ) {
 		if ( ! event.target.matches( ".gtm4wp-notice .notice-dismiss" ) ) {
@@ -269,9 +236,7 @@ final class Notices {
 	public function dismiss_notice(): void {
 		check_ajax_referer( 'gtm4wp-notice-dismiss-nonce', 'nonce' );
 
-		// The hook is only registered for users with the settings capability
-		// (see Plugin::boot()), but the handler re-checks it so it stays safe
-		// on its own regardless of how it is wired up.
+		// Re-checked here so the handler is safe on its own, however it is wired.
 		/** This filter is documented in src/Plugin.php */
 		if ( ! current_user_can( apply_filters( 'gtm4wp_admin_page_capability', 'manage_options' ) ) ) {
 			wp_die( -1, 403 );
@@ -279,12 +244,8 @@ final class Notices {
 
 		$dismisses = $this->user_dismisses();
 
-		// sanitize_key(), not esc_url_raw() + basename(): a notice id is an
-		// opaque key and never a URL, and a sanitizer that rewrites the value it
-		// is judging has no place in front of an allow-list (RI-18). The
-		// allow-list on the next line is what makes this safe either way - this
-		// only makes that obvious. Every DEFAULT_DISMISSES key is already
-		// lowercase kebab-case, so sanitize_key() passes them through untouched.
+		// sanitize_key(): a notice id is an opaque key, never a URL (RI-18); the
+		// allow-list below is what makes this safe either way.
 		$noticeid = isset( $_POST['noticeid'] ) ? sanitize_key( wp_unslash( $_POST['noticeid'] ) ) : '';
 
 		if ( array_key_exists( $noticeid, $dismisses ) ) {

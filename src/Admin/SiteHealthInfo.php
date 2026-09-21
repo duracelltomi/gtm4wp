@@ -17,20 +17,11 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Assembles one Site Health Info section for the whole plugin out of the rows
- * each module contributes.
- *
- * One section, not one per module: the Info tab is what a support thread
- * asks for, and "paste the Google Tag Manager section" has to name a single
- * thing. Modules opt in through SiteHealthInfoInterface on their admin
- * schema, in the order the registry holds them, so the table reads top to
- * bottom the way the settings screen does.
- *
- * The disclosure rule is stated on the interface; this class adds nothing to
- * a row and removes nothing from it, so what a module returns is what gets
- * pasted. The section is only added when at least one module has something
- * to say, so a site running none of the reporting features gets no empty
- * heading.
+ * Assembles ONE Site Health Info section for the whole plugin ("paste the
+ * Google Tag Manager section" must name a single thing) from the rows each
+ * module's admin schema contributes via SiteHealthInfoInterface, in registry
+ * order. The disclosure rule is on the interface; this class changes no row.
+ * Added only when a module has something to say.
  */
 final class SiteHealthInfo {
 

@@ -24,29 +24,20 @@ defined( 'ABSPATH' ) || exit;
 final class SettingsPage {
 
 	/**
-	 * Query argument carrying the option key a deep link points at.
-	 *
-	 * Defined once here and handed to the React app in the bootstrap data
-	 * (`focusArg`) rather than written a second time in JavaScript: a contract
-	 * spelled out at both ends of our own codebase diverges long before anything
-	 * upstream moves (UC-6).
+	 * Query argument carrying the option key a deep link points at; handed to
+	 * the React app as `focusArg` rather than written a second time (UC-6).
 	 */
 	public const FOCUS_QUERY_ARG = 'gtm4wp-focus';
 
 	/**
-	 * Class of the static boot-failure notice printed inside the app container.
-	 *
-	 * Written into the markup by render() and into the reveal CSS by
-	 * enqueue_assets(); defined once so the two ends cannot drift apart (UC-6).
+	 * Class of the static boot-failure notice; used by render() and by the
+	 * reveal CSS in enqueue_assets() (UC-6).
 	 */
 	public const BOOT_FALLBACK_CLASS = 'gtm4wp-admin-app-fallback';
 
 	/**
-	 * Seconds before the boot-failure notice becomes visible.
-	 *
-	 * Long enough for build/admin.js to load and boot on a slow connection
-	 * (which removes the notice before it is ever seen), short enough that an
-	 * admin staring at a blank screen gets an answer.
+	 * Seconds before the boot-failure notice becomes visible: long enough for
+	 * admin.js to boot on a slow connection, short enough to answer a blank screen.
 	 */
 	public const BOOT_FALLBACK_REVEAL_DELAY = 3;
 
@@ -60,17 +51,10 @@ final class SettingsPage {
 	}
 
 	/**
-	 * URL of the plugin settings page, optionally deep linking to a single option.
-	 *
-	 * With a `$field_key` the URL carries `gtm4wp-focus=<option key>`, which the
-	 * settings app resolves against its own bootstrap data: it selects the module
-	 * and the group tab that hold the option and highlights the control. The
-	 * address is the option key alone and never a module/tab path, so the link
-	 * keeps working when a field is regrouped or moves to another module, and the
-	 * caller never has to know where the option currently lives.
-	 *
-	 * A key that matches nothing (a removed option, a hand-edited URL) simply
-	 * opens the page the way it did before.
+	 * URL of the settings page, optionally deep linking to one option via
+	 * `gtm4wp-focus=<option key>`, which the app resolves against its bootstrap
+	 * data. The address is the option key alone, never a module/tab path, so
+	 * the link survives a field being regrouped; an unknown key opens the page.
 	 *
 	 * @param string $field_key Option key to focus - a GTM4WP_OPTION_* value - or '' for the page itself.
 	 * @return string URL for use in an href; escape it at the point of output.
@@ -116,17 +100,11 @@ final class SettingsPage {
 	}
 
 	/**
-	 * Renders the React app container, with a static boot-failure notice inside.
-	 *
-	 * The screen is drawn by build/admin.js, and the EasyPrivacy filter list
-	 * blocks everything under the plugin folder, so an admin running a content
-	 * blocker gets no script and, before this notice existed, a silently blank
-	 * page. The notice is plain server-rendered HTML that no blocker can touch:
-	 * React clears the container's children on the app's first render (U117),
-	 * so it is only ever seen when the app did not boot - the script blocked,
-	 * missing, failed, or JavaScript off entirely. The reveal CSS added in
-	 * enqueue_assets() keeps it invisible for the first few seconds so it does
-	 * not flash while the app loads normally.
+	 * Renders the React app container with a static boot-failure notice
+	 * inside, for the admin whose content blocker stops build/admin.js. React
+	 * clears the container on first render (U117), so the notice is only seen
+	 * when the app did not boot; the reveal CSS keeps it invisible for the
+	 * first seconds so it does not flash.
 	 *
 	 * @return void
 	 */
@@ -174,12 +152,9 @@ final class SettingsPage {
 
 		wp_enqueue_style( 'wp-components' );
 
-		// Reveal CSS for the boot-failure notice printed by render(). Attached to
-		// the core wp-components handle, never to the plugin's own stylesheet:
-		// the notice exists for the case where everything under the plugin folder
-		// is blocked, so its styling must not load from there. A zero-duration
-		// delayed animation flips the visibility with no JavaScript involved,
-		// which keeps the notice working when scripts are blocked or off.
+		// Reveal CSS for the boot-failure notice, attached to the core
+		// wp-components handle (the plugin folder may be blocked); a delayed
+		// zero-duration animation flips visibility with no JavaScript.
 		wp_add_inline_style(
 			'wp-components',
 			'#gtm4wp-admin-app .' . self::BOOT_FALLBACK_CLASS . '{visibility:hidden;animation:gtm4wp-admin-app-fallback-reveal 0s ' . self::BOOT_FALLBACK_REVEAL_DELAY . 's forwards}'
@@ -212,9 +187,8 @@ final class SettingsPage {
 	 * @return array<string, mixed>
 	 */
 	public function bootstrap_data(): array {
-		// ui_values(), not current_values(): where a wp-config.php constant
-		// overrides the container setup the screen shows what is actually
-		// loaded, alongside the read-only state the container schema declares.
+		// ui_values(), not current_values(): the screen shows what a wp-config
+		// constant actually loads.
 		$values  = $this->rest->ui_values();
 		$modules = array();
 
@@ -228,31 +202,18 @@ final class SettingsPage {
 
 			$panel_data = $schema instanceof PanelSchemaInterface ? $schema->panel_data() : array();
 
-			// A table column whose choices only exist at page-render time (they
-			// come from outside the settings row - the service-account list of
-			// the Data Manager destinations) receives them here through the
-			// panel data's reserved columnChoices key, keyed by option key and
-			// column key. fields() itself must stay database-free: the settings
-			// REST controller walks it for the value schema on every REST
-			// request site-wide.
+			// The two reserved panel_data keys (see PanelSchemaInterface): column
+			// choices that only exist at render time, since fields() must stay
+			// database-free, and the accordion group the panel renders inside.
 			$column_choices = is_array( $panel_data['columnChoices'] ?? null ) ? $panel_data['columnChoices'] : array();
 
-			// Which accordion group the panel belongs under, through the second
-			// reserved key. A panel is about one group's settings - the Data
-			// Manager's test panel tests destinations, not attribution capture -
-			// so once a module has more than one tab the panel has to travel
-			// with its own, instead of sitting below whichever tab is open.
-			// Empty means "below everything", which is right for a module whose
-			// panel is the whole screen.
 			$panel_group = is_string( $panel_data['panelGroup'] ?? null ) ? $panel_data['panelGroup'] : '';
 
 			$fields = array();
 			foreach ( $schema->fields() as $field ) {
 				$ui = $field->to_ui_array( $values[ $field->key ] ?? $field->default_value );
 
-				// Resolved here rather than inside to_ui_array() so that Field, which
-				// belongs to the options layer, never learns the documentation domain.
-				// The anchor is the option key itself - see the Docs class docblock.
+				// Resolved here so Field never learns the documentation domain.
 				$ui['doc'] = Docs::url( $field->doc, $field->key );
 
 				if ( isset( $column_choices[ $field->key ] ) && is_array( $column_choices[ $field->key ] ) ) {

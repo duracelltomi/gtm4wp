@@ -86,11 +86,8 @@ final class RestController {
 						'values' => array(
 							'type'       => 'object',
 							'required'   => true,
-							// Per-field types derived from the module schemas, so the
-							// REST layer validates each value's type before it reaches
-							// the schema-driven sanitizer. Unknown keys stay allowed
-							// (save_settings() ignores them) so third party option
-							// values keep round-tripping.
+							// Per-field types from the module schemas; unknown keys stay
+							// allowed (save_settings() ignores them).
 							'properties' => $this->value_schema(),
 						),
 					),
@@ -153,10 +150,8 @@ final class RestController {
 
 		$values = array_merge( $this->registry->defaults(), $stored );
 
-		// Mirror the fallback of the Options service: until the container
-		// row option is saved for the first time, expose the rows derived
-		// from the flat 1.x options so the admin UI always shows what the
-		// frontend actually loads.
+		// The Options service's pre-migration fallback, so the admin UI shows
+		// what the frontend loads.
 		if ( ! array_key_exists( GTM4WP_OPTION_GTM_CONTAINERS, $stored ) ) {
 			$values[ GTM4WP_OPTION_GTM_CONTAINERS ] = ContainerRows::from_legacy( $values );
 		}
@@ -165,19 +160,11 @@ final class RestController {
 	}
 
 	/**
-	 * Returns the values the settings screen has to render: the current values
-	 * with the container rows replaced by the ones that are actually loaded
-	 * whenever a GTM4WP_HARDCODED_* wp-config.php constant overrides them.
-	 *
-	 * The screen must never show a container setup the frontend does not use -
-	 * that is what let an admin save a container ID that never loads. The rows
-	 * are recomputed here rather than read from the Options service because that
-	 * service is built before this request writes the option row, so a save or
-	 * import response would otherwise answer with the pre-save state.
-	 *
-	 * Deliberately separate from current_values(): an export must carry the
-	 * site's OWN stored configuration, not the constants of this install, so
-	 * that the file stays portable to a site without them.
+	 * The values the settings screen renders: the current values with the
+	 * container rows replaced by the ones actually loaded under a
+	 * GTM4WP_HARDCODED_* constant (recomputed here, since the Options service
+	 * predates this request's write). Separate from current_values(): an
+	 * export must carry the site's OWN stored configuration.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -238,26 +225,13 @@ final class RestController {
 	}
 
 	/**
-	 * Keeps the container values that wp-config.php controls out of the stored
-	 * option row.
-	 *
-	 * The settings screen shows - and therefore submits - the container rows that
-	 * are actually loaded, so without this a save triggered by an unrelated field
-	 * would persist the constant's value over the admin's own container setup and
-	 * silently change which containers load once the constant is removed.
-	 *
-	 * - When the constants decide the row set, the table is read-only as a whole
-	 *   and nothing submitted for it can be intentional: the value is dropped and
-	 *   the stored rows stay exactly as they are.
-	 * - When only single columns are overridden, the rows still belong to the
-	 *   admin: every locked cell is restored from the stored row with the same
-	 *   container ID (a row that was just added has no stored value, so it stays
-	 *   empty). Matching by ID rather than by position survives rows being added,
-	 *   removed or reordered in the same save.
-	 *
-	 * A crafted request can still put anything into the option row; it stays
-	 * inert, because the constants win again at output time. This is about not
-	 * destroying the admin's stored setup behind their back.
+	 * Keeps the container values wp-config.php controls out of the stored row:
+	 * the screen submits the rows actually loaded, so a save would otherwise
+	 * persist the constant's value over the admin's own setup. When the
+	 * constants decide the row set the submitted value is dropped; when only
+	 * columns are locked, each locked cell is restored from the stored row with
+	 * the same container ID (matching by ID survives reordering). A crafted
+	 * request can still write anything; it stays inert at output time.
 	 *
 	 * @param array<string, mixed> $submitted Raw option key => value map (untrusted).
 	 * @return array<string, mixed> The submitted map with the locked container values restored.
@@ -300,13 +274,9 @@ final class RestController {
 	}
 
 	/**
-	 * Builds the settings export envelope: a small header identifying the
-	 * file plus the current option values (module defaults overlaid with the
-	 * stored row). The value set is schema driven - every registered option is
-	 * included automatically, and nothing outside the registered fields is - so
-	 * a new option is exported the moment its Field is added, with no list to
-	 * maintain here. On import every value is run back through its Field
-	 * sanitizer, so the file itself is never trusted.
+	 * Builds the settings export envelope: a header plus the current option
+	 * values. Schema driven, so every registered option is included and
+	 * nothing else; on import every value passes its Field sanitizer again.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -329,14 +299,10 @@ final class RestController {
 	}
 
 	/**
-	 * POST handler for a settings import. Accepts the raw contents of a
-	 * previously exported JSON file as the 'payload' string, decodes it with
-	 * json_decode() only (never unserialize/eval), validates the envelope and
-	 * runs every option value through the same schema-driven sanitizer as the
-	 * normal save. The stored row is rebuilt from the module defaults so the
-	 * import is a clean, complete replace; unknown keys in the file are
-	 * ignored and values rejected by a sanitizer are reported without being
-	 * stored.
+	 * POST handler for a settings import: the exported JSON as the 'payload'
+	 * string, json_decode() only, envelope validated, every value through the
+	 * same sanitizer as a save. The row is rebuilt from the module defaults (a
+	 * clean replace); unknown keys are ignored, rejected values reported.
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -344,9 +310,7 @@ final class RestController {
 	public function import_settings( \WP_REST_Request $request ) {
 		$payload = $request->get_param( 'payload' );
 
-		// The REST body arrives as a JSON string that WordPress does not slash
-		// (unlike $_POST, so no wp_unslash() here - stripping slashes would
-		// corrupt legitimate JSON escapes). It is decoded below and every
+		// A REST body is not slashed (unlike $_POST), so no wp_unslash(); every
 		// decoded value is sanitized before it can be stored.
 		if ( ! is_string( $payload ) || '' === $payload ) {
 			return new \WP_Error(
@@ -378,9 +342,7 @@ final class RestController {
 			);
 		}
 
-		// Replace onto the module defaults: options missing from the file fall
-		// back to their default, so the import lands a complete, coherent row
-		// rather than merging onto whatever the target install happened to have.
+		// Onto the module defaults, so the import lands a complete row.
 		list( $stored, $errors ) = $this->sanitize_onto( $decoded['options'], $this->registry->defaults() );
 
 		update_option( GTM4WP_OPTIONS, $stored );
@@ -395,18 +357,11 @@ final class RestController {
 	}
 
 	/**
-	 * Runs every submitted value that maps to a registered field through the
-	 * field's sanitizer and writes the sanitized result onto $base. This is the
-	 * single validation path shared by the settings save and the settings
-	 * import, so no field can bypass it:
-	 *
-	 * - unknown keys are ignored (only registered fields are iterated), so a
-	 *   crafted file can never inject an arbitrary option key;
-	 * - a value the sanitizer rejects (WP_Error) is collected in the error map
-	 *   and leaves $base untouched for that key;
-	 * - each field's derived companion values (e.g. the flat 1.x mirrors of the
-	 *   container rows) are regenerated so the stored row stays coherent for
-	 *   third party readers and 1.x downgrades.
+	 * Runs every submitted value that maps to a registered field through its
+	 * sanitizer onto $base: the single validation path of save and import.
+	 * Unknown keys are ignored (no arbitrary option key can be injected), a
+	 * rejected value leaves $base untouched and lands in the error map, and
+	 * each field's derived values (the flat 1.x mirrors) are regenerated.
 	 *
 	 * @param array<string, mixed> $submitted Raw option key => value map (untrusted).
 	 * @param array<string, mixed> $base      Option row the sanitized values are written onto.
