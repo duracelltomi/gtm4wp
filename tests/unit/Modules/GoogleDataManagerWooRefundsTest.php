@@ -462,6 +462,42 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 	}
 
 	/**
+	 * The WRONG KIND of object, not a missing one: wc_get_order() serves orders
+	 * and refunds from one lookup, so the refund id can resolve to a plain
+	 * order (a multi-vendor sub-order carries a parent_id, which would pass the
+	 * #242 parent check). The typed stub_orders() above cannot build this
+	 * shape, which is why the null case was the only guard (T91a); the EDD
+	 * sibling pins it with `type => 'sale'`.
+	 */
+	public function test_a_plain_order_at_the_refund_id_is_refused_even_with_the_right_parent(): void {
+		$order     = self::order();
+		$sub_order = new \WC_Order(
+			array(
+				'id'        => 34,
+				'parent_id' => 12,
+				'total'     => 40.0,
+				'currency'  => 'EUR',
+			)
+		);
+
+		Functions\when( 'wc_get_order' )->alias(
+			static fn ( $id ) => 12 === (int) $id ? $order : ( 34 === (int) $id ? $sub_order : false )
+		);
+
+		$this->assertNull( $this->adapter()->load( 12, 34 ), 'An order is not a refund, whatever its parent says.' );
+	}
+
+	public function test_a_refund_object_at_the_order_id_is_refused(): void {
+		$refund = self::refund( 40.0 );
+
+		Functions\when( 'wc_get_order' )->alias(
+			static fn ( $id ) => 34 === (int) $id ? $refund : ( 12 === (int) $id ? self::refund( 40.0 ) : false )
+		);
+
+		$this->assertNull( $this->adapter()->load( 12, 34 ), 'A refund is not an order either.' );
+	}
+
+	/**
 	 * The refund's parent has to be the order it is paired with, as the EDD
 	 * adapter already required: a mismatched pair would otherwise build an
 	 * event carrying the wrong order's transaction id (#242). A null here is
@@ -551,6 +587,163 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 	public function test_the_adapter_names_its_platform(): void {
 		$this->assertSame( RefundSource::PLATFORM_WOOCOMMERCE, $this->adapter()->platform() );
 		$this->assertSame( 'woocommerce', $this->adapter()->platform() );
+	}
+
+	/**
+	 * Both directions of the platform guard, through the namespace shim: the
+	 * sender skips an inactive source's hook, so this is what decides whether
+	 * a store without WooCommerce ever hears about refunds (T94b).
+	 */
+	public function test_the_adapter_is_active_only_with_woocommerce_loaded(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'           => true,
+			'wc_get_order' => true,
+		);
+
+		try {
+			$this->assertTrue( $this->adapter()->is_active() );
+
+			$GLOBALS['gtm4wp_test_forced_functions']['wc_get_order'] = false;
+			$this->assertFalse( $this->adapter()->is_active(), 'The order lookup is what load() needs, so its absence is inactivity too.' );
+
+			$GLOBALS['gtm4wp_test_forced_functions'] = array(
+				'WC'           => false,
+				'wc_get_order' => true,
+			);
+			$this->assertFalse( $this->adapter()->is_active() );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
+	}
+
+	// ---- Tax basis and creation time ---------------------------------------
+
+	/**
+	 * Every fixture above answers 'excl' for the shop's tax display, so the
+	 * tax-inclusive basis - the one a store showing prices with tax uses for
+	 * its purchase items too - was never exercised (T94h; the EDD sibling has
+	 * its tax leg pinned).
+	 */
+	public function test_the_unit_price_includes_tax_when_the_store_displays_prices_with_tax(): void {
+		$product = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Test Product',
+			)
+		);
+
+		// Two units, EUR 40 net, EUR 8 tax on the line: EUR 24 per unit with tax.
+		$item = new class( $product ) {
+			public function __construct( private \WC_Product $product ) {
+			}
+
+			public function get_product() {
+				return $this->product;
+			}
+
+			public function get_quantity() {
+				return -2;
+			}
+
+			public function get_total() {
+				return -40.0;
+			}
+
+			public function get_subtotal() {
+				return -40.0;
+			}
+
+			public function get_total_tax() {
+				return -8.0;
+			}
+		};
+
+		Functions\when( 'get_option' )->alias(
+			static function ( $key, $default_value = false ) {
+				if ( 'woocommerce_tax_display_shop' === $key ) {
+					return 'incl';
+				}
+
+				return ( 'gtm4wp-options' === $key ) ? array() : $default_value;
+			}
+		);
+		$this->stub_orders( self::order(), self::refund( 48.0, array( $item ) ) );
+
+		$items = ( new WooCommerceRefunds( new Options( ( new WooCommerceModule() )->defaults() ) ) )->load( 12, 34 )->items;
+
+		$this->assertSame( 24.0, $items[0]['unitPrice'] );
+	}
+
+	public function test_the_exclude_tax_option_overrides_a_tax_inclusive_display(): void {
+		$product = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Test Product',
+			)
+		);
+
+		$item = new class( $product ) {
+			public function __construct( private \WC_Product $product ) {
+			}
+
+			public function get_product() {
+				return $this->product;
+			}
+
+			public function get_quantity() {
+				return -2;
+			}
+
+			public function get_total() {
+				return -40.0;
+			}
+
+			public function get_subtotal() {
+				return -40.0;
+			}
+
+			public function get_total_tax() {
+				return -8.0;
+			}
+		};
+
+		Functions\when( 'get_option' )->alias(
+			static function ( $key, $default_value = false ) {
+				if ( 'woocommerce_tax_display_shop' === $key ) {
+					return 'incl';
+				}
+
+				return ( 'gtm4wp-options' === $key ) ? array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => true ) : $default_value;
+			}
+		);
+		$this->stub_orders( self::order(), self::refund( 48.0, array( $item ) ) );
+
+		$items = ( new WooCommerceRefunds( new Options( ( new WooCommerceModule() )->defaults() ) ) )->load( 12, 34 )->items;
+
+		$this->assertSame( 20.0, $items[0]['unitPrice'], 'The plugin option wins over the shop display setting, as it does for the purchase item.' );
+	}
+
+	public function test_an_unreadable_creation_time_falls_back_to_now_rather_than_failing(): void {
+		$refund_object = new class( array(
+			'id'        => 34,
+			'parent_id' => 12,
+			'total'     => -40.0,
+			'amount'    => 40.0,
+		) ) extends \WC_Order_Refund {
+			public function get_date_created() {
+				return null;
+			}
+		};
+
+		$this->stub_orders( self::order(), $refund_object );
+
+		$before = time();
+		$refund = $this->adapter()->load( 12, 34 );
+		$after  = time();
+
+		$this->assertNotNull( $refund );
+		$this->assertGreaterThanOrEqual( $before, $refund->timestamp );
+		$this->assertLessThanOrEqual( $after, $refund->timestamp );
 	}
 
 	// ---- Refunded shipping and tax -----------------------------------------

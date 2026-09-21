@@ -152,13 +152,20 @@ final class PrivacyData {
 		$removed = false;
 
 		foreach ( $orders as $order ) {
+			$deleted = false;
+
 			foreach ( AttributionCapture::meta_keys() as $key ) {
 				if ( null === $this->read_meta( $order, $key ) ) {
 					continue;
 				}
 
 				$this->delete_meta( $order, $key );
+				$deleted = true;
 				$removed = true;
+			}
+
+			if ( $deleted ) {
+				$this->persist( $order );
 			}
 		}
 
@@ -272,14 +279,8 @@ final class PrivacyData {
 	 */
 	private function delete_meta( array $order, string $key ): void {
 		if ( BackfillEndpoint::PLATFORM_WC === $order['platform'] ) {
-			if ( ! method_exists( $order['object'], 'delete_meta_data' ) ) {
-				return;
-			}
-
-			$order['object']->delete_meta_data( $key );
-
-			if ( method_exists( $order['object'], 'save' ) ) {
-				$order['object']->save();
+			if ( method_exists( $order['object'], 'delete_meta_data' ) ) {
+				$order['object']->delete_meta_data( $key );
 			}
 
 			return;
@@ -287,6 +288,24 @@ final class PrivacyData {
 
 		if ( function_exists( 'edd_delete_order_meta' ) ) {
 			edd_delete_order_meta( $order['id'], $key );
+		}
+	}
+
+	/**
+	 * Writes an order's staged deletions to the database, once per order.
+	 *
+	 * The WooCommerce CRUD stages delete_meta_data() on the object; nothing
+	 * reaches the database until save(). Saving once after the whole key loop
+	 * rather than per key keeps an erasure at one write per order instead of
+	 * one per captured field. EDD's edd_delete_order_meta() writes directly,
+	 * so there is nothing to persist on that platform.
+	 *
+	 * @param array{platform: string, id: int, object: mixed} $order The order.
+	 * @return void
+	 */
+	private function persist( array $order ): void {
+		if ( BackfillEndpoint::PLATFORM_WC === $order['platform'] && method_exists( $order['object'], 'save' ) ) {
+			$order['object']->save();
 		}
 	}
 

@@ -5,9 +5,17 @@
  * Only what the GTM4WP EDD module reads is implemented; values are injected
  * through the constructors. The row classes (Order, Order_Item,
  * Order_Adjustment, EDD_Customer) expose their data through __get WITHOUT
- * __isset on purpose: real EDD rows are magic-getter backed, and this shape
- * is exactly what RI-12 / TS-13 require a test double to reproduce - a stub
- * with plain public properties would hide isset()-based read bugs.
+ * __isset. That is STRICTER than the real thing, deliberately: real EDD rows
+ * (EDD\Orders\Order -> Database\Rows\Order -> Database\Row -> Database\Base,
+ * verified against EDD 3.7.0 src/Database/Base.php) declare their columns as
+ * protected properties and Base::__isset() answers true for any declared
+ * property, so `isset( $order->id )` and `$order->id ?? 0` work in
+ * production. A double with no __isset makes every isset()-shaped read fail
+ * here, which is the safe direction for a test double (TS-13/UC-3): code
+ * that passes against this stub passes against the real row, and the
+ * project's row_prop() reader stays the one habit that also survives the
+ * objects that really do lack __isset (PublishPress authors, RI-12). Do not
+ * read this docblock as a claim about EDD - register that in .upstream/.
  *
  * @package GTM4WP
  */

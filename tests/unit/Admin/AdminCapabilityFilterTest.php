@@ -216,6 +216,17 @@ final class AdminCapabilityFilterTest extends TestCase {
 			has_action( 'admin_notices', 'GTM4WP\Modules\GoogleDataManager\HealthNotice->show_notice()' ),
 			'Admin::boot() attaches the destination-health notice; its own tests drive a hand-built instance, so only this boot asserts the attachment (TS-15, T75).'
 		);
+		// Third recurrence of the same lesson in the same method (T83): the two
+		// Site Health attachments landed in the range after T75 was closed and
+		// were deletable green until these two lines.
+		$this->assertNotFalse(
+			has_filter( 'site_status_tests', 'GTM4WP\Modules\GoogleDataManager\SiteHealth->add_test()' ),
+			'Admin::boot() attaches the Data Manager status test to Site Health.'
+		);
+		$this->assertNotFalse(
+			has_filter( 'debug_information', 'GTM4WP\Admin\SiteHealthInfo->add_debug_information()' ),
+			'Admin::boot() attaches the plugin-wide Site Health Info section.'
+		);
 	}
 
 	public function test_admin_boot_loads_for_a_user_holding_the_filtered_capability(): void {
@@ -256,6 +267,8 @@ final class AdminCapabilityFilterTest extends TestCase {
 		);
 		$this->assertFalse( has_action( 'wp_ajax_gtm4wp_dismiss_notice' ), 'The AJAX dismiss handler is not even wired up.' );
 		$this->assertFalse( has_action( 'admin_notices' ), 'The unreadable-key notice is gated with the rest of the admin path.' );
+		$this->assertFalse( has_filter( 'site_status_tests' ), 'Site Health wiring is gated with the rest of the admin path.' );
+		$this->assertFalse( has_filter( 'debug_information' ) );
 	}
 
 	public function test_admin_boot_never_registers_the_frontend_path(): void {

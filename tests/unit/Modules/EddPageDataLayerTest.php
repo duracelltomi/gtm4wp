@@ -309,6 +309,32 @@ final class EddPageDataLayerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * The EDD sibling of the WooCommerce sink case: a stored `&amp;` in a
+	 * download category is decoded on the way to the item and the raw `&`
+	 * that produces reaches the inline script hex-encoded - both directions,
+	 * so the decode cannot become a break-out (T96a, TS-11 corollary: feed
+	 * the stored form at the source, assert the raw form at the sink).
+	 */
+	public function test_decoded_download_category_is_still_hex_encoded_in_the_script(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Shirts &amp; Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+
+		// TC-2: the expectation is produced by the same encoder the source uses.
+		$expected = wp_json_encode( 'Shirts & Ties', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+
+		$this->assertStringContainsString( (string) $expected, $pushed, 'The decoded category must reach the script hex-encoded.' );
+		$this->assertStringNotContainsString( 'Shirts & Ties', $pushed, 'A raw ampersand must never reach the script body.' );
+		$this->assertStringNotContainsString( 'Shirts &amp; Ties', $pushed, 'And the stored entity must not survive to the data layer either.' );
+	}
+
 	public function test_view_item_push_is_wrapped_for_client_side_list_attribution(): void {
 		// #405: a download page is full-page cacheable, so the list the
 		// visitor came from is merged in the browser - the wrapped push stays

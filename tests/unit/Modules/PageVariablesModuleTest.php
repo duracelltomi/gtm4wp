@@ -46,6 +46,17 @@ final class PageVariablesModuleTest extends TestCase {
 
 		Functions\stubEscapeFunctions();
 
+		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
+		// than the real function - wp_specialchars_decode() with ENT_QUOTES
+		// reverses exactly the five entities _wp_specialchars() writes.
+		Functions\when( 'wp_specialchars_decode' )->alias(
+			static fn ( $value, $quote_style = ENT_NOQUOTES ) => str_replace(
+				array( '&lt;', '&gt;', '&quot;', '&#039;', '&amp;' ),
+				array( '<', '>', '"', "'", '&' ),
+				(string) $value
+			)
+		);
+
 		// Faithful port of the core predicate rather than a justReturn() double:
 		// a stand-in that answered "never serialized" would make the suite green
 		// BECAUSE the skip is untested (UC-3). Stubbed here in setUp, not in a
@@ -784,6 +795,42 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertArrayNotHasKey( 'meta', $data_layer['pagePostTerms'], 'Enabling taxonomy terms must not publish custom fields.' );
 		// The value itself must be nowhere in the payload, not merely off the key.
 		$this->assertStringNotContainsString( 'secret-internal-note', wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * Term names arrive as they were typed, not as WordPress stored them: a
+	 * genre saved as "Sci-Fi & Fantasy" is read back as "Sci-Fi &amp; Fantasy",
+	 * and the e-commerce items have reported the typed form since the shared
+	 * decode landed - so a GTM trigger on the name matches the same string on
+	 * every variable. Both directions: the typed form present, the stored
+	 * entity gone.
+	 */
+	public function test_post_term_names_arrive_as_typed_not_as_stored(): void {
+		$this->arrange_singular_terms_and_meta();
+		Functions\when( 'get_the_terms' )->justReturn(
+			array(
+				(object) array(
+					'term_id' => 3,
+					'name'    => 'Sci-Fi &amp; Fantasy',
+				),
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => false,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'Sci-Fi & Fantasy' ), $data_layer['pagePostTerms']['genre'] );
+		$this->assertStringNotContainsString( '&amp;', $data_layer['pagePostTerms']['genre'][0] );
 	}
 
 	/**
@@ -1545,6 +1592,42 @@ final class PageVariablesModuleTest extends TestCase {
 
 		$this->assertSame( 'guides', $data_layer['pagePrimaryCategory'] );
 		$this->assertSame( 'Guides', $data_layer['pagePrimaryCategoryName'] );
+	}
+
+	public function test_primary_category_name_arrives_as_typed_not_as_stored(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_meta' )->alias(
+			static function ( int $id, string $key ) {
+				return '_yoast_wpseo_primary_category' === $key ? '9' : '';
+			}
+		);
+		Functions\when( 'get_term' )->justReturn(
+			new \WP_Term(
+				array(
+					'term_id' => 9,
+					'slug'    => 'tips-tricks',
+					'name'    => 'Tips &amp; Tricks',
+				)
+			)
+		);
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Tips & Tricks', $data_layer['pagePrimaryCategoryName'] );
+		$this->assertStringNotContainsString( '&amp;', $data_layer['pagePrimaryCategoryName'] );
+		$this->assertSame( 'tips-tricks', $data_layer['pagePrimaryCategory'], 'The slug is never encoded and is left alone.' );
 	}
 
 	public function test_primary_category_falls_back_to_first_category(): void {

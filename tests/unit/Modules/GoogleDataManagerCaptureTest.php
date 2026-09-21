@@ -395,6 +395,38 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 		$this->assertCount( AttributionCapture::MAX_SESSIONS, AttributionCapture::parse_ids()['sessions'] );
 	}
 
+	/**
+	 * The cap bounds the WORK, not only the result: it is applied before
+	 * validation, so a valid entry sitting past MAX_SESSIONS invalid ones is
+	 * never reached. That is the behaviour, not a contract - it is pinned
+	 * because the alternative (counting accepted entries while looping) keeps
+	 * both cap tests green while running the loop over an unbounded backfill
+	 * body of nothing but junk.
+	 *
+	 * @return array<string, mixed> A session map of MAX_SESSIONS invalid keys followed by one valid one.
+	 */
+	private function invalid_then_valid_sessions(): array {
+		$sessions = array();
+		for ( $i = 0; $i < AttributionCapture::MAX_SESSIONS; $i++ ) {
+			$sessions[ 'not-a-measurement-id-' . $i ] = '1788522496';
+		}
+		$sessions['G-VALID1'] = '1788522496';
+
+		return $sessions;
+	}
+
+	public function test_the_session_cap_bounds_the_work_so_a_valid_tail_past_it_is_dropped_on_the_cookie(): void {
+		$this->set_cookie( AttributionCookies::IDS_COOKIE, array( 'sessions' => $this->invalid_then_valid_sessions() ) );
+
+		$this->assertArrayNotHasKey( 'sessions', AttributionCapture::parse_ids() );
+	}
+
+	public function test_the_session_cap_bounds_the_work_so_a_valid_tail_past_it_is_dropped_on_the_route(): void {
+		$meta = AttributionCapture::parse_payload( array( 'sessions' => $this->invalid_then_valid_sessions() ) );
+
+		$this->assertArrayNotHasKey( AttributionCapture::META_SESSION_IDS, $meta );
+	}
+
 	// ---- Consent parsing ---------------------------------------------------
 
 	public function test_parses_the_consent_map_with_its_timestamp(): void {
@@ -517,6 +549,35 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 	}
 
 	/**
+	 * The signal-map twin of the session-cap work bound: MAX_SIGNALS
+	 * grammar-invalid names followed by a valid one yield no signal at all,
+	 * because the slice runs before the grammar check.
+	 *
+	 * @return array<string, string>
+	 */
+	private function invalid_then_valid_signals(): array {
+		$signals = array();
+		for ( $i = 0; $i < AttributionCapture::MAX_SIGNALS; $i++ ) {
+			$signals[ 'Not Valid ' . $i ] = 'granted';
+		}
+		$signals[ AttributionCapture::SIGNAL_ANALYTICS ] = 'granted';
+
+		return $signals;
+	}
+
+	public function test_the_signal_cap_bounds_the_work_so_a_valid_tail_past_it_is_dropped_on_the_cookie(): void {
+		$this->set_cookie( AttributionCookies::CONSENT_COOKIE, array( 'signals' => $this->invalid_then_valid_signals() ) );
+
+		$this->assertSame( array(), AttributionCapture::parse_consent()['signals'] );
+	}
+
+	public function test_the_signal_cap_bounds_the_work_so_a_valid_tail_past_it_is_dropped_on_the_route(): void {
+		$consent = AttributionCapture::parse_consent_payload( array( 'signals' => $this->invalid_then_valid_signals() ) );
+
+		$this->assertSame( array(), $consent['signals'] );
+	}
+
+	/**
 	 * A payload nested deeper than the format allows is refused outright
 	 * rather than partially read.
 	 */
@@ -589,5 +650,109 @@ final class GoogleDataManagerCaptureTest extends TestCase {
 			AttributionCapture::meta_for_order( 1 ),
 			'Returning null stores nothing, which stays distinguishable from an empty map.'
 		);
+	}
+
+	// ---- The server-side gate at order creation ----------------------------
+
+	/**
+	 * A full set of ids beside a consent cookie that denies analytics: the
+	 * page's own half of the rule never ran (a consent tool that blocks the
+	 * bundle leaves a stale ids cookie behind), so this is the only place the
+	 * rule can still hold. Every other case in this file stores `granted`, so
+	 * without these the gate at meta_for_order() was deletable green.
+	 *
+	 * @return void
+	 */
+	private function set_full_ids_cookie(): void {
+		$this->set_cookie(
+			AttributionCookies::IDS_COOKIE,
+			array(
+				'client_id' => '111.222',
+				'sessions'  => array( 'G-ABC123' => '1788522496' ),
+				'gclid'     => 'a',
+				'gbraid'    => 'b',
+				'wbraid'    => 'c',
+			)
+		);
+	}
+
+	public function test_a_denied_analytics_signal_drops_the_analytics_ids_at_order_creation(): void {
+		$this->set_full_ids_cookie();
+		$this->set_cookie(
+			AttributionCookies::CONSENT_COOKIE,
+			array(
+				'signals'     => array( AttributionCapture::SIGNAL_ANALYTICS => 'denied' ),
+				'captured_at' => 1_800_000_000,
+			)
+		);
+
+		$meta = AttributionCapture::meta_for_order( 1 );
+
+		$this->assertArrayNotHasKey( AttributionCapture::META_CLIENT_ID, $meta );
+		$this->assertArrayNotHasKey( AttributionCapture::META_SESSION_IDS, $meta );
+		$this->assertSame( 'a', $meta['_gtm4wp_gclid'], 'A denial of analytics says nothing about the click ids.' );
+		$this->assertSame( 'b', $meta['_gtm4wp_gbraid'] );
+		$this->assertSame( 'c', $meta['_gtm4wp_wbraid'] );
+		$this->assertSame(
+			array(
+				'signals'     => array( AttributionCapture::SIGNAL_ANALYTICS => 'denied' ),
+				'captured_at' => 1_800_000_000,
+			),
+			$meta[ AttributionCapture::META_CONSENT_STATE ],
+			'The denial itself is stored, so a later backfill can honour it.'
+		);
+		$this->assertFalse( AttributionCapture::is_usable( $meta ) );
+	}
+
+	public function test_a_denied_ads_signal_drops_every_click_id_at_order_creation(): void {
+		$this->set_full_ids_cookie();
+		$this->set_cookie(
+			AttributionCookies::CONSENT_COOKIE,
+			array( 'signals' => array( AttributionCapture::SIGNAL_ADS => 'denied' ) )
+		);
+
+		$meta = AttributionCapture::meta_for_order( 1 );
+
+		foreach ( AttributionCookies::CLICK_ID_PARAMS as $param ) {
+			$this->assertArrayNotHasKey( AttributionCapture::META_CLICK_ID_PREFIX . $param, $meta );
+		}
+		$this->assertSame( '111.222', $meta[ AttributionCapture::META_CLIENT_ID ] );
+		$this->assertSame( array( 'G-ABC123' => '1788522496' ), $meta[ AttributionCapture::META_SESSION_IDS ] );
+	}
+
+	public function test_an_absent_signal_is_not_a_denial_at_order_creation(): void {
+		$this->set_full_ids_cookie();
+		$this->set_cookie(
+			AttributionCookies::CONSENT_COOKIE,
+			array( 'signals' => array( 'functionality_storage' => 'denied' ) )
+		);
+
+		$meta = AttributionCapture::meta_for_order( 1 );
+
+		$this->assertSame( '111.222', $meta[ AttributionCapture::META_CLIENT_ID ] );
+		$this->assertSame( 'a', $meta['_gtm4wp_gclid'] );
+	}
+
+	/**
+	 * The gate reads the FILTERED state, so a site answering the override
+	 * filter with a denial the page never showed is answering for the stored
+	 * ids as well.
+	 */
+	public function test_the_gate_honours_a_denial_supplied_by_the_filter(): void {
+		$this->set_full_ids_cookie();
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $hook, $value ) {
+				return GTM4WP_WPFILTER_GDM_ORDER_CONSENT === $hook
+					? array( 'signals' => array( AttributionCapture::SIGNAL_ANALYTICS => 'denied' ) )
+					: $value;
+			}
+		);
+
+		$meta = AttributionCapture::meta_for_order( 1 );
+
+		$this->assertArrayNotHasKey( AttributionCapture::META_CLIENT_ID, $meta );
+		$this->assertArrayNotHasKey( AttributionCapture::META_SESSION_IDS, $meta );
+		$this->assertSame( 'a', $meta['_gtm4wp_gclid'] );
 	}
 }

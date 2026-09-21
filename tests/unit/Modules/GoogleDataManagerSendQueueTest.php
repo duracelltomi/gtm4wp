@@ -112,6 +112,30 @@ final class GoogleDataManagerSendQueueTest extends TestCase {
 		$this->assertSame( SendQueue::GROUP, $this->scheduled[0]['group'], 'The plugin\'s actions are grouped so a store owner can tell them apart from WooCommerce\'s own.' );
 	}
 
+	/**
+	 * The comment above predates gdm-platform-guard-shim.php, which CAN make
+	 * the "absent" side true again for this namespace. So the dispatcher's
+	 * else-leg is now driven through schedule() itself rather than by calling
+	 * schedule_cron() directly (T94b): with Action Scheduler forced absent and
+	 * both backends stubbed, the job must land on WP-Cron.
+	 */
+	public function test_the_dispatcher_falls_back_to_wp_cron_when_action_scheduler_is_forced_absent(): void {
+		$this->stub_action_scheduler();
+		$this->stub_wp_cron();
+
+		$GLOBALS['gtm4wp_test_forced_functions'] = array( 'as_schedule_single_action' => false );
+
+		try {
+			$this->assertFalse( SendQueue::has_action_scheduler() );
+			$this->assertTrue( SendQueue::schedule( SendQueue::HOOK_SEND, array( 'refund_id' => 7 ), 60 ) );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
+
+		$this->assertCount( 1, $this->scheduled );
+		$this->assertSame( 'wp-cron', $this->scheduled[0]['backend'], 'Action Scheduler is stubbed too, so this fails if the dispatcher ignores the discriminator.' );
+	}
+
 	public function test_the_wp_cron_backend_queues_the_job_where_action_scheduler_is_absent(): void {
 		$this->stub_wp_cron();
 

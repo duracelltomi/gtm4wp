@@ -117,7 +117,11 @@ function editContainerId( next ) {
 }
 
 beforeEach( () => {
-	apiFetch.mockReset();
+	// mockClear, not mockReset: reset would erase the stand-in's default
+	// "unconfigured call rejects loudly" implementation for the rest of the
+	// file, and a persistent mockResolvedValue would do the same - so every
+	// case below queues its answers with the …Once form (TC-15 r6).
+	apiFetch.mockClear();
 } );
 
 afterEach( () => {
@@ -211,11 +215,28 @@ describe( 'App unsaved-change warnings', () => {
 		// A screen nobody has touched must reload without a prompt.
 		expect( event.defaultPrevented ).toBe( false );
 	} );
+
+	it( 'stops asking once the value is back to what was saved', () => {
+		renderApp();
+		editContainerId( 'GTM-NEW' );
+		fireEvent.change( screen.getByDisplayValue( 'GTM-NEW' ), {
+			target: { value: 'GTM-AAA' },
+		} );
+
+		const event = new Event( 'beforeunload', { cancelable: true } );
+		window.dispatchEvent( event );
+
+		// The handler is attached only while dirty and DETACHED on the way
+		// back: a handler left behind would prompt on a screen that has
+		// nothing to lose. Asserted in one test so it cannot depend on which
+		// case ran before it on the shared jsdom window (T95b).
+		expect( event.defaultPrevented ).toBe( false );
+	} );
 } );
 
 describe( 'App saving', () => {
 	it( 'posts only the changed values, not the whole settings map', async () => {
-		apiFetch.mockResolvedValue( { saved: true, errors: {} } );
+		apiFetch.mockResolvedValueOnce( { saved: true, errors: {} } );
 
 		renderApp();
 		editContainerId( 'GTM-NEW' );
@@ -232,7 +253,7 @@ describe( 'App saving', () => {
 	} );
 
 	it( 'confirms a clean save and clears the dirty state', async () => {
-		apiFetch.mockResolvedValue( { saved: true, errors: {} } );
+		apiFetch.mockResolvedValueOnce( { saved: true, errors: {} } );
 
 		renderApp();
 		editContainerId( 'GTM-NEW' );
@@ -251,7 +272,7 @@ describe( 'App saving', () => {
 	} );
 
 	it( 'keeps a rejected field dirty and shows its error', async () => {
-		apiFetch.mockResolvedValue( {
+		apiFetch.mockResolvedValueOnce( {
 			saved: false,
 			errors: { 'gtm-code': 'Invalid container ID.' },
 		} );
@@ -277,7 +298,7 @@ describe( 'App saving', () => {
 	} );
 
 	it( 'adopts the accepted field while the rejected one stays dirty', async () => {
-		apiFetch.mockResolvedValue( {
+		apiFetch.mockResolvedValueOnce( {
 			saved: false,
 			errors: { 'gtm-code': 'Invalid container ID.' },
 		} );
@@ -310,7 +331,7 @@ describe( 'App saving', () => {
 	} );
 
 	it( 'reports a failed save with the server message', async () => {
-		apiFetch.mockRejectedValue( new Error( 'Permission denied' ) );
+		apiFetch.mockRejectedValueOnce( new Error( 'Permission denied' ) );
 
 		renderApp();
 		editContainerId( 'GTM-NEW' );
@@ -324,7 +345,7 @@ describe( 'App saving', () => {
 	} );
 
 	it( 'falls back to a generic message when the failure carries none', async () => {
-		apiFetch.mockRejectedValue( new Error( '' ) );
+		apiFetch.mockRejectedValueOnce( new Error( '' ) );
 
 		renderApp();
 		editContainerId( 'GTM-NEW' );
@@ -338,7 +359,7 @@ describe( 'App saving', () => {
 	} );
 
 	it( 'leaves the change unsaved after a failure so it can be retried', async () => {
-		apiFetch.mockRejectedValue( new Error( 'Permission denied' ) );
+		apiFetch.mockRejectedValueOnce( new Error( 'Permission denied' ) );
 
 		renderApp();
 		editContainerId( 'GTM-NEW' );
@@ -524,7 +545,7 @@ describe( 'App import', () => {
 			screen.getByRole( 'button', { name: 'Save changes' } )
 		).toBeEnabled();
 
-		apiFetch.mockResolvedValue( {
+		apiFetch.mockResolvedValueOnce( {
 			imported: true,
 			values: {
 				'gtm-code': 'GTM-IMPORTED',

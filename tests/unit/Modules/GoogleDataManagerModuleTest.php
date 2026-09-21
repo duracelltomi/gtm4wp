@@ -379,6 +379,11 @@ final class GoogleDataManagerModuleTest extends TestCase {
 		$this->assertStringNotContainsString( '>', $printed );
 		$this->assertStringNotContainsString( '&', $printed );
 		$this->assertStringNotContainsString( "'", $printed );
+		// JSON_HEX_QUOT is the one flag the absence assertions cannot see: a
+		// double quote is `\"` in JSON either way, so only its hex form proves
+		// the flag is still set at this call site.
+		$this->assertStringContainsString( '"', $printed );
+		$this->assertStringNotContainsString( '\"', $printed );
 
 		// The safe form is present and lossless: the browser parses back
 		// exactly the value that went in.

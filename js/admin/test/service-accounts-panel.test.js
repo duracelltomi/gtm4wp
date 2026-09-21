@@ -654,6 +654,45 @@ describe( 'ServiceAccountsPanel rename', () => {
 		expect( screen.queryByLabelText( EDIT_FIELD ) ).not.toBeInTheDocument();
 	} );
 
+	it( 'ignores a second Save while the rename is in flight', async () => {
+		await renderLoaded( [ PRODUCTION, STAGING ] );
+
+		let finishRename;
+		apiFetch.mockImplementationOnce(
+			() =>
+				new Promise( ( resolve ) => {
+					finishRename = resolve;
+				} )
+		);
+
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Rename Production' } )
+		);
+		fireEvent.change( screen.getByLabelText( EDIT_FIELD ), {
+			target: { value: 'Live site' },
+		} );
+		const save = screen.getByRole( 'button', {
+			name: 'Save the new label of Production',
+		} );
+		fireEvent.click( save );
+		// In flight: the prop layer disables the button (which is what jsdom
+		// can see - a disabled button never delivers a click) and the handler
+		// re-checks isBusy behind it, the recorded TC-15 r7 blind spot. Same
+		// shape as the Test button's case above; the rename had no such pin.
+		expect( save ).toBeDisabled();
+		fireEvent.click( save );
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 2 ); // the load + one rename
+
+		const renamed = { ...PRODUCTION, label: 'Live site' };
+		finishRename( { account: renamed, accounts: [ renamed, STAGING ] } );
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'Service account renamed to Live site.'
+			)
+		);
+	} );
+
 	it( 'can be cancelled without a request and keeps the stored label', async () => {
 		await renderLoaded( [ PRODUCTION ] );
 

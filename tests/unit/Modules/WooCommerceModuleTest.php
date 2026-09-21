@@ -403,6 +403,34 @@ final class WooCommerceModuleTest extends TestCase {
 	}
 
 	/**
+	 * The classic tracker needs the Store API cart address as well: a block
+	 * product page on an otherwise classic store adds a variable product through
+	 * the Interactivity API, and the tracker resolves the variation from the
+	 * cart line it fetches there. Every JS case hand-sets the global, so this
+	 * is the only pin on the attachment - it was deletable green (T87).
+	 */
+	public function test_classic_tracker_is_told_where_the_store_api_cart_is(): void {
+		CartCheckoutUtils::$cart_block     = false;
+		CartCheckoutUtils::$checkout_block = false;
+		Functions\when( 'is_checkout' )->justReturn( false );
+		Functions\when( 'is_cart' )->justReturn( false );
+
+		$result = $this->run_enqueue( $this->make_module() );
+
+		$expected_url = wp_json_encode(
+			'https://example.com/wp-json/wc/store/v1/cart',
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+		);
+
+		$this->assertArrayHasKey( 'gtm4wp-woocommerce', $result['inline'] );
+		$this->assertStringContainsString(
+			'window.gtm4wp_store_api_cart_url = ' . $expected_url . ';',
+			$result['inline']['gtm4wp-woocommerce'],
+			'The classic handle carries the same window property the blocks handle does.'
+		);
+	}
+
+	/**
 	 * #405: the product-detail view_item push is wrapped in a helper that
 	 * gtm4wp-ecommerce-generic.js defines, and that push is an inline script with no
 	 * src - it executes while the document is parsed, before any deferred bundle. So

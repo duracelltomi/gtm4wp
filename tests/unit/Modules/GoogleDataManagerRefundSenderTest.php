@@ -103,6 +103,8 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 				$this->scheduled[] = array(
 					'hook'    => $hook,
 					'payload' => $args[0] ?? array(),
+					// Two wall-clock reads (SendQueue's and this one), so a second
+					// boundary between them reads one less; the assertions allow it.
 					'delay'   => $timestamp - time(),
 				);
 
@@ -626,7 +628,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertCount( 1, $this->scheduled );
 		$this->assertSame( SendQueue::HOOK_SEND, $this->scheduled[0]['hook'] );
 		$this->assertSame( 2, $this->scheduled[0]['payload']['attempt'] );
-		$this->assertSame( 60, $this->scheduled[0]['delay'] );
+		$this->assertEqualsWithDelta( 60, $this->scheduled[0]['delay'], 1 );
 		$this->assertSame( array( 'G-ABC123' ), $this->scheduled[0]['payload']['only'] );
 		$this->assertSame( array(), $source->sent, 'Nothing is marked sent while a retry is still coming.' );
 		$this->assertSame( SendLog::OUTCOME_RETRYING, $this->entry()['outcome'] );
@@ -651,11 +653,11 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( SendLog::OUTCOME_FAILED, $this->entry()['outcome'] );
 	}
 
-	public function test_only_the_destination_that_failed_is_retried(): void {
+	public function test_two_destinations_on_one_account_share_one_accepted_request(): void {
 		$source = $this->source( self::refund() );
 
-		// Two destinations on the same account, so both fit in one request; the
-		// second one is refused with a retryable status.
+		// Two destinations on the same account fit in one request, and one
+		// accepted request answers for both.
 		$this->queue_send( 200, array( 'requestId' => 'req-ok' ) );
 
 		$sender = $this->sender(
@@ -676,6 +678,77 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( self::NOW, $this->health->get( 'G-AAA' )['last_success'] );
 		$this->assertSame( self::NOW, $this->health->get( 'G-BBB' )['last_success'] );
 		$this->assertCount( 2, $this->log->all(), 'One entry per destination: they can genuinely differ.' );
+	}
+
+	/**
+	 * The rule the class doc block is built on, with the fixture that can
+	 * actually exercise it: two accounts mean two requests, so one can be
+	 * accepted while the other is refused. Only the refused destination may
+	 * be retried, the accepted one is polled, and the refund is NOT marked
+	 * sent while any part of it is still owed (T89 - every earlier case used
+	 * one account, one chunk, so "retry everything on any failure" was green).
+	 */
+	public function test_a_partly_accepted_send_retries_only_the_refused_destination(): void {
+		$second = $this->vault->add( KeyFileFixture::parse(), 'Second' );
+		$this->assertIsString( $second );
+
+		$row_b                                    = $this->destination( 'G-BBB', '987654321' );
+		$row_b[ DestinationRows::COLUMN_ACCOUNT ] = $second;
+
+		$source = $this->source( self::refund() );
+
+		// Chunk 1 (first account): token + accepted. Chunk 2 (second account):
+		// token + a retryable refusal.
+		$this->queue_send( 200, array( 'requestId' => 'req-ok' ) );
+		$this->queue_send( 503, array( 'error' => array( 'status' => 'UNAVAILABLE' ) ) );
+
+		$this->sender(
+			$source,
+			array( GTM4WP_OPTION_GDM_DESTINATIONS => array( $this->destination( 'G-AAA' ), $row_b ) )
+		)->run( self::job() );
+
+		$sends = $this->scheduled_sends();
+		$this->assertCount( 1, $sends, 'Exactly one retry is queued.' );
+		$this->assertSame( array( 'G-BBB' ), $sends[0]['payload']['only'], 'Only the refused destination is retried; the accepted one would otherwise take the refund twice.' );
+		$this->assertSame( 2, $sends[0]['payload']['attempt'] );
+
+		$this->assertSame( array(), $source->sent, 'The refund is not marked sent while one destination still owes it.' );
+
+		$polls = array_values( array_filter( $this->scheduled, static fn ( $job ) => SendQueue::HOOK_STATUS === $job['hook'] ) );
+		$this->assertCount( 1, $polls, 'The accepted request is polled for its processing status.' );
+		$this->assertSame( 'req-ok', $polls[0]['payload']['request_id'] );
+
+		$this->assertSame( self::NOW, $this->health->get( 'G-AAA' )['last_success'] );
+		$this->assertSame( 1, $this->health->get( 'G-BBB' )['consecutive_failures'] );
+
+		$outcomes = array_column( $this->log->all(), 'outcome', 'destination' );
+		$this->assertSame( SendLog::OUTCOME_ACCEPTED, $outcomes['G-AAA'] );
+		$this->assertSame( SendLog::OUTCOME_RETRYING, $outcomes['G-BBB'] );
+	}
+
+	public function test_a_partly_accepted_send_that_exhausts_its_retries_is_still_never_marked_sent(): void {
+		$second = $this->vault->add( KeyFileFixture::parse(), 'Second' );
+		$this->assertIsString( $second );
+
+		$row_b                                    = $this->destination( 'G-BBB', '987654321' );
+		$row_b[ DestinationRows::COLUMN_ACCOUNT ] = $second;
+
+		$source = $this->source( self::refund() );
+
+		$this->queue_send( 200, array( 'requestId' => 'req-ok' ) );
+		$this->queue_send( 503, array( 'error' => array( 'status' => 'UNAVAILABLE' ) ) );
+
+		$this->sender(
+			$source,
+			array( GTM4WP_OPTION_GDM_DESTINATIONS => array( $this->destination( 'G-AAA' ), $row_b ) )
+		)->run( self::job( array( 'attempt' => 6 ) ) );
+
+		$this->assertSame( array(), $this->scheduled_sends(), 'The last attempt queues nothing more.' );
+		$this->assertSame( array( 34 => 'req-ok' ), $source->sent, 'With nothing left to retry the accepted half is what the refund is marked sent with.' );
+
+		$outcomes = array_column( $this->log->all(), 'outcome', 'destination' );
+		$this->assertSame( SendLog::OUTCOME_ACCEPTED, $outcomes['G-AAA'] );
+		$this->assertSame( SendLog::OUTCOME_FAILED, $outcomes['G-BBB'] );
 	}
 
 	public function test_a_retry_narrows_the_send_to_the_named_destinations(): void {
@@ -804,7 +877,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$this->assertCount( 1, $this->scheduled );
 		$this->assertSame( SendQueue::HOOK_SEND, $this->scheduled[0]['hook'] );
-		$this->assertSame( 60, $this->scheduled[0]['delay'], 'The platform hooks fire while the refund is still being written.' );
+		$this->assertEqualsWithDelta( 60, $this->scheduled[0]['delay'], 1, 'The platform hooks fire while the refund is still being written.' );
 		$this->assertSame(
 			array(
 				'platform'  => 'woocommerce',
@@ -840,6 +913,91 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$sender->register_hooks();
 
 		$this->assertNotFalse( has_action( SendQueue::HOOK_SEND, array( $sender, 'run' ) ) );
+	}
+
+	/**
+	 * A source double whose register_hooks() hands the enqueue callable back,
+	 * so the test can fire it the way the platform hook would. The default
+	 * double's register_hooks() is a no-op, which left the inactive-source
+	 * skip and the closure's platform binding unexercised (T94c).
+	 *
+	 * @param string $platform What the source reports as its platform.
+	 * @param bool   $active   Whether it reports itself active.
+	 * @return RefundSource&object{enqueue: ?callable, registered: int}
+	 */
+	private function hooking_source( string $platform, bool $active ): RefundSource {
+		return new class( $platform, $active ) implements RefundSource {
+			/**
+			 * The enqueue callable register_hooks() received.
+			 *
+			 * @var callable|null
+			 */
+			public $enqueue = null;
+
+			/**
+			 * How many times register_hooks() was called.
+			 */
+			public int $registered = 0;
+
+			/**
+			 * Builds the double.
+			 *
+			 * @param string $platform Platform name.
+			 * @param bool   $active   Platform availability.
+			 */
+			public function __construct( private string $platform, private bool $active ) {
+			}
+
+			public function platform(): string {
+				return $this->platform;
+			}
+
+			public function is_active(): bool {
+				return $this->active;
+			}
+
+			public function register_hooks( callable $enqueue ): void {
+				++$this->registered;
+				$this->enqueue = $enqueue;
+			}
+
+			public function load( int $order_id, int $refund_id ): ?RefundData {
+				return null;
+			}
+
+			public function objects( int $order_id, int $refund_id ): array {
+				return array( null, null );
+			}
+
+			public function is_sent( int $refund_id ): bool {
+				return false;
+			}
+
+			public function mark_sent( int $refund_id, string $request_id ): void {
+			}
+		};
+	}
+
+	public function test_only_active_sources_get_their_refund_hook_and_each_closure_names_its_own_platform(): void {
+		$woo = $this->hooking_source( RefundSource::PLATFORM_WOOCOMMERCE, false );
+		$edd = $this->hooking_source( RefundSource::PLATFORM_EDD, true );
+
+		$clock = static fn () => self::NOW;
+		( new RefundSender(
+			$this->options(),
+			new EventsIngest( new TokenService( $this->vault, $this->transport, $clock ), $this->transport, $clock ),
+			$this->health,
+			$this->log,
+			array( $woo, $edd )
+		) )->register_hooks();
+
+		$this->assertSame( 0, $woo->registered, 'An inactive platform is not asked to hook anything.' );
+		$this->assertSame( 1, $edd->registered );
+
+		( $edd->enqueue )( 12, 34 );
+
+		$this->assertCount( 1, $this->scheduled );
+		$this->assertSame( 'edd', $this->scheduled[0]['payload']['platform'], 'The closure carries the platform of the source it was handed to, so run() loads the refund from the right adapter.' );
 	}
 
 	/**

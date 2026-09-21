@@ -387,6 +387,45 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->assertStringEndsWith( '…', $stored );
 	}
 
+	/**
+	 * The shape of the status list is Google's, decoded from JSON: a row that
+	 * is not an array is skipped rather than read, and a negative count is
+	 * clamped the way record() clamps its own (T94d - record() had the
+	 * negative-count case, record_status() did not).
+	 */
+	public function test_a_malformed_status_row_is_skipped_and_negative_counts_are_clamped(): void {
+		$log = $this->log();
+		$log->record(
+			self::entry(
+				array(
+					'request_id'  => 'req-1',
+					'destination' => 'G-ABC123',
+				)
+			)
+		);
+
+		$log->record_status(
+			'req-1',
+			array(
+				'garbage',
+				null,
+				array( 'status' => 'FAILED' ),
+				array(
+					'measurement' => 'G-ABC123',
+					'status'      => 'SUCCESS',
+					'errors'      => -5,
+					'warnings'    => '-2',
+				),
+			)
+		);
+
+		$entry = $log->all()[0];
+
+		$this->assertSame( 'SUCCESS', $entry['result'], 'The one well-formed row is the one applied.' );
+		$this->assertSame( 0, $entry['errors'] );
+		$this->assertSame( 0, $entry['warnings'] );
+	}
+
 	public function test_a_status_without_a_request_id_writes_nothing(): void {
 		$log = $this->log();
 		$log->record( self::entry( array( 'request_id' => '' ) ) );

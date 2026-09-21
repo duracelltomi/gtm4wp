@@ -470,7 +470,7 @@ describe( 'ModulePanel custom panels', () => {
 	} );
 
 	it( 'renders the registered panel in place of the fields when the module has none', async () => {
-		apiFetch.mockResolvedValue( { accounts: [] } );
+		apiFetch.mockResolvedValueOnce( { accounts: [] } );
 
 		renderPanel( {
 			id: 'google-auth',

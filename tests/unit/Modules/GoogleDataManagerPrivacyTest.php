@@ -337,8 +337,10 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 		// Persistence, not just staging: the stub answers get_meta() out of
 		// what was staged on the object, so an eraser that never saved would
 		// look identical here while the row survived in the database - and the
-		// request would have reported success (TS-3).
-		$this->assertGreaterThan( 0, $order->save_count, 'The deletions are written to the database.' );
+		// request would have reported success (TS-3). Exactly once: the CRUD
+		// stages every delete_meta_data() and one save() writes them all, so a
+		// save per key would be five needless writes per order per erasure page.
+		$this->assertSame( 1, $order->save_count, 'The deletions are written to the database, in one write per order.' );
 
 		$this->assertSame(
 			array(),
@@ -387,12 +389,13 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 	}
 
 	public function test_erasing_an_order_with_nothing_stored_reports_no_removal(): void {
-		$this->given_woocommerce_order( array() );
+		$order = $this->given_woocommerce_order( array() );
 
 		$result = ( new PrivacyData() )->erase( self::EMAIL );
 
 		$this->assertFalse( $result['items_removed'] );
 		$this->assertTrue( $result['done'] );
+		$this->assertSame( 0, $order->save_count, 'An order with nothing of ours on it is not written to.' );
 	}
 
 	public function test_an_erasure_for_somebody_else_removes_nothing(): void {

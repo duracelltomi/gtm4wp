@@ -41,6 +41,8 @@ on every review before anything else.
 - **TS-16** — a green suite is **not** evidence of test isolation. When the mocking framework defines functions **process-wide and permanently** (Brain Monkey does), one file's stub silently satisfies another file's missing one, and the dependency is invisible in declaration order. `--order-by=random` is a one-flag check that no other signal in this project performs.
 - **TS-13** — a test double must be **no more capable than the real collaborator**: if the mock does the safe thing the real dependency does *not* (returns a live object the real one returns null for; leaves an element the real SDK replaces; exposes a property the real object hides behind `__get`), the failure it would cause is invisible and the suite stays green over a real bug.
 - **TS-17** — the *environment* absorbs couplings too, and leaves no double to interrogate. jsdom's `global === window` makes a window property satisfy a bare-identifier read, so the suite cannot tell the two binding kinds apart and passed identically over three features that shipped dead. Ask the TS-13 question **of the harness**; where it cannot be made faithful, move the guard to a tool that can see it (ESLint) and record the blind spot.
+- **TS-19** — a declaration asserted on one side of the language boundary: PHP declares a key/flag the JS reads (`panel_data()` → panel props, `depends_on`, an inline global) and each suite passes on its own — the PHP test pins other keys, the JS fixture hand-feeds this one. Litmus: delete the declaration; if both suites stay green the pair is unpinned.
+- **TS-20** — a recording double that drops a parameter the real collaborator branches on: an `alias()`/`expect()->with()` that records only some of the arguments a production call passes to a library lets a wrong value in the unrecorded position stay green (finding #240: `as_unschedule_all_actions( $hook, array(), 'gtm4wp' )` selects Action Scheduler's per-argument match path and cancelled nothing while both stubs recorded hook + group and never looked at `$args`). Declare the library's own defaults on the closure, record and assert the **whole tuple**, and word the assertion as the branch that tuple selects. Not BE-2 (declared-but-unused params are fine; *dropped* coupling-bearing ones are not).
 - **TS-18** — a port carries the guards but not the pins: a new integration written to parity with an existing one inherits the sibling's protections (double-init guard, typeof guard, escape sinks, parse bails) while the discriminating tests stay behind in the sibling's suite. Reviewing the port's code against the sibling's code shows parity; only diffing the port's *test suite* against the sibling's shows the guards are unpinned.
 
 **Test Smells (TS):**
@@ -218,6 +220,24 @@ Confirmed 2026-08-05 (Run 6), found by a single flag on an otherwise unchanged,
 - Mutation testing cannot be adopted until this is fixed — Infection reorders and
   re-runs tests, so an order-dependent suite reports noise.
 
+**Corollary (Run 12, 2026-09-20): the whole-suite shuffle is blind to two shapes —
+run each changed test file by path, alone.** `--order-by=random` reorders *tests*;
+it does not reorder *file loading*, and PHPUnit loads every test file before running
+any. So:
+- A **class stub** pulled in by `require_once 'edd-stubs.php'` is a *load-time*
+  dependency: a file that constructs `\EDD\Orders\Order` without requiring the stub
+  is green under every seed (six other files required it first) and errors when run
+  by path. Measured: `vendor/bin/phpunit tests/unit/Modules/GoogleDataManagerBackfillTest.php`
+  → 4 errors, whole suite green at 3 seeds (T84).
+- A production branch gated on `function_exists()` can be satisfied by an *earlier
+  test in the same file* (Brain Monkey's permanence again, but within one file), so
+  the file passes alone in declaration order and fails alone under some seeds —
+  `CaptureHooksTest`: seeds 4 and 5 red, whole suite green (T85).
+
+The complementary check is one line per changed test file, by **path** not
+`--filter` (a filter still loads every file): run it alone in declaration order and
+under 3–4 seeds. Cheap, and the only check that sees either shape.
+
 ### TS-1: A covered line is not an asserted behavior ⭐
 Line/branch coverage tells you a line *executed*, not that the test would *fail if
 the line were wrong*. The classic trap here: a sink is exercised with benign data,
@@ -327,6 +347,17 @@ corruption) would pass unnoticed with green coverage. The fix uses a hostile
 calls `stubEscapeFunctions()` (real `htmlspecialchars`), a re-added `esc_js` makes
 the assertion fail. This is TS-1 applied one hop upstream of the sink — check it
 for every module field that feeds the dataLayer with request/header data.
+
+**Corollary (Run 12, 2026-09-20): a decode between source and sink narrows what
+the raw-passthrough pin proves.** `3384cf9` introduced `wp_specialchars_decode()` at
+the term-name read site so stored `&amp;` reaches the dataLayer as `&`. The existing
+boundary pin (`ProductDataTest.php:1315`, raw `&`/`"` in, no entity out) now guards
+only the segment *after* the decode: an accidental pre-escape placed *before* it
+(`esc_html` on the term read, a filter on `get_term`) is undone by the decode and the
+pin stays green. When a decode sits between source and sink, the canonical shape is
+`PageDataLayerTest.php:2284`: feed the **stored entity form** at the source and assert
+the **raw form** at the sink (hex-encoded by `wp_json_encode`, TC-2) — that covers
+both segments. Keep the original raw-in pin too; the two are not redundant.
 
 ### TS-12: Authorization/access-control gates are their own test surface ⭐
 A `permission_callback`, a `current_user_can()` gate, or a filterable required
@@ -482,7 +513,12 @@ the payload then continues into the dataLayer as `items: [5], value: NaN`.
   users run.
 - **It can flip under you.** Adding a single `import` to such a source file makes webpack emit
   a module, and production silently changes from "garbage push" to "uncaught TypeError" — a
-  behaviour change no test would report, in either direction.
+  behaviour change no test would report, in either direction. **It did (Run 12, 2026-09-20):**
+  `c5499f9` added `import { gtm4wp_parse_block_item }` to `gtm4wp-woocommerce.js`, so the
+  measurement above is stale — `build/gtm4wp-woocommerce.js` now contains **one** `"use strict"`
+  (woocommerce-blocks 1, attribution 1, **edd still 0**). The three `not.toThrow` sites in the WC
+  suite each pair with an absence-of-push assertion, so they stayed valid; re-run the litmus on
+  every bundle each review and record the counts in the Frontend JS row.
 
 ### TS-19: A declaration asserted on one side of the language boundary ⭐
 A setting whose *declaration* lives in PHP and whose *behaviour* lives in JavaScript
@@ -515,6 +551,48 @@ which value shapes that declaration can now produce, and whether the JS helper h
 ever been handed one. Introducing the first dependency on a non-checkbox type is
 exactly the moment to extend the helper's own cases rather than only assert the new
 declaration.
+
+### TS-20: A recording double that drops a parameter the collaborator branches on ⭐
+The upstream-review system calls the code-side shape UC-3 ("do not let a test double
+absorb the coupling"); this is its test-side form, and it is distinct from TS-13.
+TS-13 is a double that *does* something the real collaborator does not. This is a
+double that *records* less than the real collaborator *reads*: an `alias()` or
+`expect()->with()` that captures only some of the arguments the production call
+passes to an external library, so a wrong value in the unrecorded position — or a
+value the library's *default* would have supplied differently — stays green.
+
+Measured 2026-09-20 (security finding #240): `uninstall.php` called
+`as_unschedule_all_actions( $hook, array(), 'gtm4wp' )`. Action Scheduler treats a
+non-null `$args` as "match actions scheduled with exactly these arguments", and an
+empty list matches only argument-less actions — every plugin action carries a payload,
+so **nothing was cancelled** and, on AS ≥ 3.5, the orphans ended as FAILED rows in the
+Scheduled Actions screen. Both stubs (`UninstallTest`, the since-deleted
+`SendQueueTest` alias) recorded hook + group and never looked at `$args`; the suite was
+green for the exact reason the bug was invisible. The fix recorded the whole tuple
+with the library's own defaults filled in (`function ( $hook, $args = array(), $group = '' )`)
+and asserted `[ 'gtm4wp_gdm_send_refund', array(), '' ]` with the assertion message
+naming the branch that tuple selects ("hook alone → cancel every action of the hook").
+Reverting the production call goes red on the `assertSame`.
+
+**Litmus vs BE-2:** BE-2 blesses a closure that *declares* parameters it does not
+*use* — that documents the receiving signature and costs nothing. The smell is the
+inverse: a position the production call *supplies* (or *omits*, when the library
+default selects a branch) that the record/assertion does not include, **when the real
+collaborator's behaviour depends on that position**. A dropped `$group` that no branch
+reads (Run 12 sweep: `RefundSenderTest:101`, `StatusPollerTest:79`) is not the smell,
+as long as the coupling is pinned somewhere (`SendQueueTest:112`).
+
+**Rules:**
+- When recording a call into a library, declare the library's defaults on the closure,
+  record the **whole tuple**, and assert it with a message that names the branch it
+  selects. Where the branch semantics are cheap to model, a fake that reproduces them
+  (a store that cancels only matching rows) is stronger than a shape pin.
+- **Sweep step for every review:** for each `->alias(`/`->with(` on a non-WordPress-core
+  library function (`as_*`, `edd_*`, `wc_*`, HTTP/transport doubles), diff the recorded
+  tuple against the production call site's argument list; a narrower record is a
+  candidate until the dropped position is shown to select no branch.
+- Register the library's argument semantics in `.upstream/` when you rely on them —
+  the #240 branch rule is an undocumented-by-signature Action Scheduler behaviour.
 
 ### TS-18: A port carries the guards but not the pins ⭐
 When a feature is built as a **parity port** of an existing integration, the source
@@ -843,6 +921,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-09-21 (Run 12 — gaps closed) | Closed T81–T96 on the user's "fix straightforward, ask with options otherwise" go-ahead (four forks answered up front). **PHP 2852→2893 / 7809→7956; JS 961→974**; declaration + 4 seeds identical; phpcs exit 0; lint:js clean; build rebuilt (4 production changes: one `save()` per erased order, PageVariables term-name decode, list add supersedes the held-back block add, non-cart body = no reading). **14 revert probes red.** Two lessons worth recording without a new number: (1) **the probe tests the test, again** — the first T88 draft asserted the push count and stayed green with the coalescing guard deleted, because two racing reads still resolve one after another in JS and the second diff sees the updated baseline; the discriminator was *when* the reads are issued, not what they produce — a guard whose effect is ordering/concurrency needs an assertion on the ordering; (2) **writing the error-leg test surfaced the third T55/T80-class latent bug**: a `200` body whose `items` is not a list normalized to an empty cart and reported every baseline item as `remove_from_cart` — the "a lost request costs an event rather than inventing one" rule was written in the docblock and not enforced at the parse bail; the fix followed the classic tracker's existing `Array.isArray` guard. The keyless-held-back-event candidate from the report is now confirmed by /code-review's answer being taken (the over-report was real and fixed) — still one instance, still unnumbered; a second sighting promotes it to a TC line beside TC-17. |
+| 2026-09-20 (Run 12 — Data Manager phases 3+4 pass, report only) | Reviewed `75c942d..b085e0e` (80 commits, +6.7k production / +17k test lines) with 4 parallel read-only deep-reads; **no tests written.** Added **TS-20** (⭐ a recording double that drops a parameter the collaborator branches on — the test-side form of UC-3, measured on security finding #240 where both `as_unschedule_all_actions` stubs recorded hook + group and never `$args`, so a call that cancelled nothing stayed green; swept the send-lane suites and found no second coupling-bearing instance). Added the **TS-16 corollary** (the whole-suite shuffle is blind to load-time class-stub requires and in-file `function_exists()` dependencies — run each changed test file by path, alone, plus seeds; two instances measured: `BackfillTest` 4 errors by path, `CaptureHooksTest` red under seeds 4/5) and the **TS-11 corollary** (a decode between source and sink narrows a raw-passthrough pin; feed the stored entity form at the source, assert the raw form at the sink). Put **TS-19** into the quick index (it had a full entry but no index row). Recorded the TS-17 v3 clause happening for real: `c5499f9`'s lib import flipped `build/gtm4wp-woocommerce.js` to strict mode (0 → 1 `"use strict"`), the paired absence-of-push asserts keep the three `not.toThrow` sites valid. Candidate not yet numbered (seen once, pending `/code-review` on the over-report): *a keyless held-back event needs an "unrelated trigger inside the window → not released" case beside its timeout case* — the timeout-drop test is half a pin when any producer's confirmation flushes the queue. |
 | 2026-09-03 (Run 11 — Data Manager phase 2 pass + closes) | Reviewed the GDM range (`99ee59a..75c942d`) with 3 parallel deep-reads and closed T75–T80 the same session ("fill straightforward, ask on forks" — no fork arose). **PHP 2394→2397 / 6539→6552; JS 807→812**; declaration + 3 seeds identical; phpcs exit 0; lint:js clean; build rebuilt (1 production change). **3 revert probes red.** Extended **TC-15 rule 6** with the `…Once` corollary: a persistent `mockResolvedValue` erases the stand-in's loud-reject default exactly as `mockReset()` would, and `mockClear()` does not restore it. Process notes: (a) **an executed probe beats a static trace for error paths whose evaluation is deferred** — the deep-read predicted a malformed REST response would "land in the catch", but `response.ok` was evaluated inside a `setResults` updater, i.e. during React's render, PAST the try/catch: only running the new test revealed a latent panel crash (fixed by building the verdict before `setResults`; the test was red pre-fix by construction — the T17/T3 "writing the missing test surfaces the live defect" class, now seen in a suite that already looked strong); (b) **TS-18 now operates at assertion granularity**: the second consecutive greenfield module landed with its pins (three-rung TS-12 ladder, revert-traced finding guards, TS-13-by-construction fake), and the residue was exactly the sibling assertions that didn't make the trip — the KeyNotice boot-attachment line (T75, the T74 lesson recurring one module over IN the same range that closed T74), the busy-guard deferred-promise test (T76), the args/panel/hostile-summary pins (T77–T79); diffing the sibling's suite remains the ready-made checklist, now down to single assertions. |
 | 2026-09-03 (Run 10 — google-auth pass + closes) | Reviewed the google-auth module range (`1c1164f..99ee59a`) with 5 parallel deep-reads and closed T66–T74 the same session ("close all, ask on forks" — 4 forks answered: refuse ports / RunInSeparateProcess / inject a clock / handler re-check + test). **PHP 2296→2313 / 6207→6299; JS 780→787**; declaration + 4 random seeds identical; phpcs exit 0; lint:js clean; build rebuilt (3 production changes, one changelog sentence). **9 revert probes red.** Extended **TC-15** with rules 6–7: `mockClear()` never `mockReset()` on a stand-in carrying a default implementation, and the measured jsdom limit that a click never reaches a `disabled` button — so a handler-level re-check behind a rendered `disabled` prop is an in-harness blind spot (TS-17 class): test the prop layer, add the re-check anyway, record the blind spot. Extended the **TS-12 ladder to three rungs** (checklist sweep row): the callback (#143), its registration (T39), and the registration's own attachment — `PluginRestWiringTest` now executes the `rest_api_init` closure from a real `boot()`. Process notes: (a) a **greenfield module CAN land with its pins** — the google-auth suites applied T39, TC-13, TS-13-conscious doubles and custody-by-construction unprompted, so this run's gaps were pins-on-strong-suites, the TS-18 failure mode absent; (b) a namespaced-function shadow of a PHP internal (`GTM4WP\Google\openssl_sign`) is the way to reach an unstubbable internal's failure leg, but ONLY under `RunInSeparateProcess` — in-process it poisons every later caller of the real function (TS-16); (c) probing an absence assertion means *adding* the forbidden thing and watching red (`expect('add_action')->never()` + an injected hook). |
 | 2026-09-02 (Run 9 — gaps closed) | Closed T52–T65 the same session (user: "close straightforward, ask about the rest" — four judgment calls answered explicitly). **PHP 2120→2143 / 5333→5419; JS 746→757**; declaration + 4 random seeds identical; phpcs exit 0; lint:js clean. **9 revert probes red**, one of which rewrote a wrong first draft (the TC-14 cart-page case passed under the removed guard because a blanket `is_singular` stub routed the request into the download branch — the discriminating shape needed an argument-sensitive stub: `is_singular('download')` false, bare `is_singular()` true; the probe-tests-the-test lesson at a new site). Process notes worth keeping: (a) the report-stage classifier block on guard-revert probes did not recur once a discriminating test existed — write the test first, then probe; (b) **behavior pins from decisions, not guesses**: the mixed-identity variation edge and the primary-category omission were pinned only after the maintainer chose, labeled behavior-not-contract with the routed question named in the docblock; (c) tooling: PCOV via `PHP_INI_SCAN_DIR` (reaches RunInSeparateProcess children — a `-d extension` flag does not, which broke Infection's initial run until switched); Infection itself is non-functional on this PHP 8.4 ZTS Windows build (silent exit-0 during mutant generation, reproduced minimal — documented in infection.json5, re-test on NTS/Linux); (d) first coverage baseline recorded: Lines 95.21% (6083/6389). |

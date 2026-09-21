@@ -226,6 +226,19 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertSame( 'POST', $captured[2]['args']['methods'] );
 		$this->assertSame( array( $controller, 'replay' ), $captured[2]['args']['callback'] );
 		$this->assertSame( array( $controller, 'can_manage' ), $captured[2]['args']['permission_callback'] );
+		// Pinned exactly like the first route's block (T94g): `references`
+		// is a filter over stored entries, and a widened item type would hand
+		// the handler shapes it only re-validates as strings.
+		$this->assertSame(
+			array(
+				'references' => array(
+					'type'     => 'array',
+					'required' => false,
+					'items'    => array( 'type' => 'string' ),
+				),
+			),
+			$captured[2]['args']['args']
+		);
 	}
 
 	// ---- Contract ----------------------------------------------------------
@@ -820,6 +833,24 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 
 		$this->assertSame( 0, $response->get_data()['queued'] );
 		$this->assertSame( array(), $this->scheduled );
+	}
+
+	/**
+	 * A refusal from the scheduler (Action Scheduler returns 0 for an action
+	 * it would not take) must not be counted as queued: the panel reports the
+	 * count back to the admin as "sent again" (T94g).
+	 */
+	public function test_a_refund_the_scheduler_refuses_is_not_counted_as_queued(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record( self::row( array() ) );
+
+		$controller = $this->replay_controller( $log );
+		Functions\when( 'as_schedule_single_action' )->justReturn( 0 );
+
+		$response = $controller->replay( new \WP_REST_Request() );
+
+		$this->assertSame( 0, $response->get_data()['queued'] );
+		$this->assertSame( array(), $response->get_data()['references'] );
 	}
 
 	public function test_replay_refuses_while_sending_is_off(): void {

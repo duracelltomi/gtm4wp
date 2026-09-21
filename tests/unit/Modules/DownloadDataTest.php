@@ -837,4 +837,38 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( 'fallback', DownloadData::row_prop( $order, 'no_such_prop', 'fallback' ) );
 		$this->assertSame( 'fallback', DownloadData::row_prop( null, 'gateway', 'fallback' ) );
 	}
+
+	// ------------------------------------------------------------------
+	// Term names as they were typed (parity with ProductDataTest): the
+	// decode lives in the shared Ecommerce\Helpers, but the EDD ROUTE to it
+	// is what this pins - an EDD-specific category branch that stopped going
+	// through the helper would otherwise be invisible (TS-18, T96a).
+	// ------------------------------------------------------------------
+
+	public function test_download_category_arrives_as_it_was_typed_not_as_wordpress_stored_it(): void {
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Shirts &amp; Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+
+		$item = $this->make_download_data()->process_download( $this->make_download(), array(), 'productdetail' );
+
+		// Both directions: the typed form is present AND the stored entity is gone.
+		$this->assertSame( 'Shirts & Ties', $item['item_category'] );
+		$this->assertStringNotContainsString( '&amp;', $item['item_category'] );
+	}
+
+	public function test_full_download_category_path_is_decoded_level_by_level(): void {
+		Functions\when( 'wp_get_post_terms' )->justReturn(
+			array( (object) array( 'name' => 'Ties', 'term_id' => 5 ) ) // phpcs:ignore
+		);
+		Functions\when( 'get_term_parents_list' )->justReturn( 'Shirts &amp; Ties/Silk &quot;Classic&quot;/' );
+
+		$item = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH => true )
+		)->process_download( $this->make_download(), array(), 'productdetail' );
+
+		$this->assertSame( 'Shirts & Ties', $item['item_category'] );
+		$this->assertSame( 'Silk "Classic"', $item['item_category2'] );
+		$this->assertArrayNotHasKey( 'item_category3', $item );
+	}
 }

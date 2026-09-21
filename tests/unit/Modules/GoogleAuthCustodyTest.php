@@ -198,11 +198,18 @@ final class GoogleAuthCustodyTest extends TestCase {
 	public function test_a_whole_screen_panel_names_no_group(): void {
 		list( $page ) = $this->make_settings_stack();
 
+		// Collected first, then asserted: an assertion inside the loop's `if`
+		// never runs when the module is missing, and a test with no assertion
+		// is merely "risky", not red (T96d).
+		$descriptor = null;
 		foreach ( $page->bootstrap_data()['modules'] as $module ) {
 			if ( 'google-auth' === $module['id'] ) {
-				$this->assertSame( '', $module['panelGroup'] );
+				$descriptor = $module;
 			}
 		}
+
+		$this->assertNotNull( $descriptor, 'The google-auth module must be in the bootstrap data.' );
+		$this->assertSame( '', $descriptor['panelGroup'] );
 	}
 
 	/**

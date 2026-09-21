@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\PageVariables;
 
+use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Frontend\DefaultLanguage;
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AbstractModule;
@@ -417,9 +418,15 @@ final class PageVariablesModule extends AbstractModule {
 						if ( is_array( $post_taxonomy_values ) ) {
 							$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
 							foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
-								$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = $use_master_language
-									? $this->localized_term_field( (int) $one_taxonomy_value->term_id, $one_object_taxonomy, 'name', (string) $one_taxonomy_value->name )
-									: $one_taxonomy_value->name;
+								// As typed, not as stored: WordPress keeps a term name
+								// entity-encoded ("Shirts &amp; Ties"), and the e-commerce
+								// items already report the typed form - one shared decode,
+								// so a GTM trigger matches the same string on every variable.
+								$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = EcommerceHelpers::decode_term_name(
+									$use_master_language
+										? $this->localized_term_field( (int) $one_taxonomy_value->term_id, $one_object_taxonomy, 'name', (string) $one_taxonomy_value->name )
+										: (string) $one_taxonomy_value->name
+								);
 							}
 						}
 					}
@@ -648,7 +655,7 @@ final class PageVariablesModule extends AbstractModule {
 					$primary_category_term = get_term( $primary_category_id );
 					if ( $primary_category_term instanceof \WP_Term ) {
 						$data_layer['pagePrimaryCategory']     = $primary_category_term->slug;
-						$data_layer['pagePrimaryCategoryName'] = $primary_category_term->name;
+						$data_layer['pagePrimaryCategoryName'] = EcommerceHelpers::decode_term_name( (string) $primary_category_term->name );
 					}
 				}
 			}

@@ -323,14 +323,21 @@ describe( 'TableControl row removal asks first', () => {
 			value: FILLED,
 		} );
 
-		const trash = screen.queryByRole( 'button', { name: 'Remove row 1' } );
+		// The button exists and is disabled: that is the prop layer, and it
+		// is what jsdom can see - a disabled button never delivers the click,
+		// so the `if ( rowsLocked ) return` re-check in requestRemoval() is
+		// the recorded TC-15 r7 blind spot, guarded by review only. Without
+		// the toBeDisabled() the case was vacuous even for the prop layer.
+		const trash = screen.getByRole( 'button', { name: 'Remove row 1' } );
+		expect( trash ).toBeDisabled();
 
-		if ( trash ) {
-			fireEvent.click( trash );
-			fireEvent.click( trash );
-		}
+		fireEvent.click( trash );
+		fireEvent.click( trash );
 
 		expect( onChange ).not.toHaveBeenCalled();
+		expect(
+			screen.queryByRole( 'button', { name: /confirm/i } )
+		).not.toBeInTheDocument();
 	} );
 } );
 
@@ -736,19 +743,40 @@ describe( 'TableControl pattern validation', () => {
 	} );
 
 	it( 'clears the mark as soon as the value is corrected', () => {
-		// Stateful wrapper: the control is controlled, so the parent must
-		// round-trip onChange for the mark to react to typing.
-		const { onChange } = renderTable( {
+		// The control is controlled, so the parent has to round-trip onChange
+		// for the mark to react: the rerender below plays that parent. The
+		// earlier form asserted only the onChange call, which stays green
+		// with the mark never re-evaluated (T95c).
+		const onChange = jest.fn();
+		const props = {
 			field: { columns: PATTERN_COLUMNS },
-			value: [ { property_id: '654987lll', measurement_id: '' } ],
-		} );
+			label: 'Destinations',
+			help: null,
+			disabled: false,
+			onChange,
+		};
+		const { rerender } = render(
+			<TableControl
+				{ ...props }
+				value={ [ { property_id: '654987lll', measurement_id: '' } ] }
+			/>
+		);
+		expect( screen.getByText( 'Numbers only.' ) ).toBeInTheDocument();
 
 		fireEvent.change( screen.getByDisplayValue( '654987lll' ), {
 			target: { value: '654987' },
 		} );
-
 		expect( onChange ).toHaveBeenCalledWith( [
 			{ property_id: '654987', measurement_id: '' },
 		] );
+
+		rerender(
+			<TableControl
+				{ ...props }
+				value={ onChange.mock.calls[ 0 ][ 0 ] }
+			/>
+		);
+
+		expect( screen.queryByText( 'Numbers only.' ) ).not.toBeInTheDocument();
 	} );
 } );

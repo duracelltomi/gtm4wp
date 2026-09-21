@@ -327,6 +327,11 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 	 * be a refund that cannot be sent, weeks later.
 	 */
 	public function test_orders_flowing_with_nothing_captured_is_a_reportable_state(): void {
+		// The EDD branch bails on function_exists() before it counts the order;
+		// an earlier test in this file used to define the function for it, so the
+		// case passed in declaration order and failed alone (TS-16 corollary).
+		Functions\expect( 'edd_update_order_meta' )->never();
+
 		$stats = new CaptureStats( static fn () => 1_800_000_000 );
 		$hooks = new CaptureHooks( $stats );
 
@@ -419,5 +424,60 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 		$this->stub_option_store( array( CaptureStats::OPTION_NAME => 'not an array' ) );
 
 		$this->assertSame( 0, ( new CaptureStats() )->get()['seen'] );
+	}
+
+	// ---- The consent filter's order reference ------------------------------
+
+	/**
+	 * Every second argument the consent filter received.
+	 *
+	 * @var array<int, mixed>
+	 */
+	private array $filter_references = array();
+
+	/**
+	 * The creation path DEFINES the type contract of the filter's second
+	 * argument (RI-31: the WC_Order object on WooCommerce, the order id as an
+	 * int on EDD); the backfill route pins the same contract on its own path.
+	 * The setUp alias discards the second argument, so without these two the
+	 * creation path could hand the filter anything and stay green.
+	 *
+	 * @return void
+	 */
+	private function record_filter_references(): void {
+		$this->filter_references = array();
+
+		Functions\when( 'apply_filters' )->alias(
+			function ( $hook, $value, ...$args ) {
+				if ( GTM4WP_WPFILTER_GDM_ORDER_CONSENT === $hook ) {
+					$this->filter_references[] = $args[0] ?? null;
+				}
+
+				return $value;
+			}
+		);
+	}
+
+	public function test_the_woocommerce_path_hands_the_filter_the_order_object(): void {
+		$this->set_captured_cookies();
+		$this->record_filter_references();
+
+		$order = new \WC_Order( array( 'id' => 7 ) );
+		$this->hooks()->capture_woocommerce_order( $order );
+
+		$this->assertCount( 1, $this->filter_references );
+		$this->assertSame( $order, $this->filter_references[0], 'The WC_Order object itself, not its id.' );
+	}
+
+	public function test_the_edd_path_hands_the_filter_the_order_id_as_an_int(): void {
+		$this->set_captured_cookies();
+		$this->record_filter_references();
+
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		$this->hooks()->capture_edd_order( '42', array() );
+
+		$this->assertCount( 1, $this->filter_references );
+		$this->assertSame( 42, $this->filter_references[0], 'A strict int, whatever type the hook delivered.' );
 	}
 }

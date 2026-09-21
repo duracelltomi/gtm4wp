@@ -81,6 +81,8 @@ final class GoogleDataManagerStatusPollerTest extends TestCase {
 				$this->scheduled[] = array(
 					'hook'    => $hook,
 					'payload' => $args[0] ?? array(),
+					// Two wall-clock reads (SendQueue's and this one), so a second
+					// boundary between them reads one less; the assertions allow it.
 					'delay'   => $timestamp - time(),
 				);
 
@@ -184,7 +186,7 @@ final class GoogleDataManagerStatusPollerTest extends TestCase {
 
 		$this->assertCount( 1, $this->scheduled );
 		$this->assertSame( SendQueue::HOOK_STATUS, $this->scheduled[0]['hook'] );
-		$this->assertSame( 1800, $this->scheduled[0]['delay'], 'Google says to wait 30 minutes before the first diagnostics request.' );
+		$this->assertEqualsWithDelta( 1800, $this->scheduled[0]['delay'], 1, 'Google says to wait 30 minutes before the first diagnostics request.' );
 		$this->assertSame(
 			array(
 				'account'    => 'sa_aaaaaaaaaaaa',
@@ -248,7 +250,7 @@ final class GoogleDataManagerStatusPollerTest extends TestCase {
 
 		$this->assertSame( 'PROCESSING', $log->all()[0]['result'], 'What is known right now is written down: "still processing" is not the same as never having heard back.' );
 		$this->assertCount( 1, $this->scheduled );
-		$this->assertSame( 2340, $this->scheduled[0]['delay'] );
+		$this->assertEqualsWithDelta( 2340, $this->scheduled[0]['delay'], 1 );
 		$this->assertSame( 2340, $this->scheduled[0]['payload']['interval'] );
 		$this->assertSame( 1800 + 2340, $this->scheduled[0]['payload']['elapsed'] );
 	}

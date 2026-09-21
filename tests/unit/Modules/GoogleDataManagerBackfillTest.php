@@ -13,6 +13,10 @@ use GTM4WP\Modules\GoogleDataManager\BackfillEndpoint;
 use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
+// The EDD receipt-hash cases build an \EDD\Orders\Order. Six sibling files load
+// the stub first in a whole-suite run, which hid the missing require from every
+// random seed; run by path, this file errored without it (TS-16 corollary).
+require_once __DIR__ . '/edd-stubs.php';
 
 /**
  * A mutation exposed to logged-out visitors, so it is tested as one.
@@ -336,6 +340,31 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
 	}
 
+	/**
+	 * The EDD writer refuses an empty token BEFORE asking the database: the
+	 * fixture's edd_get_order_by() refuses '' on its own, which is exactly why
+	 * the guard was invisible to the WC-shaped case above - a real BerlinDB
+	 * query with an empty filter is not guaranteed to refuse (TS-13/TS-18).
+	 */
+	public function test_the_edd_writer_refuses_an_empty_token_before_any_lookup(): void {
+		Functions\expect( 'edd_get_order_by' )->never();
+		Functions\expect( 'edd_get_order' )->never();
+		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+		Functions\expect( 'edd_update_order_meta' )->never();
+
+		$result = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => '',
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+	}
+
 	public function test_an_unknown_order_is_refused(): void {
 		$this->given_woocommerce_order();
 
@@ -554,10 +583,15 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * array fields overwritable.
 	 */
 	public function test_an_array_valued_field_is_not_overwritten_either(): void {
+		// The stored state GRANTS analytics on purpose: with a stored denial the
+		// stored-consent gate (#249) would drop the posted session map before the
+		// write-only-if-absent guard ever saw it, and this test would pass for a
+		// reason its name does not describe. A grant keeps the session map a
+		// live write candidate, so only the array-valued guard can be refusing it.
 		$order = $this->given_woocommerce_order(
 			array(
 				AttributionCapture::META_SESSION_IDS   => array( 'G-ABC123' => 'the-real-session' ),
-				AttributionCapture::META_CONSENT_STATE => array( 'signals' => array( 'analytics_storage' => 'denied' ) ),
+				AttributionCapture::META_CONSENT_STATE => array( 'signals' => array( 'analytics_storage' => 'granted' ) ),
 			)
 		);
 
@@ -583,9 +617,9 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 			$order->get_meta( AttributionCapture::META_SESSION_IDS, true )
 		);
 		$this->assertSame(
-			array( 'signals' => array( 'analytics_storage' => 'denied' ) ),
+			array( 'signals' => array( 'analytics_storage' => 'granted' ) ),
 			$order->get_meta( AttributionCapture::META_CONSENT_STATE, true ),
-			'A recorded denial must not be replaceable with a grant posted from the page.'
+			'The stored consent state (an array) is not replaced by the posted one, which carries a timestamp the stored one lacks.'
 		);
 	}
 

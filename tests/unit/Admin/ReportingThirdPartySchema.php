@@ -66,6 +66,13 @@ final class ReportingThirdPartySchema implements AdminSchemaInterface, SiteHealt
 				'label' => 'Items',
 				'value' => array( 'one', 'two' ),
 			),
+			// Special characters on purpose: core's Site Health screen runs
+			// esc_html() over every label and value, so the collector must
+			// hand them over RAW - a pre-escape here would show as `&amp;amp;`.
+			'raw'    => array(
+				'label' => 'A & "B" <C>',
+				'value' => "Ties & Shirts <b>\"quoted\"</b> 'apos'",
+			),
 		);
 	}
 }

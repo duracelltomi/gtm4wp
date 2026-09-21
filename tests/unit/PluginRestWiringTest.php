@@ -197,6 +197,38 @@ final class PluginRestWiringTest extends TestCase {
 		$this->assertIsArray( $test_callbacks[0] );
 		$this->assertInstanceOf( \GTM4WP\Modules\GoogleDataManager\RestController::class, $test_callbacks[0][0] );
 		$this->assertSame( 'can_manage', $test_callbacks[0][1] );
+
+		// All three Data Manager routes land from the one register_routes()
+		// call, every one on the same gate (the rung-3 symmetry pin, T94g).
+		$gdm_callbacks = $this->callbacks_of_controller( \GTM4WP\Modules\GoogleDataManager\RestController::class );
+		$this->assertCount( 3, $gdm_callbacks, 'destinations/test, send-log and send-log/replay must all be attached.' );
+		foreach ( $gdm_callbacks as $callback ) {
+			$this->assertSame( 'can_manage', $callback[1] );
+		}
+	}
+
+	/**
+	 * The replay route's "sending is off" refusal exists only because boot()
+	 * hands the controller the live Options service; a controller built with
+	 * null would queue jobs the sender then drops with no row to say so. The
+	 * controller's own suite pins the gate on a hand-built instance, so the
+	 * attachment of the options is asserted here as an effect (T94a).
+	 */
+	public function test_the_replay_route_boot_wires_refuses_while_sending_is_off(): void {
+		Functions\stubTranslationFunctions();
+		$this->run_rest_api_init(
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) )
+		);
+
+		$replay = array_values(
+			array_filter( $this->routes, static fn ( array $call ) => str_ends_with( $call['route'], 'send-log/replay' ) )
+		);
+		$this->assertCount( 1, $replay );
+
+		$result = call_user_func( $replay[0]['args']['callback'], new \WP_REST_Request() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
 	}
 
 	/**
@@ -300,6 +332,63 @@ final class PluginRestWiringTest extends TestCase {
 		$this->assertNotFalse(
 			has_filter( 'wp_privacy_personal_data_erasers', 'GTM4WP\Modules\GoogleDataManager\PrivacyData->register_eraser()' )
 		);
+	}
+
+	/**
+	 * The refund send lane is booted from Plugin::boot() because a refund is
+	 * issued in wp-admin or by a gateway callback and the send that follows
+	 * runs from Action Scheduler or WP-Cron, where neither the admin nor the
+	 * frontend branch is taken. RefundSenderTest and StatusPollerTest pin the
+	 * attachments on hand-built instances; this is the boot-level half, the
+	 * one that could be deleted with both of those green (TS-15 attachment
+	 * corollary, T82). Both directions of the option gate, and the platform
+	 * refund hooks through the shim so the WC/EDD parity is asserted at the
+	 * attachment as well.
+	 */
+	public function test_boot_wires_the_refund_send_lane_while_sending_is_on(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'            => true,
+			'wc_get_order'  => true,
+			'EDD'           => true,
+			'edd_get_order' => true,
+		);
+
+		try {
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) );
+
+			$this->assertNotFalse(
+				has_action( \GTM4WP\Modules\GoogleDataManager\SendQueue::HOOK_SEND, 'GTM4WP\Modules\GoogleDataManager\RefundSender->run()' ),
+				'The queued send job must be handled by the sender boot() built.'
+			);
+			$this->assertNotFalse(
+				has_action( \GTM4WP\Modules\GoogleDataManager\SendQueue::HOOK_STATUS, 'GTM4WP\Modules\GoogleDataManager\StatusPoller->poll()' ),
+				'The status poll job must be handled by the poller boot() built.'
+			);
+			$this->assertNotFalse( has_action( 'woocommerce_order_refunded' ), 'The WooCommerce refund hook is attached while the platform is active.' );
+			$this->assertNotFalse( has_action( 'edd_refund_order' ), 'The Easy Digital Downloads refund hook is attached while the platform is active.' );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
+	}
+
+	public function test_boot_wires_no_refund_send_lane_while_sending_is_off(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'            => true,
+			'wc_get_order'  => true,
+			'EDD'           => true,
+			'edd_get_order' => true,
+		);
+
+		try {
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) );
+
+			$this->assertFalse( has_action( \GTM4WP\Modules\GoogleDataManager\SendQueue::HOOK_SEND ) );
+			$this->assertFalse( has_action( \GTM4WP\Modules\GoogleDataManager\SendQueue::HOOK_STATUS ) );
+			$this->assertFalse( has_action( 'woocommerce_order_refunded' ), 'A store that does not send refunds pays nothing for the lane.' );
+			$this->assertFalse( has_action( 'edd_refund_order' ) );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
 	}
 
 	/**

@@ -66,7 +66,7 @@ final class SiteHealthInfoTest extends TestCase {
 		// The module wrote `status` and `items`; the collector filed them
 		// under the module id so a second module writing `status` cannot
 		// overwrite them.
-		$this->assertSame( array( 'reporting_status', 'reporting_items' ), array_keys( $fields ) );
+		$this->assertSame( array( 'reporting_status', 'reporting_items', 'reporting_raw' ), array_keys( $fields ) );
 		$this->assertSame(
 			array(
 				'label' => 'Reporting',
@@ -76,6 +76,25 @@ final class SiteHealthInfoTest extends TestCase {
 			'The row arrives as the module wrote it - nothing added, nothing removed.'
 		);
 		$this->assertSame( array( 'one', 'two' ), $fields['reporting_items']['value'], 'A list value is passed through as a list.' );
+	}
+
+	/**
+	 * The boundary must NOT pre-escape (TS-11): wp-admin/site-health-info.php
+	 * runs esc_html() over every label and value it prints, so a value that
+	 * left here as `&amp;` would render as `&amp;amp;`. The `'on'` row above
+	 * cannot see that - esc_html( 'on' ) is 'on' - so this row carries every
+	 * character the escaper would touch and asserts it arrives verbatim, with
+	 * the real escaper stubbed in so an accidental esc_html() goes red (T95a).
+	 */
+	public function test_values_are_handed_over_raw_for_core_to_escape(): void {
+		Functions\stubEscapeFunctions();
+
+		$fields = $this->collector( array( new ReportingThirdPartyModule() ) )->add_debug_information( array() )[ SiteHealthInfo::SECTION ]['fields'];
+
+		$this->assertSame( 'A & "B" <C>', $fields['reporting_raw']['label'] );
+		$this->assertSame( "Ties & Shirts <b>\"quoted\"</b> 'apos'", $fields['reporting_raw']['value'] );
+		$this->assertStringNotContainsString( '&amp;', $fields['reporting_raw']['value'] );
+		$this->assertStringNotContainsString( '&lt;', $fields['reporting_raw']['value'] );
 	}
 
 	public function test_the_module_reads_the_plugins_own_options_service(): void {

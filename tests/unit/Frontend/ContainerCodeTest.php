@@ -338,6 +338,35 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( '<!-- End Google Tag Manager for WordPress by gtm4wp.com -->', $output );
 	}
 
+	/**
+	 * The whole loader against Google's published snippet, not one token of
+	 * it (T96c): the ten `j.src` pins around this file would let every other
+	 * token drift - `new Date().getTime()`, the `&l=` data-layer suffix, the
+	 * `insertBefore` - with the suite green, while the upstream registry (U47)
+	 * calls the block byte-exact. The reference text is Google's, copied from
+	 * the "Install Google Tag Manager" page the U47 row cites, with only the
+	 * container id placeholder replaced; ours may differ in the attributes of
+	 * the opening `<script>` tag and the whitespace around the tags, nothing
+	 * else. A deliberate divergence updates this literal AND the U47 row.
+	 */
+	public function test_the_loader_is_byte_exact_against_googles_published_snippet(): void {
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-ABC123' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertSame( 1, preg_match( '#<script[^>]*>\s*(\(function\(w,d,s,l,i\).*?)\s*</script>#s', $output, $matches ), 'The loader block must be present once.' );
+
+		$google = "(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
+			. "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
+			. "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
+			. "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
+			. "})(window,document,'script','dataLayer','GTM-ABC123');";
+
+		$this->assertSame( $google, $matches[1] );
+	}
+
 	public function test_header_begin_suppresses_container_code_on_amp(): void {
 		// On an AMP page (FILTER_AMP_RUNNING true) the invalid GTM container
 		// <script> must not be emitted - the AMP module injects an amp-analytics

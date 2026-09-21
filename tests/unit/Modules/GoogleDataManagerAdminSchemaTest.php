@@ -137,6 +137,22 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 	}
 
 	/**
+	 * The send lane's switch: off by default (data leaves the site), still
+	 * experimental (the first-refund-only observation is open with Google),
+	 * and dependent on capture - without a stored client id every refund would
+	 * be skipped for want of an identifier (T94g).
+	 */
+	public function test_the_send_refunds_field_is_an_experimental_checkbox_depending_on_capture(): void {
+		$field = $this->field_by_key( GTM4WP_OPTION_GDM_SEND_REFUNDS );
+
+		$this->assertSame( Field::TYPE_CHECKBOX, $field->type );
+		$this->assertFalse( $field->default_value, 'Sending starts off: nothing leaves the site until the admin says so.' );
+		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
+		$this->assertSame( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION, $field->depends_on );
+		$this->assertSame( AdminSchema::GROUP_SENDING, $field->group );
+	}
+
+	/**
 	 * The consent policy is the field description's promise in code: three
 	 * choices, defaulting to the region gate.
 	 */
@@ -239,6 +255,30 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $data['optionKey'] );
 		$this->assertArrayHasKey( 'health', $data );
 		$this->assertArrayHasKey( 'threshold', $data );
+	}
+
+	/**
+	 * The send-log half of the panel is declared here and read in
+	 * DestinationsPanel.js (`logPath` decides whether the list renders at all,
+	 * `sendKeys` whether an empty log is hidden). The JS suite hand-feeds all
+	 * three, so this is the only place the declaration is pinned (TS-19, T86):
+	 * without it either path could be dropped with both suites green.
+	 */
+	public function test_panel_data_declares_the_send_log_routes_and_the_send_lanes(): void {
+		$schema = new AdminSchema();
+		$data   = $schema->panel_data();
+
+		$this->assertSame( 'gtm4wp/v2/google/send-log', $data['logPath'] );
+		$this->assertSame( 'gtm4wp/v2/google/send-log/replay', $data['replayPath'] );
+		$this->assertSame( array( GTM4WP_OPTION_GDM_SEND_REFUNDS ), $data['sendKeys'] );
+
+		// The TS-19 litmus: the editor's values map carries only declared
+		// fields, so a lane key that is not a field of this schema would read
+		// as "off" forever and hide the log on a store that sends.
+		$declared = array_map( static fn ( $field ) => $field->key, $schema->fields() );
+		foreach ( $data['sendKeys'] as $key ) {
+			$this->assertContains( $key, $declared, "sendKeys entry '$key' must be a declared field of this schema." );
+		}
 	}
 
 	/**

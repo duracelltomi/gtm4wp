@@ -120,7 +120,23 @@ final class GoogleDataManagerHealthTest extends TestCase {
 
 		$error = $this->health()->get( self::MEASUREMENT )['last_error'];
 		$this->assertStringNotContainsString( '<script>', $error );
+		$this->assertStringStartsWith( 'alert(1)', $error, 'The text around the markup survives; only the tags are gone (both directions).' );
 		$this->assertLessThanOrEqual( 200, mb_strlen( $error ) );
+	}
+
+	/**
+	 * The reason class takes the same path as the message and was the one
+	 * member with no hostile case (T94e): it is printed beside the message on
+	 * the settings screen, so a class name carrying markup or an oversized
+	 * value must come out as plain text within its cap.
+	 */
+	public function test_the_stored_error_class_is_sanitized_and_capped(): void {
+		$this->health()->record_failure( self::MEASUREMENT, 'boom', '<b>permission_denied</b>' . str_repeat( 'y', 100 ) );
+
+		$reason_class = $this->health()->get( self::MEASUREMENT )['last_error_class'];
+		$this->assertStringNotContainsString( '<', $reason_class );
+		$this->assertStringStartsWith( 'permission_denied', $reason_class );
+		$this->assertSame( 40, mb_strlen( $reason_class ) );
 	}
 
 	public function test_an_empty_measurement_id_records_nothing(): void {

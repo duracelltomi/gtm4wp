@@ -248,6 +248,28 @@ final class TokenServiceTest extends TestCase {
 		$this->assertCount( 2, $this->transport->requests );
 	}
 
+	/**
+	 * The fresh mint also FORCES the vault write: an admin who pressed the Test
+	 * button has to see last_checked move, and the vault's herd guard would
+	 * otherwise skip a row that says the same thing within its window. The
+	 * vault's own force flag is pinned in KeyVaultTest; this pins that the
+	 * service forwards $fresh into it (T90 - a revert to `false` here left
+	 * every earlier case green because the frozen clock makes the second
+	 * mint "unchanged and recent").
+	 */
+	public function test_a_fresh_mint_always_writes_the_account_row(): void {
+		$this->transport->will_respond( self::token_response( 'ya29.first' ) );
+		$this->transport->will_respond( self::token_response( 'ya29.second' ) );
+		$service = $this->make_service();
+
+		$service->access_token( $this->account_id, self::SCOPE );
+		$writes_before = count( $this->option_writes );
+
+		$service->access_token( $this->account_id, self::SCOPE, true );
+
+		$this->assertGreaterThan( $writes_before, count( $this->option_writes ), 'The forced mint writes the row even though nothing in it changed.' );
+	}
+
 	public function test_a_token_google_reports_as_already_expiring_is_not_cached(): void {
 		$this->transport->will_respond( self::token_response( 'ya29.short', TokenService::EARLY_EXPIRY ) );
 

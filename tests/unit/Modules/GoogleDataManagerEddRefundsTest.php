@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Actions;
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
@@ -118,7 +119,7 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 	 * @param float $tax      Refunded line tax, positive.
 	 * @return \EDD\Orders\Order_Item
 	 */
-	private static function refund_item( int $quantity, float $total, float $tax = 0.0, float $discount = 0.0 ): \EDD\Orders\Order_Item {
+	private static function refund_item( int $quantity, float $total, float $tax = 0.0, float $discount = 0.0, ?int $price_id = null ): \EDD\Orders\Order_Item {
 		return new \EDD\Orders\Order_Item(
 			array(
 				'id'           => 900,
@@ -126,7 +127,7 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 				'parent'       => 700,
 				'product_id'   => 55,
 				'product_name' => 'My eBook',
-				'price_id'     => null,
+				'price_id'     => $price_id,
 				'quantity'     => -$quantity,
 				'subtotal'     => -( $total - $tax + $discount ),
 				'discount'     => -$discount,
@@ -480,6 +481,28 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 		$this->assertSame( 'edd', $this->adapter()->platform() );
 	}
 
+	public function test_the_adapter_is_active_only_with_easy_digital_downloads_loaded(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'EDD'           => true,
+			'edd_get_order' => true,
+		);
+
+		try {
+			$this->assertTrue( $this->adapter()->is_active() );
+
+			$GLOBALS['gtm4wp_test_forced_functions']['edd_get_order'] = false;
+			$this->assertFalse( $this->adapter()->is_active() );
+
+			$GLOBALS['gtm4wp_test_forced_functions'] = array(
+				'EDD'           => false,
+				'edd_get_order' => true,
+			);
+			$this->assertFalse( $this->adapter()->is_active() );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
+	}
+
 	// ---- Refunded tax ------------------------------------------------------
 
 	public function test_the_returned_tax_is_read_off_the_refund_order_as_a_positive_amount(): void {
@@ -525,5 +548,68 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 		$names = array_column( $this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters'], 'parameterName' );
 
 		$this->assertNotContains( 'discount', $names );
+	}
+
+	// ---- Parity with the WooCommerce adapter: variations, affiliation ------
+
+	/**
+	 * An EDD variable price is an option on the same download, and the
+	 * purchase item reports the option's name as item_variant. The refund of
+	 * that line has to say the same, which is why the refund item's price_id
+	 * is handed to the purchase builder - the WC sibling pins its variation
+	 * the same way, and every EDD fixture here had price_id null (T91b).
+	 */
+	public function test_a_variable_price_line_is_reported_the_way_the_purchase_reports_it(): void {
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => new \EDD_Download(
+				array(
+					'id'                  => (int) $id,
+					'name'                => 'My eBook',
+					'price'               => 9.99,
+					'has_variable_prices' => true,
+				)
+			)
+		);
+		Functions\when( 'edd_get_price_option_amount' )->justReturn( 20.0 );
+		Functions\when( 'edd_get_variable_prices' )->justReturn(
+			array(
+				2 => array(
+					'name'   => 'Professional',
+					'amount' => 20.0,
+				),
+			)
+		);
+
+		$stored = array();
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( 2, 40.0, 0.0, 0.0, 2 ) ) ) );
+
+		$items = $this->adapter( $stored )->load( 12, 34 )->items;
+		$built = $this->download_data( $stored )->process_download( 55, array( 'price' => 20.0 ), 'purchase', null, 2 );
+
+		$this->assertSame( 'Professional', $built['item_variant'], 'Fixture check: the purchase builder resolves the option name.' );
+		$this->assertContains(
+			array(
+				'parameterName' => 'item_variant',
+				'value'         => 'Professional',
+			),
+			$items[0]['additionalItemParameters'],
+			'The refunded line names the same price option the purchase item did.'
+		);
+		$this->assertSame( '55', $items[0]['itemId'], 'The item id stays the download id; the option is a variant, not a product.' );
+		$this->assertSame( 20.0, $items[0]['unitPrice'] );
+	}
+
+	public function test_a_site_supplied_affiliation_travels_with_the_refunded_line(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_AFFILIATION )->andReturn( 'Outlet store' );
+
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( 2, 40.0 ) ) ) );
+
+		$this->assertContains(
+			array(
+				'parameterName' => 'affiliation',
+				'value'         => 'Outlet store',
+			),
+			$this->adapter()->load( 12, 34 )->items[0]['additionalItemParameters']
+		);
 	}
 }
