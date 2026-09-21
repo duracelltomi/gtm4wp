@@ -7,19 +7,12 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_dailymotion_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_dailymotion_percentage_tracking_marks = Object.create( null );
 
 /**
- * Percent-decodes one path segment, returning it unchanged when it is not valid
- * percent-encoding.
- *
- * searchParams.get() decodes for the query-string forms, so the path forms are
- * decoded too and an id means the same thing whichever embed shape produced it.
- * decodeURIComponent() throws on a malformed sequence, which must not take the
- * whole tracker down.
+ * Percent-decodes one path segment (so path forms match the searchParams
+ * forms), returning it unchanged when decodeURIComponent() throws.
  *
  * @param {string} value The raw path segment.
  * @return {string} The decoded segment, or the input when it cannot be decoded.
@@ -41,9 +34,8 @@ function gtm4wp_dailymotionDecode( value ) {
  *   https://www.dailymotion.com/embed/video/<id>        (legacy, 301s to the 1st)
  *   https://dai.ly/<id>                                 (short link)
  *
- * The id is located by the shape of the PATH and never by the shape of the id
- * itself: whatever occupies the id slot is taken verbatim, because a regex
- * validating somebody else's identifier grammar rejects their next one.
+ * The id is located by the shape of the PATH, never validated by its own
+ * shape (UC-5: a regex on somebody else's id grammar rejects their next one).
  *
  * @param {string} src The iframe's src attribute.
  * @return {{videoid: string, playerid: string}|null} The parsed ids, or null.
@@ -56,12 +48,11 @@ function gtm4wp_dailymotionEmbedInfo( src ) {
 		return null;
 	}
 
-	// The geo player carries the id in the query string; searchParams decodes it.
 	let videoid = url.searchParams.get( 'video' ) || '';
 
 	if ( ! videoid ) {
-		// Deliberately NOT a generic "last path segment" fallback: for the two
-		// geo forms that segment is `player.html` / `<playerid>.html`.
+		// NOT a generic "last path segment" fallback: for the geo forms that
+		// segment is `player.html` / `<playerid>.html`.
 		const embedded = url.pathname.match( /\/embed\/video\/([^/]+)\/?$/ );
 
 		if ( embedded ) {
@@ -73,19 +64,14 @@ function gtm4wp_dailymotionEmbedInfo( src ) {
 		}
 	}
 
-	// No video id: a `?playlist=` embed, or a Dailymotion URL that is not a
-	// player at all. Bail rather than guess. The previous "last path segment"
-	// fallback would have handed createPlayer() the literal string
-	// "player.html", which replaces a working embed with a player for a video
-	// that does not exist - a tracking failure turned into a content failure.
+	// No video id (`?playlist=`, or not a player URL): bail rather than guess,
+	// or a working embed is replaced with a player for a non-existent video.
 	if ( ! videoid ) {
 		return null;
 	}
 
-	// A /player/<playerid>.html embed names the player configuration the site
-	// chose. Replacing the embed means WE decide which player the visitor sees,
-	// so the one the embed asked for is carried over - otherwise switching
-	// tracking on silently swaps the site's configured player for the default.
+	// Carry over the site's configured player (/player/<playerid>.html), since
+	// replacing the embed means WE decide which player the visitor sees.
 	const player = url.pathname.match( /\/player\/([^/]+)\.html$/ );
 
 	return {
@@ -95,12 +81,8 @@ function gtm4wp_dailymotionEmbedInfo( src ) {
 }
 
 /**
- * Turns an iframe dimension into a CSS length.
- *
- * The HTML attribute is a bare pixel count ("640"); some embeds write a
- * percentage ("100%"). Falls back to the box the iframe actually occupies when
- * the attribute is absent, so an embed sized purely by CSS still hands the
- * container something.
+ * Turns an iframe dimension attribute ("640" or "100%") into a CSS length,
+ * falling back to the measured box for an embed sized purely by CSS.
  *
  * @param {string|null} attribute The width/height attribute value.
  * @param {number}      measured  The measured box dimension, in pixels.
@@ -124,23 +106,17 @@ function gtm4wp_dailymotionLength( attribute, measured ) {
 
 /**
  * Builds the div the Dailymotion SDK fills, carrying over the box the iframe
- * occupied.
- *
- * dailymotion.createPlayer() takes no width/height - the player fills its
- * container - so the iframe's dimensions have to be transplanted or the player
- * collapses to a zero-height block and the video silently disappears.
- * `width`/`height` are HTML dimension attributes, which mean nothing on a div,
- * so they are written as inline style instead. That is also why the box is
- * measured here, before the caller's replaceChild: a removed node measures 0x0.
+ * occupied: createPlayer() takes no width/height, so without the transplant
+ * the player collapses to zero height. Written as inline style (the HTML
+ * attributes mean nothing on a div) and measured BEFORE the caller's
+ * replaceChild (a removed node measures 0x0).
  *
  * @param {HTMLElement} frame The embed iframe being replaced.
  * @return {HTMLElement} The container, not yet inserted into the document.
  */
 function gtm4wp_dailymotionContainerFor( frame ) {
-	// Unique-container-id counter, kept on window (not module scope) so ids stay
-	// unique when the bundle is re-executed: a tag-manager re-injection restarts
-	// module scope at 0 while the earlier gtm4wp-dailymotion-0 container is still
-	// in the DOM, and createPlayer() would bind to that stale one.
+	// Counter on window, not module scope: a re-executed bundle would restart
+	// at 0 while the earlier container is still in the DOM.
 	window.gtm4wp_dailymotion_frame_index =
 		window.gtm4wp_dailymotion_frame_index || 0;
 
@@ -148,10 +124,8 @@ function gtm4wp_dailymotionContainerFor( frame ) {
 	container.id =
 		'gtm4wp-dailymotion-' + window.gtm4wp_dailymotion_frame_index++;
 
-	// Copied so a theme/plugin rule written against the embed still has
-	// something to match. Not copied: src, allow, allowfullscreen, frameborder,
-	// title - the SDK builds its own iframe with its own permission set, and
-	// those attributes are inert on a div.
+	// class/style copied so a theme rule still matches; src/allow/title not
+	// (the SDK builds its own iframe).
 	const className = frame.getAttribute( 'class' );
 	if ( className ) {
 		container.setAttribute( 'class', className );
@@ -175,8 +149,7 @@ function gtm4wp_dailymotionContainerFor( frame ) {
 		rect && rect.height
 	);
 
-	// Only ever ADDS a dimension the copied style did not already set, so a
-	// responsive embed keeps its own rule.
+	// Only ADDS a dimension the copied style did not set (responsive embeds).
 	if ( width && '' === container.style.width ) {
 		container.style.width = width;
 	}
@@ -196,9 +169,8 @@ function gtm4wp_dailymotionContainerFor( frame ) {
  * @param {HTMLElement} container The div the SDK fills with its player iframe.
  */
 function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
-	// Every Player Embeds event delivers the FULL player state - the shape
-	// getState() resolves to - rather than a per-event payload, so the latest
-	// state is cached on arrival and every push reads it from here.
+	// Every Player Embeds event delivers the FULL player state; cached on
+	// arrival, every push reads it from here.
 	let lastState = {};
 
 	const gtm4wp_dailymotionCurrentTime = function () {
@@ -211,11 +183,8 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 		return isNaN( duration ) ? 0 : duration || 0;
 	};
 
-	// The title and the owner only appear in the state once the player has
-	// fetched the video's metadata, which is after the first events arrive. The
-	// id stands in until then, as it does permanently in the Twitch tracker - an
-	// empty gtm.videoTitle reads as "this video has no title" rather than "not
-	// known yet".
+	// Title and owner arrive with the metadata, after the first events; the id
+	// stands in until then (an empty title would read as "no title").
 	const gtm4wp_dailymotionMediaData = function () {
 		return {
 			id: videoid,
@@ -304,9 +273,8 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 		);
 	};
 
-	// Refresh the cache BEFORE the handler reads it. Wrapping every subscription
-	// is what makes that unmissable: a handler registered directly on player.on()
-	// would report the PREVIOUS event's time and duration.
+	// Refresh the cache BEFORE the handler reads it; a handler registered
+	// directly on player.on() would report the PREVIOUS event's time.
 	const gtm4wp_dailymotionOn = function ( eventName, callback ) {
 		player.on( eventName, function ( state ) {
 			if ( state ) {
@@ -338,11 +306,8 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 		}
 	);
 
-	// VIDEO_PLAY, not VIDEO_START. VIDEO_START marks the beginning of the content
-	// video; what this whole tracker family reports as 'play' -> gtm.videoStatus
-	// 'start' is every transition INTO playback, resumes included ("no longer
-	// paused"). Subscribing to both would push two identical state-change events
-	// on the first play, which GTM counts twice.
+	// VIDEO_PLAY, not VIDEO_START: 'play' is every transition INTO playback,
+	// resumes included; subscribing to both doubles the first play.
 	gtm4wp_dailymotionOn( dailymotion.events.VIDEO_PLAY, function () {
 		gtm4wp_onDailymotionPlayerStateChange( 'play' );
 	} );
@@ -355,10 +320,8 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 		gtm4wp_onDailymotionPlayerStateChange( 'ended' );
 	} );
 
-	// VIDEO_SEEKEND, not VIDEO_SEEKSTART: 'seeked' -> gtm.videoStatus 'seek' is a
-	// COMPLETED seek everywhere in the family, and its videoTime is the
-	// destination rather than the position the user left. Dragging a scrub handle
-	// fires both repeatedly, so subscribing to both would double every scrub.
+	// VIDEO_SEEKEND, not VIDEO_SEEKSTART: 'seeked' is a COMPLETED seek at the
+	// destination; both would double every scrub.
 	gtm4wp_dailymotionOn( dailymotion.events.VIDEO_SEEKEND, function () {
 		gtm4wp_onDailymotionPlayerStateChange( 'seeked' );
 	} );
@@ -391,10 +354,8 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 		}
 	);
 
-	// Player Embeds folds fullscreen and Picture-in-Picture into one presentation
-	// mode, which travels as the event parameter. The event NAME stays
-	// 'fullscreenchange': that string is the data layer contract sites already
-	// trigger on.
+	// Fullscreen and PiP are one presentation mode (the event parameter); the
+	// event NAME stays 'fullscreenchange', the data layer contract.
 	gtm4wp_dailymotionOn(
 		dailymotion.events.PLAYER_PRESENTATIONMODECHANGE,
 		function ( state ) {
@@ -411,26 +372,16 @@ function gtm4wp_bindDailymotionPlayer( player, videoid, videourl, container ) {
 }
 
 function gtm4wp_initDailymotionTracking() {
-	// The library URL is built by PHP (MediaEventsModule::enqueue_scripts) because
-	// it can carry the site's configured Dailymotion player ID, which is
-	// url-encoded once, server side, where it enters the URL. Written in exactly
-	// one place: with no config published there is nothing to fetch, so the
-	// embeds are left untouched and simply go untracked.
+	// The library URL is built by PHP (MediaEventsModule::enqueue_scripts): it
+	// carries the configured player ID, url-encoded once, server side. No
+	// config = nothing to fetch, embeds untouched and untracked.
 	const config = window.gtm4wp_dailymotion_config || {};
 	const sdk = 'string' === typeof config.sdk ? config.sdk : '';
 
-	// Wire every Dailymotion iframe already on the page and any inserted later
-	// (popup/lightbox, AJAX).
-	//
-	// Dailymotion sunset the legacy player integration (api.dmcdn.net/all.js) on
-	// 2026-02-03: the script still loads but only console-warns, and no event ever
-	// fires. Its replacement, the Player Embeds API, cannot be attached to an
-	// iframe that already exists - WordPress' oEmbed emits an ID-less embed
-	// (<iframe src="https://geo.dailymotion.com/player.html?video=<id>&">), which
-	// Dailymotion documents as having no API and no way to reach the parent page.
-	// So the only way to get events is to build the player ourselves: each embed
-	// iframe is replaced with a container div the SDK fills, the same shape
-	// gtm4wp-twitch.js uses, for the same reason.
+	// The legacy player integration (api.dmcdn.net/all.js) was sunset on
+	// 2026-02-03, and the Player Embeds API cannot attach to an existing
+	// ID-less oEmbed iframe, so each embed is replaced with a container div the
+	// SDK fills (same shape as gtm4wp-twitch.js).
 	const gtm4wp_wireDailymotionFrame = function ( dailymotion_frame ) {
 		const info = gtm4wp_dailymotionEmbedInfo(
 			dailymotion_frame.getAttribute( 'src' ) || ''
@@ -442,17 +393,14 @@ function gtm4wp_initDailymotionTracking() {
 			return;
 		}
 
-		// The canonical watch URL, not the embed's own src: every video on the
-		// site is served from the same geo.dailymotion.com/player.html, so the src
-		// with its query stripped would identify nothing. Built from the id the
-		// way gtm4wp-twitch.js builds https://www.twitch.tv/videos/<id>.
+		// The canonical watch URL, not the embed src (every video shares the
+		// same geo.dailymotion.com/player.html).
 		const videourl = 'https://www.dailymotion.com/video/' + info.videoid;
 		const container = gtm4wp_dailymotionContainerFor( dailymotion_frame );
 
-		// Marked BEFORE it goes into the DOM so the iframe the SDK injects into it
-		// - which also matches this tracker's own selector - is skipped by the
-		// shared MutationObserver (it has a marked ancestor) instead of being
-		// replaced again in an unbounded loop.
+		// Marked BEFORE insertion so the iframe the SDK injects (which matches
+		// this selector) is skipped by the shared observer instead of replaced
+		// in an unbounded loop.
 		container.setAttribute( 'data-gtm4wp-media-wired', '1' );
 		dailymotion_frame.parentNode.replaceChild(
 			container,
@@ -464,27 +412,16 @@ function gtm4wp_initDailymotionTracking() {
 			options.player = info.playerid;
 		}
 
-		// Whether createPlayer() got as far as handing over a player. The failure
-		// handler below covers the bind step too - a promise rejection handler
-		// cannot see which half of the .then threw - and the two failures call for
-		// opposite responses, so they are told apart here rather than guessed at.
+		// Whether createPlayer() handed over a player: the failure handler also
+		// covers the bind step, and the two failures need opposite responses.
 		let created = false;
 
 		const gtm4wp_onDailymotionFailure = function ( error ) {
-			// The player exists and the visitor is watching it; only the
-			// event wiring failed. Tearing the container out here would
-			// destroy a working video and restart it from an iframe, to
-			// report a problem that is ours - so report it and stop.
+			// Player created, only the wiring failed: leave the working video
+			// alone. Not created: restore the original iframe, or a failure to
+			// TRACK becomes a failure to SHOW. Marked FIRST, or the shared
+			// observer would wire, replace, fail and restore it forever.
 			if ( ! created ) {
-				// The original iframe is already gone by the time this runs,
-				// so without the restore a failure to TRACK the video becomes
-				// a failure to SHOW it: the visitor is left with an empty box
-				// where the player was. Put the untouched original back.
-				//
-				// Marked FIRST, then replaced: the restored iframe matches
-				// this tracker's selector again, so with runtime tracking on
-				// the shared observer would wire it, replace it, fail,
-				// restore it - forever.
 				dailymotion_frame.setAttribute(
 					'data-gtm4wp-media-wired',
 					'1'
@@ -497,10 +434,8 @@ function gtm4wp_initDailymotionTracking() {
 				}
 			}
 
-			// Reported like every other unrecoverable player failure in the
-			// family (see the Vimeo tracker's .catch): a mediaPlayerEvent named
-			// 'error' carrying the reason, measured on whichever node is
-			// actually on screen now.
+			// Reported like every unrecoverable player failure in the family
+			// (see the Vimeo .catch): a mediaPlayerEvent 'error'.
 			window[ gtm4wp_datalayer_name ].push( {
 				event: 'gtm4wp.mediaPlayerEvent',
 				mediaType: 'dailymotion',
@@ -521,22 +456,14 @@ function gtm4wp_initDailymotionTracking() {
 					title: info.videoid,
 					currentTime: 0,
 					duration: 0,
-					// Whichever node the branch above left on the page: the
-					// container still holding the player, or the restored
-					// embed. The other one is detached and would report no
-					// position at all.
+					// Whichever node is on the page now.
 					element: created ? container : dailymotion_frame,
 				} ),
 			} );
 		};
 
-		// The try/catch is not belt and braces on top of the .catch: the embed is
-		// ALREADY GONE by this line (replaceChild above), and a promise rejection
-		// handler cannot see a synchronous throw. Without it, a createPlayer() that
-		// threw rather than rejected would leave the visitor looking at an empty
-		// div where their video was, with no restore and no error event - a
-		// tracking failure turned into a content failure, which is the one outcome
-		// this tracker is written to avoid.
+		// The try/catch is load-bearing: the embed is ALREADY GONE, and a
+		// synchronous throw from createPlayer() never reaches the .catch.
 		try {
 			dailymotion
 				.createPlayer( container.id, options )
@@ -559,11 +486,8 @@ function gtm4wp_initDailymotionTracking() {
 		'iframe[src*="dailymotion.com"],iframe[src*="dai.ly"]',
 		gtm4wp_wireDailymotionFrame,
 		function () {
-			// `dailymotion` alone is not enough: the documented bootstrap has the
-			// page define window.dailymotion = { onScriptLoaded: ... } BEFORE the
-			// library loads, so the global routinely exists with no API on it. The
-			// gate is the two members this tracker actually uses - createPlayer,
-			// and the events map every subscription indexes into.
+			// `dailymotion` alone is not enough: the documented bootstrap defines
+			// window.dailymotion = { onScriptLoaded } BEFORE the library loads.
 			return (
 				typeof dailymotion !== 'undefined' &&
 				null !== dailymotion &&

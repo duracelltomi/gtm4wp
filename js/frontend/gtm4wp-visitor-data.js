@@ -1,55 +1,31 @@
 /**
- * GTM4WP cache-safe data layer — client-side visitor data runtime (issue #398).
+ * GTM4WP cache-safe data layer: client-side visitor data runtime (issue #398).
  *
- * On full-page-cached sites, values specific to the current visitor/session must
- * not be baked into the (shared) page HTML. This script delivers them client-side
- * under the SAME data layer variable names the server used, so existing Google
- * Tag Manager setups keep working, through three channels — none of which is an
+ * Delivers the visitor/session values a full-page cache must not bake into the
+ * HTML, under the SAME data layer variable names the server used, with no
  * unconditional per-page request:
  *
- * - Tier 1 (the browser already knows it): computed from a "producer" below with
- *   zero network (referrer, search term).
- * - Tier 2/3 (server-only): fetched from the first-party session endpoint, but
- *   only when needed — Tier 2 (IP, Cloudflare country) once per session (cached in
- *   sessionStorage); Tier 3 (logged-in user data) only when its gate cookie
- *   changed, so an anonymous visitor never fetches user data.
- * - WooCommerce customer & cart: read from the cart-fragments payload WooCommerce
- *   already refreshes on every cart change (no request of our own).
- * - WooCommerce one-shot events (Phase 3): the add_to_cart after a cart "Undo" and
- *   the reliable-purchase fallback. These ride the same endpoint but are delivered
- *   only while a short-lived event cookie is present, fired ONCE each (with a
- *   per-event de-dupe guard — the purchase reuses the same gtm4wp_orderid_tracked
- *   guard as the order-received page), and are their own data layer events rather
- *   than part of the merged visitor push; the event cookie is cleared after delivery
- *   so a later page makes no request. After the fallback purchase the client also
- *   fires a single authenticated POST beacon so the server flags the order
- *   _ga_tracked, closing the cross-device double-count while the GET stays read-only
- *   (issue #398).
+ * - Tier 1 (the browser knows it): computed by a producer, zero network.
+ * - Tier 2/3 (server-only): the first-party session endpoint, Tier 2 once per
+ *   session (sessionStorage), Tier 3 only when its gate cookie changed, so an
+ *   anonymous visitor never fetches user data.
+ * - WooCommerce customer & cart: read from the cart-fragments payload
+ *   WooCommerce already refreshes.
+ * - WooCommerce one-shots (the add_to_cart after a cart "Undo", the
+ *   reliable-purchase fallback): the same endpoint, only while the event
+ *   cookie is present, fired ONCE with a de-dupe guard (the purchase reuses
+ *   gtm4wp_orderid_tracked), then the cookie is cleared and a POST beacon
+ *   lets the server flag the order while the GET stays read-only.
  *
- * Each data family arrives as its own data layer event, so a GTM setup can tell
- * from the event name alone which keys it got and needs no trigger condition:
+ * Each family is its own event so a GTM setup can tell from the name alone
+ * which keys arrived: gtm4wp.visitorData (Tier 1 + endpoint fields, ONE push,
+ * synchronous when replayed from the cache), gtm4wp.customerData and
+ * gtm4wp.cartData. The WooCommerce families arrive later than the flush (the
+ * placeholder in the HTML is empty by design) and are re-pushed on a cart
+ * change, each gated on ITS OWN half having changed; an absent family fires
+ * no event, but an empty cart IS delivered, with items: [].
  *
- * - gtm4wp.visitorData  — Tier 1 + the endpoint fields, merged into ONE push. On a
- *                         cached view the endpoint replays from the cache and that
- *                         push is synchronous; on the first view of a session it
- *                         fires when the endpoint responds.
- * - gtm4wp.customerData — the WooCommerce customer* keys.
- * - gtm4wp.cartData     — the WooCommerce cartContent.
- *
- * The two WooCommerce families cannot join the visitor push: they only exist once
- * WooCommerce has applied its cart fragment, which is always later than the flush
- * (the placeholder baked into the cacheable HTML is empty by design). They are
- * pushed as soon as they are readable and re-pushed on a cart change, each gated on
- * ITS OWN half having actually changed — so a quantity change fires cartData alone
- * and a billing-field change on checkout fires customerData alone. An event
- * therefore means "this family changed", and a family whose data is absent (its
- * feature is off) fires no event at all. Absence of cartData is NOT an empty cart:
- * an empty cart is delivered, with items: [].
- *
- * The PHP side (VisitorDataModule) bakes a small, cache-safe config into the page
- * telling this runtime which event names to use, which keys to build and how (Tier 1
- * producers, the endpoint URL + nonce, the session/gate metadata). The config
- * carries NO visitor value.
+ * The config VisitorDataModule bakes into the page carries no visitor value.
  */
 import {
 	gtm4wp_read_cookie,
@@ -60,14 +36,8 @@ import {
 ( function () {
 	'use strict';
 
-	// Guard against double registration (#83). PA-9's rule was written as "a bundle
-	// attaching document-level listeners needs a guard", and this file attaches none -
-	// it pushes, fetches and observes from its module body instead, which is the same
-	// class: a re-injected bundle (AJAX navigation, a page builder duplicating the
-	// handle) would push the visitor event a second time, issue a second request to
-	// the session endpoint, and leave a SECOND MutationObserver on document.body with
-	// its own de-dupe state - so every later cart change would push twice for BOTH
-	// WooCommerce events (2x gtm4wp.customerData + 2x gtm4wp.cartData), permanently.
+	// Guard against double registration (#83, PA-9): a re-injected bundle would
+	// push twice, fetch twice and leave a second MutationObserver behind.
 	if ( window.gtm4wp_visitordata_inited ) {
 		return;
 	}
@@ -78,14 +48,11 @@ import {
 	const fields = config.fields || {};
 
 	/**
-	 * Resolves one data layer event name from the config.
-	 *
-	 * The config is baked into cacheable HTML while this script is version-busted, so
-	 * after an update the realistic state is NEW script + OLD cached config. Hence the
-	 * chain: the current per-family map, then the single pre-split `event` key an old
-	 * cached page still carries (visitor family only), then the literal. The literals
-	 * mirror VisitorDataModule::EVENT_* — that class is the authority; these exist
-	 * because WooCommerceModule can load this handle with no config at all.
+	 * Resolves one data layer event name from the config. After an update the
+	 * realistic state is NEW script + OLD cached config, hence the chain: the
+	 * per-family map, the pre-split `event` key (visitor only), the literal. The
+	 * literals mirror VisitorDataModule::EVENT_*, the authority; they exist
+	 * because WooCommerceModule can load this handle with no config.
 	 *
 	 * @param {string} family   The config.events key ('visitor', 'customer', 'cart').
 	 * @param {string} fallback The documented event name for that family.
@@ -122,11 +89,8 @@ import {
 	);
 	const cartEventName = resolveEventName( 'cart', 'gtm4wp.cartData' );
 
-	// The nonce the one-shot confirm beacons authenticate with. It starts as the
-	// config nonce (baked into the page) but is replaced with the fresh nonce the
-	// session endpoint returns on every response — the baked one goes stale after a
-	// nonce tick (~24h), which on a long-lived cached page would 403 the beacon and
-	// silently restore the cross-device purchase double-count (issue #398).
+	// The beacon nonce: the baked config nonce until the endpoint returns a
+	// fresh one (the baked one goes stale on a long-lived cached page).
 	let beaconNonce = config.nonce || '';
 
 	/**
@@ -140,10 +104,9 @@ import {
 	}
 
 	/**
-	 * The single accumulated visitor push: the Tier 1 producers and the endpoint
-	 * fields merge their keys here, and it is flushed once, when the (possibly async)
-	 * endpoint is ready. The WooCommerce families are NOT collected here - they arrive
-	 * later, on the cart fragment, and are pushed as their own events.
+	 * The single accumulated visitor push (Tier 1 + endpoint fields), flushed
+	 * once when the endpoint is ready. The WooCommerce families are not
+	 * collected here.
 	 */
 	const collected = {};
 
@@ -164,14 +127,9 @@ import {
 	}
 
 	/**
-	 * Pushes one data layer event carrying the given key => value map, under the same
-	 * variable names the server used.
-	 *
-	 * No-op for a map that is empty or not an object: that is what makes "a family
-	 * whose data is absent fires no event", and it is also what keeps the malformed
-	 * fragment payloads (see deliverWooBlock) from producing a garbage push. No-op
-	 * for a name that is not a non-empty string, so a partial config can never put
-	 * `{ event: undefined }` into the data layer.
+	 * Pushes one data layer event carrying the given key => value map. No-op for
+	 * an empty or non-object map (an absent family fires no event) and for a
+	 * name that is not a non-empty string (no `{ event: undefined }`).
 	 *
 	 * @param {string} name The data layer event name.
 	 * @param {Object} map  The data layer keys to deliver.
@@ -191,10 +149,9 @@ import {
 			return;
 		}
 
-		// A copy, never the accumulator itself: pushing `collected` by reference would
-		// let GTM's model alias an object a later push still mutates. The event name is
-		// assigned AFTER the payload keys so a payload key called `event` cannot
-		// overwrite the one thing this whole design rests on.
+		// A copy, never the accumulator (GTM would alias an object a later push
+		// mutates); the event name is assigned AFTER the keys so a payload key
+		// called `event` cannot overwrite it.
 		const push = {};
 		keys.forEach( function ( key ) {
 			push[ key ] = map[ key ];
@@ -269,11 +226,9 @@ import {
 	}
 
 	/**
-	 * Whether both Web Storage areas are usable. The endpoint delivery relies on
-	 * them to gate the fetch (Tier 2 once per session, Tier 3 by cookie), so when
-	 * they are unavailable (e.g. hardened privacy mode) the runtime does NOT fetch
-	 * at all rather than fall back to a per-page request — the safe default is "no
-	 * extra data", never hammering the origin from every cached page view.
+	 * Whether Web Storage is usable. Without it the runtime does NOT fetch at
+	 * all: the safe default is no extra data, never a per-page request from
+	 * every cached view.
 	 *
 	 * @return {boolean} True when sessionStorage can be read and written.
 	 */
@@ -288,11 +243,9 @@ import {
 		}
 	}
 
-	// The de-dupe storage keys. gtm4wp_orderid_tracked is shared verbatim with the
-	// order-received page's inline purchase guard (PageDataLayer::purchase_dedupe_guard)
-	// so a fallback fire and a real order-received purchase for the same order can
-	// never both count; the read/write protocol below (localStorage else a one-year
-	// cookie, keyed on the order NUMBER) mirrors that block exactly.
+	// The de-dupe storage keys. gtm4wp_orderid_tracked is shared verbatim with
+	// the order-received page's inline guard (Ecommerce\Helpers::purchase_dedupe_guard):
+	// localStorage else a one-year cookie, keyed on the order NUMBER.
 	const ORDER_TRACKED_KEY = 'gtm4wp_orderid_tracked';
 	const READDED_TOKENS_KEY = 'gtm4wp_readded_to_cart';
 	const READDED_TOKENS_MAX = 20;
@@ -380,15 +333,10 @@ import {
 	}
 
 	/**
-	 * Fires the authenticated POST beacon that asks the server to flag the delivered
-	 * reliable-purchase-fallback order as tracked (issue #398), closing the
-	 * cross-device double-count while the GET session endpoint stays read-only. Sends
-	 * the shared wp_rest nonce (config.nonce) — as the X-WP-Nonce header on the fetch
-	 * keepalive path, or as the _wpnonce query parameter for the sendBeacon fallback,
-	 * which cannot set headers. Best-effort and fire-and-forget: it survives page
-	 * navigation (keepalive / sendBeacon) and any failure is swallowed, so it degrades
-	 * to the same-browser guard. Carries NO order id — the server resolves that from
-	 * its own session marker.
+	 * Fires the POST beacon that lets the server flag a delivered one-shot
+	 * (issue #398): the nonce as X-WP-Nonce on fetch keepalive, or as _wpnonce
+	 * for the sendBeacon fallback, which cannot set headers. Fire-and-forget;
+	 * carries NO order id (the server resolves it from its session marker).
 	 *
 	 * @param {string} url The confirm route URL baked into the config.
 	 * @return {void}
@@ -437,15 +385,12 @@ import {
 	}
 
 	/**
-	 * Fires the reliable-purchase fallback exactly once. De-dupes against the shared
-	 * gtm4wp_orderid_tracked guard keyed on the order number (so it can never double
-	 * with the order-received purchase), UNLESS the payload flag is false — the "Do
-	 * not flag orders as being tracked" case, where no order-tracked state is read or
-	 * written anywhere, matching the server path.
+	 * Fires the reliable-purchase fallback exactly once, de-duped against the
+	 * shared gtm4wp_orderid_tracked guard unless payload.flag is false ("Do not
+	 * flag orders as being tracked", matching the server path).
 	 *
 	 * @param {Object} payload    The resolver payload ({ push, orderNumber, flag }).
-	 * @param {string} confirmUrl Optional authenticated POST-beacon URL fired after a
-	 *                            fallback delivery to flag the order tracked server-side.
+	 * @param {string} confirmUrl Optional POST-beacon URL fired after delivery.
 	 * @return {void}
 	 */
 	function handlePendingPurchase( payload, confirmUrl ) {
@@ -469,16 +414,9 @@ import {
 			writeOrderTracked( orderNumber );
 		}
 
-		// Cross-device dedupe (issue #398): after the fallback push, tell the server to
-		// flag _ga_tracked on the order (and consume the delivery marker) so a later
-		// order-received render on ANOTHER device is suppressed. The read-only GET made
-		// no state change, so this authenticated POST is what performs it. Only when the
-		// browser guard is in use (flag !== false); the "Do not flag orders as being
-		// tracked" case writes no order-tracked state anywhere, so it also sends no
-		// beacon — the server marker then lingers with NO guard against a re-push
-		// (this branch skips the browser guard too). That is the option's contract:
-		// it asks for purchases to stay re-trackable, and the marker's only reader
-		// is this resolver, reached only while an event cookie is present.
+		// Cross-device dedupe (issue #398): the beacon flags _ga_tracked server
+		// side. Only with the browser guard in use; "Do not flag orders as being
+		// tracked" writes no tracked state anywhere, by contract.
 		if ( useGuard && confirmUrl ) {
 			fireConfirmBeacon( confirmUrl );
 		}
@@ -489,9 +427,8 @@ import {
 	 * token so a page reload does not re-push it.
 	 *
 	 * @param {Object} payload    The resolver payload ({ push, token }).
-	 * @param {string} confirmUrl Authenticated POST-beacon URL fired after delivery so
-	 *                            the server consumes the re-add's session marker (the
-	 *                            read-only GET does not, issue #398).
+	 * @param {string} confirmUrl POST-beacon URL fired after delivery so the server
+	 *                            consumes the session marker (issue #398).
 	 * @return {void}
 	 */
 	function handleReaddedToCart( payload, confirmUrl ) {
@@ -514,20 +451,15 @@ import {
 			recordReaddedToken( token );
 		}
 
-		// The GET that delivered this re-add made no state change; this authenticated
-		// POST tells the server to consume the session marker so a later page does not
-		// re-resolve it. The client's per-token guard above already stops a re-push in
-		// the meantime.
+		// The read-only GET consumed nothing; the beacon consumes the session marker.
 		if ( confirmUrl ) {
 			fireConfirmBeacon( confirmUrl );
 		}
 	}
 
 	/**
-	 * One-shot event handlers (Phase 3), keyed by the field name the server resolver
-	 * returns. Each fires its own data layer event under the SAME event name the
-	 * server path used, with a de-dupe guard so it can never double-count; unlike the
-	 * Tier 2/3 fields these values are never cached or replayed.
+	 * One-shot event handlers, keyed by the resolver field name. Each fires its
+	 * own event with a de-dupe guard; never cached or replayed.
 	 */
 	const actionHandlers = {
 		pendingPurchase: handlePendingPurchase,
@@ -535,16 +467,12 @@ import {
 	};
 
 	/**
-	 * Tier 2/3: gather the server-only fields from the session endpoint into the
-	 * pending push, fetching only when needed, then call done(). Tier 2 is fetched
-	 * once per session (then replayed from the sessionStorage cache); each Tier 3
-	 * gate is fetched only when its cookie value differs from the one we last
-	 * fetched with — so an unchanged gate (and an anonymous visitor, whose gate
-	 * cookie is absent) triggers no request. done() runs synchronously when no
-	 * fetch is needed, so a cached page view yields one synchronous push.
+	 * Tier 2/3: gather the server-only fields into the pending push, fetching
+	 * only when needed (Tier 2 once per session, a Tier 3 gate only when its
+	 * cookie value changed), then call done() - synchronously when no fetch is
+	 * needed, so a cached view yields one synchronous push.
 	 *
-	 * @param {Function} done Called (sync or async) once the endpoint data, if any,
-	 *                        has been merged into the pending push.
+	 * @param {Function} done Called (sync or async) once any endpoint data is merged.
 	 * @return {void}
 	 */
 	function collectEndpointFields( done ) {
@@ -560,11 +488,8 @@ import {
 		const gates = Array.isArray( config.gates ) ? config.gates : [];
 		const actions = Array.isArray( config.actions ) ? config.actions : [];
 
-		// The set of one-shot field names, so the fetched values can be routed to
-		// their handlers and kept out of the merged visitorData push / the cache.
-		// actionConfirm maps a one-shot key to the authenticated POST-beacon URL its
-		// handler fires after delivery (e.g. the reliable-purchase fallback flagging
-		// its order tracked, issue #398), so the GET response stays side-effect free.
+		// One-shot field names (routed to their handlers, kept out of the merged
+		// push and the cache) and their per-key beacon URLs.
 		const actionKeys = {};
 		const actionConfirm = {};
 		actions.forEach( function ( action ) {
@@ -632,10 +557,8 @@ import {
 			}
 		} );
 
-		// One-shot events (Phase 3): fetched whenever their event cookie is present.
-		// Unlike a gate they are never cached or replayed — the client fires each once,
-		// de-dupes it, then clears the event cookie below, so a later page with no
-		// cookie makes no request. An anonymous visitor never has the cookie.
+		// One-shot events: fetched whenever their event cookie is present, never
+		// cached; the cookie is cleared after delivery below.
 		const activeActionCookies = [];
 		actions.forEach( function ( action ) {
 			if ( gtm4wp_read_cookie( action.cookie ) ) {
@@ -660,24 +583,17 @@ import {
 			return;
 		}
 
-		// Feature-detect like fireConfirmBeacon() does: an unguarded call throws a
-		// ReferenceError where fetch is unavailable, and that throw escapes this
-		// function, so done() never runs and even the already-collected Tier 1
-		// values (search term, referrer) would be lost. Degrade to "no endpoint
-		// data" instead and let the caller flush what it has.
+		// Without fetch a ReferenceError would escape and lose the Tier 1 values
+		// too; degrade to "no endpoint data" instead.
 		if ( 'function' !== typeof fetch ) {
 			done();
 			return;
 		}
 
 		const headers = { Accept: 'application/json' };
-		// Send the (baked) nonce ONLY when there is identity-bound data to fetch — an
-		// active Tier 3 gate cookie, i.e. a logged-in visitor. Their page is never
-		// full-page cached, so the baked nonce is fresh and WordPress can authenticate
-		// their auth cookie so the user fields resolve. An anonymous fetch (Tier 2, or
-		// a guest one-shot) sends NO nonce: it needs none, and sending a stale nonce
-		// baked into a long-lived cached page would 403 the read (issue #398). The
-		// fresh nonce for any confirm beacon comes from the response below, not here.
+		// The baked nonce ONLY for a logged-in visitor (active Tier 3 gate; their
+		// page is never cached, so it is fresh). An anonymous fetch sends none: a
+		// stale nonce from a long-lived cached page would 403 the read.
 		if ( config.nonce && activeGates.length ) {
 			headers[ 'X-WP-Nonce' ] = config.nonce;
 		}
@@ -691,8 +607,7 @@ import {
 					return;
 				}
 
-				// Adopt the fresh nonce for the one-shot confirm beacons before any
-				// action handler below fires one (issue #398).
+				// The fresh beacon nonce, before any handler below fires one.
 				if ( 'string' === typeof body.nonce && body.nonce ) {
 					beaconNonce = body.nonce;
 				}
@@ -707,9 +622,8 @@ import {
 					return;
 				}
 
-				// Cache the Tier 2 subset and each active gate's subset (tagged with
-				// the cookie value it was fetched at) so later page views replay
-				// without a request until the session ends or a gate cookie changes.
+				// Cache the Tier 2 subset and each active gate's subset, tagged with
+				// the cookie value it was fetched at.
 				const next = { gates: {} };
 				if ( sessionFields.length ) {
 					next.session = {};
@@ -746,10 +660,8 @@ import {
 					);
 				} catch ( e ) {}
 
-				// One-shot events: hand each to its de-dupe+push handler and keep it
-				// OUT of the merged visitorData push (they are their own events and are
-				// never cached). Then clear the event cookie(s) so a later page — with
-				// the cookie gone — makes no request.
+				// One-shots go to their handlers, stay OUT of the merged push, and
+				// their event cookies are cleared so a later page makes no request.
 				Object.keys( actionKeys ).forEach( function ( key ) {
 					if ( key in data ) {
 						const handler = actionHandlers[ key ];
@@ -784,21 +696,13 @@ import {
 	}
 
 	/**
-	 * Parses a cart-fragment JSON string into the two-part { customer, cart } block
-	 * PHP encodes (see WooCommerce\PageDataLayer::visitor_cart_datalayer).
-	 *
-	 * Returns null for anything that is not a usable object. The attribute is written
-	 * by somebody else's AJAX response and can legitimately hold '' (the empty
-	 * placeholder baked into the cacheable HTML), '[]' (PHP's encoding of an empty
-	 * payload), a scalar, or - right after an update - the pre-split FLAT payload
-	 * replayed from WooCommerce's own sessionStorage fragment cache. Note JSON.parse
-	 * SUCCEEDS on 'null', '5' and '[]', so the try/catch alone is not the guard: the
-	 * type check below is, and it has to happen before any property read, or a
-	 * malformed payload would throw inside the MutationObserver callback.
-	 *
-	 * A flat payload yields no customer/cart part, so it delivers nothing until the
-	 * visitor's next cart change refreshes the fragment. That is deliberate: sniffing
-	 * key prefixes to rescue it would put a copy of today's naming in the client.
+	 * Parses a cart-fragment JSON string into the { customer, cart } block PHP
+	 * encodes, or null for anything not a usable object: the attribute can hold
+	 * '', '[]', a scalar, or a pre-split flat payload replayed from WooCommerce's
+	 * fragment cache, and JSON.parse SUCCEEDS on 'null' and '5', so the type
+	 * check is the guard, before any property read. A flat payload delivers
+	 * nothing until the next cart change: sniffing key prefixes would put a copy
+	 * of today's naming in the client.
 	 *
 	 * @param {?string} raw The raw JSON string.
 	 * @return {?Object} The parsed two-part block, or null.
@@ -826,22 +730,15 @@ import {
 		return parsed;
 	}
 
-	// The last delivered state of each WooCommerce family, held per family so each
-	// event fires only when ITS OWN half changed: WooCommerce re-applies the whole
-	// fragment as one blob, so a single whole-payload comparison would refire
-	// customerData on every quantity change with byte-identical values.
+	// Last delivered state per family, so each event fires only when ITS OWN
+	// half changed (WooCommerce re-applies the whole fragment as one blob).
 	let lastCustomerJson = null;
 	let lastCartJson = null;
 
 	/**
-	 * Pushes one WooCommerce family under its own event name, but only when it
-	 * actually changed since the last delivery.
-	 *
-	 * Compared as JSON rather than by identity: a fresh object arrives on every
-	 * fragment refresh, so only its serialization can tell a real change from a
-	 * re-application of the same data. A part that is absent is left alone (its
-	 * feature is off), never treated as "changed to nothing" - hence the previous
-	 * marker is returned unchanged in every early exit.
+	 * Pushes one WooCommerce family under its own event name when it changed
+	 * since the last delivery. Compared as JSON (a fresh object arrives on every
+	 * refresh); an absent part is left alone, never "changed to nothing".
 	 *
 	 * @param {*}       part The family payload from the fragment, if any.
 	 * @param {string}  name The data layer event name for this family.
@@ -916,19 +813,12 @@ import {
 		} ).observe( document.body, { childList: true, subtree: true } );
 	}
 
-	// Gather the synchronous Tier 1 fields, then let the endpoint (sync replay or a
-	// single gated fetch) complete the pending push, and flush it as one visitor
-	// event. Only then deliver the WooCommerce families, so the visitor event always
-	// lands FIRST: GTM's model keeps the keys of earlier pushes, so a tag triggered on
-	// customerData/cartData can read visitorId - the reverse would not work.
-	//
-	// The initial read and the observer must stay in this one synchronous block, read
-	// first: no DOM mutation can interleave between them, so the observer cannot miss a
-	// fragment that arrived before it was wired, and cannot re-deliver the one the read
-	// just handled (the per-family de-dupe absorbs its first callback). Usually the read
-	// finds nothing - the placeholder in the cacheable HTML is empty and only the
-	// fragments AJAX fills it - but it does catch the case where WooCommerce got there
-	// first while the endpoint fetch was still in flight.
+	// Tier 1, then the endpoint completes the push, flushed as one visitor
+	// event, and only then the WooCommerce families: the visitor event must
+	// land FIRST so a tag triggered on customerData/cartData can read
+	// visitorId from GTM's model. The initial read and the observer stay in
+	// one synchronous block, read first, so no fragment is missed or
+	// re-delivered in between.
 	collectClientFields();
 
 	collectEndpointFields( function () {

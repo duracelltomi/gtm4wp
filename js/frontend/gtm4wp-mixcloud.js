@@ -7,29 +7,18 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_mixcloud_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_mixcloud_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initMixcloudTracking() {
-	// Wire every Mixcloud iframe already on the page and any inserted later
-	// (popup/lightbox, AJAX). The Mixcloud Widget API
-	// (widget.mixcloud.com/media/js/widgetApi.js) is handed to gtm4wpObserveMedia
-	// rather than enqueued by PHP, so a page with no Mixcloud embed never requests
-	// it — this SDK is by far the largest of the media trackers' dependencies. It
-	// can still be missing at runtime (consent manager, ad blocker, network
-	// error), so it is re-checked per element: a frame is only wired once the SDK
-	// is available.
+	// The Widget API (the largest SDK of the family) is handed to
+	// gtm4wpObserveMedia (fetched only when an embed exists) and re-checked
+	// per element, since it can still be missing.
 	const gtm4wp_wireMixcloudFrame = function ( mixcloud_frame ) {
 		const widget = Mixcloud.PlayerWidget( mixcloud_frame );
 
-		// The Mixcloud widget exposes no getCurrentSound-style metadata getter,
-		// so the show is identified from the `feed` query parameter of the embed
-		// URL (e.g. ?feed=%2Fartist%2Fshow%2F). Title/author are not available;
-		// the feed path is the best identifier and is reused as the title, with
-		// an empty author, to keep the mediaData shape consistent with the other
-		// trackers.
+		// No metadata getter: the show is the `feed` query parameter of the
+		// embed URL, reused as the title; no author.
 		let mediaid = mixcloud_frame.getAttribute( 'src' );
 		let mediaurl = mediaid;
 		try {
@@ -48,9 +37,7 @@ function gtm4wp_initMixcloudTracking() {
 		mixcloud_frame.setAttribute( 'data-player_id', mediaid );
 		mixcloud_frame.setAttribute( 'data-player_url', mediaurl );
 
-		// Mixcloud's play/pause/ended events carry no position payload, so the
-		// latest position and duration are cached from the progress event (which
-		// reports both, in seconds) and reused by the state handlers.
+		// State events carry no position; cached from the progress event.
 		let lastPosition = 0;
 		let lastDuration = 0;
 
@@ -153,8 +140,7 @@ function gtm4wp_initMixcloudTracking() {
 					url: mediaurl,
 					title: mediaid,
 					currentTime: 0,
-					// No progress event has arrived yet, so the duration is
-					// still unknown (as it is in mediaData above).
+					// Unknown before the first progress event.
 					duration: lastDuration,
 					element: mixcloud_frame,
 				} ),

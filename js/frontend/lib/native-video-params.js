@@ -1,31 +1,15 @@
 /**
- * Google Tag Manager built-in "Video *" variable support.
+ * Google Tag Manager built-in "Video *" variable support: the flat `gtm.video*`
+ * data layer keys GTM's native YouTube trigger emits, spread by every media
+ * tracker next to its own `gtm4wp.media*` parameters so the built-in variables
+ * resolve on our events too.
  *
- * GTM ships built-in Video variables (Video Status, Video URL, Video Title,
- * Video Provider, Video Duration, Video Current Time, Video Percent, Video
- * Visible) that only read the flat `gtm.video*` data layer keys emitted by
- * GTM's own native YouTube trigger. GTM4WP's media trackers push their own
- * bespoke `gtm4wp.media*` shape, so those variables never resolve.
- *
- * These helpers build the `gtm.video*` keys so each tracker can spread them
- * next to its existing parameters in the same data layer push, letting a Custom
- * Event trigger on the existing `gtm4wp.media*` event names resolve the built-in
- * variables.
- *
- * EVERY `gtm4wp.media*` push that has a player to describe carries these keys —
- * not only the two events with a native GTM counterpart. The data layer is
- * merged state, so a key left out of a push keeps the value the PREVIOUS push
- * gave it: a `gtm4wp.mediaPlayerEvent` that omitted them would resolve Video
- * Title/Status/Percent to whatever the last state change happened to leave
- * behind, which reads as data rather than as a gap. The one exception is
- * `gtm4wp.mediaApiReady`, which fires when the provider's SDK loads and has no
- * player to report at all.
- *
- * An event with no native equivalent (player ready, and the player events that
- * are not state changes) passes `status: ''`, which is what
- * gtm4wpNativeVideoStatus() already returns for a state GTM does not model.
- * Empty rather than absent, for the same merge reason: it clears the previous
- * status instead of inheriting it.
+ * EVERY push with a player to describe carries them (not only the two events
+ * with a native counterpart): the data layer is merged state, so an omitted
+ * key keeps the PREVIOUS push's value and reads as data rather than a gap. The
+ * one exception is `gtm4wp.mediaApiReady`, which has no player. An event with
+ * no native status passes `status: ''`, empty rather than absent, for the same
+ * merge reason.
  */
 
 /**
@@ -53,21 +37,11 @@ export function gtm4wpNativeVideoStatus( state ) {
 }
 
 /**
- * Reduces a media URL to its bare form: absolute, with the query string AND the
- * fragment removed.
- *
- * Every tracker that reads an identifier out of a URL needs this first, and the
- * fragment half is not an edge case. WordPress core's
- * `wp_filter_oembed_result()` appends `#?secret=<10 chars>` to the iframe src of
- * every oEmbed result whose provider is not in core's own trusted list (it also
- * adds `sandbox="allow-scripts"` and drops `allow`/`allowfullscreen`) — so for
- * those providers a fragment is what WordPress *always* renders. Cutting only at
- * the `?` leaves the `#` behind and every id parsed from the path carries it,
- * which is what turned a Cloudflare Stream `…/{uid}/iframe#?secret=…` embed into
- * the id `iframe#`. Registered as upstream claim U106.
- *
- * `origin + pathname` drops both in one step and resolves a relative or
- * protocol-relative URL on the way.
+ * Reduces a media URL to its bare form: absolute, query string AND fragment
+ * removed. The fragment half is not an edge case: WordPress core's
+ * `wp_filter_oembed_result()` appends `#?secret=…` to the iframe src of every
+ * untrusted oEmbed provider, so cutting only at `?` left every id parsed from
+ * the path carrying a `#` (U106).
  *
  * @param {string} url The media URL, e.g. an iframe `src` or a media element's
  *                     `currentSrc`.
@@ -77,9 +51,7 @@ export function gtm4wpNativeVideoStatus( state ) {
 export function gtm4wpMediaBareUrl( url ) {
 	const src = url || '';
 
-	// An empty URL has to short-circuit: new URL( '', href ) resolves to the
-	// PAGE, so an embed with nothing to play would otherwise report the article
-	// it sits on as the media URL.
+	// new URL( '', href ) resolves to the PAGE, so '' must short-circuit.
 	if ( '' === src ) {
 		return '';
 	}
@@ -89,9 +61,8 @@ export function gtm4wpMediaBareUrl( url ) {
 
 		return parsed.origin + parsed.pathname;
 	} catch ( e ) {
-		// A URL no parser accepts still must not throw inside a tracker's
-		// wiring: fall back to cutting the two delimiters off by hand, '#' first
-		// so a '?' living inside the fragment cannot be mistaken for a query.
+		// Must not throw inside a tracker's wiring: cut by hand, '#' first so a
+		// '?' inside the fragment is not mistaken for a query.
 		return src.split( '#' ).shift().split( '?' ).shift();
 	}
 }
@@ -111,42 +82,22 @@ export function gtm4wpMediaSrcUrl( element ) {
 }
 
 /**
- * Reports whether a media player sits inside the browser viewport, for GTM's
- * built-in "Video Visible" variable (`gtm.videoVisible`).
- *
- * GTM describes the variable only as "true if the video is visible in the
- * viewport" and publishes no threshold for its own YouTube trigger, so this
- * measures at the moment of the push, in two parts: the page must be on screen
- * at all (a background tab is not), and the player's box must overlap the
- * viewport without being hidden by CSS. A player scrolled halfway out therefore
- * still counts as visible, which follows the published wording rather than
- * inventing a percentage. Registered as upstream claim U102.
- *
- * The tab half matters more than it looks: a video keeps playing in a
- * background tab, so its progress milestones keep firing at a player nobody can
- * see, and geometry alone would call every one of them visible.
- *
- * Two states are not detectable and are reported as the page's own visibility:
- * a window fully covered by another window (no browser API exposes it), and a
- * player popped out into Picture-in-Picture, which stays on screen while its
- * tab is hidden (for a provider iframe the pop-out happens inside the embed,
- * where nothing on this page can observe it).
- *
- * The measurement is synchronous (`getBoundingClientRect`) rather than a stored
- * IntersectionObserver ratio, so it can never report a value that a scroll
- * since the last observer callback has already invalidated. Media pushes are
- * infrequent — player ready, state changes, percentage milestones and the
- * user-initiated player events (rate/volume/quality/fullscreen/error), never
- * every time update — so the layout read costs nothing measurable.
+ * Whether a media player sits inside the viewport, for GTM's built-in "Video
+ * Visible" variable. GTM publishes no threshold (U102), so this measures at
+ * the moment of the push: the page must be on screen at all (a video keeps
+ * playing in a background tab, so its milestones keep firing), and the
+ * player's box must overlap the viewport without being hidden by CSS; a
+ * player scrolled halfway out counts as visible. A covered window and a
+ * Picture-in-Picture pop-out are not detectable. Synchronous
+ * getBoundingClientRect, not a stored IntersectionObserver ratio, so a scroll
+ * cannot invalidate it; media pushes are infrequent enough.
  *
  * @param {HTMLElement|Function} [target] The player element, or a function
- *                                        returning it, for a player whose SDK
- *                                        can swap the element out or that is
- *                                        resolved per event (VideoPress).
+ *                                        returning it (an SDK that swaps the
+ *                                        element, or VideoPress).
  * @return {boolean|undefined} Whether the player is in the viewport, or
- *                             undefined when there is nothing to measure (no
- *                             element, or one detached from the document) — the
- *                             caller then omits the key instead of guessing.
+ *                             undefined when there is nothing to measure (the
+ *                             caller then omits the key).
  */
 export function gtm4wpMediaVisible( target ) {
 	let element = target;
@@ -175,16 +126,14 @@ export function gtm4wpMediaVisible( target ) {
 		return undefined;
 	}
 
-	// A page in a background tab or a minimised window is not on screen at all,
-	// whatever its geometry says — and media keeps playing there, so progress
-	// milestones do keep firing. This is checked first because no box on a page
-	// nobody is looking at can be visible.
+	// Background tab / minimised window: nothing on it is visible, whatever the
+	// geometry says.
 	if ( 'hidden' === view.document.visibilityState ) {
 		return false;
 	}
 
-	// `visibility` is inherited, so this also catches a hidden ancestor. A
-	// `display: none` ancestor collapses the box to 0×0, caught by the rect below.
+	// `visibility` is inherited (catches a hidden ancestor); a `display: none`
+	// ancestor collapses the box to 0×0, caught by the rect below.
 	if ( typeof view.getComputedStyle === 'function' ) {
 		const style = view.getComputedStyle( element );
 
@@ -215,27 +164,22 @@ export function gtm4wpMediaVisible( target ) {
 }
 
 /**
- * Builds the flat `gtm.video*` keys that populate GTM's built-in Video
- * variables, ready to be spread into a data layer push.
- *
- * `currentTime` and `duration` are expected in seconds; callers whose player
- * API reports milliseconds (SoundCloud) must convert before calling. `percent`
- * is derived from time / duration when not supplied.
+ * Builds the flat `gtm.video*` keys of GTM's built-in Video variables, ready
+ * to spread into a data layer push. Times are in seconds (SoundCloud reports
+ * milliseconds: convert first); `percent` is derived when not supplied.
  *
  * @param {Object}               args
- * @param {string}               args.provider    Video provider, e.g. 'youtube', 'vimeo'.
+ * @param {string}               args.provider    Video provider, e.g. 'youtube'.
  * @param {string}               args.status      Already-mapped `gtm.videoStatus` (may be '').
  * @param {string}               args.url         Video URL.
  * @param {string}               args.title       Video title.
- * @param {number}               args.currentTime Current playback position, in seconds.
- * @param {number}               args.duration    Total duration, in seconds.
- * @param {number}               [args.percent]   Integer 0-100; computed from time/duration
- *                                                when omitted.
+ * @param {number}               args.currentTime Playback position, seconds.
+ * @param {number}               args.duration    Total duration, seconds.
+ * @param {number}               [args.percent]   Integer 0-100; computed when omitted.
  * @param {HTMLElement|Function} [args.element]   The player element (or a function returning
- *                                                it) whose viewport position becomes
- *                                                `gtm.videoVisible`. Omitting it omits that
- *                                                one key; every other key is unaffected.
- * @return {Object} The `gtm.video*` keys to spread into a data layer push.
+ *                                                it) for `gtm.videoVisible`; omitting it
+ *                                                omits only that key.
+ * @return {Object} The `gtm.video*` keys.
  */
 export function gtm4wpNativeVideoParams( {
 	provider,
@@ -267,8 +211,7 @@ export function gtm4wpNativeVideoParams( {
 		'gtm.videoPercent': pct,
 	};
 
-	// Left out entirely when there is no element to measure: an absent variable
-	// is honest, a guessed false is not.
+	// Omitted when there is nothing to measure rather than guessed false.
 	const visible = gtm4wpMediaVisible( element );
 	if ( typeof visible === 'boolean' ) {
 		params[ 'gtm.videoVisible' ] = visible;
@@ -278,27 +221,16 @@ export function gtm4wpNativeVideoParams( {
 }
 
 /**
- * Fires each not-yet-reached percentage milestone once.
+ * Fires each `step`-sized mark (0, 10, 20, …) the current `percentage` has
+ * newly crossed, once per media item: the shared milestone bookkeeping of
+ * every media tracker.
  *
- * Every media tracker records the milestones it has already pushed per media
- * item and, on each progress tick, fires the callback for each `step`-sized mark
- * (0, 10, 20, …) the current `percentage` has newly crossed. This helper holds
- * that shared bookkeeping so each tracker only supplies its own push payload.
+ * Callers must guard a zero/absent duration before computing `percentage`:
+ * `time / 0` is `Infinity` and would fire every mark.
  *
- * Callers must guard against a zero/absent duration before computing
- * `percentage` (e.g. `if ( ! duration ) return;`): `time / 0` is `Infinity`,
- * which is greater than every mark and would fire them all.
- *
- * `key` is a media id the provider reports, so it is never assumed to be an
- * ordinary property name. The already-fired list is resolved into a local
- * variable and type-checked rather than read back out of the store on each
- * pass: a key of `__proto__` reads `Object.prototype` off a plain object — an
- * existing value, so a `typeof … === 'undefined'` test skips the initialisation
- * and the loop then calls `.indexOf()` on it — and writing that key back does
- * not create an own property either. Callers should still declare the store
- * with `Object.create( null )`, which is what makes the write a plain property;
- * this end holds regardless, because the store belongs to the caller and a
- * third-party tracker may hand over any object at all.
+ * `key` is a provider-reported media id, so it may be `__proto__`: the fired
+ * list is resolved locally and Array-checked, never trusted from the store
+ * (callers should still declare the store with `Object.create( null )`).
  *
  * @param {Object}   marks       Per-key store of already-fired marks (mutated).
  * @param {string}   key         Media item key (video id / uri / currentSrc).
@@ -330,12 +262,9 @@ export function gtm4wpMediaMilestones(
 }
 
 /**
- * Runs a tracker's init once the DOM is ready.
- *
- * A tracker bundle may execute before or after the DOM has finished parsing
- * (defer/async strategy, or late injection by a tag manager). This runs the
- * init immediately when parsing is already done, otherwise on DOMContentLoaded,
- * so nothing is left silently uninitialized.
+ * Runs a tracker's init once the DOM is ready: immediately when parsing is
+ * already done (defer, or late injection by a tag manager), otherwise on
+ * DOMContentLoaded.
  *
  * @param {Function} callback The tracker init function.
  * @return {void}
@@ -349,84 +278,61 @@ export function gtm4wpOnReady( callback ) {
 }
 
 /**
- * Wires every element matching `selector` and, when the site has opted in to
- * runtime tracking, keeps wiring ones inserted later (popup/lightbox, AJAX) so a
- * media player added after page load is tracked exactly like one present at init.
+ * Wires every element matching `selector`; players already in the DOM are
+ * always wired. Watching for later insertions (popup/lightbox, AJAX) is opt-in
+ * via `window.gtm4wp_media_observe_dynamic` (the "track dynamically inserted
+ * players" setting) because a body-wide MutationObserver has a per-mutation
+ * cost. All providers share ONE observer: each tracker registers a (selector,
+ * wire) scanner, and the callback inspects only the nodes each mutation adds.
  *
- * The players already in the DOM are always wired. Watching for later insertions
- * is opt-in via `window.gtm4wp_media_observe_dynamic` (set by the media module
- * from the "track dynamically inserted players" setting), because a body-wide
- * MutationObserver has a per-mutation cost that only pays off on sites that
- * inject players after load. When enabled, ALL providers share ONE observer:
- * each tracker registers a (selector, wire) scanner, so enabling N providers
- * does not create N observers on the document. The shared callback inspects only
- * the nodes each mutation adds (never the whole document).
- *
- * Each wired element is marked with a data attribute so a re-report — or a node
- * moved elsewhere in the DOM — never binds it twice. The marker doubles as the
- * guard against a provider SDK that injects its own matching iframe into a
- * container the tracker created (the Twitch embed): mark that container and its
- * descendants are skipped.
- *
- * A marker on the element alone is not enough for an SDK that REPLACES the
- * element it is handed (Spotify): the marker leaves with the replaced node, so
- * the observer would see the SDK's own iframe as a fresh, unmarked match and
- * wire it — replacing it again, forever. wireOnce therefore re-marks whatever
- * takes the element's slot. Keep this invariant when adding a provider: never
+ * A wired element carries a data-attribute marker so a re-report or a moved
+ * node is never bound twice; a marked ancestor is skipped too (the Twitch
+ * container whose SDK-injected iframe also matches). An SDK that REPLACES the
+ * element it is handed (Spotify) takes the marker with it, and the observer
+ * would wire the replacement, replacing it again forever, so wireOnce re-marks
+ * whatever takes the element's slot. Invariant when adding a provider: never
  * assume the element handed to wireElement survives the call.
  *
  * @param {string}        selector    CSS selector identifying the provider embed.
- * @param {Function}      wireElement Called once with each matching element to wire
- *                                    it (the same wiring the tracker runs at init).
- *                                    Receives a second argument: a function
- *                                    resolving the element that currently occupies
- *                                    the wired element's slot, for a tracker whose
- *                                    SDK replaces it (Spotify).
- * @param {Function}      [isReady]   Optional predicate; when it returns a falsy value
- *                                    the element is left unwired AND unmarked (e.g.
- *                                    the player SDK has not loaded), so a later
- *                                    insertion can still wire it once the SDK exists.
- * @param {string|Object} [sdk]       The provider SDK to load, and ONLY once this page
- *                                    is known to contain a matching embed. A string is
- *                                    the script URL, ready when the script fires load.
- *                                    Use the object form `{ src, subscribe }` for an
- *                                    SDK that signals readiness through a global
- *                                    callback instead of its own load event (YouTube's
- *                                    onYouTubeIframeAPIReady, Spotify's
- *                                    onSpotifyIframeApiReady): `subscribe` is handed a
- *                                    rescan function to call from that callback. Omit
- *                                    for a tracker with no SDK to fetch (HTML5 media)
- *                                    or one that binds to a runtime the page already
- *                                    loads (Wistia, JW Player, VideoPress).
+ * @param {Function}      wireElement Called once per matching element with a second
+ *                                    argument resolving the element currently in
+ *                                    the wired element's slot (for a replacing SDK).
+ * @param {Function}      [isReady]   When falsy the element is left unwired AND
+ *                                    unmarked (SDK not loaded yet), so a later
+ *                                    rescan can still wire it.
+ * @param {string|Object} [sdk]       Provider SDK to load ONLY once the page is known
+ *                                    to contain a matching embed: a script URL (ready
+ *                                    on its load event), or `{ src, subscribe }` for
+ *                                    an SDK signalling readiness through a global
+ *                                    callback (onYouTubeIframeAPIReady,
+ *                                    onSpotifyIframeApiReady): `subscribe` receives a
+ *                                    rescan function to call from there. Omit when
+ *                                    there is nothing to fetch (HTML5, Wistia, JW
+ *                                    Player, VideoPress).
  * @return {MutationObserver|null} The shared observer, or null when runtime
  *                                 tracking is not enabled.
  */
 export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 	const wireOnce = function ( element ) {
-		// Skip when this element — or an ancestor the tracker already marked
-		// (e.g. the Twitch container whose SDK-injected iframe also matches the
-		// selector) — has been wired.
+		// Already wired, or inside a marked container (Twitch).
 		if ( element.closest( '[data-gtm4wp-media-wired]' ) ) {
 			return;
 		}
-		// SDK not ready: leave the element unmarked so a later insertion (once
-		// the SDK has loaded) can still wire it.
+		// SDK not ready: leave unmarked so a later rescan can wire it.
 		if ( typeof isReady === 'function' && ! isReady() ) {
 			return;
 		}
 
-		// Remember the slot BEFORE wiring: some provider SDKs replace the element
-		// they are handed (see the re-mark below), which takes the marker with it.
+		// Remember the slot BEFORE wiring: a replacing SDK takes the marker with
+		// the node (see the re-mark below).
 		const parent = element.parentNode;
 		const slot = parent
 			? Array.prototype.indexOf.call( parent.childNodes, element )
 			: -1;
 
-		// Resolves whichever element currently occupies this slot: the wired
-		// element itself, or — once an SDK has replaced it — its replacement.
-		// Trackers hand this to gtm4wpNativeVideoParams so `gtm.videoVisible` is
-		// measured on the node that is actually on screen; a detached original
-		// would report a 0×0 box forever.
+		// The element currently in this slot (the wired one or its SDK
+		// replacement), so `gtm.videoVisible` is measured on the node actually
+		// on screen; a detached original would report 0×0 forever.
 		const liveElement = function () {
 			if ( element.isConnected ) {
 				return element;
@@ -435,11 +341,8 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 			if ( parent && slot > -1 ) {
 				const node = parent.childNodes[ slot ];
 
-				// Same test as the re-mark below: only a node this scanner would
-				// itself recognise as the provider's embed counts as the
-				// replacement. Without it, a node that merely shifted into the
-				// slot after an unrelated removal would be measured as if it
-				// were the player.
+				// Same test as the re-mark: only a node this scanner would
+				// recognise counts, not one that merely shifted into the slot.
 				if (
 					node &&
 					1 === node.nodeType &&
@@ -455,28 +358,20 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 
 		element.setAttribute( 'data-gtm4wp-media-wired', '1' );
 
-		// One provider's wiring must never cost another's. This runs inside
-		// forEach over every match on the page and, with runtime tracking on,
-		// inside the shared MutationObserver callback across every registered
-		// scanner - so an exception escaping here would abandon the remaining
-		// embeds and the remaining providers for that pass, from one bad embed.
-		// The tracker is responsible for its own cleanup (the Dailymotion one
-		// restores the embed it replaced); this only stops the blast radius.
+		// One bad embed must not abandon the remaining embeds and providers of
+		// this pass (forEach over every match, and the shared observer callback
+		// across every scanner). Cleanup is the tracker's job (Dailymotion
+		// restores the embed it replaced).
 		try {
 			wireElement( element, liveElement );
 		} catch ( e ) {}
 
-		// Some SDKs REPLACE the element they are given with their own iframe
-		// rather than reusing it in place — Spotify's createController() does
-		// `parentElement.replaceChild( iframe, target )` plus a synchronous `src`
-		// assignment. The replacement matches the same selector, carries no
-		// marker and has no marked ancestor, so the observer would wire it, which
-		// replaces it again — an unbounded loop that hangs the tab. replaceChild
-		// keeps the slot, so re-mark whatever now occupies it. Only a node that
-		// would actually be re-wired by THIS scanner is marked (it matches the
-		// selector, or wraps something that does), so an unrelated node shifting
-		// into the slot after a plain removal is never marked — which would have
-		// hidden a real embed from tracking.
+		// A replacing SDK (Spotify's createController() does replaceChild plus a
+		// synchronous src assignment) leaves an unmarked node matching the same
+		// selector; the observer would wire it again, an unbounded loop that
+		// hangs the tab. replaceChild keeps the slot, so re-mark what occupies
+		// it, but only a node THIS scanner would re-wire: marking an unrelated
+		// node that shifted into the slot would hide a real embed.
 		if ( parent && slot > -1 && element.parentNode !== parent ) {
 			const replacement = parent.childNodes[ slot ];
 
@@ -494,50 +389,38 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 	const sdkSrc = 'string' === typeof sdk ? sdk : ( sdk && sdk.src ) || '';
 	let sdkRequested = false;
 
-	// Re-run the whole scan. Elements wired on an earlier pass carry the marker
-	// and are skipped, so this is idempotent and safe to call from every
-	// readiness signal an SDK offers.
+	// Idempotent (marked elements are skipped), so safe from every readiness
+	// signal an SDK offers.
 	const rescan = function () {
 		document.querySelectorAll( selector ).forEach( wireOnce );
 	};
 
-	// Fetch the provider SDK at most once, and only from a caller that has
-	// already found a matching embed. That deferral is the point: a page with
-	// no embed of this provider must cost zero bytes and zero requests to the
-	// vendor — which also means no visitor IP, User-Agent or Referer reaches
-	// them from a page that never had their player on it.
+	// Fetch the provider SDK at most once, and only once a matching embed was
+	// found: a page without this provider's player must send the vendor no
+	// request at all (no visitor IP, User-Agent or Referer).
 	const ensureSdk = function () {
 		if ( '' === sdkSrc || sdkRequested ) {
 			return;
 		}
 
-		// Two ways the site can refuse this request, checked HERE rather than at
-		// the top of gtm4wpObserveMedia so a refusal costs the vendor request
-		// and nothing else: players already on the page are still wired, and a
-		// site that loads an SDK itself keeps working normally.
+		// Two ways the site can refuse the request, checked HERE so a refusal
+		// costs only the vendor request (present players stay wired, a site
+		// loading the SDK itself keeps working):
+		// 1. the gtm4wp_media_sdk_blocked filter, decided server-side;
+		// 2. the gate script (gtm4wp-media-gate.js), a real enqueued <script
+		//    src> a consent manager can block by rewriting/removing its tag;
+		//    a gate that never ran leaves gtm4wp_media_sdk_allowed unset. (Not
+		//    wp_dequeue_script(): every tracker depends on that handle, so WP
+		//    prints it regardless.)
+		// The check needing NO configuration is the caller: every SDK-fetching
+		// tracker selects on the embed's own vendor domain, so a consent-blocked
+		// embed (src -> data-src, placeholder) already withholds the request.
+		// Never widen a selector to match a consent-blocked embed.
 		//
-		// 1. The gtm4wp_media_sdk_blocked filter, decided server-side.
-		// 2. The gate script (js/frontend/gtm4wp-media-gate.js), which exists to
-		//    be blockable: it is a real enqueued <script src>, so a consent
-		//    manager can refuse it by rewriting or removing its tag, and a gate
-		//    that never ran leaves gtm4wp_media_sdk_allowed unset. Blocking the
-		//    tag, not wp_dequeue_script() - every tracker declares that handle as
-		//    a dependency, so WordPress prints it whether or not it was dequeued.
-		//
-		// Both of these take deliberate configuration. Note that the check that
-		// needs NONE is the one above this function: ensureSdk() is reached only
-		// from `if ( present.length )` and the observer's `if ( matched || … )`,
-		// and every SDK-fetching tracker selects on the embed's own vendor domain
-		// - so a consent manager that blocks the EMBED (src -> data-src, or a
-		// placeholder node) already withholds the vendor request here, with no
-		// rule naming GTM4WP anywhere. Keep it that way: never widen a selector
-		// to match a consent-blocked embed.
-		//
-		// The gate is only consulted when PHP said it enqueued one. That
-		// distinction is what keeps "the gate was blocked" apart from "no gate
-		// is in play at all" - a tracker loaded on its own, or a unit test -
-		// which a bare `! allowed` check cannot tell apart, and getting it wrong
-		// in that direction silently ends media tracking rather than a request.
+		// The gate is consulted only when PHP said it enqueued one: a bare
+		// `! allowed` could not tell "gate blocked" from "no gate in play"
+		// (tracker loaded on its own, unit test) and would silently end media
+		// tracking.
 		const gateExpected = !! window.gtm4wp_media_gate_expected;
 		const gateOpen =
 			! gateExpected || true === window.gtm4wp_media_sdk_allowed;
@@ -545,13 +428,11 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		if ( window.gtm4wp_media_sdk_blocked || ! gateOpen ) {
 			sdkRequested = true;
 
-			// Only the gate case is reported, and only where the site asked for
-			// console output. The filter is a deliberate server-side decision
-			// and needs no telling; a blocked gate is something that happened TO
-			// the site, and it fails closed - so without a word here it looks
-			// exactly like a player that simply never fires (RI-20). Guarded
-			// with typeof because the flag is a top-level `const` the head block
-			// may never have printed.
+			// Only the gate case is reported (the filter is a deliberate
+			// server-side decision), and only with console output enabled: a
+			// blocked gate fails closed and would otherwise look like a player
+			// that never fires (RI-20). typeof: the flag is a top-level `const`
+			// the head block may never have printed.
 			if (
 				! window.gtm4wp_media_sdk_blocked &&
 				typeof gtm4wp_console_log !== 'undefined' &&
@@ -573,18 +454,14 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 
 		sdkRequested = true;
 
-		// Already usable: the site loads this SDK itself, or a re-executed
-		// bundle got here first. Nothing to fetch and nothing to wait for.
+		// Already usable (site loads the SDK itself, or a re-executed bundle).
 		if ( typeof isReady === 'function' && isReady() ) {
 			return;
 		}
 
-		// A tag for this exact src may already be in flight — the site's own,
-		// or one this function added before the bundle was re-executed. Attach
-		// to that one instead of requesting the same script twice. Compared on
-		// the literal attribute rather than the resolved .src property, because
-		// these URLs are written as literals by the trackers (YouTube's is
-		// protocol-relative, so the two forms never match as strings).
+		// Attach to a tag for this src already in flight (the site's own, or
+		// ours before a bundle re-execution). Compared on the literal attribute,
+		// not the resolved .src: YouTube's URL is protocol-relative.
 		let tag = null;
 		const scripts = document.getElementsByTagName( 'script' );
 
@@ -602,23 +479,21 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 			( document.head || document.documentElement ).appendChild( tag );
 		}
 
-		// `load` fires once the script has executed, which for an SDK that
-		// hands its API to a global callback is still too early — YouTube sets
-		// YT and only THEN calls onYouTubeIframeAPIReady. That is what the
-		// `subscribe` form is for. Registering both means neither signal is
-		// load-bearing on its own, and a rescan that arrives while isReady() is
-		// still false costs nothing: it wires nothing and marks nothing.
+		// `load` is too early for an SDK that hands its API to a global
+		// callback (YouTube sets YT and only THEN calls onYouTubeIframeAPIReady;
+		// that is what `subscribe` is for). Both are registered; a rescan while
+		// isReady() is still false wires and marks nothing.
 		tag.addEventListener( 'load', rescan );
 	};
 
-	// Let a callback-style SDK drive the rescan. Registered before anything is
-	// fetched, so the callback cannot fire before the tracker is listening.
+	// Registered before anything is fetched, so the SDK callback cannot fire
+	// before the tracker listens.
 	if ( sdk && 'function' === typeof sdk.subscribe ) {
 		sdk.subscribe( rescan );
 	}
 
-	// Wire everything already present (this happens regardless of the opt-in),
-	// and only then decide whether this page owes the vendor a request.
+	// Wire everything already present (regardless of the opt-in), then decide
+	// whether this page owes the vendor a request.
 	const present = document.querySelectorAll( selector );
 
 	present.forEach( wireOnce );
@@ -632,10 +507,8 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		return null;
 	}
 
-	// Register this provider's scanner on the single shared observer. A
-	// re-executed bundle (tag manager re-injection) replaces its own scanner
-	// rather than stacking a duplicate — the double-init guard, mirroring the
-	// VideoPress/Wistia/Spotify trackers.
+	// Register this provider's scanner on the shared observer; a re-executed
+	// bundle replaces its own scanner rather than stacking a duplicate.
 	window.gtm4wp_media_scanners = (
 		window.gtm4wp_media_scanners || []
 	).filter( function ( scanner ) {
@@ -660,19 +533,15 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 							scanner.wireOnce( node );
 							matched = true;
 						}
-						// The added node may be a wrapper (a lightbox/popup
-						// container) holding the embed; querySelectorAll scans
-						// only that added subtree, never the whole document.
+						// The added node may be a wrapper holding the embed; only
+						// that subtree is scanned.
 						const inner = node.querySelectorAll( scanner.selector );
 
 						inner.forEach( scanner.wireOnce );
 
-						// First sighting of this provider on a page that loaded
-						// without one (a player opened in a lightbox): the SDK
-						// was deliberately not fetched at init, so fetch it now.
-						// wireOnce above left these elements unmarked while
-						// isReady() was false, and the SDK's load/ready signal
-						// rescans the document and picks them up.
+						// First sighting of this provider (a lightbox player):
+						// fetch the SDK now; its ready signal rescans and picks
+						// up the elements wireOnce left unmarked.
 						if ( matched || inner.length ) {
 							scanner.ensureSdk();
 						}

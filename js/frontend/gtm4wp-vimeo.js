@@ -8,25 +8,16 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_vimeo_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_vimeo_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initVimeoTracking() {
-	// Wire every Vimeo iframe already on the page and any inserted later
-	// (popup/lightbox, AJAX). The Vimeo Player SDK (player.vimeo.com/api/player.js)
-	// is handed to gtm4wpObserveMedia rather than enqueued by PHP, so a page with
-	// no Vimeo embed never requests it. It can still be missing at runtime
-	// (consent manager, ad blocker, network error), so it is re-checked per
-	// element: a frame is only wired once the SDK is available, otherwise it is
-	// left for the SDK's load event or a later insertion to pick up.
+	// The Player SDK is handed to gtm4wpObserveMedia (fetched only when an
+	// embed exists) and re-checked per element, since it can still be missing.
 	const gtm4wp_wireVimeoFrame = function ( vimeo_frame ) {
 		const vimeoapi = new Vimeo.Player( vimeo_frame );
-		// Read through gtm4wpMediaSrcUrl() so the id is the last path segment and
-		// not the last path segment plus whatever fragment the embed carries: a
-		// `#t=30` or WordPress' own `#?secret=` (U106) would otherwise become part
-		// of the video id and of every reported URL.
+		// gtm4wpMediaSrcUrl() strips the fragment (`#t=30`, WordPress' own
+		// `#?secret=`, U106) that would otherwise end up in the id.
 		const videourl = gtm4wpMediaSrcUrl( vimeo_frame );
 		const videoid = videourl.split( '/' ).pop();
 
@@ -51,10 +42,7 @@ function gtm4wp_initVimeoTracking() {
 							mediaType: 'vimeo',
 							mediaData: {
 								id: videoid,
-								// The Vimeo Player SDK exposes no owner/author
-								// name (only getVideoTitle/getVideoId/getDuration
-								// and friends), so `author` is intentionally left
-								// empty here and in every push below.
+								// The SDK exposes no owner/author name.
 								author: '',
 								title: vimeo_frame.getAttribute(
 									'data-player_title'
@@ -133,11 +121,8 @@ function gtm4wp_initVimeoTracking() {
 				} );
 			} ); // end of api call getVideoTitle
 
-		// Vimeo fires "play" as soon as playback is requested and "playing"
-		// once it actually starts (after any initial buffering). We track
-		// "playing" so the start signal matches the YouTube and SoundCloud
-		// trackers, which report on the real playing state, and pair it with
-		// the bufferstart/bufferend handlers below.
+		// "playing" (real start, after buffering), not "play" (requested),
+		// matching the YouTube and SoundCloud trackers.
 		vimeoapi.on( 'playing', function ( data ) {
 			gtm4wp_onVimeoPlayerStateChange( 'play', data );
 		} );
@@ -154,10 +139,8 @@ function gtm4wp_initVimeoTracking() {
 			gtm4wp_onVimeoPlayerStateChange( 'seeked', data );
 		} );
 
-		// bufferstart/bufferend carry no data payload, so the current time is
-		// read from the player. "bufferstart" maps to GTM's built-in
-		// "buffering" video status (matching the YouTube tracker); "bufferend"
-		// has no native equivalent and reports an empty native status.
+		// No data payload: the current time is read from the player.
+		// "bufferend" has no native GTM status.
 		vimeoapi.on( 'bufferstart', function () {
 			gtm4wp_onVimeoBufferStateChange( 'buffering' );
 		} );
@@ -205,9 +188,7 @@ function gtm4wp_initVimeoTracking() {
 			gtm4wp_onVimeoPercentageChange( data );
 		} );
 
-		// Pushes a gtm4wp.mediaPlayerEvent for player events that are not state
-		// changes. Most of these events do not report the current position, so
-		// it is fetched from the player before the push.
+		// Non-state player events; the position is fetched from the player.
 		const gtm4wp_pushVimeoPlayerEvent = function ( eventName, eventParam ) {
 			vimeoapi
 				.getCurrentTime()
@@ -304,9 +285,7 @@ function gtm4wp_initVimeoTracking() {
 			} );
 		};
 
-		// bufferstart/bufferend arrive without a data payload, so the same
-		// mediaPlayerStateChange shape is rebuilt from the fetched current time
-		// and the duration stored on the iframe once the player became ready.
+		// Rebuilt from the fetched time and the duration stored on the iframe.
 		const gtm4wp_onVimeoBufferStateChange = function ( player_state ) {
 			vimeoapi
 				.getCurrentTime()

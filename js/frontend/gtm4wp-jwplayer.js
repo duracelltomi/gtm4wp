@@ -7,23 +7,15 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_jwplayer_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_jwplayer_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initJWPlayerTracking() {
-	// No SDK is enqueued for JW Player: the site loads its own JW library, so this
-	// tracker only hooks the existing global `jwplayer`, re-checked per element
-	// (see gtm4wpObserveMedia) so a container inserted later (popup/AJAX) is still
-	// wired once the library is present. JW Player upgrades its container element
-	// with the `jwplayer`/`jw-player` class during setup; each such element
-	// carries the id used to fetch the player instance. `seen` guards against two
-	// containers sharing one id (the data-attribute marker guards the element).
-	//
-	// A null prototype, because the id comes off the page: on a plain object an
-	// id of `__proto__` reads Object.prototype back as truthy, so the very first
-	// such player would be skipped as one already wired.
+	// No SDK: the site loads its own JW library, so only the existing global
+	// `jwplayer` is hooked, re-checked per element. JW Player marks its
+	// container with the `jwplayer`/`jw-player` class and its id fetches the
+	// instance. `seen` guards two containers sharing one id (the marker guards
+	// the element); null prototype since the id comes off the page.
 	const gtm4wp_jwplayer_seen = Object.create( null );
 
 	const gtm4wp_wireJWPlayerContainer = function ( container ) {
@@ -38,9 +30,7 @@ function gtm4wp_initJWPlayerTracking() {
 			return;
 		}
 
-		// Metadata is read from the current playlist item on every push so a
-		// playlist advancing to the next item reports that item. Author is not
-		// exposed by JW Player, so it is left empty.
+		// From the current playlist item on every push; no author exposed.
 		const gtm4wp_jwMediaData = function () {
 			const item =
 				( typeof player.getPlaylistItem === 'function' &&
@@ -148,9 +138,7 @@ function gtm4wp_initJWPlayerTracking() {
 			);
 		};
 
-		// The player instances found in the DOM are already set up, so the ready
-		// signal is pushed immediately rather than waiting for the 'ready' event
-		// (which may have fired before this tracker ran).
+		// Players found in the DOM are already set up: ready is pushed now.
 		const gtm4wp_jwReadyMediaData = gtm4wp_jwMediaData();
 
 		window[ gtm4wp_datalayer_name ].push( {

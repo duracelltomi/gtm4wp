@@ -8,40 +8,25 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_html5media_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_html5media_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initHTML5MediaTracking() {
-	// Native <video>/<audio> players. Wire those already present and any inserted
-	// later (popup/lightbox, AJAX). Provider embeds (YouTube, Vimeo, SoundCloud)
-	// are iframes, not media elements, so there is nothing to exclude here — they
-	// are tracked by their own dedicated trackers.
+	// Native <video>/<audio>; provider embeds are iframes and never match.
 	const gtm4wp_wireHTML5MediaElement = function ( media_element ) {
-		// The filename is the only stable identifier a local media file
-		// exposes, so it stands in for both the id and the title. It is read
-		// from the live currentSrc on every push because a source can still be
-		// resolving when the element is first seen, and <source>-based players
-		// only settle currentSrc after resource selection.
-		//
-		// The query and the fragment are cut off BEFORE the last path segment is
-		// taken (U106), because an identifier has to be stable: a `?ver=` cache
-		// buster would make the same file a different video after every plugin
-		// update, and a signed CDN token would make it a different video on every
-		// single request - besides putting the token itself into the data layer.
-		// The reported `url` keeps them, since there they are part of the request
-		// that actually played.
+		// The filename is the only stable identifier (id and title), read from
+		// the live currentSrc on every push (<source> players settle it late).
+		// Query and fragment are cut BEFORE the last segment (U106): a `?ver=`
+		// or a signed CDN token would make the same file a different video and
+		// put the token into the data layer. The reported `url` keeps them.
 		const gtm4wp_getHTML5MediaFilename = function () {
 			return gtm4wpMediaBareUrl( media_element.currentSrc )
 				.split( '/' )
 				.pop();
 		};
 
-		// Pushes gtm4wp.mediaPlayerReady once the element's metadata (and thus
-		// its real duration and resolved currentSrc) is available, matching the
-		// "ready carries a real duration" contract of the YouTube, Vimeo and
-		// SoundCloud trackers.
+		// mediaPlayerReady once metadata (real duration, resolved currentSrc)
+		// is available, the family contract.
 		const gtm4wp_pushHTML5MediaReady = function () {
 			const html5media_filename = gtm4wp_getHTML5MediaFilename();
 			const duration = isNaN( media_element.duration )
@@ -53,8 +38,7 @@ function gtm4wp_initHTML5MediaTracking() {
 				mediaType: 'html5media',
 				mediaData: {
 					id: html5media_filename,
-					// Native media elements expose no author metadata, so
-					// `author` is intentionally left empty in every push.
+					// Native media elements expose no author metadata.
 					author: '',
 					title: html5media_filename,
 					url: media_element.currentSrc,
@@ -74,10 +58,8 @@ function gtm4wp_initHTML5MediaTracking() {
 			} );
 		};
 
-		// HAVE_METADATA (1) or more means duration/currentSrc are known already
-		// (e.g. preload="metadata"/"auto" that finished before this ran), so
-		// fire now; otherwise wait for loadedmetadata. `once` guards against a
-		// second ready push if the resource is later reloaded.
+		// readyState >= HAVE_METADATA: fire now, else wait for loadedmetadata
+		// (`once`: no second push on a reload).
 		if ( media_element.readyState >= 1 ) {
 			gtm4wp_pushHTML5MediaReady();
 		} else {
@@ -88,10 +70,7 @@ function gtm4wp_initHTML5MediaTracking() {
 			);
 		}
 
-		// Pushes a gtm4wp.mediaPlayerStateChange. `state` is the normalized
-		// GTM4WP state (e.g. 'play', 'buffering'), which can differ from the
-		// DOM event name (the 'playing' event maps to the 'play' state), so it
-		// is what feeds gtm4wpNativeVideoStatus for the built-in Video variables.
+		// `state` is the normalized GTM4WP state ('playing' event -> 'play').
 		const gtm4wp_pushHTML5MediaStateChange = function ( state ) {
 			const html5media_filename = gtm4wp_getHTML5MediaFilename();
 			const duration = isNaN( media_element.duration )
@@ -125,8 +104,7 @@ function gtm4wp_initHTML5MediaTracking() {
 			} );
 		};
 
-		// Pushes a gtm4wp.mediaPlayerEvent for interactions that are not state
-		// changes (errors, rate/volume/PiP/fullscreen changes).
+		// Non-state interactions (errors, rate/volume/PiP/fullscreen).
 		const gtm4wp_pushHTML5MediaPlayerEvent = function (
 			eventName,
 			eventParam
@@ -165,12 +143,8 @@ function gtm4wp_initHTML5MediaTracking() {
 			} );
 		};
 
-		// The DOM "playing" event (real playback, after any initial buffering)
-		// is used as the start signal so it matches the YouTube, Vimeo and
-		// SoundCloud trackers; it still reports mediaPlayerState "play" to keep
-		// the data layer contract. "waiting" is HTML5's buffering signal and
-		// maps to GTM's built-in "buffering" video status, matching the Vimeo
-		// bufferstart handler.
+		// "playing" (real playback, after buffering) is the start signal, still
+		// reported as state "play"; "waiting" is HTML5's buffering signal.
 		media_element.addEventListener( 'playing', function () {
 			gtm4wp_pushHTML5MediaStateChange( 'play' );
 		} );
@@ -213,9 +187,7 @@ function gtm4wp_initHTML5MediaTracking() {
 			);
 		} );
 
-		// Picture-in-Picture and fullscreen only apply to <video>. These mirror
-		// the enter/leave picture-in-picture and fullscreenchange events the
-		// Vimeo tracker already reports.
+		// PiP and fullscreen only apply to <video> (same events as Vimeo).
 		if ( media_element.tagName === 'VIDEO' ) {
 			media_element.addEventListener(
 				'enterpictureinpicture',
@@ -249,10 +221,7 @@ function gtm4wp_initHTML5MediaTracking() {
 			const videoDuration = media_element.duration;
 			const videoCurrentTime = media_element.currentTime;
 
-			// Guard a missing/zero/NaN duration the same way the other trackers do
-			// (the `if ( ! duration ) return;` family convention, finding #20): with
-			// duration 0 and a positive currentTime, currentTime / 0 is Infinity and
-			// Math.floor(Infinity * 100) would fire EVERY milestone at once.
+			// Zero-duration guard (#20): x / 0 is Infinity and fires every mark.
 			if ( ! videoDuration || isNaN( videoCurrentTime ) ) {
 				return;
 			}
@@ -261,9 +230,7 @@ function gtm4wp_initHTML5MediaTracking() {
 				( videoCurrentTime / videoDuration ) * 100
 			);
 			const html5media_filename = gtm4wp_getHTML5MediaFilename();
-			// Keyed by the full currentSrc (not just the filename) so two
-			// different files that happen to share a basename do not share
-			// milestone state.
+			// Keyed by the full currentSrc: two files may share a basename.
 			const videoid = media_element.currentSrc;
 
 			gtm4wpMediaMilestones(

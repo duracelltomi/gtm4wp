@@ -1,13 +1,8 @@
 /**
- * GTM4WP shared first-party cookie helpers.
- *
- * The one canonical copy of the cookie read/write idiom used by the frontend
- * bundles (the list-attribution cookie in gtm4wp-ecommerce-generic.js, the
- * gate/one-shot/order-tracked cookies in gtm4wp-visitor-data.js). A THIRD copy
- * of the same byte format lives in PHP-emitted JavaScript —
- * PageDataLayer::purchase_dedupe_guard() — which cannot import this module:
- * its protocol (raw value, ';expires=<UTC>;path=/') must stay byte-compatible
- * with gtm4wp_write_cookie(), so change the two together.
+ * GTM4WP shared first-party cookie helpers, the one copy for the frontend
+ * bundles. A second copy of the byte format (raw value, ';expires=<UTC>;path=/')
+ * lives in PHP-emitted JS, PageDataLayer::purchase_dedupe_guard(), which
+ * cannot import this module: change the two together.
  */
 
 /**
@@ -25,11 +20,9 @@ export function gtm4wp_read_cookie( name ) {
 }
 
 /**
- * Writes a first-party cookie on path=/ with a lifetime in days.
- *
- * The value is stored as given — callers URL-encode when their value needs
- * it — and the attribute order (expires, path, optional SameSite) matches the
- * PHP-emitted order-tracked guard byte for byte.
+ * Writes a first-party cookie on path=/ with a lifetime in days. The value is
+ * stored as given (callers URL-encode); the attribute order matches the
+ * PHP-emitted guard byte for byte.
  *
  * @param {string}  name        The cookie name.
  * @param {string}  value       The raw value to store.

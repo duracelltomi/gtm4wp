@@ -7,11 +7,8 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_youtube_percentage_tracking = 10;
-// Both keyed by the YouTube video id, so a null prototype: on a plain object a
-// key of `__proto__` resolves to Object.prototype instead of a missing entry,
-// and writing it back sets the store's prototype instead of a property — which
-// for the interval store means clearInterval() is handed Object.prototype and
-// the progress poll for that video is never stopped.
+// Keyed by the video id, so null prototypes (a `__proto__` key would hand
+// clearInterval() Object.prototype and never stop the poll).
 const gtm4wp_youtube_percentage_tracking_timeouts = Object.create( null );
 const gtm4wp_youtube_percentage_tracking_marks = Object.create( null );
 
@@ -30,10 +27,8 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 
 		const gtm4wp_ytsrc = youtube_frame.getAttribute( 'src' );
 
-		// The fragment is held aside for both halves of what follows: a '?' INSIDE
-		// a fragment is not a query, and anything appended AFTER a '#' is part of
-		// the fragment, so YouTube would never see the parameters and the JS API
-		// would stay switched off - which fires no error and fails no test (U106).
+		// Fragment held aside: a '?' inside it is not a query, and a parameter
+		// appended after '#' is never seen by YouTube, silently (U106).
 		const gtm4wp_ythashpos = gtm4wp_ytsrc.indexOf( '#' );
 		const gtm4wp_ytbase =
 			-1 === gtm4wp_ythashpos
@@ -45,12 +40,8 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 				: gtm4wp_ytsrc.slice( gtm4wp_ythashpos );
 
 		if ( gtm4wp_ytbase.indexOf( 'enablejsapi=1' ) == -1 ) {
-			// Use the correct query separator: '?' when the src carries no
-			// query yet, '&' otherwise. (The previous code always appended
-			// '?' and then '&enablejsapi=1', producing a stray '?&'.) The
-			// origin is a scheme://host built from location, which the
-			// YouTube API expects raw and un-encoded - matching the
-			// server-side enable_youtube_js_api() oEmbed filter.
+			// '?' or '&' by whether the src has a query. The origin is a raw,
+			// un-encoded scheme://host, matching enable_youtube_js_api().
 			const gtm4wp_ytsep = gtm4wp_ytbase.indexOf( '?' ) == -1 ? '?' : '&';
 
 			youtube_frame.setAttribute(
@@ -77,15 +68,8 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 		} );
 	};
 
-	// Wire the YouTube iframes present now and any inserted later (popup/AJAX).
-	// The observer scans the page BEFORE it fetches anything, so a page with no
-	// YouTube embed never requests the IFrame API.
-	//
-	// The API is described in the object form because its script load event
-	// fires too early to wire against: the API defines YT and only THEN calls
-	// onYouTubeIframeAPIReady, so that callback is what re-runs the scan. It is
-	// registered whether or not this page has an embed, which keeps the
-	// behaviour a site gets when it loads the IFrame API itself.
+	// Object form: the API's load event fires too early (YT is defined, then
+	// onYouTubeIframeAPIReady is called), so that callback re-runs the scan.
 	gtm4wpObserveMedia(
 		"iframe[src^='https://www.youtube.com/embed']",
 		gtm4wp_wireYouTubeFrame,
@@ -116,10 +100,8 @@ if ( typeof onYouTubeIframeAPIReady === 'undefined' ) {
 }
 
 /**
- * The player's iframe, whose viewport position becomes gtm.videoVisible.
- *
- * getIframe() is part of the YouTube IFrame Player API; it is guarded so a
- * player object without it simply omits that one key instead of throwing.
+ * The player's iframe, for gtm.videoVisible; guarded so a player without
+ * getIframe() omits that one key.
  *
  * @param {Object} target The YT.Player the event carries.
  * @return {HTMLElement|null} The embed iframe, or null when unavailable.
@@ -222,9 +204,7 @@ function gtm4wp_onYouTubePlayerStateChange( event ) {
 }
 
 /**
- * Pushes a gtm4wp.mediaPlayerEvent for the YouTube events that are not state
- * changes. All four report the same player, so they share one push (matching the
- * single ...PlayerEvent helper every other tracker has).
+ * Pushes a gtm4wp.mediaPlayerEvent for the non-state YouTube events.
  *
  * @param {Object} event     The YT.Player event.
  * @param {string} eventName The gtm4wp media player event name.

@@ -1,15 +1,11 @@
 /**
- * Pure helpers for the WooCommerce block (Store API) tracker.
- *
- * These have no dependency on @wordpress/data or the DOM so they can be unit
- * tested directly. The tracker feeds them the raw cart items from the
- * `wc/store/cart` data store and turns the result into dataLayer events.
+ * Pure helpers for the WooCommerce block (Store API) tracker: no data-store
+ * or DOM dependency, so they are unit tested directly.
  */
 
 /**
- * Parses the GA4 item carried on a Store API line at
- * extensions.gtm4wp.item. Product lines expose it as an object, cart lines as a
- * JSON string (cart-item extension values are strings), so both are accepted.
+ * Parses the GA4 item at extensions.gtm4wp.item: an object on product lines,
+ * a JSON string on cart lines (cart-item extension values are strings).
  *
  * @param {Object|string|undefined} raw The extensions.gtm4wp.item value.
  * @return {Object|null} The parsed GA4 item, or null when absent/invalid.
@@ -78,12 +74,8 @@ export function gtm4wp_diff_cart_items( previous, current ) {
 	const previous_list = Array.isArray( previous ) ? previous : [];
 	const current_list = Array.isArray( current ) ? current : [];
 
-	// Keyed by the Store API cart-item key, so a null prototype - the same rule
-	// the media trackers follow. WooCommerce generates that key as a hash, so no
-	// real cart reaches an inherited Object member; on a plain object one that
-	// did would resolve to a truthy non-entry, making `before.quantity`
-	// undefined, the delta NaN and `NaN > 0` false - so the line would be
-	// silently dropped from add_to_cart/remove_from_cart rather than throwing.
+	// Keyed by the cart-item key, so null prototypes (an inherited member would
+	// read as a truthy non-entry and silently drop the line).
 	const previous_by_key = Object.create( null );
 	previous_list.forEach( ( entry ) => {
 		previous_by_key[ entry.key ] = entry;
@@ -119,11 +111,9 @@ export function gtm4wp_diff_cart_items( previous, current ) {
 }
 
 /**
- * Normalizes the raw `wc/store/cart` crossSells array (cross-sell products the
- * Cart block renders) into a compact list of { id, permalink, item } entries,
- * dropping any product without GA4 item data. Cross-sell products are serialized
- * through the Store API ProductSchema, so they carry the same
- * extensions.gtm4wp.item the product endpoint exposes.
+ * Normalizes the raw `wc/store/cart` crossSells array into { id, permalink,
+ * item } entries, dropping any product without GA4 item data (they go
+ * through ProductSchema, so they carry extensions.gtm4wp.item).
  *
  * @param {Array} cross_sells The getCartData().crossSells array.
  * @return {Array<{id: number, permalink: string, item: Object}>} Normalized items.

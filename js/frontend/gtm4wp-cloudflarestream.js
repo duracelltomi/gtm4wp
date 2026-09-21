@@ -8,42 +8,28 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_cloudflarestream_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_cloudflarestream_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initCloudflareStreamTracking() {
-	// Wire every Cloudflare Stream iframe already on the page and any inserted
-	// later (popup/lightbox, AJAX). The Stream Player SDK
-	// (embed.cloudflarestream.com/embed/sdk.latest.js) is handed to
-	// gtm4wpObserveMedia rather than enqueued by PHP, so a page with no Stream
-	// embed never requests it. It can still be missing at runtime (consent
-	// manager, ad blocker, network error), so it is re-checked per element: a
-	// frame is only wired once the SDK is available.
+	// The Player SDK is handed to gtm4wpObserveMedia (fetched only when an
+	// embed exists) and re-checked per element, since it can still be missing.
 	const gtm4wp_wireStreamFrame = function ( stream_frame ) {
 		const videourl = gtm4wpMediaSrcUrl( stream_frame );
 
-		// The video UID is the last path segment, or the one before it when the
-		// embed URL ends in /iframe (…/{uid}/iframe). That is why the src is read
-		// through gtm4wpMediaSrcUrl(): WordPress renders a Stream embed as
-		// …/{uid}/iframe#?secret=… (U106), and a '#' left on the last segment makes
-		// it miss the /iframe test, so every event reports 'iframe#' as the video.
+		// The UID is the last path segment, or the one before a trailing
+		// /iframe. gtm4wpMediaSrcUrl() strips WordPress' `#?secret=` (U106),
+		// which would otherwise make the segment 'iframe#'.
 		const parts = videourl.split( '/' ).filter( Boolean );
 		let videoid = parts[ parts.length - 1 ];
 		if ( videoid === 'iframe' && parts.length >= 2 ) {
 			videoid = parts[ parts.length - 2 ];
 		}
 
-		// The Stream player mirrors the HTML5 media API: events carry no payload,
-		// so the current time and duration are read from the player object.
-		//
-		// The Player SDK exposes no title and no author, so the UID stands in as
-		// the title - unless the embed carries a title attribute, which is the one
-		// real title available client-side. WordPress fills that attribute from the
-		// oEmbed response (`wp_filter_oembed_iframe_title_attribute()`) and its
-		// oEmbed sanitizer keeps it, so on a site whose provider returns a title
-		// the embed has one; Cloudflare's own copy-paste snippet does not.
+		// Events carry no payload (HTML5-like API): time and duration are read
+		// from the player. No title/author in the SDK: the iframe title
+		// attribute (filled by WordPress from the oEmbed response, absent from
+		// Cloudflare's own snippet) or the UID.
 		const frametitle = (
 			stream_frame.getAttribute( 'title' ) || ''
 		).trim();

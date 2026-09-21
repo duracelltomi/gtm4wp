@@ -1,17 +1,11 @@
-// Guard against double registration: a re-injected bundle (AJAX navigation, a page
-// builder duplicating the handle) would otherwise attach these document-level
-// listeners twice and double-push every form event. The media-tracker family and
-// the CF7 tracker have carried this guard since #22 / #28; both times it was written
-// as a media-tracker rule, so the bundles that attach document listeners without
-// being media trackers were left behind (#71). Litmus: every js/frontend/*.js file
-// with a module-scope addEventListener() needs one, whatever it tracks.
+// Double-init guard (#71): every frontend bundle with a module-scope
+// addEventListener() needs one, or a re-injected bundle double-pushes.
 if ( ! window.gtm4wp_form_move_inited ) {
 	window.gtm4wp_form_move_inited = true;
 
-	// Printed by UserEventsModule::enqueue_scripts() as a `var`, which really is a
-	// window property; a top-level `const` would bind lexically and never show up
-	// here (RI-14). Defaulted rather than assumed, so the bundle still behaves when
-	// something enqueues it without the inline config.
+	// Printed by UserEventsModule::enqueue_scripts() as a `var`, a real window
+	// property (a top-level `const` would bind lexically, RI-14). Defaulted so
+	// the bundle behaves without the inline config.
 	const gtm4wp_form_move_config = window.gtm4wp_form_move_config || {
 		filledOnly: false,
 	};
@@ -19,10 +13,8 @@ if ( ! window.gtm4wp_form_move_inited ) {
 	const gtm4wp_form_move_selector =
 		'input,select,textarea,button,meter,progress';
 
-	// Input types with no meaningful "filled in" state: a checkbox or a radio
-	// carries its information equally when checked and unchecked, and a button can
-	// only ever be clicked. These stay exempt from the filled-only option, so they
-	// are reported the same way whether it is on or off.
+	// Types with no meaningful "filled in" state, exempt from the filled-only
+	// option.
 	const gtm4wp_form_move_unfillable_types = [
 		'checkbox',
 		'radio',
@@ -32,10 +24,8 @@ if ( ! window.gtm4wp_form_move_inited ) {
 		'image',
 	];
 
-	// Was the field empty when the visitor entered it? Written on focusin and read
-	// on focusout, because the option reports the empty -> filled transition rather
-	// than the value on its own. A WeakMap, so a form removed from the DOM takes
-	// its entries with it.
+	// Was the field empty on focusin? The option reports the empty -> filled
+	// transition. A WeakMap, so a removed form takes its entries with it.
 	const gtm4wp_form_move_empty_on_enter = new WeakMap();
 
 	/**
@@ -55,9 +45,7 @@ if ( ! window.gtm4wp_form_move_inited ) {
 			return false;
 		}
 
-		// The DOM property, not the attribute: it normalizes a missing or
-		// unrecognized type attribute to "text", which is what the browser does
-		// with the field itself.
+		// The DOM property normalizes a missing/unknown type to "text".
 		const type = String( elem.type || 'text' ).toLowerCase();
 
 		return -1 === gtm4wp_form_move_unfillable_types.indexOf( type );
@@ -106,32 +94,23 @@ if ( ! window.gtm4wp_form_move_inited ) {
 	}
 
 	/**
-	 * Builds the flat `gtm.element*` keys that populate GTM's built-in Form
-	 * variables, ready to be spread into a data layer push.
-	 *
-	 * Google publishes no "Form Name" built-in, so the form's name attribute has
-	 * no key here and stays available as our own `formName`. See U108.
+	 * Builds the flat `gtm.element*` keys of GTM's built-in Form variables.
+	 * Google publishes no "Form Name" built-in, so the name stays our own
+	 * `formName` (U108).
 	 *
 	 * @param {HTMLFormElement|null} form The form the focused element belongs to.
 	 * @return {Object} The `gtm.element*` keys, empty when there is no form.
 	 */
 	function gtm4wp_form_move_native_params( form ) {
-		// Omitted rather than emptied when the element belongs to no form: the
-		// six keys above fall back to "(no form ID)" style placeholders, and
-		// feeding one of those to a built-in variable would have GTM report the
-		// placeholder as though it were the form's real id.
+		// Omitted, not emptied: a "(no form ID)" placeholder would reach a
+		// built-in variable as the form's real id.
 		if ( ! form ) {
 			return {};
 		}
 
-		// DOM properties, not getAttribute(): these have to match what GTM
-		// itself pushes on a form submission, where an absent attribute reads as
-		// an empty string and `action` resolves to an absolute URL (falling back
-		// to the document URL when the attribute is missing).
-		//
-		// These are the same keys GTM's Clicks category reads, so on our events
-		// Click ID and Click Classes resolve to the form as well. That is how
-		// Google defines them; it is not something we can separate.
+		// DOM properties, not getAttribute(), to match what GTM pushes on a
+		// form submission (absent = '', `action` resolves to an absolute URL).
+		// The Clicks built-ins read the same keys; Google defines it that way.
 		return {
 			'gtm.elementId': form.id || '',
 			'gtm.elementClasses': form.className || '',
@@ -163,8 +142,8 @@ if ( ! window.gtm4wp_form_move_inited ) {
 				return;
 			}
 
-			// Recorded before the push, so that a data layer listener reacting to
-			// the enter event cannot change what the leave handler compares to.
+			// Recorded before the push, so a data layer listener cannot change
+			// what the leave handler compares to.
 			if (
 				gtm4wp_form_move_config.filledOnly &&
 				gtm4wp_form_move_has_value_state( elem )
@@ -175,9 +154,7 @@ if ( ! window.gtm4wp_form_move_inited ) {
 				);
 			}
 
-			// The enter event is never filtered: it reports which fields the
-			// visitor engaged with, which is exactly the half the leave event
-			// stops reporting once the option is on.
+			// Never filtered: it reports which fields the visitor engaged with.
 			gtm4wp_form_move_push( elem, 'gtm4wp.formElementEnter' );
 		},
 		false
@@ -198,10 +175,8 @@ if ( ! window.gtm4wp_form_move_inited ) {
 				const wasempty = gtm4wp_form_move_empty_on_enter.get( elem );
 				gtm4wp_form_move_empty_on_enter.delete( elem );
 
-				// Report only the visit that actually filled the field in. A
-				// field with no recorded entry state was focused before this
-				// bundle attached its listeners, so the transition was never
-				// observed; that stays silent rather than being guessed at.
+				// Only the visit that filled the field in; no recorded entry
+				// state (focused before the listeners attached) stays silent.
 				if ( true !== wasempty || gtm4wp_form_move_is_empty( elem ) ) {
 					return;
 				}

@@ -5,28 +5,19 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_wistia_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_wistia_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initWistiaTracking() {
-	// Bind once: if this bundle is executed twice (e.g. re-injected by a tag
-	// manager) a second `_wq` push would register `onReady` again and every
-	// Wistia event would be pushed to the data layer twice.
+	// Double-init guard: a second `_wq` push would double every event.
 	if ( window.gtm4wp_wistia_inited ) {
 		return;
 	}
 	window.gtm4wp_wistia_inited = true;
 
-	// Wistia's Player API is consumed through the global `_wq` ready queue rather
-	// than a script we enqueue: pushing a handler with id '_all' registers an
-	// onReady callback for every Wistia video on the page, and Wistia's own embed
-	// runtime processes the queue whenever it loads. If that runtime never loads
-	// (consent manager / ad blocker / no Wistia embed present), onReady simply
-	// never fires and nothing is pushed — graceful by design, so no SDK guard is
-	// needed here. The queue is populated immediately (not on DOMContentLoaded)
-	// so it is in place before the player becomes ready.
+	// The Player API is the global `_wq` ready queue ('_all' = every video),
+	// processed by Wistia's own runtime whenever it loads; if it never loads,
+	// nothing fires. Populated immediately so it is in place before ready.
 	window._wq = window._wq || [];
 	window._wq.push( {
 		id: '_all',
@@ -34,14 +25,10 @@ function gtm4wp_initWistiaTracking() {
 			const videoid = video.hashedId();
 			const videourl = 'https://fast.wistia.net/embed/iframe/' + videoid;
 
-			// The element whose viewport position the pushes report as
-			// gtm.videoVisible. Wistia's Player API documents no DOM accessor,
-			// so the documented async-embed markup (a container carrying the
-			// `wistia_async_<hashedId>` class) is the contract relied on here;
-			// the undocumented elem() the runtime also exposes is preferred when
-			// present, because it is exact for a page with two embeds of the
-			// same video. Resolved per push: a player inserted later (popup /
-			// lightbox) is not in the DOM when onReady runs.
+			// Element for gtm.videoVisible: the undocumented elem() when
+			// present (exact for two embeds of one video), else the documented
+			// `wistia_async_<hashedId>` container. Resolved per push: a later
+			// inserted player is not in the DOM when onReady runs.
 			const gtm4wp_wistiaElement = function () {
 				if ( typeof video.elem === 'function' ) {
 					const element = video.elem();

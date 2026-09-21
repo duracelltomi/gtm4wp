@@ -7,28 +7,18 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_soundclound_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_soundclound_percentage_tracking_marks = Object.create( null );
 
 function gtm4wp_initSoundCloudTracking() {
-	// Wire every SoundCloud iframe already on the page and any inserted later
-	// (popup/lightbox, AJAX). The SoundCloud Widget API (w.soundcloud.com/player/api.js)
-	// is handed to gtm4wpObserveMedia rather than enqueued by PHP, so a page with
-	// no SoundCloud embed never requests it. It can still be missing at runtime
-	// (consent manager, ad blocker, network error), so it is re-checked per
-	// element: a frame is only wired once the SDK is available.
+	// The Widget API is handed to gtm4wpObserveMedia (fetched only when an
+	// embed exists) and re-checked per element, since it can still be missing.
 	const gtm4wp_wireSoundCloudFrame = function ( soundcloud_frame ) {
 		const widget = SC.Widget( soundcloud_frame );
 		let sound = {};
 
-		// Reads the widget's current sound, refreshes the cached `sound` and the
-		// data-player_* attributes, then runs `done`. SoundCloud widgets can host
-		// a playlist, so the current sound changes as playback advances between
-		// tracks; refreshing on READY and on every PLAY keeps each push tied to
-		// the track that is actually playing (and keeps the percentage marks
-		// keyed by the right sound id).
+		// Refreshes the cached `sound` and the data-player_* attributes, then
+		// runs `done`. A playlist advances, so refreshed on READY and every PLAY.
 		const gtm4wp_refreshSoundCloudCurrentSound = function ( done ) {
 			widget.getCurrentSound( function ( soundData ) {
 				if ( soundData ) {
@@ -97,9 +87,7 @@ function gtm4wp_initSoundCloudTracking() {
 			);
 
 			widget.bind( SC.Widget.Events.PLAY, function ( eventData ) {
-				// Refresh the current sound first so a playlist advancing to the
-				// next track reports that track's metadata instead of the first
-				// sound's, then push the state change.
+				// Refresh first so a playlist reports the track now playing.
 				gtm4wp_refreshSoundCloudCurrentSound( function () {
 					gtm4wp_onSoundCloudPlayerStateChange( eventData, 'play' );
 				} );

@@ -6,37 +6,22 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_spotify_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// All three stores are keyed by a provider-reported URI, so null prototypes
+// (`__proto__` key).
 const gtm4wp_spotify_percentage_tracking_marks = Object.create( null );
 
-// The Spotify iFrame API exposes no discrete play/pause/seek/end events — only a
-// periodic `playback_update` carrying isPaused/isBuffering/position/duration. The
-// player state is derived from those updates, and the last state pushed per URI
-// is tracked so the repeated updates collapse to a single state change. A null
-// prototype for the same reason as the title cache above: a URI must never read
-// an inherited Object member back as if it were a stored state.
+// The iFrame API has no discrete play/pause/seek/end events, only a periodic
+// `playback_update` (isPaused/isBuffering/position/duration); the state is
+// derived and the last one pushed per URI collapses the repeats.
 const gtm4wp_spotify_last_state = Object.create( null );
 
-// Resolved titles, keyed by Spotify URI. A null prototype so a URI can never
-// read an inherited Object member back as if it were a cached title.
-//
-// Keyed by URI rather than by embed because a playlist or album advances: the
-// embed markup describes the playlist, while each track that starts playing
-// needs a title of its own.
-//
-// A stored '' means "resolved to nothing" and is deliberate. playback_update
-// repeats every few hundred milliseconds, so a lookup whose failure is not
-// remembered would be re-issued several times a second.
+// Resolved titles by URI (a playlist advances to tracks the embed markup
+// says nothing about). A stored '' = "resolved to nothing", so a failed
+// lookup is not re-issued on every playback_update.
 const gtm4wp_spotify_titles = Object.create( null );
 
-// Spotify's oEmbed markup prefixes the iframe title attribute with this exact
-// literal: title="Spotify Embed: Never Gonna Give You Up". The string is
-// Spotify's own, not one WordPress composes — core's
-// wp_filter_oembed_iframe_title_attribute() keeps an existing title attribute
-// rather than building one — so it is the same English literal on every locale.
-// Registered as an upstream coupling (U104).
+// Spotify's own oEmbed title literal (title="Spotify Embed: …"), the same on
+// every locale since core keeps an existing title attribute (U104).
 const gtm4wp_spotify_title_prefix = 'Spotify Embed: ';
 
 // Public oEmbed endpoint, used only when an embed carries no title attribute.
@@ -58,11 +43,8 @@ function gtm4wp_spotifyContentUrl( uri ) {
 }
 
 /**
- * Builds the mediaData object from a Spotify URI (spotify:type:id).
- *
- * The Spotify embed API carries no title of its own, so the title is whatever
- * gtm4wp_resolveSpotifyTitle() has resolved for this URI. Until (or unless) that
- * lands, the URI itself is reported, exactly as it always was.
+ * Builds the mediaData object from a Spotify URI (spotify:type:id). The embed
+ * API carries no title; the resolved one is used, else the URI.
  *
  * @param {string} uri      The Spotify URI.
  * @param {number} duration Duration in seconds.
@@ -92,28 +74,23 @@ function gtm4wp_spotifyTitleFromFrame( frame ) {
 		return '';
 	}
 
-	// getAttribute() reports the decoded value, so a title carrying &amp; in the
-	// markup arrives here as & and needs no further work.
+	// getAttribute() reports the decoded value (&amp; arrives as &).
 	const title = ( frame.getAttribute( 'title' ) || '' ).trim();
 
 	if ( 0 === title.indexOf( gtm4wp_spotify_title_prefix ) ) {
 		return title.slice( gtm4wp_spotify_title_prefix.length ).trim();
 	}
 
-	// A hand-written embed may carry a title of its own with no Spotify prefix.
+	// A hand-written embed may carry an unprefixed title.
 	return title;
 }
 
 /**
- * Resolves the title for one Spotify URI into the cache, at most once per URI.
- *
- * Nothing waits on this. The seed (the embed's own title attribute) is available
- * synchronously and covers the normal case, so every push carries a real title.
- * The oEmbed lookup is the fallback for an embed with no title attribute, and is
- * started as the embed is wired — a whole iframe load before the SDK reports
- * ready — so it has landed by the time anything is pushed in all but the slowest
- * case. Deferring an event on it instead would risk losing that event entirely
- * when a consent manager or an ad blocker leaves the request hanging.
+ * Resolves the title for one Spotify URI into the cache, at most once per
+ * URI. Nothing waits on it: the seed (the embed's title attribute) is
+ * synchronous, and the oEmbed fallback starts as the embed is wired; deferring
+ * an event on it would lose the event when a blocker leaves the request
+ * hanging.
  *
  * @param {string} uri         The Spotify URI.
  * @param {string} [seedTitle] Title already known from the embed markup.
@@ -131,19 +108,15 @@ function gtm4wp_resolveSpotifyTitle( uri, seedTitle ) {
 
 	const contentUrl = gtm4wp_spotifyContentUrl( uri );
 
-	// Claim the URI before the request goes out, and leave that '' in place on
-	// every failure path below: that is what stops a blocked, failing or
-	// unparseable endpoint from being asked again on the next playback_update.
+	// Claimed before the request; the '' stays on every failure path so a
+	// failing endpoint is not asked again.
 	gtm4wp_spotify_titles[ uri ] = '';
 
-	// A URI that did not split into a type and an id cannot address anything, so
-	// no request is built from it.
 	if ( ! contentUrl || 'function' !== typeof fetch ) {
 		return;
 	}
 
-	// credentials: 'omit' — the endpoint answers with a Set-Cookie for
-	// .spotify.com, and looking up a title is not a reason to store it.
+	// credentials: 'omit': the endpoint sets a .spotify.com cookie.
 	fetch( gtm4wp_spotify_oembed_endpoint + encodeURIComponent( contentUrl ), {
 		credentials: 'omit',
 	} )
@@ -156,8 +129,7 @@ function gtm4wp_resolveSpotifyTitle( uri, seedTitle ) {
 			}
 		} )
 		.catch( function () {
-			// Network error, blocked request or an unparseable body: the ''
-			// written above stands, so the URI is reported and not retried.
+			// The '' written above stands.
 		} );
 }
 
@@ -227,12 +199,10 @@ function gtm4wp_onSpotifyPercentageChange(
  * Binds the data layer pushes to one Spotify embed controller.
  *
  * @param {Object}      controller The Spotify EmbedController.
- * @param {HTMLElement} frame      The iframe handed to createController. Read for
- *                                 its src only: the SDK replaces this node, so it
- *                                 is detached by the time playback starts.
- * @param {Function}    liveFrame  Resolves the iframe that took the original's
- *                                 place, so gtm.videoVisible measures the embed
- *                                 that is actually on screen.
+ * @param {HTMLElement} frame      The iframe handed to createController, read for
+ *                                 its src only (the SDK replaces the node).
+ * @param {Function}    liveFrame  Resolves the iframe that took its place, for
+ *                                 gtm.videoVisible.
  */
 function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 	const fallbackUri = gtm4wp_spotifyUriFromSrc( frame );
@@ -251,8 +221,7 @@ function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 				url: info.url,
 				title: info.title,
 				currentTime: 0,
-				// The controller reports no duration until the first
-				// playback_update, so ready carries 0 (as mediaData does).
+				// No duration before the first playback_update.
 				duration: 0,
 				element: liveFrame,
 			} ),
@@ -263,13 +232,11 @@ function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 		const data = ( e && e.data ) || {};
 		const uri = data.playingURI || fallbackUri;
 
-		// A playlist or album embed advances to a URI the embed markup says
-		// nothing about, so that one is resolved on its own. Cached after the
-		// first update, which is what keeps the repeated updates silent.
+		// A playlist advances to a URI the markup does not know; cached after
+		// the first update.
 		gtm4wp_resolveSpotifyTitle( uri );
 
-		// Spotify reports times in milliseconds; gtm4wp media events and the
-		// gtm.video* variables use seconds.
+		// Spotify reports milliseconds.
 		const currentTime = ( data.position || 0 ) / 1000;
 		const duration = ( data.duration || 0 ) / 1000;
 
@@ -318,33 +285,25 @@ function gtm4wp_bindSpotifyController( controller, frame, liveFrame ) {
 }
 
 function gtm4wp_initSpotifyTracking() {
-	// Register once: if this bundle is executed twice (e.g. re-injected by a tag
-	// manager) it would chain its own onSpotifyIframeApiReady onto itself and
-	// create a controller per iframe twice, doubling every data layer push.
+	// Double-init guard: a re-executed bundle would chain onSpotifyIframeApiReady
+	// onto itself and double every push.
 	if ( window.gtm4wp_spotify_inited ) {
 		return;
 	}
 	window.gtm4wp_spotify_inited = true;
 
-	// Spotify hands its controller factory to the global onSpotifyIframeApiReady
-	// callback instead of exposing a global object, so "the SDK is ready" here
-	// means "that callback has fired" and the IFrameAPI it was given IS the SDK.
-	// That is why the SDK is described to gtm4wpObserveMedia in the object form:
-	// the script's own load event fires too early to wire anything.
+	// The SDK is the IFrameAPI handed to the global onSpotifyIframeApiReady
+	// callback (no global object), hence the object form for gtm4wpObserveMedia:
+	// the script's load event fires too early.
 	let spotifyApi = null;
 
-	// Wire the Spotify embeds present now and any inserted later (popup/AJAX).
-	// The observer scans first and only fetches the iFrame API if this page
-	// actually has an embed, so a page without one never calls open.spotify.com.
 	gtm4wpObserveMedia(
 		'iframe[src*="open.spotify.com/embed"]',
 		function ( spotify_frame, liveFrame ) {
 			const uri = gtm4wp_spotifyUriFromSrc( spotify_frame );
 
-			// Read the title attribute BEFORE createController: the SDK
-			// replaces this node with its own iframe, and the attribute leaves
-			// with it. This is also the earliest point the oEmbed fallback can
-			// start, giving it the whole embed load to finish in.
+			// BEFORE createController: the SDK replaces this node and the title
+			// attribute leaves with it.
 			gtm4wp_resolveSpotifyTitle(
 				uri,
 				gtm4wp_spotifyTitleFromFrame( spotify_frame )
@@ -368,11 +327,8 @@ function gtm4wp_initSpotifyTracking() {
 		{
 			src: 'https://open.spotify.com/embed/iframe-api/v1',
 			subscribe( rescan ) {
-				// A previously registered callback (another integration, or the
-				// site loading the API for its own reasons) is preserved and
-				// chained so this tracker does not clobber it. If the API never
-				// loads (consent manager / ad blocker) the callback never fires
-				// and nothing is pushed — graceful by design.
+				// A previously registered callback (another integration) is
+				// chained, not clobbered. If the API never loads, nothing fires.
 				const previous = window.onSpotifyIframeApiReady;
 
 				window.onSpotifyIframeApiReady = function ( IFrameAPI ) {

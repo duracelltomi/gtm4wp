@@ -7,14 +7,11 @@ import {
 } from './lib/native-video-params';
 
 const gtm4wp_twitch_percentage_tracking = 10;
-// Keyed by the media id the provider reports, so a null prototype: on a plain
-// object a key of `__proto__` resolves to Object.prototype instead of a missing
-// entry, and writing it back sets the store's prototype instead of a property.
+// Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_twitch_percentage_tracking_marks = Object.create( null );
 
-// `container` is the div the tracker put in the iframe's place, which the Twitch
-// Embed SDK fills with its own player iframe — so it is the element whose
-// viewport position the pushes report as gtm.videoVisible.
+// `container` is the div the SDK fills with its player iframe, measured for
+// gtm.videoVisible.
 function gtm4wp_bindTwitchPlayer(
 	player,
 	channel,
@@ -95,9 +92,8 @@ function gtm4wp_bindTwitchPlayer(
 		} );
 	};
 
-	// Twitch has no periodic time event, so percentage milestones are polled
-	// while playing (like the YouTube tracker). Live streams report no duration,
-	// so the percentage helper simply does nothing for them.
+	// No periodic time event: milestones are polled while playing (like
+	// YouTube). Live streams report no duration, so nothing fires for them.
 	const gtm4wp_onTwitchPercentageChange = function () {
 		const videoDuration = gtm4wp_twitchDuration();
 		if ( ! videoDuration ) {
@@ -201,16 +197,10 @@ function gtm4wp_bindTwitchPlayer(
 }
 
 function gtm4wp_initTwitchTracking() {
-	// A plain Twitch player iframe cannot be wrapped after the fact: the events
-	// are only available on a player created through the Embed API. Each iframe is
-	// therefore replaced with a Twitch.Player pointing at the same channel/video,
-	// which re-creates the embed under our control so its events can be tracked.
-	// The Twitch Embed API (embed.twitch.tv/embed/v1.js) is handed to
-	// gtm4wpObserveMedia rather than enqueued by PHP, so a page with no Twitch
-	// embed never requests it. It can still be missing at runtime (consent
-	// manager, ad blocker, network error), so it is re-checked per element: a
-	// frame is only wired once the SDK is available, and this also covers iframes
-	// inserted later (popup/AJAX).
+	// A plain player iframe cannot be wrapped: events exist only on a player
+	// created through the Embed API, so each iframe is replaced with a
+	// Twitch.Player for the same channel/video. The SDK is handed to
+	// gtm4wpObserveMedia and re-checked per element.
 	const gtm4wp_wireTwitchFrame = function ( twitch_frame ) {
 		let params;
 		try {
@@ -233,18 +223,15 @@ function gtm4wp_initTwitchTracking() {
 			return;
 		}
 
-		// Unique-container-id counter for the Twitch.Player replacements. Kept on
-		// window (not module scope) so ids stay unique even when the bundle is
-		// re-executed (a tag-manager re-injection restarts module scope at 0 while the
-		// earlier gtm4wp-twitch-0 container is still in the DOM, which would collide).
+		// Counter on window, not module scope: a re-executed bundle would
+		// restart at 0 while the earlier container is still in the DOM.
 		window.gtm4wp_twitch_frame_index =
 			window.gtm4wp_twitch_frame_index || 0;
 
 		const container = document.createElement( 'div' );
 		container.id = 'gtm4wp-twitch-' + window.gtm4wp_twitch_frame_index++;
-		// Mark the container so the iframe the Twitch Embed SDK injects into it —
-		// which also matches iframe[src*="player.twitch.tv"] — is skipped by the
-		// shared MutationObserver instead of being replaced again in a loop.
+		// Marked so the iframe the SDK injects (which matches the selector) is
+		// skipped by the shared observer instead of replaced in a loop.
 		container.setAttribute( 'data-gtm4wp-media-wired', '1' );
 		twitch_frame.parentNode.replaceChild( container, twitch_frame );
 

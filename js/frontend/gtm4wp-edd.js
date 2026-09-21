@@ -1,56 +1,37 @@
 /**
- * GTM4WP Easy Digital Downloads frontend tracker.
+ * GTM4WP Easy Digital Downloads frontend tracker: view_item_list ([downloads]
+ * grid and the EDD downloads block), select_item, add_to_cart (buy buttons
+ * incl. Buy Now), remove_from_cart (cart row remove links plus quantity-edit
+ * deltas), add_payment_info (gateway selection) and the view_item re-fire on
+ * a variable-priced download's price option.
  *
- * Fires the client-side GA4 e-commerce events of the EDD integration:
- * view_item_list (impressions of the [downloads] grid and the EDD downloads
- * block), select_item, add_to_cart (buy button clicks incl. Buy Now),
- * remove_from_cart (cart row remove links - classic templates, the checkout
- * block and the full cart block - plus quantity-edit deltas when EDD's Item
- * Quantities setting renders quantity fields), add_payment_info (gateway
- * selection) and the view_item re-fire when the buyer picks a price option
- * of a variable-priced download on its detail page.
- *
- * Reads the hidden markup emitted by the ListTracking PHP class:
- * span.gtm4wp_edd_productdata (grid items), input[name=gtm4wp_product_data]
- * (purchase forms) and span.gtm4wp_edd_cartitemdata (checkout cart rows).
- * The classes deliberately differ from the WooCommerce tracker's so a site
- * running both store plugins never counts an element twice.
- *
- * The jQuery dependency is on purpose: EDD core triggers its gateway event
- * (edd_gateway_loaded) through jQuery's own event system, which vanilla
- * listeners can not observe.
+ * Reads the markup emitted by ListTracking: span.gtm4wp_edd_productdata,
+ * input[name=gtm4wp_product_data] and span.gtm4wp_edd_cartitemdata. The
+ * classes differ from the WooCommerce tracker's on purpose (both plugins on
+ * one site). jQuery is required: EDD triggers edd_gateway_loaded through
+ * jQuery's own event system.
  */
 
-// Guard against double registration (#218, PA-9): a re-injected bundle (AJAX
-// navigation, a page builder or optimizer duplicating the handle) would otherwise
-// attach the document listeners below twice and double-push every EDD event, and
-// re-run the view_item_list impression scan. The whole module body is wrapped, so
-// nothing runs a second time - the reference shape of gtm4wp-form-move-tracker.js,
-// not the boot-entry guard of gtm4wp-woocommerce.js (which only works there because
-// #82 also moved its state to window).
+// Double-init guard (#218, PA-9): the whole module body is wrapped (the
+// gtm4wp-form-move-tracker.js shape), so a re-injected bundle runs nothing.
 if ( ! window.gtm4wp_edd_inited ) {
 	window.gtm4wp_edd_inited = true;
 
-	// #222: match the WooCommerce bundle's typeof-guarded init of the shared
-	// cross-container id; a plain `x = x || ''` is wrong for a value whose
-	// legitimate content can be 0 (see gtm4wp-woocommerce.js).
+	// #222: typeof-guarded like the WooCommerce bundle; the value can be 0.
 	if ( 'undefined' === typeof window.gtm4wp_first_container_id ) {
 		window.gtm4wp_first_container_id = '';
 	}
 
-	// Payment info is reported once per selected gateway, mirroring the
-	// WooCommerce tracker's checkout-step dedupe.
+	// add_payment_info once per selected gateway.
 	const gtm4wp_edd_payment_info_fired = [];
 
-	// EDD fires edd_gateway_loaded once while the checkout page initializes;
-	// only a later firing means the buyer actively picked a gateway.
+	// edd_gateway_loaded fires once while the checkout initializes; only a
+	// later firing is a buyer choice.
 	let gtm4wp_edd_gateway_events_seen = 0;
 
 	/**
-	 * Whether the opt-in GA4 list-attribution persistence (#405) is on. The flag
-	 * is printed as a top-level const, so it binds lexically and must be read as
-	 * a bare identifier - `window.gtm4wp_list_attribution` is permanently
-	 * undefined.
+	 * Whether the opt-in list-attribution persistence (#405) is on. The flag is
+	 * a top-level const (binds lexically): read it bare, never via `window.`.
 	 *
 	 * @return {boolean} Whether list attribution persistence is enabled.
 	 */
@@ -107,8 +88,7 @@ if ( ! window.gtm4wp_edd_inited ) {
 
 	/**
 	 * Fires the GA4 add_to_cart event for an EDD purchase (buy button) form.
-	 * Exposed on window so a theme with a custom add-to-cart flow can fire the
-	 * event from its own handler without duplicating the tracker.
+	 * Exposed on window for themes with a custom add-to-cart flow.
 	 *
 	 * @param {Element} trigger_element The clicked buy button (or a descendant).
 	 * @return {boolean} Whether an add_to_cart event was tracked.
@@ -149,10 +129,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 			return false;
 		}
 
-		// #405: the buy-button markup is baked into cacheable HTML, so the list
-		// this visitor came from is merged client-side from the first-party
-		// cookie, keyed by the download id (internal_id was excluded above, so
-		// read it separately). Opt-in only.
+		// #405 (opt-in): the list is merged client-side from the cookie, keyed
+		// by the download id (internal_id was excluded above).
 		let list_lookup_id = 0;
 		if ( gtm4wp_edd_list_attribution_enabled() ) {
 			const rawdata = gtm4wp_read_from_json( product_data_el.value, [] );
@@ -177,9 +155,7 @@ if ( ! window.gtm4wp_edd_inited ) {
 		let sum_value = 0;
 
 		if ( price_options ) {
-			// Variable prices: one item per checked price option (radio in single
-			// mode, checkboxes in multi mode), carrying the option's price and
-			// name as the GA4 item_variant.
+			// One item per checked price option (radio or multi-mode checkbox).
 			const checked = gtm4wp_edd_checked_price_option_items(
 				form,
 				productdata,
@@ -213,13 +189,10 @@ if ( ! window.gtm4wp_edd_inited ) {
 	window.gtm4wp_edd_track_add_to_cart = gtm4wp_edd_track_add_to_cart;
 
 	/**
-	 * Re-fires the GA4 view_item event with the picked price option when the
-	 * buyer selects an option of a variable-priced download on its own detail
-	 * page - the EDD counterpart of the WooCommerce tracker's found_variation
-	 * handling. The PHP data layer sets window.gtm4wp_edd_variable_view_item on
-	 * singular download pages only, and forms inside grid items (the [downloads]
-	 * shortcode or the EDD downloads block) are ignored even there: interacting
-	 * with a grid item stays list territory (select_item / add_to_cart).
+	 * Re-fires view_item with the picked price option of a variable-priced
+	 * download on its detail page (the EDD counterpart of found_variation). PHP
+	 * sets window.gtm4wp_edd_variable_view_item on singular pages only, and
+	 * forms inside grid items are ignored even there (list territory).
 	 *
 	 * @param {Element} option_input The changed price option input.
 	 * @return {boolean} Whether a view_item event was tracked.
@@ -265,8 +238,7 @@ if ( ! window.gtm4wp_edd_inited ) {
 			return false;
 		}
 
-		// #405: merge the originating list onto the re-fired view_item from the
-		// first-party cookie, keyed by the download id. Opt-in only.
+		// #405 (opt-in): merge the originating list from the cookie.
 		if ( gtm4wp_edd_list_attribution_enabled() ) {
 			const rawdata = gtm4wp_read_from_json( product_data_el.value, [] );
 			const list_lookup_id = ( rawdata && rawdata.internal_id ) || 0;
@@ -286,12 +258,10 @@ if ( ! window.gtm4wp_edd_inited ) {
 	}
 
 	/**
-	 * Fires add_to_cart / remove_from_cart for the quantity delta when the buyer
-	 * edits a cart row's quantity field (EDD renders these fields only when its
-	 * Item Quantities setting is on). The server-rendered defaultValue is the
-	 * previous quantity, and it is advanced after each report so consecutive
-	 * edits diff against the quantity already reported - EDD updates the cart
-	 * over AJAX without re-rendering the rows.
+	 * Fires add_to_cart / remove_from_cart for the quantity delta of a cart row
+	 * edit (Item Quantities setting). defaultValue is the previous quantity and
+	 * is advanced after each report: EDD updates the cart over AJAX without
+	 * re-rendering the rows.
 	 *
 	 * @param {Element} qty_el The changed quantity input.
 	 * @return {boolean} Whether an event was tracked.
@@ -340,8 +310,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 	}
 
 	/**
-	 * Fires the GA4 add_payment_info event for the given gateway once. Uses the
-	 * checkout products the PHP data layer exposed on window.
+	 * Fires add_payment_info for the given gateway once, with the checkout
+	 * products PHP exposed on window.
 	 *
 	 * @param {string} gateway The selected gateway slug.
 	 * @return {void}
@@ -367,9 +337,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 	}
 
 	/**
-	 * Returns the currently selected gateway slug on the checkout page, or an
-	 * empty string when there is none (single-gateway checkouts render no
-	 * payment-mode selector).
+	 * The selected gateway slug on the checkout page, or '' (a single-gateway
+	 * checkout renders no selector).
 	 *
 	 * @return {string} The selected gateway slug or ''.
 	 */
@@ -435,11 +404,9 @@ if ( ! window.gtm4wp_edd_inited ) {
 					return true;
 				}
 
-				// Track remove links in cart rows. The classic checkout cart and
-				// the EDD checkout block both render edd_cart_remove_item_btn
-				// links; the cart block's full cart renders AJAX
-				// edd-remove-from-cart links instead. Classic rows are tr
-				// elements, block rows are divs - both carry .edd_cart_item.
+				// Cart row remove links: edd_cart_remove_item_btn (classic and
+				// checkout block), edd-remove-from-cart (cart block, AJAX). Rows
+				// are tr or div, both .edd_cart_item.
 				const remove_link = event_target_element.closest(
 					'a.edd_cart_remove_item_btn, a.edd-remove-from-cart'
 				);
@@ -472,9 +439,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 					return true;
 				}
 
-				// Track clicks in download grids (select_item): the [downloads]
-				// shortcode wraps items in .edd_download, the EDD downloads block
-				// in article.edd-blocks__download.
+				// select_item: [downloads] items are .edd_download, block items
+				// article.edd-blocks__download.
 				const matching_link_element = event_target_element.closest(
 					'.edd_download a:not(.edd-add-to-cart), .edd-blocks__download a:not(.edd-add-to-cart)'
 				);
@@ -512,10 +478,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 					return true;
 				}
 
-				// #405: persist this list attribution (keyed by download id) so
-				// the later view_item / add_to_cart / checkout / purchase events
-				// can be attributed back to the originating list. internal_id was
-				// excluded above, so read it straight from the node. Opt-in only.
+				// #405 (opt-in): persist the list attribution keyed by download
+				// id; internal_id was excluded above, so read it from the node.
 				if (
 					gtm4wp_edd_list_attribution_enabled() &&
 					productdata.item_list_name
@@ -534,9 +498,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 					}
 				}
 
-				// Look at the first GTM container ID in case there are multiple GTM
-				// containers live on the page, since eventCallback is called once per
-				// container and the redirect must only run once.
+				// First container id: eventCallback runs once per container and
+				// the redirect must run once.
 				for ( const i in window.google_tag_manager ) {
 					if ( 'gtm-' === i.substring( 0, 4 ).toLowerCase() ) {
 						window.gtm4wp_first_container_id = i;
@@ -620,9 +583,7 @@ if ( ! window.gtm4wp_edd_inited ) {
 			{ capture: true }
 		);
 
-		// Change events: re-fire view_item with the picked price option of the
-		// page's main download (variable-priced downloads on their own detail
-		// page) and report checkout cart quantity edits as add/remove deltas.
+		// Change events: price option view_item re-fire, cart quantity deltas.
 		document.addEventListener(
 			'change',
 			function ( e ) {
@@ -648,19 +609,16 @@ if ( ! window.gtm4wp_edd_inited ) {
 			{ capture: true }
 		);
 
-		// Checkout gateway tracking. EDD loads the selected gateway's form
-		// fragment over AJAX and announces it with a jQuery event on body, so
-		// jQuery is required to observe it.
+		// Gateway tracking: EDD announces the AJAX-loaded gateway form with a
+		// jQuery event on body.
 		if ( window.jQuery ) {
 			window
 				.jQuery( document.body )
 				.on( 'edd_gateway_loaded', function ( event, gateway ) {
 					gtm4wp_edd_gateway_events_seen++;
 
-					// The first firing is the checkout page initializing its
-					// default gateway, not a buyer choice; the purchase-button
-					// fallback below still reports it if the buyer submits without
-					// ever switching.
+					// First firing = page init, not a choice; the purchase-button
+					// fallback still reports it.
 					if ( gtm4wp_edd_gateway_events_seen < 2 ) {
 						return;
 					}
@@ -671,9 +629,7 @@ if ( ! window.gtm4wp_edd_inited ) {
 				} );
 		}
 
-		// Fallback: report the payment info at the latest when the buyer submits
-		// the purchase form (covers single-gateway checkouts where
-		// edd_gateway_loaded only fires while the page initializes).
+		// Fallback on purchase submit (single-gateway checkouts).
 		document.addEventListener(
 			'click',
 			function ( e ) {

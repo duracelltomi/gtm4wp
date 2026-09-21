@@ -2,15 +2,11 @@ import { gtm4wp_parse_block_item } from './lib/gtm4wp-blocks-cart-diff';
 
 let gtm4wp_last_selected_product_variation;
 
-// #82: these three carry de-dupe state that the document-level listeners registered
-// in gtm4wp_woocommerce_process_pages() read on every event, so they must survive a
-// re-injected bundle. The double-init guard added for #71 lives inside that function
-// and therefore protects nothing written above it: a second copy of this module ran
-// its initializers, the guard then stopped it registering listeners, and the FIRST
-// copy's listeners went on reading state the second copy had just wiped - so
-// add_payment_info / add_shipping_info could fire twice and the page-load view_item
-// suppression reset. Initialize only when absent. A plain `x = x || default` is wrong
-// for gtm4wp_first_container_id, whose legitimate value can be 0.
+// #82: de-dupe state read by the document-level listeners, so it must survive a
+// re-injected bundle (the #71 double-init guard lives inside
+// gtm4wp_woocommerce_process_pages() and protects nothing above it). Initialize
+// only when absent; `x = x || default` is wrong for gtm4wp_first_container_id,
+// whose legitimate value can be 0.
 if ( 'undefined' === typeof window.gtm4wp_view_item_fired_during_pageload ) {
 	window.gtm4wp_view_item_fired_during_pageload = false;
 }
@@ -26,14 +22,9 @@ if ( 'undefined' === typeof window.gtm4wp_first_container_id ) {
 
 /**
  * Read a quantity out of the DOM as a number, or null when there is nothing usable.
- *
- * Every quantity in this file comes from an element that may be absent - the
- * lookup short-circuits to null - and that yields a *string* when it is present.
- * Converting first and testing the number afterwards is the only order that
- * handles both: isNaN( null ) is false, because Number( null ) is 0, so a guard
- * written after the fact never fires; and `|| 1` lets the truthy string '0'
- * through untouched. Callers decide what an absent or zero quantity means for
- * their own event, since that differs per surface (RI-16, findings #69 / #79).
+ * Convert first, test the number after: the element may be absent (isNaN( null )
+ * is false) and its value is a string (`|| 1` lets '0' through). Callers decide
+ * what absent/zero means for their event (RI-16, #69 / #79).
  *
  * @param {HTMLElement|null} el   Element carrying the quantity, may be null.
  * @param {string}           prop Property to read - 'value' or 'textContent'.
@@ -47,23 +38,12 @@ function gtm4wp_read_quantity( el, prop ) {
 
 /**
  * Whether the #405 "Persist product list attribution across the funnel" opt-in is on.
- *
- * The PHP side prints this flag - like every GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY entry -
- * as a top-level `const` inside a CLASSIC inline <script> (ContainerCode::header_top()).
- * A top-level `const` binds in the global LEXICAL environment record, so it never
- * becomes a property of `window`: reading it as `window.gtm4wp_list_attribution` yields
- * undefined on every real page and turns the whole feature off silently. It has to be
- * read as a bare identifier, which is why .eslintrc.js both declares it as a global and
- * forbids the `window.` spelling.
- *
- * The typeof guard is what makes the bare read safe: every caller runs inside a
- * document click or jQuery event handler, where an undeclared read would throw a
- * ReferenceError - the situation when the head block never ran (stripped by an
- * optimizer, or the WooCommerce module added no vars).
- *
- * Evaluated per call rather than once at module scope on purpose: this bundle is
- * enqueued blocking while the head block is written by wp_head, so a load-time read
- * would depend on script order rather than on the option.
+ * PHP prints the flag (like every GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY entry) as a
+ * top-level `const`, which binds lexically and never becomes a `window` property:
+ * `window.gtm4wp_list_attribution` is always undefined (.eslintrc.js forbids that
+ * spelling). The typeof guard covers a head block that never ran. Evaluated per
+ * call, not at module scope, so the result depends on the option, not on script
+ * order.
  *
  * @return {boolean} Whether list attribution should be stored and applied.
  */
@@ -197,12 +177,9 @@ function gtm4wp_woocommerce_handle_shipping_method_change() {
 }
 
 /**
- * Reads the step identifier from a CheckoutWC cfw_step_changed event (#385).
- *
- * CheckoutWC's event payload shape is not verified against a live install, so
- * this looks in the likely places (a plain string detail, or a detail object
- * keyed by step / current / to / name) and returns a lowercase string, or an
- * empty string when nothing recognizable is present.
+ * Reads the step identifier from a CheckoutWC cfw_step_changed event (#385). The
+ * payload shape is not verified against a live install, so the likely places
+ * (string detail, or detail.step / current / to / name) are tried.
  *
  * @param {Event} e The cfw_step_changed event.
  * @return {string} The lowercased step identifier, or '' if unknown.
@@ -228,17 +205,15 @@ function gtm4wp_woocommerce_checkoutwc_step( e ) {
 
 /**
  * Fires the GA4 add_to_cart event for a product added from its product detail
- * page - the variable, grouped and simple cases. Exposed on window so a theme
- * that handles add to cart with its own AJAX (and calls e.preventDefault() on the
- * button, which stops the built-in click tracking) can fire the event from its own
- * success handler without copying the tracker (#273).
+ * page (variable, grouped and simple). Exposed on window so a theme with its own
+ * AJAX add to cart (whose preventDefault() stops the click tracking) can fire it
+ * from its success handler (#273).
  *
  * @param {Element} trigger_element The clicked add-to-cart button (or a descendant).
  * @param {Element} [product_form]  The product's form.cart; derived from the button when omitted.
- * @param {Object}  [options]       Optional { emit }: a replacement for the dataLayer
- *                                  push, so a caller can hold the event back until
- *                                  the add is confirmed (see the block add to cart
- *                                  below). Defaults to pushing immediately.
+ * @param {Object}  [options]       Optional { emit }: replaces the dataLayer push so
+ *                                  the block path can hold the event until the add
+ *                                  is confirmed.
  * @return {boolean} Whether an add_to_cart event was tracked.
  */
 function gtm4wp_track_single_add_to_cart(
@@ -250,9 +225,6 @@ function gtm4wp_track_single_add_to_cart(
 		return false;
 	}
 
-	// Where the finished event goes. The default is the dataLayer; the block
-	// add-to-cart path passes its own collector so the event can wait for
-	// WooCommerce to confirm that the item was really added.
 	const emit =
 		options && 'function' === typeof options.emit
 			? options.emit
@@ -276,10 +248,8 @@ function gtm4wp_track_single_add_to_cart(
 		return false;
 	}
 
-	// Do not fire add_to_cart when the browser would block the form submit for
-	// unfilled required fields (e.g. Product Add-ons): the item is not actually
-	// added, so reporting it would be a false event (#274). Server-side-only
-	// validation still cannot be seen from here.
+	// No add_to_cart when the browser would block the submit for unfilled
+	// required fields (Product Add-ons): nothing was added (#274).
 	if ( typeof form.checkValidity === 'function' && ! form.checkValidity() ) {
 		return false;
 	}
@@ -294,8 +264,7 @@ function gtm4wp_track_single_add_to_cart(
 				form.querySelector( '[name=quantity]' ),
 				'value'
 			);
-			// No usable quantity means the form has no quantity field, so one unit
-			// is the only sensible reading; a zero cannot be added either way.
+			// No quantity field, or zero: one unit.
 			gtm4wp_last_selected_product_variation.quantity =
 				null === variation_qty || variation_qty < 1 ? 1 : variation_qty;
 
@@ -337,9 +306,7 @@ function gtm4wp_track_single_add_to_cart(
 				return true;
 			}
 
-			// A grouped-product row left at zero was not ordered, so it is not part
-			// of this add_to_cart. An unreadable field still counts as one unit,
-			// which is what the previous `|| 1` produced.
+			// A row left at zero was not ordered; an unreadable field is one unit.
 			if ( 0 === product_qty ) {
 				return true;
 			}
@@ -369,11 +336,9 @@ function gtm4wp_track_single_add_to_cart(
 			value: sum_value.toFixed( 2 ),
 		} );
 	} else {
-		// The hidden span with the data attribute is the current markup: an input
-		// inside the form would flip WooCommerce's blockified add-to-cart form
-		// into its legacy full-page POST mode (#462). The [name=gtm4wp_product_data]
-		// input is still read as a fallback so a cached page rendered by an older
-		// plugin version keeps tracking.
+		// The hidden span is the current markup: an input inside the form flips
+		// WooCommerce's blockified add-to-cart form into legacy POST mode (#462).
+		// The input is still read so a cached page from an older version tracks.
 		const product_data_el = form.querySelector(
 			'.gtm4wp_single_productdata,[name=gtm4wp_product_data]'
 		);
@@ -381,26 +346,19 @@ function gtm4wp_track_single_add_to_cart(
 			return false;
 		}
 
-		// Keep internal_id from being excluded so #405 can look up the stored list
-		// by product id; it is deleted again before the push below.
+		// internal_id is kept for the #405 list lookup and deleted before the push.
 		const productdata = gtm4wp_read_from_json(
 			( product_data_el.dataset &&
 				product_data_el.dataset.gtm4wp_product_data ) ||
 				product_data_el.value,
 			[ 'productlink' ]
 		);
-		// #190: the helper returns false when the payload cannot be parsed - the
-		// server prints an empty attribute when wp_json_encode() refuses the
-		// product array (a site filter supplying INF/NAN or over-deep nesting)
-		// and "null" when such a filter returns null. Same guard as the eight
-		// gtm4wp_read_json_from_node call sites; without it this path pushed
-		// add_to_cart with items: [false] and value: NaN.
+		// #190: false when the payload cannot be parsed (empty attribute when
+		// wp_json_encode() refused the array, "null" from a null-returning filter).
 		if ( ! productdata ) {
 			return false;
 		}
-		// #69: the previous guard read `isNaN( quantity )` AFTER a lookup that
-		// short-circuits to null, and isNaN( null ) is false - so a product form
-		// with no quantity field emitted quantity: null and value: 0.
+		// #69: a form without a quantity field is one unit, not quantity: null.
 		const simple_qty = gtm4wp_read_quantity(
 			form.querySelector( '[name=quantity]' ),
 			'value'
@@ -432,22 +390,16 @@ function gtm4wp_track_single_add_to_cart(
  */
 const GTM4WP_BLOCK_ADD_TO_CART_TIMEOUT = 10000;
 
-// The add_to_cart event of the most recent click on a block add-to-cart button,
-// held back until WooCommerce confirms the add. Only the newest click is kept:
-// a click whose add failed is replaced by the next one rather than firing later.
+// The add_to_cart of the most recent block add-to-cart click, held back until
+// WooCommerce confirms the add; a failed click is replaced by the next one.
 let gtm4wp_pending_block_add_to_cart = null;
 let gtm4wp_pending_block_add_to_cart_timer = null;
 
 /**
  * The product form around an add-to-cart button when WooCommerce rendered it
- * with the Interactivity API rather than as the classic POST form.
- *
- * WooCommerce gives the classic form the `cart` class and the interactive one
- * only its submit directive, so the missing class is what tells the two apart.
- * That difference is why add_to_cart stopped firing on product pages built with
- * the Add to Cart + Options block: the classic path looks for `form.cart`, finds
- * nothing and returns before it reads the product data, even though the button
- * carries the classes it expects.
+ * with the Interactivity API (Add to Cart + Options block): the classic POST
+ * form carries the `cart` class, the interactive one does not, which is why the
+ * `form.cart` lookup of the classic path finds nothing there.
  *
  * @param {Element} trigger_element The clicked add-to-cart button.
  * @return {Element|null} The interactive product form, or null for the classic one.
@@ -463,16 +415,10 @@ function gtm4wp_interactive_product_form( trigger_element ) {
 }
 
 /**
- * Resolves the GA4 item of a product that was just added, by reading the cart
- * back from the Store API and taking the line that product created.
- *
- * This is how a variable product is reported on an interactive product page.
- * The classic page hands the tracker the selected variation through
- * WooCommerce's jQuery found_variation event, which the Interactivity API form
- * does not dispatch, and the parent product's price would be the wrong number
- * to report. The cart line carries the finished item for the variation itself,
- * built by the same server code as every other item, so it is a better source
- * than anything that could be reassembled in the browser.
+ * Resolves the GA4 item of a product just added by reading the cart back from
+ * the Store API and taking its line. Used for a variable product on an
+ * interactive product page: that form dispatches no found_variation event, and
+ * the cart line carries the server-built item of the variation itself.
  *
  * @param {number} product_id The product or variation id whose cart line to find.
  * @return {Promise<Object|null>} The GA4 item, or null when it cannot be resolved.
@@ -534,14 +480,9 @@ function gtm4wp_clear_pending_block_add_to_cart() {
 
 /**
  * Builds the add_to_cart event for a click on a block add-to-cart button and
- * holds it until the add is confirmed.
- *
- * The interactive form adds the item over the Store API without reloading the
- * page, so a click is not yet an add: the item can be refused for being out of
- * stock, or the block's own validation can stop the submit. WooCommerce
- * dispatches wc-blocks_added_to_cart once the request succeeded, and that is
- * what releases the event here. An add that never succeeds is dropped after
- * GTM4WP_BLOCK_ADD_TO_CART_TIMEOUT rather than reported.
+ * holds it until wc-blocks_added_to_cart confirms the Store API add (the item
+ * can be refused, or the block's validation can stop the submit). An add that
+ * never succeeds is dropped after GTM4WP_BLOCK_ADD_TO_CART_TIMEOUT.
  *
  * @param {Element} trigger_element The clicked add-to-cart button.
  * @param {Element} product_form    The interactive product form around it.
@@ -560,11 +501,8 @@ function gtm4wp_queue_block_add_to_cart( trigger_element, product_form ) {
 	let pending = queued.length ? { pushes: queued } : null;
 
 	if ( ! pending ) {
-		// Nothing could be built from the page, which on an interactive form
-		// means a variable product: its variation data reaches the classic page
-		// through an event these blocks do not dispatch. The form does carry the
-		// selected variation id, and the cart line the add creates carries the
-		// finished item, so the event is completed from the cart afterwards.
+		// Nothing built from the page = a variable product (no found_variation on
+		// an interactive form): complete the event from the cart line afterwards.
 		const variation_el = product_form.querySelector(
 			'[name=variation_id]'
 		);
@@ -624,9 +562,8 @@ function gtm4wp_flush_pending_block_add_to_cart() {
 		return;
 	}
 
-	// The variable product case: the item comes from the cart line the add has
-	// just created. The quantity is the one on the form rather than the one on
-	// the line, since the line also counts what was already in the cart.
+	// Variable product: item from the cart line, quantity from the form (the line
+	// also counts what was already in the cart).
 	gtm4wp_fetch_cart_item( pending.lookup.product_id ).then(
 		function ( item ) {
 			if ( ! item ) {
@@ -713,36 +650,22 @@ window.gtm4wp_track_single_add_to_cart = gtm4wp_track_single_add_to_cart;
 window.gtm4wp_track_list_add_to_cart = gtm4wp_track_list_add_to_cart;
 
 function gtm4wp_woocommerce_process_pages() {
-	// Guard against double registration: this is the bundle's single boot entry, so
-	// every document-level listener below is attached from here. A re-injected
-	// bundle (AJAX navigation, a page builder duplicating the handle) would
-	// otherwise attach them twice and double-push every ecommerce event. The media
-	// trackers and the CF7 tracker have had this since #22 / #28; both times the
-	// rule was written as a media-tracker rule, so the non-media bundles that also
-	// attach document listeners were left behind (#71).
+	// Double-init guard (#71): a re-injected bundle would attach every
+	// document-level listener below twice and double-push every event.
 	if ( window.gtm4wp_woocommerce_inited ) {
 		return;
 	}
 	window.gtm4wp_woocommerce_inited = true;
 
-	// Resolve the GA4 list identity of WooCommerce's legacy product grid blocks.
-	//
-	// WooCommerce fires woocommerce_blocks_product_grid_item_html with no block
-	// context, so ListTracking::add_productdata_to_wc_block() cannot tell one grid
-	// from another and writes the generic "General Product List" placeholder pair.
-	// The grid container carries the block name as a wp-block-{block_name} class
-	// (WC's AbstractProductGrid::get_container_classes()), so the real identity is
-	// resolved here - and BOTH halves of the pair are written back, never only the
-	// name: an item_list_name that no longer matches its item_list_id collapses
-	// every grid on the page onto one id in GA4.
-	//
-	// listid is a literal, not slugified in JS. PHP derives every other list's
-	// item_list_id with sanitize_title(), which does entity decoding, accent
-	// folding and filter application a small JS slugifier would drift from. Each
-	// value below is sanitize_title( displayname ) computed once, so it is also
-	// byte-identical to the id ListTracking gives the same list on the Product
-	// Collection path - a store migrating a legacy grid to a Product Collection
-	// block keeps its GA4 list history. Upstream registry row U99.
+	// GA4 list identity of WooCommerce's legacy product grid blocks (U99).
+	// woocommerce_blocks_product_grid_item_html carries no block context, so
+	// ListTracking::add_productdata_to_wc_block() writes the generic "General
+	// Product List" pair; the container's wp-block-{block_name} class
+	// (AbstractProductGrid::get_container_classes()) resolves it here. BOTH
+	// halves are written back: a name without its matching id collapses every
+	// grid onto one id in GA4. listid is sanitize_title( displayname ) computed
+	// once, never slugified in JS, so it stays byte-identical to the id the
+	// Product Collection path gives the same list.
 	const gtm4wp_product_block_names = {
 		'wp-block-handpicked-products': {
 			displayname: 'Handpicked Products',
@@ -808,8 +731,7 @@ function gtm4wp_woocommerce_process_pages() {
 								'item_list_name',
 								gtm4wp_product_block_names[ i ].displayname
 							);
-							// Written next to the name, never separately: the
-							// server pair is consistent and has to stay that way.
+							// Always written together with the name.
 							gtm4wp_update_json_in_node(
 								product_data_el,
 								'gtm4wp_product_data',
@@ -867,11 +789,9 @@ function gtm4wp_woocommerce_process_pages() {
 		}
 	}
 
-	// WooCommerce confirms a block add to cart with this event, dispatched on
-	// document.body only after the Store API accepted the item. It releases the
-	// add_to_cart held back by the click handler below. Listening on document
-	// rather than on body, since the event bubbles and body is not guaranteed to
-	// be the same element for the whole life of the page.
+	// WooCommerce dispatches this on document.body once the Store API accepted
+	// the item; it releases the held-back add_to_cart. Listened on document
+	// because body may be swapped during the page's life.
 	document.addEventListener(
 		'wc-blocks_added_to_cart',
 		gtm4wp_flush_pending_block_add_to_cart
@@ -894,12 +814,9 @@ function gtm4wp_woocommerce_process_pages() {
 					'.add_to_cart_button:not(.product_type_variable, .product_type_grouped, .product_type_bundle_input_required, .single_add_to_cart_button)'
 				)
 			) {
-				// A list add is reported on the click, and WooCommerce confirms
-				// it with the same wc-blocks_added_to_cart the product form's
-				// held-back event waits for. That confirmation carries no
-				// product, so a product-form add refused moments earlier would
-				// be released by this one and reported twice. The click here
-				// supersedes whatever was still waiting.
+				// A list add is reported on the click and confirmed by the same
+				// product-less wc-blocks_added_to_cart the held-back form event
+				// waits for, so drop that one or it would be released here.
 				gtm4wp_clear_pending_block_add_to_cart();
 				gtm4wp_track_list_add_to_cart( event_target_element );
 			}
@@ -909,10 +826,9 @@ function gtm4wp_woocommerce_process_pages() {
 				'.single_add_to_cart_button'
 			);
 			if ( add_to_cart_button ) {
-				// A block product page adds the item in the background, so the
-				// event waits there for WooCommerce to confirm the add. The
-				// classic form posts the page, where the click is the last
-				// moment to report it.
+				// A block product page adds in the background (wait for the
+				// confirmation); the classic form posts the page (the click is
+				// the last moment to report).
 				const interactive_form =
 					gtm4wp_interactive_product_form( add_to_cart_button );
 
@@ -951,12 +867,9 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
-				// #79: the cart page reads an input's value (always a string) while
-				// the mini-cart parsed its textContent, so the same removal reported
-				// quantity: "1" on one surface and 1 on the other - and the strict
-				// `0 === qty` guard below never matched the cart page's "0", so a
-				// zero-quantity line fired there but was suppressed in the mini-cart.
-				// Both surfaces now resolve through the same parse.
+				// #79: cart page (input value) and mini-cart (textContent) resolve
+				// through the same parse, so both report a number and both
+				// suppress a zero line.
 				let qty = null;
 				const cart_item_el = productdata_el.closest( '.cart_item' );
 				let qty_element =
@@ -1071,10 +984,9 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
-				// #405: persist this list attribution (keyed by product id) so the
-				// later view_item / add_to_cart / checkout / purchase events can be
-				// attributed back to the originating list. internal_id was excluded
-				// above, so read it straight from the node. Opt-in only.
+				// #405 (opt-in): persist the list attribution keyed by product id
+				// for the later funnel events; internal_id was excluded above, so
+				// read it from the node.
 				if (
 					gtm4wp_list_attribution_enabled() &&
 					productdata.item_list_name
@@ -1221,11 +1133,8 @@ function gtm4wp_woocommerce_process_pages() {
 				return true;
 			}
 
-			// #190: a parse can SUCCEED with null - the attribute is the literal
-			// string "null" when a site filter returns null and the server
-			// wp_json_encode()s it - which passes the catch above and then threw
-			// on the first property access below. Treat it as "no product data",
-			// like the catch does.
+			// #190: the parse SUCCEEDS with null when a site filter returned null
+			// (the attribute is the literal "null"); treat it as no product data.
 			if ( ! current_product_detail_data ) {
 				return true;
 			}
@@ -1236,11 +1145,9 @@ function gtm4wp_woocommerce_process_pages() {
 
 			current_product_detail_data.item_group_id =
 				current_product_detail_data.id;
-			// Re-apply the dynamic-remarketing product-id prefix to the selected
-			// variation's id: the server prefixes the parent id, but here we swap in
-			// the variation id, so the prefix would otherwise be lost (#383). item_id
-			// stays unprefixed (server contract), and the prefix is only prepended
-			// when set, so an unprefixed id keeps its original type.
+			// Re-apply the remarketing product-id prefix to the variation id the
+			// server-prefixed parent id is swapped for (#383); item_id stays
+			// unprefixed (server contract), and an unprefixed id keeps its type.
 			current_product_detail_data.id = gtm4wp_remarketing_prod_id_prefix
 				? gtm4wp_remarketing_prod_id_prefix +
 				  product_variation.variation_id
@@ -1275,15 +1182,14 @@ function gtm4wp_woocommerce_process_pages() {
 			gtm4wp_last_selected_product_variation =
 				current_product_detail_data;
 
-			// #405: the parent product id (internal_id, about to be deleted) is what
-			// the list stored the attribution under; use it to enrich this view_item
-			// (and the add_to_cart that reuses this object) from the cookie. Opt-in.
+			// #405: the list stored the attribution under the parent product id
+			// (internal_id); it enriches this view_item and the add_to_cart that
+			// reuses this object.
 			const list_product_id = current_product_detail_data.internal_id;
 
 			delete current_product_detail_data.internal_id;
 
-			// GA4 expects a quantity on the view_item item; a product view is a single
-			// unit (#348). add_to_cart later overwrites this with the chosen quantity.
+			// A product view is one unit (#348); add_to_cart overwrites it later.
 			current_product_detail_data.quantity = 1;
 
 			if ( gtm4wp_list_attribution_enabled() ) {
@@ -1329,11 +1235,8 @@ function gtm4wp_woocommerce_process_pages() {
 							const dl_data_obj = JSON.parse(
 								dl_data.dataset.gtm4wp_datalayer
 							);
-							// #405: Quick View builds its view_item on the server
-							// like a product page does, so it arrives without the
-							// list the visitor clicked from. Unlike the product
-							// page this payload keeps internal_id, so the lookup
-							// key is right here in the item. Opt-in.
+							// #405: the server-built Quick View view_item arrives
+							// without the list; this payload keeps internal_id.
 							if (
 								gtm4wp_list_attribution_enabled() &&
 								dl_data_obj &&
@@ -1346,13 +1249,8 @@ function gtm4wp_woocommerce_process_pages() {
 								);
 							}
 
-							// #66: the data layer variable name is an option on
-							// the PHP side, so every push site must go through
-							// the indirection rather than the default literal.
-							// This was the only site hardcoding window.dataLayer,
-							// and its own truthiness guard then swallowed the
-							// failure on any site using the rename - or pushed
-							// into whatever other tool owns that global there.
+							// #66: the data layer name is an option; never
+							// hardcode window.dataLayer.
 							if (
 								dl_data_obj &&
 								window[ gtm4wp_datalayer_name ]
@@ -1483,16 +1381,11 @@ function gtm4wp_woocommerce_process_pages() {
 		} );
 	}
 
-	// CheckoutWC compatibility (#385): CheckoutWC replaces the checkout with its
-	// own multi-step template, so the classic shipping/payment change events and
-	// the jQuery checkout_place_order event above are not reliably dispatched and
-	// add_shipping_info / add_payment_info are missed. Bind those steps to
-	// CheckoutWC's own cfw_step_changed event instead. cfw_step_changed only fires
-	// on CheckoutWC's checkout, so this block is inert on every other page (and
-	// gtm4wp_is_checkout may be false there, hence a separate branch). The step
-	// handlers are idempotent (gtm4wp_checkout_step_fired dedup) and read the
-	// selected method straight from the DOM, which CheckoutWC keeps on
-	// WooCommerce's standard field names.
+	// CheckoutWC (#385): its multi-step template does not reliably dispatch the
+	// classic change / checkout_place_order events, so add_shipping_info and
+	// add_payment_info bind to its cfw_step_changed instead. Separate branch:
+	// gtm4wp_is_checkout may be false there. The step handlers are idempotent
+	// and read the DOM, which CheckoutWC keeps on WooCommerce's field names.
 	if ( 'undefined' !== typeof gtm4wp_checkoutwc && gtm4wp_checkoutwc ) {
 		window.gtm4wp_checkout_value = window.gtm4wp_checkout_value || 0;
 		window.gtm4wp_checkout_products = window.gtm4wp_checkout_products || [];

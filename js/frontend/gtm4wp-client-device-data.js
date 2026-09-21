@@ -9,11 +9,8 @@
 ( function () {
 	'use strict';
 
-	// Guard against double registration (#83). This bundle attaches no listeners - it
-	// detects and pushes straight from its module body - so PA-9's "module-scope
-	// addEventListener" litmus never selected it, but a re-injected bundle pushes
-	// gtm4wp.deviceData twice just the same. The trigger is "does anything run at
-	// import time", not "does it listen".
+	// Double-init guard (#83, PA-9): the bundle pushes at import time, so a
+	// re-injected copy would push gtm4wp.deviceData twice.
 	if ( window.gtm4wp_clientdevice_inited ) {
 		return;
 	}
