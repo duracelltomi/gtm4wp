@@ -99,12 +99,28 @@ data, and its reader is not a person: the client is an AI assistant, so
 **everything an ability returns leaves the site in a transcript held by a third
 party**. Rate it as an **A4 delegate whose reach ends where the settings screen's
 does**: an ability may return what the settings screen or the Site Health Info
-section already shows to the same capability, and nothing more - no key material,
-no service-account e-mail, no raw third-party error text, no GA4 property id, no
-visitor data. Two questions for a new ability or a new output field:
+section already shows to the same capability, and nothing more. Two questions for
+a new ability or a new output field:
 
 1. would the settings screen show it to this capability, and
 2. does an assistant need it to do the job the ability's description promises.
+
+Question (2) is what keeps the **status, health and inventory** answers
+(`get-status`, `get-site-health`, `get-service-accounts`, the send log) down to
+option states, statuses, counts and identifiers already in the site's public
+HTML: no key material, no service-account e-mail, no raw third-party error text,
+no GA4 property id, no visitor data, and the container environment tokens as one
+boolean. The **edit surface** (`get-settings`, `export-settings`,
+`update-settings`, `import-settings`) is different by construction and carries
+every stored cell of every registered option - the environment tokens and the
+destinations' property id included: a table option is written whole
+(`SettingsStore::sanitize_onto()` hands the entire value to its Field sanitizer),
+so an assistant that edits any cell must send every cell back, and an export must
+restore on another site. Masking a cell there is refused by the row sanitizer and
+turns a restore into an empty container table (R34, #252 - measured). None of
+that is exposure: the settings screen shows the same cells to the same
+capability, and the environment tokens travel in the public loader URL of every
+page.
 
 A field that fails (1) is exposure (RI-11), rated on the lowest actor who can call
 the ability - A4 today, but the `gtm4wp_admin_page_capability` filter delegates
@@ -256,3 +272,4 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | 2026-09-20 | Added **The stored attribution and the send lane** (R33, #246): phases 3–4 store pseudonymous visitor identifiers in order meta, a diagnostics ring, counters and queued job payloads, and the ladder had no vocabulary for any of them. Exposure rule for the identifiers, the paste-into-public rule for Site Health rows, and how a consent-gate bypass is rated. |
 | 2026-09-03 | Added **The stored credential** (R30, #230): the google-auth module made the old out-of-scope line "the plugin stores no credentials" false, and the off-site pivot a compromised service-account key enables had no rating vocabulary. Custody invariant, the encryption's honest boundary (with the DB-stored-salts caveat), and the A4→A4 rule for the key's own management routes. |
 | 2026-07-29 | Added the **development-time actors D0/D1** and brought the repository's own toolchain into scope (PA-14). A0–A4 rate risk to a *site*; they have no way to express third-party text or branch content causing code to run on the *maintainer's machine*, so findings #76/#77 had no severity vocabulary and, before that, no lens that would prompt for them. Same lowest-actor rule: D0 → D1 is the finding, rated on what the execution reaches, with enforced boundaries distinguished from described ones. |
+| 2026-09-22 | **The ability surface** wording corrected (R34, #252): the example list of withheld values was fused into the general rule and contradicted the shipped edit surface (`get-settings`/`export-settings` return the GA4 property id and the environment tokens by design, and must - a table option is written whole). Split into the status/inventory rule (question 2) and the edit-surface rule. Verifier-measured: every mask is refused by the row sanitizers, and a masked export imports as an empty container table; the tokens are in every page's public loader URL, so withholding them from an A4 delegate protects nothing. |

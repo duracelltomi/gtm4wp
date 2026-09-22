@@ -102,6 +102,13 @@ So, after drafting the findings and before writing the report:
      - *`--force`*, because plain `remove` exits **128** on a worktree with uncommitted
        changes, which is exactly the state a patching verifier leaves behind and exactly how
        a leftover arises in the first place.
+   - ⛔ **On Windows, delete `vendor/` INSIDE the worktree before `git worktree remove`.**
+     Measured twice in one run (R34): `git worktree remove --force <wt>` on a tree holding a
+     composer `vendor/` deregisters the worktree first and then dies with `Filename too long`
+     deleting `vendor/`, leaving the directory behind — a leftover the snapshot diff cannot
+     see, because the registration is already gone. `rm -rf <wt>/vendor && git worktree
+     remove --force <wt>`, then confirm with `ls <wt>` that the path is gone, not only
+     unregistered.
    - ⛔ **NAMESPACE the worktree path per verifier, and never prune a tree you did not
      create.** The bullets above put the worktree outside the repo; they do not stop two
      concurrent verifiers landing on the *same* outside path. Measured on **R26/#L15**, in a
