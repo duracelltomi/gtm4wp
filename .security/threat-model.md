@@ -119,8 +119,22 @@ security control (an A4 who omits it overwrites what an A4 may overwrite). The
 confirmation protocol in a write's description and the `destructive` annotation
 are the delegate's leash, not ours: the site's protection against a wrong write is
 the same as against a wrong click on the settings screen, which is why a write
-ability never gets a lower gate than that screen. The disclosure property is pinned
-by the serialised-answer assertions in `tests/unit/Abilities/StatusAbilitiesTest.php`.
+ability never gets a lower gate than that screen. The same holds for the `confirm:
+true` input of the site-wide operations (`import-settings`, the refund replay):
+a guard against an assistant acting without its user, never against the user.
+The Google-facing abilities (`test-service-account`,
+`test-google-data-manager-destination`, `replay-google-data-manager-refunds`) are
+the panel's buttons behind the same gate plus the write switch: they run the shared
+service the REST route runs (`TokenService::test_account()`, `DestinationProbe`,
+`RefundReplay`), so an A4 delegate can cause the same outbound requests with the
+site's stored credentials as an A4 click, and nothing else - the only identifiers
+it supplies (`measurement_id`, the account `id`) resolve against stored rows and
+refuse unknown ones before anything leaves the site; the account and property
+ids in the request to Google are always the site's own. The disclosure property
+is pinned by the serialised-answer assertions in
+`tests/unit/Abilities/StatusAbilitiesTest.php` and
+`tests/unit/Modules/GoogleAuthAbilitiesTest.php` (`get-service-accounts` returns
+id, label, status and test time; never the account e-mail or key id the panel shows).
 
 ---
 

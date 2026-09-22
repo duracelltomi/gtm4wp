@@ -42,11 +42,21 @@ defined( 'ABSPATH' ) || exit;
  * confirmation protocol the assistant has to follow (show current and new
  * value, wait for an explicit yes); the annotations mark it destructive, so
  * an MCP client asks before calling it even if the assistant would not.
+ *
+ * gtm4wp/export-settings and gtm4wp/import-settings are the settings screen's
+ * Export and Import buttons: the same envelope SettingsStore::export_data()
+ * builds (the site's own stored values, never a service-account key), and
+ * the same import path - size cap, depth cap, type marker, every value
+ * through its Field sanitizer onto the module defaults. The import is a
+ * SITE-WIDE replace, so on top of the write switch it requires confirm: true
+ * in the call itself.
  */
 final class SettingsAbilities implements ProviderInterface {
 
 	public const GET_SETTINGS    = Registrar::NAMESPACE_PREFIX . 'get-settings';
 	public const UPDATE_SETTINGS = Registrar::NAMESPACE_PREFIX . 'update-settings';
+	public const EXPORT_SETTINGS = Registrar::NAMESPACE_PREFIX . 'export-settings';
+	public const IMPORT_SETTINGS = Registrar::NAMESPACE_PREFIX . 'import-settings';
 
 	/**
 	 * The settings service.
@@ -164,9 +174,107 @@ final class SettingsAbilities implements ProviderInterface {
 			)
 		);
 
+		$this->register_export_settings();
+
 		if ( Registrar::writes_allowed() ) {
 			$this->register_update_settings();
+			$this->register_import_settings();
 		}
+	}
+
+	/**
+	 * Registers gtm4wp/export-settings.
+	 *
+	 * @return void
+	 */
+	private function register_export_settings(): void {
+		wp_register_ability(
+			self::EXPORT_SETTINGS,
+			array(
+				'label'               => __( 'Export the Google Tag Manager settings', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Returns the settings of Google Tag Manager for WordPress as the portable JSON envelope the Export button of the settings screen downloads: every option with its stored value (the site\'s own configuration, without the wp-config.php overrides get-settings applies), the plugin version and a type marker. Keep the envelope as a backup before a change, or hand it to import-settings on another site. It contains no service-account key - keys are never exported. Read-only.', 'duracelltomi-google-tag-manager' ),
+				'category'            => Registrar::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'default'              => array(),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'plugin'  => array( 'type' => 'string' ),
+						'type'    => array(
+							'type'        => 'string',
+							'enum'        => array( SettingsStore::EXPORT_TYPE ),
+							'description' => 'The marker import-settings requires.',
+						),
+						'version' => array(
+							'type'        => 'string',
+							'description' => 'The plugin version that wrote the envelope.',
+						),
+						'options' => array(
+							'type'        => 'object',
+							'description' => 'Option key => stored value.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'export_settings' ),
+				'permission_callback' => array( Capability::class, 'can_manage_settings' ),
+				'meta'                => Meta::read(),
+			)
+		);
+	}
+
+	/**
+	 * Registers gtm4wp/import-settings.
+	 *
+	 * @return void
+	 */
+	private function register_import_settings(): void {
+		wp_register_ability(
+			self::IMPORT_SETTINGS,
+			array(
+				'label'               => __( 'Import the Google Tag Manager settings', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Replaces EVERY option of Google Tag Manager for WordPress with the values of a settings export - site-wide: an option missing from the envelope falls back to its default, so this is a full restore, not a patch (use update-settings to change a few options). payload is the export envelope as a JSON string, exactly as export-settings returned it or as the Export button of the settings screen downloaded it; anything else is refused with 400 (a size cap, a check of the type marker) and nothing is stored. Every value passes the same sanitizer as the settings screen: a value the sanitizer refuses is reported under errors and its option keeps the default, while the rest is stored. Protocol, in this order: 1) call export-settings first and keep its answer, so the previous configuration can be restored with this ability; 2) tell the user which site and plugin version the envelope came from and that every option of this site will be replaced, the container IDs included, and ask "Replace all settings on this site?" - wait for an explicit yes in the same turn; a general instruction such as "restore my settings" is not a confirmation; 3) call this ability with confirm true. Without confirm true the call is refused with 400 and nothing is stored. Destructive: a wrong envelope switches tracking off for every visitor or points the site at somebody else\'s container. Options that wp-config.php constants control keep the constant\'s value whatever is stored. The answer carries the new values_hash for update-settings.', 'duracelltomi-google-tag-manager' ),
+				'category'            => Registrar::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'default'              => array(),
+					'required'             => array( 'payload', 'confirm' ),
+					'properties'           => array(
+						'payload' => array(
+							'type'        => 'string',
+							'description' => 'The export envelope as a JSON string: the answer of export-settings, or the contents of a downloaded export file.',
+						),
+						'confirm' => array(
+							'type'        => 'boolean',
+							'description' => 'Must be true: the user confirmed, in this turn, that every option of this site is to be replaced.',
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'imported'    => array(
+							'type'        => 'boolean',
+							'description' => 'True when every option of the envelope was stored; false when at least one was refused (see errors).',
+						),
+						'errors'      => array(
+							'type'        => 'object',
+							'description' => 'Option key => the sanitizer\'s message, for every value of the envelope that was refused; that option keeps its default.',
+						),
+						'values_hash' => array(
+							'type'        => 'string',
+							'description' => 'Fingerprint of the stored settings after the import.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'import_settings' ),
+				'permission_callback' => array( Registrar::class, 'can_write' ),
+				'meta'                => Meta::write( true, true ),
+			)
+		);
 	}
 
 	/**
@@ -376,6 +484,58 @@ final class SettingsAbilities implements ProviderInterface {
 			'saved'       => array() === $errors,
 			'errors'      => (object) $errors,
 			'changed'     => (object) $changed,
+			'values_hash' => $this->store->values_hash(),
+		);
+	}
+
+	/**
+	 * The gtm4wp/export-settings ability: the store's envelope, with the
+	 * options as an object so a client never sees a bare [] where a map was
+	 * promised.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function export_settings(): array {
+		$envelope = $this->store->export_data();
+
+		$envelope['options'] = (object) $envelope['options'];
+
+		return $envelope;
+	}
+
+	/**
+	 * The gtm4wp/import-settings ability. Refusals in the order of the
+	 * cheapest one: the write switch, the missing confirmation, then the
+	 * store's own checks of the payload (size, depth, type marker) - and only
+	 * then the replace, which runs every value of the envelope through its
+	 * Field sanitizer onto the module defaults, exactly as the settings
+	 * screen's Import button does.
+	 *
+	 * @param mixed $input The validated input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function import_settings( $input = null ) {
+		if ( ! Registrar::writes_allowed() ) {
+			return Registrar::write_disabled_error();
+		}
+
+		$input = is_array( $input ) ? $input : array();
+
+		if ( true !== ( $input['confirm'] ?? null ) ) {
+			return Registrar::confirmation_required_error();
+		}
+
+		$options = $this->store->decode_import( $input['payload'] ?? null );
+
+		if ( $options instanceof \WP_Error ) {
+			return $options;
+		}
+
+		$errors = $this->store->replace( $options );
+
+		return array(
+			'imported'    => array() === $errors,
+			'errors'      => (object) $errors,
 			'values_hash' => $this->store->values_hash(),
 		);
 	}

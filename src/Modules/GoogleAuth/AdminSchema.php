@@ -10,7 +10,9 @@
 
 namespace GTM4WP\Modules\GoogleAuth;
 
+use GTM4WP\Abilities\ProviderInterface;
 use GTM4WP\Google\KeyVault;
+use GTM4WP\Module\AbilitiesInterface;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\PanelSchemaInterface;
@@ -20,9 +22,9 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The service-accounts panel: no Field controls, one custom panel backed by
- * the module's own REST routes.
+ * the module's own REST routes, plus the module's abilities (Abilities).
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, AbilitiesInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -112,6 +114,19 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function panel(): string {
 		return self::PANEL;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The abilities live in Abilities, next to the REST controller serving
+	 * the same accounts. Runs only inside wp_abilities_api_init; the vault
+	 * it builds reads nothing until an ability runs.
+	 *
+	 * @return ProviderInterface
+	 */
+	public function abilities(): ProviderInterface {
+		return new Abilities();
 	}
 
 	/**

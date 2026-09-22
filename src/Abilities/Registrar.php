@@ -161,6 +161,24 @@ final class Registrar {
 	}
 
 	/**
+	 * The refusal an ability with a `confirm` input returns when the call
+	 * does not carry `confirm: true`: the site-wide operations (a settings
+	 * import, a refund replay) ask for the user's explicit yes in the call
+	 * itself, so an assistant that skipped the confirmation protocol in the
+	 * description still cannot run them by accident. One definition, so the
+	 * code and the wording are the same for every such ability.
+	 *
+	 * @return \WP_Error
+	 */
+	public static function confirmation_required_error(): \WP_Error {
+		return new \WP_Error(
+			'gtm4wp_confirmation_required',
+			__( 'This call needs confirm: true. Show the user what it will do, ask for an explicit yes, and repeat the call with confirm set to true.', 'duracelltomi-google-tag-manager' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	/**
 	 * Registers the plugin's ability category. Categories must exist before
 	 * the abilities that name them, which is why core fires this action first.
 	 *

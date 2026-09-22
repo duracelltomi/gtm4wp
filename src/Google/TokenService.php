@@ -148,6 +148,37 @@ final class TokenService {
 	}
 
 	/**
+	 * The settings screen's "test" action: mints a token now, bypassing the
+	 * cache, and reports whether Google accepted the key. The one definition
+	 * behind the REST test route and the gtm4wp/test-service-account ability
+	 * (UC-6). The token itself stays on the server; the answer is the
+	 * outcome plus a sentence - Google's capped summary on a refusal - and
+	 * the vault's status row is updated as a side effect, as for any mint.
+	 *
+	 * @param string $account_id Account id.
+	 * @return array{ok: bool, message: string}|\WP_Error 404 when the account does not exist; nothing is sent then.
+	 */
+	public function test_account( string $account_id ) {
+		if ( ! $this->vault->has( $account_id ) ) {
+			return new \WP_Error(
+				'gtm4wp_google_account_unknown',
+				__( 'This service account no longer exists.', 'duracelltomi-google-tag-manager' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$token = $this->access_token( $account_id, self::SCOPE_DATA_MANAGER, true );
+		$ok    = ! ( $token instanceof \WP_Error );
+
+		return array(
+			'ok'      => $ok,
+			'message' => $ok
+				? __( 'Google accepted the key and issued an access token.', 'duracelltomi-google-tag-manager' )
+				: $token->get_error_message(),
+		);
+	}
+
+	/**
 	 * Drops the cached token of an account and scope. Called when the account
 	 * is deleted so a consumer cannot keep using a key the admin removed.
 	 *

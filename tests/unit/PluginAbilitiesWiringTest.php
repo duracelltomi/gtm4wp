@@ -162,11 +162,17 @@ final class PluginAbilitiesWiringTest extends TestCase {
 				'gtm4wp/get-status',
 				'gtm4wp/get-site-health',
 				'gtm4wp/get-settings',
+				'gtm4wp/export-settings',
 				'gtm4wp/update-settings',
+				'gtm4wp/import-settings',
+				'gtm4wp/get-service-accounts',
+				'gtm4wp/test-service-account',
 				'gtm4wp/get-google-data-manager-log',
+				'gtm4wp/test-google-data-manager-destination',
+				'gtm4wp/replay-google-data-manager-refunds',
 			),
 			array_keys( $this->registered ),
-			'The catalogue of phases 1 and 2, in registration order.'
+			'The catalogue of phases 1 to 3, in registration order: the plugin-wide providers, then the modules in registry order.'
 		);
 
 		foreach ( $this->registered as $name => $args ) {

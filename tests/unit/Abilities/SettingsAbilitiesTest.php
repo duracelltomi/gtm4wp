@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Abilities;
 
+use Brain\Monkey\Filters;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Module\Registry;
@@ -390,5 +391,253 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 'GTM-STORED1', $this->stored_settings()[ GTM4WP_OPTION_GTM_CODE ], 'The hard coded ID does not leak into the 1.x mirror either.' );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_GTM_CONTAINERS, (array) $result['changed'], 'A locked table is reported as unchanged, which is the truth.' );
 		$this->assertTrue( ( (array) $result['changed'] )[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] );
+	}
+
+	// ---- export-settings ---------------------------------------------------
+
+	public function test_the_export_is_the_stores_envelope_with_the_options_as_an_object(): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'myLayer' ) );
+
+		$result = $this->execute( SettingsAbilities::EXPORT_SETTINGS );
+
+		$this->assertSame( array( 'plugin', 'type', 'version', 'options' ), array_keys( $result ), 'The envelope the Export button downloads, member for member.' );
+		$this->assertSame( 'gtm4wp', $result['plugin'] );
+		$this->assertSame( SettingsStore::EXPORT_TYPE, $result['type'], 'The marker import-settings requires.' );
+		$this->assertIsString( $result['version'] );
+		$this->assertIsObject( $result['options'], 'A map, so a client never sees a bare [].' );
+		$this->assertSame( 'myLayer', ( (array) $result['options'] )[ GTM4WP_OPTION_DATALAYER_NAME ] );
+		$this->assertSame( SettingsStore::EXPORT_TYPE, $this->registered[ SettingsAbilities::EXPORT_SETTINGS ]['output_schema']['properties']['type']['enum'][0] );
+	}
+
+	public function test_the_export_carries_the_stored_configuration_not_the_wp_config_override(): void {
+		// The custody of the service-account key is GoogleAuthCustodyTest's;
+		// pinned here is the difference to get-settings: an export must carry
+		// the site's OWN stored rows, ui_values() the rows actually loaded.
+		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( 'id' => 'GTM-STORED1' ) ) ) );
+
+		$options = (array) $this->execute( SettingsAbilities::EXPORT_SETTINGS )['options'];
+
+		$this->assertSame( 'GTM-STORED1', $options[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'] );
+	}
+
+	// ---- import-settings ---------------------------------------------------
+
+	/**
+	 * A valid envelope carrying the given options.
+	 *
+	 * @param array<string, mixed> $options Option key => value.
+	 * @return string
+	 */
+	private static function envelope( array $options ): string {
+		return (string) json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- building the fixture.
+			array(
+				'plugin'  => 'gtm4wp',
+				'type'    => SettingsStore::EXPORT_TYPE,
+				'version' => '2.1.0',
+				'options' => $options,
+			)
+		);
+	}
+
+	public function test_the_import_is_registered_as_a_confirmed_site_wide_replace(): void {
+		$args   = $this->registered[ SettingsAbilities::IMPORT_SETTINGS ];
+		$schema = $args['input_schema'];
+
+		$this->assertSame( array( 'payload', 'confirm' ), $schema['required'] );
+		$this->assertSame( 'string', $schema['properties']['payload']['type'] );
+		$this->assertSame( 'boolean', $schema['properties']['confirm']['type'] );
+		$this->assertStringContainsString( 'export-settings first', $args['description'], 'The runbook: keep a way back before replacing everything.' );
+		$this->assertStringContainsString( 'Replace all settings on this site?', $args['description'] );
+	}
+
+	/**
+	 * Calls that do not carry the confirmation.
+	 *
+	 * @return array<string, array{0: array<string, mixed>}>
+	 */
+	public static function unconfirmed_imports(): array {
+		return array(
+			'confirm missing' => array( array() ),
+			'confirm false'   => array( array( 'confirm' => false ) ),
+			'confirm string'  => array( array( 'confirm' => 'true' ) ),
+			'confirm 1'       => array( array( 'confirm' => 1 ) ),
+		);
+	}
+
+	/**
+	 * Without `confirm: true` a valid envelope is refused before it is even
+	 * decoded, and the row stays as it was.
+	 *
+	 * @param array<string, mixed> $confirm The confirm member, or none.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'unconfirmed_imports' )]
+	public function test_an_import_without_confirm_true_is_refused_before_anything_runs( array $confirm ): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array_merge( array( 'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ) ), $confirm )
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_confirmation_required', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
+		$this->assertSame( 0, $this->settings_writes() );
+	}
+
+	/**
+	 * Payloads the store refuses, each with the code that names the problem.
+	 *
+	 * @return array<string, array{0: mixed, 1: string}>
+	 */
+	public static function refused_payloads(): array {
+		return array(
+			'no type marker'        => array( '{"plugin":"gtm4wp","options":{"gtm-datalayer-variable-name":"x"}}', 'gtm4wp_import_invalid' ),
+			'wrong type marker'     => array( '{"type":"somebody-elses-export","options":{}}', 'gtm4wp_import_invalid' ),
+			'options not an object' => array( '{"type":"' . SettingsStore::EXPORT_TYPE . '","options":"x"}', 'gtm4wp_import_invalid' ),
+			'not JSON'              => array( 'gtm-datalayer-variable-name=x', 'gtm4wp_import_invalid' ),
+			'empty'                 => array( '', 'gtm4wp_import_empty' ),
+			'not a string'          => array( array( 'type' => SettingsStore::EXPORT_TYPE ), 'gtm4wp_import_empty' ),
+			'over the size cap'     => array( '{' . str_repeat( ' ', SettingsStore::IMPORT_MAX_BYTES ) . '}', 'gtm4wp_import_too_large' ),
+		);
+	}
+
+	/**
+	 * A refused payload is a 400 that stores nothing - the same checks as the
+	 * settings screen's Import button, through the same store.
+	 *
+	 * @param mixed  $payload The payload.
+	 * @param string $code    Expected error code.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'refused_payloads' )]
+	public function test_a_payload_that_is_not_an_export_is_refused_with_400_and_stores_nothing( $payload, string $code ): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => $payload,
+				'confirm' => true,
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( $code, $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
+		$this->assertSame( 0, $this->settings_writes() );
+	}
+
+	public function test_a_hostile_envelope_is_re_sanitised_value_by_value(): void {
+		// Every value of the file runs through its Field sanitizer as if typed
+		// into the settings screen (TS-1, TS-2 both directions): a tag is
+		// stripped, a refused value is reported and its option keeps the
+		// default, a key that is no field is never injected into the row.
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'before' ) );
+		$hostile = 'ORD-"</script><script>alert(1)</script>';
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => self::envelope(
+					array(
+						GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX => $hostile,
+						GTM4WP_OPTION_DATALAYER_NAME => 'my-layer',
+						GTM4WP_OPTION_LOADEARLY      => 'yes',
+						'not-a-field'                => 'injected',
+					)
+				),
+				'confirm' => true,
+			)
+		);
+
+		$stored = $this->stored_settings();
+
+		$this->assertFalse( $result['imported'] );
+		$this->assertSame( array( GTM4WP_OPTION_DATALAYER_NAME ), array_keys( (array) $result['errors'] ) );
+		$this->assertNotSame( '', ( (array) $result['errors'] )[ GTM4WP_OPTION_DATALAYER_NAME ], 'The sanitizer\'s message, so the assistant can tell the user why.' );
+
+		$this->assertNotSame( $hostile, $stored[ GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX ] );
+		$this->assertStringNotContainsString( '<script', $stored[ GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX ] );
+		$this->assertSame( 'ORD-"alert(1)', $stored[ GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX ] );
+		$this->assertSame( '', $stored[ GTM4WP_OPTION_DATALAYER_NAME ], 'The refused value never reaches the row, and a replace does not keep the old value either: the default.' );
+		$this->assertTrue( $stored[ GTM4WP_OPTION_LOADEARLY ], 'The checkbox lands as a bool: the Field sanitizer ran.' );
+		$this->assertArrayNotHasKey( 'not-a-field', $stored );
+		$this->assertSame( ( new SettingsStore( $this->registry ) )->values_hash(), $result['values_hash'] );
+	}
+
+	public function test_an_import_replaces_the_whole_row_so_an_option_missing_from_the_envelope_falls_back_to_its_default(): void {
+		$this->store_settings(
+			array(
+				GTM4WP_OPTION_DATALAYER_NAME => 'old',
+				GTM4WP_OPTION_LOADEARLY      => true,
+			)
+		);
+		$before = ( new SettingsStore( $this->registry ) )->values_hash();
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => self::envelope( array( GTM4WP_OPTION_INCLUDE_LOGGEDIN => true ) ),
+				'confirm' => true,
+			)
+		);
+
+		$this->assertTrue( $result['imported'] );
+		$this->assertIsObject( $result['errors'] );
+		$this->assertSame( array(), (array) $result['errors'] );
+		$this->assertSame( '', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ], 'Not a patch: the option the envelope does not name is reset.' );
+		$this->assertFalse( $this->stored_settings()[ GTM4WP_OPTION_LOADEARLY ] );
+		$this->assertTrue( $this->stored_settings()[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] );
+		$this->assertNotSame( $before, $result['values_hash'], 'The write moved the fingerprint.' );
+	}
+
+	public function test_an_export_round_trips_through_the_import(): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'myLayer' ) );
+		$payload = (string) json_encode( $this->execute( SettingsAbilities::EXPORT_SETTINGS ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- what a client sends back.
+
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'lost' ) );
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => $payload,
+				'confirm' => true,
+			)
+		);
+
+		$this->assertTrue( $result['imported'], 'What export-settings hands out is what import-settings takes.' );
+		$this->assertSame( 'myLayer', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
+	}
+
+	public function test_a_read_only_site_lists_the_export_but_not_the_import(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE )->atLeast()->once()->with( true )->andReturn( false );
+
+		$this->registered = array();
+		( new SettingsAbilities( $this->registry ) )->register();
+
+		$this->assertSame( array( SettingsAbilities::GET_SETTINGS, SettingsAbilities::EXPORT_SETTINGS ), array_keys( $this->registered ) );
+	}
+
+	public function test_an_import_run_after_the_switch_flipped_refuses_with_403_and_writes_nothing(): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
+		$this->assertArrayHasKey( SettingsAbilities::IMPORT_SETTINGS, $this->registered, 'Registered while writes were allowed.' );
+
+		Filters\expectApplied( GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE )->atLeast()->once()->with( true )->andReturn( false );
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ),
+				'confirm' => true,
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_abilities_write_disabled', $result->get_error_code() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
+		$this->assertSame( 0, $this->settings_writes() );
 	}
 }

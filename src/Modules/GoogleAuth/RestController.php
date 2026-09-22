@@ -239,35 +239,23 @@ final class RestController {
 	}
 
 	/**
-	 * POST handler of the test action: mints a token now, bypassing the cache,
-	 * and reports whether Google accepted the key. The token itself stays on
-	 * the server.
+	 * POST handler of the test action: TokenService::test_account(), shared
+	 * with the gtm4wp/test-service-account ability, plus the refreshed
+	 * account row for the panel. The token itself stays on the server.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function test_account( \WP_REST_Request $request ) {
-		$id = (string) $request->get_param( 'id' );
+		$id     = (string) $request->get_param( 'id' );
+		$result = $this->tokens->test_account( $id );
 
-		if ( ! $this->vault->has( $id ) ) {
-			return new \WP_Error(
-				'gtm4wp_google_account_unknown',
-				__( 'This service account no longer exists.', 'duracelltomi-google-tag-manager' ),
-				array( 'status' => 404 )
-			);
+		if ( $result instanceof \WP_Error ) {
+			return $result;
 		}
 
-		$token = $this->tokens->access_token( $id, TokenService::SCOPE_DATA_MANAGER, true );
-		$ok    = ! ( $token instanceof \WP_Error );
+		$result['account'] = $this->vault->get( $id );
 
-		return new \WP_REST_Response(
-			array(
-				'ok'      => $ok,
-				'message' => $ok
-					? __( 'Google accepted the key and issued an access token.', 'duracelltomi-google-tag-manager' )
-					: $token->get_error_message(),
-				'account' => $this->vault->get( $id ),
-			)
-		);
+		return new \WP_REST_Response( $result );
 	}
 }

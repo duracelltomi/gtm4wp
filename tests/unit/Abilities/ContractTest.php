@@ -11,6 +11,7 @@ use GTM4WP\Abilities\Registrar;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Abilities\StatusAbilities;
 use GTM4WP\Capability;
+use GTM4WP\Modules\GoogleAuth\Abilities as GoogleAuthAbilities;
 use GTM4WP\Modules\GoogleDataManager\Abilities;
 
 /**
@@ -34,21 +35,54 @@ final class ContractTest extends AbilitiesTestCase {
 		StatusAbilities::GET_STATUS,
 		StatusAbilities::GET_SITE_HEALTH,
 		SettingsAbilities::GET_SETTINGS,
+		SettingsAbilities::EXPORT_SETTINGS,
 		Abilities::GET_LOG,
+		GoogleAuthAbilities::GET_ACCOUNTS,
 	);
 
 	/**
 	 * Abilities that change settings or contact Google, each with the
 	 * annotations it has to carry: destructive when the change can switch
 	 * tracking off site-wide, idempotent when repeating the same call changes
-	 * nothing further. An MCP client acts on these (it asks before a
-	 * destructive call), so they are pinned to behaviour here.
+	 * nothing further, open_world when the ability contacts Google. An MCP
+	 * client acts on these (it asks before a destructive call), so they are
+	 * pinned to behaviour here.
 	 */
 	private const WRITES = array(
 		SettingsAbilities::UPDATE_SETTINGS => array(
 			'destructive' => true,
 			'idempotent'  => true,
+			'open_world'  => false,
 		),
+		SettingsAbilities::IMPORT_SETTINGS => array(
+			'destructive' => true,
+			'idempotent'  => true,
+			'open_world'  => false,
+		),
+		GoogleAuthAbilities::TEST_ACCOUNT  => array(
+			'destructive' => false,
+			'idempotent'  => true,
+			'open_world'  => true,
+		),
+		Abilities::TEST_DESTINATION        => array(
+			'destructive' => false,
+			'idempotent'  => true,
+			'open_world'  => true,
+		),
+		Abilities::REPLAY_REFUNDS          => array(
+			'destructive' => false,
+			'idempotent'  => false,
+			'open_world'  => true,
+		),
+	);
+
+	/**
+	 * The site-wide operations that ask for the user's yes in the call
+	 * itself: `confirm` is a required boolean of their input.
+	 */
+	private const CONFIRMED = array(
+		SettingsAbilities::IMPORT_SETTINGS,
+		Abilities::REPLAY_REFUNDS,
 	);
 
 	protected function setUp(): void {
@@ -65,6 +99,7 @@ final class ContractTest extends AbilitiesTestCase {
 		sort( $actual );
 
 		$this->assertSame( $expected, $actual, 'Every listed ability is registered and nothing else is.' );
+		$this->assertCount( 11, $actual, 'The catalogue of the 2.1 release.' );
 	}
 
 	public function test_every_ability_name_is_a_verb_noun_under_the_plugin_namespace(): void {
@@ -150,6 +185,7 @@ final class ContractTest extends AbilitiesTestCase {
 			$this->assertTrue( $annotations['readonly'], "$name is a read." );
 			$this->assertFalse( $annotations['destructive'], "$name destroys nothing." );
 			$this->assertTrue( $annotations['idempotent'], "$name is idempotent." );
+			$this->assertArrayNotHasKey( 'openWorldHint', $annotations, "$name contacts nothing outside the site." );
 		}
 
 		foreach ( self::WRITES as $name => $expected ) {
@@ -158,6 +194,22 @@ final class ContractTest extends AbilitiesTestCase {
 			$this->assertFalse( $annotations['readonly'], "$name is a write and must not claim to be read-only." );
 			$this->assertSame( $expected['destructive'], $annotations['destructive'], "$name destructive" );
 			$this->assertSame( $expected['idempotent'], $annotations['idempotent'], "$name idempotent" );
+
+			if ( $expected['open_world'] ) {
+				$this->assertTrue( $annotations['openWorldHint'] ?? false, "$name contacts Google and says so (U157: passed through to the MCP client as is)." );
+			} else {
+				$this->assertArrayNotHasKey( 'openWorldHint', $annotations, "$name stays on the site." );
+			}
+		}
+	}
+
+	public function test_the_site_wide_operations_require_confirm_in_the_call(): void {
+		foreach ( self::CONFIRMED as $name ) {
+			$schema = $this->registered[ $name ]['input_schema'];
+
+			$this->assertContains( 'confirm', $schema['required'], "$name cannot be called without confirm." );
+			$this->assertSame( 'boolean', $schema['properties']['confirm']['type'] );
+			$this->assertStringContainsString( 'confirm', $this->registered[ $name ]['description'], "$name tells the assistant about the confirmation in its runbook." );
 		}
 	}
 

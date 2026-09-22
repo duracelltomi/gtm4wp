@@ -22,8 +22,12 @@ defined( 'ABSPATH' ) || exit;
  *
  * - POST destinations/test  probe one destination with a validateOnly ingest
  * - GET  send-log           read the diagnostics ring of the send lanes
+ * - POST send-log/replay    queue failed or fixable refunds again
  *
- * The test route takes the destination's values from the request so an edit
+ * A thin adapter: the probe lives in DestinationProbe, the replay in
+ * RefundReplay and the log shaping in SendLog, each shared with the
+ * module's abilities so the panel and an assistant do the same thing. The
+ * test route takes the destination's values from the request so an edit
  * can be tested before saving; every value passes the DestinationRows rules
  * first, and the only URL contacted is the fixed ingest endpoint. Requires the
  * settings capability and the REST nonce; the response never carries a token.
@@ -43,6 +47,20 @@ final class RestController {
 	public const REPLAY_ROUTE = '/google/send-log/replay';
 
 	/**
+	 * The probe behind the test route.
+	 *
+	 * @var DestinationProbe
+	 */
+	private DestinationProbe $probe;
+
+	/**
+	 * The replay behind the replay route.
+	 *
+	 * @var RefundReplay
+	 */
+	private RefundReplay $replay;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param KeyVault               $vault   The key store, to name an unknown account before any request.
@@ -52,12 +70,14 @@ final class RestController {
 	 * @param DestinationHealth|null $health  Per-destination health, cleared by a passing probe; null builds one on demand.
 	 */
 	public function __construct(
-		private KeyVault $vault,
-		private EventsIngest $ingest,
+		KeyVault $vault,
+		EventsIngest $ingest,
 		private SendLog $log,
-		private ?Options $options = null,
-		private ?DestinationHealth $health = null
+		?Options $options = null,
+		?DestinationHealth $health = null
 	) {
+		$this->probe  = new DestinationProbe( $vault, $ingest, $health );
+		$this->replay = new RefundReplay( $log, $options );
 	}
 
 	/**
@@ -125,53 +145,20 @@ final class RestController {
 	/**
 	 * POST handler: queues every replayable refund again, or only the named
 	 * ones, as fresh first attempts aimed at the destinations still missing
-	 * them. Nothing is sent from this request; the sender applies every gate again.
+	 * them. Nothing is sent from this request; the sender applies every gate
+	 * again. The work is RefundReplay's, shared with the replay ability.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function replay( \WP_REST_Request $request ) {
-		if ( null !== $this->options && ! $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ) {
-			return new \WP_Error(
-				'gtm4wp_gdm_sending_off',
-				__( 'Turn on "Send refunds to Google Analytics" and save before sending anything again.', 'duracelltomi-google-tag-manager' ),
-				array( 'status' => 409 )
-			);
+		$result = $this->replay->replay( RefundReplay::references( $request->get_param( 'references' ) ) );
+
+		if ( $result instanceof \WP_Error ) {
+			return $result;
 		}
 
-		$references = array();
-
-		foreach ( (array) $request->get_param( 'references' ) as $reference ) {
-			if ( is_string( $reference ) && null !== SendLog::parse_reference( $reference ) ) {
-				$references[] = $reference;
-			}
-		}
-
-		$queued = array();
-
-		foreach ( $this->log->replay_plan( $references ) as $reference => $job ) {
-			$payload = array(
-				'platform'  => $job['platform'],
-				'order_id'  => $job['order_id'],
-				'refund_id' => $job['refund_id'],
-				'attempt'   => 1,
-			);
-
-			if ( array() !== $job['only'] ) {
-				$payload['only'] = $job['only'];
-			}
-
-			if ( SendQueue::schedule( SendQueue::HOOK_SEND, $payload ) ) {
-				$queued[] = $reference;
-			}
-		}
-
-		return new \WP_REST_Response(
-			array(
-				'queued'     => count( $queued ),
-				'references' => $queued,
-			)
-		);
+		return new \WP_REST_Response( $result );
 	}
 
 	/**
@@ -200,8 +187,8 @@ final class RestController {
 	}
 
 	/**
-	 * POST handler: validates the submitted destination and sends the
-	 * validateOnly probe.
+	 * POST handler: validates the submitted destination and hands it to the
+	 * probe shared with the test ability.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -225,31 +212,13 @@ final class RestController {
 			);
 		}
 
-		if ( ! $this->vault->has( $row[ DestinationRows::COLUMN_ACCOUNT ] ) ) {
-			return new \WP_Error(
-				'gtm4wp_google_account_unknown',
-				__( 'This service account no longer exists.', 'duracelltomi-google-tag-manager' ),
-				array( 'status' => 404 )
-			);
+		$result = $this->probe->probe( $row );
+
+		if ( $result instanceof \WP_Error ) {
+			return $result;
 		}
 
-		$result = $this->ingest->validate_destination( $row );
-		$ok     = ! ( $result instanceof \WP_Error );
-
-		// A passing probe ends the failure streak and the notice it raises;
-		// otherwise the notice stayed until the next refund.
-		if ( $ok ) {
-			( $this->health ?? new DestinationHealth() )->clear_failures( $row[ DestinationRows::COLUMN_MEASUREMENT ] );
-		}
-
-		return new \WP_REST_Response(
-			array(
-				'ok'      => $ok,
-				'message' => $ok
-					? __( 'Google accepted a test request for this destination.', 'duracelltomi-google-tag-manager' )
-					: $result->get_error_message(),
-			)
-		);
+		return new \WP_REST_Response( $result );
 	}
 
 	/**

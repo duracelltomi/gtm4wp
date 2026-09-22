@@ -13,6 +13,7 @@ use GTM4WP\Abilities\Registrar;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Abilities\StatusAbilities;
 use GTM4WP\Module\Registry;
+use GTM4WP\Modules\GoogleAuth\Abilities as GoogleAuthAbilities;
 use GTM4WP\Modules\GoogleDataManager\Abilities;
 use GTM4WP\Tests\unit\Admin\UndocumentedThirdPartyModule;
 
@@ -35,9 +36,11 @@ final class RegistrarTest extends AbilitiesTestCase {
 	 * module yields.
 	 */
 	private const PLUGIN_WIDE = array(
+		SettingsAbilities::EXPORT_SETTINGS,
 		SettingsAbilities::GET_SETTINGS,
 		StatusAbilities::GET_SITE_HEALTH,
 		StatusAbilities::GET_STATUS,
+		SettingsAbilities::IMPORT_SETTINGS,
 		SettingsAbilities::UPDATE_SETTINGS,
 	);
 
@@ -149,6 +152,7 @@ final class RegistrarTest extends AbilitiesTestCase {
 
 		$this->assertSame( self::PLUGIN_WIDE, $actual, 'Only the plugin-wide abilities: a module ability comes from the registry walk, not from a list.' );
 		$this->assertArrayNotHasKey( Abilities::GET_LOG, $this->registered, 'With the Data Manager module absent from the registry, its ability is absent too.' );
+		$this->assertArrayNotHasKey( GoogleAuthAbilities::GET_ACCOUNTS, $this->registered, 'Same for the service-accounts module.' );
 	}
 
 	public function test_a_module_naming_a_schema_class_that_does_not_exist_is_skipped(): void {
@@ -177,6 +181,15 @@ final class RegistrarTest extends AbilitiesTestCase {
 		( new Registrar( $this->registry() ) )->register_abilities();
 
 		$this->assertArrayHasKey( Abilities::GET_LOG, $this->registered, 'The built-in module opts in the same way a third party does; the Registrar names no module.' );
+		$this->assertArrayHasKey( Abilities::TEST_DESTINATION, $this->registered );
+		$this->assertArrayHasKey( Abilities::REPLAY_REFUNDS, $this->registered );
+	}
+
+	public function test_the_service_account_abilities_reach_the_registry_through_their_module(): void {
+		( new Registrar( $this->registry() ) )->register_abilities();
+
+		$this->assertArrayHasKey( GoogleAuthAbilities::GET_ACCOUNTS, $this->registered, 'GoogleAuth opts in on its admin schema like the Data Manager module; the Registrar names neither.' );
+		$this->assertArrayHasKey( GoogleAuthAbilities::TEST_ACCOUNT, $this->registered );
 	}
 
 	// ---- The write switch (TS-12: both halves of the gate) -----------------
@@ -187,9 +200,16 @@ final class RegistrarTest extends AbilitiesTestCase {
 		( new Registrar( $this->registry() ) )->register_abilities();
 
 		$this->assertArrayNotHasKey( SettingsAbilities::UPDATE_SETTINGS, $this->registered, 'A read-only site never lists the write, so a client cannot discover an ability it may not run.' );
+		$this->assertArrayNotHasKey( SettingsAbilities::IMPORT_SETTINGS, $this->registered );
+		$this->assertArrayNotHasKey( GoogleAuthAbilities::TEST_ACCOUNT, $this->registered, 'Contacting Google with the site\'s credentials is withheld with the writes.' );
+		$this->assertArrayNotHasKey( Abilities::TEST_DESTINATION, $this->registered );
+		$this->assertArrayNotHasKey( Abilities::REPLAY_REFUNDS, $this->registered );
 		$this->assertArrayHasKey( SettingsAbilities::GET_SETTINGS, $this->registered );
+		$this->assertArrayHasKey( SettingsAbilities::EXPORT_SETTINGS, $this->registered );
 		$this->assertArrayHasKey( StatusAbilities::GET_STATUS, $this->registered );
-		$this->assertNotEmpty( $this->registered );
+		$this->assertArrayHasKey( GoogleAuthAbilities::GET_ACCOUNTS, $this->registered );
+		$this->assertArrayHasKey( Abilities::GET_LOG, $this->registered );
+		$this->assertCount( 6, $this->registered, 'The six reads of the catalogue.' );
 
 		// The generic half: whatever the catalogue grows to, nothing registered
 		// on a read-only site claims to write - a provider that forgets to check
