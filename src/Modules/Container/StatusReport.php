@@ -87,7 +87,7 @@ final class StatusReport {
 				'valid'      => ( '' === $configured ) || ( $configured === $effective ),
 			),
 			'hardcoded'             => array(
-				'active'         => array() !== $locks['columns'],
+				'active'         => HardcodedContainers::locks_any( $locks ),
 				'locked_columns' => array_keys( $locks['columns'] ),
 				'locked_rows'    => array() !== $locks['rows'],
 				'errors'         => $this->options->hardcoded_errors(),

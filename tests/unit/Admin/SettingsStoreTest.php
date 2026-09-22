@@ -189,4 +189,56 @@ final class SettingsStoreTest extends TestCase {
 		$this->assertSame( 'gtm4wp', $export['plugin'] );
 		$this->assertSame( 'mine', $export['options'][ GTM4WP_OPTION_DATALAYER_NAME ] );
 	}
+
+	/**
+	 * The store's own current_values(), moved here from the REST controller's
+	 * suite when its forwarder went (#255): defaults overlaid with the stored row,
+	 * the container rows derived from the flat 1.x keys until the row option exists.
+	 */
+	public function test_current_values_merge_defaults_with_stored(): void {
+		$this->options[ GTM4WP_OPTIONS ] = array( GTM4WP_OPTION_GTM_CODE => 'GTM-STORED' );
+
+		$values = $this->store()->current_values();
+
+		$this->assertSame( 'GTM-STORED', $values[ GTM4WP_OPTION_GTM_CODE ] );
+		$this->assertFalse( $values[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ], 'Unset options fall back to module defaults.' );
+	}
+
+	public function test_current_values_derive_container_rows_from_legacy_options(): void {
+		$this->options[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CODE  => 'GTM-STORED',
+			GTM4WP_OPTION_GTMDOMAIN => 'gtm.example.com',
+		);
+
+		$values = $this->store()->current_values();
+
+		$this->assertSame(
+			array(
+				array(
+					'id'          => 'GTM-STORED',
+					'gtm_auth'    => '',
+					'gtm_preview' => '',
+					'domain'      => 'gtm.example.com',
+					'path'        => '',
+				),
+			),
+			$values[ GTM4WP_OPTION_GTM_CONTAINERS ],
+			'Until the row option is saved, the admin UI shows the rows the frontend derives from the flat 1.x options.'
+		);
+	}
+
+	public function test_current_values_keep_saved_empty_container_rows(): void {
+		$this->options[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GTM_CONTAINERS => array(),
+			GTM4WP_OPTION_GTM_CODE       => 'GTM-STALE1',
+		);
+
+		$values = $this->store()->current_values();
+
+		$this->assertSame(
+			array(),
+			$values[ GTM4WP_OPTION_GTM_CONTAINERS ],
+			'An intentionally emptied table must not be repopulated from stale legacy keys.'
+		);
+	}
 }

@@ -394,7 +394,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			)
 		);
 
-		if ( array() === $locks['columns'] ) {
+		if ( ! HardcodedContainers::locks_any( $locks ) ) {
 			return $intro;
 		}
 

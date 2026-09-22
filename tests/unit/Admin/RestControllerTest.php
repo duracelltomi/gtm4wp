@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Admin;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Admin\RestController;
+use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Module\Registry;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -88,59 +89,6 @@ final class RestControllerTest extends TestCase {
 		Functions\when( 'get_option' )->justReturn( $stored );
 
 		return new RestController( Registry::with_default_modules() );
-	}
-
-	public function test_current_values_merge_defaults_with_stored(): void {
-		$controller = $this->make_controller(
-			array( GTM4WP_OPTION_GTM_CODE => 'GTM-STORED' )
-		);
-
-		$values = $controller->current_values();
-
-		$this->assertSame( 'GTM-STORED', $values[ GTM4WP_OPTION_GTM_CODE ] );
-		$this->assertFalse( $values[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ], 'Unset options fall back to module defaults.' );
-	}
-
-	public function test_current_values_derive_container_rows_from_legacy_options(): void {
-		$controller = $this->make_controller(
-			array(
-				GTM4WP_OPTION_GTM_CODE  => 'GTM-STORED',
-				GTM4WP_OPTION_GTMDOMAIN => 'gtm.example.com',
-			)
-		);
-
-		$values = $controller->current_values();
-
-		$this->assertSame(
-			array(
-				array(
-					'id'          => 'GTM-STORED',
-					'gtm_auth'    => '',
-					'gtm_preview' => '',
-					'domain'      => 'gtm.example.com',
-					'path'        => '',
-				),
-			),
-			$values[ GTM4WP_OPTION_GTM_CONTAINERS ],
-			'Until the row option is saved, the admin UI shows the rows the frontend derives from the flat 1.x options.'
-		);
-	}
-
-	public function test_current_values_keep_saved_empty_container_rows(): void {
-		$controller = $this->make_controller(
-			array(
-				GTM4WP_OPTION_GTM_CONTAINERS => array(),
-				GTM4WP_OPTION_GTM_CODE       => 'GTM-STALE1',
-			)
-		);
-
-		$values = $controller->current_values();
-
-		$this->assertSame(
-			array(),
-			$values[ GTM4WP_OPTION_GTM_CONTAINERS ],
-			'An intentionally emptied table must not be repopulated from stale legacy keys.'
-		);
 	}
 
 	public function test_save_sanitizes_and_persists_values(): void {
@@ -341,7 +289,7 @@ final class RestControllerTest extends TestCase {
 		$data = $controller->export_settings()->get_data();
 
 		$this->assertSame( 'gtm4wp', $data['plugin'] );
-		$this->assertSame( RestController::EXPORT_TYPE, $data['type'] );
+		$this->assertSame( SettingsStore::EXPORT_TYPE, $data['type'] );
 		$this->assertSame( GTM4WP_VERSION, $data['version'] );
 		$this->assertSame( 'GTM-EXPORTED', $data['options'][ GTM4WP_OPTION_GTM_CODE ] );
 	}
@@ -355,7 +303,7 @@ final class RestControllerTest extends TestCase {
 	public function test_export_includes_every_registered_option(): void {
 		$controller = $this->make_controller();
 
-		$options = $controller->export_data()['options'];
+		$options = $controller->export_settings()->get_data()['options'];
 
 		foreach ( $this->registered_field_keys() as $key ) {
 			$this->assertArrayHasKey(
@@ -384,7 +332,7 @@ final class RestControllerTest extends TestCase {
 
 		$payload = wp_json_encode(
 			array(
-				'type'    => RestController::EXPORT_TYPE,
+				'type'    => SettingsStore::EXPORT_TYPE,
 				'options' => array(
 					GTM4WP_OPTION_BLACKLIST_STATUS => array( 'html', $hostile, 'gaawe' ),
 				),
@@ -413,7 +361,7 @@ final class RestControllerTest extends TestCase {
 
 		$payload = wp_json_encode(
 			array(
-				'type'    => RestController::EXPORT_TYPE,
+				'type'    => SettingsStore::EXPORT_TYPE,
 				'options' => array(
 					GTM4WP_OPTION_GTM_CONTAINERS => array(
 						array( 'id' => "GTM-\x3Cscript\x3Ealert(1)\x3C/script\x3E" ),
@@ -443,7 +391,7 @@ final class RestControllerTest extends TestCase {
 
 		$payload = wp_json_encode(
 			array(
-				'type'    => RestController::EXPORT_TYPE,
+				'type'    => SettingsStore::EXPORT_TYPE,
 				'options' => array(
 					'evil-injected-key'            => 'value',
 					GTM4WP_OPTION_INCLUDE_LOGGEDIN => true,
@@ -468,7 +416,7 @@ final class RestControllerTest extends TestCase {
 
 		$payload = wp_json_encode(
 			array(
-				'type'    => RestController::EXPORT_TYPE,
+				'type'    => SettingsStore::EXPORT_TYPE,
 				'options' => array(
 					GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION => 250,
 				),
@@ -563,7 +511,7 @@ final class RestControllerTest extends TestCase {
 		);
 
 		// Capture the export payload before switching the get_option() stub.
-		$payload = wp_json_encode( $exporter->export_data() );
+		$payload = wp_json_encode( $exporter->export_settings()->get_data() );
 
 		$importer = $this->make_controller();
 
@@ -614,7 +562,7 @@ final class RestControllerTest extends TestCase {
 			)
 		);
 
-		$ui_rows = $controller->ui_values()[ GTM4WP_OPTION_GTM_CONTAINERS ];
+		$ui_rows = $controller->get_settings()->get_data()['values'][ GTM4WP_OPTION_GTM_CONTAINERS ];
 
 		$this->assertCount( 1, $ui_rows );
 		$this->assertSame( 'GTM-HARD01', $ui_rows[0]['id'], 'The screen shows the container ID the frontend loads.' );
@@ -622,7 +570,7 @@ final class RestControllerTest extends TestCase {
 
 		$this->assertSame(
 			'GTM-STORED1',
-			$controller->current_values()[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'],
+			$controller->export_settings()->get_data()['options'][ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'],
 			'The export path keeps the stored setup, so a settings file stays portable to a site without the constant.'
 		);
 	}

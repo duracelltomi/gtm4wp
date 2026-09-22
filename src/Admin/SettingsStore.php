@@ -58,6 +58,14 @@ final class SettingsStore {
 	public const IMPORT_MAX_DEPTH = 16;
 
 	/**
+	 * The Field definitions per module, built on the first call (see
+	 * fields_by_module()).
+	 *
+	 * @var array<string, Field[]>|null
+	 */
+	private ?array $fields_by_module = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Registry $registry The module registry.
@@ -256,9 +264,22 @@ final class SettingsStore {
 	 * The Field definitions of every registered module, keyed by module id in
 	 * registry order - the order the settings screen lists the modules in.
 	 *
+	 * Built once per instance: the definitions are static for a request
+	 * (fields() is database-free by design, and nothing mutates a Field after
+	 * it is built), while the VALUES this class reads always come from the
+	 * option row afresh. Without the memo one abilities registration walked
+	 * the registry four times and built every Field three times (#257). The
+	 * boundary it draws: a module added to the registry after this instance's
+	 * first walk is invisible to it, which is already true of the enums the
+	 * abilities publish and of the module defaults the Options service loads.
+	 *
 	 * @return array<string, Field[]>
 	 */
 	public function fields_by_module(): array {
+		if ( null !== $this->fields_by_module ) {
+			return $this->fields_by_module;
+		}
+
 		$by_module = array();
 
 		foreach ( $this->registry->all() as $module ) {
@@ -269,6 +290,8 @@ final class SettingsStore {
 
 			$by_module[ $module->id() ] = ( new $schema_class() )->fields();
 		}
+
+		$this->fields_by_module = $by_module;
 
 		return $by_module;
 	}

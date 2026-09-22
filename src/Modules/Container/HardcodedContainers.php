@@ -185,11 +185,24 @@ final class HardcodedContainers {
 	}
 
 	/**
+	 * Whether a lock report says any part of the container table is taken over:
+	 * the one predicate behind is_active(), the status report and the settings
+	 * screen's read-out, so a caller that already holds a report applies it to
+	 * that report instead of resolving the constants a second time (#254).
+	 *
+	 * @param array<string, mixed> $locks A report as locks() returns it.
+	 * @return bool
+	 */
+	public static function locks_any( array $locks ): bool {
+		return array() !== ( $locks['columns'] ?? array() );
+	}
+
+	/**
 	 * Whether any valid constant currently overrides the container setup.
 	 *
 	 * @return bool
 	 */
 	public static function is_active(): bool {
-		return array() !== self::locks()['columns'];
+		return self::locks_any( self::locks() );
 	}
 }

@@ -497,7 +497,7 @@ final class EventsIngest {
 		}
 
 		$summary = ( '' === $status ) ? $message : trim( $status . ': ' . $message );
-		$summary = mb_substr( sanitize_text_field( $summary ), 0, 200 );
+		$summary = mb_substr( sanitize_text_field( $summary ), 0, TokenService::ERROR_MAX_LENGTH );
 
 		$hint = self::status_hint( $status );
 

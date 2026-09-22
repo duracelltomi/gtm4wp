@@ -45,10 +45,10 @@ final class SettingsPage {
 	/**
 	 * Constructor.
 	 *
-	 * @param Registry       $registry The module registry.
-	 * @param RestController $rest     The settings REST controller (for current values).
+	 * @param Registry      $registry The module registry.
+	 * @param SettingsStore $store    The settings service the screen reads its values from.
 	 */
-	public function __construct( private Registry $registry, private RestController $rest ) {
+	public function __construct( private Registry $registry, private SettingsStore $store ) {
 	}
 
 	/**
@@ -189,7 +189,7 @@ final class SettingsPage {
 	public function bootstrap_data(): array {
 		// ui_values(), not current_values(): the screen shows what a wp-config
 		// constant actually loads.
-		$values  = $this->rest->ui_values();
+		$values  = $this->store->ui_values();
 		$modules = array();
 
 		foreach ( $this->registry->all() as $module ) {

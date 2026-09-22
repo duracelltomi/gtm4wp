@@ -29,6 +29,14 @@ defined( 'ABSPATH' ) || exit;
 final class TokenService {
 
 	/**
+	 * Longest error text from Google the plugin keeps or hands on: the vault's
+	 * stored last_error, the message the Test buttons and the two test
+	 * abilities return, and EventsIngest's summaries all use this one cap, so
+	 * the three cannot drift apart (#259).
+	 */
+	public const ERROR_MAX_LENGTH = 200;
+
+	/**
 	 * Google's OAuth 2.0 token endpoint. The one place the URL is written; a
 	 * key file must name the same endpoint (ServiceAccountKey) and the
 	 * transport must allow its host (WpTransport::ALLOWED_HOSTS).
@@ -260,8 +268,11 @@ final class TokenService {
 	}
 
 	/**
-	 * A short, storable description of a refused token exchange from Google's
-	 * `error` and `error_description` (never key material; the vault caps it).
+	 * A short description of a refused token exchange from Google's `error`
+	 * and `error_description` (never key material). Capped and tag-stripped
+	 * here, where the text is built, so the settings screen, both test
+	 * abilities and the vault row get the same text; the vault applies the same
+	 * cap again when it stores it, which is idempotent (#259).
 	 *
 	 * @param array{status: int, body: array|null} $response The transport response.
 	 * @return string
@@ -279,6 +290,8 @@ final class TokenService {
 			);
 		}
 
-		return ( '' === $description ) ? $code : $code . ': ' . $description;
+		$summary = ( '' === $description ) ? $code : $code . ': ' . $description;
+
+		return mb_substr( sanitize_text_field( $summary ), 0, self::ERROR_MAX_LENGTH );
 	}
 }

@@ -222,4 +222,80 @@ final class ContractTest extends AbilitiesTestCase {
 			$this->assertTrue( method_exists( $callback[0], $callback[1] ), "$name execute callback names a real method." );
 		}
 	}
+
+	/**
+	 * Core validates an ability's input and output with
+	 * rest_validate_value_from_schema(), which recurses into every sub-schema
+	 * it can reach from a value and reads its `type` unguarded: a sub-schema
+	 * written as array() is published as `[]` and costs three PHP warnings and
+	 * two _doing_it_wrong() per value while validation still passes (RI-33,
+	 * #251). The per-property loop above only sees the top level; this walk
+	 * sees every level.
+	 */
+	public function test_every_sub_schema_of_every_ability_carries_a_type(): void {
+		foreach ( $this->registered as $name => $args ) {
+			$this->assert_typed( $args['input_schema'], "$name input_schema" );
+			$this->assert_typed( $args['output_schema'], "$name output_schema" );
+		}
+	}
+
+	/**
+	 * Asserts a schema and every schema nested under it carries a `type`
+	 * (or an anyOf/oneOf alternative list).
+	 *
+	 * @param mixed  $schema The schema.
+	 * @param string $path   Where it sits, for the message.
+	 */
+	private function assert_typed( $schema, string $path ): void {
+		$this->assertIsArray( $schema, "$path is a schema" );
+		$this->assertTrue(
+			array_key_exists( 'type', $schema ) || array_key_exists( 'anyOf', $schema ) || array_key_exists( 'oneOf', $schema ),
+			"$path carries a type - an empty array is published as [] and makes core's validator warn."
+		);
+
+		foreach ( array( 'properties', 'patternProperties' ) as $map ) {
+			foreach ( $schema[ $map ] ?? array() as $property => $sub ) {
+				$this->assert_typed( $sub, "$path.$map.$property" );
+			}
+		}
+
+		if ( isset( $schema['items'] ) ) {
+			$this->assert_typed( $schema['items'], "$path.items" );
+		}
+
+		if ( isset( $schema['additionalProperties'] ) && is_array( $schema['additionalProperties'] ) ) {
+			$this->assert_typed( $schema['additionalProperties'], "$path.additionalProperties" );
+		}
+
+		foreach ( array( 'anyOf', 'oneOf' ) as $list ) {
+			foreach ( $schema[ $list ] ?? array() as $index => $sub ) {
+				$this->assert_typed( $sub, "$path.$list.$index" );
+			}
+		}
+	}
+
+	/**
+	 * The schema-property descriptions are read by the same assistant that
+	 * reads the translated ability descriptions, and WordPress core and
+	 * WooCommerce wrap every one of theirs. phpcs cannot see a MISSING
+	 * translation call, so the providers' source is checked for the literal
+	 * form (#256). The stubbed __() makes a runtime check meaningless here.
+	 */
+	public function test_every_schema_description_in_the_providers_is_translatable(): void {
+		$providers = array(
+			'src/Abilities/StatusAbilities.php',
+			'src/Abilities/SettingsAbilities.php',
+			'src/Modules/GoogleAuth/Abilities.php',
+			'src/Modules/GoogleDataManager/Abilities.php',
+		);
+
+		foreach ( $providers as $file ) {
+			$source = file_get_contents( dirname( __DIR__, 3 ) . '/' . $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- reading the plugin's own source in a test.
+			$this->assertIsString( $source, "$file is readable" );
+
+			$literal = preg_match_all( "/^\\s*'description'\\s*=>\\s*'/m", $source, $matches );
+
+			$this->assertSame( 0, $literal, "$file: every schema description goes through __(): " . implode( ' | ', array_map( 'trim', $matches[0] ) ) );
+		}
+	}
 }

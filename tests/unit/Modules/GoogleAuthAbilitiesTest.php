@@ -207,6 +207,35 @@ final class GoogleAuthAbilitiesTest extends AbilitiesTestCase {
 	}
 
 	/**
+	 * The answer ends in an assistant's transcript: Google's reason arrives
+	 * capped and stripped, never as a raw body (#259; the threat model's "no
+	 * raw third-party error text"). Core-like sanitize_text_field stand-in.
+	 */
+	public function test_a_refused_keys_reason_is_capped_and_stripped_in_the_answer(): void {
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) )
+		);
+
+		$id = $this->store_account();
+		$this->transport->will_respond_json(
+			400,
+			array(
+				'error'             => 'invalid_grant',
+				'error_description' => "<script>alert(1)</script>Invalid JWT\nSignature. " . str_repeat( 'x', 5000 ),
+			)
+		);
+
+		$result = $this->execute( Abilities::TEST_ACCOUNT, array( 'id' => $id ) );
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['ok'] );
+		$this->assertSame( TokenService::ERROR_MAX_LENGTH, mb_strlen( $result['message'] ) );
+		$this->assertStringStartsWith( 'invalid_grant: alert(1)Invalid JWT Signature. ', $result['message'] );
+		$this->assertStringNotContainsString( '<', $result['message'] );
+		$this->assertStringNotContainsString( "\n", $result['message'] );
+	}
+
+	/**
 	 * Ids that name no stored account: a well-formed one, a malformed one, a
 	 * missing one. Each is refused with 404 before anything leaves the site.
 	 *

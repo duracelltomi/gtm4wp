@@ -11,6 +11,7 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Admin\RestController;
 use GTM4WP\Admin\SettingsPage;
+use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Module\Registry;
 use GTM4WP\Plugin;
 use GTM4WP\Tests\unit\TestCase;
@@ -118,7 +119,7 @@ final class AdminCapabilityFilterTest extends TestCase {
 			}
 		);
 
-		$page = new SettingsPage( new Registry(), new RestController( new Registry() ) );
+		$page = new SettingsPage( new Registry(), new SettingsStore( new Registry() ) );
 		$page->add_admin_page();
 
 		return $captured;

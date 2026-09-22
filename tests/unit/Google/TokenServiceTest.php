@@ -329,6 +329,35 @@ final class TokenServiceTest extends TestCase {
 	}
 
 	/**
+	 * Google's reason is returned to the settings screen and to two abilities,
+	 * so it is capped and stripped BEFORE it is returned, not only when the
+	 * vault stores it (#259). A core-like sanitize_text_field stand-in here:
+	 * tags out, whitespace collapsed, trimmed.
+	 */
+	public function test_a_refusal_message_is_capped_and_stripped_before_it_is_returned(): void {
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) )
+		);
+
+		$this->transport->will_respond_json(
+			400,
+			array(
+				'error'             => 'invalid_grant',
+				'error_description' => "<script>alert(1)</script>Invalid JWT\nSignature. " . str_repeat( 'x', 5000 ),
+			)
+		);
+
+		$result = $this->make_service()->test_account( $this->account_id );
+
+		$this->assertFalse( $result['ok'] );
+		$this->assertSame( TokenService::ERROR_MAX_LENGTH, mb_strlen( $result['message'] ) );
+		$this->assertStringStartsWith( 'invalid_grant: alert(1)Invalid JWT Signature. ', $result['message'] );
+		$this->assertStringNotContainsString( '<', $result['message'] );
+		$this->assertStringNotContainsString( "\n", $result['message'] );
+		$this->assertSame( $result['message'], $this->vault->get( $this->account_id )['last_error'], 'The returned message and the stored one are the same text.' );
+	}
+
+	/**
 	 * Response shapes that are not a token, with the summary each produces.
 	 *
 	 * @return array<string, array{0: int, 1: array|null, 2: string}>

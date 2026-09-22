@@ -33,13 +33,9 @@ final class RestController {
 	public const REST_ROUTE_IMPORT = '/settings/import';
 
 	/**
-	 * The export file's type marker; owned by the store, kept here for readers
-	 * of this class.
-	 */
-	public const EXPORT_TYPE = SettingsStore::EXPORT_TYPE;
-
-	/**
-	 * The settings service behind every route.
+	 * The settings service behind every route. Nothing else is read here: the
+	 * routes are thin adapters, and a caller that wants the values goes to the
+	 * store itself (SettingsPage does) rather than through a forwarder (#255).
 	 *
 	 * @var SettingsStore
 	 */
@@ -48,10 +44,10 @@ final class RestController {
 	/**
 	 * Constructor.
 	 *
-	 * @param Registry           $registry The module registry.
+	 * @param Registry           $registry The module registry the store is built over.
 	 * @param SettingsStore|null $store    The settings service; built over the registry when null.
 	 */
-	public function __construct( private Registry $registry, ?SettingsStore $store = null ) {
+	public function __construct( Registry $registry, ?SettingsStore $store = null ) {
 		$this->store = $store ?? new SettingsStore( $registry );
 	}
 
@@ -128,26 +124,6 @@ final class RestController {
 	}
 
 	/**
-	 * Returns the current raw option values (defaults overlaid with the
-	 * stored values), keyed by the 1.x compatible option keys.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function current_values(): array {
-		return $this->store->current_values();
-	}
-
-	/**
-	 * The values the settings screen renders: what the frontend actually
-	 * loads, wp-config.php overrides applied.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function ui_values(): array {
-		return $this->store->ui_values();
-	}
-
-	/**
 	 * GET handler.
 	 *
 	 * @return \WP_REST_Response
@@ -181,21 +157,12 @@ final class RestController {
 	}
 
 	/**
-	 * The settings export envelope.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function export_data(): array {
-		return $this->store->export_data();
-	}
-
-	/**
-	 * GET handler for the export endpoint.
+	 * GET handler for the export endpoint: the store's envelope.
 	 *
 	 * @return \WP_REST_Response
 	 */
 	public function export_settings(): \WP_REST_Response {
-		return new \WP_REST_Response( $this->export_data() );
+		return new \WP_REST_Response( $this->store->export_data() );
 	}
 
 	/**

@@ -517,6 +517,36 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertCount( 1, $this->transport->requests, 'No ingest probe follows a refused token exchange.' );
 	}
 
+	/**
+	 * The token refusal reaches this route (and the test-destination ability)
+	 * through DestinationProbe, so the cap and the tag strip applied where the
+	 * message is built hold here too (#259). The setUp stand-in strips tags;
+	 * whitespace is collapsed here as core does.
+	 */
+	public function test_a_refused_token_exchanges_reason_is_capped_and_stripped(): void {
+		Functions\when( 'sanitize_text_field' )->alias(
+			static fn ( $value ) => trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) )
+		);
+
+		$id = $this->store_account();
+		$this->transport->will_respond_json(
+			400,
+			array(
+				'error'             => 'invalid_grant',
+				'error_description' => "<script>alert(1)</script>Invalid JWT\nsignature. " . str_repeat( 'x', 5000 ),
+			)
+		);
+
+		$response = $this->make_controller()->test_destination( self::request( $id ) );
+
+		$data = $response->get_data();
+		$this->assertFalse( $data['ok'] );
+		$this->assertSame( TokenService::ERROR_MAX_LENGTH, mb_strlen( $data['message'] ) );
+		$this->assertStringStartsWith( 'invalid_grant: alert(1)Invalid JWT signature. ', $data['message'] );
+		$this->assertStringNotContainsString( '<', $data['message'] );
+		$this->assertStringNotContainsString( "\n", $data['message'] );
+	}
+
 	public function test_a_transport_failure_surfaces_as_the_failure_reason(): void {
 		$id = $this->store_account();
 		$this->queue_token();

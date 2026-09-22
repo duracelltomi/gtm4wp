@@ -80,21 +80,21 @@ final class StatusAbilities implements ProviderInterface {
 				'label'               => __( 'Get the Google Tag Manager status', 'duracelltomi-google-tag-manager' ),
 				'description'         => __( 'Call this first. Reports what Google Tag Manager for WordPress loads on this site and what is wrong with it: the plugin version, every container that loads (with the wp-config.php overrides applied), where the container code is placed, the data layer variable name, which modules are available and switched on (and, for a module that integrates another plugin, whether that plugin is installed and in which version), and the configuration problems the plugin reports as admin notices. Read-only. Use gtm4wp/get-settings for option values and gtm4wp/get-site-health for the Site Health state.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
-				'input_schema'        => self::no_input_schema(),
+				'input_schema'        => Registrar::no_input_schema(),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
 						'plugin_version'        => array( 'type' => 'string' ),
 						'containers'            => array(
 							'type'        => 'array',
-							'description' => 'The containers that load, in load order, wp-config.php overrides applied.',
+							'description' => __( 'The containers that load, in load order, wp-config.php overrides applied.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array(
 								'type'       => 'object',
 								'properties' => array(
 									'id'          => array( 'type' => 'string' ),
 									'environment' => array(
 										'type'        => 'boolean',
-										'description' => 'Whether the container loads a GTM environment (gtm_auth and gtm_preview both set).',
+										'description' => __( 'Whether the container loads a GTM environment (gtm_auth and gtm_preview both set).', 'duracelltomi-google-tag-manager' ),
 									),
 									'domain'      => array( 'type' => 'string' ),
 									'path'        => array( 'type' => 'string' ),
@@ -108,7 +108,7 @@ final class StatusAbilities implements ProviderInterface {
 						),
 						'container_code_output' => array(
 							'type'        => 'boolean',
-							'description' => 'False when the placement is off: the data layer is written but no container code is emitted.',
+							'description' => __( 'False when the placement is off: the data layer is written but no container code is emitted.', 'duracelltomi-google-tag-manager' ),
 						),
 						'datalayer_name'        => array(
 							'type'       => 'object',
@@ -120,7 +120,7 @@ final class StatusAbilities implements ProviderInterface {
 						),
 						'hardcoded'             => array(
 							'type'        => 'object',
-							'description' => 'The GTM4WP_HARDCODED_* wp-config.php constants in effect.',
+							'description' => __( 'The GTM4WP_HARDCODED_* wp-config.php constants in effect.', 'duracelltomi-google-tag-manager' ),
 							'properties'  => array(
 								'active'         => array( 'type' => 'boolean' ),
 								'locked_columns' => array(
@@ -130,7 +130,7 @@ final class StatusAbilities implements ProviderInterface {
 								'locked_rows'    => array( 'type' => 'boolean' ),
 								'errors'         => array(
 									'type'        => 'array',
-									'description' => 'Constants defined with a malformed value, ignored by the plugin.',
+									'description' => __( 'Constants defined with a malformed value, ignored by the plugin.', 'duracelltomi-google-tag-manager' ),
 									'items'       => array( 'type' => 'string' ),
 								),
 							),
@@ -145,7 +145,7 @@ final class StatusAbilities implements ProviderInterface {
 									'available'   => array( 'type' => 'boolean' ),
 									'enabled'     => array(
 										'type'        => array( 'boolean', 'null' ),
-										'description' => 'The module\'s master switch, or null for a module that has none.',
+										'description' => __( 'The module\'s master switch, or null for a module that has none.', 'duracelltomi-google-tag-manager' ),
 									),
 									'integration' => self::integration_schema(),
 								),
@@ -181,7 +181,7 @@ final class StatusAbilities implements ProviderInterface {
 				'label'               => __( 'Get the Site Health state of Google Tag Manager', 'duracelltomi-google-tag-manager' ),
 				'description'         => __( 'Returns the plugin\'s own Site Health status tests and its section of the Site Health Info tab, as an administrator sees them under Tools -> Site Health. Read-only and safe to quote: statuses, counts, timestamps and short reason codes only - no keys, no account addresses, no visitor data. Call gtm4wp/get-status first for the configuration itself.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
-				'input_schema'        => self::no_input_schema(),
+				'input_schema'        => Registrar::no_input_schema(),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -360,33 +360,11 @@ final class StatusAbilities implements ProviderInterface {
 	private static function integration_schema(): array {
 		return array(
 			'type'        => array( 'object', 'null' ),
-			'description' => 'The plugin this module integrates: whether it is installed, and its version. Null for a module that integrates nothing.',
+			'description' => __( 'The plugin this module integrates: whether it is installed, and its version. Null for a module that integrates nothing.', 'duracelltomi-google-tag-manager' ),
 			'properties'  => array(
 				'active'  => array( 'type' => 'boolean' ),
 				'version' => array( 'type' => array( 'string', 'null' ) ),
 			),
-		);
-	}
-
-	/**
-	 * The input schema of an ability that takes no input. The empty-object
-	 * default is what core applies when a client sends nothing at all, so a
-	 * bare call validates instead of failing on a null input (U155).
-	 *
-	 * No `properties` key on purpose: an empty PHP array serialises as `[]`,
-	 * and while core's REST route turns the empty `default` into `{}` it leaves
-	 * `properties` alone, so the published schema would carry an invalid
-	 * fragment (JSON Schema wants an object there). Core validates the absent
-	 * key the same way it validates an empty one, and `additionalProperties`
-	 * still refuses every input key (U155).
-	 *
-	 * @return array<string, mixed>
-	 */
-	public static function no_input_schema(): array {
-		return array(
-			'type'                 => 'object',
-			'default'              => array(),
-			'additionalProperties' => false,
 		);
 	}
 }

@@ -61,11 +61,6 @@ final class KeyVault {
 	public const STATUS_REFRESH_INTERVAL = 900;
 
 	/**
-	 * Longest last-error text kept per account (shown on the settings screen).
-	 */
-	private const ERROR_MAX_LENGTH = 200;
-
-	/**
 	 * Cipher and its parameters; GCM authenticates the ciphertext, so a tampered
 	 * blob fails to decrypt instead of decrypting to junk.
 	 */
@@ -358,7 +353,7 @@ final class KeyVault {
 		$accounts[ $id ]['last_checked'] = $this->now();
 		$accounts[ $id ]['last_error']   = $ok
 			? ''
-			: mb_substr( sanitize_text_field( $message ), 0, self::ERROR_MAX_LENGTH );
+			: mb_substr( sanitize_text_field( $message ), 0, TokenService::ERROR_MAX_LENGTH );
 
 		if ( $ok && ( '' !== $scope ) ) {
 			$scopes = self::minted_scopes( $accounts[ $id ] );

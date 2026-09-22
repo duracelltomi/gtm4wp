@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use GTM4WP\Modules\Container\ContainerRows;
+use GTM4WP\Modules\Container\HardcodedContainers;
 use GTM4WP\Modules\Container\StatusReport;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Abilities\AbilitiesTestCase;
@@ -172,6 +173,41 @@ final class ContainerStatusReportTest extends AbilitiesTestCase {
 				'errors'         => array(),
 			),
 			$report['hardcoded']
+		);
+	}
+
+	/**
+	 * The report's `active` is HardcodedContainers' own predicate, not a
+	 * second copy of it (PA-2, #254): under a defined constant the two agree
+	 * and the lock columns are the ones locks() names. Green by design before
+	 * and after the shared predicate landed - it pins that the two cannot
+	 * drift apart, not a defect.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_hardcoded_container_id_is_reported_as_active_by_the_shared_predicate(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ID', 'GTM-BBB222' );
+
+		$report = $this->report( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
+		$locks  = HardcodedContainers::locks();
+
+		$this->assertTrue( HardcodedContainers::is_active() );
+		$this->assertSame( HardcodedContainers::is_active(), $report['hardcoded']['active'] );
+		$this->assertSame( HardcodedContainers::locks_any( $locks ), $report['hardcoded']['active'] );
+		$this->assertSame( array_keys( $locks['columns'] ), $report['hardcoded']['locked_columns'] );
+		$this->assertTrue( $report['hardcoded']['locked_rows'] );
+		$this->assertSame(
+			array(
+				array(
+					'id'          => 'GTM-BBB222',
+					'environment' => false,
+					'domain'      => '',
+					'path'        => '',
+					'omit_id'     => false,
+				),
+			),
+			$report['containers'],
+			'The reported container is the one the constant loads.'
 		);
 	}
 }

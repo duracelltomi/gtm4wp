@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Admin;
 use Brain\Monkey\Functions;
 use GTM4WP\Admin\RestController;
 use GTM4WP\Admin\SettingsPage;
+use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Module\Registry;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -164,7 +165,7 @@ final class SettingsPageTest extends TestCase {
 
 		$registry = Registry::with_default_modules();
 
-		return new SettingsPage( $registry, new RestController( $registry ) );
+		return new SettingsPage( $registry, new SettingsStore( $registry ) );
 	}
 
 	/**
@@ -534,7 +535,7 @@ final class SettingsPageTest extends TestCase {
 		$registry = new Registry();
 		$registry->add( new UndocumentedThirdPartyModule() );
 
-		$page    = new SettingsPage( $registry, new RestController( $registry ) );
+		$page    = new SettingsPage( $registry, new SettingsStore( $registry ) );
 		$modules = $page->bootstrap_data()['modules'];
 
 		$this->assertCount( 1, $modules );

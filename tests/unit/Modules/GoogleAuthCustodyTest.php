@@ -11,6 +11,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Admin\RestController as SettingsRestController;
 use GTM4WP\Admin\SettingsPage;
+use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Google\TokenService;
 use GTM4WP\Module\Registry;
@@ -104,9 +105,9 @@ final class GoogleAuthCustodyTest extends TestCase {
 	 */
 	private function make_settings_stack(): array {
 		$registry = Registry::with_default_modules();
-		$rest     = new SettingsRestController( $registry );
+		$store    = new SettingsStore( $registry );
 
-		return array( new SettingsPage( $registry, $rest ), $rest );
+		return array( new SettingsPage( $registry, $store ), new SettingsRestController( $registry, $store ) );
 	}
 
 	public function test_the_settings_get_route_does_not_carry_the_key(): void {

@@ -85,11 +85,7 @@ final class Abilities implements ProviderInterface {
 				'label'               => __( 'Get the Google service accounts', 'duracelltomi-google-tag-manager' ),
 				'description'         => __( 'Lists the Google Cloud service accounts stored by Google Tag Manager for WordPress: for each one its id, the label the admin gave it, its status (unverified: never tested; ok: Google accepted the key on the last test; error: Google refused it; reupload-required: the stored key can no longer be read, usually because the security keys in wp-config.php changed) and when it was last tested (a Unix timestamp, 0 for never). The id is what test-service-account takes and what a Google Data Manager destination names as its account. The account\'s e-mail address, key id and key are never returned; an assistant does not need them to pick an account. Read-only; the list is empty on a site that uploaded no account.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
-				'input_schema'        => array(
-					'type'                 => 'object',
-					'default'              => array(),
-					'additionalProperties' => false,
-				),
+				'input_schema'        => Registrar::no_input_schema(),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -140,7 +136,7 @@ final class Abilities implements ProviderInterface {
 					'properties'           => array(
 						'id' => array(
 							'type'        => 'string',
-							'description' => 'The account id as get-service-accounts lists it.',
+							'description' => __( 'The account id as get-service-accounts lists it.', 'duracelltomi-google-tag-manager' ),
 							'pattern'     => '^' . KeyVault::ID_PATTERN . '$',
 						),
 					),
@@ -151,11 +147,11 @@ final class Abilities implements ProviderInterface {
 					'properties' => array(
 						'ok'      => array(
 							'type'        => 'boolean',
-							'description' => 'True when Google issued an access token for the key.',
+							'description' => __( 'True when Google issued an access token for the key.', 'duracelltomi-google-tag-manager' ),
 						),
 						'message' => array(
 							'type'        => 'string',
-							'description' => 'What happened, in one sentence; Google\'s reason when the key was refused.',
+							'description' => __( 'What happened, in one sentence; Google\'s reason when the key was refused.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 				),

@@ -116,7 +116,7 @@ final class Abilities implements ProviderInterface {
 						'problems_only' => array(
 							'type'        => 'boolean',
 							'default'     => false,
-							'description' => 'Only the entries that failed, were skipped, are being retried or came back with warnings.',
+							'description' => __( 'Only the entries that failed, were skipped, are being retried or came back with warnings.', 'duracelltomi-google-tag-manager' ),
 						),
 						'limit'         => array(
 							'type'    => 'integer',
@@ -199,7 +199,7 @@ final class Abilities implements ProviderInterface {
 					'properties'           => array(
 						'measurement_id' => array(
 							'type'        => 'string',
-							'description' => 'The measurement ID of a stored destination, as get-settings lists it.',
+							'description' => __( 'The measurement ID of a stored destination, as get-settings lists it.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 					'additionalProperties' => false,
@@ -209,11 +209,11 @@ final class Abilities implements ProviderInterface {
 					'properties' => array(
 						'ok'      => array(
 							'type'        => 'boolean',
-							'description' => 'True when Google accepted the validate-only request.',
+							'description' => __( 'True when Google accepted the validate-only request.', 'duracelltomi-google-tag-manager' ),
 						),
 						'message' => array(
 							'type'        => 'string',
-							'description' => 'What happened, in one sentence; what to check when the request was refused.',
+							'description' => __( 'What happened, in one sentence; what to check when the request was refused.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 				),
@@ -243,12 +243,12 @@ final class Abilities implements ProviderInterface {
 					'properties'           => array(
 						'references' => array(
 							'type'        => 'array',
-							'description' => 'Send only these refunds again, by their reference from the log. Omit for every refund the log marks replayable.',
+							'description' => __( 'Send only these refunds again, by their reference from the log. Omit for every refund the log marks replayable.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array( 'type' => 'string' ),
 						),
 						'confirm'    => array(
 							'type'        => 'boolean',
-							'description' => 'Must be true: the user confirmed, in this turn, that these refunds are to be sent to Google again.',
+							'description' => __( 'Must be true: the user confirmed, in this turn, that these refunds are to be sent to Google again.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 					'additionalProperties' => false,
@@ -258,11 +258,11 @@ final class Abilities implements ProviderInterface {
 					'properties' => array(
 						'queued'     => array(
 							'type'        => 'integer',
-							'description' => 'How many refunds were queued.',
+							'description' => __( 'How many refunds were queued.', 'duracelltomi-google-tag-manager' ),
 						),
 						'references' => array(
 							'type'        => 'array',
-							'description' => 'The references queued.',
+							'description' => __( 'The references queued.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array( 'type' => 'string' ),
 						),
 					),

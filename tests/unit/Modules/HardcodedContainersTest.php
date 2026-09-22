@@ -61,6 +61,31 @@ final class HardcodedContainersTest extends TestCase {
 		$this->assertSame( array(), $errors );
 	}
 
+	/**
+	 * The one predicate behind is_active(), the status report and the
+	 * settings screen's read-out (#254): a lock report with any column.
+	 */
+	public function test_locks_any_is_true_for_any_locked_column_and_false_otherwise(): void {
+		$this->assertFalse(
+			HardcodedContainers::locks_any(
+				array(
+					'columns' => array(),
+					'rows'    => array(),
+				)
+			)
+		);
+		$this->assertFalse( HardcodedContainers::locks_any( array() ), 'A report without a columns key locks nothing.' );
+		$this->assertTrue(
+			HardcodedContainers::locks_any(
+				array(
+					'columns' => array( 'gtm_auth' => 'GTM4WP_HARDCODED_GTM_ENV_AUTH' ),
+					'rows'    => array(),
+				)
+			)
+		);
+		$this->assertSame( HardcodedContainers::locks_any( HardcodedContainers::locks() ), HardcodedContainers::is_active() );
+	}
+
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_hardcoded_gtm_id_locks_the_id_column_and_the_row_set(): void {

@@ -100,7 +100,7 @@ final class SettingsAbilities implements ProviderInterface {
 					'properties'           => array(
 						'modules'        => array(
 							'type'        => 'array',
-							'description' => 'Return only the options of these modules (the sections of the settings screen). Omit for every module.',
+							'description' => __( 'Return only the options of these modules (the sections of the settings screen). Omit for every module.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array(
 								'type' => 'string',
 								'enum' => $module_ids,
@@ -108,7 +108,7 @@ final class SettingsAbilities implements ProviderInterface {
 						),
 						'keys'           => array(
 							'type'        => 'array',
-							'description' => 'Return only these options. Omit for every option.',
+							'description' => __( 'Return only these options. Omit for every option.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array(
 								'type' => 'string',
 								'enum' => $option_keys,
@@ -117,7 +117,7 @@ final class SettingsAbilities implements ProviderInterface {
 						'include_schema' => array(
 							'type'        => 'boolean',
 							'default'     => false,
-							'description' => 'Also describe each returned option: label, description, type, default, choices, documentation link.',
+							'description' => __( 'Also describe each returned option: label, description, type, default, choices, documentation link.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 					'additionalProperties' => false,
@@ -127,11 +127,11 @@ final class SettingsAbilities implements ProviderInterface {
 					'properties' => array(
 						'values'      => array(
 							'type'        => 'object',
-							'description' => 'Option key => current value.',
+							'description' => __( 'Option key => current value.', 'duracelltomi-google-tag-manager' ),
 						),
 						'fields'      => array(
 							'type'        => 'array',
-							'description' => 'One entry per returned option when include_schema is true, otherwise empty.',
+							'description' => __( 'One entry per returned option when include_schema is true, otherwise empty.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array(
 								'type'       => 'object',
 								'properties' => array(
@@ -142,7 +142,7 @@ final class SettingsAbilities implements ProviderInterface {
 									'description' => array( 'type' => 'string' ),
 									'type'        => array( 'type' => 'string' ),
 									'phase'       => array( 'type' => 'string' ),
-									'default'     => array(),
+									'default'     => array( 'type' => array( 'string', 'integer', 'number', 'boolean', 'array', 'object', 'null' ) ),
 									'choices'     => array( 'type' => 'object' ),
 									'columns'     => array( 'type' => 'array' ),
 									'depends_on'  => array( 'type' => 'string' ),
@@ -153,7 +153,7 @@ final class SettingsAbilities implements ProviderInterface {
 						),
 						'locked'      => array(
 							'type'        => 'object',
-							'description' => 'Which parts of the container table wp-config.php constants take over: locked_columns (column keys) and locked_rows (the whole table).',
+							'description' => __( 'Which parts of the container table wp-config.php constants take over: locked_columns (column keys) and locked_rows (the whole table).', 'duracelltomi-google-tag-manager' ),
 							'properties'  => array(
 								'locked_columns' => array(
 									'type'  => 'array',
@@ -164,7 +164,7 @@ final class SettingsAbilities implements ProviderInterface {
 						),
 						'values_hash' => array(
 							'type'        => 'string',
-							'description' => 'Fingerprint of the stored settings at the time of this answer; pass it to update-settings as expected_hash.',
+							'description' => __( 'Fingerprint of the stored settings at the time of this answer; pass it to update-settings as expected_hash.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 				),
@@ -194,11 +194,7 @@ final class SettingsAbilities implements ProviderInterface {
 				'label'               => __( 'Export the Google Tag Manager settings', 'duracelltomi-google-tag-manager' ),
 				'description'         => __( 'Returns the settings of Google Tag Manager for WordPress as the portable JSON envelope the Export button of the settings screen downloads: every option with its stored value (the site\'s own configuration, without the wp-config.php overrides get-settings applies), the plugin version and a type marker. Keep the envelope as a backup before a change, or hand it to import-settings on another site. It contains no service-account key - keys are never exported. Read-only.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
-				'input_schema'        => array(
-					'type'                 => 'object',
-					'default'              => array(),
-					'additionalProperties' => false,
-				),
+				'input_schema'        => Registrar::no_input_schema(),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -206,15 +202,15 @@ final class SettingsAbilities implements ProviderInterface {
 						'type'    => array(
 							'type'        => 'string',
 							'enum'        => array( SettingsStore::EXPORT_TYPE ),
-							'description' => 'The marker import-settings requires.',
+							'description' => __( 'The marker import-settings requires.', 'duracelltomi-google-tag-manager' ),
 						),
 						'version' => array(
 							'type'        => 'string',
-							'description' => 'The plugin version that wrote the envelope.',
+							'description' => __( 'The plugin version that wrote the envelope.', 'duracelltomi-google-tag-manager' ),
 						),
 						'options' => array(
 							'type'        => 'object',
-							'description' => 'Option key => stored value.',
+							'description' => __( 'Option key => stored value.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 				),
@@ -244,11 +240,11 @@ final class SettingsAbilities implements ProviderInterface {
 					'properties'           => array(
 						'payload' => array(
 							'type'        => 'string',
-							'description' => 'The export envelope as a JSON string: the answer of export-settings, or the contents of a downloaded export file.',
+							'description' => __( 'The export envelope as a JSON string: the answer of export-settings, or the contents of a downloaded export file.', 'duracelltomi-google-tag-manager' ),
 						),
 						'confirm' => array(
 							'type'        => 'boolean',
-							'description' => 'Must be true: the user confirmed, in this turn, that every option of this site is to be replaced.',
+							'description' => __( 'Must be true: the user confirmed, in this turn, that every option of this site is to be replaced.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 					'additionalProperties' => false,
@@ -258,15 +254,15 @@ final class SettingsAbilities implements ProviderInterface {
 					'properties' => array(
 						'imported'    => array(
 							'type'        => 'boolean',
-							'description' => 'True when every option of the envelope was stored; false when at least one was refused (see errors).',
+							'description' => __( 'True when every option of the envelope was stored; false when at least one was refused (see errors).', 'duracelltomi-google-tag-manager' ),
 						),
 						'errors'      => array(
 							'type'        => 'object',
-							'description' => 'Option key => the sanitizer\'s message, for every value of the envelope that was refused; that option keeps its default.',
+							'description' => __( 'Option key => the sanitizer\'s message, for every value of the envelope that was refused; that option keeps its default.', 'duracelltomi-google-tag-manager' ),
 						),
 						'values_hash' => array(
 							'type'        => 'string',
-							'description' => 'Fingerprint of the stored settings after the import.',
+							'description' => __( 'Fingerprint of the stored settings after the import.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 				),
@@ -290,7 +286,7 @@ final class SettingsAbilities implements ProviderInterface {
 			self::UPDATE_SETTINGS,
 			array(
 				'label'               => __( 'Update the Google Tag Manager settings', 'duracelltomi-google-tag-manager' ),
-				'description'         => __( 'Changes one or more options of Google Tag Manager for WordPress and saves them. Send only the options that change (a sparse patch); the others keep their value. Protocol, in this order: 1) call get-settings first (with include_schema when the option key or its allowed values are not known) and keep its values_hash; 2) show the user each option\'s current value and the new value and ask "Confirm this change?" - wait for an explicit yes in the same turn; a general instruction such as "enable it" or "fix it" is not a confirmation; 3) call this ability with the confirmed values and that values_hash as expected_hash. When expected_hash no longer matches, the settings were saved by somebody else in between (the settings screen, another assistant) and nothing is saved: the call is refused with status 409 - call get-settings again and repeat from step 2. Every value runs through the same sanitizer as the settings screen: a normalised value is stored (a checkbox becomes true or false, tags are stripped from a text), a value the sanitizer refuses is reported under errors with its message and is not stored, while the other options of the same call are. The answer lists under changed the options whose stored value actually changed, with the value as stored, and the new values_hash. Options that wp-config.php constants control (locked in the get-settings answer) cannot be changed here. Destructive: a wrong container ID or placement switches tracking off for every visitor, so never call this without the confirmation above.', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Changes one or more options of Google Tag Manager for WordPress and saves them. Send only the options that change (a sparse patch); the others keep their value. A table option - the container list, the Google Data Manager destinations - is replaced as a whole: send every row with every column, not only the cells that change. Protocol, in this order: 1) call get-settings first (with include_schema when the option key or its allowed values are not known) and keep its values_hash; 2) show the user each option\'s current value and the new value and ask "Confirm this change?" - wait for an explicit yes in the same turn; a general instruction such as "enable it" or "fix it" is not a confirmation; 3) call this ability with the confirmed values and that values_hash as expected_hash. When expected_hash no longer matches, the settings were saved by somebody else in between (the settings screen, another assistant) and nothing is saved: the call is refused with status 409 - call get-settings again and repeat from step 2. Every value runs through the same sanitizer as the settings screen: a normalised value is stored (a checkbox becomes true or false, tags are stripped from a text), a value the sanitizer refuses is reported under errors with its message and is not stored, while the other options of the same call are. The answer lists under changed the options whose stored value actually changed, with the value as stored, and the new values_hash. Options that wp-config.php constants control (locked in the get-settings answer) cannot be changed here. Destructive: a wrong container ID or placement switches tracking off for every visitor, so never call this without the confirmation above.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -299,14 +295,14 @@ final class SettingsAbilities implements ProviderInterface {
 					'properties'           => array(
 						'values'        => array(
 							'type'                 => 'object',
-							'description'          => 'Option key => new value, only for the options that change. The keys and value types are those of get-settings.',
+							'description'          => __( 'Option key => new value, only for the options that change. The keys and value types are those of get-settings.', 'duracelltomi-google-tag-manager' ),
 							'minProperties'        => 1,
 							'properties'           => $this->store->value_schema(),
 							'additionalProperties' => false,
 						),
 						'expected_hash' => array(
 							'type'        => 'string',
-							'description' => 'The values_hash of the get-settings answer the new values were decided from. Refused with 409 when the settings changed since; omit only when overwriting a concurrent change is acceptable.',
+							'description' => __( 'The values_hash of the get-settings answer the new values were decided from. Refused with 409 when the settings changed since; omit only when overwriting a concurrent change is acceptable.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 					'additionalProperties' => false,
@@ -316,19 +312,19 @@ final class SettingsAbilities implements ProviderInterface {
 					'properties' => array(
 						'saved'       => array(
 							'type'        => 'boolean',
-							'description' => 'True when every submitted option was stored; false when at least one was refused (see errors).',
+							'description' => __( 'True when every submitted option was stored; false when at least one was refused (see errors).', 'duracelltomi-google-tag-manager' ),
 						),
 						'errors'      => array(
 							'type'        => 'object',
-							'description' => 'Option key => the sanitizer\'s message, for every submitted value that was refused and not stored.',
+							'description' => __( 'Option key => the sanitizer\'s message, for every submitted value that was refused and not stored.', 'duracelltomi-google-tag-manager' ),
 						),
 						'changed'     => array(
 							'type'        => 'object',
-							'description' => 'Option key => the value as stored, for every option whose stored value differs from before the call.',
+							'description' => __( 'Option key => the value as stored, for every option whose stored value differs from before the call.', 'duracelltomi-google-tag-manager' ),
 						),
 						'values_hash' => array(
 							'type'        => 'string',
-							'description' => 'Fingerprint of the stored settings after the call.',
+							'description' => __( 'Fingerprint of the stored settings after the call.', 'duracelltomi-google-tag-manager' ),
 						),
 					),
 				),

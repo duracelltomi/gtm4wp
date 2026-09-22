@@ -179,6 +179,29 @@ final class Registrar {
 	}
 
 	/**
+	 * The input schema of an ability that takes no input, shared by every
+	 * provider (#253). The empty-object default is what core applies when a
+	 * client sends nothing at all, so a bare call validates instead of failing
+	 * on a null input (U155).
+	 *
+	 * No `properties` key on purpose: an empty PHP array serialises as `[]`,
+	 * and while core's REST route turns the empty `default` into `{}` it leaves
+	 * `properties` alone, so the published schema would carry an invalid
+	 * fragment (JSON Schema wants an object there). Core validates the absent
+	 * key the same way it validates an empty one, and `additionalProperties`
+	 * still refuses every input key (U155). ContractTest pins the shape.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function no_input_schema(): array {
+		return array(
+			'type'                 => 'object',
+			'default'              => array(),
+			'additionalProperties' => false,
+		);
+	}
+
+	/**
 	 * Registers the plugin's ability category. Categories must exist before
 	 * the abilities that name them, which is why core fires this action first.
 	 *
