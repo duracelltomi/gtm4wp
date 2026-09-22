@@ -84,6 +84,7 @@ Run these first, for every entry. Then spend the fetch budget on what survives.
    distinguishable — collapsing them hides which happened.
 5. **New-coupling detection**, diff-scoped from the base sha over `src js compat`:
    newly added URLs, `wc-api=`, `__next`, `wc-block`, `wpcf7`, `HTTP_[A-Z_]+`,
+   `md5\(|hash_hmac\(|hash_equals\(` (a copied upstream formula — UC-8),
    `Automattic`, `version_compare`. Over-reports on a large diff; under-reports a
    selector built from a variable. **It cannot see drift caused by upstream moving** —
    that produces no diff here at all.

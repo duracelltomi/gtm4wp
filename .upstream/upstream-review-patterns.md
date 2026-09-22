@@ -25,7 +25,7 @@ breakage · Blessed Couplings (**UB**) — deliberate, do **not** flag.
 
 Each row is `ID — one-line litmus`.
 
-**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3
+**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3, UC-8
 
 **Upstream Drift (UD):**
 
@@ -65,6 +65,7 @@ Each row is `ID — one-line litmus`.
 | UC-5 | A regex validating an upstream identifier format rejects the future by default. |
 | UC-6 | An upstream string duplicated across two of our own files drifts internally before upstream ever moves. |
 | UC-7 | A dependency pulled in as an unpinned *runtime* external breaks on the host's update, not on ours — `npm outdated` cannot see it. |
+| UC-8 ⭐ | A formula copied from upstream's source (a hash, a normalisation, a derived key) is a mirror with no row; the day upstream wraps it in a method is the day to delegate, because the next change is the one you cannot mirror. |
 
 **Blessed Couplings (UB) — do NOT flag:**
 
@@ -291,6 +292,14 @@ request (the `j.src` URL, the `gtm.start` expression, the `dataLayer` literal, t
 an unshaped extraction, so it is `fetch-failed`, not "changed"; and a probe that names
 the tokens it expects is also the one that can be compared against a contract test
 literal instead of against the ledger's own prose.
+
+**Second corollary (S4, 2026-09-22): two truncations on one source means the transport, not the
+prompt, is the problem.** The GA4 events reference truncated at `refund` in S1 and again in S4
+under a different prompt. The remedy that worked was to stop summarising: fetch the raw HTML
+and grep the heading ids (`<h3 id="view_item_list">`), which carries the sentinel, costs one
+fetch, and is diffable run to run. Prefer that transport for every ordered reference page
+(GA4 events, the restrict page, any parameter table): a summariser is for judgement, a grep is
+for tokens.
 
 ### UD-15: One finding per upstream ⭐
 
@@ -564,6 +573,34 @@ breakage arrives via a **WordPress core update on the user's site** and is invis
 to every local tool. The only usable signal is the Gutenberg release stream, which
 runs ahead of core.
 
+### UC-8: A copied formula is a mirror with no row — delegate the day upstream wraps it ⭐
+
+`receipt_hash_matches()` computed EDD's receipt-link hash as `md5( id . payment_key . email )`,
+copied from the inline expression in EDD 3.7.0's block resolver because no function exposed
+it. The copy was correct, tested, and reviewed — and it was a hand-maintained mirror of an
+upstream fact with no registry row, because the new-coupling hunt looks for names (hooks,
+selectors, headers, URLs) and a formula has none. EDD 3.7.1 moved the expression behind
+`Order::is_receipt_hash_valid()` **and changed it** to an HMAC keyed on a per-site secret in the
+same release. A secret-keyed formula cannot be mirrored at all, so the copy stopped matching
+on 3.7.1 (D23) while the suite stayed green, because the stub order object had no such method
+to disagree with (UC-3).
+
+Three rules from it:
+
+1. **A copied expression gets a row on the day it is copied**, source file and line named, cadence
+   on that upstream's release. Grep for `md5(`, `hash_hmac(`, `hash_equals(`, `sha1(`, `crc32(`,
+   `base64_encode(` and arithmetic on upstream fields in the new-coupling hunt — the S4 regex
+   now carries the first three.
+2. **The moment upstream exposes a method for the thing you mirrored, delegate**
+   (`method_exists()` → call it, keep the copy only as the pre-method fallback). A method
+   appearing is upstream telling you the formula is now theirs to change.
+3. **The test double must carry the method** once you delegate, and the test must assert the
+   delegation, not the fallback — otherwise the double absorbs the coupling (UC-3) and the
+   green suite is negative information.
+
+Sibling entries: UD-1 (a mirror has no expiry), UD-19 (a vendor's sample is not its spec — here
+the sample was the vendor's own inline code, which is not a contract either).
+
 ---
 
 ## Blessed Couplings — do NOT flag
@@ -689,6 +726,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-09-22 (S4) | Added **UC-8** (⭐ a formula copied from upstream's source is a mirror with no row; delegate the day upstream wraps it in a method) after EDD 3.7.1 replaced the receipt-link `md5` our success-page resolver had copied inline with a site-keyed HMAC behind `Order::is_receipt_hash_valid()` — D23 / new row U159, fixed the same day (delegation + digest fallback, both shapes tested). Added the **UD-14 second corollary** (two truncations on one source = change the transport: raw HTML + heading-id grep carried the sentinel the summariser dropped twice). New-coupling regex in `.claude/commands/upstream-review.md` extended with `md5\(\|hash_hmac\(\|hash_equals\(`. Sweep 4 itself: the UD-7 window used on three upstreams in one day (WC 11.2.0-beta.1 package grepped whole — nothing moved; CF7 v6.2.0-rc — contract untouched, rc floors WP 7.1 / PHP 8.3; EDD 3.7.1 — D23), U52–U55 verified for the first time, U10 retired (D25), `overrides` necessity re-derived and two dead pins dropped (D26). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3, UC-8. |
 | 2026-09-21 (S3) | Renumbered the duplicated **UD-20** (the 2026-09-05 "our output is an input to their render decision" entry → **UD-21**; the 2026-09-01 presence-check entry keeps UD-20; `.security/code-review-patterns.md`'s citation re-pointed). Added **UD-22** (⭐ registry ids are assigned on `master` at the moment of writing; a merge touching a ledger re-runs the duplicate-id check; the earliest row keeps its id when it has already happened) after Sweep 3 found eleven duplicated `U#` ids across the WP/WC, EDD and Google sections plus this file's own UD-20. Added the **UD-14 corollary** (ask for tokens, never for the block — the fetch summariser refused a verbatim public snippet and answered a token probe). Sweep 3 itself: registry renumbered (U142–U151), two unregistered couplings rowed (U152 WC refund model, U153 EDD order-meta API + `__isset`), three anchors moved to `src/Ecommerce/`, Release Radar fully refreshed (WP 7.1.1, WC 11.1.1 → D14, CF7 6.1.7 packaging-only, Gutenberg 24.0.0, EDD 3.7.0, AS 4.2.0). |
 | 2026-08-05 | Seeded: UD-1..UD-10, UC-1..UC-7, UB-1..UB-3 from the initial dependency inventory (88 couplings across WordPress core, WooCommerce, third-party plugins, Google specs, media SDKs and the toolchain). |
 | 2026-08-05 | Added **UD-14** (⭐ a truncated fetch of an ordered page reads as deletion) after Sweep 1 produced exactly that false positive on U54: five core GA4 e-commerce events reported undocumented because the alphabetical page truncated mid-`refund`. Caught by the maintainer. Countermeasure: every long-page probe carries a sentinel (the known-last item); no sentinel in the extraction → `fetch-failed`. |
