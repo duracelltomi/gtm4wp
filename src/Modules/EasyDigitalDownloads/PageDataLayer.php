@@ -490,16 +490,31 @@ final class PageDataLayer {
 	}
 
 	/**
-	 * Whether a receipt-link verification hash (`?order=`, md5 of id, payment
-	 * key and email, per EDD\Blocks\Orders\get_payment_key()) belongs to an
+	 * Whether a receipt-link verification hash (`?order=`) belongs to an
 	 * order. One definition for the confirmation page and the Data Manager
 	 * backfill route.
+	 *
+	 * The hash is EDD's, and its formula changed once (registry row U159):
+	 * EDD 3.7.1 signs `id . payment_key . email` with a per-site secret and
+	 * verifies it through Order::is_receipt_hash_valid(); EDD 3.0 - 3.7.0
+	 * compared md5() of the same three fields inline in its block resolver
+	 * (EDD\Blocks\Orders\get_payment_key()). The signed form cannot be
+	 * recomputed here, so an order that verifies its own hash is asked,
+	 * and the digest is only computed for the releases that have no verifier.
 	 *
 	 * @param \EDD\Orders\Order $order The order the hash is claimed for.
 	 * @param string            $hash  The hash from the URL or the request.
 	 * @return bool
 	 */
 	public static function receipt_hash_matches( \EDD\Orders\Order $order, string $hash ): bool {
+		if ( '' === $hash ) {
+			return false;
+		}
+
+		if ( method_exists( $order, 'is_receipt_hash_valid' ) ) {
+			return (bool) $order->is_receipt_hash_valid( $hash );
+		}
+
 		$expected = md5(
 			DownloadData::row_prop( $order, 'id' )
 			. DownloadData::row_prop( $order, 'payment_key' )
@@ -508,7 +523,7 @@ final class PageDataLayer {
 
 		// hash_equals(): the comparison is against a secret's digest, so it
 		// must not leak through timing.
-		return '' !== $hash && hash_equals( $expected, $hash );
+		return hash_equals( $expected, $hash );
 	}
 
 	/**

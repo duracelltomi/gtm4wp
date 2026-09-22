@@ -161,31 +161,41 @@ final class EddPageDataLayerTest extends TestCase {
 	 * @return \EDD\Orders\Order
 	 */
 	private function make_order( array $data = array() ): \EDD\Orders\Order {
-		return new \EDD\Orders\Order(
-			array_merge(
-				array(
-					'id'           => 77,
-					'status'       => 'complete',
-					'currency'     => 'USD',
-					'tax'          => 2.0,
-					'total'        => 38.0,
-					'email'        => 'buyer@example.com',
-					'customer_id'  => 0,
-					'payment_key'  => 'pk_super_secret_key',
-					'date_created' => gmdate( 'Y-m-d H:i:s' ),
-					'items'        => array(
-						new \EDD\Orders\Order_Item(
-							array(
-								'product_id' => 55,
-								'quantity'   => 2,
-								'tax'        => 2.0,
-								'total'      => 38.0,
-							)
-						),
+		return new \EDD\Orders\Order( $this->order_data( $data ) );
+	}
+
+	/**
+	 * An order as EDD 3.7.1+ shapes it: it verifies its own receipt-link hash
+	 * and only $signed_hash passes.
+	 */
+	private function make_order_verifying_receipt_hash( string $signed_hash, array $data = array() ): \EDD\Orders\Order_Verifying_Receipt_Hash {
+		return new \EDD\Orders\Order_Verifying_Receipt_Hash( $this->order_data( $data ), $signed_hash );
+	}
+
+	private function order_data( array $data = array() ): array {
+		return array_merge(
+			array(
+				'id'           => 77,
+				'status'       => 'complete',
+				'currency'     => 'USD',
+				'tax'          => 2.0,
+				'total'        => 38.0,
+				'email'        => 'buyer@example.com',
+				'customer_id'  => 0,
+				'payment_key'  => 'pk_super_secret_key',
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+				'items'        => array(
+					new \EDD\Orders\Order_Item(
+						array(
+							'product_id' => 55,
+							'quantity'   => 2,
+							'tax'        => 2.0,
+							'total'      => 38.0,
+						)
 					),
 				),
-				$data
-			)
+			),
+			$data
 		);
 	}
 
@@ -843,6 +853,92 @@ final class EddPageDataLayerTest extends TestCase {
 
 		$this->assertArrayNotHasKey( 'orderData', $data_layer, 'A forged receipt hash must expose no order data at all.' );
 		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * EDD 3.7.1 signs the receipt-link hash with a site secret and verifies it
+	 * through Order::is_receipt_hash_valid() (registry row U159). The plugin
+	 * cannot recompute a signed value, so an order that carries the verifier
+	 * is asked and its answer decides: the signed hash EDD's link carries
+	 * resolves the order and the purchase fires.
+	 */
+	public function test_success_page_order_id_branch_asks_an_order_that_verifies_its_own_receipt_hash(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+
+		// Shaped like an HMAC-SHA256 hex digest; no md5 of the order's fields equals it.
+		$signed        = str_repeat( 'a1', 32 );
+		$order         = $this->make_order_verifying_receipt_hash( $signed );
+		$_GET['id']    = '77';
+		$_GET['order'] = $signed;
+
+		Functions\expect( 'edd_get_order' )
+			->once()
+			->with( 77 )
+			->andReturn( $order );
+		Functions\expect( 'edd_get_order_by' )
+			->once()
+			->with( 'payment_key', 'pk_super_secret_key' )
+			->andReturn( $order );
+		Functions\expect( 'edd_update_order_meta' )
+			->once()
+			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output() );
+		$this->assertSame( array( $signed ), $order->asked, 'The order itself must have been asked, once, with the hash from the URL.' );
+	}
+
+	/**
+	 * The other half of the delegation: on an order that verifies its own
+	 * hash, the pre-3.7.1 digest of id, key and e-mail is NOT accepted by the
+	 * plugin on its own. EDD rejects it, so the plugin must too - a fallback
+	 * to the digest on such an order would resolve a link EDD itself no
+	 * longer honours. This test goes red if receipt_hash_matches() computes
+	 * the md5 whenever the verifier says no.
+	 */
+	public function test_success_page_order_id_branch_does_not_fall_back_to_the_digest_on_an_order_that_verifies_its_own_hash(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+
+		$digest        = md5( '77pk_super_secret_keybuyer@example.com' );
+		$order         = $this->make_order_verifying_receipt_hash( str_repeat( 'a1', 32 ) );
+		$_GET['id']    = '77';
+		$_GET['order'] = $digest;
+
+		Functions\when( 'edd_get_order' )->justReturn( $order );
+		Functions\expect( 'edd_get_order_by' )->never();
+		Functions\expect( 'edd_update_order_meta' )->never();
+
+		$data_layer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true )
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $data_layer );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+		$this->assertSame( array( $digest ), $order->asked, 'EDD was asked and answered no; nothing else may have decided.' );
+	}
+
+	/**
+	 * Calls receipt_hash_matches() directly: an empty hash is refused on both
+	 * order shapes without consulting anything, and each shape decides its own way -
+	 * the verifier on 3.7.1+, the digest on 3.0 - 3.7.0.
+	 */
+	public function test_receipt_hash_matches_decides_by_order_shape(): void {
+		$digest    = md5( '77pk_super_secret_keybuyer@example.com' );
+		$signed    = str_repeat( 'b2', 32 );
+		$old_shape = $this->make_order();
+		$new_shape = $this->make_order_verifying_receipt_hash( $signed );
+
+		$this->assertFalse( PageDataLayer::receipt_hash_matches( $old_shape, '' ) );
+		$this->assertFalse( PageDataLayer::receipt_hash_matches( $new_shape, '' ) );
+		$this->assertSame( array(), $new_shape->asked, 'An empty hash is refused before the order is asked.' );
+
+		$this->assertTrue( PageDataLayer::receipt_hash_matches( $old_shape, $digest ) );
+		$this->assertFalse( PageDataLayer::receipt_hash_matches( $old_shape, $signed ) );
+
+		$this->assertTrue( PageDataLayer::receipt_hash_matches( $new_shape, $signed ) );
+		$this->assertFalse( PageDataLayer::receipt_hash_matches( $new_shape, $digest ) );
+		$this->assertSame( array( $signed, $digest ), $new_shape->asked );
 	}
 
 	/**

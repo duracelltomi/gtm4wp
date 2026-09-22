@@ -75,6 +75,31 @@ namespace EDD\Orders {
 		}
 	}
 
+	if ( ! class_exists( 'EDD\Orders\Order_Verifying_Receipt_Hash' ) ) {
+		/**
+		 * An order as EDD 3.7.1+ shapes it: it verifies its own receipt-link
+		 * hash (a signature keyed on a site secret, EDD\Utils\Tokenizer), so
+		 * the plugin can no longer compute the expected value and has to ask.
+		 * The base Order above models 3.0 - 3.7.0, which has no such method.
+		 * Records every hash it was asked about, so a test can prove the
+		 * delegation happened rather than the digest fallback.
+		 */
+		class Order_Verifying_Receipt_Hash extends Order {
+			/** @var string[] */
+			public array $asked = array();
+
+			public function __construct( array $data, private string $valid_hash ) {
+				parent::__construct( $data );
+			}
+
+			public function is_receipt_hash_valid( $hash ): bool {
+				$this->asked[] = (string) $hash;
+
+				return '' !== $this->valid_hash && hash_equals( $this->valid_hash, (string) $hash );
+			}
+		}
+	}
+
 	if ( ! class_exists( 'EDD\Orders\Order_Item' ) ) {
 		class Order_Item {
 			public function __construct( private array $data = array() ) {}

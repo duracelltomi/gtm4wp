@@ -150,7 +150,17 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * @param string $payment_key The key that resolves it.
 	 * @return void
 	 */
-	private function given_edd_order( string $payment_key ): void {
+	/**
+	 * Stubs the EDD order lookups for one order, in either EDD shape.
+	 *
+	 * @param string      $payment_key         The order's payment key.
+	 * @param string|null $signed_receipt_hash When given, the order is shaped
+	 *                                         like EDD 3.7.1+ and verifies its
+	 *                                         own receipt hash: only this value
+	 *                                         passes. Null models 3.0 - 3.7.0,
+	 *                                         where the hash is a plain digest.
+	 */
+	private function given_edd_order( string $payment_key, ?string $signed_receipt_hash = null ): void {
 		Functions\when( 'edd_get_order_by' )->alias(
 			static function ( $field, $value ) use ( $payment_key ) {
 				if ( 'payment_key' !== $field || $value !== $payment_key ) {
@@ -165,18 +175,22 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 		// digest of the order's own key and e-mail, so the writer has to load
 		// the order the request names to check it.
 		Functions\when( 'edd_get_order' )->alias(
-			static function ( $id ) use ( $payment_key ) {
+			static function ( $id ) use ( $payment_key, $signed_receipt_hash ) {
 				if ( self::ORDER_ID !== (int) $id ) {
 					return false;
 				}
 
-				return new \EDD\Orders\Order(
-					array(
-						'id'          => self::ORDER_ID,
-						'payment_key' => $payment_key,
-						'email'       => 'buyer@example.com',
-					)
+				$data = array(
+					'id'          => self::ORDER_ID,
+					'payment_key' => $payment_key,
+					'email'       => 'buyer@example.com',
 				);
+
+				if ( null !== $signed_receipt_hash ) {
+					return new \EDD\Orders\Order_Verifying_Receipt_Hash( $data, $signed_receipt_hash );
+				}
+
+				return new \EDD\Orders\Order( $data );
 			}
 		);
 
@@ -462,10 +476,11 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * check.
 	 */
 	/**
-	 * EDD's own receipt links carry the order id plus md5( id . key . email )
-	 * rather than the key, and the receipt page hands that hash over as the
-	 * token so the key never has to be printed (#250). The writer accepts it
-	 * as proof through the same rule the confirmation page applies.
+	 * EDD's own receipt links carry the order id plus a verification hash
+	 * rather than the key - md5( id . key . email ) up to EDD 3.7.0 - and the
+	 * receipt page hands that hash over as the token so the key never has to
+	 * be printed (#250). The writer accepts it as proof through the same rule
+	 * the confirmation page applies.
 	 */
 	public function test_a_valid_edd_receipt_hash_writes_the_attribution(): void {
 		$this->given_edd_order( 'edd-payment-key-abc' );
@@ -491,6 +506,49 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 				array(
 					'platform' => BackfillEndpoint::PLATFORM_EDD,
 					'token'    => md5( self::ORDER_ID . 'some-other-keybuyer@example.com' ),
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( array(), $this->edd_written );
+	}
+
+	/**
+	 * EDD 3.7.1 signs the receipt hash with a site secret and the order
+	 * verifies it itself (registry row U159); the writer asks the order and
+	 * accepts what EDD accepts.
+	 */
+	public function test_a_signed_edd_receipt_hash_is_verified_by_the_order_itself(): void {
+		$signed = str_repeat( 'c3', 32 );
+		$this->given_edd_order( 'edd-payment-key-abc', $signed );
+
+		$response = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => $signed,
+				)
+			)
+		);
+
+		$this->assertSame( 204, $response->get_status() );
+		$this->assertContains( AttributionCapture::META_CLIENT_ID, array_column( $this->edd_written, 1 ) );
+	}
+
+	/**
+	 * On such an order the pre-3.7.1 digest is worth nothing: EDD no longer
+	 * honours it, so neither may the writer. Red if the digest is computed
+	 * as a fallback when the order's own verifier says no.
+	 */
+	public function test_the_digest_is_not_a_fallback_on_an_edd_order_that_verifies_its_own_hash(): void {
+		$this->given_edd_order( 'edd-payment-key-abc', str_repeat( 'c3', 32 ) );
+
+		$response = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => md5( self::ORDER_ID . 'edd-payment-key-abcbuyer@example.com' ),
 				)
 			)
 		);
