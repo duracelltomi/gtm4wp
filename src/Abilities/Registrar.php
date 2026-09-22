@@ -42,8 +42,10 @@ defined( 'ABSPATH' ) || exit;
  * write switch is enforced at both ends: a provider registers a write only
  * while writes_allowed() says so, and every write names can_write() as its
  * permission callback and refuses with write_disabled_error() when run
- * after the switch flipped. ContractTest pins both for every write in the
- * catalogue.
+ * after the switch flipped. ContractTest pins the permission callback of
+ * every write; RegistrarTest pins that a read-only site registers no write;
+ * the refusal of a write run after the switch flipped is pinned per write in
+ * RegistrarTest and in each provider's own test.
  */
 final class Registrar {
 

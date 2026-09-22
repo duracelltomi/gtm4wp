@@ -147,6 +147,20 @@ final class SettingsStoreTest extends TestCase {
 		$this->assertNotSame( $missing, $this->store()->values_hash(), 'A fresh install and a configured one never share a hash.' );
 	}
 
+	/**
+	 * A row that is not an array (a corrupt option, a plugin that wrote a
+	 * string) reads as empty: defaults, no warning, a hash all the same (T105e).
+	 */
+	public function test_a_stored_row_that_is_not_an_array_reads_as_the_defaults(): void {
+		$this->options[ GTM4WP_OPTIONS ] = 'corrupt';
+
+		$values = $this->store()->current_values();
+
+		$this->assertFalse( $values[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] );
+		$this->assertSame( '', $values[ GTM4WP_OPTION_DATALAYER_NAME ] );
+		$this->assertMatchesRegularExpression( '/^[0-9a-f]{32}$/', $this->store()->values_hash() );
+	}
+
 	public function test_decode_import_refuses_an_empty_payload(): void {
 		$result = $this->store()->decode_import( '' );
 

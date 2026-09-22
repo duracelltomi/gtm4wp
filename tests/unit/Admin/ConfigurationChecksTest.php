@@ -207,6 +207,58 @@ final class ConfigurationChecksTest extends TestCase {
 		$this->assertTrue( $problems[0]['dismissible'] );
 	}
 
+	public function test_both_conflicting_plugins_are_reported_one_problem_each_in_order(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( true );
+
+		$problems = $this->checks(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS             => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_GTM_PLACEMENT              => GTM4WP_PLACEMENT_FOOTER,
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+			)
+		)->problems();
+
+		$this->assertSame(
+			array( ConfigurationChecks::CODE_CONFLICT_WC_GA, ConfigurationChecks::CODE_CONFLICT_MONSTERINSIGHTS ),
+			array_column( $problems, 'code' ),
+			'Each conflicting plugin is its own problem, WooCommerce\'s first (T105c: the MonsterInsights branch had never been raised).'
+		);
+		$this->assertStringContainsString( 'MonsterInsights', $problems[1]['message'] );
+		$this->assertNotSame( $problems[0]['message'], $problems[1]['message'] );
+		$this->assertSame( ConfigurationChecks::SEVERITY_WARNING, $problems[1]['severity'] );
+		$this->assertSame( '', $problems[1]['option_key'] );
+		$this->assertTrue( $problems[1]['dismissible'] );
+	}
+
+	/**
+	 * The order the notices show them and get-status lists them: container
+	 * first, then the request-side and data-layer checks, conflicts last.
+	 */
+	public function test_problems_are_listed_in_the_order_the_notices_show_them(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( true );
+
+		$this->assertSame(
+			array(
+				ConfigurationChecks::CODE_MISSING_CONTAINER_ID,
+				ConfigurationChecks::CODE_UNTRUSTED_VISITOR_IP,
+				ConfigurationChecks::CODE_INVALID_DATALAYER_NAME,
+				ConfigurationChecks::CODE_CONFLICT_WC_GA,
+				ConfigurationChecks::CODE_CONFLICT_MONSTERINSIGHTS,
+			),
+			$this->codes(
+				array(
+					GTM4WP_OPTION_GTM_CONTAINERS     => array(),
+					GTM4WP_OPTION_GTM_PLACEMENT      => GTM4WP_PLACEMENT_FOOTER,
+					GTM4WP_OPTION_INCLUDE_VISITOR_IP => true,
+					GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER => 'HTTP_X_FORWARDED_FOR',
+					GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+					GTM4WP_OPTION_DATALAYER_NAME     => 'not-an-identifier',
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				)
+			)
+		);
+	}
+
 	public function test_conflicting_plugins_are_not_checked_while_ecommerce_tracking_is_off(): void {
 		Functions\when( 'is_plugin_active' )->justReturn( true );
 

@@ -258,24 +258,51 @@ final class ContactForm7ModuleTest extends TestCase {
 	// ---- Status info -------------------------------------------------------
 
 	/**
-	 * What the schema tells the status ability about the module. The host's
-	 * version constant is process-global (the CF7 stub file of this suite defines it),
-	 * so under a random order it may or may not be present here: what is
-	 * pinned is the mapping against the process state at the time of the
-	 * call (TS-16).
+	 * What the schema tells the status ability about the module: its one
+	 * switch, and whether the host plugin is present. The host is detected by
+	 * its version constant, which nothing in this suite defines, so the absent
+	 * leg runs here and the present leg in a process of its own with the
+	 * constant defined. Both legs are literals (TS-21, T98): an expectation
+	 * computed with the same defined() the source uses cannot go red.
 	 */
-	public function test_the_schema_reports_its_master_switch_and_host_plugin(): void {
+	public function test_the_schema_reports_its_master_switch_and_an_absent_host(): void {
 		$schema = new AdminSchema();
 		$this->assertInstanceOf( StatusInfoInterface::class, $schema );
+		$this->assertFalse( defined( 'WPCF7_VERSION' ), 'Precondition: nothing in the suite defines the host constant in-process (TS-16).' );
 
 		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
 		$info = $schema->status_info( new Options( ( new ContactForm7Module() )->defaults() ) );
 
-		$this->assertTrue( $info['enabled'], 'The one switch of the module.' );
-		$this->assertSame( defined( 'WPCF7_VERSION' ), $info['integration']['active'] );
-		$this->assertSame( defined( 'WPCF7_VERSION' ) ? (string) constant( 'WPCF7_VERSION' ) : null, $info['integration']['version'] );
+		$this->assertSame(
+			array(
+				'enabled'     => true,
+				'integration' => array(
+					'active'  => false,
+					'version' => null,
+				),
+			),
+			$info,
+			'The one switch of the module, and a host that is not installed.'
+		);
 
 		Functions\when( 'get_option' )->justReturn( array() );
 		$this->assertFalse( $schema->status_info( new Options( ( new ContactForm7Module() )->defaults() ) )['enabled'], 'Off by default.' );
+	}
+
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_schema_reports_the_installed_host_and_its_version(): void {
+		define( 'WPCF7_VERSION', '6.1.2' );
+		Functions\when( 'get_option' )->justReturn( array() );
+
+		$info = ( new AdminSchema() )->status_info( new Options( ( new ContactForm7Module() )->defaults() ) );
+
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => '6.1.2',
+			),
+			$info['integration']
+		);
 	}
 }

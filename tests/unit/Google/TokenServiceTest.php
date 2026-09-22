@@ -270,6 +270,31 @@ final class TokenServiceTest extends TestCase {
 		$this->assertGreaterThan( $writes_before, count( $this->option_writes ), 'The forced mint writes the row even though nothing in it changed.' );
 	}
 
+	/**
+	 * The Test button: test_account() sits behind the REST route and the
+	 * test-service-account ability: it has to mint even though a token is
+	 * cached, or a revoked key reads "ok" until the cache expires. Every
+	 * adapter test stubs the cache empty, so this is the one case where the
+	 * `true` the service passes to itself is observable (T97: flipping it to
+	 * `false` left all three files green).
+	 */
+	public function test_the_test_action_mints_fresh_even_when_a_token_is_cached(): void {
+		$this->transport->will_respond( self::token_response( 'ya29.cached' ) );
+		$this->transport->will_respond( self::token_response( 'ya29.retested' ) );
+		$service = $this->make_service();
+
+		$service->access_token( $this->account_id, self::SCOPE );
+		$this->assertCount( 1, $this->transients, 'Precondition: a token is cached.' );
+		$writes_before = count( $this->option_writes );
+
+		$result = $service->test_account( $this->account_id );
+
+		$this->assertTrue( $result['ok'] );
+		$this->assertCount( 2, $this->transport->requests, 'The test sent a second exchange instead of answering from the cache.' );
+		$this->assertSame( 'ya29.retested', array_values( $this->transients )[0][0], 'The fresh token replaced the cached one.' );
+		$this->assertGreaterThan( $writes_before, count( $this->option_writes ), 'The vault row was written, so last_checked moves.' );
+	}
+
 	public function test_a_token_google_reports_as_already_expiring_is_not_cached(): void {
 		$this->transport->will_respond( self::token_response( 'ya29.short', TokenService::EARLY_EXPIRY ) );
 

@@ -11,6 +11,7 @@ use Brain\Monkey\Filters;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Module\Registry;
+use GTM4WP\Modules\Container\ContainerRows;
 
 /**
  * The gtm4wp/get-settings ability answers from the same store as the settings REST route,
@@ -121,7 +122,51 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertStringEndsWith( '#' . GTM4WP_OPTION_DATALAYER_NAME, $field['doc_url'], 'The anchor is the option key, the deep link the settings screen uses.' );
 	}
 
-	public function test_the_values_are_what_the_frontend_loads_not_the_raw_row(): void {
+	/**
+	 * The plain-text promise, pinned with a description that actually carries
+	 * markup (T105a: the dataLayer-name case above has none, so the strip was
+	 * deletable green), plus the table-only members of a field description
+	 * that no other case reads.
+	 */
+	public function test_include_schema_strips_the_markup_of_a_description_and_carries_the_table_shape(): void {
+		$result = $this->execute(
+			SettingsAbilities::GET_SETTINGS,
+			array(
+				'keys'           => array( GTM4WP_OPTION_GTM_PLACEMENT, GTM4WP_OPTION_GTM_CONTAINERS ),
+				'include_schema' => true,
+			)
+		);
+
+		$fields = array_column( $result['fields'], null, 'key' );
+
+		$placement = $fields[ GTM4WP_OPTION_GTM_PLACEMENT ]['description'];
+		$this->assertStringContainsString( 'noscript', $placement, 'The text survives.' );
+		$this->assertStringNotContainsString( '<code>', $placement, 'The limited HTML the settings screen renders does not.' );
+		$this->assertStringNotContainsString( '<br', $placement );
+		$this->assertStringNotContainsString( '<', $placement );
+
+		$containers = $fields[ GTM4WP_OPTION_GTM_CONTAINERS ];
+		$this->assertSame( 'table', $containers['type'] );
+		$this->assertSame(
+			array(
+				ContainerRows::COLUMN_ID,
+				ContainerRows::COLUMN_AUTH,
+				ContainerRows::COLUMN_PREVIEW,
+				ContainerRows::COLUMN_DOMAIN,
+				ContainerRows::COLUMN_PATH,
+				ContainerRows::COLUMN_NO_ID,
+			),
+			array_column( $containers['columns'], 'key' ),
+			'The columns an assistant has to send back whole (a table value replaces the table).'
+		);
+		foreach ( $containers['columns'] as $column ) {
+			$this->assertNotSame( '', $column['label'], $column['key'] . ' is labelled.' );
+		}
+		$this->assertFalse( $containers['rows_locked'], 'No wp-config.php constant in this process.' );
+		$this->assertSame( array(), $fields[ GTM4WP_OPTION_GTM_PLACEMENT ]['columns'], 'A non-table field has no columns.' );
+	}
+
+	public function test_the_values_are_the_stored_shape_the_settings_screen_edits(): void {
 		// A stored blacklist status is normalized by the Options service on the
 		// frontend; the store answers with the stored shape, which is what the
 		// settings screen edits. Pinned so the two abilities that read settings
@@ -391,6 +436,55 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 'GTM-STORED1', $this->stored_settings()[ GTM4WP_OPTION_GTM_CODE ], 'The hard coded ID does not leak into the 1.x mirror either.' );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_GTM_CONTAINERS, (array) $result['changed'], 'A locked table is reported as unchanged, which is the truth.' );
 		$this->assertTrue( ( (array) $result['changed'] )[ GTM4WP_OPTION_INCLUDE_LOGGEDIN ] );
+
+		// Same process, same constant: get-settings answers with the rows
+		// actually loaded and says the table is locked; the export keeps the
+		// site's own stored rows (T101: swapping ui_values() for the raw
+		// values was green in this file, the lock flags never true).
+		$settings = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'keys' => array( GTM4WP_OPTION_GTM_CONTAINERS ) ) );
+
+		$this->assertSame( 'GTM-HARD01', ( (array) $settings['values'] )[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'], 'What the frontend loads, as the settings screen shows it.' );
+		$this->assertTrue( $settings['locked']['locked_rows'] );
+
+		$export = (array) $this->execute( SettingsAbilities::EXPORT_SETTINGS )['options'];
+
+		$this->assertSame( 'GTM-STORED1', $export[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'], 'The export is the stored configuration, never the wp-config override.' );
+	}
+
+	/**
+	 * A column constant locks one cell of every row: get-settings shows the
+	 * constant's value in it and names the column as locked, the export keeps
+	 * the stored cell.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_locked_column_is_reported_and_the_export_keeps_the_stored_cell(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ENV_AUTH', 'hard-auth' );
+
+		$this->store_settings(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						'id'          => 'GTM-STORED1',
+						'gtm_auth'    => 'stored-auth',
+						'gtm_preview' => 'env-1',
+						'domain'      => '',
+						'path'        => '',
+						'no_id'       => '',
+					),
+				),
+			)
+		);
+
+		$settings = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'keys' => array( GTM4WP_OPTION_GTM_CONTAINERS ) ) );
+
+		$this->assertSame( 'hard-auth', ( (array) $settings['values'] )[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['gtm_auth'] );
+		$this->assertSame( array( 'gtm_auth' ), $settings['locked']['locked_columns'] );
+		$this->assertFalse( $settings['locked']['locked_rows'], 'A column constant does not decide the row set.' );
+
+		$export = (array) $this->execute( SettingsAbilities::EXPORT_SETTINGS )['options'];
+
+		$this->assertSame( 'stored-auth', $export[ GTM4WP_OPTION_GTM_CONTAINERS ][0]['gtm_auth'] );
 	}
 
 	// ---- export-settings ---------------------------------------------------
@@ -409,10 +503,11 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( SettingsStore::EXPORT_TYPE, $this->registered[ SettingsAbilities::EXPORT_SETTINGS ]['output_schema']['properties']['type']['enum'][0] );
 	}
 
-	public function test_the_export_carries_the_stored_configuration_not_the_wp_config_override(): void {
-		// The custody of the service-account key is GoogleAuthCustodyTest's;
-		// pinned here is the difference to get-settings: an export must carry
-		// the site's OWN stored rows, ui_values() the rows actually loaded.
+	public function test_the_export_carries_the_stored_container_rows(): void {
+		// The custody of the service-account key is GoogleAuthCustodyTest's.
+		// The difference to get-settings under a wp-config.php override is
+		// pinned in the separate-process cases above, where a constant is
+		// actually defined; here only the plain stored row.
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( 'id' => 'GTM-STORED1' ) ) ) );
 
 		$options = (array) $this->execute( SettingsAbilities::EXPORT_SETTINGS )['options'];
@@ -493,13 +588,21 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 */
 	public static function refused_payloads(): array {
 		return array(
-			'no type marker'        => array( '{"plugin":"gtm4wp","options":{"gtm-datalayer-variable-name":"x"}}', 'gtm4wp_import_invalid' ),
-			'wrong type marker'     => array( '{"type":"somebody-elses-export","options":{}}', 'gtm4wp_import_invalid' ),
-			'options not an object' => array( '{"type":"' . SettingsStore::EXPORT_TYPE . '","options":"x"}', 'gtm4wp_import_invalid' ),
-			'not JSON'              => array( 'gtm-datalayer-variable-name=x', 'gtm4wp_import_invalid' ),
-			'empty'                 => array( '', 'gtm4wp_import_empty' ),
-			'not a string'          => array( array( 'type' => SettingsStore::EXPORT_TYPE ), 'gtm4wp_import_empty' ),
-			'over the size cap'     => array( '{' . str_repeat( ' ', SettingsStore::IMPORT_MAX_BYTES ) . '}', 'gtm4wp_import_too_large' ),
+			'no type marker'            => array( '{"plugin":"gtm4wp","options":{"gtm-datalayer-variable-name":"x"}}', 'gtm4wp_import_invalid' ),
+			'wrong type marker'         => array( '{"type":"somebody-elses-export","options":{}}', 'gtm4wp_import_invalid' ),
+			'options not an object'     => array( '{"type":"' . SettingsStore::EXPORT_TYPE . '","options":"x"}', 'gtm4wp_import_invalid' ),
+			'not JSON'                  => array( 'gtm-datalayer-variable-name=x', 'gtm4wp_import_invalid' ),
+			'empty'                     => array( '', 'gtm4wp_import_empty' ),
+			'not a string'              => array( array( 'type' => SettingsStore::EXPORT_TYPE ), 'gtm4wp_import_empty' ),
+			'over the size cap'         => array( '{' . str_repeat( ' ', SettingsStore::IMPORT_MAX_BYTES ) . '}', 'gtm4wp_import_too_large' ),
+			// Seventeen levels with the envelope's own two, one past the cap of
+			// sixteen: json_decode() answers null at the cap, so the envelope is
+			// invalid as a whole. A literal on purpose - a payload sized from the
+			// constant moves with a raised cap and stays green (T105b, TS-21).
+			'nested past the depth cap' => array(
+				'{"type":"' . SettingsStore::EXPORT_TYPE . '","options":{"gtm-datalayer-variable-name":' . str_repeat( '[', 15 ) . str_repeat( ']', 15 ) . '}}',
+				'gtm4wp_import_invalid',
+			),
 		);
 	}
 

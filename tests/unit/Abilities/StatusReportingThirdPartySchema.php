@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Abilities;
 
 use GTM4WP\Module\AdminSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
@@ -16,9 +17,22 @@ use GTM4WP\Options\Options;
  * The counterpart of Admin\UndocumentedThirdPartySchema: the same shape, plus
  * StatusInfoInterface. Reports a master switch read from the options it is
  * given and a host plugin, so the status ability's walk and pass-through can
- * be asserted on something that is not a built-in module.
+ * be asserted on something that is not a built-in module. Also reports two
+ * Site Health rows, one of them `private` - the row contract of
+ * SiteHealthInfoInterface that no built-in module uses, so the get-site-health
+ * ability's exclusion of it is observable (T99).
  */
-final class StatusReportingThirdPartySchema implements AdminSchemaInterface, StatusInfoInterface {
+final class StatusReportingThirdPartySchema implements AdminSchemaInterface, StatusInfoInterface, SiteHealthInfoInterface {
+
+	/**
+	 * The value of the private row: must never reach a transcript.
+	 */
+	public const PRIVATE_VALUE = 'ACME-PRIVATE-ROW-VALUE';
+
+	/**
+	 * The value of the public row: must.
+	 */
+	public const PUBLIC_VALUE = 'ACME-PUBLIC-ROW-VALUE';
 
 	/**
 	 * The Options instance the last status_info() call received.
@@ -63,6 +77,20 @@ final class StatusReportingThirdPartySchema implements AdminSchemaInterface, Sta
 			'integration' => array(
 				'active'  => true,
 				'version' => '9.9.0',
+			),
+		);
+	}
+
+	public function site_health_info( Options $options ): array {
+		return array(
+			'public'  => array(
+				'label' => 'Acme public',
+				'value' => self::PUBLIC_VALUE,
+			),
+			'private' => array(
+				'label'   => 'Acme private',
+				'value'   => self::PRIVATE_VALUE,
+				'private' => true,
 			),
 		);
 	}

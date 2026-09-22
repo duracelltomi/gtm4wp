@@ -77,6 +77,86 @@ final class ContainerStatusReportTest extends AbilitiesTestCase {
 		$this->assertStringNotContainsString( 'env-3', $text );
 	}
 
+	/**
+	 * The per-row booleans between the two extremes (T102): an environment
+	 * needs BOTH tokens - a row with one is exactly what the configuration
+	 * checks flag as incomplete, so the two readers must agree - and the
+	 * legacy '0' no_id flag means off.
+	 */
+	public function test_a_row_with_one_environment_token_or_a_zero_no_id_flag_reports_neither(): void {
+		$report = $this->report(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(
+					array(
+						ContainerRows::COLUMN_ID   => 'GTM-AUTH01',
+						ContainerRows::COLUMN_AUTH => 'auth-only',
+					),
+					array(
+						ContainerRows::COLUMN_ID      => 'GTM-PREV01',
+						ContainerRows::COLUMN_PREVIEW => 'env-only',
+					),
+					array(
+						ContainerRows::COLUMN_ID    => 'GTM-ZERO01',
+						ContainerRows::COLUMN_NO_ID => '0',
+					),
+				),
+			)
+		);
+
+		$rows = array_column( $report['containers'], null, 'id' );
+
+		$this->assertFalse( $rows['GTM-AUTH01']['environment'], 'gtm_auth alone is not an environment.' );
+		$this->assertFalse( $rows['GTM-PREV01']['environment'], 'gtm_preview alone is not an environment.' );
+		$this->assertFalse( $rows['GTM-ZERO01']['omit_id'], "A stored '0' is the 1.x spelling of off." );
+
+		$text = (string) json_encode( $report ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for substring assertions.
+		$this->assertStringNotContainsString( 'auth-only', $text );
+		$this->assertStringNotContainsString( 'env-only', $text );
+	}
+
+	public function test_an_empty_container_table_reports_no_containers(): void {
+		$report = $this->report( array( GTM4WP_OPTION_GTM_CONTAINERS => array() ) );
+
+		$this->assertSame( array(), $report['containers'] );
+		$this->assertTrue( $report['container_code_output'], 'Placement, not the table, decides whether container code is emitted.' );
+	}
+
+	public function test_a_placement_value_outside_the_known_ones_falls_back_to_the_footer(): void {
+		$report = $this->report(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_GTM_PLACEMENT  => 99,
+			)
+		);
+
+		$this->assertSame( StatusReport::PLACEMENT_FOOTER, $report['placement'], 'The default leg of placement_name(): what ContainerCode does with an unknown value.' );
+		$this->assertTrue( $report['container_code_output'] );
+	}
+
+	/**
+	 * A constant defined with a malformed value is ignored by the plugin and
+	 * named in `errors`, the way the admin notice names it; the ignored
+	 * constant locks nothing.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_malformed_constant_is_reported_as_an_error_and_locks_nothing(): void {
+		define( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW', "env-42\n" );
+
+		$report = $this->report( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
+
+		$this->assertSame(
+			array(
+				'active'         => false,
+				'locked_columns' => array(),
+				'locked_rows'    => false,
+				'errors'         => array( 'GTM4WP_HARDCODED_GTM_ENV_PREVIEW' ),
+			),
+			$report['hardcoded']
+		);
+		$this->assertFalse( $report['containers'][0]['environment'], 'The malformed value was not applied.' );
+	}
+
 	public function test_the_report_keeps_the_ability_key_order(): void {
 		$report = $this->report( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
 

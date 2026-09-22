@@ -219,7 +219,9 @@ final class ContractTest extends AbilitiesTestCase {
 
 			$this->assertIsArray( $callback, "$name execute callback" );
 			$this->assertIsObject( $callback[0] );
-			$this->assertTrue( method_exists( $callback[0], $callback[1] ), "$name execute callback names a real method." );
+			// is_callable(), as core checks it: a private or protected method
+			// passes method_exists() and fails at run time (T105g).
+			$this->assertIsCallable( $callback, "$name execute callback names a public method." );
 		}
 	}
 

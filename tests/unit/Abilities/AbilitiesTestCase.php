@@ -99,8 +99,14 @@ abstract class AbilitiesTestCase extends TestCase {
 		$this->registered = array();
 		$this->categories = array();
 
+		// Core _doing_it_wrong()s a duplicate name and keeps the first
+		// registration; the fake is stricter and fails outright (TS-13: a
+		// double that silently overwrote would hide a provider registering the
+		// same ability twice). A test that re-registers resets $registered first.
 		Functions\when( 'wp_register_ability' )->alias(
 			function ( $name, $args ) {
+				$this->assertArrayNotHasKey( (string) $name, $this->registered, "$name registered twice." );
+
 				$this->registered[ (string) $name ] = (array) $args;
 
 				return null;
@@ -167,6 +173,115 @@ abstract class AbilitiesTestCase extends TestCase {
 	protected function execute( string $name, $input = array() ) {
 		$this->assertArrayHasKey( $name, $this->registered, "$name must be registered." );
 
-		return call_user_func( $this->registered[ $name ]['execute_callback'], $input );
+		$result = call_user_func( $this->registered[ $name ]['execute_callback'], $input );
+
+		// Core validates every result against the output schema and answers
+		// ability_invalid_output on a miss, which a direct call to the execute
+		// callback never sees (T105g). Every ability test inherits the check.
+		if ( ! $result instanceof \WP_Error ) {
+			$this->assert_matches_schema( $result, (array) $this->registered[ $name ]['output_schema'], "$name output" );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Asserts a value validates against a JSON-schema fragment the way core's
+	 * WP_Ability::validate_output() (rest_validate_value_from_schema()) would:
+	 * type (one or several), enum, required, properties, additionalProperties
+	 * and items. Stricter than core where core is lenient - an integer is
+	 * is_int(), never a numeric string - which is the safe direction for a
+	 * double.
+	 *
+	 * @param mixed                $value  The value.
+	 * @param array<string, mixed> $schema The schema fragment.
+	 * @param string               $path   Where the value sits, for the message.
+	 * @return void
+	 */
+	protected function assert_matches_schema( $value, array $schema, string $path ): void {
+		$types = (array) ( $schema['type'] ?? array() );
+		$type  = null;
+
+		foreach ( $types as $candidate ) {
+			if ( self::is_of_type( $value, (string) $candidate ) ) {
+				$type = (string) $candidate;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $type, "$path: " . get_debug_type( $value ) . ' is none of [' . implode( ', ', $types ) . '].' );
+
+		if ( isset( $schema['enum'] ) ) {
+			$this->assertContains( $value, (array) $schema['enum'], "$path: value outside the enum." );
+		}
+
+		if ( 'object' === $type ) {
+			$members    = (array) $value;
+			$properties = (array) ( $schema['properties'] ?? array() );
+
+			foreach ( (array) ( $schema['required'] ?? array() ) as $required ) {
+				$this->assertArrayHasKey( $required, $members, "$path: required member $required missing." );
+			}
+
+			foreach ( $members as $key => $member ) {
+				if ( isset( $properties[ $key ] ) ) {
+					$this->assert_matches_schema( $member, (array) $properties[ $key ], "$path.$key" );
+					continue;
+				}
+
+				$additional = $schema['additionalProperties'] ?? true;
+
+				$this->assertNotFalse( $additional, "$path.$key: not a declared member, and additionalProperties is false." );
+
+				if ( is_array( $additional ) ) {
+					$this->assert_matches_schema( $member, $additional, "$path.$key" );
+				}
+			}
+		}
+
+		if ( 'array' === $type && isset( $schema['items'] ) ) {
+			foreach ( (array) $value as $index => $item ) {
+				$this->assert_matches_schema( $item, (array) $schema['items'], "{$path}[{$index}]" );
+			}
+		}
+	}
+
+	/**
+	 * Whether a PHP value is of a JSON-schema type. An empty array is both a
+	 * list and an object, as for core.
+	 *
+	 * @param mixed  $value The value.
+	 * @param string $type  The schema type word.
+	 * @return bool
+	 */
+	private static function is_of_type( $value, string $type ): bool {
+		switch ( $type ) {
+			case 'object':
+				return $value instanceof \stdClass || ( is_array( $value ) && ( array() === $value || ! self::is_list( $value ) ) );
+			case 'array':
+				return is_array( $value ) && self::is_list( $value );
+			case 'string':
+				return is_string( $value );
+			case 'integer':
+				return is_int( $value );
+			case 'number':
+				return is_int( $value ) || is_float( $value );
+			case 'boolean':
+				return is_bool( $value );
+			case 'null':
+				return null === $value;
+			default:
+				return false;
+		}
+	}
+
+	/**
+	 * Whether an array is a list (keys 0..n-1 in order); PHP 8.0 has no array_is_list().
+	 *
+	 * @param array<mixed> $value The array.
+	 * @return bool
+	 */
+	private static function is_list( array $value ): bool {
+		return array() === $value || array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
 }

@@ -511,6 +511,101 @@ final class NoticesTest extends TestCase {
 		$this->assertStringNotContainsString( 'visitor-ip-untrusted-header', $output );
 	}
 
+	// ---- The rendered notice is a two-reader contract (T100) ---------------
+
+	/**
+	 * WordPress renders the dismiss button only for `is-dismissible` and colours
+	 * by the `notice-*` class; the inline dismiss script reads `data-href` and
+	 * posts everything after its first character as the notice id. Neither
+	 * side pinned the `?`, the class or the mapping before this: dropping any
+	 * of them left every test green while dismissal silently stopped working.
+	 */
+	public function test_a_dismissible_error_renders_the_code_the_dismiss_script_reads(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(),
+				GTM4WP_OPTION_GTM_PLACEMENT  => GTM4WP_PLACEMENT_FOOTER,
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<div class="gtm4wp-notice notice notice-error is-dismissible" data-href="?enter-gtm-code">', $output );
+		$this->assertStringContainsString( '>Open the setting</a>', $output, 'A problem about a setting links to it.' );
+
+		// The other side of the contract: the script strips exactly one leading
+		// character, the `?` printed above.
+		Functions\when( 'wp_create_nonce' )->justReturn( '0a1b2c3d4e' );
+		ob_start();
+		$notices->print_dismiss_script();
+		$script = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'body.append( "noticeid", notice.dataset.href.substring( 1 ) );', $script );
+	}
+
+	public function test_a_non_dismissible_error_renders_without_the_dismiss_class(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_DATALAYER_NAME => 'not-an-identifier',
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<div class="gtm4wp-notice notice notice-error" data-href="?invalid-datalayer-name">', $output );
+		$this->assertStringNotContainsString( 'is-dismissible', $output, 'A misconfiguration the admin has to fix cannot be waved away.' );
+		$this->assertStringNotContainsString( 'notice-warning', $output );
+	}
+
+	public function test_a_warning_renders_with_the_warning_class_and_no_link_when_it_names_no_setting(): void {
+		Functions\when( 'is_plugin_active' )->alias(
+			static fn ( $plugin ) => 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' === $plugin
+		);
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS             => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning">', $output );
+		$this->assertStringNotContainsString( 'notice-error', $output );
+		$this->assertStringNotContainsString( 'Open the setting', $output, 'A conflict with another plugin has no setting to point at.' );
+	}
+
+	/**
+	 * The message embeds the stored dataLayer name, an admin-stored value
+	 * that reaches the notice through esc_html(). The setUp stubs make the
+	 * escapers identity functions, so this case installs Brain Monkey's
+	 * real-behaviour stand-ins and asserts both directions (TS-2, T105h).
+	 */
+	public function test_the_stored_datalayer_name_is_html_escaped_in_the_notice(): void {
+		Functions\stubEscapeFunctions();
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_DATALAYER_NAME => 'my<layer"&',
+			)
+		);
+
+		ob_start();
+		$notices->show_notices();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'my&lt;layer&quot;&amp;', $output, 'The safe form is present.' );
+		$this->assertStringNotContainsString( 'my<layer', $output, 'The raw break-out character is absent.' );
+		$this->assertStringNotContainsString( '&amp;lt;', $output, 'And it is not escaped twice.' );
+	}
+
 	public function test_show_notices_prompts_for_gtm_id_when_code_empty(): void {
 		$notices = $this->make_notices_with_options( array( GTM4WP_OPTION_GTM_CODE => '' ) );
 

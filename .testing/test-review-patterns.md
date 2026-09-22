@@ -49,6 +49,7 @@ on every review before anything else.
 - **TS-11** — upstream raw-passthrough contract: a module that hands a value to a *shared downstream JSON sink* needs a **special-character** input proving it does NOT pre-escape (`esc_js`/`esc_attr`). With benign data (`'HU'`) an accidental pre-escape is invisible and coverage stays green (the module-boundary form of TS-1 / RI-4).
 - **TS-3** — the test asserts it *ran* (a call happened, a handle registered) but not the *effect* (the queue flushed, the value changed).
 - **TS-4** — tautological test: it asserts the value a stub/mock was told to return, exercising nothing real.
+- **TS-21** — the expected value is computed by the source's own expression (`assertSame( defined('X'), $info['active'] )`): a tautology without a stub. It cannot go red in either direction, and it usually comes with a docblock explaining why the literal was not written. Write the literal, and make the environment produce it (a separate process that `define()`s the constant).
 - **TS-5** — happy-path only: no error / empty / boundary / invalid-input branch (a valid custom value tested, the fallback path not).
 - **TS-7** — state leakage: a test reads/writes `$_SERVER`, `$GLOBALS`, statics or singletons without snapshotting and resetting them in `setUp`/`tearDown`.
 - **TS-8** — non-determinism: reliance on real time, randomness, or test-execution order.
@@ -176,6 +177,14 @@ Confirmed twice in Run 5 (2026-08-05), both found only by reverting:
   lead; classify each as needs-its-own-case vs `[-]` N/A (internally-typed input that
   cannot fail).
 
+- **Probe mechanics (Run 13):** a mutation probe is only evidence once three things
+  are true — the mutant parsed (`php -l` it; two "39 errors" in one run were the
+  probe's own syntax errors from a perl `$var` interpolation, not a red test), the
+  summary line was actually read (`phpunit.xml` colours the output, so grep with
+  `--colors=never`), and the file was restored (`git checkout -- <file>` after each
+  probe, tree clean at the end). Run an expected-red control alongside the
+  expected-green ones so a broken harness cannot report every gap as confirmed.
+
 ### TS-16: A green suite is not evidence of isolation — check the order ⭐
 TS-7 asks whether a test *resets* the state it writes. This asks the question one
 level up: **would the suite still pass if the tests ran in a different order?** The
@@ -272,6 +281,37 @@ A test that stubs `foo()` to return `X` and then asserts the result is `X` exerc
 the stub, not the code. Watch for `Functions\when(...)->justReturn($x)` immediately
 followed by an assertion on `$x`. Assert something the *code under test* computed,
 transformed, or routed — not the mock's own echo.
+
+### TS-21: The expected value is the source's own expression
+
+The stub-free cousin of TS-4. When a test computes what it expects with the same
+expression the code under test uses, the assertion compares the code to itself:
+`assertSame( defined( 'WC_VERSION' ), $info['integration']['active'] )` holds
+whether the constant is defined or not, and holds equally after the source is
+changed to `'active' => false` (probe-green, Run 13, three sites at once: the
+WooCommerce, Contact Form 7 and Easy Digital Downloads `status_info()` tests).
+
+The tell is a docblock explaining why the literal could not be written — "the
+stub file of other suites may or may not define it under a random order". That
+sentence was false (nothing in `tests/` defines `WC_VERSION`), but even when it is
+true it names the fix rather than the excuse: the *environment* must produce the
+value the literal expects.
+
+- **Write the literal on both legs.** `['active' => true, 'version' => '9.9.0']`
+  in a `#[RunInSeparateProcess]` case that `define()`s the constant; `['active' =>
+  false, 'version' => null]` in a case that guarantees it is absent (separate
+  process too when another file defines it order-stickily — TS-16).
+- **Grep the suite for the constant before writing "may be present".** If nothing
+  defines it, the present leg has never run; if one file defines it, the test is
+  order-dependent, which is TS-16's shape.
+- Same family as TS-4 (asserting the double's echo) and TS-14 (a comment that
+  rationalises a weak assertion); TS-15 is what exposes it — mutate the source
+  literal and watch nothing go red.
+- **The same tautology hides in a fixture.** A payload built to exceed a cap and
+  sized from that cap's constant (`str_repeat( '[', IMPORT_MAX_DEPTH )`) moves
+  with the cap: raise it to 512 and the fixture is 512 deep, still refused, still
+  green. Caught by the close-time probe of T105b. The number in a boundary
+  fixture is a literal, and the comment says which contract it is one past.
 
 ### TS-5: Happy-path only
 Every branch that can go wrong deserves a case: empty input, invalid input, the
@@ -921,6 +961,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-09-22 (Run 13 — gaps closed) | Closed T97–T105 on the maintainer's "fix straightforward, ask with options otherwise" go-ahead (four forks answered up front). **PHP 3075/9675 → 3114/13316**; declaration + 3 seeds identical; `phpcs` exit 0; no JS or behavioural production change (one docblock, `[skip changelog]`). Every survivor mutation of the report re-probed red. New harness: `AbilitiesTestCase::execute()` validates every ability result against its output schema the way core's `WP_Ability::validate_output()` does, and the `wp_register_ability` fake refuses a duplicate name. TS-21 gained the fixture corollary (a boundary payload sized from the constant it must exceed). |
+| 2026-09-22 (Run 13 — abilities-branch pass, report only) | Reviewed `b085e0e..9541679` (25 commits; the Abilities API surface, `Capability`, `SettingsStore`/`ConfigurationChecks`/`StatusReport`/`DestinationProbe`/`RefundReplay` extractions) with 3 parallel read-only deep-reads and **17 main-thread mutation probes (11 survived, 5 controls red, 1 predicted gap already pinned); no tests written.** Added **TS-21** (the expected value is the source's own expression — the stub-free TS-4, found at three `status_info()` tests whose `defined()` mirror cannot fail and whose docblocks assume constants nothing in the suite defines) and a probe-mechanics note under TS-15 (`php -l` the mutant, `--colors=never`, always run an expected-red control). The Abilities layer had no matrix row — the absent-not-`[ ]` failure's third occurrence, added. Gaps T97–T105 logged (5 Med, 4 Low); every ability gate confirmed at all three rungs (C3/C5 probe-red), every disclosure sink with a secret-bearing fixture (C2/C4 probe-red). |
 | 2026-09-21 (Run 12 — gaps closed) | Closed T81–T96 on the user's "fix straightforward, ask with options otherwise" go-ahead (four forks answered up front). **PHP 2852→2893 / 7809→7956; JS 961→974**; declaration + 4 seeds identical; phpcs exit 0; lint:js clean; build rebuilt (4 production changes: one `save()` per erased order, PageVariables term-name decode, list add supersedes the held-back block add, non-cart body = no reading). **14 revert probes red.** Two lessons worth recording without a new number: (1) **the probe tests the test, again** — the first T88 draft asserted the push count and stayed green with the coalescing guard deleted, because two racing reads still resolve one after another in JS and the second diff sees the updated baseline; the discriminator was *when* the reads are issued, not what they produce — a guard whose effect is ordering/concurrency needs an assertion on the ordering; (2) **writing the error-leg test surfaced the third T55/T80-class latent bug**: a `200` body whose `items` is not a list normalized to an empty cart and reported every baseline item as `remove_from_cart` — the "a lost request costs an event rather than inventing one" rule was written in the docblock and not enforced at the parse bail; the fix followed the classic tracker's existing `Array.isArray` guard. The keyless-held-back-event candidate from the report is now confirmed by /code-review's answer being taken (the over-report was real and fixed) — still one instance, still unnumbered; a second sighting promotes it to a TC line beside TC-17. |
 | 2026-09-20 (Run 12 — Data Manager phases 3+4 pass, report only) | Reviewed `75c942d..b085e0e` (80 commits, +6.7k production / +17k test lines) with 4 parallel read-only deep-reads; **no tests written.** Added **TS-20** (⭐ a recording double that drops a parameter the collaborator branches on — the test-side form of UC-3, measured on security finding #240 where both `as_unschedule_all_actions` stubs recorded hook + group and never `$args`, so a call that cancelled nothing stayed green; swept the send-lane suites and found no second coupling-bearing instance). Added the **TS-16 corollary** (the whole-suite shuffle is blind to load-time class-stub requires and in-file `function_exists()` dependencies — run each changed test file by path, alone, plus seeds; two instances measured: `BackfillTest` 4 errors by path, `CaptureHooksTest` red under seeds 4/5) and the **TS-11 corollary** (a decode between source and sink narrows a raw-passthrough pin; feed the stored entity form at the source, assert the raw form at the sink). Put **TS-19** into the quick index (it had a full entry but no index row). Recorded the TS-17 v3 clause happening for real: `c5499f9`'s lib import flipped `build/gtm4wp-woocommerce.js` to strict mode (0 → 1 `"use strict"`), the paired absence-of-push asserts keep the three `not.toThrow` sites valid. Candidate not yet numbered (seen once, pending `/code-review` on the over-report): *a keyless held-back event needs an "unrelated trigger inside the window → not released" case beside its timeout case* — the timeout-drop test is half a pin when any producer's confirmation flushes the queue. |
 | 2026-09-03 (Run 11 — Data Manager phase 2 pass + closes) | Reviewed the GDM range (`99ee59a..75c942d`) with 3 parallel deep-reads and closed T75–T80 the same session ("fill straightforward, ask on forks" — no fork arose). **PHP 2394→2397 / 6539→6552; JS 807→812**; declaration + 3 seeds identical; phpcs exit 0; lint:js clean; build rebuilt (1 production change). **3 revert probes red.** Extended **TC-15 rule 6** with the `…Once` corollary: a persistent `mockResolvedValue` erases the stand-in's loud-reject default exactly as `mockReset()` would, and `mockClear()` does not restore it. Process notes: (a) **an executed probe beats a static trace for error paths whose evaluation is deferred** — the deep-read predicted a malformed REST response would "land in the catch", but `response.ok` was evaluated inside a `setResults` updater, i.e. during React's render, PAST the try/catch: only running the new test revealed a latent panel crash (fixed by building the verdict before `setResults`; the test was red pre-fix by construction — the T17/T3 "writing the missing test surfaces the live defect" class, now seen in a suite that already looked strong); (b) **TS-18 now operates at assertion granularity**: the second consecutive greenfield module landed with its pins (three-rung TS-12 ladder, revert-traced finding guards, TS-13-by-construction fake), and the residue was exactly the sibling assertions that didn't make the trip — the KeyNotice boot-attachment line (T75, the T74 lesson recurring one module over IN the same range that closed T74), the busy-guard deferred-promise test (T76), the args/panel/hostile-summary pins (T77–T79); diffing the sibling's suite remains the ready-made checklist, now down to single assertions. |

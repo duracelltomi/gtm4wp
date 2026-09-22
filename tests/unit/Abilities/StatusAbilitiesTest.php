@@ -182,31 +182,62 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 	}
 
 	/**
-	 * The host plugins' version constants are process-global: the EDD and
-	 * WooCommerce stub files of other suites define them, so under a random
-	 * order any of the three may be "present" here. What is pinned is the
-	 * mapping the schemas promise - active exactly when the constant is
-	 * defined, the version exactly its value, null otherwise - against the
-	 * process state at the time of the call (TS-16).
+	 * The three integrating modules report their host plugin in their own row.
+	 * The hosts are detected by version constants: WC_VERSION and WPCF7_VERSION
+	 * are defined by nothing in the suite, so their absent leg is a literal
+	 * here (EDD_VERSION is defined order-stickily by the EDD module test, so
+	 * its absent leg is the schema test's, in a process of its own); the
+	 * present leg of all three is the separate-process case below. Literals,
+	 * never a defined() mirror of the source (TS-21, T98).
 	 */
-	public function test_the_integrating_modules_report_their_host_plugin_in_their_own_row(): void {
+	public function test_the_integrating_modules_report_an_absent_host_in_their_own_row(): void {
+		$this->assertFalse( defined( 'WC_VERSION' ), 'Precondition (TS-16): nothing in the suite defines the WooCommerce version in-process.' );
+		$this->assertFalse( defined( 'WPCF7_VERSION' ), 'Precondition (TS-16): nothing in the suite defines the Contact Form 7 version in-process.' );
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
 
 		$modules = array_column( $this->execute( StatusAbilities::GET_STATUS )['modules'], 'integration', 'id' );
 
-		$constants = array(
-			'woocommerce'    => 'WC_VERSION',
-			'edd'            => 'EDD_VERSION',
-			'contact-form-7' => 'WPCF7_VERSION',
+		$absent = array(
+			'active'  => false,
+			'version' => null,
 		);
 
-		foreach ( $constants as $module_id => $constant ) {
-			$defined = defined( $constant );
+		$this->assertSame( $absent, $modules['woocommerce'] );
+		$this->assertSame( $absent, $modules['contact-form-7'] );
+		$this->assertSame( array( 'active', 'version' ), array_keys( $modules['edd'] ) );
+	}
 
-			$this->assertSame( array( 'active', 'version' ), array_keys( $modules[ $module_id ] ), $module_id );
-			$this->assertSame( $defined, $modules[ $module_id ]['active'], $module_id );
-			$this->assertSame( $defined ? (string) constant( $constant ) : null, $modules[ $module_id ]['version'], $module_id );
-		}
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_integrating_modules_report_an_installed_host_and_its_version_in_their_own_row(): void {
+		define( 'WC_VERSION', '9.9.0' );
+		define( 'EDD_VERSION', '3.7.0' );
+		define( 'WPCF7_VERSION', '6.1.2' );
+		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
+
+		$modules = array_column( $this->execute( StatusAbilities::GET_STATUS )['modules'], 'integration', 'id' );
+
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => '9.9.0',
+			),
+			$modules['woocommerce']
+		);
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => '3.7.0',
+			),
+			$modules['edd']
+		);
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => '6.1.2',
+			),
+			$modules['contact-form-7']
+		);
 	}
 
 	public function test_a_third_party_module_whose_schema_opts_in_reports_its_switch_and_host(): void {
@@ -225,6 +256,60 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		);
 		$this->assertInstanceOf( Options::class, StatusReportingThirdPartySchema::$received );
 		$this->assertTrue( StatusReportingThirdPartySchema::$received->get( 'acme-status-switch' ), 'The schema reads the fresh Options service the ability built, so it sees the stored value merged over its own default.' );
+	}
+
+	/**
+	 * A schema that opted in and answers with the wrong types: the row
+	 * degrades to unknown (null) for both facts, so the output schema's
+	 * types hold and no junk reaches a transcript (T105d).
+	 */
+	public function test_a_third_party_schema_reporting_junk_types_degrades_to_unknown(): void {
+		$rows = array_column( $this->status_over( array( new JunkStatusThirdPartyModule() ) )['modules'], null, 'id' );
+
+		$this->assertSame( array( 'acme-junk' ), array_keys( $rows ) );
+		$this->assertSame( 'Acme junk', $rows['acme-junk']['title'] );
+		$this->assertNull( $rows['acme-junk']['enabled'], 'A string is not a switch state.' );
+		$this->assertNull( $rows['acme-junk']['integration'], 'A string is not an integration entry.' );
+	}
+
+	/**
+	 * A module naming a schema class that does not exist (a third party that
+	 * renamed it) still gets a row, titled by its id, with both facts unknown.
+	 */
+	public function test_a_module_whose_schema_class_is_missing_is_listed_by_its_id(): void {
+		$module = new class() implements \GTM4WP\Module\ModuleInterface {
+			public function id(): string {
+				return 'acme-missing';
+			}
+
+			public function defaults(): array {
+				return array();
+			}
+
+			public function is_available(): bool {
+				return false;
+			}
+
+			public function frontend( Options $options ): void {
+			}
+
+			public function admin_schema(): string {
+				return 'GTM4WP_No_Such_Schema';
+			}
+		};
+
+		$rows = array_column( $this->status_over( array( $module ) )['modules'], null, 'id' );
+
+		$this->assertSame(
+			array(
+				'id'          => 'acme-missing',
+				'title'       => 'acme-missing',
+				'available'   => false,
+				'enabled'     => null,
+				'integration' => null,
+			),
+			$rows['acme-missing']
+		);
 	}
 
 	public function test_a_third_party_module_without_the_interface_reports_unknown_not_off(): void {
@@ -272,6 +357,32 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 
 		$this->assertSame( 'critical', $health['tests'][0]['status'] );
 		$this->assertStringContainsString( 'Main property', $health['tests'][0]['description'] );
+	}
+
+	/**
+	 * A row a module marks `private` is kept out of the Info tab's
+	 * copy-to-clipboard text by core, and out of the transcript here for the
+	 * same reason. No built-in row sets the flag, so the third-party fixture
+	 * carries one private and one public row; both directions asserted over
+	 * the serialised answer (T99: deleting the exclusion was green).
+	 */
+	public function test_site_health_keeps_a_private_row_out_of_the_transcript(): void {
+		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
+
+		$registry = $this->registry();
+		$registry->add( new StatusReportingThirdPartyModule() );
+		$this->registered = array();
+		( new StatusAbilities( $registry, $this->vault, $this->health, $this->stats ) )->register();
+
+		$health = $this->execute( StatusAbilities::GET_SITE_HEALTH );
+		$rows   = array_column( $health['info'], 'value', 'key' );
+		$text   = (string) json_encode( $health ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for substring assertions.
+
+		$this->assertSame( StatusReportingThirdPartySchema::PUBLIC_VALUE, $rows['acme-status_public'], 'The public row arrives under the module-prefixed key.' );
+		$this->assertArrayNotHasKey( 'acme-status_private', $rows );
+		$this->assertStringContainsString( StatusReportingThirdPartySchema::PUBLIC_VALUE, $text );
+		$this->assertStringNotContainsString( StatusReportingThirdPartySchema::PRIVATE_VALUE, $text, 'A private row is not in the transcript, under any key.' );
+		$this->assertStringNotContainsString( 'Acme private', $text, 'Nor is its label.' );
 	}
 
 	/**

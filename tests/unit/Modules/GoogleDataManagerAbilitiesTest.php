@@ -186,7 +186,78 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( array( Abilities::GET_LOG, Abilities::TEST_DESTINATION, Abilities::REPLAY_REFUNDS ), array_keys( $this->registered ), 'The provider the schema builds registers the module abilities, nothing else.' );
 	}
 
+	// ---- Registration (T104: the published contract, pinned as the REST args are) ----
+
+	public function test_the_log_input_schema_pins_the_limit_bounds_and_the_default_filter(): void {
+		$schema = $this->registered[ Abilities::GET_LOG ]['input_schema'];
+
+		$this->assertFalse( $schema['additionalProperties'] );
+		$this->assertSame( array( 'problems_only', 'limit' ), array_keys( $schema['properties'] ) );
+		$this->assertSame( 'boolean', $schema['properties']['problems_only']['type'] );
+		$this->assertFalse( $schema['properties']['problems_only']['default'], 'Everything unless asked otherwise.' );
+		$this->assertSame(
+			array(
+				'type'    => 'integer',
+				'minimum' => 1,
+				'maximum' => Abilities::MAX_LIMIT,
+				'default' => Abilities::MAX_LIMIT,
+			),
+			$schema['properties']['limit'],
+			'Core refuses a limit outside the bounds before the callback clamps it.'
+		);
+	}
+
+	public function test_the_destination_test_requires_the_measurement_id_by_schema(): void {
+		$schema = $this->registered[ Abilities::TEST_DESTINATION ]['input_schema'];
+
+		$this->assertSame( array( 'measurement_id' ), $schema['required'] );
+		$this->assertSame( array( 'measurement_id' ), array_keys( $schema['properties'] ) );
+		$this->assertSame( 'string', $schema['properties']['measurement_id']['type'] );
+		$this->assertFalse( $schema['additionalProperties'] );
+	}
+
+	public function test_the_replay_input_schema_names_string_references_and_a_boolean_confirm(): void {
+		$schema = $this->registered[ Abilities::REPLAY_REFUNDS ]['input_schema'];
+
+		$this->assertSame( array( 'confirm' ), $schema['required'], 'References are optional; the confirmation is not.' );
+		$this->assertSame( array( 'references', 'confirm' ), array_keys( $schema['properties'] ) );
+		$this->assertSame( 'array', $schema['properties']['references']['type'] );
+		$this->assertSame( array( 'type' => 'string' ), $schema['properties']['references']['items'], 'The log references are strings (platform:order:refund), as the REST route declares them.' );
+		$this->assertSame( 'boolean', $schema['properties']['confirm']['type'] );
+		$this->assertFalse( $schema['additionalProperties'] );
+	}
+
 	// ---- get-google-data-manager-log ---------------------------------------
+
+	/**
+	 * The allow-list is SendLog's (its own test pins the write side); this
+	 * pins it on the read side through the ability's own log, with a fixture
+	 * that really carries a secret (T105k).
+	 */
+	public function test_a_field_a_caller_smuggled_into_an_entry_never_reaches_the_answer(): void {
+		$this->log->record(
+			array(
+				'feature'      => SendLog::FEATURE_REFUND,
+				'reference'    => 'woocommerce:10:11',
+				'destination'  => self::MEASUREMENT,
+				'outcome'      => SendLog::OUTCOME_ACCEPTED,
+				'attempt'      => 1,
+				'status'       => 200,
+				'request_id'   => 'req-10',
+				'reason'       => '',
+				'access_token' => 'ya29.smuggled-secret',
+				'request_body' => array( 'events' => array( 'user_data' => 'hashed@example.com' ) ),
+			)
+		);
+
+		$text = (string) json_encode( $this->execute( Abilities::GET_LOG ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for substring assertions.
+
+		$this->assertStringContainsString( 'woocommerce:10:11', $text, 'The entry itself is there.' );
+		$this->assertStringNotContainsString( 'ya29.smuggled-secret', $text );
+		$this->assertStringNotContainsString( 'access_token', $text );
+		$this->assertStringNotContainsString( 'request_body', $text );
+		$this->assertStringNotContainsString( 'hashed@example.com', $text );
+	}
 
 	public function test_the_log_is_returned_newest_first_with_the_derived_fields(): void {
 		$this->record( 'woocommerce:10:11', SendLog::OUTCOME_ACCEPTED );
