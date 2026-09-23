@@ -76,7 +76,7 @@ So, after drafting the findings and before writing the report:
    - Cheap pass on **every** finding: a Low finding's mechanism has been wrong before.
    - Anything Medium+ or implying a code change gets the full adversarial treatment,
      including the verifier implementing the recommendation in a throwaway probe.
-   - ⛔ **Any verifier you ask to PATCH gets `isolation: "worktree"`.** This stage runs
+   - ⛔ **Any verifier you ask to PATCH gets its OWN worktree — created by the verifier itself at the scratchpad path below, NEVER through the Agent tool's `isolation: "worktree"` parameter.** That parameter places the tree at `.claude/worktrees/<agent>/` *inside* the repository, exactly where the bullet two down forbids it; measured on R36 (#311): a jest run from the repo root collected that copy's tests too (13 → 26 for one file) while it existed. The isolation requirement itself stands. This stage runs
      verifiers concurrently *and* tells them to edit files, so by default several agents
      mutate one working tree at once. Measured on the run that introduced this stage
      (**#170**): one verifier read another's in-flight edit and was about to report it as a
