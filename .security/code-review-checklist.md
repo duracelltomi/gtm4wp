@@ -1171,7 +1171,7 @@ the cost #306's disposition never had. **Maintainer's call recorded as open on #
 | # | Sev | Status | Actor | Area | Summary |
 |---|---|---|---|---|---|
 | 323 | Low | fixed (`c420137`; the #315 test also made order-independent, TS-7/TS-16) | — | `src/Google/*`, `Abilities/SettingsAbilities.php`, `Admin/{RestController,SettingsStore}.php`, `Modules/{GoogleAuth,GoogleDataManager}/*` | 36 methods whose docblock promises `X\|\WP_Error` carry no native return type on an 8.0 floor that has union types; verifier-measured green with the union types added (39 signatures / 18 files — the `Transport` fake must be typed in the same change or the suite fatals at class load) |
-| 325 | Low | open (needs design; U35) | — | `Frontend/ContainerCode.php:596-601` + `ConsentDefaults.php:121-140` | The WP Rocket inline-JS exclusion names the literal `dataLayer`; since the #269 fix the consent-defaults block pushes to the configured name, so under a custom name that one block is no longer covered (on `2.0` too). Drafted "append the configured name" refuted (identifier grammar admits `$` and single letters; duplicate with the default; breaks the existing pin); the surviving shapes need WP Rocket's consumer read (U35, never verified, drift class should be `silent-wrong`) |
+| 325 | Low | fixed (`412a63b`; backported to `2.0` `68d5d1d`) | — | `Frontend/ContainerCode.php:596-601` + `ConsentDefaults.php:121-140` | The WP Rocket inline-JS exclusion names the literal `dataLayer`; since the #269 fix the consent-defaults block pushes to the configured name, so under a custom name that one block is no longer covered (on `2.0` too). Drafted "append the configured name" refuted (identifier grammar admits `$` and single letters; duplicate with the default; breaks the existing pin); the surviving shapes need WP Rocket's consumer read (U35, never verified, drift class should be `silent-wrong`) |
 | 326 | Low | accepted (observation) | — | `ContainerCode.php:153` / `ConsentDefaults.php:125` | The two `gtag` shims differ in scope on purpose (IIFE-local vs block-level global); Node probe: both arrangements push in order, no failure — recorded so a future "deduplicate" keeps the consent guard |
 
 **Adjudication: 4 drafts — 3 dispatched to `finding-verifier` (2 patching in own detached
@@ -1194,9 +1194,15 @@ custom data layer name contains at least one returned exclusion pattern (the pro
 `[skip changelog]` — annotations only; post-fix PHP 3256 / 17962 twice under `--order-by=random`,
 `phpcs` 0). The first random run surfaced a pre-existing order dependence in R37's #315 test
 (reaches `wp_unslash` when another file leaks `$_SERVER['HTTP_REFERER']`); it stubs its own
-referer leg now. #326 accepted. #325 and the #306 reaffirm-or-reverse question put to the
-maintainer with options. **Claims that changed shape after the report was written: 0.**
-**The base for the next review is the last commit of this fix session.**
+referer leg now. #326 accepted. The maintainer chose the fixed-token shape for #325 and reversed
+#306: both landed in `412a63b` — `ConsentDefaults::CONSENT_DEFAULT_COMMAND` is one definition shared by
+the consent block and the WP Rocket pattern list (never the user's identifier), a test pins that every
+inline block printed under a custom name carries a pattern (watched red on the consent block first),
+U35 re-described with its claims and drift class `silent-wrong`; `header_top()` takes no argument and
+returns nothing, its one test deleted, a 2.1 `Changed:` bullet for developers. **#325 backported to
+`2.0` as `68d5d1d`** (fix part only; `2.0` after: PHP 2078 / 5000, `phpcs` 0). Post-fix on master:
+PHP 3256 / 17964 (`--order-by=random`), `phpcs` 0, prose budget clean. **Claims that changed shape
+after the report was written: 0.** **The base for the next review is `412a63b`.**
 
 ### Report 37: `.security/code-review-report-2026-09-23-1852.md`
 
@@ -1333,7 +1339,7 @@ at any actor.
 | 303 | Low | fixed (this run) | — | `.security/code-review-checklist.md` | Admin JS label 11 vs 15 files; Options Cap/Nonce cell `[x]` for a non-existent surface (now `[-]`); UserEvents row now names its tracker |
 | 304 | Low | open | — | `Admin/SettingsPage.php:212-260` | Panel data shipped twice (lifted `choices` + whole `panelData`) |
 | 305 | Low | fixed (`537bc33`) | — | `Frontend/ContainerCode.php:341-347 vs 444-448` | `get_tag()` inlines `console_off_warning()` |
-| 306 | Low | fixed (`537bc33`, docblock + test comment; parameter kept) | — | `ContainerCode.php:118-179` | `header_top( false )` has no production caller, a false AMP docblock, and returns the block unsanitized |
+| 306 | Low | superseded — parameter removed in `412a63b` (R38 re-derived it as #324: no caller in 1.x, `2.0`, compat or docs; the "public API for themes" claim lived only in a test comment; maintainer reversed the "kept" disposition once the cost was measured) | — | `ContainerCode.php:118-179` | `header_top( false )` has no production caller, a false AMP docblock, and returns the block unsanitized |
 | 307 | Low | fixed (`537bc33`) | — | `Frontend/DataLayer.php:262` | Literal push handle beside `PUSH_HANDLE` |
 | 308 | Low | fixed (`537bc33`) | site code | `Frontend/ConsentDefaults.php:88-101` | Overwrite filter coerced by truthiness: `'denied'` → granted |
 | 309 | Low | fixed (`537bc33`, return type only) | — | `ContainerCode.php:124, 223, 429` | Three methods over 50 lines; two untyped params |
