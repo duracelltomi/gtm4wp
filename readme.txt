@@ -313,7 +313,6 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Added: an optional **"Report downloads in the default language"** setting (Easy Digital Downloads → Product data), the EDD counterpart of the WooCommerce option above and with the same caveat about setups keyed on the translated `item_id`. Off by default (experimental) (#145).
 * Added: an optional **"Report the form name in the default language"** setting (Contact Form 7), so `form_name` carries the master-language title and submissions of one form combine across languages. Works for forms translated as separate entries. Off by default (experimental) (#145).
 * Changed: `pagePostTerms` and `pagePrimaryCategoryName` report term names as they were typed, the same string the e-commerce items have carried since 2.0.2. A GTM trigger that matched the encoded form on either variable needs the plain text now; the slug variables are unchanged.
-* Fixed: the browser, OS and device data script reported all three signals when a page optimiser removed its inline configuration. It now reports nothing in that case.
 * Changed: `siteSearchTerm` carries the search term as typed; the classic data layer used to HTML-encode it while the cache-safe one did not. A GTM trigger matching the encoded form needs the plain text now.
 * Changed: `pagePostTerms` is omitted when the post has no terms and no reported meta, instead of being an empty list.
 * Changed: the Contact Form 7 tracker script is no longer loaded while Contact Form 7 is not installed.
@@ -324,10 +323,6 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Changed: with trusted proxy addresses configured, the Cloudflare country code is read only for requests that arrived through one of them, so add Cloudflare's IP ranges to the list; an admin notice asks for it while the option is on without one.
 * Changed: a `gtm4wp_admin_page_capability` callback returning something other than a capability name is reported through `_doing_it_wrong()` and the default applies instead of locking every administrator out.
 * Changed: the Axeptio project ID field looks up the cookie versions 400 ms after typing stops instead of on every keystroke.
-* Fixed: a login or registration event was lost when the visitor's next request was a REST call rather than a page view.
-* Fixed: a user account created by a logged-in administrator through the REST API fired `gtm4wp.userRegistered` in the administrator's own browser.
-* Fixed: the form interaction and Contact Form 7 events reported a hidden `action` field instead of the form's URL when the form contained a field named `action`, `id` or `target`.
-* Fixed: with the cache-safe data layer, a logged-in visitor served a cached page kept requesting their visitor data on every page view after WordPress refused the page's nonce.
 * Removed: the `$gtp4wp_plugin_url`, `$gtp4wp_plugin_basename` and `$gtp4wp_script_path` globals, deprecated in 2.0 as announced. Third-party code still reading them uses `plugin_dir_url( GTM4WP_PLUGIN_FILE )`, `plugin_basename( GTM4WP_PLUGIN_FILE )` and `plugin_dir_url( GTM4WP_PLUGIN_FILE ) . 'build/'` instead.
 
 **Easy Digital Downloads**
@@ -366,6 +361,11 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Fixed: a purchase was never reported when the customer reached the order received page while the order was still Pending payment. With "Reliable purchase tracking" on, the order is now remembered and reported once after its status becomes a tracked one; the wait ends when the order fails, is cancelled or refunded, or exceeds the "Maximum order age".
 * Fixed: with a custom data layer variable name, the Google Consent Mode default block pushed its defaults to dataLayer instead of the configured variable, so the consent defaults did not apply. The block now uses the configured name.
 * Fixed: on a subdomain multisite, or any site defining COOKIE_DOMAIN, the cache-safe data layer could not clear its event cookie after a one-shot event, so every later page view made a needless request. The cookie is now host-only.
+* Fixed: a login or registration event was lost when the visitor's next request was a REST call rather than a page view.
+* Fixed: a user account created by a logged-in administrator through the REST API fired gtm4wp.userRegistered in the administrator's own browser.
+* Fixed: the form interaction and Contact Form 7 events reported a hidden action field instead of the form's URL when the form contained a field named action, id or target.
+* Fixed: the browser, OS and device data script reported all three signals when a page optimiser removed its inline configuration. It now reports nothing in that case.
+* Fixed: with the cache-safe data layer, a logged-in visitor served a cached page kept requesting their visitor data on every page view after WordPress refused the page's nonce.
 * Updated: tested with WooCommerce 11.1.2.
 
 = 2.0.2 =
