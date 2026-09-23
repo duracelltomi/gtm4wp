@@ -46,6 +46,15 @@ final class ContainerCode {
 	public const FILTER_AMP_RUNNING = 'gtm4wp_amp_running';
 
 	/**
+	 * The Google tag developer ID Google issued to GTM4WP. Pushed as
+	 * `gtag('set', 'developer_id.<id>', true)` before the container loads so
+	 * Google can tell which platform installed the tag (U165).
+	 *
+	 * @since 2.0.3
+	 */
+	public const DEVELOPER_ID = 'dNGJiYT';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options         $options    The plugin options service.
@@ -138,7 +147,8 @@ final class ContainerCode {
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 ' . $this->script_tag->opening_tag() . '
 	var gtm4wp_datalayer_name = ' . ScriptTag::json_literal( $datalayer_name, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
-	var ' . $datalayer_name . ' = ' . $datalayer_name . ' || [];';
+	var ' . $datalayer_name . ' = ' . $datalayer_name . ' || [];
+	(function(){function gtag(){' . $datalayer_name . '.push(arguments);}gtag(\'set\', \'developer_id.' . self::DEVELOPER_ID . '\', true);})();';
 
 		// Load in the global variables from the gtm4wp_add_global_vars_array / GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY filter.
 		$added_global_js_vars = (array) apply_filters( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array() );
