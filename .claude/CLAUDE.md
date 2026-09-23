@@ -143,10 +143,19 @@ narrative ("measured, it does not…"), phase history, proofs of a rule already
 stated, and anything the code below already says. A "do NOT do X" survives as one
 line with a half-sentence reason; never sharpen a defect description (RI-24).
 
+The same budget governs changelog bullets (60 words; see the `changelog` skill).
+
 Enforced advisory-style by the `prose-budget` Stop hook, which reports only what the
 working tree ADDS: `bash .claude/hooks/prose-budget.sh check` runs the same check by
 hand, `report` scans the whole tree. A block that genuinely needs the length is kept
 — stop again and it passes.
+
+**One-time setup per machine.** `.claude/settings.json` is git-ignored, so the hook
+wiring does not travel with a clone. Install the out-of-tree runner the way
+`gtm4wp-changelog-check` is installed (it materialises the script from `master`, so a
+branch under review cannot supply it — `.security` finding #77), then add a `Stop`
+hook running `bash ~/.githooks/gtm4wp/gtm4wp-prose-budget stop`. Unlike the changelog
+gate this one fails **open**: an advisory check must never block a turn.
 
 ## Build System
 
