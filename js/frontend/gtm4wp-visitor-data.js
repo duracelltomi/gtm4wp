@@ -16,6 +16,8 @@
  *   cookie is present, fired ONCE with a de-dupe guard (the purchase reuses
  *   gtm4wp_orderid_tracked), then the cookie is cleared and a POST beacon
  *   lets the server flag the order while the GET stays read-only.
+ *   The cookie is KEPT while the server reports the purchase as still pending
+ *   (an order awaiting the gateway's confirmation), so the next page asks again.
  *
  * Each family is its own event so a GTM setup can tell from the name alone
  * which keys arrived: gtm4wp.visitorData (Tier 1 + endpoint fields, ONE push,
@@ -389,13 +391,26 @@ import {
 	 * shared gtm4wp_orderid_tracked guard unless payload.flag is false ("Do not
 	 * flag orders as being tracked", matching the server path).
 	 *
-	 * @param {Object} payload    The resolver payload ({ push, orderNumber, flag }).
+	 * A payload of `{ pending: true }` and no push means the server remembered an
+	 * order whose status is not trackable yet (the customer reached the order
+	 * received page before the gateway's webhook confirmed the payment). Nothing is
+	 * pushed, and the handler asks the caller to KEEP the event cookie so the next
+	 * page view asks again; the server stops reporting it once the order is
+	 * trackable (then it pushes), terminal or past its re-check window (then the
+	 * cookie is cleared as usual).
+	 *
+	 * @param {Object} payload    The resolver payload ({ push, orderNumber, flag } or
+	 *                            { pending: true }).
 	 * @param {string} confirmUrl Optional POST-beacon URL fired after delivery.
-	 * @return {void}
+	 * @return {boolean|undefined} True when the event cookie must be kept for a re-check.
 	 */
 	function handlePendingPurchase( payload, confirmUrl ) {
 		if ( ! payload || 'object' !== typeof payload || ! payload.push ) {
-			return;
+			return payload &&
+				'object' === typeof payload &&
+				true === payload.pending
+				? true
+				: undefined;
 		}
 
 		const orderNumber =
@@ -662,16 +677,34 @@ import {
 
 				// One-shots go to their handlers, stay OUT of the merged push, and
 				// their event cookies are cleared so a later page makes no request.
+				// A handler that returns true asks for its cookie to be KEPT: the server
+				// has an event that is not ready yet (a purchase awaiting the gateway's
+				// confirmation), so the next page view must ask again.
+				const keepCookies = {};
 				Object.keys( actionKeys ).forEach( function ( key ) {
 					if ( key in data ) {
 						const handler = actionHandlers[ key ];
-						if ( 'function' === typeof handler ) {
-							handler( data[ key ], actionConfirm[ key ] );
+						if (
+							'function' === typeof handler &&
+							true ===
+								handler( data[ key ], actionConfirm[ key ] )
+						) {
+							actions.forEach( function ( action ) {
+								if (
+									-1 !== ( action.keys || [] ).indexOf( key )
+								) {
+									keepCookies[ action.cookie ] = true;
+								}
+							} );
 						}
 						delete data[ key ];
 					}
 				} );
-				activeActionCookies.forEach( gtm4wp_clear_cookie );
+				activeActionCookies.forEach( function ( cookie ) {
+					if ( ! keepCookies[ cookie ] ) {
+						gtm4wp_clear_cookie( cookie );
+					}
+				} );
 
 				collect( data );
 			} )

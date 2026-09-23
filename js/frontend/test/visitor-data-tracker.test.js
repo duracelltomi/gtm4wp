@@ -1280,6 +1280,66 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
 	} );
 
+	// The reported gap (GTM4WP 2.0.2 + Stripe with webhooks): the order is still
+	// "Pending payment" when the customer reaches the order received page, and the
+	// webhook confirms it a moment later. The server remembers such an order and
+	// reports it as pending, with nothing to push, until its status is tracked. The
+	// client must then KEEP the event cookie (a cleared cookie means no further
+	// request, so the purchase would be lost) and ask again on the next page - one
+	// request per page view, never a loop - and fire once the server delivers it.
+	it( 'keeps the event cookie and pushes nothing while the purchase is still pending, then fires it on a later page', async () => {
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		// First page after checkout: the order still awaits the gateway's webhook.
+		mockEndpointOnce( { pendingPurchase: { pending: true } } );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		expect( confirmBeacon() ).toBeUndefined();
+		expect( document.cookie ).toContain( EVENT_COOKIE + '=1' );
+
+		// The next page view: the webhook has landed and the server now delivers the
+		// purchase. A page view is a new window, so clear the #83 boot guard.
+		delete window.gtm4wp_visitordata_inited;
+		window.dataLayer = [];
+		mockEndpointOnce( purchasePayload( '1001', true ) );
+
+		loadTracker();
+		await flush();
+
+		const endpointFetches = global.fetch.mock.calls.filter(
+			( call ) => call[ 0 ] === ENDPOINT
+		);
+		expect( endpointFetches ).toHaveLength( 2 );
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+		expect( confirmBeacon() ).toBeTruthy();
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	it( 'does not keep the event cookie for a pending payload that also carries a push', async () => {
+		// A payload with a push is a delivery, whatever else it says: it fires and the
+		// cookie is cleared as usual, so a server-side mistake cannot re-fire it.
+		window.gtm4wp_visitordata_config = actionConfig( [
+			'pendingPurchase',
+		] );
+		setCookie( EVENT_COOKIE, '1' );
+		const payload = purchasePayload( '1001', true );
+		payload.pendingPurchase.pending = true;
+		mockEndpointOnce( payload );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
 	it( 'clears a stale event cookie even when nothing is pending server-side', async () => {
 		window.gtm4wp_visitordata_config = actionConfig( [
 			'readdedToCart',

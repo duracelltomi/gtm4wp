@@ -535,6 +535,75 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->make_tracking()->remember_order( 1001 );
 	}
 
+	/**
+	 * The reported gap (GTM4WP 2.0.2 + WooCommerce Stripe Gateway with webhooks):
+	 * the customer reaches a thank-you render while the order is still "Pending
+	 * payment", the webhook moves it to processing a moment later in a request
+	 * with no access to the buyer's session, and remember_order() - which refuses
+	 * a non-trackable status by design - never seeds it. The render itself must
+	 * remember such an order so the fallback re-checks it on the next page views,
+	 * while pushing nothing and leaving the order unflagged (Pending payment is
+	 * NOT a tracked status; a revisit must still fire once the status caught up).
+	 */
+	public function test_on_thankyou_remembers_a_still_pending_order_for_the_recheck_and_pushes_nothing(): void {
+		$session = $this->stub_wc_with_session();
+		$order   = $this->make_order( array( 'status' => 'pending' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$tracking = $this->make_tracking(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		);
+
+		ob_start();
+		$tracking->on_thankyou( 1001 );
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'purchase', $output, 'A still-pending order is withheld on this render.' );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'Pending payment must never be treated as tracked.' );
+		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The render must remember the pending order for the re-check.' );
+		$this->assertArrayNotHasKey( 'gtm4wp_woocommerce_purchase_data_pushed', $GLOBALS, 'Nothing was pushed, so the request-scoped flag stays down.' );
+
+		// remember_order() fires on the same woocommerce_thankyou hook right after.
+		// It refuses the pending status, so the seed above must survive it.
+		$tracking->remember_order( 1001 );
+
+		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ], 'The status-time seed must not undo the render-time seed.' );
+	}
+
+	public function test_on_thankyou_does_not_remember_a_pending_order_without_reliable_purchase_tracking(): void {
+		$session = $this->stub_wc_with_session();
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_order( array( 'status' => 'pending' ) ) );
+
+		$this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $this->make_order( array( 'status' => 'pending' ) ) );
+
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The fallback is the marker\'s only reader; nothing is remembered while it is off.' );
+	}
+
+	public function test_on_thankyou_does_not_remember_a_terminal_or_already_tracked_order(): void {
+		$session = $this->stub_wc_with_session();
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+		);
+
+		$this->run_thankyou( $options, $this->make_order( array( 'status' => 'cancelled' ) ) );
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'A cancelled order can never become trackable.' );
+
+		$this->run_thankyou(
+			$options,
+			$this->make_order(
+				array(
+					'status' => 'pending',
+					'meta'   => array( '_ga_tracked' => 1 ),
+				)
+			)
+		);
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'An order already flagged tracked is never re-checked.' );
+	}
+
 	public function test_purchase_datalayer_is_hex_encoded_in_script_context(): void {
 		// A break-out attempt in a value reaching the purchase data layer (here
 		// the order number, which a plugin can customize) must be hex-encoded by
