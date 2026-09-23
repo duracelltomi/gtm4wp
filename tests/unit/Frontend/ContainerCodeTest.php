@@ -1534,8 +1534,48 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container = $this->make_container();
 
 		$this->assertSame(
-			array( 'existing', 'dataLayer', 'gtm4wp' ),
+			array( 'existing', 'dataLayer', 'gtm4wp', ConsentDefaults::CONSENT_DEFAULT_COMMAND ),
 			$container->rocket_excluded_inline_js_content( array( 'existing' ) )
 		);
+	}
+
+	/**
+	 * #325 (RI-34): the exclusion list names literals, so every inline block the
+	 * plugin prints must carry one of them WHATEVER the data layer name - the
+	 * consent block lost `dataLayer` when it started pushing to the configured
+	 * name (#269) and fell out of WP Rocket's exclusion on custom-name sites.
+	 *
+	 * @return void
+	 */
+	public function test_every_inline_block_carries_a_rocket_exclusion_pattern_under_a_custom_data_layer_name(): void {
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE              => 'GTM-ABC123',
+				GTM4WP_OPTION_DATALAYER_NAME        => 'customDL',
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS => true,
+			)
+		);
+		$patterns  = $container->rocket_excluded_inline_js_content( array() );
+
+		ob_start();
+		$container->header_top();
+		$container->header_begin();
+		$blocks = array_filter(
+			preg_split( '/(?=<script)/', ob_get_clean() ),
+			static fn ( string $part ): bool => str_starts_with( $part, '<script' )
+		);
+
+		$this->assertCount( 4, $blocks, 'init block, data layer block, consent block, loader' );
+		$this->assertStringContainsString( '"consent", "default"', implode( '', $blocks ) );
+		foreach ( $blocks as $block ) {
+			$hit = false;
+			foreach ( $patterns as $pattern ) {
+				$hit = $hit || ( false !== strpos( $block, $pattern ) );
+			}
+			$this->assertTrue( $hit, 'An inline block carries no WP Rocket exclusion pattern: ' . substr( $block, 0, 120 ) );
+		}
 	}
 }

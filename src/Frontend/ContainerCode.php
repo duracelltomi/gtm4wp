@@ -701,6 +701,9 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	public function rocket_excluded_inline_js_content( $pattern ) {
 		$pattern[] = 'dataLayer';
 		$pattern[] = 'gtm4wp';
+		// The consent block names neither once it pushes to a custom data layer
+		// name (#325, RI-34); a fixed plugin token, never the user's identifier.
+		$pattern[] = ConsentDefaults::CONSENT_DEFAULT_COMMAND;
 
 		return $pattern;
 	}

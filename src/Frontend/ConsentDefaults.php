@@ -33,6 +33,16 @@ final class ConsentDefaults {
 	public const FILTER_DEFAULT_ENABLED = 'gtm4wp_consent_mode_default_enabled';
 
 	/**
+	 * The fixed opening of the consent default command, also handed to WP
+	 * Rocket as an exclusion pattern (#325, RI-34): the block's only other
+	 * reference to the array is the configured name, which a list of literals
+	 * cannot follow.
+	 *
+	 * @since 2.0.3
+	 */
+	public const CONSENT_DEFAULT_COMMAND = 'gtag("consent", "default"';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -123,7 +133,7 @@ final class ConsentDefaults {
 			function gtag(){' . $datalayer_name . '.push(arguments);}
 		}
 
-		gtag("consent", "default", {
+		' . self::CONSENT_DEFAULT_COMMAND . ', {
 			"analytics_storage": "' . $this->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ) . '",
 			"ad_storage": "' . $this->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) . '",
 			"ad_user_data": "' . $this->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA ) . '",
