@@ -486,7 +486,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'brand_taxonomy'             => SiteHealthRows::items( __( 'Brand taxonomy', 'duracelltomi-google-tag-manager' ), array( (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ) ) ),
 			'business_vertical'          => SiteHealthRows::text( __( 'Google Ads business vertical', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ) ),
 			'products_per_impression'    => SiteHealthRows::count( __( 'Products per impression', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ) ),
-			'order_max_age'              => SiteHealthRows::count( __( 'Maximum order age (days)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ) ),
+			'order_max_age'              => SiteHealthRows::count( __( 'Maximum order age (minutes)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ) ),
 			'datalayer_timeout'          => SiteHealthRows::count( __( 'Data layer timeout (ms)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT ) ),
 			'purchase_statuses'          => SiteHealthRows::items( __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ), (array) $options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES ) ),
 			'product_id_prefix'          => SiteHealthRows::set_or_empty( __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) ),
@@ -495,15 +495,15 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'cart_checkout_pages'        => SiteHealthRows::assoc(
 				__( 'Cart and checkout pages', 'duracelltomi-google-tag-manager' ),
 				array(
-					'cart'     => self::word( $cart ),
-					'checkout' => self::word( $checkout ),
+					'cart'     => SiteHealthRows::word( $cart ),
+					'checkout' => SiteHealthRows::word( $checkout ),
 				),
 				array(
 					'cart'     => $cart,
 					'checkout' => $checkout,
 				)
 			),
-			'hpos'                       => SiteHealthRows::text( __( 'High-performance order storage', 'duracelltomi-google-tag-manager' ), self::word( $hpos ), $hpos ),
+			'hpos'                       => SiteHealthRows::text( __( 'High-performance order storage', 'duracelltomi-google-tag-manager' ), SiteHealthRows::word( $hpos ), $hpos ),
 		);
 	}
 
@@ -537,26 +537,5 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		}
 
 		return call_user_func( array( $utils, 'custom_orders_table_usage_is_enabled' ) ) ? 'on' : 'off';
-	}
-
-	/**
-	 * One of the runtime words, translated.
-	 *
-	 * @param string $word The English word.
-	 * @return string
-	 */
-	private static function word( string $word ): string {
-		switch ( $word ) {
-			case 'block':
-				return __( 'block', 'duracelltomi-google-tag-manager' );
-			case 'classic':
-				return __( 'classic', 'duracelltomi-google-tag-manager' );
-			case 'on':
-				return __( 'on', 'duracelltomi-google-tag-manager' );
-			case 'off':
-				return __( 'off', 'duracelltomi-google-tag-manager' );
-			default:
-				return __( 'unknown', 'duracelltomi-google-tag-manager' );
-		}
 	}
 }

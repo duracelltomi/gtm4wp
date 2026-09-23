@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Admin;
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Admin\SiteHealthTests;
+use GTM4WP\Module\ModuleInterface;
 use GTM4WP\Module\Registry;
 use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
@@ -95,6 +96,21 @@ final class SiteHealthTestsTest extends TestCase {
 
 	public function test_a_filter_value_that_is_not_an_array_is_passed_through(): void {
 		$this->assertSame( 'unexpected', $this->collector()->add_tests( 'unexpected' ) );
+	}
+
+	public function test_a_scalar_left_under_direct_by_another_plugin_is_replaced_not_fataled(): void {
+		// Core builds both keys as arrays and only restores an ABSENT one after
+		// the filter; a present scalar would otherwise fatal on the nested write.
+		$tests = $this->collector()->add_tests(
+			array(
+				'direct' => 'abc',
+				'async'  => array(),
+			)
+		);
+
+		$this->assertIsArray( $tests['direct'] );
+		$this->assertArrayHasKey( SiteHealthTests::TEST_CONFIGURATION, $tests['direct'] );
+		$this->assertSame( array(), $tests['async'] );
 	}
 
 	// ---- The configuration test --------------------------------------------
@@ -186,6 +202,70 @@ final class SiteHealthTestsTest extends TestCase {
 		$this->assertSame( 'gtm4wp_acme_testing_overrides', $result['test'], 'The id is the collector\'s: it must be unique and prefixed.' );
 		$this->assertSame( '', $result['description'], 'A key the module left out is defaulted so core reads it.' );
 		$this->assertSame( '', $result['actions'] );
+	}
+
+	public function test_a_module_id_core_cannot_select_is_slugged_to_a_safe_test_id(): void {
+		// Core interpolates the id into an HTML id and reads it back through a
+		// jQuery '#' selector: a space or a dot leaves the panel unopenable.
+		$results = $this->collector( array( $this->module_with_id( 'My Module.v2' ) ) )->run_all();
+
+		$this->assertSame(
+			array( SiteHealthTests::TEST_CONFIGURATION, 'gtm4wp_my_module_v2_checks_out', 'gtm4wp_my_module_v2_overrides' ),
+			array_keys( $results )
+		);
+		$this->assertSame( 'gtm4wp_my_module_v2_checks_out', $results['gtm4wp_my_module_v2_checks_out']['test'] );
+	}
+
+	public function test_two_modules_landing_on_the_same_test_id_both_keep_their_tests(): void {
+		$results = $this->collector( array( $this->module_with_id( 'acme-x' ), $this->module_with_id( 'acme_x' ) ) )->run_all();
+
+		$this->assertSame(
+			array(
+				SiteHealthTests::TEST_CONFIGURATION,
+				'gtm4wp_acme_x_checks_out',
+				'gtm4wp_acme_x_overrides',
+				'gtm4wp_acme_x_checks_out_2',
+				'gtm4wp_acme_x_overrides_2',
+			),
+			array_keys( $results ),
+			'A collision suffixes the later test instead of silently dropping one.'
+		);
+
+		foreach ( $results as $id => $result ) {
+			$this->assertSame( $id, $result['test'] );
+		}
+	}
+
+	/**
+	 * A third-party module under any id, reporting the Acme testing schema.
+	 *
+	 * @param string $id The module id.
+	 * @return ModuleInterface
+	 */
+	private function module_with_id( string $id ): ModuleInterface {
+		return new class( $id ) implements ModuleInterface {
+			public function __construct( private string $module_id ) {
+			}
+
+			public function id(): string {
+				return $this->module_id;
+			}
+
+			public function defaults(): array {
+				return array();
+			}
+
+			public function is_available(): bool {
+				return true;
+			}
+
+			public function frontend( Options $options ): void {
+			}
+
+			public function admin_schema(): string {
+				return TestingThirdPartySchema::class;
+			}
+		};
 	}
 
 	public function test_a_schema_without_the_interface_contributes_nothing_and_does_not_fatal(): void {

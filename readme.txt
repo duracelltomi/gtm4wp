@@ -289,7 +289,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 **Site Health**
 
-* Added: **Tools → Site Health** reports the whole plugin: every module's option states, the containers, placement, data layer name and wp-config overrides in the Info section (English copy text; no keys, addresses or visitor data), plus a status test turning the admin-notice problems into a critical or recommended result. Third-party modules report through `SiteHealthInfoInterface` and `SiteHealthTestsInterface`.
+* Added: **Tools → Site Health** reports the whole plugin: every module's option states, the containers, placement, data layer name and wp-config overrides in the Info section (English copy text; no keys, addresses or visitor data), plus status tests for the configuration, the Google service account keys and Data Manager sending. Third-party modules report through `SiteHealthInfoInterface` and `SiteHealthTestsInterface`.
 
 **AI assistants (WordPress Abilities API)**
 

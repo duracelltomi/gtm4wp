@@ -140,7 +140,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				: SiteHealthRows::items( __( 'AMP containers', 'duracelltomi-google-tag-manager' ), $ids ),
 			'amp_plugin'     => SiteHealthRows::text(
 				__( 'AMP plugin', 'duracelltomi-google-tag-manager' ),
-				$present ? __( 'present', 'duracelltomi-google-tag-manager' ) : __( 'absent', 'duracelltomi-google-tag-manager' ),
+				SiteHealthRows::word( $present ? 'present' : 'absent' ),
 				$present ? 'present' : 'absent'
 			),
 		);

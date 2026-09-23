@@ -53,6 +53,7 @@ final class CommerceSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$this->assertSame( 'retail', $rows['business_vertical']['debug'] );
 		$this->assertSame( '10', $rows['products_per_impression']['debug'] );
 		$this->assertSame( '30', $rows['order_max_age']['debug'] );
+		$this->assertSame( 'Maximum order age (minutes)', $rows['order_max_age']['label'], 'The unit the code compares in, not a guessed one.' );
 		$this->assertSame( '2000', $rows['datalayer_timeout']['debug'] );
 		$this->assertSame( 'processing, on-hold, completed', $rows['purchase_statuses']['debug'] );
 		$this->assertSame( 'empty', $rows['product_id_prefix']['debug'] );
@@ -122,6 +123,7 @@ final class CommerceSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 			'No cart/checkout-page or HPOS rows: those are WooCommerce facts.'
 		);
 		$this->assertSame( 'on', $rows['tracking']['debug'] );
+		$this->assertSame( 'Maximum order age (minutes)', $rows['order_max_age']['label'] );
 		$this->assertCount( 11, $rows['options']['debug'] );
 		$this->assertSame( 'none', $rows['brand_taxonomy']['debug'] );
 		$this->assertSame( 'pending, processing, complete', $rows['purchase_statuses']['debug'] );

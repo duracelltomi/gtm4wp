@@ -366,6 +366,26 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( ConfigurationChecks::CODE_MISSING_CONTAINER_ID, $rows['problems'], 'The Info row carries the code, the test the message.' );
 	}
 
+	public function test_site_health_separates_two_configuration_problems_with_a_line_break(): void {
+		$this->store_settings(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS             => array(),
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP         => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER  => 'HTTP_X_FORWARDED_FOR',
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+			)
+		);
+
+		$tests       = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['tests'], null, 'id' );
+		$description = $tests[ SiteHealthTests::TEST_CONFIGURATION ]['description'];
+
+		// The Status tab renders one paragraph per problem; the transcript gets
+		// one line per problem, never two sentences fused at the boundary.
+		$this->assertMatchesRegularExpression( '/GTM ID\.\n[A-Z]/', $description );
+		$this->assertStringNotContainsString( "\n\n", $description );
+		$this->assertStringNotContainsString( '<', $description );
+	}
+
 	public function test_site_health_reports_a_failing_destination_as_critical(): void {
 		$this->store_settings(
 			array(

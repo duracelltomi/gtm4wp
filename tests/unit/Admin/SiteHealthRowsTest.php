@@ -62,6 +62,14 @@ final class SiteHealthRowsTest extends TestCase {
 		$this->assertSame( 'none', SiteHealthRows::none( 'L' )['debug'] );
 	}
 
+	public function test_word_is_the_one_translator_of_every_state_word_and_falls_back_to_none(): void {
+		foreach ( array( 'on', 'off', 'yes', 'no', 'set', 'empty', 'none', 'unknown', 'block', 'classic', 'present', 'absent', 'blocklist', 'allowlist', 'disabled' ) as $word ) {
+			$this->assertSame( '[' . $word . ']', SiteHealthRows::word( $word ), $word );
+		}
+
+		$this->assertSame( '[none]', SiteHealthRows::word( 'bogus' ), 'An out-of-set word is the "none" state, never an untranslated pass-through.' );
+	}
+
 	public function test_set_or_empty_never_carries_the_value_itself(): void {
 		$row = SiteHealthRows::set_or_empty( 'Header', 'HTTP_X_SECRET_HEADER' );
 

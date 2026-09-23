@@ -224,12 +224,14 @@ final class SiteHealthRows {
 	}
 
 	/**
-	 * One of the state words, translated.
+	 * One of the state words, translated: the single translator every module's
+	 * rows use (UC-6), so a word is never re-translated per module. Literal
+	 * msgids so make-pot sees them; an out-of-set word is the "none" state.
 	 *
 	 * @param string $word The English word.
 	 * @return string
 	 */
-	private static function word( string $word ): string {
+	public static function word( string $word ): string {
 		switch ( $word ) {
 			case 'on':
 				return __( 'on', 'duracelltomi-google-tag-manager' );
@@ -243,6 +245,22 @@ final class SiteHealthRows {
 				return __( 'set', 'duracelltomi-google-tag-manager' );
 			case 'empty':
 				return __( 'empty', 'duracelltomi-google-tag-manager' );
+			case 'unknown':
+				return __( 'unknown', 'duracelltomi-google-tag-manager' );
+			case 'block':
+				return __( 'block', 'duracelltomi-google-tag-manager' );
+			case 'classic':
+				return __( 'classic', 'duracelltomi-google-tag-manager' );
+			case 'present':
+				return __( 'present', 'duracelltomi-google-tag-manager' );
+			case 'absent':
+				return __( 'absent', 'duracelltomi-google-tag-manager' );
+			case 'blocklist':
+				return __( 'blocklist', 'duracelltomi-google-tag-manager' );
+			case 'allowlist':
+				return __( 'allowlist', 'duracelltomi-google-tag-manager' );
+			case 'disabled':
+				return __( 'disabled', 'duracelltomi-google-tag-manager' );
 			default:
 				return __( 'none', 'duracelltomi-google-tag-manager' );
 		}

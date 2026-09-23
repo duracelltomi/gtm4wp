@@ -24,7 +24,8 @@ defined( 'ABSPATH' ) || exit;
  * in: `status` (good, recommended or critical), `label`, `description` and
  * `actions`. The last two are HTML that core prints unescaped, so the module
  * escapes them itself. The collector adds the test id
- * (`gtm4wp_<module id>_<key>`) and the plugin badge. Runs only when the
+ * (`gtm4wp_<module id>_<key>`, both lower-cased with everything outside
+ * [a-z0-9_] as `_`, suffixed on a collision) and the plugin badge. Runs only when the
  * Status tab renders or an ability asks, so stored records may be read; an
  * HTTP request may not be made.
  */

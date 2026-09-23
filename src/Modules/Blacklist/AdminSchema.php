@@ -334,25 +334,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		$valid = count( array_intersect( array_map( 'strval', $stored ), BlacklistModule::valid_restrictions() ) );
 
 		return array(
-			'mode'         => SiteHealthRows::text( __( 'Tag restrictions', 'duracelltomi-google-tag-manager' ), self::word( $mode ), $mode ),
+			'mode'         => SiteHealthRows::text( __( 'Tag restrictions', 'duracelltomi-google-tag-manager' ), SiteHealthRows::word( $mode ), $mode ),
 			'restrictions' => SiteHealthRows::count( __( 'Restricted entities', 'duracelltomi-google-tag-manager' ), $valid ),
 		);
-	}
-
-	/**
-	 * The mode word, translated.
-	 *
-	 * @param string $mode The English word.
-	 * @return string
-	 */
-	private static function word( string $mode ): string {
-		switch ( $mode ) {
-			case 'blocklist':
-				return __( 'blocklist', 'duracelltomi-google-tag-manager' );
-			case 'allowlist':
-				return __( 'allowlist', 'duracelltomi-google-tag-manager' );
-			default:
-				return __( 'disabled', 'duracelltomi-google-tag-manager' );
-		}
 	}
 }

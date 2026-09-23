@@ -433,7 +433,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'brand_taxonomy'          => SiteHealthRows::items( __( 'Brand taxonomy', 'duracelltomi-google-tag-manager' ), array( (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDBRANDTAXONOMY ) ) ),
 			'business_vertical'       => SiteHealthRows::text( __( 'Google Ads business vertical', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL ) ),
 			'products_per_impression' => SiteHealthRows::count( __( 'Products per impression', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION ) ),
-			'order_max_age'           => SiteHealthRows::count( __( 'Maximum order age (days)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERMAXAGE ) ),
+			'order_max_age'           => SiteHealthRows::count( __( 'Maximum order age (minutes)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERMAXAGE ) ),
 			'datalayer_timeout'       => SiteHealthRows::count( __( 'Data layer timeout (ms)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT ) ),
 			'purchase_statuses'       => SiteHealthRows::items( __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ), (array) $options->get( GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES ) ),
 			'product_id_prefix'       => SiteHealthRows::set_or_empty( __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDPRODIDPREFIX ) ),

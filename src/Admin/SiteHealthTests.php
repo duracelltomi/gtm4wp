@@ -66,6 +66,12 @@ final class SiteHealthTests {
 			return $tests;
 		}
 
+		// Core restores an ABSENT 'direct' after the filter, not a scalar an
+		// earlier callback left there, and the nested write below would fatal on one.
+		if ( ! isset( $tests['direct'] ) || ! is_array( $tests['direct'] ) ) {
+			$tests['direct'] = array();
+		}
+
 		foreach ( $this->tests() as $id => $run ) {
 			$tests['direct'][ $id ] = array( 'test' => $run );
 		}
@@ -105,7 +111,7 @@ final class SiteHealthTests {
 					continue;
 				}
 
-				$id           = $prefix . self::slug( (string) $key );
+				$id           = self::unique( $prefix . self::slug( (string) $key ), $tests );
 				$tests[ $id ] = self::wrap( $id, $run );
 			}
 		}
@@ -182,13 +188,36 @@ final class SiteHealthTests {
 	}
 
 	/**
-	 * A module or test id as a test-id segment: core uses the id as an HTML id.
+	 * A module or test id as a test-id segment. Core interpolates the id into
+	 * an HTML id and reads it back through a jQuery `#` selector, and the
+	 * registry validates nothing, so every character outside [a-z0-9_] becomes
+	 * an underscore (a space or a dot leaves the panel unopenable).
 	 *
 	 * @param string $id The id.
 	 * @return string
 	 */
 	private static function slug( string $id ): string {
-		return str_replace( '-', '_', $id );
+		$slug = preg_replace( '/[^a-z0-9_]/', '_', strtolower( $id ) );
+
+		return is_string( $slug ) ? $slug : '_';
+	}
+
+	/**
+	 * The id, suffixed when the slug of another module's test already took it
+	 * (`a-b` and `a_b` collide): a collision must never drop a test silently.
+	 *
+	 * @param string               $id    The derived id.
+	 * @param array<string, mixed> $taken The tests collected so far.
+	 * @return string
+	 */
+	private static function unique( string $id, array $taken ): string {
+		$candidate = $id;
+
+		for ( $n = 2; isset( $taken[ $candidate ] ); $n++ ) {
+			$candidate = $id . '_' . $n;
+		}
+
+		return $candidate;
 	}
 
 	/**

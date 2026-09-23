@@ -240,7 +240,7 @@ final class StatusAbilities implements ProviderInterface {
 				'id'          => (string) $id,
 				'status'      => (string) ( $result['status'] ?? 'good' ),
 				'label'       => (string) ( $result['label'] ?? '' ),
-				'description' => trim( wp_strip_all_tags( (string) ( $result['description'] ?? '' ) ) ),
+				'description' => self::plain_text( (string) ( $result['description'] ?? '' ) ),
 			);
 		}
 
@@ -264,6 +264,20 @@ final class StatusAbilities implements ProviderInterface {
 			'tests' => $tests,
 			'info'  => $info,
 		);
+	}
+
+	/**
+	 * A test description as text: one line per block, because a plain tag strip
+	 * fuses adjacent paragraphs ("…GTM ID.Google Tag Manager…"). A constant
+	 * replacement, so the data never reaches the replacement argument (PA-7).
+	 *
+	 * @param string $html The description as the Status tab renders it.
+	 * @return string
+	 */
+	private static function plain_text( string $html ): string {
+		$lined = preg_replace( '#(</(?:p|li|div)>|<br\s*/?>)\s*#i', "\n", $html );
+
+		return trim( wp_strip_all_tags( is_string( $lined ) ? $lined : $html ) );
 	}
 
 	/**
