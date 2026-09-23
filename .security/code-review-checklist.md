@@ -1203,6 +1203,13 @@ returns nothing, its one test deleted, a 2.1 `Changed:` bullet for developers. *
 `2.0` as `68d5d1d`** (fix part only; `2.0` after: PHP 2078 / 5000, `phpcs` 0). Post-fix on master:
 PHP 3256 / 17964 (`--order-by=random`), `phpcs` 0, prose budget clean. **Claims that changed shape
 after the report was written: 0.** **The base for the next review is `412a63b`.**
+**2026-09-23, later (`/upstream-review` focused U35, WP Rocket 3.23.3.3 read at source):** the consumer
+is a plain `strpos()`, and WP Rocket's own shipped list already carries `gtag` / `gtm` / `dataLayer`,
+so the consent block was excluded under a custom name before the fix as well — the
+`CONSENT_DEFAULT_COMMAND` token is **redundancy, kept as a guard against their weekly remote list**,
+not a fix; #325's reach on a stock WP Rocket is nil (the PLAUSIBLE resolves to "not reachable with
+their defaults"), its mechanism (a combined block lands before `</body>`, after the loader) is real.
+The same read found #325's shape inside their Delay JS one-click list (U166 / D42, maintainer decision).
 
 ### Report 37: `.security/code-review-report-2026-09-23-1852.md`
 
