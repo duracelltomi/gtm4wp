@@ -629,14 +629,30 @@ import {
 
 		request( sendNonce )
 			.then( function ( response ) {
-				// A 403 with the nonce: a cache handed this logged-in visitor an
+				// A nonce rejection: a cache handed this logged-in visitor an
 				// anonymous page, so its nonce is not theirs (#291). Ask once more
 				// as anonymous: the session fields still arrive and the loop stops.
-				if ( sendNonce && response && 403 === response.status ) {
+				// Only core's own error code (#319): a security layer's 403 would
+				// refuse the retry too.
+				if ( ! sendNonce || ! response || 403 !== response.status ) {
+					return response;
+				}
+				const body =
+					'function' === typeof response.json
+						? response.json().catch( function () {
+								return null;
+						  } )
+						: Promise.resolve( null );
+				return body.then( function ( error ) {
+					if (
+						! error ||
+						'rest_cookie_invalid_nonce' !== error.code
+					) {
+						return response;
+					}
 					anonymousRetry = true;
 					return request( false );
-				}
-				return response;
+				} );
 			} )
 			.then( function ( response ) {
 				return response && response.ok ? response.json() : null;

@@ -2,6 +2,8 @@
  * Pure helper functions of the GTM4WP admin app.
  */
 
+import { _x } from '@wordpress/i18n';
+
 /**
  * Coerces a raw stored option value into the shape the UI control expects.
  *
@@ -216,7 +218,15 @@ export function dependencyLabel( field, allFields ) {
 			return target && target.label ? target.label : '';
 		} )
 		.filter( ( label ) => '' !== label )
-		.join( ' / ' );
+		.join(
+			' ' +
+				_x(
+					'/',
+					'separator between the labels of several settings a field depends on',
+					'duracelltomi-google-tag-manager'
+				) +
+				' '
+		);
 }
 
 /**

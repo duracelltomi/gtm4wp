@@ -211,8 +211,8 @@ final class PageVariablesModule extends AbstractModule {
 	/**
 	 * The visitor variables of the classic (non cache-safe) data layer: login
 	 * state, roles, the identity variables, user id and IP. The identity
-	 * variables are OMITTED for a visitor who is not logged in or has no
-	 * value, exactly as the cache-safe tier omits them (#277).
+	 * variables and the IP are OMITTED for a visitor who is not logged in or
+	 * has no value, exactly as the cache-safe tier omits them (#277, #312).
 	 *
 	 * @param array<string, mixed> $data_layer The data layer so far.
 	 * @return array<string, mixed>
@@ -264,12 +264,13 @@ final class PageVariablesModule extends AbstractModule {
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
-			// Passed raw: the sink escapes via wp_json_encode() + hex flags, and
-			// VisitorIp::get() already validates it as an IP.
-			$data_layer['visitorIP'] = VisitorIp::get(
-				(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ),
-				(string) $this->opt( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )
-			);
+			// The cache-safe resolver: raw (the sink hex-encodes), validated as
+			// an IP, and null when none can be determined (a private peer with
+			// no header) - omitted then, never '' (#312).
+			$ip = $this->resolve_visitor_ip();
+			if ( null !== $ip ) {
+				$data_layer['visitorIP'] = $ip;
+			}
 		}
 
 		return $data_layer;
@@ -988,7 +989,11 @@ final class PageVariablesModule extends AbstractModule {
 				}
 			}
 		}
-		$data_layer['siteSearchResults'] = (int) $wp_query->post_count;
+		// is_search() only guarantees the global is SET (RI-13, #315): gated
+		// like the post counts, omitted otherwise.
+		if ( isset( $wp_query->post_count ) ) {
+			$data_layer['siteSearchResults'] = (int) $wp_query->post_count;
+		}
 
 		return $data_layer;
 	}
@@ -1040,8 +1045,10 @@ final class PageVariablesModule extends AbstractModule {
 	 * The Cloudflare country code header, or null. Cloudflare REPLACES the
 	 * header, so it only means anything when the request came through
 	 * Cloudflare: gated on the trusted-proxy list like visitorIP (#272,
-	 * RI-18); an empty list keeps the unverified read of 1.x. Sanitized here,
-	 * hex-encoded by the sink (RI-4).
+	 * RI-18); an empty list keeps the unverified read of 1.x. The value is
+	 * bounded to the form Cloudflare documents (U63): ISO 3166-1 alpha-2 plus
+	 * `XX` (no data) and `T1` (Tor); anything else is omitted (#314). Passed
+	 * raw to the hex-encoding sink (RI-4).
 	 *
 	 * @return string|null
 	 */
@@ -1056,9 +1063,9 @@ final class PageVariablesModule extends AbstractModule {
 			return null;
 		}
 
-		$country = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) );
+		$country = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) );
 
-		return '' === $country ? null : $country;
+		return 1 === preg_match( '/^(?:[A-Z]{2}|T1)$/', $country ) ? $country : null;
 	}
 
 	/**

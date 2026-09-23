@@ -41,6 +41,7 @@ final class ConfigurationChecks {
 	public const CODE_INVALID_HARDCODED        = 'invalid-hardcoded-constant';
 	public const CODE_UNTRUSTED_VISITOR_IP     = 'visitor-ip-untrusted-header';
 	public const CODE_UNTRUSTED_COUNTRY        = 'cloudflare-country-untrusted-header';
+	public const CODE_UNTRUSTED_PROXY_HEADERS  = 'proxy-headers-untrusted';
 	public const CODE_INVALID_DATALAYER_NAME   = 'invalid-datalayer-name';
 	public const CODE_CONFLICT_WC_GA           = 'wc-ga-plugin-warning';
 	public const CODE_CONFLICT_MONSTERINSIGHTS = 'wc-gayoast-plugin-warning';
@@ -67,8 +68,7 @@ final class ConfigurationChecks {
 			$this->missing_container_id(),
 			$this->incomplete_environments(),
 			$this->invalid_hardcoded_constants(),
-			$this->untrusted_visitor_ip_header(),
-			$this->untrusted_country_header(),
+			$this->untrusted_proxy_headers(),
 			$this->invalid_datalayer_name(),
 			$this->conflicting_plugins()
 		);
@@ -167,6 +167,33 @@ final class ConfigurationChecks {
 					),
 					implode( ', ', $hardcoded_errors )
 				),
+				'dismissible' => false,
+			),
+		);
+	}
+
+	/**
+	 * The two proxy-header readers share one trusted-proxy list, so with both
+	 * on and the list empty they are ONE problem naming both remedies (#313);
+	 * two warnings each offering "turn the other reader off" would only swap
+	 * places.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function untrusted_proxy_headers(): array {
+		$visitor_ip = $this->untrusted_visitor_ip_header();
+		$country    = $this->untrusted_country_header();
+
+		if ( array() === $visitor_ip || array() === $country ) {
+			return array_merge( $visitor_ip, $country );
+		}
+
+		return array(
+			array(
+				'code'        => self::CODE_UNTRUSTED_PROXY_HEADERS,
+				'severity'    => self::SEVERITY_WARNING,
+				'option_key'  => GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES,
+				'message'     => __( 'Google Tag Manager for WordPress is reading the visitor IP address from a custom HTTP header and the visitor country from the Cloudflare header, but no trusted proxy addresses are configured. HTTP headers are sent by the visitor, so both values can be chosen by them. Please add the addresses of your reverse proxy, load balancer or CDN and the Cloudflare IP ranges as trusted proxy addresses, or turn the custom header and the Cloudflare country code off.', 'duracelltomi-google-tag-manager' ),
 				'dismissible' => false,
 			),
 		);

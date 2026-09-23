@@ -455,6 +455,48 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 		expect( options.headers[ 'X-WP-Nonce' ] ).toBeUndefined();
 	} );
 
+	it( 'does not retry a 403 that is not the nonce rejection', async () => {
+		// #319: a security layer refusing the endpoint answers 403 too, with
+		// another code or no JSON at all; retrying anonymously would only double
+		// the cost of a request that cannot succeed.
+		setCookie( 'gtm4wp_login', 'abc' );
+		window.gtm4wp_visitordata_config = {
+			events: EVENTS,
+			fields: {},
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'cached-anonymous-nonce',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+			gates: [ { cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] } ],
+		};
+		global.fetch.mockResolvedValueOnce( {
+			ok: false,
+			status: 403,
+			json: async () => ( { code: 'rest_forbidden' } ),
+		} );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+
+		// The same for a 403 whose body is not JSON (a firewall page).
+		delete window.gtm4wp_visitordata_inited;
+		global.fetch.mockClear();
+		global.fetch.mockResolvedValueOnce( {
+			ok: false,
+			status: 403,
+			json: async () => {
+				throw new SyntaxError( 'not json' );
+			},
+		} );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+	} );
+
 	it( 'retries once without the nonce when WordPress rejects it, and stops looping on that page', async () => {
 		// #291 (PA-12 residual): a full-page cache serving anonymous HTML to a
 		// logged-in visitor bakes a nonce that is not theirs; core answers 403 to
@@ -472,7 +514,11 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 			gates: [ { cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] } ],
 		};
 		window.gtm4wp_visitordata_config = config;
-		global.fetch.mockResolvedValueOnce( { ok: false, status: 403 } );
+		global.fetch.mockResolvedValueOnce( {
+			ok: false,
+			status: 403,
+			json: async () => ( { code: 'rest_cookie_invalid_nonce' } ),
+		} );
 		mockEndpointOnce( { visitorIP: '8.8.4.4' } );
 
 		loadTracker();

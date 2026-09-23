@@ -129,7 +129,10 @@ final class SettingsAbilities implements ProviderInterface {
 									'default'     => array( 'type' => array( 'string', 'integer', 'number', 'boolean', 'array', 'object', 'null' ) ),
 									'choices'     => array( 'type' => 'object' ),
 									'columns'     => array( 'type' => 'array' ),
-									'depends_on'  => array( 'type' => 'string' ),
+									'depends_on'  => array(
+										'type'        => 'string',
+										'description' => __( 'The key of the setting this field depends on in the settings screen, or several keys comma separated (the field is enabled while any one of them is on); empty when it stands alone. Informational: a value is stored either way.', 'duracelltomi-google-tag-manager' ),
+									),
 									'rows_locked' => array( 'type' => 'boolean' ),
 									'doc_url'     => array( 'type' => 'string' ),
 								),

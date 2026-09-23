@@ -539,6 +539,39 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * #315: the search block reads the same global. Core's is_search() only
+	 * guarantees the global is SET, not that the object carries post_count (a
+	 * plugin may swap in its own), so the result count is gated like the post
+	 * counts: omitted, no warning.
+	 */
+	public function test_search_result_count_omitted_without_warning_when_the_main_query_global_is_unavailable(): void {
+		Functions\when( 'is_search' )->justReturn( true );
+		Functions\when( 'get_search_query' )->justReturn( 'term' );
+		$GLOBALS['wp_query'] = null;
+
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SEARCHDATA => true ) );
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only: promotes the PHP warning to a test failure; restored in finally.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception; the message is reported by PHPUnit, never rendered as HTML.
+				throw new \ErrorException( $errstr, 0, $errno );
+			},
+			E_WARNING | E_NOTICE
+		);
+
+		try {
+			$data_layer = $module->add_datalayer_data( array() );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertSame( 'search-results', $data_layer['pagePostType'] );
+		$this->assertSame( 'term', $data_layer['siteSearchTerm'] );
+		$this->assertArrayNotHasKey( 'siteSearchResults', $data_layer, 'The result count must be omitted, not 0, when the main query global is unavailable.' );
+	}
+
+	/**
 	 * The RI-13 sibling of the null-post case: the main query global is not
 	 * guaranteed either (a plugin resetting it, the compile fired before the
 	 * main query exists). The two count variables must be omitted - never
@@ -2363,24 +2396,38 @@ final class PageVariablesModuleTest extends TestCase {
 	 * if that regression returns. The XSS itself is guarded at the sink
 	 * (ContainerCodeTest / DataLayerTest); here we pin the "arrives raw" contract.
 	 */
-	public function test_cloudflare_country_code_reaches_data_layer_without_entity_escaping(): void {
+	public function test_cloudflare_country_code_is_bounded_to_cloudflares_documented_form(): void {
 		Functions\when( 'sanitize_text_field' )->returnArg();
 		Functions\when( 'wp_unslash' )->returnArg();
 
-		// A spoofed, hostile country header carrying every break-out character.
-		$hostile = 'A&"<B';
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => true ) );
 
-		$_SERVER['HTTP_CF_IPCOUNTRY'] = $hostile;
+		// #314 (RI-18): the header is a claim the visitor can type; anything
+		// outside Cloudflare's documented two-character form is omitted, never
+		// pre-escaped (#12, RI-4) and never passed through.
+		foreach ( array( 'A&"<B', 'A1', '00', 'HUN', 'H', '', ' HU', 'Magyarország', str_repeat( 'AB ', 100 ) ) as $hostile ) {
+			$_SERVER['HTTP_CF_IPCOUNTRY'] = $hostile;
+			$data_layer                   = $module->add_datalayer_data( array() );
 
-		$module     = $this->make_module( array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => true ) );
-		$data_layer = $module->add_datalayer_data( array() );
+			$this->assertArrayNotHasKey( 'geoCloudflareCountryCode', $data_layer, "Rejected, so omitted: $hostile" );
+			$this->assertStringNotContainsString( '&amp;', wp_json_encode( $data_layer ) );
+		}
 
-		// Present: the raw value, byte-for-byte.
-		$this->assertSame( $hostile, $data_layer['geoCloudflareCountryCode'] );
-		// Absent: any HTML-entity encoding an esc_js()/esc_attr() pre-escape would add.
-		$this->assertStringNotContainsString( '&amp;', $data_layer['geoCloudflareCountryCode'] );
-		$this->assertStringNotContainsString( '&quot;', $data_layer['geoCloudflareCountryCode'] );
-		$this->assertStringNotContainsString( '&lt;', $data_layer['geoCloudflareCountryCode'] );
+		// Every documented value is accepted, upper-cased: ISO 3166-1 alpha-2,
+		// XX (no data) and T1 (Tor).
+		$documented = array(
+			'HU' => 'HU',
+			'hu' => 'HU',
+			'XX' => 'XX',
+			'T1' => 'T1',
+			't1' => 'T1',
+		);
+		foreach ( $documented as $sent => $reported ) {
+			$_SERVER['HTTP_CF_IPCOUNTRY'] = $sent;
+			$data_layer                   = $module->add_datalayer_data( array() );
+
+			$this->assertSame( $reported, $data_layer['geoCloudflareCountryCode'] );
+		}
 
 		unset( $_SERVER['HTTP_CF_IPCOUNTRY'] );
 	}
@@ -2416,6 +2463,28 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertArrayNotHasKey( 'visitorIP', $data_layer );
 
 		unset( $_SERVER['REMOTE_ADDR'] );
+	}
+
+	/**
+	 * #312 (RI-13, the #277 straggler): a site behind a proxy with no custom
+	 * header sees a private REMOTE_ADDR, so no address can be determined. The
+	 * key is then omitted on the classic tier as it is on the cache-safe tier,
+	 * never reported as an empty string.
+	 */
+	public function test_visitor_ip_omitted_when_no_address_can_be_determined(): void {
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		$_SERVER['REMOTE_ADDR'] = '192.168.1.10';
+
+		$module     = $this->make_module( array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'visitorIP', $data_layer, 'A private peer with no header yields no address: omit, do not report "".' );
+
+		unset( $_SERVER['REMOTE_ADDR'] );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'visitorIP', $data_layer, 'No REMOTE_ADDR at all: omitted too.' );
 	}
 
 	public function test_disabled_options_produce_empty_data_layer(): void {
@@ -2483,8 +2552,10 @@ final class PageVariablesModuleTest extends TestCase {
 		);
 		Functions\when( 'get_current_user_id' )->justReturn( 3 );
 
-		$_SERVER['REMOTE_ADDR']       = '8.8.8.8';
-		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'CF_MARKER"&<x';
+		$_SERVER['REMOTE_ADDR'] = '8.8.8.8';
+		// A VALID code (#314 rejects anything else), unique in the fixture so
+		// its absence below still proves the cache-safe withholding.
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'ZQ';
 		$_SERVER['HTTP_REFERER']      = 'https://evil.example/?REF_MARKER="><script>';
 
 		$GLOBALS['wp_query']->post_count = 5;
@@ -2532,7 +2603,7 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertStringNotContainsString( 'SEARCH_MARKER', $serialized );
 		$this->assertStringNotContainsString( 'EDITOR_MARKER', $serialized );
 		$this->assertStringNotContainsString( 'editor@example.com', $serialized );
-		$this->assertStringNotContainsString( 'CF_MARKER', $serialized );
+		$this->assertStringNotContainsString( '"ZQ"', $serialized );
 		$this->assertStringNotContainsString( 'REF_MARKER', $serialized );
 		$this->assertStringNotContainsString( '8.8.8.8', $serialized );
 	}
@@ -2554,7 +2625,7 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 3, $data_layer['visitorId'] );
 		$this->assertSame( '8.8.8.8', $data_layer['visitorIP'] );
 		// The header values still reach the data layer raw (the sink escapes them).
-		$this->assertSame( 'CF_MARKER"&<x', $data_layer['geoCloudflareCountryCode'] );
+		$this->assertSame( 'ZQ', $data_layer['geoCloudflareCountryCode'] );
 		$this->assertSame( 'SEARCH_MARKER"&<x', $data_layer['siteSearchTerm'] );
 		$this->assertArrayHasKey( 'siteSearchFrom', $data_layer );
 	}
@@ -2663,24 +2734,24 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
-	 * The Cloudflare-country resolver mirrors the server path (RI-4): the spoofable
-	 * header value arrives RAW so the endpoint's single output sink hex-encodes it.
-	 * A hostile country must not be entity-escaped by the resolver.
+	 * The Cloudflare-country resolver mirrors the server path: a documented
+	 * code arrives upper-cased and unescaped (RI-4), anything else resolves to
+	 * null and is omitted (#314) - never entity-escaped, never passed through.
 	 */
-	public function test_cloudflare_country_resolver_returns_raw_value(): void {
+	public function test_cloudflare_country_resolver_mirrors_the_server_path(): void {
 		Functions\when( 'sanitize_text_field' )->returnArg();
 		Functions\when( 'wp_unslash' )->returnArg();
 
 		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => true ) );
 
-		$hostile                      = 'A&"<B';
-		$_SERVER['HTTP_CF_IPCOUNTRY'] = $hostile;
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'A&"<B';
+		$this->assertNull( $module->resolve_cloudflare_country(), 'A hostile value is omitted, not escaped.' );
 
-		$value = $module->resolve_cloudflare_country();
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'hu';
+		$this->assertSame( 'HU', $module->resolve_cloudflare_country() );
 
-		$this->assertSame( $hostile, $value );
-		$this->assertStringNotContainsString( '&amp;', (string) $value );
-		$this->assertStringNotContainsString( '&quot;', (string) $value );
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'T1';
+		$this->assertSame( 'T1', $module->resolve_cloudflare_country() );
 
 		unset( $_SERVER['HTTP_CF_IPCOUNTRY'] );
 		$this->assertNull( $module->resolve_cloudflare_country(), 'Absent header resolves to null (omitted).' );

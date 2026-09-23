@@ -256,6 +256,50 @@ final class ConfigurationChecksTest extends TestCase {
 	}
 
 	/**
+	 * #313: with BOTH proxy-header readers on and no trusted proxies, one
+	 * problem names both readers and both remedies, in the slot the two single
+	 * warnings occupy; each reader alone keeps its own code, and the list
+	 * silences all three.
+	 */
+	public function test_both_untrusted_proxy_headers_fold_into_one_warning(): void {
+		$base = array(
+			GTM4WP_OPTION_GTM_CONTAINERS             => array(),
+			GTM4WP_OPTION_GTM_PLACEMENT              => GTM4WP_PLACEMENT_FOOTER,
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP         => true,
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER  => 'CF-Connecting-IP',
+			GTM4WP_OPTION_INCLUDE_MISCGEOCF          => true,
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+			GTM4WP_OPTION_DATALAYER_NAME             => 'not-an-identifier',
+		);
+
+		$problems = $this->checks( $base )->problems();
+
+		$this->assertSame(
+			array(
+				ConfigurationChecks::CODE_MISSING_CONTAINER_ID,
+				ConfigurationChecks::CODE_UNTRUSTED_PROXY_HEADERS,
+				ConfigurationChecks::CODE_INVALID_DATALAYER_NAME,
+			),
+			array_column( $problems, 'code' ),
+			'One problem for one empty list, where the single warnings sit.'
+		);
+		$this->assertSame( ConfigurationChecks::SEVERITY_WARNING, $problems[1]['severity'] );
+		$this->assertSame( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES, $problems[1]['option_key'] );
+		$this->assertFalse( $problems[1]['dismissible'] );
+		$this->assertStringContainsString( 'custom HTTP header', $problems[1]['message'] );
+		$this->assertStringContainsString( 'Cloudflare', $problems[1]['message'] );
+
+		$this->assertContains( ConfigurationChecks::CODE_UNTRUSTED_COUNTRY, $this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER => '' ) ) ), 'Custom header off: the country warning alone.' );
+		$this->assertContains( ConfigurationChecks::CODE_UNTRUSTED_VISITOR_IP, $this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => false ) ) ), 'Country off: the visitor-IP warning alone.' );
+		$this->assertNotContains( ConfigurationChecks::CODE_UNTRUSTED_PROXY_HEADERS, $this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => false ) ) ) );
+		$this->assertSame(
+			array( ConfigurationChecks::CODE_MISSING_CONTAINER_ID, ConfigurationChecks::CODE_INVALID_DATALAYER_NAME ),
+			$this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '103.21.244.0/22' ) ) ),
+			'Silent once trusted proxies are configured.'
+		);
+	}
+
+	/**
 	 * The order the notices show them and get-status lists them: container
 	 * first, then the request-side and data-layer checks, conflicts last.
 	 */
