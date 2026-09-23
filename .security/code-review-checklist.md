@@ -1174,9 +1174,9 @@ exposure or authorization finding at any actor.
 | 314 | Low | fixed (`2f53e06`, maintainer chose the smallest documented set; U63 verified) | A0 → own dataLayer (integrity) | `PageVariablesModule.php:1048-1062` | `geoCloudflareCountryCode` has no value grammar on the kept "read as sent" path (and none behind the provenance gate); Cloudflare documents alpha-2 + `XX` + `T1`. Grammar + omit; cost measured: three raw-passthrough pins + the leak marker + U63 |
 | 315 | Low | fixed (`2f53e06`) | — | `PageVariablesModule.php:965-991` | `siteSearchResults` reads `$wp_query->post_count` ungated (inherited from #59's cast, R9) while the sibling gates with `isset`; core's `is_search()` guarantees `isset`, not the class. 3-line gate probe-verified; sweep row corrected |
 | 316 | Low | accepted (maintainer: the 1.x contract stands) | — | `PageVariablesModule.php:981` / `gtm4wp-visitor-data.js:197` | `siteSearchFrom` is `''` with no referrer on both tiers; letter of RI-13, contract of 1.x — accept or omit on both in one change |
-| 317 | Low | fixed (`2f53e06`) | — | `Frontend/ConsentDefaults.php:122` | `script_block()`'s new `$datalayer_name` parameter defaults to `'dataLayer'`, the literal #269 removed; a second caller gets the defect back. Make it required |
+| 317 | Low | fixed (`2f53e06`; backported to `2.0` `192d3bd`) | — | `Frontend/ConsentDefaults.php:122` | `script_block()`'s new `$datalayer_name` parameter defaults to `'dataLayer'`, the literal #269 removed; a second caller gets the defect back. Make it required |
 | 318 | Low | accepted (maintainer: core warns per call too) | — | `src/Capability.php:51-66` | `_doing_it_wrong()` on every `settings()` call (9 call sites, several per admin request) — per-request burst under `WP_DEBUG` |
-| 319 | Low | fixed (`2f53e06`, maintainer chose the nonce-error-only retry; `2.0` still carries #291's unconditional form — backport pending their call) | — | `gtm4wp-visitor-data.js:617-640` | The #291 retry fires on any 403 while the nonce was sent; a WAF 403 costs two requests per view instead of one (bounded) |
+| 319 | Low | fixed (`2f53e06`, maintainer chose the nonce-error-only retry; backported to `2.0` `192d3bd`) | — | `gtm4wp-visitor-data.js:617-640` | The #291 retry fires on any 403 while the nonce was sent; a WAF 403 costs two requests per view instead of one (bounded) |
 | 320 | Low | fixed (`2f53e06`; the `/` is translated and padded in code — `@wordpress/i18n-no-flanking-whitespace` refuses `' / '`) | — | `js/admin/utils.js:216-219` | `dependencyLabel()` joins labels with a literal `' / '` (RI-5) |
 | 321 | Low | fixed (`2f53e06`) | A4 delegate | `Options/Field.php:81`, `Abilities/SettingsAbilities.php:132,533` | `depends_on` may now be a comma list; published as an undescribed `string` — the `Field` docblock is the only definition |
 | 322 | Low | fixed (this run) | — | sweep rows | `global $` statements 8 → 9 (the #294 split); `$GLOBALS[` 35 stands (0 in the diff); toolchain definition counts reproduce |
@@ -1213,8 +1213,11 @@ statements (all gated now), 12 `print_*_block` callers, 22 `esc_js(` lines / 14 
 constants, 13 routes / 27 callbacks — unchanged. Changelog: the visitor-fields and Cloudflare
 bullets edited in both files (same-version repairs, no `Fixed:`). **Claims that changed shape
 after the report was written: 1** (#320's recommendation `_x( ' / ', … )` is refused by the
-i18n lint rule; the separator is translated bare and padded in code). Open: #304 (R36); the
-`2.0` backport of #319 is the maintainer's call.
+i18n lint rule; the separator is translated bare and padded in code). **Backported to `2.0` as
+`192d3bd`** (maintainer re-screened the set): #317 and #319, the two that repair fixes `a88d481`
+carried — #312 stays out with #277 (a data-layer contract change reserved for 2.1), #314 with the
+2.1 proxy gate, #315 is unreachable on a genuine `WP_Query`, #313/#320/#321 repair 2.1-only code.
+`2.0` after the backport: PHP 2076 / 4989, JS 761 / 35, `phpcs` 0, build clean. Open: #304 (R36).
 
 ### Report 36: `.security/code-review-report-2026-09-23-1615.md`
 
