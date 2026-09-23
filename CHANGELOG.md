@@ -46,7 +46,7 @@
 * Fixed: on a store whose product page runs the newer WooCommerce blocks (the ones built on the WordPress Interactivity API), an add to cart that the store refused - out of stock, or stopped by the block's own validation - could still be reported a moment later. The plugin holds such an add back until WooCommerce confirms it, and that confirmation carries no product, so a related-products or grid add clicked within the next ten seconds released the held-back one as well and `add_to_cart` fired twice for a single item. A list add now supersedes whatever the product form still had waiting, so only the item that really reached the cart is reported.
 * Fixed: on the same stores, the cart read the plugin makes over the WooCommerce Store API when the cart changes could report every item as removed when the request came back with something other than a cart - a security or caching layer answering a logged-in request with a page instead of the cart data, for instance. Such an answer is now treated as no reading at all, so at worst one change goes unreported rather than a `remove_from_cart` being invented for the whole cart.
 * Fixed: a purchase was never reported when the customer reached the order received page while the order was still Pending payment. With "Reliable purchase tracking" on, the order is now remembered and reported once after its status becomes a tracked one; the wait ends when the order fails, is cancelled or refunded, or exceeds the "Maximum order age".
-* Updated: tested with WooCommerce 11.1.1.
+* Updated: tested with WooCommerce 11.1.2.
 
 ## 2.0.2
 

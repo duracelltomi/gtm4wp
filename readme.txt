@@ -303,7 +303,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Fixed: on a store whose product page runs the newer WooCommerce blocks (built on the WordPress Interactivity API), an add to cart the store refused could still be reported when a related-products or grid add was clicked within the next ten seconds, so add_to_cart fired twice for a single item. A list add now supersedes whatever the product form still had waiting.
 * Fixed: on the same stores, a cart read over the Store API that came back with something other than a cart could report every item as removed; it is now treated as no reading at all.
 * Fixed: a purchase was never reported when the customer reached the order received page while the order was still Pending payment. With "Reliable purchase tracking" on, the order is now remembered and reported once after its status becomes a tracked one; the wait ends when the order fails, is cancelled or refunded, or exceeds the "Maximum order age".
-* Updated: tested with WooCommerce 11.1.1.
+* Updated: tested with WooCommerce 11.1.2.
 
 = 2.0.2 =
 

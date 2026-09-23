@@ -34,6 +34,7 @@ Each row is `ID — one-line litmus`.
 | UD-1 ⭐ | A hand-maintained mirror of an upstream list carries no expiry date; it looks equally correct on the day it goes stale. |
 | UD-21 | Our own output can be an input to *their* render decision, so both branches of that decision are our problem. |
 | UD-22 ⭐ | Registry ids are assigned from `max(id on master)+1` at the moment of writing, and a merge touching a ledger re-runs the duplicate-id check first; when it has happened, the earliest row keeps its id and every cross-reference is re-pointed by meaning. |
+| UD-23 | A behaviour whose spec page sunset is a coupling with no source: the row records the nearest documented cousin plus a measurement recipe, and is rated as drifted until the measurement has run. |
 | UD-2 ⭐ | Silent failure needs a canary, not a comment. A code comment recording the last manual sync does not fire when the sync goes stale. |
 | UD-3 | A documentation page is a spec with no version and no changelog; diff the *claim*, never the page. |
 | UD-4 | An upstream deprecation notice is a dated obligation, not news — it belongs in the ledger with the removal release as its due date. |
@@ -504,6 +505,36 @@ ambiguous, and one (`consent-roadmap.md`) had planned a *third* U115.
   replace re-points the wrong half.
 - A retired id is never reused (`~~U111~~` stays a tombstone), for the same reason.
 
+### UD-23: A behaviour whose spec page sunset is a coupling with no source
+
+UD-3 says a doc page is a spec with no version. This is the step after: the page is
+gone and nothing replaced it, so the claim has **no source at all** — only the vendor's
+running code, which can change without a page ever moving. It is unversioned in the
+UD-5 sense and unobservable in the UD-11 sense at the same time.
+
+**Confirmed 2026-09-23 (S5).** The product-list click hold rests on GTM invoking a push's
+`eventCallback` (or firing after `eventTimeout` ms), once per container with the
+container id as its argument. The UA enhanced-ecommerce guide that documented the two keys
+now carries a sunset banner; the Tag Platform data-layer page never mentions them; the
+gtag.js reference has only the snake_case cousin; the per-container argument was never
+documented anywhere. The behaviour had been load-bearing for years and had no row.
+
+**Rules:**
+- The row records **the nearest documented cousin** (with its own sentinel) and a
+  **probe** — not "no source", which reads as "nothing to check".
+- **The vendor's compiled artifact is a source.** The maintainer's move on this one: the
+  served `gtm.js` keeps property names through minification, so `curl` + grep for the
+  literals found the read site, the once-per-container invocation with the container id
+  as first argument, and the `google_tag_manager[<id>]` write — all three claims, in
+  minutes, from the thing that actually runs. Prefer that over a dev-site measurement:
+  it is repeatable, diffable (count of hits, the shape of the call site) and needs no
+  second container.
+- Rate it as drifted until the probe has run (UD-11), and re-run the probe on the row's
+  cadence.
+- When a change would make the coupling load-bearing for a new feature, prefer a
+  documented mechanism first; where none exists, say so in the row and keep the fallback
+  defined (the guard here returns early and the link still works).
+
 ### UC-1: A version floor written in N places drifts ⭐
 
 The PHP floor appears in the plugin header, the runtime `version_compare` gate, and
@@ -726,6 +757,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-09-23 (S5) | Added **UD-23** (a behaviour whose spec page sunset is a coupling with no source: record the documented cousin + a measurement recipe, rate as drifted until measured) after registering the GTM `eventCallback`/`eventTimeout` contract from R35 #261 (U163, D33) and finding no current Google page for it. Sweep 5 itself: WooCommerce 11.1.2 shipped a day after S4 (D32, claim one patch behind); the full-tree coupling inventory — not the diff-scoped hunt — surfaced four unrowed couplings older than the base (OpenSSL → U164, the WC session-cookie prefix → U147, core `_get_cron_array()` → U139, page-conditional wording → U12/U115); U161 gained the R35 #266 selector sentence and lost three unescaped pipes (D39 — the cell-count check must ignore `\|`). |
 | 2026-09-22 (S4) | Added **UC-8** (⭐ a formula copied from upstream's source is a mirror with no row; delegate the day upstream wraps it in a method) after EDD 3.7.1 replaced the receipt-link `md5` our success-page resolver had copied inline with a site-keyed HMAC behind `Order::is_receipt_hash_valid()` — D23 / new row U159, fixed the same day (delegation + digest fallback, both shapes tested). Added the **UD-14 second corollary** (two truncations on one source = change the transport: raw HTML + heading-id grep carried the sentinel the summariser dropped twice). New-coupling regex in `.claude/commands/upstream-review.md` extended with `md5\(\|hash_hmac\(\|hash_equals\(`. Sweep 4 itself: the UD-7 window used on three upstreams in one day (WC 11.2.0-beta.1 package grepped whole — nothing moved; CF7 v6.2.0-rc — contract untouched, rc floors WP 7.1 / PHP 8.3; EDD 3.7.1 — D23), U52–U55 verified for the first time, U10 retired (D25), `overrides` necessity re-derived and two dead pins dropped (D26). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3, UC-8. |
 | 2026-09-21 (S3) | Renumbered the duplicated **UD-20** (the 2026-09-05 "our output is an input to their render decision" entry → **UD-21**; the 2026-09-01 presence-check entry keeps UD-20; `.security/code-review-patterns.md`'s citation re-pointed). Added **UD-22** (⭐ registry ids are assigned on `master` at the moment of writing; a merge touching a ledger re-runs the duplicate-id check; the earliest row keeps its id when it has already happened) after Sweep 3 found eleven duplicated `U#` ids across the WP/WC, EDD and Google sections plus this file's own UD-20. Added the **UD-14 corollary** (ask for tokens, never for the block — the fetch summariser refused a verbatim public snippet and answered a token probe). Sweep 3 itself: registry renumbered (U142–U151), two unregistered couplings rowed (U152 WC refund model, U153 EDD order-meta API + `__isset`), three anchors moved to `src/Ecommerce/`, Release Radar fully refreshed (WP 7.1.1, WC 11.1.1 → D14, CF7 6.1.7 packaging-only, Gutenberg 24.0.0, EDD 3.7.0, AS 4.2.0). |
 | 2026-08-05 | Seeded: UD-1..UD-10, UC-1..UC-7, UB-1..UB-3 from the initial dependency inventory (88 couplings across WordPress core, WooCommerce, third-party plugins, Google specs, media SDKs and the toolchain). |
