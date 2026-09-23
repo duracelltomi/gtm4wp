@@ -96,6 +96,14 @@ final class PurchaseTracking {
 		// The separate age check above only exists so orderData is skipped for
 		// too-old orders as well; the composite re-runs it for free.
 		if ( isset( $order ) && ! $this->product_data->is_order_trackable( $order, (int) $order_id ) ) {
+			// An order that is here before its status became trackable (a gateway
+			// confirming the payment by webhook a moment after the redirect) is
+			// remembered so the reliable-purchase fallback re-checks it on the
+			// buyer's next page views. remember_order() fires on this same hook
+			// right after, but it refuses a non-trackable status by design, so
+			// this is the only seed such an order gets. The request-scoped
+			// "pushed" flag stays down: nothing was pushed.
+			$this->product_data->remember_if_may_become_trackable( $order, (int) $order_id );
 			unset( $order );
 		}
 
@@ -151,8 +159,14 @@ final class PurchaseTracking {
 	 * and woocommerce_thankyou - the union of these fires for every payment method:
 	 * instant gateways and the order-pay flow (payment_complete), Cash on Delivery
 	 * and bank transfer (status change to processing/on-hold) and any thank-you
-	 * page render. Only trackable-status orders are remembered, so a still-pending
-	 * order awaiting payment is never seeded.
+	 * page render. Only trackable-status orders are remembered from here, so a
+	 * still-pending order awaiting payment is never seeded by a status change.
+	 * The one still-pending order that IS remembered is the one the customer
+	 * carries to an order-received render before the gateway's webhook confirms
+	 * the payment: that render seeds it itself, through
+	 * ProductData::remember_if_may_become_trackable(), because the later status
+	 * change runs in the gateway's server-to-server request, which has no access
+	 * to the buyer's session and so cannot seed anything from this hook.
 	 *
 	 * @param int $order_id The id of the order that reached a placed/paid state.
 	 * @return void
@@ -189,15 +203,15 @@ final class PurchaseTracking {
 			return;
 		}
 
+		// Deliberately the status leg alone, not the full gauntlet: "Do not flag
+		// orders as being tracked" disables the tracked-order suppressors by
+		// design, and the age gate is applied where the marker is read. A
+		// still-pending order is not seeded from here; the order-received renders
+		// remember such an order themselves (ProductData::remember_if_may_become_trackable()).
 		if ( ! $this->product_data->is_order_status_trackable( $order ) ) {
 			return;
 		}
 
-		$woo->session->set( ProductData::PENDING_PURCHASE_SESSION_KEY, $order_id );
-
-		// Cache-safe data layer (issue #398, Phase 3): flag that a one-shot event
-		// (the reliable-purchase fallback) is pending so the client fetches it on the
-		// next page it can. No-op unless the cache-safe mode is on.
-		Helpers::flag_oneshot_event( (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) );
+		$this->product_data->remember_pending_purchase( $order_id );
 	}
 }

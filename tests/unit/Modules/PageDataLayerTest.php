@@ -1075,6 +1075,287 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The stale pending marker must still be consumed.' );
 	}
 
+	/**
+	 * The reported gap (GTM4WP 2.0.2 + WooCommerce Stripe Gateway with webhooks):
+	 * the customer lands on the standard order-received page while the order is
+	 * still "Pending payment"; the webhook moves it to processing a moment later,
+	 * in a request with no access to the buyer's session. The first load must
+	 * behave as before - orderData written, purchase withheld, order unflagged -
+	 * and additionally remember the order so the fallback re-checks it.
+	 */
+	public function test_order_received_pending_order_writes_order_data_withholds_the_purchase_and_is_remembered(): void {
+		$order = $this->stub_order_received_request( array( 'status' => 'pending' ) );
+		// Swap in the recording session AFTER the order-received stubs: the order
+		// still resolves from the request; the session records what is seeded.
+		$session = $this->stub_wc_pending( 0 );
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'orderData', $result, 'The order-received page still writes orderData for a pending order.' );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'Pending payment is not a tracked status: the purchase is withheld on this load.' );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'A withheld order stays unflagged, so a revisit still fires once the status caught up.' );
+		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The pending order must be remembered for the re-check.' );
+		$this->assertNotEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ?? null, 'The order-received render still claims the purchase for this request.' );
+	}
+
+	/**
+	 * The re-check emits from the SESSION, where the order is the buyer's own and
+	 * the customer identity blocks are not withheld. So a visitor WooCommerce would
+	 * hide the order from (here: a registered customer's order opened logged out,
+	 * the known-shopper gate) must not get the pending order seeded into THEIR
+	 * session, or their next page view would carry the identity data this render
+	 * just kept from them. Same gate, same answer as the withheld blocks.
+	 */
+	public function test_order_received_pending_order_is_not_remembered_for_a_visitor_woocommerce_hides_it_from(): void {
+		$this->stub_order_received_request(
+			array(
+				'status'      => 'pending',
+				'customer_id' => 5,
+			)
+		);
+		$session = $this->stub_wc_pending( 0 );
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'orderData', $result, 'Precondition: the render happened.' );
+		$this->assertArrayNotHasKey( 'customer', $result['orderData'], 'Precondition: this is a visitor the identity blocks are withheld from.' );
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'A visitor WooCommerce hides the order from must not have it remembered for a session re-check.' );
+	}
+
+	public function test_order_received_pending_order_is_not_remembered_without_reliable_purchase_tracking(): void {
+		$this->stub_order_received_request( array( 'status' => 'pending' ) );
+		$session = $this->stub_wc_pending( 0 );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The fallback is the marker\'s only reader; nothing is remembered while it is off.' );
+	}
+
+	/**
+	 * The later page view, once the webhook has moved the order to processing:
+	 * the purchase fires exactly once, the order is flagged and the marker is
+	 * consumed. A further page view in the same session (the stub session keeps
+	 * reporting the marker) is stopped by the _ga_tracked flag.
+	 */
+	public function test_pending_purchase_recheck_emits_the_purchase_once_the_status_became_trackable(): void {
+		$order = $this->make_recent_order( array( 'status' => 'processing' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+			GTM4WP_OPTION_INTEGRATE_WCORDERDATA         => true,
+			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+		);
+
+		$result = $this->make_page_datalayer( $options )->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The re-check must emit the purchase once the status is tracked.' );
+		$this->assertStringContainsString( '"transaction_id":"1001"', $this->inline_js );
+		$this->assertArrayHasKey( 'orderData', $result, 'orderData travels with the purchase on the page that emits it.' );
+		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'The emitted order must be flagged tracked.' );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The marker must be consumed on emission.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+
+		// A further page view in the same session.
+		unset( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+		$this->inline_js = '';
+
+		$this->make_page_datalayer( $options )->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'The purchase fires once: the flagged order is never emitted again.' );
+	}
+
+	/**
+	 * The page view between the two: the order is still pending. Nothing may be
+	 * emitted - not even orderData, which GTM setups commonly use as the
+	 * "confirmation page" signal - and the marker must stay for the next view.
+	 */
+	public function test_pending_purchase_recheck_keeps_the_marker_and_emits_nothing_while_the_order_is_still_pending(): void {
+		$order = $this->make_recent_order( array( 'status' => 'pending' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'A still-pending order emits nothing.' );
+		$this->assertArrayNotHasKey( 'orderData', $result, 'No orderData on a page that carries no purchase.' );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'Pending payment must never be treated as tracked.' );
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The marker must be left in place for the next page view.' );
+		$this->assertEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] ?? null, 'Nothing was pushed, so the request-scoped flag stays down.' );
+	}
+
+	public function test_pending_purchase_recheck_clears_the_marker_on_a_terminal_status(): void {
+		foreach ( ProductData::PENDING_PURCHASE_TERMINAL_STATUSES as $status ) {
+			unset( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+			$this->inline_js = '';
+
+			$order = $this->make_recent_order( array( 'status' => $status ) );
+			Functions\when( 'wc_get_order' )->justReturn( $order );
+			$session = $this->stub_wc_pending( 1001 );
+
+			$this->make_page_datalayer(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				)
+			)->add_datalayer_data( array() );
+
+			$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, "A {$status} order is never a sale." );
+			$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, "A {$status} order can never become trackable: the marker must be consumed." );
+			$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+			$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta );
+		}
+	}
+
+	public function test_pending_purchase_recheck_clears_the_marker_once_the_order_is_outside_the_recheck_window(): void {
+		$order = $this->make_recent_order(
+			array(
+				'status'       => 'pending',
+				'date_created' => '-25 hours',
+			)
+		);
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				// "Maximum order age" off, so the window alone decides here.
+				GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE    => 0,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'A never-paid order must not haunt the session past the re-check window.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+	}
+
+	public function test_pending_purchase_recheck_never_emits_a_pending_order_already_flagged_tracked(): void {
+		$order = $this->make_recent_order(
+			array(
+				'status' => 'pending',
+				'meta'   => array( '_ga_tracked' => 1 ),
+			)
+		);
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'A flag written elsewhere (another device, the confirm beacon) wins over the re-check.' );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'A tracked order is not worth re-checking: the marker is consumed.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+	}
+
+	/**
+	 * "Do not flag orders as being tracked" (#369): no _ga_tracked, no browser
+	 * guard - but the pending re-check must still remember, wait and emit, and
+	 * the marker must still be consumed on emission so the same page view is
+	 * not re-armed.
+	 */
+	public function test_pending_order_recheck_under_do_not_flag_orders_emits_once_without_the_tracked_state(): void {
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE     => true,
+			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE  => true,
+			GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true,
+		);
+
+		// First load: the standard order-received page, order still pending.
+		$this->stub_order_received_request( array( 'status' => 'pending' ) );
+		$session = $this->stub_wc_pending( 0 );
+
+		$this->make_page_datalayer( $options )->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'Remembered under the do-not-flag option as well.' );
+
+		// A later page view: the webhook moved the order to processing.
+		unset( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'], $_GET['order'], $_GET['key'] );
+		$this->inline_js = '';
+		Functions\when( 'is_order_received_page' )->justReturn( false );
+
+		$order = $this->make_recent_order(
+			array(
+				'id'     => 1001,
+				'status' => 'processing',
+			)
+		);
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer( $options )->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js, 'The re-check emits once the status is tracked.' );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'The option asks for no tracked flag anywhere (#369).' );
+		$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_js, 'The browser guard is skipped with the option on (#369).' );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The marker is still consumed on emission.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+	}
+
+	/**
+	 * The cache-safe delivery (#398) of the same re-check: the read-only GET
+	 * resolver reports a still-pending order as such, with no push and no state
+	 * change, so the client keeps its event cookie and asks again on the next
+	 * page; a terminal order resolves to nothing, so the client clears the cookie.
+	 */
+	public function test_resolve_pending_purchase_reports_a_still_pending_order_with_no_push(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order( array( 'status' => 'pending' ) ) );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertSame( array( 'pending' => true ), $payload, 'A still-pending order is reported as pending, with nothing to push.' );
+		$this->assertSame( array(), $session->sets, 'The GET resolver stays read-only: no marker consumed, none written.' );
+	}
+
+	public function test_resolve_pending_purchase_returns_null_for_a_terminal_order(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order( array( 'status' => 'cancelled' ) ) );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertNull( $payload, 'A terminal order resolves to nothing, so the client clears its event cookie.' );
+		$this->assertSame( array(), $session->sets, 'Still read-only: the lingering marker is left to expire with the session.' );
+	}
+
 	public function test_pending_purchase_fallback_hex_encodes_a_hostile_order_number(): void {
 		$order = $this->make_recent_order( array( 'order_number' => 'ORD</script>' ) );
 		Functions\when( 'wc_get_order' )->justReturn( $order );

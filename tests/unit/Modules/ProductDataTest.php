@@ -194,6 +194,246 @@ final class ProductDataTest extends TestCase {
 		$this->assertFalse( $product_data->is_order_status_trackable( new \WC_Order( array( 'status' => 'failed' ) ) ) );
 	}
 
+	/**
+	 * Pins the mirror of WooCommerce's terminal order statuses and the re-check
+	 * window (registry row U126). A remembered order in one of these statuses can
+	 * never reach a tracked one, so the reliable-purchase fallback drops it instead
+	 * of re-checking it. An exact set: a rename or an addition upstream shows up
+	 * here rather than as a silent day of no-op re-checks of an order going nowhere.
+	 */
+	public function test_terminal_statuses_and_the_recheck_window_are_pinned(): void {
+		$this->assertSame( array( 'failed', 'cancelled', 'refunded' ), ProductData::PENDING_PURCHASE_TERMINAL_STATUSES );
+		$this->assertSame( 24 * 60, ProductData::PENDING_PURCHASE_RECHECK_WINDOW_MINUTES );
+	}
+
+	/**
+	 * The reported case: a Stripe order the customer carried to the order-received
+	 * page while still "Pending payment". Not trackable now, but the webhook that
+	 * moves it to processing is seconds away, so it is worth waiting for.
+	 */
+	public function test_may_become_trackable_accepts_a_recent_pending_order(): void {
+		$this->assertTrue(
+			$this->make_product_data()->may_become_trackable( new \WC_Order( array( 'status' => 'pending' ) ), 11 )
+		);
+	}
+
+	public function test_may_become_trackable_rejects_an_order_that_is_trackable_now(): void {
+		// Nothing to wait for: the caller emits the purchase instead of remembering.
+		$this->assertFalse(
+			$this->make_product_data()->may_become_trackable( new \WC_Order( array( 'status' => 'processing' ) ), 11 ),
+			'A trackable order is emitted, never remembered for a re-check.'
+		);
+	}
+
+	public function test_may_become_trackable_rejects_every_terminal_status(): void {
+		$product_data = $this->make_product_data();
+
+		foreach ( ProductData::PENDING_PURCHASE_TERMINAL_STATUSES as $status ) {
+			$this->assertFalse(
+				$product_data->may_become_trackable( new \WC_Order( array( 'status' => $status ) ), 11 ),
+				"A {$status} order can never reach a tracked status and must not be re-checked."
+			);
+		}
+	}
+
+	public function test_may_become_trackable_rejects_an_order_already_flagged_tracked(): void {
+		$this->assertFalse(
+			$this->make_product_data()->may_become_trackable(
+				new \WC_Order(
+					array(
+						'status' => 'pending',
+						'meta'   => array( '_ga_tracked' => 1 ),
+					)
+				),
+				11
+			),
+			'An order flagged tracked elsewhere (another device, the confirm beacon) must not be re-checked.'
+		);
+	}
+
+	public function test_may_become_trackable_rejects_an_order_recorded_in_the_tracked_cookie(): void {
+		$_COOKIE['gtm4wp_orderid_tracked'] = 'WC-1001';
+
+		try {
+			$this->assertFalse(
+				$this->make_product_data()->may_become_trackable(
+					new \WC_Order(
+						array(
+							'status'       => 'pending',
+							'order_number' => 'WC-1001',
+						)
+					),
+					1001
+				),
+				'The browser-side guard is one of the already-tracked legs and must veto the re-check too.'
+			);
+		} finally {
+			unset( $_COOKIE['gtm4wp_orderid_tracked'] );
+		}
+	}
+
+	public function test_may_become_trackable_honors_the_recheck_window(): void {
+		// "Maximum order age" off (its default of 30 minutes would veto first and
+		// hide the window), so this exercises the window alone.
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE => 0 ) );
+
+		$this->assertTrue(
+			$product_data->may_become_trackable(
+				new \WC_Order(
+					array(
+						'status'       => 'pending',
+						'date_created' => '-23 hours',
+					)
+				),
+				11
+			),
+			'Inside the window the order is still worth a re-check.'
+		);
+
+		$this->assertFalse(
+			$product_data->may_become_trackable(
+				new \WC_Order(
+					array(
+						'status'       => 'pending',
+						'date_created' => '-25 hours',
+					)
+				),
+				11
+			),
+			'Past the window a never-paid order is dropped rather than re-checked on every page view for as long as the session lives.'
+		);
+	}
+
+	public function test_may_become_trackable_honors_the_maximum_order_age(): void {
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE => 30 ) );
+
+		$this->assertFalse(
+			$product_data->may_become_trackable(
+				new \WC_Order(
+					array(
+						'status'       => 'pending',
+						'date_created' => '-2 hours',
+					)
+				),
+				11
+			),
+			'The "Maximum order age" option applies on top of the re-check window.'
+		);
+	}
+
+	/**
+	 * The status list stays the only authority on WHEN a purchase counts. A store
+	 * that tracks only `completed` withholds a `processing` order - and that order
+	 * is exactly one that may become trackable later, so it waits like a pending one.
+	 */
+	public function test_may_become_trackable_waits_for_a_placement_status_the_store_does_not_track(): void {
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES => array( 'completed' ) )
+		);
+
+		$this->assertTrue( $product_data->may_become_trackable( new \WC_Order( array( 'status' => 'processing' ) ), 11 ) );
+		$this->assertFalse( $product_data->may_become_trackable( new \WC_Order( array( 'status' => 'completed' ) ), 11 ), 'Trackable now: emitted, not remembered.' );
+	}
+
+	public function test_may_become_trackable_never_waits_under_the_empty_list_fallback(): void {
+		// The empty-list fallback tracks anything but failed, so a pending order is
+		// trackable right away and a failed one is terminal: nothing ever waits.
+		$product_data = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES => array() )
+		);
+
+		$this->assertFalse( $product_data->may_become_trackable( new \WC_Order( array( 'status' => 'pending' ) ), 11 ) );
+		$this->assertFalse( $product_data->may_become_trackable( new \WC_Order( array( 'status' => 'failed' ) ), 11 ) );
+	}
+
+	/**
+	 * Stubs WC() to return a store with a session that records set() calls.
+	 *
+	 * @return object The session object (inspect its ->sets array).
+	 */
+	private function stub_wc_with_session(): object {
+		$session = new class() {
+			/**
+			 * Recorded set() calls, keyed by session key.
+			 *
+			 * @var array<string, mixed>
+			 */
+			public array $sets = array();
+
+			public function get( $key ) {
+				return null;
+			}
+
+			public function set( $key, $value ) {
+				$this->sets[ $key ] = $value;
+			}
+		};
+
+		$store          = new \stdClass();
+		$store->session = $session;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		return $session;
+	}
+
+	public function test_remember_if_may_become_trackable_requires_reliable_purchase_tracking(): void {
+		$session = $this->stub_wc_with_session();
+
+		$remembered = $this->make_product_data()->remember_if_may_become_trackable( new \WC_Order( array( 'status' => 'pending' ) ), 1001 );
+
+		$this->assertFalse( $remembered );
+		$this->assertSame( array(), $session->sets, 'The fallback is the only reader of the marker, so nothing is written while it is off.' );
+	}
+
+	public function test_remember_if_may_become_trackable_seeds_the_session_marker(): void {
+		$session = $this->stub_wc_with_session();
+
+		$remembered = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true ) )
+			->remember_if_may_become_trackable( new \WC_Order( array( 'status' => 'pending' ) ), 1001 );
+
+		$this->assertTrue( $remembered );
+		$this->assertSame( 1001, $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null );
+	}
+
+	public function test_remember_if_may_become_trackable_refuses_an_order_that_is_trackable_or_terminal(): void {
+		$session      = $this->stub_wc_with_session();
+		$product_data = $this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true ) );
+
+		$this->assertFalse( $product_data->remember_if_may_become_trackable( new \WC_Order( array( 'status' => 'processing' ) ), 1001 ) );
+		$this->assertFalse( $product_data->remember_if_may_become_trackable( new \WC_Order( array( 'status' => 'cancelled' ) ), 1001 ) );
+		$this->assertSame( array(), $session->sets );
+	}
+
+	public function test_remember_pending_purchase_writes_nothing_without_a_session(): void {
+		$store          = new \stdClass();
+		$store->session = null;
+		Functions\when( 'WC' )->justReturn( $store );
+
+		$this->assertFalse( $this->make_product_data()->remember_pending_purchase( 1001 ) );
+	}
+
+	public function test_remember_pending_purchase_flags_the_oneshot_cookie_in_cache_safe_mode(): void {
+		$this->stub_wc_with_session();
+
+		Functions\when( 'headers_sent' )->justReturn( false );
+		Functions\when( 'is_ssl' )->justReturn( false );
+		$cookie_names = array();
+		Functions\when( 'setcookie' )->alias(
+			static function ( $name ) use ( &$cookie_names ) {
+				$cookie_names[] = $name;
+				return true;
+			}
+		);
+
+		try {
+			$this->make_product_data( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )->remember_pending_purchase( 1001 );
+
+			$this->assertContains( Helpers::ONESHOT_EVENT_COOKIE, $cookie_names, 'The client only fetches the session endpoint while the event cookie is present, so the render-time seed must set it as the status-time seed does.' );
+		} finally {
+			unset( $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] );
+		}
+	}
+
 	public function test_item_list_id_is_derived_from_the_item_list_name(): void {
 		$product_data = $this->make_product_data();
 

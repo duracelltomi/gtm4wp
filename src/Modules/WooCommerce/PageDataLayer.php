@@ -958,9 +958,20 @@ final class PageDataLayer {
 	 * is on and the order-received page did not already fire the purchase this
 	 * request, emit the purchase for the order remembered in this browser's
 	 * session (seeded by PurchaseTracking::remember_order() at payment/status
-	 * time). This fires on whatever page the customer views next - so a customized
-	 * thank-you page, or landing on the order-pay page, no longer loses the sale.
-	 * The order-tracked flag, age gate and browser cookie prevent double counting.
+	 * time, or by an order-received render for an order that got there before
+	 * its status became trackable). This fires on whatever page the customer
+	 * views next - so a customized thank-you page, landing on the order-pay page,
+	 * or a Stripe order still "Pending payment" when the customer arrived on the
+	 * order-received page, no longer loses the sale. The order-tracked flag, age
+	 * gate and browser cookie prevent double counting.
+	 *
+	 * The marker is consumed on every outcome but one: an order that is not
+	 * trackable YET (ProductData::may_become_trackable()) is left in the session,
+	 * untouched and with nothing emitted - not even orderData, which a GTM setup
+	 * commonly uses as its "this is the confirmation" signal - so the next page
+	 * view asks again. That wait is bounded: the order's status turning terminal,
+	 * the order aging past the re-check window or the "Maximum order age", or the
+	 * order being flagged tracked elsewhere all consume it on the next check.
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -981,8 +992,17 @@ final class PageDataLayer {
 
 		$order = wc_get_order( $order_id );
 
-		// Consume the pending marker regardless of the outcome so the fallback does
-		// not re-evaluate the same order on every subsequent page view.
+		// Still waiting for the status to catch up: keep the marker, emit nothing,
+		// and leave the request-scoped flag down as well - nothing was pushed, and
+		// a status change landing later in this very request (a gateway callback
+		// rendered as a page) must still be able to seed through remember_order().
+		if ( $order instanceof \WC_Order && $this->product_data->may_become_trackable( $order, $order_id ) ) {
+			return $data_layer;
+		}
+
+		// Every other outcome consumes the pending marker - the purchase is emitted
+		// below, or the order is gone, already tracked, terminal or too old - so the
+		// fallback does not re-evaluate the same order on every subsequent page view.
 		$this->clear_pending_session_order();
 		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = true;
 
@@ -1054,6 +1074,26 @@ final class PageDataLayer {
 		// The separate age check above only exists so orderData is skipped for
 		// too-old orders as well; the composite re-runs it for free.
 		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
+			// Withheld on the status alone, with the order still able to reach a
+			// tracked status (the customer arrived before the gateway's webhook moved
+			// it out of "Pending payment"): remember it in the buyer's session so the
+			// reliable-purchase fallback re-checks it on their next page views. The
+			// order stays unflagged, so a revisit of this page fires as before, and
+			// orderData above was still written for this render. No-op unless
+			// "Reliable purchase tracking" is on, and for every other reason to
+			// withhold (already tracked, terminal, too old).
+			//
+			// Not for a visitor WooCommerce itself would hide the order from: the
+			// re-check emits from the SESSION, where the order is taken to be the
+			// buyer's own and the customer identity blocks are not withheld, so
+			// seeding here for a holder of a forwarded confirmation URL would hand
+			// them, on their next page view, exactly the identity data this render
+			// just kept from them. The buyer arriving from checkout is logged in or
+			// inside the verification grace period and passes this gate.
+			if ( ! $withhold_customer_data ) {
+				$this->product_data->remember_if_may_become_trackable( $order, $order_id );
+			}
+
 			return $data_layer;
 		}
 
@@ -1595,6 +1635,18 @@ final class PageDataLayer {
 		}
 
 		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
+			// Not trackable YET (the order-received render remembered a still-pending
+			// order): tell the client so, with no event to push. The client then keeps
+			// the event cookie instead of clearing it, so the next page view fetches
+			// again - one request per page view, never a loop, and bounded by the
+			// re-check window, after which this returns null and the client clears
+			// the cookie. Still read-only: the marker is not consumed here for a
+			// terminal or expired order either; it simply stops resolving, the
+			// client stops asking, and the session expires with it.
+			if ( $this->product_data->may_become_trackable( $order, $order_id ) ) {
+				return array( 'pending' => true );
+			}
+
 			return null;
 		}
 

@@ -26,10 +26,42 @@ final class ProductData {
 	/**
 	 * WooCommerce session key that holds the id of an order placed in this
 	 * browser session and still waiting to have its purchase event emitted.
-	 * Written by PurchaseTracking::remember_order() and consumed by
+	 * Written by remember_pending_purchase() - from PurchaseTracking::remember_order()
+	 * at payment/status time, and from the order-received renders for an order
+	 * that arrived there before its status became trackable - and consumed by
 	 * PageDataLayer's session fallback / custom order-received page resolution.
 	 */
 	public const PENDING_PURCHASE_SESSION_KEY = 'gtm4wp_pending_purchase';
+
+	/**
+	 * WooCommerce order statuses an order cannot leave towards a paid one, so
+	 * a remembered order in one of them is dropped instead of re-checked: the
+	 * three core statuses that mean "this sale is not happening". Mirrors the
+	 * status list in wc_get_order_statuses() (WooCommerce 11.1.1) minus the
+	 * placement and pending statuses - registry row U126 in
+	 * .upstream/upstream-review-checklist.md, pinned by ProductDataTest.
+	 * WooCommerce's own cleanup of an abandoned order lands here as well:
+	 * wc_cancel_unpaid_orders() moves a still-pending order to `cancelled`
+	 * after the "hold stock" minutes.
+	 *
+	 * @var string[]
+	 */
+	public const PENDING_PURCHASE_TERMINAL_STATUSES = array( 'failed', 'cancelled', 'refunded' );
+
+	/**
+	 * How long (in minutes, from the order's creation) an order that reached an
+	 * order-received page before its status became trackable is re-checked on
+	 * the buyer's later page views. The thing being waited for is a gateway's
+	 * server-to-server confirmation, which is a matter of seconds to minutes, so
+	 * the bound is a clock and not a page-view count: a customer who browses
+	 * twenty pages in the first minute must not exhaust the budget before the
+	 * webhook lands, and one who comes back the next week must not be re-checked
+	 * for a sale that never closed. A logged-in customer's WooCommerce session
+	 * renews on every visit, so without this ceiling a never-paid order would
+	 * be re-checked on every page view for as long as they keep shopping.
+	 * The "Maximum order age" option, when set, still applies on top of this.
+	 */
+	public const PENDING_PURCHASE_RECHECK_WINDOW_MINUTES = 24 * 60;
 
 	/**
 	 * Name of the browser-side duplicate-purchase guard, stored in localStorage
@@ -727,17 +759,28 @@ final class ProductData {
 			return false;
 		}
 
+		return $this->is_order_older_than( $order, $max_age );
+	}
+
+	/**
+	 * Whether the order's reference date (paid date when paid, creation date
+	 * otherwise) lies more than the given number of minutes in the past.
+	 *
+	 * @param \WC_Order $order   The order to check.
+	 * @param int       $minutes The age limit in minutes.
+	 * @return bool
+	 */
+	private function is_order_older_than( \WC_Order $order, int $minutes ): bool {
 		if ( $order->is_paid() && $order->get_date_paid() ) {
 			$reference = $order->get_date_paid();
 		} else {
 			$reference = $order->get_date_created();
 		}
 
-		$now     = new \DateTime( 'now', $reference->getTimezone() );
-		$diff    = $now->diff( $reference );
-		$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
+		$now = new \DateTime( 'now', $reference->getTimezone() );
+		$age = $now->diff( $reference );
 
-		return $minutes > $max_age;
+		return ( ( $age->days * 24 * 60 ) + ( $age->h * 60 ) + $age->i ) > $minutes;
 	}
 
 	/**
@@ -831,6 +874,107 @@ final class ProductData {
 		return ! $this->is_order_older_than_max_age( $order )
 			&& ! $this->is_purchase_already_tracked( $order, $order_id )
 			&& $this->is_order_status_trackable( $order );
+	}
+
+	/**
+	 * Whether an order that is NOT trackable right now may still become so, and
+	 * is therefore worth remembering in the buyer's session and re-checking on
+	 * their later page views. True for an order that is recent, not already
+	 * tracked, and in a status that is neither in the tracked list nor one of
+	 * the terminal statuses - typically an order the customer carried to the
+	 * order-received page while still "Pending payment", because the gateway
+	 * confirms the payment through a webhook that arrives a moment later, in a
+	 * request that has no access to the buyer's session (Stripe with webhooks
+	 * enabled is the reported case). It also holds for an order in a placement
+	 * status the store chose not to track, e.g. `processing` on a store that
+	 * only tracks `completed`; the status list stays the only authority on
+	 * WHEN the purchase counts, this only decides whether to keep looking.
+	 *
+	 * A trackable order returns false: there is nothing to wait for, the caller
+	 * emits the purchase instead.
+	 *
+	 * @param \WC_Order $order    The order to check.
+	 * @param int       $order_id The order id of the current request (cookie dedupe).
+	 * @return bool
+	 */
+	public function may_become_trackable( \WC_Order $order, int $order_id ): bool {
+		if ( $this->is_order_older_than_max_age( $order ) ) {
+			return false;
+		}
+
+		if ( $this->is_purchase_already_tracked( $order, $order_id ) ) {
+			return false;
+		}
+
+		if ( $this->is_order_status_trackable( $order ) ) {
+			return false;
+		}
+
+		if ( in_array( $order->get_status(), self::PENDING_PURCHASE_TERMINAL_STATUSES, true ) ) {
+			return false;
+		}
+
+		return ! $this->is_order_older_than( $order, self::PENDING_PURCHASE_RECHECK_WINDOW_MINUTES );
+	}
+
+	/**
+	 * Remembers an order that reached an order-received render before its status
+	 * became trackable, so the reliable-purchase fallback re-checks it on the
+	 * buyer's later page views and emits the purchase once the status has
+	 * caught up. Only when "Reliable purchase tracking" is on (the fallback is
+	 * the only reader of the marker), and only for an order may_become_trackable()
+	 * accepts - never for a trackable one (the caller emits that), an already
+	 * tracked one, a terminal one or one outside the re-check window.
+	 *
+	 * @param \WC_Order $order    The order that was withheld from the purchase event.
+	 * @param int       $order_id The order id of the current request (cookie dedupe).
+	 * @return bool Whether the order was remembered.
+	 */
+	public function remember_if_may_become_trackable( \WC_Order $order, int $order_id ): bool {
+		if ( true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+			return false;
+		}
+
+		if ( ! $this->may_become_trackable( $order, $order_id ) ) {
+			return false;
+		}
+
+		return $this->remember_pending_purchase( $order_id );
+	}
+
+	/**
+	 * Writes the pending-purchase marker for the given order into the current
+	 * request's WooCommerce session and, under the cache-safe data layer, flags
+	 * the one-shot event cookie so the client fetches the session endpoint on the
+	 * next page. The single definition of the write; PurchaseTracking::remember_order()
+	 * and remember_if_may_become_trackable() both end here, so the marker's key
+	 * and the cookie it travels with cannot drift apart between the two seeds.
+	 *
+	 * Performs no eligibility check of its own - each caller applies the gate
+	 * that suits its hook (status trackable at payment/status time; may become
+	 * trackable at render time).
+	 *
+	 * @param int $order_id The id of the order to remember.
+	 * @return bool Whether the marker was written (false without a WooCommerce session).
+	 */
+	public function remember_pending_purchase( int $order_id ): bool {
+		if ( $order_id <= 0 ) {
+			return false;
+		}
+
+		$woo = function_exists( 'WC' ) ? WC() : null;
+		if ( ! $woo || empty( $woo->session ) ) {
+			return false;
+		}
+
+		$woo->session->set( self::PENDING_PURCHASE_SESSION_KEY, $order_id );
+
+		// Cache-safe data layer (issue #398, Phase 3): flag that a one-shot event
+		// (the reliable-purchase fallback) is pending so the client fetches it on the
+		// next page it can. No-op unless the cache-safe mode is on.
+		Helpers::flag_oneshot_event( (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) );
+
+		return true;
 	}
 
 	/**

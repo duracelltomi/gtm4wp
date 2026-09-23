@@ -355,7 +355,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Turn this on if some purchases are missing. When the customer lands on a heavily customized thank-you page, or on the order-pay page instead of the order received page, the purchase event is emitted on the next page they view in the same browser session instead. The order tracked flag and browser cookie still prevent double counting. Note: this cannot capture orders where the buyer pays via an asynchronous gateway and never returns to the site - that case needs server side tracking.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Turn this on if some purchases are missing. When the customer lands on a heavily customized thank-you page, or on the order-pay page instead of the order received page, the purchase event is emitted on the next page they view in the same browser session instead. An order that is still Pending payment when the customer reaches the order received page, because the payment provider confirms the payment a moment later (Stripe with webhooks, for example), is re-checked on the next page views for a day and reported once its status becomes one of the tracked statuses. The order tracked flag and browser cookie still prevent double counting. Note: this cannot capture orders where the buyer pays via an asynchronous gateway and never returns to the site - that case needs server side tracking.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE
