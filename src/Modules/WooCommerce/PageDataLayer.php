@@ -1382,7 +1382,10 @@ final class PageDataLayer {
 	 * (issue #398). Consumes the session marker and flags the order tracked, so a
 	 * later order-received render on another device is suppressed. The order id
 	 * comes ONLY from the session marker, never the request body (no IDOR); the
-	 * marker is consumed unconditionally so the write happens at most once.
+	 * marker is consumed before the flag write so the write happens at most once.
+	 * A marker still waiting for the order's status (T110) is left alone: the
+	 * beacon only ever follows a delivered push, so such a POST is a stray and
+	 * flagging would end the re-check on a purchase nothing has reported.
 	 *
 	 * @return \WP_REST_Response A 204 No Content response.
 	 */
@@ -1391,17 +1394,16 @@ final class PageDataLayer {
 
 		if ( $woo && ! empty( $woo->session ) ) {
 			$order_id = absint( $woo->session->get( ProductData::PENDING_PURCHASE_SESSION_KEY ) );
+			$order    = ( $order_id > 0 ) ? wc_get_order( $order_id ) : null;
 
-			// Consume the marker up front so the flag write happens at most once,
-			// regardless of whether the order can still be loaded below (idempotent).
+			if ( ( $order instanceof \WC_Order ) && $this->product_data->may_become_trackable( $order, $order_id ) ) {
+				return new \WP_REST_Response( null, 204 );
+			}
+
 			$this->clear_pending_session_order();
 
-			if ( $order_id > 0 ) {
-				$order = wc_get_order( $order_id );
-
-				if ( $order instanceof \WC_Order ) {
-					$this->product_data->flag_order_tracked( $order );
-				}
+			if ( $order instanceof \WC_Order ) {
+				$this->product_data->flag_order_tracked( $order );
 			}
 		}
 

@@ -25,6 +25,9 @@ abstract class ModuleSiteHealthTestCase extends TestCase {
 		parent::setUp();
 
 		Functions\stubTranslationFunctions();
+		// Marks every translation, so a `debug` twin that went through __()
+		// cannot pass as English (TS-22: an identity translator would hide it).
+		Functions\when( '__' )->alias( static fn ( string $text ): string => '[' . $text . ']' );
 		Functions\stubEscapeFunctions();
 	}
 
@@ -50,6 +53,10 @@ abstract class ModuleSiteHealthTestCase extends TestCase {
 			$this->assertArrayHasKey( 'value', $row, $key );
 			$this->assertArrayHasKey( 'debug', $row, "$key: every row carries the English twin the copied text prints." );
 			$this->assertNotSame( '', $row['value'], "$key: an empty value prints as undefined." );
+
+			foreach ( (array) $row['debug'] as $line ) {
+				$this->assertStringNotContainsString( '[', (string) $line, "$key: the English twin went through the translator (U161)." );
+			}
 		}
 
 		return $rows;

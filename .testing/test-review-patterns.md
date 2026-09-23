@@ -50,6 +50,7 @@ on every review before anything else.
 - **TS-3** — the test asserts it *ran* (a call happened, a handle registered) but not the *effect* (the queue flushed, the value changed).
 - **TS-4** — tautological test: it asserts the value a stub/mock was told to return, exercising nothing real.
 - **TS-21** — the expected value is computed by the source's own expression (`assertSame( defined('X'), $info['active'] )`): a tautology without a stub. It cannot go red in either direction, and it usually comes with a docblock explaining why the literal was not written. Write the literal, and make the environment produce it (a separate process that `define()`s the constant).
+- **TS-22** — a stub that collapses two outputs the code must keep distinct: an identity translator (`__` returning its input) makes a translated `value` and its English `debug` twin identical, so a module handing the translated string as `debug` stays green; a mock that returns the same thing on both legs of a branch hides which leg ran. Make the double *mark* what it touches (`'[' . $text . ']'`) and assert the mark is absent where the raw form is required.
 - **TS-5** — happy-path only: no error / empty / boundary / invalid-input branch (a valid custom value tested, the fallback path not).
 - **TS-7** — state leakage: a test reads/writes `$_SERVER`, `$GLOBALS`, statics or singletons without snapshotting and resetting them in `setUp`/`tearDown`.
 - **TS-8** — non-determinism: reliance on real time, randomness, or test-execution order.
@@ -312,6 +313,37 @@ value the literal expects.
   with the cap: raise it to 512 and the fixture is 512 deep, still refused, still
   green. Caught by the close-time probe of T105b. The number in a boundary
   fixture is a literal, and the comment says which contract it is one past.
+
+### TS-22: A stub that collapses two outputs the code must keep distinct
+
+TS-13's quieter cousin. TS-13 is a double that does the *safe* thing the real
+collaborator does not; TS-22 is a double that returns the *same* thing on two paths
+the real collaborator keeps apart, so an assertion on either path holds for both.
+
+Measured 2026-09-23 (Run 14). Every Site Health row carries a translated `value` and
+an English `debug` twin (U161: the copied text must print the English form). The
+row builder's own test installs a *marking* translator (`__` → `'[' . $text . ']'`)
+and pins the pair. Every per-module test and the abilities harness install the
+*identity* translator, so `value === debug` on every row — and a module that
+hands the translated line as its `debug`, or an ability that prefers `value`
+over `debug`, is green (probes SH-3/SH-5 in the report). One test even says so in
+its own assertion message ("with the identity translator the English twin is the
+same line") — a TS-14 lead written as a comment.
+
+- **Ask of every convenience stub: which two things does the code keep apart that
+  this stub makes equal?** Identity translators, `esc_*` stubs that return their
+  input, `wp_json_encode` stubs without the flags, a clock that returns the same
+  instant for `created` and `now`.
+- **Make the double mark what it touched**, then assert the mark where the
+  transformed form belongs and its *absence* where the raw form is required. The
+  marking translator is the recipe; `stubEscapeFunctions` + a raw `& " < '` value
+  (T95a) is the same recipe for escaping.
+- **Put the marking double in the shared base case**, not in one test — the pair
+  is a contract across every producer, so every producer's test must be able to
+  see it break.
+- Same family as TS-13 (double more capable than the collaborator), TS-21 (expected
+  value equal to the source's expression) and TS-14 (a comment explaining why the
+  assertion cannot discriminate).
 
 ### TS-5: Happy-path only
 Every branch that can go wrong deserves a case: empty input, invalid input, the
@@ -961,6 +993,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-09-23 (Run 14 — gaps closed) | Closed T106–T115 on the maintainer's "fix straightforward, ask with options otherwise" go-ahead (one fork: T110 → the confirm POST skips flag + consume while the order may still become trackable, a production change with an edited changelog bullet). **PHP 3204/16332 → 3226/17836**, declaration + 3 seeds identical; **JS 976 → 979**; `phpcs` exit 0; `lint:js` clean. **Every survivor mutation re-probed red**, T110 red on revert; SH-18 recorded `[-]` (unreachable behind the health store's own refusal). TS-22's recipe applied in the shape it prescribes: the marking translator now lives in the shared `ModuleSiteHealthTestCase`, the GDM Site Health test and the abilities test, and no `debug` line may carry the mark — no producer was leaking. Harness lesson: a jest loop over payloads trips the tracker's boot guard on the second pass; one case per `it`. |
+| 2026-09-23 (Run 14 — Site Health + pending re-check pass, report only) | Reviewed `9541679..3c31165` (11 commits; the plugin-wide Site Health surface + R35 fixes, the WooCommerce pending-purchase re-check, the EDD receipt hash) with 2 parallel read-only deep-reads and **37 valid main-thread mutation probes (25 survived → T106–T115, 4 N/A on boolean/enum-only sinks, 8 red incl. 1 control and 1 refuted candidate); no tests written.** Added **TS-22** (a stub that collapses two outputs the code must keep distinct — the identity translator hiding the English `debug` twin of every Site Health row; the marking-translator recipe belongs in the shared base case). Deep pass on the oldest `[x]` components: every `JSON_HEX_*` guard in the 2026-08-13 batch red on drop or docblock-blessed N/A. No latent production bug; T110 (confirm POST while the marker holds a pending order) routed to `/code-review` as a design question. |
 | 2026-09-22 (Run 13 — gaps closed) | Closed T97–T105 on the maintainer's "fix straightforward, ask with options otherwise" go-ahead (four forks answered up front). **PHP 3075/9675 → 3114/13316**; declaration + 3 seeds identical; `phpcs` exit 0; no JS or behavioural production change (one docblock, `[skip changelog]`). Every survivor mutation of the report re-probed red. New harness: `AbilitiesTestCase::execute()` validates every ability result against its output schema the way core's `WP_Ability::validate_output()` does, and the `wp_register_ability` fake refuses a duplicate name. TS-21 gained the fixture corollary (a boundary payload sized from the constant it must exceed). |
 | 2026-09-22 (Run 13 — abilities-branch pass, report only) | Reviewed `b085e0e..9541679` (25 commits; the Abilities API surface, `Capability`, `SettingsStore`/`ConfigurationChecks`/`StatusReport`/`DestinationProbe`/`RefundReplay` extractions) with 3 parallel read-only deep-reads and **17 main-thread mutation probes (11 survived, 5 controls red, 1 predicted gap already pinned); no tests written.** Added **TS-21** (the expected value is the source's own expression — the stub-free TS-4, found at three `status_info()` tests whose `defined()` mirror cannot fail and whose docblocks assume constants nothing in the suite defines) and a probe-mechanics note under TS-15 (`php -l` the mutant, `--colors=never`, always run an expected-red control). The Abilities layer had no matrix row — the absent-not-`[ ]` failure's third occurrence, added. Gaps T97–T105 logged (5 Med, 4 Low); every ability gate confirmed at all three rungs (C3/C5 probe-red), every disclosure sink with a secret-bearing fixture (C2/C4 probe-red). |
 | 2026-09-21 (Run 12 — gaps closed) | Closed T81–T96 on the user's "fix straightforward, ask with options otherwise" go-ahead (four forks answered up front). **PHP 2852→2893 / 7809→7956; JS 961→974**; declaration + 4 seeds identical; phpcs exit 0; lint:js clean; build rebuilt (4 production changes: one `save()` per erased order, PageVariables term-name decode, list add supersedes the held-back block add, non-cart body = no reading). **14 revert probes red.** Two lessons worth recording without a new number: (1) **the probe tests the test, again** — the first T88 draft asserted the push count and stayed green with the coalescing guard deleted, because two racing reads still resolve one after another in JS and the second diff sees the updated baseline; the discriminator was *when* the reads are issued, not what they produce — a guard whose effect is ordering/concurrency needs an assertion on the ordering; (2) **writing the error-leg test surfaced the third T55/T80-class latent bug**: a `200` body whose `items` is not a list normalized to an empty cart and reported every baseline item as `remove_from_cart` — the "a lost request costs an event rather than inventing one" rule was written in the docblock and not enforced at the parse bail; the fix followed the classic tracker's existing `Array.isArray` guard. The keyless-held-back-event candidate from the report is now confirmed by /code-review's answer being taken (the over-report was real and fixed) — still one instance, still unnumbered; a second sighting promotes it to a TC line beside TC-17. |

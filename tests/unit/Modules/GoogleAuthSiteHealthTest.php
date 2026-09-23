@@ -149,6 +149,17 @@ final class GoogleAuthSiteHealthTest extends TestCase {
 
 		$this->assertSame( 'sa_aaaaaaaaaaaa', KeyVault::safe_label( $account ) );
 		$this->assertSame( 'Production', KeyVault::safe_label( array( 'label' => 'Production' ) ) );
+		// T114: an empty label falls back to the id too (the vault never stores one, a caller may pass one).
+		$this->assertSame(
+			'sa_x',
+			KeyVault::safe_label(
+				array(
+					'id'    => 'sa_x',
+					'label' => '',
+				)
+			)
+		);
+		$this->assertSame( '', KeyVault::safe_label( array() ), 'Nothing to name it by.' );
 	}
 
 	public function test_the_rows_carry_no_address_and_no_key_material_in_any_form(): void {

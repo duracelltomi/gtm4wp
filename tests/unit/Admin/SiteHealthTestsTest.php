@@ -123,6 +123,23 @@ final class SiteHealthTestsTest extends TestCase {
 		$this->assertSame( 'Google Tag Manager', $result['badge']['label'] );
 		$this->assertSame( 'blue', $result['badge']['color'] );
 		$this->assertSame( '', $result['actions'] );
+		$this->assertStringContainsString( 'no problem', $result['description'], 'The container loads: the plain good wording, not the switched-off one.' );
+		$this->assertStringNotContainsString( 'switched off', $result['description'] );
+	}
+
+	public function test_a_problem_that_quotes_a_typed_value_is_escaped_into_the_description(): void {
+		// T106: core prints a status test's description unescaped. The invalid
+		// dataLayer-name message quotes the typed value, so the message is escaped
+		// once here, both directions: entities present, the raw characters absent.
+		$stored = $this->configured( array( GTM4WP_OPTION_DATALAYER_NAME => 'x<b>&"y' ) );
+
+		$result = $this->collector( array(), $stored )->run_all()[ SiteHealthTests::TEST_CONFIGURATION ];
+
+		$this->assertSame( 'critical', $result['status'] );
+		$this->assertStringContainsString( '&quot;x&lt;b&gt;&amp;&quot;y&quot;', $result['description'] );
+		$this->assertStringNotContainsString( '<b>', $result['description'] );
+		$this->assertStringNotContainsString( '&"y', $result['description'] );
+		$this->assertSame( 1, substr_count( $result['description'], '<p>' ), 'The only markup is the paragraph the collector adds.' );
 	}
 
 	public function test_a_missing_container_id_is_critical_and_links_to_the_setting(): void {
@@ -138,6 +155,7 @@ final class SiteHealthTestsTest extends TestCase {
 
 		$this->assertSame( 'good', $result['status'], 'No container ID is not a problem in the data-layer-only setup.' );
 		$this->assertStringContainsString( 'switched off', $result['description'] );
+		$this->assertStringNotContainsString( 'no problem', $result['description'] );
 	}
 
 	public function test_a_warning_alone_is_recommended(): void {
@@ -167,6 +185,34 @@ final class SiteHealthTestsTest extends TestCase {
 
 		$this->assertSame( 'critical', $result['status'] );
 		$this->assertSame( 2, substr_count( $result['description'], '<p>' ), 'One paragraph per problem.' );
+		// T113: the link opens the FIRST problem's setting (the missing id), not the last.
+		$this->assertStringContainsString( 'gtm4wp-focus=' . rawurlencode( GTM4WP_OPTION_GTM_CONTAINERS ), $result['actions'] );
+		$this->assertStringNotContainsString( rawurlencode( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES ), $result['actions'] );
+	}
+
+	public function test_a_module_whose_schema_class_is_missing_is_skipped_without_a_fatal(): void {
+		// T113: a half-installed third party naming a class that does not exist.
+		$results = $this->collector( array( $this->module_with_id( 'acme-gone', 'GTM4WP\Tests\unit\Admin\NoSuchSchema' ) ) )->run_all();
+
+		$this->assertSame( array( SiteHealthTests::TEST_CONFIGURATION ), array_keys( $results ) );
+	}
+
+	public function test_the_wrapper_absorbs_odd_result_shapes_and_odd_keys(): void {
+		// T113: a scalar result becomes an empty good result; a label-only result
+		// keeps its label and gets the good status; a key core could not select
+		// (dot, space, upper case) is slugged like a module id (#266).
+		$results = $this->collector( array( $this->module_with_id( 'acme-odd', OddShapesThirdPartySchema::class ) ) )->run_all();
+
+		$this->assertSame(
+			array( SiteHealthTests::TEST_CONFIGURATION, 'gtm4wp_acme_odd_scalar', 'gtm4wp_acme_odd_label_only', 'gtm4wp_acme_odd_odd_key_v2' ),
+			array_keys( $results )
+		);
+		$this->assertSame( 'good', $results['gtm4wp_acme_odd_scalar']['status'] );
+		$this->assertSame( '', $results['gtm4wp_acme_odd_scalar']['label'] );
+		$this->assertSame( 'gtm4wp_acme_odd_scalar', $results['gtm4wp_acme_odd_scalar']['test'] );
+		$this->assertSame( 'good', $results['gtm4wp_acme_odd_label_only']['status'] );
+		$this->assertSame( 'Only a label', $results['gtm4wp_acme_odd_label_only']['label'] );
+		$this->assertSame( 'recommended', $results['gtm4wp_acme_odd_odd_key_v2']['status'] );
 	}
 
 	// ---- The module opt-in -------------------------------------------------
@@ -242,9 +288,9 @@ final class SiteHealthTestsTest extends TestCase {
 	 * @param string $id The module id.
 	 * @return ModuleInterface
 	 */
-	private function module_with_id( string $id ): ModuleInterface {
-		return new class( $id ) implements ModuleInterface {
-			public function __construct( private string $module_id ) {
+	private function module_with_id( string $id, string $schema = TestingThirdPartySchema::class ): ModuleInterface {
+		return new class( $id, $schema ) implements ModuleInterface {
+			public function __construct( private string $module_id, private string $schema ) {
 			}
 
 			public function id(): string {
@@ -263,7 +309,7 @@ final class SiteHealthTestsTest extends TestCase {
 			}
 
 			public function admin_schema(): string {
-				return TestingThirdPartySchema::class;
+				return $this->schema;
 			}
 		};
 	}

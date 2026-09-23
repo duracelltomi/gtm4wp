@@ -412,6 +412,13 @@ final class ProductDataTest extends TestCase {
 		$this->assertFalse( $this->make_product_data()->remember_pending_purchase( 1001 ) );
 	}
 
+	public function test_remember_pending_purchase_refuses_an_order_id_of_zero(): void {
+		$session = $this->stub_wc_with_session();
+
+		$this->assertFalse( $this->make_product_data()->remember_pending_purchase( 0 ) );
+		$this->assertSame( array(), $session->sets, 'No marker is written for an id that names no order.' );
+	}
+
 	public function test_remember_pending_purchase_flags_the_oneshot_cookie_in_cache_safe_mode(): void {
 		$this->stub_wc_with_session();
 

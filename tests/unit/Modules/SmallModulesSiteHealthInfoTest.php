@@ -45,7 +45,10 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$rows = $this->rows( new UserEventsModule(), array( GTM4WP_OPTION_EVENTS_USERLOGIN => true ) );
 
 		$this->assertSame( array( 'options' ), array_keys( $rows ) );
-		$this->assertCount( 4, $rows['options']['debug'] );
+		$this->assertSame(
+			array( GTM4WP_OPTION_EVENTS_FORMMOVE, GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY, GTM4WP_OPTION_EVENTS_NEWUSERREG, GTM4WP_OPTION_EVENTS_USERLOGIN ),
+			array_keys( $rows['options']['debug'] )
+		);
 		$this->assertSame( 'on', $rows['options']['debug'][ GTM4WP_OPTION_EVENTS_USERLOGIN ] );
 	}
 
@@ -59,7 +62,23 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		);
 
 		$this->assertSame( array( 'players', 'dynamic_media', 'dailymotion_player_id' ), array_keys( $rows ) );
-		$this->assertCount( 12, $rows['players']['debug'] );
+		$this->assertSame(
+			array(
+				GTM4WP_OPTION_EVENTS_YOUTUBE,
+				GTM4WP_OPTION_EVENTS_VIMEO,
+				GTM4WP_OPTION_EVENTS_SOUNDCLOUD,
+				GTM4WP_OPTION_EVENTS_HTML5MEDIA,
+				GTM4WP_OPTION_EVENTS_DAILYMOTION,
+				GTM4WP_OPTION_EVENTS_MIXCLOUD,
+				GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM,
+				GTM4WP_OPTION_EVENTS_WISTIA,
+				GTM4WP_OPTION_EVENTS_JWPLAYER,
+				GTM4WP_OPTION_EVENTS_VIDEOPRESS,
+				GTM4WP_OPTION_EVENTS_SPOTIFY,
+				GTM4WP_OPTION_EVENTS_TWITCH,
+			),
+			array_keys( $rows['players']['debug'] )
+		);
 		$this->assertSame( 'on', $rows['players']['debug'][ GTM4WP_OPTION_EVENTS_YOUTUBE ] );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC, $rows['players']['debug'], 'Not a player: its own row.' );
 		$this->assertSame( 'off', $rows['dynamic_media']['debug'] );
@@ -79,9 +98,24 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 
 		$this->assertSame( array( 'consent_mode', 'granted_by_default', 'consent_tools' ), array_keys( $rows ), 'No Axeptio row while Axeptio is off.' );
 		$this->assertSame( 'on', $rows['consent_mode']['debug'] );
-		$this->assertCount( 7, $rows['granted_by_default']['debug'] );
+		$this->assertSame(
+			array(
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC,
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY,
+			),
+			array_keys( $rows['granted_by_default']['debug'] )
+		);
 		$this->assertSame( 'on', $rows['granted_by_default']['debug'][ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ] );
 		$this->assertSame( 'off', $rows['granted_by_default']['debug'][ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ] );
+		$this->assertSame(
+			array( GTM4WP_OPTION_INTEGRATE_COOKIEBOT, GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR, GTM4WP_OPTION_INTEGRATE_COOKIEYES, GTM4WP_OPTION_INTEGRATE_AXEPTIO ),
+			array_keys( $rows['consent_tools']['debug'] )
+		);
 		$this->assertSame( 'on', $rows['consent_tools']['debug'][ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ] );
 	}
 
@@ -111,7 +145,27 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$rows = $this->rows( new AmpModule(), array( GTM4WP_OPTION_INTEGRATE_AMPID => 'GTM-AMP111, GTM-AMP222' ) );
 
 		$this->assertSame( 'GTM-AMP111, GTM-AMP222', $rows['amp_containers']['debug'], 'Container IDs are in every AMP page.' );
-		$this->assertContains( $rows['amp_plugin']['debug'], array( 'present', 'absent' ) );
+	}
+
+	public function test_the_amp_plugin_is_present_when_its_function_exists_whatever_it_returns(): void {
+		// T109: existence decides, not the return value. Stubbed here on purpose:
+		// AmpModuleTest defines the function process-wide, so under a random order
+		// this file cannot tell "present" from "absent" without saying which it is.
+		\Brain\Monkey\Functions\when( 'amp_is_request' )->justReturn( false );
+
+		$this->assertSame( 'present', $this->rows( new AmpModule() )['amp_plugin']['debug'] );
+	}
+
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_amp_plugin_is_absent_when_neither_of_its_functions_exists(): void {
+		$this->assertFalse( function_exists( 'amp_is_request' ), 'Precondition (TS-16): no AMP in this process.' );
+		$this->assertFalse( function_exists( 'is_amp_endpoint' ) );
+
+		$rows = $this->rows( new AmpModule() );
+
+		$this->assertSame( 'absent', $rows['amp_plugin']['debug'] );
+		$this->assertSame( '[absent]', $rows['amp_plugin']['value'] );
 	}
 
 	public function test_tag_restrictions_report_the_mode_and_a_count_of_valid_entries(): void {
@@ -131,5 +185,18 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 
 		$this->assertSame( 'allowlist', $rows['mode']['debug'] );
 		$this->assertSame( '2', $rows['restrictions']['debug'], 'Counted after the same re-validation the data layer applies.' );
+
+		// T114: mode 1 is the block list, and a 1.x comma-string is split before counting.
+		$rows = $this->rows(
+			new BlacklistModule(),
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => $valid[0] . ',' . $valid[2] . ',not-a-real-entity',
+			)
+		);
+
+		$this->assertSame( 'blocklist', $rows['mode']['debug'] );
+		$this->assertSame( '[blocklist]', $rows['mode']['value'] );
+		$this->assertSame( '2', $rows['restrictions']['debug'] );
 	}
 }

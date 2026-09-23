@@ -145,12 +145,6 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	}
 
 	/**
-	 * Registers an EDD order resolvable by its payment key.
-	 *
-	 * @param string $payment_key The key that resolves it.
-	 * @return void
-	 */
-	/**
 	 * Stubs the EDD order lookups for one order, in either EDD shape.
 	 *
 	 * @param string      $payment_key         The order's payment key.

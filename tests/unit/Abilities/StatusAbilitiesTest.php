@@ -354,6 +354,65 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 'off', $rows['google-data-manager_send_refunds'] );
 	}
 
+	/**
+	 * The copied value is the English `debug` twin, never the translated page
+	 * value (U161), and a group row's sub-lines are "key: value". The harness'
+	 * identity translator makes the two twins equal (TS-22), so every
+	 * translation is marked here and no marked string may reach the answer.
+	 */
+	public function test_site_health_copies_the_english_twin_and_names_the_sub_lines(): void {
+		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
+		\Brain\Monkey\Functions\when( '__' )->alias( static fn ( string $text ): string => '[' . $text . ']' );
+
+		$health = $this->execute( StatusAbilities::GET_SITE_HEALTH );
+		$rows   = array_column( $health['info'], 'value', 'key' );
+		$labels = array_column( $health['info'], 'label', 'key' );
+
+		$this->assertSame( '[Refund sending]', $labels['google-data-manager_send_refunds'], 'Precondition: the marking translator was live for the walk.' );
+		$this->assertSame( 'off', $rows['google-data-manager_send_refunds'] );
+		$this->assertContains( GTM4WP_OPTION_LOADEARLY . ': off', $rows['container_options'] );
+
+		foreach ( $rows as $key => $value ) {
+			foreach ( (array) $value as $line ) {
+				$this->assertStringNotContainsString( '[', (string) $line, "$key: a translated string reached the copied value." );
+			}
+		}
+	}
+
+	public function test_site_health_turns_every_block_boundary_of_a_description_into_a_line_break(): void {
+		// T114: </p> is what the built-in tests emit; a third party's </li>, <br>
+		// and </div> are boundaries too, never fused into one sentence.
+		$registry = $this->registry();
+		$registry->add(
+			new class() implements \GTM4WP\Module\ModuleInterface {
+				public function id(): string {
+					return 'acme-odd';
+				}
+
+				public function defaults(): array {
+					return array();
+				}
+
+				public function is_available(): bool {
+					return true;
+				}
+
+				public function frontend( \GTM4WP\Options\Options $options ): void {
+				}
+
+				public function admin_schema(): string {
+					return \GTM4WP\Tests\unit\Admin\OddShapesThirdPartySchema::class;
+				}
+			}
+		);
+		$this->registered = array();
+		( new StatusAbilities( $registry ) )->register();
+
+		$tests = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['tests'], null, 'id' );
+
+		$this->assertSame( "a\nb\nc\nd\ne\nf", $tests['gtm4wp_acme_odd_odd_key_v2']['description'] );
+	}
+
 	public function test_site_health_reports_a_missing_container_id_as_a_critical_configuration(): void {
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array() ) );
 

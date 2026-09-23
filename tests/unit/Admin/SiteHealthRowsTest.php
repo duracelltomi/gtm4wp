@@ -70,6 +70,57 @@ final class SiteHealthRowsTest extends TestCase {
 		$this->assertSame( '[none]', SiteHealthRows::word( 'bogus' ), 'An out-of-set word is the "none" state, never an untranslated pass-through.' );
 	}
 
+	public function test_a_plugin_row_reads_the_version_and_only_judges_it_against_a_floor_it_knows(): void {
+		$this->assertSame( '[not installed]', SiteHealthRows::plugin( 'P', array( 'active' => false ), '5.0' )['value'] );
+		$this->assertSame( 'not installed', SiteHealthRows::plugin( 'P', array( 'active' => false ), '5.0' )['debug'] );
+		$this->assertSame(
+			'9.0.0',
+			SiteHealthRows::plugin(
+				'P',
+				array(
+					'active'  => true,
+					'version' => '9.0.0',
+				)
+			)['debug'],
+			'No floor: the version as is.'
+		);
+		$this->assertSame(
+			'4.9.0 (below the 5.0 floor)',
+			SiteHealthRows::plugin(
+				'P',
+				array(
+					'active'  => true,
+					'version' => '4.9.0',
+				),
+				'5.0'
+			)['debug']
+		);
+		$this->assertSame(
+			'[4.9.0 (below the 5.0 floor)]',
+			SiteHealthRows::plugin(
+				'P',
+				array(
+					'active'  => true,
+					'version' => '4.9.0',
+				),
+				'5.0'
+			)['value']
+		);
+		// T114: an active host with no version reported is a dash, never "(below the floor)".
+		$this->assertSame(
+			'-',
+			SiteHealthRows::plugin(
+				'P',
+				array(
+					'active'  => true,
+					'version' => null,
+				),
+				'5.0'
+			)['debug']
+		);
+		$this->assertSame( '-', SiteHealthRows::plugin( 'P', array( 'active' => true ), '5.0' )['debug'] );
+	}
+
 	public function test_set_or_empty_never_carries_the_value_itself(): void {
 		$row = SiteHealthRows::set_or_empty( 'Header', 'HTTP_X_SECRET_HEADER' );
 

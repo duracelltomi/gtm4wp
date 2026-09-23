@@ -49,6 +49,9 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		parent::setUp();
 
 		Functions\stubTranslationFunctions();
+		// Marks every translation, so an English `debug` twin that went through
+		// __() cannot pass as English (TS-22: the identity translator hides it).
+		Functions\when( '__' )->alias( static fn ( string $text ): string => '[' . $text . ']' );
 		Functions\stubEscapeFunctions();
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) );
 		Functions\when( 'admin_url' )->alias( static fn ( $path = '' ) => 'https://example.com/wp-admin/' . $path );
@@ -205,7 +208,68 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$this->assertStringContainsString( self::MEASUREMENT, $row['value'], 'The measurement ID is already in the site\'s public HTML.' );
 		$this->assertStringContainsString( 'PERMISSION_DENIED', $row['value'], 'The bare code name says what went wrong without quoting the request.' );
 		$this->assertStringContainsString( '2027-01-15', $row['value'] );
-		$this->assertSame( $row['value'], $row['debug'], 'With the identity translator the English twin is the same line.' );
+		$this->assertStringStartsWith( '[', $row['value'], 'The page line is translated.' );
+		$this->assertStringStartsWith( 'Main property (', $row['debug'], 'The copied line is English (U161).' );
+		$this->assertStringNotContainsString( '[', $row['debug'] );
+	}
+
+	public function test_a_destination_without_a_label_is_named_by_its_measurement_id_and_a_failure_without_a_class_reads_as_a_dash(): void {
+		// T114: the two fallbacks of the destination line.
+		$this->health->record_success( self::MEASUREMENT );
+		$this->health->record_failure( self::MEASUREMENT, 'timeout' );
+
+		$row = $this->site_health( array( GTM4WP_OPTION_GDM_DESTINATIONS => array( array_merge( $this->destination_row(), array( DestinationRows::COLUMN_LABEL => '' ) ) ) ) )->debug_fields()['destination_0'];
+
+		$this->assertStringStartsWith( self::MEASUREMENT . ' (' . DestinationRows::TYPE_GA4 . ', ' . self::MEASUREMENT . '): ', $row['debug'] );
+		$this->assertStringEndsWith( '1 failures in a row, last reason -', $row['debug'] );
+	}
+
+	public function test_a_stored_destination_list_that_is_not_a_list_yields_no_destination_rows(): void {
+		$fields = $this->site_health( array( GTM4WP_OPTION_GDM_DESTINATIONS => 'corrupt' ) )->debug_fields();
+
+		$this->assertArrayNotHasKey( 'destination_0', $fields );
+		$this->assertSame( 'good', $this->site_health( array( GTM4WP_OPTION_GDM_DESTINATIONS => 'corrupt' ) )->run_test()['status'] );
+	}
+
+	public function test_a_row_without_a_measurement_id_is_never_a_failing_destination(): void {
+		// T114: a half-filled row has no stream to fail. DestinationHealth refuses
+		// the empty id too, so the row-side skip alone is not pinned here (`[-]`);
+		// this holds the pair: neither layer may start filing under ''.
+		for ( $i = 0; $i < DestinationHealth::FAILURE_THRESHOLD; $i++ ) {
+			$this->health->record_failure( '', 'PERMISSION_DENIED', 'PERMISSION_DENIED' );
+		}
+
+		$result = $this->site_health( array( GTM4WP_OPTION_GDM_DESTINATIONS => array( array_merge( $this->destination_row(), array( DestinationRows::COLUMN_MEASUREMENT => '' ) ) ) ) )->run_test();
+
+		$this->assertSame( 'good', $result['status'] );
+	}
+
+	public function test_a_failing_destination_label_is_escaped_into_the_description_once(): void {
+		// T106: core prints the description unescaped; the label is admin-typed
+		// text that keeps & and quotes. Both directions.
+		$this->fail_the_destination();
+
+		$result = $this->site_health( array( GTM4WP_OPTION_GDM_DESTINATIONS => array( array_merge( $this->destination_row(), array( DestinationRows::COLUMN_LABEL => 'Main & "property"' ) ) ) ) )->run_test();
+
+		$this->assertSame( 'critical', $result['status'] );
+		$this->assertStringContainsString( 'Main &amp; &quot;property&quot;', $result['description'] );
+		$this->assertStringNotContainsString( '& "', $result['description'] );
+		$this->assertStringNotContainsString( '&amp;amp;', $result['description'], 'Escaped once, not twice.' );
+	}
+
+	/**
+	 * The stored destination row of the fixture site.
+	 *
+	 * @return array<string, string>
+	 */
+	private function destination_row(): array {
+		return array(
+			DestinationRows::COLUMN_LABEL       => 'Main property',
+			DestinationRows::COLUMN_ACCOUNT     => 'sa_aaaaaaaaaaaa',
+			DestinationRows::COLUMN_TYPE        => DestinationRows::TYPE_GA4,
+			DestinationRows::COLUMN_PROPERTY    => self::PROPERTY,
+			DestinationRows::COLUMN_MEASUREMENT => self::MEASUREMENT,
+		);
 	}
 
 	public function test_a_destination_nothing_has_been_sent_to_says_so(): void {

@@ -1358,6 +1358,58 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
 	} );
 
+	it( 'clears the event cookie for a push-less object without the pending flag', async () => {
+		// T112: the flag is `true === pending`. An empty object is nothing to
+		// wait for: no push, no beacon, cookie cleared.
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( { pendingPurchase: {} } );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		expect( confirmBeacon() ).toBeUndefined();
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	it( 'clears the event cookie for a look-alike pending value that is not true', async () => {
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		mockEndpointOnce( { pendingPurchase: { pending: 'yes' } } );
+
+		loadTracker();
+		await flush();
+
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		expect( confirmBeacon() ).toBeUndefined();
+		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
+	} );
+
+	it( 'keeps the event cookie when the endpoint answers with an HTTP error', async () => {
+		// T112: an error response is not an answer; the cookie survives so the next
+		// page view asks again (the retry the pending flow depends on). One request.
+		window.gtm4wp_visitordata_config = actionConfigConfirm(
+			[ 'pendingPurchase' ],
+			{ pendingPurchase: CONFIRM_URL }
+		);
+		setCookie( EVENT_COOKIE, '1' );
+		global.fetch.mockResolvedValueOnce( { ok: false } );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+		expect( document.cookie ).toContain( EVENT_COOKIE + '=1' );
+	} );
+
 	// Cross-device dedupe (issue #398): after a fallback delivery the client fires ONE
 	// authenticated POST beacon (with the shared wp_rest nonce) to flag the order
 	// tracked server-side, so a later order-received render on another device is

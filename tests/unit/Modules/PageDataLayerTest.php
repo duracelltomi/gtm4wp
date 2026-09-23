@@ -1356,6 +1356,43 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( array(), $session->sets, 'Still read-only: the lingering marker is left to expire with the session.' );
 	}
 
+	public function test_pending_purchase_fallback_consumes_the_marker_when_the_order_is_gone(): void {
+		// T111: the marker names an order WooCommerce no longer returns. Nothing to
+		// emit and nothing to wait for, so the marker is consumed like every other
+		// non-pending outcome and the request-scoped flag is raised.
+		Functions\when( 'wc_get_order' )->justReturn( false );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$result = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertArrayNotHasKey( 'orderData', $result );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The marker is consumed, not re-checked on every page view.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+		$this->assertNotEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+	}
+
+	public function test_resolve_pending_purchase_returns_null_when_the_order_is_gone(): void {
+		Functions\when( 'wc_get_order' )->justReturn( false );
+		$session = $this->stub_wc_pending( 1001 );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertNull( $payload, 'A missing order resolves to nothing, so the client clears its event cookie.' );
+		$this->assertSame( array(), $session->sets, 'The GET resolver stays read-only.' );
+	}
+
 	public function test_pending_purchase_fallback_hex_encodes_a_hostile_order_number(): void {
 		$order = $this->make_recent_order( array( 'order_number' => 'ORD</script>' ) );
 		Functions\when( 'wc_get_order' )->justReturn( $order );
@@ -3496,6 +3533,47 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( array( 1001 ), $requested, 'The marker is consumed on the first POST; the second loads nothing.' );
 		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null, 'The order is flagged exactly once.' );
 		$this->assertNull( $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] ?? null, 'The delivery marker is consumed.' );
+	}
+
+	public function test_confirm_purchase_leaves_a_still_pending_order_unflagged_and_keeps_the_marker(): void {
+		// T110: the marker may name an order still waiting for its status (the
+		// re-check of f7da613). The beacon never follows a push-less payload, so a
+		// POST in that window is a stray; flagging would end the wait on a purchase
+		// nothing has reported. Neither the flag nor the marker is touched.
+		$order = $this->make_recent_order( array( 'status' => 'pending' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
+
+		$response = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->confirm_pending_purchase_tracked();
+
+		$this->assertSame( 204, $response->get_status() );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, 'A purchase nothing has reported is never flagged.' );
+		$this->assertSame( array(), $session->sets, 'The marker is kept for the re-check on the next page view.' );
+		$this->assertSame( 1001, $session->store[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+	}
+
+	public function test_confirm_purchase_consumes_the_marker_when_the_order_is_gone(): void {
+		// T111: a marker naming an order WooCommerce no longer returns is consumed
+		// (nothing to flag, nothing to wait for), so the next POST loads nothing.
+		Functions\when( 'wc_get_order' )->justReturn( false );
+		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
+
+		$response = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->confirm_pending_purchase_tracked();
+
+		$this->assertSame( 204, $response->get_status() );
+		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The marker is consumed.' );
+		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ] );
+		$this->assertArrayNotHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->store );
 	}
 
 	public function test_confirm_readded_to_cart_consumes_the_marker(): void {

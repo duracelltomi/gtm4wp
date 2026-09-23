@@ -29,7 +29,13 @@ final class CommerceSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$this->assertSame( 'not installed', $rows['plugin']['debug'] );
 		$this->assertSame( 'on', $rows['tracking']['debug'] );
 		$this->assertSame( 'full', $rows['inputs']['debug'] );
-		$this->assertSame( 'off', $rows['options']['debug'][ GTM4WP_OPTION_INTEGRATE_WPCF7_GA4EVENTS ] );
+		$this->assertSame(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WPCF7_GA4EVENTS => 'off',
+				GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE => 'off',
+			),
+			$rows['options']['debug']
+		);
 	}
 
 	public function test_woocommerce_rows_over_the_defaults(): void {
@@ -46,14 +52,34 @@ final class CommerceSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		);
 
 		$this->assertSame( 'not installed', $rows['plugin']['debug'] );
+		$this->assertSame( '[not installed]', $rows['plugin']['value'] );
 		$this->assertSame( 'off', $rows['tracking']['debug'] );
-		$this->assertCount( 14, $rows['options']['debug'] );
+		$this->assertSame(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCUSESKU,
+				GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH,
+				GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE,
+				GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT,
+				GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION,
+				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA,
+				GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX,
+				GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING,
+				GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE,
+				GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL,
+				GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC,
+			),
+			array_keys( $rows['options']['debug'] ),
+			'Every switch by name (T108): a swapped option keeps the count.'
+		);
 		$this->assertSame( 'on', $rows['options']['debug'][ GTM4WP_OPTION_INTEGRATE_WCUSESKU ] );
 		$this->assertSame( 'product_brand', $rows['brand_taxonomy']['debug'] );
 		$this->assertSame( 'retail', $rows['business_vertical']['debug'] );
 		$this->assertSame( '10', $rows['products_per_impression']['debug'] );
 		$this->assertSame( '30', $rows['order_max_age']['debug'] );
-		$this->assertSame( 'Maximum order age (minutes)', $rows['order_max_age']['label'], 'The unit the code compares in, not a guessed one.' );
+		$this->assertSame( '[Maximum order age (minutes)]', $rows['order_max_age']['label'], 'The unit the code compares in, not a guessed one.' );
 		$this->assertSame( '2000', $rows['datalayer_timeout']['debug'] );
 		$this->assertSame( 'processing, on-hold, completed', $rows['purchase_statuses']['debug'] );
 		$this->assertSame( 'empty', $rows['product_id_prefix']['debug'] );
@@ -123,8 +149,24 @@ final class CommerceSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 			'No cart/checkout-page or HPOS rows: those are WooCommerce facts.'
 		);
 		$this->assertSame( 'on', $rows['tracking']['debug'] );
-		$this->assertSame( 'Maximum order age (minutes)', $rows['order_max_age']['label'] );
-		$this->assertCount( 11, $rows['options']['debug'] );
+		$this->assertSame( '[Maximum order age (minutes)]', $rows['order_max_age']['label'] );
+		$this->assertSame(
+			array(
+				GTM4WP_OPTION_INTEGRATE_EDDUSESKU,
+				GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH,
+				GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE,
+				GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION,
+				GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL,
+				GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA,
+				GTM4WP_OPTION_INTEGRATE_EDDORDERDATA,
+				GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX,
+				GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG,
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE,
+				GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL,
+			),
+			array_keys( $rows['options']['debug'] ),
+			'Every switch by name (T108).'
+		);
 		$this->assertSame( 'none', $rows['brand_taxonomy']['debug'] );
 		$this->assertSame( 'pending, processing, complete', $rows['purchase_statuses']['debug'] );
 		$this->assertSame( 'set', $rows['product_id_prefix']['debug'] );

@@ -168,6 +168,18 @@ final class SiteHealthInfoTest extends TestCase {
 		$this->assertSame( array( 'version', 'problems', 'reporting_ok' ), array_keys( $fields ) );
 	}
 
+	public function test_a_module_whose_schema_class_is_missing_is_skipped_without_a_fatal(): void {
+		// T113: a third-party module naming a class that does not exist (a
+		// half-installed plugin) contributes nothing; the plugin rows still print.
+		$module = new class() extends ReportingThirdPartyModule {
+			public function admin_schema(): string {
+				return 'GTM4WP\Tests\unit\Admin\NoSuchSchema';
+			}
+		};
+
+		$this->assertSame( array( 'version', 'problems' ), array_keys( $this->collector( array( $module ) )->fields() ) );
+	}
+
 	public function test_a_value_that_is_not_an_array_is_passed_through(): void {
 		$this->assertSame( 'unexpected', $this->collector( array() )->add_debug_information( 'unexpected' ) );
 	}

@@ -194,6 +194,25 @@ final class AmpModuleTest extends TestCase {
 		$this->assertStringNotContainsString( '&lt;', $vars['siteSearchTerm'] );
 	}
 
+	public function test_a_container_id_is_url_encoded_into_the_config_url(): void {
+		// T115: the schema sanitizer keeps a stored id to GTM-[A-Z0-9]+, so this
+		// value can only arrive past it; the encoding is defense in depth (RI-2).
+		$module  = $this->make_module_with_datalayer( array( 'event' => 'x' ), "GTM-A\x26B=1" );
+		$entries = $module->add_amp_analytics_entries( array() );
+
+		$config = $entries["gtm4wp-GTM-A\x26B=1"]['attributes']['config'];
+
+		$this->assertStringContainsString( 'amp.json?id=GTM-A%26B%3D1&gtm.url=SOURCE_URL', $config );
+		$this->assertStringNotContainsString( "\x26B=1", $config, 'A raw & would start a second query parameter.' );
+	}
+
+	public function test_a_non_array_filter_value_is_replaced_by_the_gtm_entry(): void {
+		$module  = $this->make_module_with_datalayer( array( 'event' => 'x' ) );
+		$entries = $module->add_amp_analytics_entries( 'junk' );
+
+		$this->assertSame( array( 'gtm4wp-GTM-AMP1' ), array_keys( $entries ) );
+	}
+
 	public function test_is_amp_request_prefers_amp_is_request_then_falls_back(): void {
 		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_INTEGRATE_AMPID => 'GTM-AMP1' ) );
 		$module = new AmpModule();
