@@ -173,7 +173,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function import_settings( \WP_REST_Request $request ) {
+	public function import_settings( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		// A REST body is not slashed (unlike $_POST), so no wp_unslash(); every
 		// decoded value is sanitized before it can be stored.
 		$options = $this->store->decode_import( $request->get_param( 'payload' ) );

@@ -547,6 +547,11 @@ final class PageVariablesModuleTest extends TestCase {
 	public function test_search_result_count_omitted_without_warning_when_the_main_query_global_is_unavailable(): void {
 		Functions\when( 'is_search' )->justReturn( true );
 		Functions\when( 'get_search_query' )->justReturn( 'term' );
+		// The referer leg is reached whenever another test's $_SERVER leaks in
+		// (TS-7/TS-16): own stubs, own empty referer.
+		Functions\when( 'esc_url_raw' )->returnArg();
+		Functions\when( 'wp_unslash' )->returnArg();
+		unset( $_SERVER['HTTP_REFERER'] );
 		$GLOBALS['wp_query'] = null;
 
 		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SEARCHDATA => true ) );

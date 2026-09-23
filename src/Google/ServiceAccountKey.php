@@ -71,7 +71,7 @@ final class ServiceAccountKey {
 	 * @param string $json Raw contents of the uploaded key file.
 	 * @return self|\WP_Error
 	 */
-	public static function from_json( string $json ) {
+	public static function from_json( string $json ): self|\WP_Error {
 		if ( ! function_exists( 'openssl_pkey_get_private' ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_key_no_openssl',

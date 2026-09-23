@@ -104,7 +104,7 @@ final class BackfillEndpoint {
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function backfill( \WP_REST_Request $request ) {
+	public function backfill( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$platform = (string) $request->get_param( 'platform' );
 		$order    = (string) $request->get_param( 'order' );
 		$token    = (string) $request->get_param( 'token' );

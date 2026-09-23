@@ -33,7 +33,7 @@ interface Transport {
 	 * @param array<string, string> $headers Extra request headers.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	public function post_form( string $url, array $fields, array $headers = array() );
+	public function post_form( string $url, array $fields, array $headers = array() ): array|\WP_Error;
 
 	/**
 	 * Sends an application/json POST.
@@ -43,7 +43,7 @@ interface Transport {
 	 * @param array<string, string> $headers Extra request headers.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	public function post_json( string $url, array $body, array $headers = array() );
+	public function post_json( string $url, array $body, array $headers = array() ): array|\WP_Error;
 
 	/**
 	 * Sends a GET.
@@ -52,5 +52,5 @@ interface Transport {
 	 * @param array<string, string> $headers Extra request headers.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	public function get( string $url, array $headers = array() );
+	public function get( string $url, array $headers = array() ): array|\WP_Error;
 }

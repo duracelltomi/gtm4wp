@@ -184,7 +184,7 @@ final class SettingsStore {
 	 * @param mixed $payload The raw file contents, a JSON string.
 	 * @return array<string, mixed>|\WP_Error The option key => value map of the file.
 	 */
-	public function decode_import( $payload ) {
+	public function decode_import( $payload ): array|\WP_Error {
 		if ( ! is_string( $payload ) || '' === $payload ) {
 			return new \WP_Error(
 				'gtm4wp_import_empty',

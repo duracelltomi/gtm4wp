@@ -45,7 +45,7 @@ final class DestinationProbe {
 	 * @param array<string, string> $row A normalized row that passed DestinationRows::is_valid_row().
 	 * @return array{ok: bool, message: string}|\WP_Error 404 when the row's service account no longer exists.
 	 */
-	public function probe( array $row ) {
+	public function probe( array $row ): array|\WP_Error {
 		if ( ! $this->vault->has( (string) ( $row[ DestinationRows::COLUMN_ACCOUNT ] ?? '' ) ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_account_unknown',

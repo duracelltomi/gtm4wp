@@ -61,7 +61,7 @@ final class RefundReplay {
 	 * @param string[] $references Limit to these references; empty means every replayable refund.
 	 * @return array{queued: int, references: string[]}|\WP_Error The count and the references queued; 409 while sending is off.
 	 */
-	public function replay( array $references = array() ) {
+	public function replay( array $references = array() ): array|\WP_Error {
 		if ( null !== $this->options && ! $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ) {
 			return new \WP_Error(
 				'gtm4wp_gdm_sending_off',

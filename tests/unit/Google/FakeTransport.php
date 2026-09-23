@@ -73,21 +73,21 @@ final class FakeTransport implements Transport {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function post_form( string $url, array $fields, array $headers = array() ) {
+	public function post_form( string $url, array $fields, array $headers = array() ): array|\WP_Error {
 		return $this->record( 'POST_FORM', $url, $fields, null, $headers );
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
-	public function post_json( string $url, array $body, array $headers = array() ) {
+	public function post_json( string $url, array $body, array $headers = array() ): array|\WP_Error {
 		return $this->record( 'POST_JSON', $url, null, $body, $headers );
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
-	public function get( string $url, array $headers = array() ) {
+	public function get( string $url, array $headers = array() ): array|\WP_Error {
 		return $this->record( 'GET', $url, null, null, $headers );
 	}
 

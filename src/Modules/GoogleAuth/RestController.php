@@ -152,7 +152,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function upload_account( \WP_REST_Request $request ) {
+	public function upload_account( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$key_file = $request->get_param( 'key_file' );
 
 		if ( ! is_string( $key_file ) || ( '' === trim( $key_file ) ) ) {
@@ -199,7 +199,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function relabel_account( \WP_REST_Request $request ) {
+	public function relabel_account( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$id    = (string) $request->get_param( 'id' );
 		$label = $request->get_param( 'label' );
 
@@ -223,7 +223,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function delete_account( \WP_REST_Request $request ) {
+	public function delete_account( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$id      = (string) $request->get_param( 'id' );
 		$deleted = $this->vault->delete( $id );
 
@@ -246,7 +246,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function test_account( \WP_REST_Request $request ) {
+	public function test_account( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$id     = (string) $request->get_param( 'id' );
 		$result = $this->tokens->test_account( $id );
 

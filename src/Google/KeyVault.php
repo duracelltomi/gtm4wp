@@ -119,7 +119,7 @@ final class KeyVault {
 	 * @param string            $label Admin-chosen label; the account e-mail when empty.
 	 * @return string|\WP_Error The new account id.
 	 */
-	public function add( ServiceAccountKey $key, string $label ) {
+	public function add( ServiceAccountKey $key, string $label ): string|\WP_Error {
 		$accounts = $this->read();
 		$id       = $this->new_id( $accounts );
 
@@ -162,7 +162,7 @@ final class KeyVault {
 	 * @param string $id Account id.
 	 * @return true|\WP_Error
 	 */
-	public function delete( string $id ) {
+	public function delete( string $id ): bool|\WP_Error {
 		$accounts = $this->read();
 
 		if ( ! isset( $accounts[ $id ] ) ) {
@@ -208,7 +208,7 @@ final class KeyVault {
 	 * @param string $label New label; the account e-mail when empty, as on add().
 	 * @return array<string, mixed>|\WP_Error The account's refreshed public view.
 	 */
-	public function relabel( string $id, string $label ) {
+	public function relabel( string $id, string $label ): array|\WP_Error {
 		$accounts = $this->read();
 
 		if ( ! isset( $accounts[ $id ] ) ) {
@@ -308,7 +308,7 @@ final class KeyVault {
 	 * @param string $id Account id.
 	 * @return ServiceAccountKey|\WP_Error
 	 */
-	public function open( string $id ) {
+	public function open( string $id ): ServiceAccountKey|\WP_Error {
 		$accounts = $this->read();
 
 		if ( ! isset( $accounts[ $id ] ) ) {
@@ -482,7 +482,7 @@ final class KeyVault {
 	 * @param string $id  Account id the blob belongs to.
 	 * @return array{iv: string, tag: string, ciphertext: string}|\WP_Error Base64 fields.
 	 */
-	private function seal( string $pem, string $id ) {
+	private function seal( string $pem, string $id ): array|\WP_Error {
 		if ( ! function_exists( 'openssl_encrypt' ) || ! in_array( self::CIPHER, openssl_get_cipher_methods(), true ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_key_no_openssl',

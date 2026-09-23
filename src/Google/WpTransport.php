@@ -52,7 +52,7 @@ final class WpTransport implements Transport {
 	 * @param array<string, string> $headers Extra request headers.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	public function post_form( string $url, array $fields, array $headers = array() ) {
+	public function post_form( string $url, array $fields, array $headers = array() ): array|\WP_Error {
 		return $this->send(
 			$url,
 			'POST',
@@ -69,7 +69,7 @@ final class WpTransport implements Transport {
 	 * @param array<string, string> $headers Extra request headers.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	public function post_json( string $url, array $body, array $headers = array() ) {
+	public function post_json( string $url, array $body, array $headers = array() ): array|\WP_Error {
 		$encoded = wp_json_encode( $body );
 		if ( false === $encoded ) {
 			return new \WP_Error(
@@ -93,7 +93,7 @@ final class WpTransport implements Transport {
 	 * @param array<string, string> $headers Extra request headers.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	public function get( string $url, array $headers = array() ) {
+	public function get( string $url, array $headers = array() ): array|\WP_Error {
 		return $this->send( $url, 'GET', $headers, null );
 	}
 
@@ -123,7 +123,7 @@ final class WpTransport implements Transport {
 	 * @param string|null           $body    Encoded request body, null for GET.
 	 * @return array{status: int, body: array|null}|\WP_Error
 	 */
-	private function send( string $url, string $method, array $headers, ?string $body ) {
+	private function send( string $url, string $method, array $headers, ?string $body ): array|\WP_Error {
 		if ( ! self::is_allowed_url( $url ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_transport_refused',

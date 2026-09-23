@@ -88,7 +88,7 @@ final class TokenService {
 	 * @param bool   $fresh      Skip the cache and mint now - the settings screen's "test" action.
 	 * @return string|\WP_Error The bearer token.
 	 */
-	public function access_token( string $account_id, string $scope, bool $fresh = false ) {
+	public function access_token( string $account_id, string $scope, bool $fresh = false ): string|\WP_Error {
 		$transient = self::transient_name( $account_id, $scope );
 
 		if ( ! $fresh ) {
@@ -166,7 +166,7 @@ final class TokenService {
 	 * @param string $account_id Account id.
 	 * @return array{ok: bool, message: string}|\WP_Error 404 when the account does not exist; nothing is sent then.
 	 */
-	public function test_account( string $account_id ) {
+	public function test_account( string $account_id ): array|\WP_Error {
 		if ( ! $this->vault->has( $account_id ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_account_unknown',
@@ -221,7 +221,7 @@ final class TokenService {
 	 * @param string            $scope OAuth scope.
 	 * @return string|\WP_Error Compact serialised JWT.
 	 */
-	private function sign_assertion( ServiceAccountKey $key, string $scope ) {
+	private function sign_assertion( ServiceAccountKey $key, string $scope ): string|\WP_Error {
 		$now = is_callable( $this->clock ) ? (int) call_user_func( $this->clock ) : time();
 
 		$header = array(

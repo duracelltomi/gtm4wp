@@ -138,7 +138,7 @@ final class EventsIngest {
 	 * @param array<string, string> $row Validated destination row.
 	 * @return true|\WP_Error True when Google accepted the request.
 	 */
-	public function validate_destination( array $row ) {
+	public function validate_destination( array $row ): bool|\WP_Error {
 		$token = $this->tokens->access_token(
 			(string) ( $row[ DestinationRows::COLUMN_ACCOUNT ] ?? '' ),
 			TokenService::SCOPE_DATA_MANAGER
@@ -374,7 +374,7 @@ final class EventsIngest {
 	 * @param string $request_id The requestId the ingest response returned.
 	 * @return array<int, array{measurement: string, status: string, errors: int, warnings: int}>|\WP_Error
 	 */
-	public function request_status( string $account_id, string $request_id ) {
+	public function request_status( string $account_id, string $request_id ): array|\WP_Error {
 		if ( '' === $request_id ) {
 			return new \WP_Error(
 				'gtm4wp_gdm_status_no_request',

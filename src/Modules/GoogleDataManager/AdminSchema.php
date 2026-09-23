@@ -259,7 +259,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * @param mixed $value Raw submitted value.
 	 * @return array<int, array<string, string>>|\WP_Error
 	 */
-	private static function sanitize_destinations( $value ) {
+	private static function sanitize_destinations( $value ): array|\WP_Error {
 		if ( ! is_array( $value ) ) {
 			return array();
 		}

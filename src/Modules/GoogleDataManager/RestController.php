@@ -151,7 +151,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function replay( \WP_REST_Request $request ) {
+	public function replay( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$result = $this->replay->replay( RefundReplay::references( $request->get_param( 'references' ) ) );
 
 		if ( $result instanceof \WP_Error ) {
@@ -193,7 +193,7 @@ final class RestController {
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function test_destination( \WP_REST_Request $request ) {
+	public function test_destination( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$row = DestinationRows::normalize_row(
 			array(
 				DestinationRows::COLUMN_ACCOUNT     => $request->get_param( DestinationRows::COLUMN_ACCOUNT ),

@@ -184,7 +184,7 @@ final class Abilities implements ProviderInterface {
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function test_service_account( $input = null ) {
+	public function test_service_account( $input = null ): array|\WP_Error {
 		if ( ! Registrar::writes_allowed() ) {
 			return Registrar::write_disabled_error();
 		}

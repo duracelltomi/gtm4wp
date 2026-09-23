@@ -330,7 +330,7 @@ final class SettingsAbilities implements ProviderInterface {
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function get_settings( $input = null ) {
+	public function get_settings( $input = null ): array|\WP_Error {
 		$input = is_array( $input ) ? $input : array();
 
 		$by_module      = $this->store->fields_by_module();
@@ -411,7 +411,7 @@ final class SettingsAbilities implements ProviderInterface {
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function update_settings( $input = null ) {
+	public function update_settings( $input = null ): array|\WP_Error {
 		if ( ! Registrar::writes_allowed() ) {
 			return Registrar::write_disabled_error();
 		}
@@ -487,7 +487,7 @@ final class SettingsAbilities implements ProviderInterface {
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function import_settings( $input = null ) {
+	public function import_settings( $input = null ): array|\WP_Error {
 		if ( ! Registrar::writes_allowed() ) {
 			return Registrar::write_disabled_error();
 		}

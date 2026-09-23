@@ -308,7 +308,7 @@ final class Abilities implements ProviderInterface {
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function test_destination( $input = null ) {
+	public function test_destination( $input = null ): array|\WP_Error {
 		if ( ! Registrar::writes_allowed() ) {
 			return Registrar::write_disabled_error();
 		}
@@ -338,7 +338,7 @@ final class Abilities implements ProviderInterface {
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function replay_refunds( $input = null ) {
+	public function replay_refunds( $input = null ): array|\WP_Error {
 		if ( ! Registrar::writes_allowed() ) {
 			return Registrar::write_disabled_error();
 		}
