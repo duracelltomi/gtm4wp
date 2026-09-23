@@ -364,7 +364,9 @@ final class PageVariablesModule extends AbstractModule {
 			$include_post_meta  = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA );
 
 			if ( ( $include_post_terms || $include_post_meta ) && null !== $post ) {
-				$data_layer['pagePostTerms'] = array();
+				// Built locally and assigned only when non-empty: [] is truthy in
+				// JavaScript and a different type from the populated object (#275).
+				$post_terms = array();
 
 				if ( $include_post_terms ) {
 					$object_taxonomies = get_object_taxonomies( get_post_type() );
@@ -372,11 +374,11 @@ final class PageVariablesModule extends AbstractModule {
 					foreach ( $object_taxonomies as $one_object_taxonomy ) {
 						$post_taxonomy_values = get_the_terms( $post->ID, $one_object_taxonomy );
 						if ( is_array( $post_taxonomy_values ) ) {
-							$data_layer['pagePostTerms'][ $one_object_taxonomy ] = array();
+							$post_terms[ $one_object_taxonomy ] = array();
 							foreach ( $post_taxonomy_values as $one_taxonomy_value ) {
 								// As typed, not as stored ("Shirts &amp; Ties"): the same
 								// decode the e-commerce items use.
-								$data_layer['pagePostTerms'][ $one_object_taxonomy ][] = EcommerceHelpers::decode_term_name(
+								$post_terms[ $one_object_taxonomy ][] = EcommerceHelpers::decode_term_name(
 									$use_master_language
 										? $this->localized_term_field( (int) $one_taxonomy_value->term_id, $one_object_taxonomy, 'name', (string) $one_taxonomy_value->name )
 										: (string) $one_taxonomy_value->name
@@ -451,9 +453,13 @@ final class PageVariablesModule extends AbstractModule {
 						// Omit an empty container: [] is truthy in JavaScript and a
 						// different type from the populated object (RI-13/RI-20).
 						if ( array() !== $meta_values ) {
-							$data_layer['pagePostTerms']['meta'] = $meta_values;
+							$post_terms['meta'] = $meta_values;
 						}
 					}
+				}
+
+				if ( array() !== $post_terms ) {
+					$data_layer['pagePostTerms'] = $post_terms;
 				}
 			}
 
@@ -661,7 +667,10 @@ final class PageVariablesModule extends AbstractModule {
 				// the cache-safe data layer they are delivered client-side (see
 				// declare_visitor_scoped_fields()); siteSearchResults stays server-side.
 				if ( ! $cache_safe ) {
-					$data_layer['siteSearchTerm'] = get_search_query();
+					// The RAW term (#274): the hex-flag JSON sink escapes it, and the
+					// cache-safe client tier sends the raw ?s= value, so both tiers
+					// report one string. get_search_query() would esc_attr() it.
+					$data_layer['siteSearchTerm'] = get_search_query( false );
 					$data_layer['siteSearchFrom'] = '';
 					if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
 						$referer_url_parts            = explode( '?', esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) );

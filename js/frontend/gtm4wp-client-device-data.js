@@ -16,11 +16,13 @@
 	}
 	window.gtm4wp_clientdevice_inited = true;
 
-	const config = window.gtm4wp_clientdevice_config || {
-		browser: true,
-		os: true,
-		device: true,
-	};
+	// The PHP side prints the config with the bundle; when a page optimiser has
+	// stripped it, fail closed like gtm4wp-visitor-data.js: pushing all three
+	// signals would ignore the admin's per-signal choice (#290).
+	const config = window.gtm4wp_clientdevice_config;
+	if ( ! config ) {
+		return;
+	}
 	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
 
 	function pushDeviceData( data ) {

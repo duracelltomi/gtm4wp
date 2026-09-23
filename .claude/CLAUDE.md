@@ -91,7 +91,7 @@ the doc block on the constants in `src/Options/Field.php` — in short:
   - `src/Module/` — module framework (`ModuleInterface`, `AbstractModule`, `AdminSchemaInterface`, `Registry`)
   - `src/Modules/<Name>/` — feature modules: Container, PageVariables, ClientDeviceData, UserEvents, MediaEvents, ConsentMode, ContactForm7, WooCommerce, Amp, Blacklist
   - `src/Options/` — options service + field schema
-  - `src/Compat/` — read-only `$GLOBALS` mirrors for 1.x consumers
+  - `src/Compat/` — the `$GLOBALS` mirrors and shared state slots for 1.x consumers
 - `compat/` — 1.x public API kept alive: `constants.php` (option/hook/placement constants) and `functions.php` (template functions; frontend-only)
 - `js/admin/` — React settings app built on `@wordpress/components`
 - `js/frontend/` — per-feature frontend trackers (each becomes its own bundle)
@@ -102,11 +102,13 @@ the doc block on the constants in `src/Options/Field.php` — in short:
 - `.testing/` — cumulative test-review system (see above; mirrors `.security/`)
 - `.upstream/` — cumulative upstream-dependency review system (see above; same quartet)
 
-### Global data (backward-compatible, read-only)
+### Global data (backward-compatible)
 
-Populated by `src/Compat/Globals.php` from the `Options` service. These are 1.x
-mirrors that third-party code reads; internal 2.x code must never read them
-back — use the `Options`/`Frontend` services instead.
+Populated by `src/Compat/Globals.php` from the `Options` service. The first two
+are read-only mirrors that third-party code reads; internal 2.x code never reads
+them back — use the `Options`/`Frontend` services instead. The last three are
+shared read-write state by design (1.x code appends to them), owned by
+`DataLayer`/`ContainerCode`.
 
 - `$GLOBALS['gtm4wp_options']` - Merged plugin options
 - `$GLOBALS['gtm4wp_datalayer_name']` - Data layer variable name (defaults to `dataLayer`)

@@ -18,8 +18,11 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Populates the well-known 1.x globals that third party code reads.
  *
- * These are read-only mirrors of the new OOP services; internal 2.x code
- * must never read them back.
+ * The mirrors gtm4wp_options and gtm4wp_datalayer_name are read-only views of
+ * the OOP services; internal 2.x code never reads them back. The other three
+ * (gtm4wp_datalayer_data, gtm4wp_additional_datalayer_pushes,
+ * gtm4wp_container_code_written) stay shared read-write state by design, so
+ * 1.x code that appends to them keeps working (#296).
  */
 final class Globals {
 

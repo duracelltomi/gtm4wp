@@ -82,7 +82,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this to fire dataLayer events for Contact Form 7 submissions (supported events: before submit, invalid input, unaccepted terms, spam detected, submission aborted, form submitted, mail sent, mail send failed). Each event carries the form ID, unit tag, container post ID, locale and submission status.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this to fire dataLayer events for Contact Form 7 submissions (supported events: before submit, invalid input, unaccepted terms, spam detected, submission aborted, form submitted, mail sent, mail send failed). Each event carries the form ID, form name, unit tag, container post ID, locale and submission status.', 'duracelltomi-google-tag-manager' ),
 				group: 'cf7',
 				doc: self::DOC_PAGE
 			),

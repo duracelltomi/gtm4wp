@@ -55,7 +55,8 @@ final class Notices {
 	public function register_hooks(): void {
 		add_action( 'admin_notices', array( $this, 'show_notices' ) );
 		add_action( 'wp_ajax_gtm4wp_dismiss_notice', array( $this, 'dismiss_notice' ) );
-		add_action( 'admin_footer', array( $this, 'print_dismiss_script' ) );
+		// The dismiss script is hooked from print_notice() only when a dismissible
+		// notice was printed, not on every admin screen (#302).
 	}
 
 	/**
@@ -109,6 +110,11 @@ final class Notices {
 		$classes = 'gtm4wp-notice notice notice-'
 			. ( ConfigurationChecks::SEVERITY_WARNING === $problem['severity'] ? 'warning' : 'error' )
 			. ( $problem['dismissible'] ? ' is-dismissible' : '' );
+
+		if ( $problem['dismissible'] ) {
+			// admin_notices runs before admin_footer; re-adding the same callable is idempotent.
+			add_action( 'admin_footer', array( $this, 'print_dismiss_script' ) );
+		}
 
 		echo '<div class="' . esc_attr( $classes ) . '" data-href="?' . esc_attr( $problem['code'] ) . '"><p><strong>' . esc_html( $problem['message'] ) . '</strong>';
 

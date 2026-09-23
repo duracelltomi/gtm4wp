@@ -169,14 +169,17 @@ final class PageVariablesModuleTest extends TestCase {
 		return $module;
 	}
 
-	public function test_search_page_data_with_escaped_search_term(): void {
+	public function test_search_page_data_with_raw_search_term(): void {
 		Functions\when( 'is_search' )->justReturn( true );
 
-		// Mirrors WordPress get_search_query() default behavior: the search
-		// term arrives esc_attr() escaped. Absorbed from the 1.x XSS test.
+		// #274: the RAW query is read (get_search_query( false )) so the classic
+		// and the cache-safe tier report one string; the hex-flag JSON sink is
+		// what neutralises it (ContainerCodeTest pins that encoding).
 		$malicious_term = '<script>alert("xss")</script>';
-		Functions\when( 'get_search_query' )->justReturn(
-			htmlspecialchars( $malicious_term, ENT_QUOTES, 'UTF-8' )
+		Functions\when( 'get_search_query' )->alias(
+			static function ( $escaped = true ) use ( $malicious_term ) {
+				return $escaped ? htmlspecialchars( $malicious_term, ENT_QUOTES, 'UTF-8' ) : $malicious_term;
+			}
 		);
 
 		$_SERVER['HTTP_REFERER'] = 'https://example.com/page/?param=value';
@@ -191,9 +194,9 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 'search-results', $data_layer['pagePostType'] );
 		$this->assertSame( 5, $data_layer['siteSearchResults'] );
 
-		// The raw script tag must never appear in the data layer value.
-		$this->assertStringNotContainsString( '<script>', $data_layer['siteSearchTerm'] );
-		$this->assertSame( htmlspecialchars( $malicious_term, ENT_QUOTES, 'UTF-8' ), $data_layer['siteSearchTerm'] );
+		// Raw in the ARRAY: the value must not arrive pre-encoded (RI-4), the
+		// script sink encodes it once.
+		$this->assertSame( $malicious_term, $data_layer['siteSearchTerm'] );
 
 		// Referrer query strings are rawurlencoded as in 1.x.
 		$this->assertSame( 'https://example.com/page/?param%3Dvalue', $data_layer['siteSearchFrom'] );
@@ -1052,8 +1055,59 @@ final class PageVariablesModuleTest extends TestCase {
 
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertArrayNotHasKey( 'meta', $data_layer['pagePostTerms'] );
+		// #275: with nothing surviving, the whole container is absent - never
+		// `"pagePostTerms":[]`, a truthy value of the wrong type.
+		$this->assertArrayNotHasKey( 'pagePostTerms', $data_layer );
 		$this->assertStringNotContainsString( '"meta":[]', wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * #275 (RI-13, #197's outer sibling): the terms option on a post type with
+	 * no taxonomies (a default page) must omit the container, not emit `[]`.
+	 */
+	public function test_pagepostterms_absent_when_the_post_type_has_no_taxonomies(): void {
+		$this->arrange_singular_terms_and_meta();
+		Functions\when( 'get_object_taxonomies' )->justReturn( array() );
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => false,
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'pagePostTerms', $data_layer );
+		$this->assertStringNotContainsString( '"pagePostTerms":[]', wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * The populated form is unchanged by #275: terms and meta share the object.
+	 */
+	public function test_pagepostterms_keeps_terms_and_meta_together_when_both_exist(): void {
+		$this->arrange_singular_terms_and_meta();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE      => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES    => false,
+				GTM4WP_OPTION_INCLUDE_TAGS          => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR        => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST  => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA      => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS => 'internal_note',
+			)
+		);
+
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( array( 'Fiction' ), $data_layer['pagePostTerms']['genre'] );
+		$this->assertSame( array( 'internal_note' => 'secret-internal-note' ), $data_layer['pagePostTerms']['meta'] );
 	}
 
 	/**

@@ -35,6 +35,8 @@ final class GoogleDataManagerHealthNoticeTest extends TestCase {
 		Functions\stubEscapeFunctions();
 		Functions\when( '_n' )->alias( static fn ( $single, $plural, $number ) => ( 1 === $number ) ? $single : $plural );
 		Functions\when( 'menu_page_url' )->justReturn( self::SETTINGS_URL );
+		// Notices render inside wp-admin, after the menu was registered (#282).
+		do_action( 'admin_menu' );
 		Functions\when( 'add_query_arg' )->alias( static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . rawurlencode( (string) $value ) );
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) );
 

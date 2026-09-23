@@ -22,6 +22,8 @@ defined( 'ABSPATH' ) || exit;
  * Origin with Allow-Credentials by default, so a third-party page could read
  * and replay any token. RestCors withdraws that reflection, but the two
  * controls stay independent on purpose. One definition for every route (UC-6).
+ * get_http_origin() ends in the `http_origin` filter, so a site callback can
+ * move this gate; kept as the lever for a proxy that mangles Origin (#289).
  */
 final class RequestOrigin {
 

@@ -101,9 +101,9 @@ final class Helpers {
 	 * JS-readable event cookie the cache-safe data layer (issue #398) sets when a
 	 * WooCommerce one-shot event is queued in the session; its presence tells the
 	 * client runtime to fetch the session endpoint on the next page, and the client
-	 * clears it after delivery. Must match the literal in
-	 * js/frontend/gtm4wp-visitor-data.js and the cookie_gate in
-	 * PageDataLayer::declare_visitor_scoped_fields().
+	 * clears it after delivery. The runtime learns the name from the baked
+	 * config (VisitorDataModule::build_config() actions); the cookie_gate in
+	 * PageDataLayer::declare_visitor_scoped_fields() names the same constant.
 	 */
 	public const ONESHOT_EVENT_COOKIE = 'gtm4wp_woo_event';
 
@@ -112,7 +112,10 @@ final class Helpers {
 	 * cache-safe data layer is on (otherwise the event renders server-side). Called
 	 * from the hooks that seed the session markers, which run only on non-cached
 	 * requests. Not HttpOnly on purpose (the client reads it); it carries no
-	 * visitor value. The 2-day expiry only bounds an undelivered event.
+	 * visitor value. The 2-day expiry only bounds an undelivered event. Host-only
+	 * on purpose (no Domain attribute, unlike the login-gate cookie): the JS
+	 * clearer writes no Domain either, and a cookie set with one is a different
+	 * cookie the clear would never remove (#270, RI-14).
 	 *
 	 * @param bool $cache_safe_enabled Whether GTM4WP_OPTION_CACHE_SAFE_DATALAYER is on.
 	 * @return void
@@ -128,7 +131,6 @@ final class Helpers {
 			array(
 				'expires'  => time() + ( 2 * DAY_IN_SECONDS ),
 				'path'     => '/',
-				'domain'   => defined( 'COOKIE_DOMAIN' ) ? COOKIE_DOMAIN : '',
 				'secure'   => is_ssl(),
 				'httponly' => false,
 				'samesite' => 'Lax',

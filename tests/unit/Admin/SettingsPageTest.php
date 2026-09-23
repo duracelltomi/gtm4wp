@@ -259,6 +259,7 @@ final class SettingsPageTest extends TestCase {
 	 * in JavaScript (UC-6). The JS half is in js/admin/test/utils.test.js.
 	 */
 	public function test_url_deep_links_to_the_named_option(): void {
+		do_action( 'admin_menu' );
 		Functions\when( 'menu_page_url' )->justReturn( 'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG );
 		Functions\when( 'add_query_arg' )->alias(
 			static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . rawurlencode( (string) $value )
@@ -272,6 +273,7 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	public function test_url_without_an_option_is_the_plain_settings_page(): void {
+		do_action( 'admin_menu' );
 		Functions\when( 'menu_page_url' )->justReturn( 'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG );
 
 		$url = SettingsPage::url();
@@ -281,9 +283,29 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	/**
-	 * The menu_page_url() function lives in wp-admin/includes/plugin.php, which
-	 * a REST request never loads, and the Site Health tests ask for a deep link
-	 * from an ability. Separate process: nothing may have defined the function.
+	 * #282 (RI-19): the production REST case is not "menu_page_url() undefined"
+	 * but "defined and answering ''": ConfigurationChecks loads the admin file
+	 * on any request, while admin_menu never ran. The presence of the function
+	 * must not select it; did_action( 'admin_menu' ) must.
+	 */
+	public function test_url_falls_back_to_admin_url_when_the_menu_was_never_registered(): void {
+		Functions\when( 'menu_page_url' )->justReturn( '' );
+		Functions\when( 'admin_url' )->alias( static fn ( $path = '' ) => 'https://example.com/wp-admin/' . $path );
+		Functions\when( 'add_query_arg' )->alias(
+			static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . rawurlencode( (string) $value )
+		);
+
+		$this->assertSame( 0, did_action( 'admin_menu' ), 'Precondition: no admin menu in this request.' );
+		$this->assertSame(
+			'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG . '&gtm4wp-focus=' . GTM4WP_OPTION_DATALAYER_NAME,
+			SettingsPage::url( GTM4WP_OPTION_DATALAYER_NAME )
+		);
+		$this->assertSame( 'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG, SettingsPage::url() );
+	}
+
+	/**
+	 * The other REST shape: the admin file was never required at all. Separate
+	 * process: nothing may have defined the function.
 	 */
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]

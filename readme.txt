@@ -313,6 +313,13 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Added: an optional **"Report downloads in the default language"** setting (Easy Digital Downloads → Product data), the EDD counterpart of the WooCommerce option above and with the same caveat about setups keyed on the translated `item_id`. Off by default (experimental) (#145).
 * Added: an optional **"Report the form name in the default language"** setting (Contact Form 7), so `form_name` carries the master-language title and submissions of one form combine across languages. Works for forms translated as separate entries. Off by default (experimental) (#145).
 * Changed: `pagePostTerms` and `pagePrimaryCategoryName` report term names as they were typed, the same string the e-commerce items have carried since 2.0.2. A GTM trigger that matched the encoded form on either variable needs the plain text now; the slug variables are unchanged.
+* Fixed: with a custom data layer variable name, the Google Consent Mode default block pushed its defaults to `dataLayer` instead of the configured variable, so the consent defaults did not apply. The block now uses the configured name.
+* Fixed: on a subdomain multisite, or any site defining `COOKIE_DOMAIN`, the cache-safe data layer could not clear its event cookie after a one-shot event, so every later page view made a needless request. The cookie is now host-only.
+* Fixed: the browser, OS and device data script reported all three signals when a page optimiser removed its inline configuration. It now reports nothing in that case.
+* Changed: `siteSearchTerm` carries the search term as typed; the classic data layer used to HTML-encode it while the cache-safe one did not. A GTM trigger matching the encoded form needs the plain text now.
+* Changed: `pagePostTerms` is omitted when the post has no terms and no reported meta, instead of being an empty list.
+* Changed: the Contact Form 7 tracker script is no longer loaded while Contact Form 7 is not installed.
+* Changed: for developers, `gtm4wp_datalayer_push()` returns `false` for a non-string `$js_before`/`$js_after` argument instead of printing `Array` into the page; the consent mode flag override filter also accepts the strings `granted` and `denied`.
 * Removed: the `$gtp4wp_plugin_url`, `$gtp4wp_plugin_basename` and `$gtp4wp_script_path` globals, deprecated in 2.0 as announced. Third-party code still reading them uses `plugin_dir_url( GTM4WP_PLUGIN_FILE )`, `plugin_basename( GTM4WP_PLUGIN_FILE )` and `plugin_dir_url( GTM4WP_PLUGIN_FILE ) . 'build/'` instead.
 
 **Easy Digital Downloads**

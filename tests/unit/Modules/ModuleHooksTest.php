@@ -92,10 +92,26 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertStringContainsString( 'CookieLawInfo_Accept_Callback', $js );
 	}
 
-	public function test_contact_form_7_active_when_enabled(): void {
+	/**
+	 * #281: the tracker is enqueued only while Contact Form 7 is installed.
+	 * Separate process: the host's version constant must be definable here and
+	 * absent everywhere else.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_contact_form_7_active_when_enabled_and_installed(): void {
+		define( 'WPCF7_VERSION', '6.1.2' );
+
 		$enabled = $this->boot( new ContactForm7Module(), array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
 		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $enabled, 'enqueue_scripts' ) ) );
 		$this->assertNotFalse( has_filter( 'wpcf7_form_additional_atts', array( $enabled, 'add_form_name_attribute' ) ) );
+	}
+
+	public function test_contact_form_7_inactive_when_enabled_but_not_installed(): void {
+		$this->assertFalse( defined( 'WPCF7_VERSION' ), 'Precondition (TS-16): no host in this process.' );
+
+		$enabled = $this->boot( new ContactForm7Module(), array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
+		$this->assertFalse( has_action( 'wp_enqueue_scripts', array( $enabled, 'enqueue_scripts' ) ), 'No Contact Form 7, no tracker on the page (#281).' );
 	}
 
 	public function test_contact_form_7_inactive_when_disabled(): void {

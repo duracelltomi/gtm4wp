@@ -195,14 +195,17 @@ final class UninstallTest extends TestCase {
 
 		require self::UNINSTALL_FILE;
 
+		// Pinned against the constants the writers use (#301): the uninstaller
+		// writes the names out (no autoloader there), so a renamed constant
+		// would otherwise orphan its row while this stayed green.
 		$this->assertSame(
 			array(
-				'gtm4wp-options',
-				'gtm4wp-plugin-version',
-				'gtm4wp_google_service_accounts',
-				'gtm4wp_gdm_destination_health',
-				'gtm4wp_gdm_capture_stats',
-				'gtm4wp_gdm_send_log',
+				GTM4WP_OPTIONS,
+				\GTM4WP\Migration::VERSION_OPTION,
+				\GTM4WP\Google\KeyVault::OPTION_NAME,
+				\GTM4WP\Modules\GoogleDataManager\DestinationHealth::OPTION_NAME,
+				\GTM4WP\Modules\GoogleDataManager\CaptureStats::OPTION_NAME,
+				\GTM4WP\Modules\GoogleDataManager\SendLog::OPTION_NAME,
 			),
 			$deleted_options,
 			'Exactly the six plugin option rows are deleted, in order and with no extras.'

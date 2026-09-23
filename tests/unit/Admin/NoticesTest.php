@@ -79,6 +79,8 @@ final class NoticesTest extends TestCase {
 		Functions\when( 'esc_attr' )->returnArg();
 		Functions\when( 'esc_url' )->returnArg();
 		Functions\when( 'menu_page_url' )->justReturn( 'options-general.php?page=gtm4wp' );
+		// Notices render inside wp-admin, after the menu was registered (#282).
+		do_action( 'admin_menu' );
 		// Reached through SettingsPage::url(), which every notice anchor below
 		// builds its deep link with. Stubbed here rather than borrowed from
 		// whichever file ran first (TS-16); the real one encodes the value, so
@@ -543,6 +545,38 @@ final class NoticesTest extends TestCase {
 		$script = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'body.append( "noticeid", notice.dataset.href.substring( 1 ) );', $script );
+	}
+
+	/**
+	 * #302: the dismiss handler (a listener plus a nonce) is hooked into the
+	 * footer only once a dismissible notice was printed, not on every admin
+	 * screen. Grant and deny in one test: the non-dismissible fixture first.
+	 */
+	public function test_the_dismiss_script_is_hooked_only_after_a_dismissible_notice_printed(): void {
+		$notices = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_DATALAYER_NAME => 'not-an-identifier',
+			)
+		);
+		$notices->register_hooks();
+		$this->assertFalse( has_action( 'admin_footer', array( $notices, 'print_dismiss_script' ) ), 'Registering the hooks alone puts nothing in the footer.' );
+
+		ob_start();
+		$notices->show_notices();
+		ob_end_clean();
+		$this->assertFalse( has_action( 'admin_footer', array( $notices, 'print_dismiss_script' ) ), 'A non-dismissible notice needs no dismiss handler.' );
+
+		$dismissible = $this->make_notices_with_options(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array(),
+				GTM4WP_OPTION_GTM_PLACEMENT  => GTM4WP_PLACEMENT_FOOTER,
+			)
+		);
+		ob_start();
+		$dismissible->show_notices();
+		ob_end_clean();
+		$this->assertNotFalse( has_action( 'admin_footer', array( $dismissible, 'print_dismiss_script' ) ), 'A dismissible notice hooks the handler that reports its dismissal.' );
 	}
 
 	public function test_a_non_dismissible_error_renders_without_the_dismiss_class(): void {

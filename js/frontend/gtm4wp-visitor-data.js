@@ -170,8 +170,9 @@ import {
 	 */
 	const producers = {
 		/**
-		 * The site search term from the current URL query string (?s=...),
-		 * mirroring get_search_query() / the siteSearchTerm server value.
+		 * The site search term from the current URL query string (?s=...), raw:
+		 * the server-rendered siteSearchTerm is the raw query too (#274), so
+		 * both tiers report the same string.
 		 *
 		 * @return {string} The search term, or '' when absent.
 		 */

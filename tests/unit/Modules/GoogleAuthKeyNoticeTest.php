@@ -36,6 +36,8 @@ final class GoogleAuthKeyNoticeTest extends TestCase {
 		Functions\stubEscapeFunctions();
 		Functions\when( '_n' )->alias( static fn ( $single, $plural, $number ) => ( 1 === $number ) ? $single : $plural );
 		Functions\when( 'menu_page_url' )->justReturn( self::SETTINGS_URL );
+		// Notices render inside wp-admin, after the menu was registered (#282).
+		do_action( 'admin_menu' );
 		// The vault sanitizes labels on write; the stand-in strips tags the way
 		// sanitize_text_field() does, so the notice's own escape is what the
 		// assertions below exercise, not the write-time cleanup.

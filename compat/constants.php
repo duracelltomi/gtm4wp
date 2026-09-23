@@ -93,10 +93,13 @@ define( 'GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE', 'include-master-language' );
 // pushes what it can itself (referrer, search) as a gtm4wp.visitorData event.
 define( 'GTM4WP_OPTION_CACHE_SAFE_DATALAYER', 'cache-safe-datalayer' );
 
+// Live: the Cloudflare country code page variable (PageVariables module). Not
+// part of the removed geo/weather set below, despite the shared prefix.
+define( 'GTM4WP_OPTION_INCLUDE_MISCGEOCF', 'include-miscgeo-cloudflare' );
+
 // Removed in 2.0: geo and weather data. Constants kept for third party compatibility.
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEO', 'include-miscgeo' );
 define( 'GTM4WP_OPTION_INCLUDE_MISCGEOAPI', 'geo-apikey' );
-define( 'GTM4WP_OPTION_INCLUDE_MISCGEOCF', 'include-miscgeo-cloudflare' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHER', 'include-weather' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHERUNITS', 'weather-weatherunits' );
 define( 'GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI', 'weather-openweathermap-apikey' );
@@ -245,6 +248,8 @@ define( 'GTM4WP_WPACTION_AFTER_CONTAINER_CODE', 'gtm4wp_after_container_code' );
  * Filter deciding whether the container code (head loader + noscript iframe)
  * is output on the current request; default true. Return false (e.g. from an
  * mu-plugin on a staging copy) to suppress it while the data layer stays active.
+ * Applied once per output site (head and body), so a callback runs more than
+ * once per request and must be cheap and side-effect free (#310).
  */
 define( 'GTM4WP_WPFILTER_OUTPUT_CONTAINER', 'gtm4wp_output_container' );
 

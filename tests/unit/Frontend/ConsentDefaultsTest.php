@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Frontend;
 
 use Brain\Monkey\Filters;
+use Brain\Monkey\Functions;
 use GTM4WP\Frontend\ConsentDefaults;
 use GTM4WP\Frontend\ScriptTag;
 
@@ -130,5 +131,48 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$this->assertStringContainsString( '"security_storage": "denied"', $block );
 		$this->assertStringContainsString( '"personalization_storage": "denied"', $block );
 		$this->assertStringContainsString( 'function gtag(){dataLayer.push(arguments);}', $block );
+	}
+
+	/**
+	 * #269 (RI-14): the gtag shim must push to the CONFIGURED data layer, the
+	 * array the container reads via `&l=`. 1.x hardcoded `dataLayer`, so a site
+	 * with a renamed data layer never applied its consent defaults.
+	 */
+	public function test_script_block_binds_the_shim_to_the_configured_data_layer_name(): void {
+		$options = $this->make_options( array( GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true ) );
+
+		$block = ( new ConsentDefaults( $options ) )->script_block( new ScriptTag( $options ), 'myDL' );
+
+		$this->assertStringContainsString( 'function gtag(){myDL.push(arguments);}', $block );
+		$this->assertStringNotContainsString( 'dataLayer.push(arguments)', $block );
+	}
+
+	/**
+	 * #308: a filter callback that answers in the output vocabulary ("denied")
+	 * must not be read as a truthy boolean.
+	 */
+	public function test_flag_accepts_the_granted_and_denied_strings_from_the_filter(): void {
+		$consent = new ConsentDefaults(
+			$this->make_options(
+				array(
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS => true,
+				)
+			)
+		);
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $tag, $value = null ) {
+				return GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG === $tag ? 'denied' : $value;
+			}
+		);
+		$this->assertSame( 'denied', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
+
+		Functions\when( 'apply_filters' )->alias(
+			static function ( $tag, $value = null ) {
+				return GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG === $tag ? 'granted' : $value;
+			}
+		);
+		$this->assertSame( 'granted', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
 	}
 }

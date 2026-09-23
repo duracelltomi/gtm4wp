@@ -23,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Migration {
 
-	private const VERSION_OPTION = 'gtm4wp-plugin-version';
+	public const VERSION_OPTION = 'gtm4wp-plugin-version';
 
 	/**
 	 * Option keys of features removed in 2.0: weather + geo data, WP e-Commerce,
@@ -76,7 +76,10 @@ final class Migration {
 
 		self::cleanup_removed_options();
 
-		update_option( self::VERSION_OPTION, GTM4WP_VERSION, false );
+		// Autoloaded: read on every admin request, a few bytes (#292). The stored
+		// flag flips on the next version change (update_option() returns early
+		// on an unchanged value).
+		update_option( self::VERSION_OPTION, GTM4WP_VERSION, true );
 	}
 
 	/**

@@ -225,4 +225,19 @@ describe( 'gtm4wp-client-device-data', () => {
 		loadTracker();
 		expect( deviceEvents() ).toHaveLength( 1 );
 	} );
+
+	it( 'pushes nothing when the config the PHP side prints is missing', () => {
+		// #290: fail closed like gtm4wp-visitor-data.js. The config is the admin's
+		// per-signal choice; a stripped inline script must not turn every signal on.
+		delete window.gtm4wp_clientdevice_config;
+		setNavigator( {
+			userAgent:
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+			userAgentData: undefined,
+		} );
+
+		loadTracker();
+
+		expect( deviceEvents() ).toHaveLength( 0 );
+	} );
 } );

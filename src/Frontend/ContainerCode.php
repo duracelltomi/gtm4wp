@@ -30,7 +30,10 @@ final class ContainerCode {
 	/**
 	 * Internal filter that modules use to append inline JavaScript to the
 	 * data layer initialization block in the <head> (e.g. consent tool
-	 * callbacks).
+	 * callbacks). The block passes through ScriptTag::print_script_block(),
+	 * whose wp_kses() pass rewrites a bare `<` or `>` and strips tag-like
+	 * spans, so the appended code must contain neither (no `=>`, `>=`, `<`
+	 * comparisons or regex literals) and no literal `&amp;` (#271, RI-3).
 	 *
 	 * @since 2.0.0
 	 */
@@ -118,10 +121,14 @@ final class ContainerCode {
 	 * Function executed during wp_head with high priority.
 	 * Outputs some global JavaScript variables that need to be accessible by other parts of the plugin.
 	 *
-	 * @param boolean $echo_output If set to true and AMP is not generating the page content, the HTML is output immediately.
-	 * @return string|void Returns the HTML if the $echo_output parameter is set to false or when AMP page generation is running.
+	 * On an AMP page nothing is output or returned (the AMP module reads
+	 * DataLayer::compiled() instead). The returned form skips the
+	 * print_script_block() sanitizer: the caller owns the escaping.
+	 *
+	 * @param bool $echo_output True prints the block; false returns it.
+	 * @return string|void The block when $echo_output is false, otherwise nothing.
 	 */
-	public function header_top( $echo_output = true ) {
+	public function header_top( bool $echo_output = true ) {
 		$datalayer_name = $this->datalayer->name();
 
 		// 'var', not 'let': 'let' breaks related browser extensions and third party
@@ -154,7 +161,9 @@ final class ContainerCode {
 		/**
 		 * Filters the additional inline JavaScript appended to the data layer
 		 * initialization block. Modules (e.g. consent tool integrations) add
-		 * their 1.x-identical code snippets here.
+		 * their 1.x-identical code snippets here. The block is sanitized with
+		 * wp_kses(): the JavaScript must contain no `<`, `>` or literal `&amp;`
+		 * (see FILTER_HEADER_TOP_JS), or the whole head block fails to parse.
 		 *
 		 * @since 2.0.0
 		 *
@@ -220,7 +229,7 @@ final class ContainerCode {
 	 *
 	 * @return void
 	 */
-	public function header_begin() {
+	public function header_begin(): void {
 		// On an AMP page the container <script> would be stripped by the AMP
 		// sanitizer; the AMP module injects amp-analytics instead. The data layer
 		// is still compiled so its values, the hook and the global stay available.
@@ -266,7 +275,7 @@ final class ContainerCode {
 		}
 
 		if ( $this->consent->enabled() ) {
-			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag ) );
+			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag, $datalayer_name ) );
 		}
 
 		if ( ( array() !== $containers ) && $output_container_code ) {
@@ -441,11 +450,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			$GLOBALS['gtm4wp_container_code_written'] = true;
 
 			if ( ! $no_console_log ) {
-				$_gtm_tag .= '
-' . $this->script_tag->opening_tag() . '
-	console.warn && console.warn("[GTM4WP] Google Tag Manager container code placement set to OFF !!!");
-	console.warn && console.warn("[GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!!");
-</script>';
+				$_gtm_tag .= $this->console_off_warning();
 			}
 		} elseif ( ! $this->should_output_container() ) {
 			// Kill switch: same as placement OFF.

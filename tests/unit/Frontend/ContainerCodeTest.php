@@ -754,6 +754,58 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertLessThan( $loader_pos, $consent_pos, 'Consent defaults must be output before the container loader.' );
 	}
 
+	/**
+	 * #269 (RI-14): with a renamed data layer the consent shim, the header and
+	 * the loader must all name the same array, or the defaults never reach GTM.
+	 */
+	public function test_header_begin_binds_the_consent_shim_to_the_renamed_data_layer(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE              => 'GTM-AAA111',
+				GTM4WP_OPTION_DATALAYER_NAME        => 'customDL',
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'function gtag(){customDL.push(arguments);}', $output );
+		$this->assertStringContainsString( "'customDL','GTM-AAA111'", $output );
+		$this->assertStringNotContainsString( 'dataLayer.push(arguments)', $output );
+	}
+
+	/**
+	 * #271: print_script_block() runs wp_kses(), which rewrites a bare `<`/`>`
+	 * and strips tag-like spans. The identity stub in FrontendTestCase cannot
+	 * see that, so this pins the plugin's own head block against a model that
+	 * does; a `<` or `>` sneaking into the JavaScript would fail here.
+	 */
+	public function test_header_top_javascript_survives_a_kses_pass_that_rewrites_angle_brackets(): void {
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- model matches the real signature
+				// Keep the <script> element and the HTML comments, encode every
+				// other angle bracket (kses keeps allowed tags and comments too).
+				return preg_replace_callback(
+					'#(<script[^>]*>|</script>|<!--.*?-->)|([<>])#s',
+					static fn ( $m ) => '' !== $m[1] ? $m[1] : ( '<' === $m[2] ? '&lt;' : '&gt;' ),
+					$content
+				);
+			}
+		);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' ) );
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var customDL = customDL || [];', $output );
+		$this->assertStringNotContainsString( '&lt;', $output );
+		$this->assertStringNotContainsString( '&gt;', $output );
+	}
+
 	public function test_header_begin_custom_domain_and_path_in_loader(): void {
 		$container = $this->make_container(
 			array(
@@ -1211,8 +1263,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	public function test_header_top_returns_markup_when_echo_disabled(): void {
-		// The $echo_output = false path (used by the AMP integration) returns the
-		// markup instead of printing it.
+		// The $echo_output = false path returns the markup instead of printing
+		// it (public API for themes; no in-tree caller, #306).
 		$container = $this->make_container( array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' ) );
 
 		ob_start();

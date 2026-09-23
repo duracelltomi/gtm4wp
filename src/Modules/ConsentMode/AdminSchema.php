@@ -224,7 +224,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: false,
 				label: __( 'Enable Axeptio', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Enable this to let GTM4WP load the Axeptio CMP SDK directly. No separate Axeptio plugin is required. Enter your Axeptio project ID and cookies version below.',
+					'Enable this to let GTM4WP load the Axeptio CMP SDK directly. No separate Axeptio plugin is required. Enter your Axeptio project ID and cookies version below. A dedicated dataLayer event (gtm4wp.axeptioConsentUpdate) is pushed whenever the visitor updates their choices.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: 'axeptio',
@@ -260,7 +260,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: false,
 				label: __( 'Enable Google Consent Mode v2', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'When enabled, Axeptio drives Google Consent Mode v2: it fires both the "default" (everything denied) and the "update" commands using its certified vendor mapping. Use this instead of the plugin\'s own "Google Consent Mode" feature, and do not enable both. A dedicated dataLayer event (gtm4wp.axeptioConsentUpdate) is also pushed whenever the visitor updates their choices.',
+					'When enabled, Axeptio drives Google Consent Mode v2: it fires both the "default" (everything denied) and the "update" commands using its certified vendor mapping. Use this instead of the plugin\'s own "Google Consent Mode" feature, and do not enable both.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: 'axeptio',

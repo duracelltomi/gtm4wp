@@ -101,6 +101,11 @@ final class UserEventsModule extends AbstractModule {
 	/**
 	 * Sets a cookie so that the next page load can fire a GTM event after a user has been logged in.
 	 *
+	 * The Secure flag needs BOTH an https home URL and is_ssl(): the cookie is
+	 * written on the login page (TLS under FORCE_SSL_ADMIN even on an http site)
+	 * and read on the front end, so is_ssl() alone would set a flag the http
+	 * pages never send back. Deliberately unlike the other cookie writers (#214).
+	 *
 	 * @return void
 	 */
 	public function on_login(): void {

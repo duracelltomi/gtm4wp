@@ -215,6 +215,54 @@ final class FieldTest extends TestCase {
 		$this->assertSame( '', $table_result[0]['id'], 'A nested-array table cell collapses to an empty string.' );
 	}
 
+	/**
+	 * #287: the default TYPE_TABLE branch (the one a third-party module gets
+	 * without a custom sanitizer) stores only the declared columns; a row from
+	 * an import may carry any key. No declared columns keeps every key.
+	 */
+	public function test_table_keeps_only_the_declared_columns(): void {
+		$field = $this->make_field(
+			Field::TYPE_TABLE,
+			array(),
+			array(
+				'columns' => array(
+					array( 'key' => 'id' ),
+					array( 'key' => 'code' ),
+				),
+			)
+		);
+
+		$submitted = array(
+			array(
+				'id'       => 'GTM-AAA',
+				'evil_col' => 'x',
+				'code'     => 'c',
+			),
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'id'   => 'GTM-AAA',
+					'code' => 'c',
+				),
+			),
+			$field->sanitize( $submitted )
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'id'       => 'GTM-AAA',
+					'evil_col' => 'x',
+					'code'     => 'c',
+				),
+			),
+			$this->make_field( Field::TYPE_TABLE, array() )->sanitize( $submitted ),
+			'With no columns declared the branch is unchanged.'
+		);
+	}
+
 	public function test_custom_sanitizer_takes_precedence(): void {
 		$field = $this->make_field(
 			Field::TYPE_TEXT,

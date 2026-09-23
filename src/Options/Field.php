@@ -173,11 +173,21 @@ final class Field {
 				if ( ! is_array( $value ) ) {
 					return array();
 				}
+				// Only the declared columns are stored (#287): a submitted row may
+				// carry any key. With no columns declared every key is kept.
+				$keys = array_values( array_filter( array_column( $this->columns, 'key' ), 'is_string' ) );
+
 				return array_values(
 					array_map(
-						static fn ( $row ) => is_array( $row )
-							? array_map( static fn ( $cell ) => sanitize_text_field( self::to_string( $cell ) ), $row )
-							: array(),
+						static function ( $row ) use ( $keys ) {
+							if ( ! is_array( $row ) ) {
+								return array();
+							}
+							if ( array() !== $keys ) {
+								$row = array_intersect_key( $row, array_flip( $keys ) );
+							}
+							return array_map( static fn ( $cell ) => sanitize_text_field( self::to_string( $cell ) ), $row );
+						},
 						$value
 					)
 				);

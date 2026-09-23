@@ -25,7 +25,10 @@ defined( 'ABSPATH' ) || exit;
 interface ModuleInterface {
 
 	/**
-	 * Unique module id, used as the REST/admin navigation key.
+	 * Unique module id, used as the REST/admin navigation key. Use lower-case
+	 * letters, digits and hyphens only: the id is written into the settings
+	 * screen's URL fragment (`#<module>/<group>`) and derived into Site Health
+	 * test ids, and a `/`, space or non-ASCII character breaks the bookmark (#293).
 	 *
 	 * @return string
 	 */

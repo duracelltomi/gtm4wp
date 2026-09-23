@@ -411,6 +411,15 @@ final class UserEventsModuleTest extends TestCase {
 		$this->assertFalse( $this->cookie_writes[0][5] );
 	}
 
+	public function test_cookies_are_not_marked_secure_on_a_tls_login_page_of_an_http_site(): void {
+		// #214's divergent cell (owed since R30, #300): the login page runs under
+		// TLS (FORCE_SSL_ADMIN) while the front end, where the cookie is read, is
+		// plain http - a Secure cookie would never be sent back there.
+		$this->make_module( array(), true, 'http://shop.example', true )->on_login();
+
+		$this->assertFalse( $this->cookie_writes[0][5], 'An http home URL wins over is_ssl() on the login page.' );
+	}
+
 	public function test_clear_event_cookies_expires_both_cookies_when_present(): void {
 		$_COOKIE['gtm4wp_user_logged_in']  = '1';
 		$_COOKIE['gtm4wp_user_registered'] = '1';

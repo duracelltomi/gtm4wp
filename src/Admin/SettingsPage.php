@@ -61,9 +61,10 @@ final class SettingsPage {
 	 * @return string URL for use in an href; escape it at the point of output.
 	 */
 	public static function url( string $field_key = '' ): string {
-		// menu_page_url() lives in an admin-only file; an ability asks for the
-		// link on a REST request, where only admin_url() exists.
-		$url = function_exists( 'menu_page_url' )
+		// menu_page_url() answers only once admin_menu has registered the page.
+		// Its file may be loaded on a REST request too (ConfigurationChecks
+		// requires it), where the function exists and returns '' (#282).
+		$url = function_exists( 'menu_page_url' ) && did_action( 'admin_menu' )
 			? menu_page_url( GTM4WP_ADMINSLUG, false )
 			: admin_url( 'options-general.php?page=' . GTM4WP_ADMINSLUG );
 

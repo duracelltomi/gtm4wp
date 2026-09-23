@@ -13,6 +13,13 @@ const preset = require( '@wordpress/jest-preset-default/jest-preset' );
 
 module.exports = {
 	...preset,
+	// A git worktree checked out under .claude/worktrees/ (the Agent tool's
+	// isolation location) carries a full copy of this suite; without this a
+	// root run collects and counts it too (#311).
+	testPathIgnorePatterns: [
+		...( preset.testPathIgnorePatterns || [] ),
+		'<rootDir>/.claude/worktrees/',
+	],
 	setupFilesAfterEnv: [
 		...( preset.setupFilesAfterEnv || [] ),
 		require.resolve( '@testing-library/jest-dom' ),

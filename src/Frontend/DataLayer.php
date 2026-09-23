@@ -145,8 +145,8 @@ final class DataLayer {
 	 *
 	 * @param string $event_name      The name of the GTM event.
 	 * @param array  $event_data      Additional event parameters to be passed after the event. Optional.
-	 * @param string $js_before       Inline JS code to be added before the dataLayer.push() line.
-	 * @param string $js_after        Inline JS code to be added after the dataLayer.push() line.
+	 * @param string $js_before       Inline JS code to be added before the dataLayer.push() line (string, scalar or null; anything else returns false).
+	 * @param string $js_after        Inline JS code to be added after the dataLayer.push() line (same rule).
 	 * @param string $js_wrapper      Optional. Name of a `window` function the pushed object passes through first (e.g. to merge visitor data client-side). Must be a plain identifier or it is dropped; an unloaded wrapper falls back to identity.
 	 * @param array  $js_wrapper_args Optional. Extra JSON-encoded arguments passed to $js_wrapper after the object.
 	 * @return bool True when the event was successfully queued.
@@ -157,6 +157,16 @@ final class DataLayer {
 		}
 
 		if ( ! is_array( $event_data ) ) {
+			return false;
+		}
+
+		// The two raw JS legs are concatenated at flush time, so an array or a
+		// non-Stringable object would print "Array" into the script (#288); the
+		// wrapper docblock promises false for an invalid type.
+		$js_before = self::inline_js_leg( $js_before );
+		$js_after  = self::inline_js_leg( $js_after );
+
+		if ( null === $js_before || null === $js_after ) {
 			return false;
 		}
 
@@ -180,6 +190,26 @@ final class DataLayer {
 		);
 
 		return true;
+	}
+
+	/**
+	 * Normalizes a raw inline-JS leg of queue_push(): null becomes '', a scalar
+	 * or Stringable is cast (the forms that always worked), anything else is
+	 * invalid.
+	 *
+	 * @param mixed $leg The js_before / js_after argument.
+	 * @return string|null The JS, or null when the type is invalid.
+	 */
+	private static function inline_js_leg( $leg ): ?string {
+		if ( null === $leg ) {
+			return '';
+		}
+
+		if ( is_scalar( $leg ) || $leg instanceof \Stringable ) {
+			return (string) $leg;
+		}
+
+		return null;
 	}
 
 	/**
@@ -259,7 +289,7 @@ final class DataLayer {
 				$datalayer_push_code .= $one_event['js_after'];
 			}
 
-			wp_add_inline_script( 'gtm4wp-additional-datalayer-pushes', $datalayer_push_code, 'after' );
+			wp_add_inline_script( self::PUSH_HANDLE, $datalayer_push_code, 'after' );
 		}
 
 		// Reset the queue so this method can re-run without double output.
