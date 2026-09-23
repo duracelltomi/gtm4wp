@@ -269,7 +269,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Fixed: a user account created by a logged-in administrator through the REST API or an admin app fired gtm4wp.userRegistered in the administrator's own browser instead of nowhere.
 * Fixed: the form interaction and Contact Form 7 events reported a hidden action field instead of the form's URL when the form contained a field named action, id or target.
 * Fixed: the browser, OS and device data script reported all three signals when a page optimiser removed its inline configuration, ignoring which of them were enabled. It now reports nothing in that case.
-* Fixed: with the cache-safe data layer, a logged-in visitor served a cached page kept requesting their visitor data on every page view after WordPress refused the page's nonce. The data is requested once more anonymously and that page stops asking.
+* Fixed: with the cache-safe data layer, a logged-in visitor served a cached page kept requesting their visitor data on every page view after WordPress refused the page's nonce. When WordPress itself reports the rejected nonce, the data is requested once more anonymously and that page stops asking.
 * Updated: tested with WooCommerce 11.1.2.
 
 = 2.0.2 =

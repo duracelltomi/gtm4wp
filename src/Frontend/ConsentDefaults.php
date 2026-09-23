@@ -116,7 +116,7 @@ final class ConsentDefaults {
 	 * @param string    $datalayer_name Validated data layer variable name (DataLayer::name()).
 	 * @return string
 	 */
-	public function script_block( ScriptTag $script_tag, string $datalayer_name = 'dataLayer' ): string {
+	public function script_block( ScriptTag $script_tag, string $datalayer_name ): string {
 		return '
 ' . $script_tag->opening_tag() . '
 		if (typeof gtag == "undefined") {

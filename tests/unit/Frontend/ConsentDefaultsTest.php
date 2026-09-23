@@ -119,7 +119,7 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		);
 
 		$consent = new ConsentDefaults( $options );
-		$block   = $consent->script_block( new ScriptTag( $options ) );
+		$block   = $consent->script_block( new ScriptTag( $options ), 'dataLayer' );
 
 		$this->assertStringContainsString( 'gtag("consent", "default", {', $block );
 		$this->assertStringContainsString( '"analytics_storage": "granted"', $block );
