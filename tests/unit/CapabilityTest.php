@@ -38,6 +38,44 @@ final class CapabilityTest extends TestCase {
 		$this->assertSame( self::CUSTOMCAP, Capability::settings() );
 	}
 
+	/**
+	 * #285: a wrong-typed or empty filter return used to reach current_user_can()
+	 * as '' or "Array" and deny everyone silently. It is a site bug: reported
+	 * through _doing_it_wrong() and the default capability is kept.
+	 *
+	 * @param mixed $returned What the site's callback returned.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_non_capability_returns' )]
+	public function test_a_non_string_filter_return_is_reported_and_falls_back_to_the_default( $returned ): void {
+		Filters\expectApplied( Capability::FILTER )->once()->with( 'manage_options' )->andReturn( $returned );
+		Functions\when( '__' )->returnArg();
+		Functions\when( 'esc_html' )->returnArg();
+		Functions\expect( '_doing_it_wrong' )->once()->with( 'GTM4WP\Capability::settings', \Mockery::type( 'string' ), '2.1' );
+
+		$this->assertSame( 'manage_options', Capability::settings() );
+	}
+
+	/**
+	 * The returns a site callback can hand back that are not a capability name.
+	 *
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function provide_non_capability_returns(): array {
+		return array(
+			'null'         => array( null ),
+			'false'        => array( false ),
+			'empty string' => array( '' ),
+			'array'        => array( array( 'manage_options' ) ),
+		);
+	}
+
+	public function test_a_capability_string_from_the_filter_raises_no_notice(): void {
+		Filters\expectApplied( Capability::FILTER )->once()->with( 'manage_options' )->andReturn( 'do_not_allow' );
+		Functions\expect( '_doing_it_wrong' )->never();
+
+		$this->assertSame( 'do_not_allow', Capability::settings() );
+	}
+
 	public function test_can_manage_settings_checks_manage_options_by_default(): void {
 		Functions\expect( 'current_user_can' )
 			->once()

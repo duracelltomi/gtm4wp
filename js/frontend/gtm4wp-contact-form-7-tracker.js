@@ -137,9 +137,31 @@ function gtm4wp_cf7_ga4_form_fields( form ) {
 	return {
 		form_id: idinput ? idinput.value : '',
 		form_name: gtm4wp_cf7_form_name( form ),
-		form_destination:
-			form && form.action ? form.action : window.location.href,
+		form_destination: gtm4wp_cf7_form_destination( form ),
 	};
+}
+
+/**
+ * The form's action as an absolute URL, the current page when it has none.
+ * The attribute, resolved against document.baseURI: a control named `action`
+ * shadows the DOM property (#280).
+ *
+ * @param {Element} form The Contact Form 7 <form> element.
+ * @return {string} Absolute URL.
+ */
+function gtm4wp_cf7_form_destination( form ) {
+	const action =
+		form && form.getAttribute ? form.getAttribute( 'action' ) || '' : '';
+
+	if ( '' === action ) {
+		return window.location.href;
+	}
+
+	try {
+		return new URL( action, document.baseURI ).href;
+	} catch ( e ) {
+		return window.location.href;
+	}
 }
 
 /**

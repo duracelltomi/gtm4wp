@@ -17,6 +17,9 @@
  * free text, so it changes on nearly every keystroke and slow responses arrive
  * out of order. A late response for an ABANDONED project id must not overwrite
  * the current one.
+ *
+ * The fetch is debounced (#283), so the file runs on fake timers and every
+ * case that expects a request flushes the debounce first.
  */
 
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -29,6 +32,19 @@ const MANUAL_ENTRY_AFTER_FAILURE =
 	'The Axeptio project versions could not be loaded. Enter the cookies version manually below.';
 const MANUAL_ENTRY_AFTER_EMPTY =
 	'We were unable to find your Axeptio project, or it has not been published yet. Enter the cookies version manually below.';
+
+// Mirrors FETCH_DELAY_MS in the component.
+const FETCH_DELAY_MS = 400;
+
+/**
+ * Lets the debounce elapse so the pending fetch is issued; async so a response
+ * that settles at once lands inside act().
+ */
+async function flushDebounce() {
+	await act( async () => {
+		jest.advanceTimersByTime( FETCH_DELAY_MS );
+	} );
+}
 
 function renderControl( { projectId = 'proj-1', value = '' } = {} ) {
 	const onChange = jest.fn();
@@ -60,17 +76,20 @@ function okResponse( body ) {
 }
 
 beforeEach( () => {
+	jest.useFakeTimers();
 	window.fetch = jest.fn();
 } );
 
 afterEach( () => {
 	delete window.fetch;
 	jest.clearAllMocks();
+	jest.useRealTimers();
 } );
 
 describe( 'AxeptioVersionControl without a Project ID', () => {
-	it( 'does not call the Axeptio API at all', () => {
+	it( 'does not call the Axeptio API at all', async () => {
 		renderControl( { projectId: '' } );
+		await flushDebounce();
 
 		expect( window.fetch ).not.toHaveBeenCalled();
 	} );
@@ -86,8 +105,9 @@ describe( 'AxeptioVersionControl without a Project ID', () => {
 		).toBeInTheDocument();
 	} );
 
-	it( 'treats a whitespace-only Project ID as absent', () => {
+	it( 'treats a whitespace-only Project ID as absent', async () => {
 		renderControl( { projectId: '   ' } );
+		await flushDebounce();
 
 		expect( window.fetch ).not.toHaveBeenCalled();
 	} );
@@ -98,6 +118,7 @@ describe( 'AxeptioVersionControl with published versions', () => {
 		window.fetch.mockReturnValue( okResponse( { cookies: [] } ) );
 
 		renderControl( { projectId: 'a/b c' } );
+		await flushDebounce();
 
 		await waitFor( () => expect( window.fetch ).toHaveBeenCalled() );
 
@@ -116,6 +137,7 @@ describe( 'AxeptioVersionControl with published versions', () => {
 		);
 
 		renderControl();
+		await flushDebounce();
 
 		expect(
 			await screen.findByRole( 'option', { name: 'Version one' } )
@@ -133,6 +155,7 @@ describe( 'AxeptioVersionControl with published versions', () => {
 		);
 
 		renderControl( { value: 'retired-version' } );
+		await flushDebounce();
 
 		expect(
 			await screen.findByRole( 'option', { name: 'retired-version' } )
@@ -145,6 +168,7 @@ describe( 'AxeptioVersionControl degradation to manual entry', () => {
 		window.fetch.mockReturnValue( okResponse( { cookies: [] } ) );
 
 		renderControl();
+		await flushDebounce();
 
 		expect(
 			await screen.findByText( MANUAL_ENTRY_AFTER_EMPTY )
@@ -158,6 +182,7 @@ describe( 'AxeptioVersionControl degradation to manual entry', () => {
 		window.fetch.mockReturnValue( okResponse( { cookies: 'nope' } ) );
 
 		renderControl();
+		await flushDebounce();
 
 		expect(
 			await screen.findByText( MANUAL_ENTRY_AFTER_EMPTY )
@@ -168,6 +193,7 @@ describe( 'AxeptioVersionControl degradation to manual entry', () => {
 		window.fetch.mockReturnValue( okResponse( {} ) );
 
 		renderControl();
+		await flushDebounce();
 
 		expect(
 			await screen.findByText( MANUAL_ENTRY_AFTER_EMPTY )
@@ -178,6 +204,7 @@ describe( 'AxeptioVersionControl degradation to manual entry', () => {
 		window.fetch.mockReturnValue( Promise.resolve( { ok: false } ) );
 
 		renderControl();
+		await flushDebounce();
 
 		expect(
 			await screen.findByText( MANUAL_ENTRY_AFTER_FAILURE )
@@ -190,6 +217,7 @@ describe( 'AxeptioVersionControl degradation to manual entry', () => {
 		);
 
 		renderControl();
+		await flushDebounce();
 
 		expect(
 			await screen.findByText( MANUAL_ENTRY_AFTER_FAILURE )
@@ -202,6 +230,7 @@ describe( 'AxeptioVersionControl degradation to manual entry', () => {
 		);
 
 		renderControl( { value: 'saved-version' } );
+		await flushDebounce();
 
 		await screen.findByText( MANUAL_ENTRY_AFTER_FAILURE );
 		expect(
@@ -224,6 +253,8 @@ describe( 'AxeptioVersionControl stale-response guard', () => {
 		);
 
 		const { rerender } = renderControl( { projectId: 'old-project' } );
+		// Past the debounce: the first request is really in flight.
+		await flushDebounce();
 
 		// The admin keeps typing: a second Project ID supersedes the first.
 		rerender(
@@ -235,7 +266,9 @@ describe( 'AxeptioVersionControl stale-response guard', () => {
 				onChange={ jest.fn() }
 			/>
 		);
+		await flushDebounce();
 
+		expect( window.fetch ).toHaveBeenCalledTimes( 2 );
 		expect(
 			await screen.findByRole( 'option', { name: 'Current project' } )
 		).toBeInTheDocument();
@@ -257,6 +290,43 @@ describe( 'AxeptioVersionControl stale-response guard', () => {
 		).not.toBeInTheDocument();
 		expect(
 			screen.getByRole( 'option', { name: 'Current project' } )
+		).toBeInTheDocument();
+	} );
+} );
+
+describe( 'AxeptioVersionControl debounce', () => {
+	it( 'issues one request for the last of several rapid Project ID edits', async () => {
+		// Five keystrokes inside the debounce window: the abandoned ids never
+		// reach the third-party host at all (#283).
+		window.fetch.mockReturnValue( okResponse( { cookies: [] } ) );
+
+		const { rerender } = renderControl( { projectId: 'p' } );
+
+		[ 'pr', 'pro', 'proj', 'proj-5' ].forEach( ( projectId ) => {
+			act( () => {
+				jest.advanceTimersByTime( 50 );
+			} );
+			rerender(
+				<AxeptioVersionControl
+					value=""
+					allValues={ { [ PROJECT_ID_KEY ]: projectId } }
+					label="Cookies version"
+					help={ null }
+					onChange={ jest.fn() }
+				/>
+			);
+		} );
+
+		expect( window.fetch ).not.toHaveBeenCalled();
+
+		await flushDebounce();
+
+		expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( window.fetch.mock.calls[ 0 ][ 0 ] ).toContain(
+			'https://client.axept.io/proj-5.json'
+		);
+		expect(
+			await screen.findByText( MANUAL_ENTRY_AFTER_EMPTY )
 		).toBeInTheDocument();
 	} );
 } );

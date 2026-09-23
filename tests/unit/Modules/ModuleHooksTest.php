@@ -120,6 +120,17 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertFalse( has_filter( 'wpcf7_form_additional_atts', array( $disabled, 'add_form_name_attribute' ) ) );
 	}
 
+	/**
+	 * #278: the event cookies are consumed on template_redirect, which only a
+	 * page render reaches - never on init, which a REST request runs too.
+	 */
+	public function test_user_events_clear_the_cookies_on_template_redirect_not_init(): void {
+		$module = $this->boot( new UserEventsModule() );
+
+		$this->assertNotFalse( has_action( 'template_redirect', array( $module, 'clear_event_cookies' ) ) );
+		$this->assertFalse( has_action( 'init', array( $module, 'clear_event_cookies' ) ) );
+	}
+
 	public function test_user_events_login_hook_active_when_enabled(): void {
 		$enabled = $this->boot( new UserEventsModule(), array( GTM4WP_OPTION_EVENTS_USERLOGIN => true ) );
 		$this->assertNotFalse( has_action( 'wp_login', array( $enabled, 'on_login' ) ) );

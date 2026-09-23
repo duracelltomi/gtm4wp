@@ -171,102 +171,107 @@ export default function DestinationsPanel( { data, values } ) {
 		.map( ( row, index ) => ( { row, index } ) )
 		.filter( ( { row } ) => isTestable( row ) );
 
-	// Shown even with no testable row: "no destination configured" is one
-	// of the entries worth reading.
-	if ( 0 === testable.length ) {
-		return (
-			<SendLogList
-				logPath={ logPath }
-				replayPath={ replayPath }
-				hideWhenEmpty={ ! sendingEnabled }
-			/>
-		);
-	}
-
+	// The log keeps one tree position whether or not a row is testable, so a
+	// row becoming (or ceasing to be) testable does not remount it and refetch
+	// (#284). It is shown even with no testable row: "no destination
+	// configured" is one of the entries worth reading.
 	return (
-		<div className="gtm4wp-destinations">
-			<h3>
-				{ __( 'Test destinations', 'duracelltomi-google-tag-manager' ) }
-			</h3>
-			<p>
-				{ __(
-					'Each test sends one validation-only request: Google checks the destination and the access of its service account, but stores nothing. Unsaved changes to the table are tested as shown above.',
-					'duracelltomi-google-tag-manager'
-				) }
-			</p>
-			<ul className="gtm4wp-destinations__list">
-				{ testable.map( ( { row, index } ) => {
-					const record =
-						healthRecords[ cell( row, COLUMN_MEASUREMENT ) ];
-					const failing =
-						record && record.consecutive_failures >= threshold;
-					const stored = results[ index ];
-					const result =
-						stored &&
-						stored.fingerprint ===
-							JSON.stringify( probePayload( row ) )
-							? stored
-							: null;
+		<>
+			{ testable.length > 0 && (
+				<div className="gtm4wp-destinations">
+					<h3>
+						{ __(
+							'Test destinations',
+							'duracelltomi-google-tag-manager'
+						) }
+					</h3>
+					<p>
+						{ __(
+							'Each test sends one validation-only request: Google checks the destination and the access of its service account, but stores nothing. Unsaved changes to the table are tested as shown above.',
+							'duracelltomi-google-tag-manager'
+						) }
+					</p>
+					<ul className="gtm4wp-destinations__list">
+						{ testable.map( ( { row, index } ) => {
+							const record =
+								healthRecords[
+									cell( row, COLUMN_MEASUREMENT )
+								];
+							const failing =
+								record &&
+								record.consecutive_failures >= threshold;
+							const stored = results[ index ];
+							const result =
+								stored &&
+								stored.fingerprint ===
+									JSON.stringify( probePayload( row ) )
+									? stored
+									: null;
 
-					return (
-						<li key={ index } className="gtm4wp-destinations__row">
-							<span className="gtm4wp-destinations__name">
-								{ rowName( row ) }
-							</span>
-							<Button
-								variant="secondary"
-								disabled={ null !== busyIndex }
-								isBusy={ busyIndex === index }
-								label={ sprintf(
-									/* translators: %s: label or measurement ID of the destination. */
-									__(
-										'Test %s',
-										'duracelltomi-google-tag-manager'
-									),
-									rowName( row )
-								) }
-								onClick={ () => onTest( row, index ) }
-							>
-								{ __(
-									'Test',
-									'duracelltomi-google-tag-manager'
-								) }
-							</Button>
-							{ result && (
-								<span
-									className={ `gtm4wp-destinations__result gtm4wp-destinations__result--${
-										result.ok ? 'ok' : 'error'
-									}` }
+							return (
+								<li
+									key={ index }
+									className="gtm4wp-destinations__row"
 								>
-									{ result.text }
-								</span>
-							) }
-							{ ! result && failing && (
-								<span className="gtm4wp-destinations__result gtm4wp-destinations__result--error">
-									{ sprintf(
-										/* translators: 1: number of consecutive failed sends. 2: last error reported by Google. */
-										__(
-											'The last %1$d sends to this destination failed. Last error: %2$s',
-											'duracelltomi-google-tag-manager'
-										),
-										record.consecutive_failures,
-										record.last_error ||
+									<span className="gtm4wp-destinations__name">
+										{ rowName( row ) }
+									</span>
+									<Button
+										variant="secondary"
+										disabled={ null !== busyIndex }
+										isBusy={ busyIndex === index }
+										label={ sprintf(
+											/* translators: %s: label or measurement ID of the destination. */
 											__(
-												'unknown',
+												'Test %s',
 												'duracelltomi-google-tag-manager'
-											)
+											),
+											rowName( row )
+										) }
+										onClick={ () => onTest( row, index ) }
+									>
+										{ __(
+											'Test',
+											'duracelltomi-google-tag-manager'
+										) }
+									</Button>
+									{ result && (
+										<span
+											className={ `gtm4wp-destinations__result gtm4wp-destinations__result--${
+												result.ok ? 'ok' : 'error'
+											}` }
+										>
+											{ result.text }
+										</span>
 									) }
-								</span>
-							) }
-						</li>
-					);
-				} ) }
-			</ul>
+									{ ! result && failing && (
+										<span className="gtm4wp-destinations__result gtm4wp-destinations__result--error">
+											{ sprintf(
+												/* translators: 1: number of consecutive failed sends. 2: last error reported by Google. */
+												__(
+													'The last %1$d sends to this destination failed. Last error: %2$s',
+													'duracelltomi-google-tag-manager'
+												),
+												record.consecutive_failures,
+												record.last_error ||
+													__(
+														'unknown',
+														'duracelltomi-google-tag-manager'
+													)
+											) }
+										</span>
+									) }
+								</li>
+							);
+						} ) }
+					</ul>
+				</div>
+			) }
 			<SendLogList
 				logPath={ logPath }
 				replayPath={ replayPath }
 				hideWhenEmpty={ ! sendingEnabled }
 			/>
-		</div>
+		</>
 	);
 }

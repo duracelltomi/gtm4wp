@@ -48,7 +48,29 @@ final class Capability {
 		 *
 		 * @param string $capability The required capability. Default 'manage_options'.
 		 */
-		return (string) apply_filters( self::FILTER, self::DEFAULT_CAPABILITY );
+		$capability = apply_filters( self::FILTER, self::DEFAULT_CAPABILITY );
+
+		// A wrong-typed or empty return used to deny everyone silently (#285):
+		// say so under WP_DEBUG and keep the default. 'do_not_allow' is the
+		// documented way to deny every user.
+		if ( ! is_string( $capability ) || '' === $capability ) {
+			_doing_it_wrong(
+				__METHOD__,
+				esc_html(
+					sprintf(
+						/* translators: 1: filter name, 2: the type returned. */
+						__( 'The %1$s filter must return a capability name (a non-empty string); %2$s was returned, so the default capability is used. Return "do_not_allow" to deny every user.', 'duracelltomi-google-tag-manager' ),
+						self::FILTER,
+						gettype( $capability )
+					)
+				),
+				'2.1'
+			);
+
+			return self::DEFAULT_CAPABILITY;
+		}
+
+		return $capability;
 	}
 
 	/**

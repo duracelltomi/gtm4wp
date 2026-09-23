@@ -138,6 +138,31 @@ final class ConfigurationChecksTest extends TestCase {
 		$this->assertSame( array(), $this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => false ) ) ), 'Silent while the variable is off.' );
 	}
 
+	/**
+	 * #272: the Cloudflare country header is the same unauthenticated read as a
+	 * custom visitor-IP header, so it gets the same warning until trusted
+	 * proxies are configured. Grant and deny.
+	 */
+	public function test_the_cloudflare_country_header_without_trusted_proxies_is_a_warning_about_the_proxy_list(): void {
+		$base = array(
+			GTM4WP_OPTION_GTM_CONTAINERS             => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+			GTM4WP_OPTION_GTM_PLACEMENT              => GTM4WP_PLACEMENT_FOOTER,
+			GTM4WP_OPTION_INCLUDE_MISCGEOCF          => true,
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '',
+		);
+
+		$problems = $this->checks( $base )->problems();
+
+		$this->assertCount( 1, $problems );
+		$this->assertSame( ConfigurationChecks::CODE_UNTRUSTED_COUNTRY, $problems[0]['code'] );
+		$this->assertSame( ConfigurationChecks::SEVERITY_WARNING, $problems[0]['severity'] );
+		$this->assertSame( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES, $problems[0]['option_key'] );
+		$this->assertFalse( $problems[0]['dismissible'] );
+
+		$this->assertSame( array(), $this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '103.21.244.0/22' ) ) ), 'Silent once trusted proxies are configured.' );
+		$this->assertSame( array(), $this->codes( array_merge( $base, array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => false ) ) ), 'Silent while the variable is off.' );
+	}
+
 	public function test_an_unusable_data_layer_name_is_an_error_about_that_option(): void {
 		$problems = $this->checks(
 			array(

@@ -40,6 +40,7 @@ final class ConfigurationChecks {
 	public const CODE_INCOMPLETE_ENVIRONMENT   = 'incomplete-gtm-env-config';
 	public const CODE_INVALID_HARDCODED        = 'invalid-hardcoded-constant';
 	public const CODE_UNTRUSTED_VISITOR_IP     = 'visitor-ip-untrusted-header';
+	public const CODE_UNTRUSTED_COUNTRY        = 'cloudflare-country-untrusted-header';
 	public const CODE_INVALID_DATALAYER_NAME   = 'invalid-datalayer-name';
 	public const CODE_CONFLICT_WC_GA           = 'wc-ga-plugin-warning';
 	public const CODE_CONFLICT_MONSTERINSIGHTS = 'wc-gayoast-plugin-warning';
@@ -67,6 +68,7 @@ final class ConfigurationChecks {
 			$this->incomplete_environments(),
 			$this->invalid_hardcoded_constants(),
 			$this->untrusted_visitor_ip_header(),
+			$this->untrusted_country_header(),
 			$this->invalid_datalayer_name(),
 			$this->conflicting_plugins()
 		);
@@ -165,6 +167,31 @@ final class ConfigurationChecks {
 					),
 					implode( ', ', $hardcoded_errors )
 				),
+				'dismissible' => false,
+			),
+		);
+	}
+
+	/**
+	 * The Cloudflare country header with no trusted proxies declared: the
+	 * same unauthenticated read as the visitor-IP case below (#272).
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function untrusted_country_header(): array {
+		if (
+			! $this->options->get( GTM4WP_OPTION_INCLUDE_MISCGEOCF )
+			|| ( '' !== trim( (string) $this->options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES ) ) )
+		) {
+			return array();
+		}
+
+		return array(
+			array(
+				'code'        => self::CODE_UNTRUSTED_COUNTRY,
+				'severity'    => self::SEVERITY_WARNING,
+				'option_key'  => GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES,
+				'message'     => __( 'Google Tag Manager for WordPress is reading the visitor country from the Cloudflare header, but no trusted proxy addresses are configured. HTTP headers are sent by the visitor, so the reported country can be chosen by them. Please add the Cloudflare IP ranges as trusted proxy addresses, or turn the Cloudflare country code off.', 'duracelltomi-google-tag-manager' ),
 				'dismissible' => false,
 			),
 		);

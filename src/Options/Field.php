@@ -78,7 +78,7 @@ final class Field {
 	 * @param callable|null $derive        Optional fn( mixed $sanitized ): array returning additional
 	 *                                     option key => value pairs stored alongside this field
 	 *                                     (used to keep 1.x mirror options in sync).
-	 * @param string        $depends_on    Optional key of a field this one depends on: the admin UI
+	 * @param string        $depends_on    Optional key of a field this one depends on (several keys comma separated: any one of them on keeps it enabled): the admin UI
 	 *                                     disables the control while that field is empty/off. UX only;
 	 *                                     the frontend module still ignores the value itself.
 	 * @param bool          $rows_locked   TYPE_TABLE only: the row set comes from a wp-config.php

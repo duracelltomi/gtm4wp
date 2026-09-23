@@ -455,6 +455,58 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 		expect( options.headers[ 'X-WP-Nonce' ] ).toBeUndefined();
 	} );
 
+	it( 'retries once without the nonce when WordPress rejects it, and stops looping on that page', async () => {
+		// #291 (PA-12 residual): a full-page cache serving anonymous HTML to a
+		// logged-in visitor bakes a nonce that is not theirs; core answers 403 to
+		// the invalid nonce. The anonymous retry still delivers the session tier;
+		// the gate entry is tagged with the rejected nonce so the same cached page
+		// makes no further request, while a page with another nonce asks again.
+		setCookie( 'gtm4wp_login', 'abc' );
+		const config = {
+			events: EVENTS,
+			fields: {},
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'cached-anonymous-nonce',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+			gates: [ { cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] } ],
+		};
+		window.gtm4wp_visitordata_config = config;
+		global.fetch.mockResolvedValueOnce( { ok: false, status: 403 } );
+		mockEndpointOnce( { visitorIP: '8.8.4.4' } );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 2 );
+		expect(
+			global.fetch.mock.calls[ 0 ][ 1 ].headers[ 'X-WP-Nonce' ]
+		).toBe( 'cached-anonymous-nonce' );
+		expect(
+			global.fetch.mock.calls[ 1 ][ 1 ].headers[ 'X-WP-Nonce' ]
+		).toBeUndefined();
+		expect(
+			visitorEvents().find( ( e ) => e.visitorIP === '8.8.4.4' )
+		).toBeTruthy();
+
+		// Same cached page again: no request at all.
+		delete window.gtm4wp_visitordata_inited;
+		loadTracker();
+		await flush();
+		expect( global.fetch ).toHaveBeenCalledTimes( 2 );
+
+		// An uncached page with a fresh nonce: asks again, with the nonce.
+		delete window.gtm4wp_visitordata_inited;
+		window.gtm4wp_visitordata_config = { ...config, nonce: 'fresh-nonce' };
+		mockEndpointOnce( { visitorEmail: 'user@example.com' } );
+		loadTracker();
+		await flush();
+		expect( global.fetch ).toHaveBeenCalledTimes( 3 );
+		expect(
+			global.fetch.mock.calls[ 2 ][ 1 ].headers[ 'X-WP-Nonce' ]
+		).toBe( 'fresh-nonce' );
+	} );
+
 	it( 'does NOT fetch when the gate cookie is unchanged (cookie gate suppresses it)', async () => {
 		// Seed the cache as if we already fetched at cookie value "abc".
 		window.sessionStorage.setItem(

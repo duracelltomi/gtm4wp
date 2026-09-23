@@ -84,6 +84,18 @@ final class VisitorIp {
 	}
 
 	/**
+	 * Whether this request reached the site through one of the given proxies -
+	 * the gate every replace-style proxy header (an IP, a country) needs before
+	 * its value means anything (RI-18).
+	 *
+	 * @param string[] $trusted Validated IP addresses / CIDR ranges from parse_trusted_proxies().
+	 * @return bool
+	 */
+	public static function request_via_trusted_proxy( array $trusted ): bool {
+		return self::ip_in_any_range( self::remote_addr_any(), $trusted );
+	}
+
+	/**
 	 * Reads the configured header against the operator's declared proxy set.
 	 *
 	 * @param string   $header_name  The $_SERVER key being read.

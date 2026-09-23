@@ -108,15 +108,31 @@ if ( ! window.gtm4wp_form_move_inited ) {
 			return {};
 		}
 
-		// DOM properties, not getAttribute(), to match what GTM pushes on a
-		// form submission (absent = '', `action` resolves to an absolute URL).
-		// The Clicks built-ins read the same keys; Google defines it that way.
+		// Attributes, the action resolved against document.baseURI: a control
+		// named `action` (or id/class/target) shadows the DOM property (#280).
 		return {
-			'gtm.elementId': form.id || '',
-			'gtm.elementClasses': form.className || '',
-			'gtm.elementUrl': form.action || '',
-			'gtm.elementTarget': form.target || '',
+			'gtm.elementId': form.getAttribute( 'id' ) || '',
+			'gtm.elementClasses': form.getAttribute( 'class' ) || '',
+			'gtm.elementUrl': gtm4wp_form_move_action_url( form ),
+			'gtm.elementTarget': form.getAttribute( 'target' ) || '',
 		};
+	}
+
+	/**
+	 * The form's action as the absolute URL GTM's Form URL built-in reports.
+	 *
+	 * @param {HTMLFormElement} form The form.
+	 * @return {string} The absolute URL, '' when the action does not parse.
+	 */
+	function gtm4wp_form_move_action_url( form ) {
+		try {
+			return new URL(
+				form.getAttribute( 'action' ) || '',
+				document.baseURI
+			).href;
+		} catch ( e ) {
+			return '';
+		}
 	}
 
 	/**

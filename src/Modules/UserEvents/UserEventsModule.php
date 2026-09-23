@@ -52,7 +52,9 @@ final class UserEventsModule extends AbstractModule {
 	 * @return void
 	 */
 	protected function register_frontend_hooks(): void {
-		add_action( 'init', array( $this, 'clear_event_cookies' ) );
+		// template_redirect, not init (#278): init also runs on a REST request,
+		// which never prints the footer, so the event would be consumed unseen.
+		add_action( 'template_redirect', array( $this, 'clear_event_cookies' ) );
 		add_action( 'wp_footer', array( $this, 'output_event_scripts' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
@@ -123,9 +125,19 @@ final class UserEventsModule extends AbstractModule {
 	/**
 	 * Sets a cookie so that the next page load can fire a GTM event after a new user has been registered.
 	 *
+	 * Only for the registrant's own browser: user_register also fires when a
+	 * logged-in administrator creates the account (REST, a React admin UI), and
+	 * the cookie would then ride the creator's response (#279). A front-end
+	 * registration runs logged out, so it still qualifies.
+	 *
+	 * @param int $user_id The new user's id, as user_register passes it.
 	 * @return void
 	 */
-	public function on_register(): void {
+	public function on_register( $user_id = 0 ): void {
+		if ( is_user_logged_in() && get_current_user_id() !== (int) $user_id ) {
+			return;
+		}
+
 		setcookie(
 			'gtm4wp_user_registered',
 			'1',
@@ -138,7 +150,8 @@ final class UserEventsModule extends AbstractModule {
 	}
 
 	/**
-	 * Removes the event cookies during the init hook.
+	 * Expires the event cookies on template_redirect, before the page that
+	 * prints the event is sent ($_COOKIE still carries them for the footer).
 	 *
 	 * @return void
 	 */

@@ -174,7 +174,23 @@ export function isFieldDisabled( field, values ) {
 		return false;
 	}
 
-	return ! isValueSet( values ? values[ dependency ] : undefined );
+	// A comma separated list: any one of the targets on keeps the field enabled.
+	return ! dependencyKeys( dependency ).some( ( key ) =>
+		isValueSet( values ? values[ key ] : undefined )
+	);
+}
+
+/**
+ * The keys named by a `depends_on` value (one, or several comma separated).
+ *
+ * @param {string} dependency The field's `depends_on`.
+ * @return {string[]} The dependency keys, trimmed and non-empty.
+ */
+function dependencyKeys( dependency ) {
+	return String( dependency )
+		.split( ',' )
+		.map( ( key ) => key.trim() )
+		.filter( ( key ) => '' !== key );
 }
 
 /**
@@ -192,11 +208,15 @@ export function dependencyLabel( field, allFields ) {
 		return '';
 	}
 
-	const target = allFields.find(
-		( candidate ) => candidate && candidate.key === dependency
-	);
-
-	return target && target.label ? target.label : '';
+	return dependencyKeys( dependency )
+		.map( ( key ) => {
+			const target = allFields.find(
+				( candidate ) => candidate && candidate.key === key
+			);
+			return target && target.label ? target.label : '';
+		} )
+		.filter( ( label ) => '' !== label )
+		.join( ' / ' );
 }
 
 /**

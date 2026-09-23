@@ -217,11 +217,183 @@ final class PageVariablesModuleTest extends TestCase {
 			)
 		);
 
-		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SITEID => true ) )
-			->add_datalayer_data( array() );
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_SITEID   => true,
+				GTM4WP_OPTION_INCLUDE_SITENAME => true,
+			)
+		)->add_datalayer_data( array() );
 
 		$this->assertSame( 3, $data_layer['siteID'], 'siteID must be typed as an int.' );
 		$this->assertSame( 'Site three', $data_layer['siteName'] );
+	}
+
+	/**
+	 * #276 (RI-13): on a single site get_blog_details() does not exist; the
+	 * variables carry the site's own id and name, never 0 / '' placeholders,
+	 * and only the variable whose option is on. Separate process: another
+	 * test stubs get_blog_details() for the rest of the run (TS-16).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_single_site_reports_its_own_id_and_name_and_only_the_enabled_variable(): void {
+		$this->assertFalse( function_exists( 'get_blog_details' ), 'Precondition: single site.' );
+		Functions\when( 'get_current_blog_id' )->justReturn( 1 );
+		Functions\when( 'get_bloginfo' )->justReturn( 'My single site' );
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SITENAME => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( 'My single site', $data_layer['siteName'] );
+		$this->assertArrayNotHasKey( 'siteID', $data_layer, 'Only the enabled variable is emitted.' );
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SITEID => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( 1, $data_layer['siteID'] );
+		$this->assertArrayNotHasKey( 'siteName', $data_layer );
+	}
+
+	/**
+	 * #277 (RI-13): the identity variables are omitted for a logged-out visitor
+	 * on the classic data layer too, as the cache-safe tier already did;
+	 * visitorType keeps its documented logged-out value.
+	 */
+	public function test_identity_variables_are_omitted_for_a_logged_out_visitor(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( false );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'              => 0,
+				'roles'           => array(),
+				'user_email'      => '',
+				'user_registered' => '',
+				'user_login'      => '',
+			)
+		);
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_USERROLE    => true,
+				GTM4WP_OPTION_INCLUDE_USEREMAIL   => true,
+				GTM4WP_OPTION_INCLUDE_USERREGDATE => true,
+				GTM4WP_OPTION_INCLUDE_USERNAME    => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 'visitor-logged-out', $data_layer['visitorType'] );
+		foreach ( array( 'visitorEmail', 'visitorEmailHash', 'visitorRegistrationDate', 'visitorUsername' ) as $key ) {
+			$this->assertArrayNotHasKey( $key, $data_layer, "{$key} must be omitted, not emitted empty." );
+		}
+	}
+
+	/**
+	 * #277: an empty value and the '0000-00-00' registration rows imports leave
+	 * behind are omitted (strtotime() would turn the latter into a year-0
+	 * timestamp), on both tiers.
+	 */
+	public function test_empty_identity_values_are_omitted_on_both_tiers(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'              => 7,
+				'roles'           => array( 'subscriber' ),
+				'user_email'      => '',
+				'user_registered' => '0000-00-00 00:00:00',
+				'user_login'      => 'seven',
+			)
+		);
+
+		$module     = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_USEREMAIL   => true,
+				GTM4WP_OPTION_INCLUDE_USERREGDATE => true,
+				GTM4WP_OPTION_INCLUDE_USERNAME    => true,
+			)
+		);
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'visitorEmail', $data_layer );
+		$this->assertArrayNotHasKey( 'visitorEmailHash', $data_layer );
+		$this->assertArrayNotHasKey( 'visitorRegistrationDate', $data_layer );
+		$this->assertSame( 'seven', $data_layer['visitorUsername'] );
+
+		$this->assertNull( $module->resolve_visitor_email() );
+		$this->assertNull( $module->resolve_visitor_email_hash() );
+		$this->assertNull( $module->resolve_visitor_registration_date() );
+		$this->assertSame( 'seven', $module->resolve_visitor_username() );
+	}
+
+	/**
+	 * #277: visitorEmailHash is normalized like the e-commerce user_data hashes
+	 * (lower-cased, gmail dots and plus tags folded) on both tiers.
+	 */
+	public function test_visitor_email_hash_is_normalized_like_user_data(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'              => 7,
+				'roles'           => array( 'subscriber' ),
+				'user_email'      => 'Jane.Doe+shopping@Gmail.com',
+				'user_registered' => '2020-01-01 00:00:00',
+				'user_login'      => 'jane',
+			)
+		);
+
+		$module     = $this->make_module( array( GTM4WP_OPTION_INCLUDE_USEREMAIL => true ) );
+		$data_layer = $module->add_datalayer_data( array() );
+
+		$this->assertSame( 'Jane.Doe+shopping@Gmail.com', $data_layer['visitorEmail'], 'The address itself is passed as stored.' );
+		$this->assertSame( hash( 'sha256', 'janedoe@gmail.com' ), $data_layer['visitorEmailHash'] );
+		$this->assertSame( hash( 'sha256', 'janedoe@gmail.com' ), $module->resolve_visitor_email_hash() );
+		$this->assertSame( 1577836800, $module->resolve_visitor_registration_date() );
+	}
+
+	/**
+	 * #273 (RI-4 residue): wp_title() arrives texturized and entity-encoded;
+	 * pageTitle carries the text the visitor reads and the JSON sink escapes
+	 * it once.
+	 */
+	public function test_page_title_decodes_the_entities_the_title_filters_add(): void {
+		Functions\when( 'wp_title' )->justReturn( 'Marks &#038; Spencer &#8211; Tom&#8217;s &lt;b&gt;shop&lt;/b&gt;' );
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_POSTTITLE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( "Marks & Spencer \u{2013} Tom\u{2019}s <b>shop</b>", $data_layer['pageTitle'] );
+	}
+
+	/**
+	 * #272 (RI-18): with trusted proxies configured the Cloudflare country header
+	 * counts only for a request that came through one of them, like visitorIP;
+	 * an empty list keeps the 1.x read. Both tiers share the rule.
+	 */
+	public function test_cloudflare_country_is_read_only_through_a_trusted_proxy_when_proxies_are_configured(): void {
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'HU';
+		Functions\when( 'sanitize_text_field' )->returnArg();
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		try {
+			$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+			$module                 = $this->make_module(
+				array(
+					GTM4WP_OPTION_INCLUDE_MISCGEOCF => true,
+					GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '103.21.244.0/22',
+				)
+			);
+			$this->assertArrayNotHasKey( 'geoCloudflareCountryCode', $module->add_datalayer_data( array() ), 'Not through Cloudflare: the header is the visitor\'s claim.' );
+			$this->assertNull( $module->resolve_cloudflare_country() );
+
+			$_SERVER['REMOTE_ADDR'] = '103.21.244.7';
+			$this->assertSame( 'HU', $module->add_datalayer_data( array() )['geoCloudflareCountryCode'] );
+			$this->assertSame( 'HU', $module->resolve_cloudflare_country() );
+
+			$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+			$module                 = $this->make_module( array( GTM4WP_OPTION_INCLUDE_MISCGEOCF => true ) );
+			$this->assertSame( 'HU', $module->add_datalayer_data( array() )['geoCloudflareCountryCode'], 'No list configured: read as sent, as before (#75).' );
+		} finally {
+			unset( $_SERVER['HTTP_CF_IPCOUNTRY'], $_SERVER['REMOTE_ADDR'] );
+		}
 	}
 
 	public function test_singular_post_data(): void {

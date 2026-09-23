@@ -516,6 +516,47 @@ describe( 'DestinationsPanel send log', () => {
 
 		expect( apiFetch ).not.toHaveBeenCalled();
 	} );
+
+	it( 'does not refetch the log when the first row becomes testable', async () => {
+		// The log used to sit at a different tree position in the two states,
+		// so completing a row remounted it and fetched again (#284). Only one
+		// response is queued: a second fetch would also hit the stand-in's
+		// loud default.
+		apiFetch.mockResolvedValueOnce( { entries: [] } );
+		const data = panelData( {
+			logPath: LOG_PATH,
+			sendKeys: [ SEND_REFUNDS_KEY ],
+		} );
+
+		const { rerender } = renderPanel( {
+			data,
+			rows: [ { ...ROW, measurement_id: '' } ],
+			values: { [ SEND_REFUNDS_KEY ]: true },
+		} );
+
+		expect(
+			await screen.findByText( 'Nothing has been sent yet.' )
+		).toBeInTheDocument();
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+
+		rerender(
+			<DestinationsPanel
+				data={ data }
+				values={ {
+					[ OPTION_KEY ]: [ ROW ],
+					[ SEND_REFUNDS_KEY ]: true,
+				} }
+			/>
+		);
+
+		expect(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		).toBeInTheDocument();
+		expect(
+			screen.getByText( 'Nothing has been sent yet.' )
+		).toBeInTheDocument();
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+	} );
 } );
 
 describe( 'DestinationsPanel send log visibility', () => {

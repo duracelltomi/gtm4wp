@@ -156,9 +156,11 @@ final class PageVariablesAdminSchemaTest extends TestCase {
 		);
 	}
 
-	public function test_trusted_proxy_field_depends_on_the_visitor_ip_option(): void {
+	public function test_trusted_proxy_field_depends_on_either_reader_of_a_proxy_header(): void {
+		// #272: the list serves the visitor IP AND the Cloudflare country code;
+		// either option on keeps it editable (a comma separated depends_on).
 		$this->assertSame(
-			GTM4WP_OPTION_INCLUDE_VISITOR_IP,
+			GTM4WP_OPTION_INCLUDE_VISITOR_IP . ',' . GTM4WP_OPTION_INCLUDE_MISCGEOCF,
 			$this->field( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES )->depends_on
 		);
 	}

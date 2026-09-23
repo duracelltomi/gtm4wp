@@ -14,6 +14,10 @@ import { axeptioVersionOptions } from '../utils';
 // Stable public option key of the Axeptio Project ID field (compat/constants.php).
 const PROJECT_ID_KEY = 'integrate-axeptio-projectid';
 
+// Debounce of the project fetch: the Project ID field is free text, and every
+// keystroke would otherwise reach a third-party host (#283).
+const FETCH_DELAY_MS = 400;
+
 export default function AxeptioVersionControl( {
 	value,
 	allValues,
@@ -41,61 +45,67 @@ export default function AxeptioVersionControl( {
 		setIsLoading( true );
 		setFetchError( '' );
 
-		window
-			.fetch(
-				`https://client.axept.io/${ encodeURIComponent(
-					projectId
-				) }.json?nocache=${ Date.now() }`
-			)
-			.then( ( response ) => {
-				if ( ! response.ok ) {
-					throw new Error( 'Network response was not ok' );
-				}
+		const timer = setTimeout( () => {
+			window
+				.fetch(
+					`https://client.axept.io/${ encodeURIComponent(
+						projectId
+					) }.json?nocache=${ Date.now() }`
+				)
+				.then( ( response ) => {
+					if ( ! response.ok ) {
+						throw new Error( 'Network response was not ok' );
+					}
 
-				return response.json();
-			} )
-			.then( ( data ) => {
-				if ( cancelled ) {
-					return;
-				}
+					return response.json();
+				} )
+				.then( ( data ) => {
+					if ( cancelled ) {
+						return;
+					}
 
-				const list =
-					data && Array.isArray( data.cookies ) ? data.cookies : [];
+					const list =
+						data && Array.isArray( data.cookies )
+							? data.cookies
+							: [];
 
-				if ( list.length ) {
-					setCookies( list );
-					setFetchError( '' );
-				} else {
+					if ( list.length ) {
+						setCookies( list );
+						setFetchError( '' );
+					} else {
+						setCookies( [] );
+						setFetchError(
+							__(
+								'We were unable to find your Axeptio project, or it has not been published yet. Enter the cookies version manually below.',
+								'duracelltomi-google-tag-manager'
+							)
+						);
+					}
+				} )
+				.catch( () => {
+					if ( cancelled ) {
+						return;
+					}
+
 					setCookies( [] );
 					setFetchError(
 						__(
-							'We were unable to find your Axeptio project, or it has not been published yet. Enter the cookies version manually below.',
+							'The Axeptio project versions could not be loaded. Enter the cookies version manually below.',
 							'duracelltomi-google-tag-manager'
 						)
 					);
-				}
-			} )
-			.catch( () => {
-				if ( cancelled ) {
-					return;
-				}
+				} )
+				.finally( () => {
+					if ( ! cancelled ) {
+						setIsLoading( false );
+					}
+				} );
+		}, FETCH_DELAY_MS );
 
-				setCookies( [] );
-				setFetchError(
-					__(
-						'The Axeptio project versions could not be loaded. Enter the cookies version manually below.',
-						'duracelltomi-google-tag-manager'
-					)
-				);
-			} )
-			.finally( () => {
-				if ( ! cancelled ) {
-					setIsLoading( false );
-				}
-			} );
-
+		// A superseded id clears its pending fetch AND discards an in-flight one.
 		return () => {
 			cancelled = true;
+			clearTimeout( timer );
 		};
 	}, [ projectId ] );
 

@@ -394,7 +394,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Logged in user email', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the email address of the logged in user.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the email address of the logged in user as visitorEmail and its SHA-256 hash as visitorEmailHash (lower-cased and normalized the way Google matches user-provided data). Both are omitted for a logged-out visitor.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				doc: self::DOC_VISITOR
 			),
@@ -440,7 +440,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				description: esc_html__( 'The IP addresses or CIDR ranges of the reverse proxies, load balancers and CDNs that sit in front of this site - one per line, or comma separated. This is what makes the custom header above trustworthy: with it set, an X-Forwarded-For list is read from the right (skipping your own hops) and a single-value header such as CF-Connecting-IP is only used when the request really did arrive through one of these addresses. Leave it empty if nothing sits in front of your site. Cloudflare publishes its ranges at cloudflare.com/ips; for a load balancer inside your own network the address is usually a private range such as 10.0.0.0/8.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				phase: Field::PHASE_BETA,
-				depends_on: GTM4WP_OPTION_INCLUDE_VISITOR_IP,
+				// Either reader of a proxy header keeps the list editable (#272).
+				depends_on: GTM4WP_OPTION_INCLUDE_VISITOR_IP . ',' . GTM4WP_OPTION_INCLUDE_MISCGEOCF,
 				sanitizer: static function ( $value ) {
 					// A custom sanitizer REPLACES the type-defensive default (RI-6).
 					$value = Field::to_string( $value );
@@ -457,7 +458,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Cloudflare country code', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Add the country code of the user provided by Cloudflare (if Cloudflare is used with your site)', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Add the country code of the user provided by Cloudflare (if Cloudflare is used with your site). With trusted proxy addresses configured above, the header is read only for requests that arrived through one of them; without them it is read as sent.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_GEO

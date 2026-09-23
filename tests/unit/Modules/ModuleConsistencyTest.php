@@ -113,17 +113,20 @@ final class ModuleConsistencyTest extends TestCase {
 
 				// A field can only depend on a real option so the React app can
 				// resolve the current value it must gate the control on; a
-				// dependency on itself would never resolve.
-				$this->assertContains(
-					$field->depends_on,
-					$field_keys,
-					"Module '{$module_id}': field '{$field->key}' depends on unknown option '{$field->depends_on}'."
-				);
-				$this->assertNotSame(
-					$field->key,
-					$field->depends_on,
-					"Module '{$module_id}': field '{$field->key}' must not depend on itself."
-				);
+				// dependency on itself would never resolve. Several keys may be
+				// listed comma separated (#272); each must resolve.
+				foreach ( array_map( 'trim', explode( ',', $field->depends_on ) ) as $dependency ) {
+					$this->assertContains(
+						$dependency,
+						$field_keys,
+						"Module '{$module_id}': field '{$field->key}' depends on unknown option '{$dependency}'."
+					);
+					$this->assertNotSame(
+						$field->key,
+						$dependency,
+						"Module '{$module_id}': field '{$field->key}' must not depend on itself."
+					);
+				}
 			}
 		}
 

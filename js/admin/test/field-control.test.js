@@ -8,7 +8,7 @@
  * hands back to onChange, not by which component rendered.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import FieldControl from '../components/FieldControl';
 
@@ -280,6 +280,31 @@ describe( 'FieldControl dependencies and annotations', () => {
 		);
 
 		expect( screen.getByRole( 'textbox' ) ).toBeEnabled();
+	} );
+
+	it( 'stays enabled while any one of several comma separated dependencies is on', () => {
+		// #272: the trusted-proxies list serves two readers (visitor IP and the
+		// Cloudflare country code); either one keeps it editable.
+		const field = {
+			key: 'k',
+			type: 'text',
+			label: 'Child',
+			depends_on: 'first, second',
+		};
+
+		renderField( field, {
+			value: '',
+			values: { first: false, second: true },
+		} );
+		expect( screen.getByRole( 'textbox' ) ).toBeEnabled();
+
+		cleanup();
+
+		renderField( field, {
+			value: '',
+			values: { first: false, second: false },
+		} );
+		expect( screen.getByRole( 'textbox' ) ).toBeDisabled();
 	} );
 
 	/**
