@@ -65,6 +65,37 @@ Corollaries:
   instead of `###`). A user-visible change updates both files together, opening
   the readme block alongside the changelog heading when it does not exist yet.
 
+## How long a bullet is
+
+**Budget: 25–40 words, ceiling 60.** A bullet is release notes for somebody
+upgrading, not the investigation that produced the change. Measured 2026-09-23,
+the unreleased 2.1 section ran to 280 words per bullet against 117 for 2.0 and 57
+for 1.22.5, and `readme.txt`'s changelog section stood at 6,928 words against the
+**5,000-word cap wordpress.org truncates at** (U150 / drift row D21) — so length
+here is a published defect, not a matter of taste.
+
+What a bullet carries, in this order:
+
+1. **What changed**, in the user's vocabulary (setting names as they appear on
+   the screen, event and field names as they appear in the data layer).
+2. **What they must do**, when anything: a GTM trigger to adjust, a default that
+   changed, an option to switch on. This is the part nobody may cut.
+3. **Why**, in at most one clause — and only when it changes what they should do.
+4. The issue number and the credit: `(#145)`, `Thanks to @user for the report`.
+
+Leave out: how the bug was found, what the code did internally, which class or
+hook was involved, how long it had been broken, what was measured or ruled out,
+and reassurance that unaffected setups are unaffected. An option's full
+explanation belongs in its field description and on gtm4wp.com, not here — link
+it instead of restating it.
+
+`readme.txt` is the tighter of the two: it mirrors the entry, flattened, and the
+whole `== Changelog ==` section stays under 5,000 words (target ~4,000), so older
+sections get summarised and linked to `CHANGELOG.md` rather than left in full.
+
+The `prose-budget` Stop hook reports any bullet over 60 words that the working
+tree added; `bash .claude/hooks/prose-budget.sh check` runs the same check by hand.
+
 ## Enforcement
 
 One shared script, `.claude/hooks/require-changelog.sh`, enforces this:

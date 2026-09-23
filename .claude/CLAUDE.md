@@ -132,6 +132,22 @@ back — use the `Options`/`Frontend` services instead.
 - **Security**: Always use `wp_kses()`, `sanitize_text_field()`, `esc_attr()`, and `wp_json_encode()` with `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS` for script-context output
 - Run `vendor/bin/phpcs` (or `composer phpcs`) to check code standards before committing
 
+### Comment budget (write it short the first time)
+
+Comments are for the two of us when we next touch this code; public documentation
+is a distant second. **One comment block stays under ~15 lines**, and a change adds
+fewer comment lines than code lines. Keep: the one-line WHAT, the non-obvious WHY
+(an invariant, a trap, an upstream claim, a U-row/issue number/PA-RI-UC code) and
+the `@param`/`@return` phpcs requires. Drop: rejected alternatives, measurement
+narrative ("measured, it does not…"), phase history, proofs of a rule already
+stated, and anything the code below already says. A "do NOT do X" survives as one
+line with a half-sentence reason; never sharpen a defect description (RI-24).
+
+Enforced advisory-style by the `prose-budget` Stop hook, which reports only what the
+working tree ADDS: `bash .claude/hooks/prose-budget.sh check` runs the same check by
+hand, `report` scans the whole tree. A block that genuinely needs the length is kept
+— stop again and it passes.
+
 ## Build System
 
 - **Tooling**: `@wordpress/scripts` (`wp-scripts`) driving a custom `webpack.config.js`
