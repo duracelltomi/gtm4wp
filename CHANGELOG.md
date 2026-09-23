@@ -27,8 +27,12 @@
 * Added: **server-side refund events** (experimental, off by default) on the Data Manager's **Sending events** tab, the signal browser-side tracking can never report: a refund issued in the WooCommerce or EDD admin is sent to each destination as a GA4 `refund` event, matched to its purchase by transaction ID and the captured client ID. Amount, items, shipping and tax are reported, so partial refunds add up. Sending runs in the background with retries; a known limitation with multi-step refunds is named on the option itself.
 * Changed: the settings screen shows **Unsaved changes** next to the Save button while anything is waiting, and the browser asks before a tab with unsaved edits is closed or reloaded.
 * Changed: removing a row from a settings table now asks first: the trash icon becomes a Remove/Cancel pair for that row. A row nobody has typed into is still removed straight away.
-* Added: a **Recent sends** list under the destinations table: what was sent to Google from the server and what became of it, deliberate skips and their reason included, with a switch that hides everything Google applied. Failed or fixable refunds can be queued again, one row or all. **Tools → Site Health** gains a status test and an Info section, extensible through the new `SiteHealthInfoInterface`.
+* Added: a **Recent sends** list under the destinations table: what was sent to Google from the server and what became of it, deliberate skips and their reason included, with a switch that hides everything Google applied. Failed or fixable refunds can be queued again, one row or all. Its state is also reported in **Tools → Site Health**.
 * Added: a **"Require consent before sending"** setting (experimental) deciding which orders need analytics storage granted before anything about them is sent: buyers in the EEA, the UK and Switzerland by billing country (the default), every order, or never. Where the gate applies and consent was denied or was never captured, nothing is sent and the reason is recorded.
+
+### Site Health
+
+* Added: **Tools → Site Health** reports the whole plugin: every module's option states, the containers, placement, data layer name and wp-config overrides in the Info section (English copy text; no keys, addresses or visitor data), plus a status test turning the admin-notice problems into a critical or recommended result. Third-party modules report through `SiteHealthInfoInterface` and `SiteHealthTestsInterface`.
 
 ### AI assistants (WordPress Abilities API)
 

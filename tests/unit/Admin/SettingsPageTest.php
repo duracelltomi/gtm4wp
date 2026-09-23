@@ -280,6 +280,26 @@ final class SettingsPageTest extends TestCase {
 		$this->assertStringNotContainsString( SettingsPage::FOCUS_QUERY_ARG, $url );
 	}
 
+	/**
+	 * The menu_page_url() function lives in wp-admin/includes/plugin.php, which
+	 * a REST request never loads, and the Site Health tests ask for a deep link
+	 * from an ability. Separate process: nothing may have defined the function.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_url_falls_back_to_admin_url_where_menu_page_url_is_not_loaded(): void {
+		$this->assertFalse( function_exists( 'menu_page_url' ), 'Precondition (TS-16): the admin-only function is absent in this process.' );
+		Functions\when( 'admin_url' )->alias( static fn ( $path = '' ) => 'https://example.com/wp-admin/' . $path );
+		Functions\when( 'add_query_arg' )->alias(
+			static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . rawurlencode( (string) $value )
+		);
+
+		$this->assertSame(
+			'https://example.com/wp-admin/options-general.php?page=' . GTM4WP_ADMINSLUG . '&gtm4wp-focus=' . GTM4WP_OPTION_DATALAYER_NAME,
+			SettingsPage::url( GTM4WP_OPTION_DATALAYER_NAME )
+		);
+	}
+
 	public function test_bootstrap_data_names_the_focus_query_argument_for_the_app(): void {
 		$data = $this->make_settings_page( array() )->bootstrap_data();
 

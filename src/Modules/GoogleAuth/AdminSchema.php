@@ -16,15 +16,19 @@ use GTM4WP\Module\AbilitiesInterface;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\PanelSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
+use GTM4WP\Module\SiteHealthTestsInterface;
+use GTM4WP\Options\Options;
 use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * The service-accounts panel: no Field controls, one custom panel backed by
- * the module's own REST routes, plus the module's abilities (Abilities).
+ * the module's own REST routes, plus the module's abilities (Abilities) and
+ * its Site Health rows and test (SiteHealth).
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, AbilitiesInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, AbilitiesInterface, SiteHealthInfoInterface, SiteHealthTestsInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -127,6 +131,29 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function abilities(): ProviderInterface {
 		return new Abilities();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The rows live in SiteHealth next to the keys test; runs only when the
+	 * Info tab renders or an ability asks.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		return ( new SiteHealth( new KeyVault() ) )->debug_fields();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, callable>
+	 */
+	public function site_health_tests( Options $options ): array {
+		return array( SiteHealth::TEST_KEY => array( new SiteHealth( new KeyVault() ), 'run_test' ) );
 	}
 
 	/**

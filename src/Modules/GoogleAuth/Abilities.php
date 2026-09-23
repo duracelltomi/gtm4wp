@@ -167,7 +167,7 @@ final class Abilities implements ProviderInterface {
 		foreach ( $this->vault->all() as $account ) {
 			$accounts[] = array(
 				'id'        => (string) $account['id'],
-				'label'     => (string) $account['label'],
+				'label'     => KeyVault::safe_label( $account ),
 				'status'    => (string) $account['status'],
 				'tested_at' => (int) $account['last_checked'],
 			);

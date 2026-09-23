@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Admin;
 
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
+use GTM4WP\Admin\ConfigurationChecks;
 use GTM4WP\Admin\SiteHealthInfo;
 use GTM4WP\Module\Registry;
 use GTM4WP\Options\Options;
@@ -64,9 +65,9 @@ final class SiteHealthInfoTest extends TestCase {
 		$fields = $info[ SiteHealthInfo::SECTION ]['fields'];
 
 		// The module wrote `status` and `items`; the collector filed them
-		// under the module id so a second module writing `status` cannot
-		// overwrite them.
-		$this->assertSame( array( 'reporting_status', 'reporting_items', 'reporting_raw' ), array_keys( $fields ) );
+		// under the module id, after its own two rows, so a second module
+		// writing `status` cannot overwrite them.
+		$this->assertSame( array( 'version', 'problems', 'reporting_status', 'reporting_items', 'reporting_raw' ), array_keys( $fields ) );
 		$this->assertSame(
 			array(
 				'label' => 'Reporting',
@@ -105,17 +106,42 @@ final class SiteHealthInfoTest extends TestCase {
 	}
 
 	public function test_a_schema_without_the_interface_contributes_nothing_and_does_not_fatal(): void {
-		$info = $this->collector( array( new UndocumentedThirdPartyModule() ) )->add_debug_information( array() );
+		$fields = $this->collector( array( new UndocumentedThirdPartyModule() ) )->fields();
 
 		// The same guarantee the settings page gives an old third party schema:
 		// instanceof, never a method call that would fatal.
-		$this->assertArrayNotHasKey( SiteHealthInfo::SECTION, $info );
+		$this->assertSame( array( 'version', 'problems' ), array_keys( $fields ) );
 	}
 
-	public function test_no_section_is_added_when_no_module_has_anything_to_say(): void {
+	public function test_the_plugin_rows_are_there_whatever_the_modules_say(): void {
 		$info = $this->collector( array() )->add_debug_information( array( 'wp-core' => array() ) );
 
-		$this->assertSame( array( 'wp-core' => array() ), $info, 'A site running none of the reporting features gets no empty heading.' );
+		$this->assertSame( array( 'wp-core', SiteHealthInfo::SECTION ), array_keys( $info ), 'Core\'s sections are kept; the plugin\'s is appended.' );
+
+		$fields = $info[ SiteHealthInfo::SECTION ]['fields'];
+
+		$this->assertSame( GTM4WP_VERSION, $fields['version']['value'] );
+		$this->assertSame( ConfigurationChecks::CODE_MISSING_CONTAINER_ID, $fields['problems']['debug'], 'No container is stored: the same problem the admin notice reports, as its code.' );
+	}
+
+	/**
+	 * The problems row carries codes only: a message quotes what the admin
+	 * typed (the rejected dataLayer name here), and the section is pasted in
+	 * public.
+	 */
+	public function test_the_problems_row_carries_codes_never_the_messages(): void {
+		Functions\when( 'get_option' )->justReturn(
+			array(
+				GTM4WP_OPTION_GTM_CONTAINERS => array( array( 'id' => 'GTM-ABC123' ) ),
+				GTM4WP_OPTION_DATALAYER_NAME => 'my-secret-layer',
+			)
+		);
+
+		$fields = $this->collector( array() )->fields();
+		$text   = (string) json_encode( $fields ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for a substring assertion.
+
+		$this->assertSame( ConfigurationChecks::CODE_INVALID_DATALAYER_NAME, $fields['problems']['debug'] );
+		$this->assertStringNotContainsString( 'my-secret-layer', $text );
 	}
 
 	public function test_there_is_one_section_for_the_plugin_however_many_modules_report(): void {
@@ -139,7 +165,7 @@ final class SiteHealthInfoTest extends TestCase {
 
 		$fields = $this->collector( array( $module ) )->fields();
 
-		$this->assertSame( array( 'reporting_ok' ), array_keys( $fields ) );
+		$this->assertSame( array( 'version', 'problems', 'reporting_ok' ), array_keys( $fields ) );
 	}
 
 	public function test_a_value_that_is_not_an_array_is_passed_through(): void {

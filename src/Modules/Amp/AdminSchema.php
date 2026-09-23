@@ -10,16 +10,19 @@
 
 namespace GTM4WP\Modules\Amp;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Field definitions of the AMP module, ported from the 1.x Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -117,5 +120,29 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The AMP container IDs are in the public HTML of every AMP page.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$ids     = array_filter( array_map( 'trim', explode( ',', (string) $options->get( GTM4WP_OPTION_INTEGRATE_AMPID ) ) ) );
+		$present = function_exists( 'amp_is_request' ) || function_exists( 'is_amp_endpoint' );
+
+		return array(
+			'amp_containers' => ( array() === $ids )
+				? SiteHealthRows::on_off( __( 'AMP containers', 'duracelltomi-google-tag-manager' ), false )
+				: SiteHealthRows::items( __( 'AMP containers', 'duracelltomi-google-tag-manager' ), $ids ),
+			'amp_plugin'     => SiteHealthRows::text(
+				__( 'AMP plugin', 'duracelltomi-google-tag-manager' ),
+				$present ? __( 'present', 'duracelltomi-google-tag-manager' ) : __( 'absent', 'duracelltomi-google-tag-manager' ),
+				$present ? 'present' : 'absent'
+			),
+		);
 	}
 }

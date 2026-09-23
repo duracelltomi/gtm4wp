@@ -10,16 +10,19 @@
 
 namespace GTM4WP\Modules\VisitorData;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Field definitions of the cache-safe data layer module.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com. The cache-safe mode is
@@ -93,5 +96,20 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		return array(
+			'cache_safe_datalayer' => SiteHealthRows::on_off(
+				__( 'Cache-safe data layer', 'duracelltomi-google-tag-manager' ),
+				(bool) $options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER )
+			),
+		);
 	}
 }

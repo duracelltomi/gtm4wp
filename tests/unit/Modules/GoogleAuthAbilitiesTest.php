@@ -128,6 +128,19 @@ final class GoogleAuthAbilitiesTest extends AbilitiesTestCase {
 		);
 	}
 
+	/**
+	 * The vault stores an unlabelled account under its address, so the raw
+	 * label used to carry the e-mail into the transcript.
+	 */
+	public function test_an_account_uploaded_without_a_label_is_listed_by_its_id_never_its_address(): void {
+		$id = $this->store_account( '' );
+
+		$result = $this->execute( Abilities::GET_ACCOUNTS );
+
+		$this->assertSame( $id, $result['accounts'][0]['label'] );
+		$this->assertStringNotContainsString( KeyFileFixture::CLIENT_EMAIL, (string) json_encode( $result ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for a substring assertion.
+	}
+
 	public function test_the_list_never_discloses_the_account_address_key_id_or_key_material(): void {
 		$this->store_account();
 

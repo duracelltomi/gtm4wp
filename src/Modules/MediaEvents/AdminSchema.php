@@ -10,16 +10,19 @@
 
 namespace GTM4WP\Modules\MediaEvents;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Field definitions of the media events module, ported from the 1.x Events tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation hub of this module on gtm4wp.com. Every player has a page of
@@ -223,5 +226,34 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$players = array(
+			GTM4WP_OPTION_EVENTS_YOUTUBE,
+			GTM4WP_OPTION_EVENTS_VIMEO,
+			GTM4WP_OPTION_EVENTS_SOUNDCLOUD,
+			GTM4WP_OPTION_EVENTS_HTML5MEDIA,
+			GTM4WP_OPTION_EVENTS_DAILYMOTION,
+			GTM4WP_OPTION_EVENTS_MIXCLOUD,
+			GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM,
+			GTM4WP_OPTION_EVENTS_WISTIA,
+			GTM4WP_OPTION_EVENTS_JWPLAYER,
+			GTM4WP_OPTION_EVENTS_VIDEOPRESS,
+			GTM4WP_OPTION_EVENTS_SPOTIFY,
+			GTM4WP_OPTION_EVENTS_TWITCH,
+		);
+
+		return array(
+			'players'               => SiteHealthRows::group( __( 'Media players', 'duracelltomi-google-tag-manager' ), SiteHealthRows::states( $options, $players ) ),
+			'dynamic_media'         => SiteHealthRows::on_off( __( 'Dynamically added media', 'duracelltomi-google-tag-manager' ), (bool) $options->get( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC ) ),
+			'dailymotion_player_id' => SiteHealthRows::set_or_empty( __( 'Dailymotion player ID', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID ) ),
+		);
 	}
 }

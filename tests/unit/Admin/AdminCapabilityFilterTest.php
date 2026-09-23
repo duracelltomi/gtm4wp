@@ -221,8 +221,8 @@ final class AdminCapabilityFilterTest extends TestCase {
 		// Site Health attachments landed in the range after T75 was closed and
 		// were deletable green until these two lines.
 		$this->assertNotFalse(
-			has_filter( 'site_status_tests', 'GTM4WP\Modules\GoogleDataManager\SiteHealth->add_test()' ),
-			'Admin::boot() attaches the Data Manager status test to Site Health.'
+			has_filter( 'site_status_tests', 'GTM4WP\Admin\SiteHealthTests->add_tests()' ),
+			'Admin::boot() attaches the plugin-wide Site Health status tests.'
 		);
 		$this->assertNotFalse(
 			has_filter( 'debug_information', 'GTM4WP\Admin\SiteHealthInfo->add_debug_information()' ),

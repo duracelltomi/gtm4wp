@@ -10,16 +10,19 @@
 
 namespace GTM4WP\Modules\ConsentMode;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Field definitions of the consent module, ported from the 1.x Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation hub of this module on gtm4wp.com and the per-tool setup
@@ -273,5 +276,60 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The Axeptio project id is in the public HTML, but set/empty is all a
+	 * support thread needs.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$signals = array(
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_USER_DATA,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_AD_PERSO,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_PERSO,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC,
+			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY,
+		);
+		$tools   = array(
+			GTM4WP_OPTION_INTEGRATE_COOKIEBOT,
+			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
+			GTM4WP_OPTION_INTEGRATE_COOKIEYES,
+			GTM4WP_OPTION_INTEGRATE_AXEPTIO,
+		);
+
+		$rows = array(
+			'consent_mode'       => SiteHealthRows::on_off( __( 'Consent mode defaults', 'duracelltomi-google-tag-manager' ), (bool) $options->get( GTM4WP_OPTION_INTEGRATE_CONSENTMODE ) ),
+			'granted_by_default' => SiteHealthRows::group( __( 'Signals granted by default', 'duracelltomi-google-tag-manager' ), SiteHealthRows::states( $options, $signals ) ),
+			'consent_tools'      => SiteHealthRows::group( __( 'Consent tool integrations', 'duracelltomi-google-tag-manager' ), SiteHealthRows::states( $options, $tools ) ),
+		);
+
+		if ( $options->get( GTM4WP_OPTION_INTEGRATE_AXEPTIO ) ) {
+			$project = SiteHealthRows::set_or_empty( '', (string) $options->get( GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID ) );
+			$version = SiteHealthRows::set_or_empty( '', (string) $options->get( GTM4WP_OPTION_INTEGRATE_AXEPTIO_COOKIES_VERSION ) );
+			$consent = SiteHealthRows::on_off( '', (bool) $options->get( GTM4WP_OPTION_INTEGRATE_AXEPTIO_CONSENTMODE ) );
+
+			$rows['axeptio'] = SiteHealthRows::assoc(
+				__( 'Axeptio', 'duracelltomi-google-tag-manager' ),
+				array(
+					'project_id'      => $project['value'],
+					'cookies_version' => $version['value'],
+					'consent_mode'    => $consent['value'],
+				),
+				array(
+					'project_id'      => $project['debug'],
+					'cookies_version' => $version['debug'],
+					'consent_mode'    => $consent['debug'],
+				)
+			);
+		}
+
+		return $rows;
 	}
 }

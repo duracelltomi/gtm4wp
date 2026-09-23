@@ -9,14 +9,15 @@ namespace GTM4WP\Tests\unit\Abilities;
 
 use GTM4WP\Abilities\StatusAbilities;
 use GTM4WP\Admin\ConfigurationChecks;
+use GTM4WP\Admin\SiteHealthTests;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Module\Registry;
 use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Modules\Container\StatusReport;
-use GTM4WP\Modules\GoogleDataManager\CaptureStats;
+use GTM4WP\Modules\GoogleAuth\SiteHealth as GoogleAuthSiteHealth;
 use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
 use GTM4WP\Modules\GoogleDataManager\DestinationRows;
-use GTM4WP\Modules\GoogleDataManager\SiteHealth;
+use GTM4WP\Modules\GoogleDataManager\SiteHealth as DataManagerSiteHealth;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Admin\UndocumentedThirdPartyModule;
 use GTM4WP\Tests\unit\Google\KeyFileFixture;
@@ -41,22 +42,25 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 	private const MEASUREMENT = 'G-ABC123';
 	private const PROPERTY    = '123456789';
 
+	/**
+	 * Writes to the same in-memory option rows the abilities read back through
+	 * their own, freshly built collaborators.
+	 *
+	 * @var KeyVault
+	 */
 	private KeyVault $vault;
 
 	private DestinationHealth $health;
-
-	private CaptureStats $stats;
 
 	protected function setUp(): void {
 		parent::setUp();
 
 		$this->vault  = new KeyVault( self::SECRET, static fn () => self::NOW );
 		$this->health = new DestinationHealth( static fn () => self::NOW );
-		$this->stats  = new CaptureStats( static fn () => self::NOW );
 
 		StatusReportingThirdPartySchema::$received = null;
 
-		( new StatusAbilities( $this->registry(), $this->vault, $this->health, $this->stats ) )->register();
+		( new StatusAbilities( $this->registry() ) )->register();
 	}
 
 	/**
@@ -73,7 +77,7 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		}
 
 		$this->registered = array();
-		( new StatusAbilities( $registry, $this->vault, $this->health, $this->stats ) )->register();
+		( new StatusAbilities( $registry ) )->register();
 
 		return $this->execute( StatusAbilities::GET_STATUS );
 	}
@@ -326,19 +330,40 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 
 	// ---- get-site-health ---------------------------------------------------
 
-	public function test_site_health_reports_the_status_test_and_the_info_rows(): void {
+	public function test_site_health_reports_every_status_test_and_the_info_rows(): void {
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
 
 		$health = $this->execute( StatusAbilities::GET_SITE_HEALTH );
+		$tests  = array_column( $health['tests'], null, 'id' );
 
-		$this->assertCount( 1, $health['tests'] );
-		$this->assertSame( SiteHealth::TEST_ID, $health['tests'][0]['id'] );
-		$this->assertSame( 'good', $health['tests'][0]['status'] );
-		$this->assertStringNotContainsString( '<', $health['tests'][0]['description'], 'The description is text, not the HTML Site Health renders.' );
+		$this->assertSame(
+			array( SiteHealthTests::TEST_CONFIGURATION, GoogleAuthSiteHealth::TEST_ID, DataManagerSiteHealth::TEST_ID ),
+			array_keys( $tests ),
+			'The plugin-wide test first, then the module tests in registry order.'
+		);
+
+		foreach ( $tests as $id => $test ) {
+			$this->assertSame( 'good', $test['status'], $id );
+			$this->assertStringNotContainsString( '<', $test['description'], 'The description is text, not the HTML Site Health renders.' );
+		}
 
 		$rows = array_column( $health['info'], 'value', 'key' );
-		$this->assertArrayHasKey( 'google-data-manager_gdm_send_refunds', $rows, 'The rows the Info tab shows, under the same prefixed keys.' );
-		$this->assertSame( 'off', $rows['google-data-manager_gdm_send_refunds'] );
+		$this->assertSame( GTM4WP_VERSION, $rows['version'] );
+		$this->assertSame( 'none', $rows['problems'] );
+		$this->assertArrayHasKey( 'google-data-manager_send_refunds', $rows, 'The rows the Info tab shows, under the same prefixed keys.' );
+		$this->assertSame( 'off', $rows['google-data-manager_send_refunds'] );
+	}
+
+	public function test_site_health_reports_a_missing_container_id_as_a_critical_configuration(): void {
+		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array() ) );
+
+		$health = $this->execute( StatusAbilities::GET_SITE_HEALTH );
+		$tests  = array_column( $health['tests'], null, 'id' );
+		$rows   = array_column( $health['info'], 'value', 'key' );
+
+		$this->assertSame( 'critical', $tests[ SiteHealthTests::TEST_CONFIGURATION ]['status'] );
+		$this->assertStringContainsString( 'GTM ID', $tests[ SiteHealthTests::TEST_CONFIGURATION ]['description'] );
+		$this->assertSame( ConfigurationChecks::CODE_MISSING_CONTAINER_ID, $rows['problems'], 'The Info row carries the code, the test the message.' );
 	}
 
 	public function test_site_health_reports_a_failing_destination_as_critical(): void {
@@ -353,10 +378,11 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 			$this->health->record_failure( self::MEASUREMENT, 'PERMISSION_DENIED: no access to property ' . self::PROPERTY . '.', 'PERMISSION_DENIED' );
 		}
 
-		$health = $this->execute( StatusAbilities::GET_SITE_HEALTH );
+		$tests = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['tests'], null, 'id' );
 
-		$this->assertSame( 'critical', $health['tests'][0]['status'] );
-		$this->assertStringContainsString( 'Main property', $health['tests'][0]['description'] );
+		$this->assertSame( 'critical', $tests[ DataManagerSiteHealth::TEST_ID ]['status'] );
+		$this->assertStringContainsString( 'Main property', $tests[ DataManagerSiteHealth::TEST_ID ]['description'] );
+		$this->assertSame( 'good', $tests[ GoogleAuthSiteHealth::TEST_ID ]['status'], 'The keys are readable; that is the other module\'s test.' );
 	}
 
 	/**
@@ -372,7 +398,7 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$registry = $this->registry();
 		$registry->add( new StatusReportingThirdPartyModule() );
 		$this->registered = array();
-		( new StatusAbilities( $registry, $this->vault, $this->health, $this->stats ) )->register();
+		( new StatusAbilities( $registry ) )->register();
 
 		$health = $this->execute( StatusAbilities::GET_SITE_HEALTH );
 		$rows   = array_column( $health['info'], 'value', 'key' );
@@ -386,15 +412,18 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 	}
 
 	/**
-	 * The disclosure test. With a stored service account and a destination in
-	 * place, the whole serialised answer names the account by its label and the
-	 * destination by its measurement ID (already in the site's public HTML) and
-	 * carries none of: the account e-mail, the key id, key material, the GA4
-	 * property ID, or Google's raw error text.
+	 * The disclosure test. With two stored service accounts (one uploaded with
+	 * no label, which the vault stores under its address) and a destination in
+	 * place, the whole serialised answer names the accounts by label or id and
+	 * the destination by its measurement ID (already in the site's public HTML)
+	 * and carries none of: the account e-mail, the key id, key material, the
+	 * GA4 property ID, or Google's raw error text.
 	 */
 	public function test_site_health_never_discloses_the_account_address_key_material_or_property_ids(): void {
 		$id = $this->vault->add( KeyFileFixture::parse(), 'Production' );
 		$this->assertIsString( $id );
+		$unlabelled = $this->vault->add( KeyFileFixture::parse(), '' );
+		$this->assertIsString( $unlabelled );
 
 		$this->store_settings(
 			array(
@@ -408,6 +437,7 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 
 		// Present: what an assistant needs.
 		$this->assertStringContainsString( 'Production', $text, 'The account is named by its label.' );
+		$this->assertStringContainsString( $unlabelled, $text, 'An unlabelled account is named by its id.' );
 		$this->assertStringContainsString( self::MEASUREMENT, $text, 'The destination is named by its measurement ID.' );
 		$this->assertStringContainsString( 'PERMISSION_DENIED', $text, 'The bare reason code.' );
 

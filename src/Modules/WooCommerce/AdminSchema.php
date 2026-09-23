@@ -10,8 +10,10 @@
 
 namespace GTM4WP\Modules\WooCommerce;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
@@ -22,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the WooCommerce module, ported from the 1.x
  * Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation hub of this module on gtm4wp.com.
@@ -442,5 +444,119 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				'version' => defined( 'WC_VERSION' ) ? (string) constant( 'WC_VERSION' ) : null,
 			),
 		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Text options are reported set/empty (a page id is configuration); the
+	 * cart/checkout page kind and HPOS are read from WooCommerce's utilities
+	 * behind class/method guards, "unknown" when they are not there (UC-2).
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$info     = $this->status_info( $options );
+		$switches = array(
+			GTM4WP_OPTION_INTEGRATE_WCUSESKU,
+			GTM4WP_OPTION_INTEGRATE_WCUSEFULLCATEGORYPATH,
+			GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE,
+			GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT,
+			GTM4WP_OPTION_INTEGRATE_WCLISTATTRIBUTION,
+			GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL,
+			GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA,
+			GTM4WP_OPTION_INTEGRATE_WCORDERDATA,
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX,
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING,
+			GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG,
+			GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE,
+			GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL,
+			GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC,
+		);
+
+		$cart     = self::page_kind( 'is_cart_block_default' );
+		$checkout = self::page_kind( 'is_checkout_block_default' );
+		$hpos     = self::hpos();
+
+		return array(
+			'plugin'                     => SiteHealthRows::plugin( 'WooCommerce', $info['integration'], WooCommerceModule::MIN_WC_VERSION ),
+			'tracking'                   => SiteHealthRows::on_off( __( 'E-commerce tracking', 'duracelltomi-google-tag-manager' ), $info['enabled'] ),
+			'options'                    => SiteHealthRows::group( __( 'Options', 'duracelltomi-google-tag-manager' ), SiteHealthRows::states( $options, $switches ) ),
+			'brand_taxonomy'             => SiteHealthRows::items( __( 'Brand taxonomy', 'duracelltomi-google-tag-manager' ), array( (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCEECBRANDTAXONOMY ) ) ),
+			'business_vertical'          => SiteHealthRows::text( __( 'Google Ads business vertical', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCBUSINESSVERTICAL ) ),
+			'products_per_impression'    => SiteHealthRows::count( __( 'Products per impression', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ) ),
+			'order_max_age'              => SiteHealthRows::count( __( 'Maximum order age (days)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCORDERMAXAGE ) ),
+			'datalayer_timeout'          => SiteHealthRows::count( __( 'Data layer timeout (ms)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_WCDLMAXTIMEOUT ) ),
+			'purchase_statuses'          => SiteHealthRows::items( __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ), (array) $options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASESTATUSES ) ),
+			'product_id_prefix'          => SiteHealthRows::set_or_empty( __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCREMPRODIDPREFIX ) ),
+			'transaction_id_prefix'      => SiteHealthRows::set_or_empty( __( 'Transaction ID prefix', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCTRANSACTIONIDPREFIX ) ),
+			'custom_order_received_page' => SiteHealthRows::set_or_empty( __( 'Custom order received page', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE ) ),
+			'cart_checkout_pages'        => SiteHealthRows::assoc(
+				__( 'Cart and checkout pages', 'duracelltomi-google-tag-manager' ),
+				array(
+					'cart'     => self::word( $cart ),
+					'checkout' => self::word( $checkout ),
+				),
+				array(
+					'cart'     => $cart,
+					'checkout' => $checkout,
+				)
+			),
+			'hpos'                       => SiteHealthRows::text( __( 'High-performance order storage', 'duracelltomi-google-tag-manager' ), self::word( $hpos ), $hpos ),
+		);
+	}
+
+	/**
+	 * Whether the store's cart or checkout page is the block or the classic
+	 * one, as WooCommerce's own utility answers it.
+	 *
+	 * @param string $method The CartCheckoutUtils predicate.
+	 * @return string block, classic or unknown.
+	 */
+	private static function page_kind( string $method ): string {
+		$utils = 'Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils';
+
+		if ( ! class_exists( $utils ) || ! method_exists( $utils, $method ) ) {
+			return 'unknown';
+		}
+
+		return call_user_func( array( $utils, $method ) ) ? 'block' : 'classic';
+	}
+
+	/**
+	 * Whether orders live in the custom tables (HPOS).
+	 *
+	 * @return string on, off or unknown.
+	 */
+	private static function hpos(): string {
+		$utils = 'Automattic\WooCommerce\Utilities\OrderUtil';
+
+		if ( ! class_exists( $utils ) || ! method_exists( $utils, 'custom_orders_table_usage_is_enabled' ) ) {
+			return 'unknown';
+		}
+
+		return call_user_func( array( $utils, 'custom_orders_table_usage_is_enabled' ) ) ? 'on' : 'off';
+	}
+
+	/**
+	 * One of the runtime words, translated.
+	 *
+	 * @param string $word The English word.
+	 * @return string
+	 */
+	private static function word( string $word ): string {
+		switch ( $word ) {
+			case 'block':
+				return __( 'block', 'duracelltomi-google-tag-manager' );
+			case 'classic':
+				return __( 'classic', 'duracelltomi-google-tag-manager' );
+			case 'on':
+				return __( 'on', 'duracelltomi-google-tag-manager' );
+			case 'off':
+				return __( 'off', 'duracelltomi-google-tag-manager' );
+			default:
+				return __( 'unknown', 'duracelltomi-google-tag-manager' );
+		}
 	}
 }

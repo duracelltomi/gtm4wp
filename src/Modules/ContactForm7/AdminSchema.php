@@ -10,8 +10,10 @@
 
 namespace GTM4WP\Modules\ContactForm7;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
@@ -22,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the Contact Form 7 module, ported from the 1.x
  * Integration tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com. One page covers all three
@@ -145,6 +147,26 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'integration' => array(
 				'active'  => defined( 'WPCF7_VERSION' ),
 				'version' => defined( 'WPCF7_VERSION' ) ? (string) constant( 'WPCF7_VERSION' ) : null,
+			),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$info = $this->status_info( $options );
+
+		return array(
+			'plugin'   => SiteHealthRows::plugin( 'Contact Form 7', $info['integration'] ),
+			'tracking' => SiteHealthRows::on_off( __( 'Form tracking', 'duracelltomi-google-tag-manager' ), $info['enabled'] ),
+			'inputs'   => SiteHealthRows::text( __( 'Form inputs in the data layer', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_WPCF7_INPUTS ) ),
+			'options'  => SiteHealthRows::group(
+				__( 'Options', 'duracelltomi-google-tag-manager' ),
+				SiteHealthRows::states( $options, array( GTM4WP_OPTION_INTEGRATE_WPCF7_GA4EVENTS, GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE ) )
 			),
 		);
 	}

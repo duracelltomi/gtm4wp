@@ -518,7 +518,7 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 
 		// The rows are SiteHealth's, under its module-local keys; the collector
 		// is what files them under the module id.
-		foreach ( array( 'gdm_capture_attribution', 'gdm_send_refunds', 'gdm_consent_policy', 'gdm_capture_rate', 'gdm_queue' ) as $key ) {
+		foreach ( array( 'capture_attribution', 'send_refunds', 'consent_policy', 'capture_rate', 'queue' ) as $key ) {
 			$this->assertArrayHasKey( $key, $rows );
 			$this->assertArrayHasKey( 'label', $rows[ $key ] );
 			$this->assertArrayHasKey( 'value', $rows[ $key ] );
@@ -536,6 +536,6 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$registry = Registry::with_default_modules();
 		$fields   = ( new SiteHealthInfo( $registry, new Options( $registry->defaults() ) ) )->fields();
 
-		$this->assertArrayHasKey( GoogleDataManagerModule::ID . '_gdm_send_refunds', $fields );
+		$this->assertArrayHasKey( GoogleDataManagerModule::ID . '_send_refunds', $fields );
 	}
 }

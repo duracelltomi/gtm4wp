@@ -17,6 +17,7 @@ use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\PanelSchemaInterface;
 use GTM4WP\Module\SiteHealthInfoInterface;
+use GTM4WP\Module\SiteHealthTestsInterface;
 use GTM4WP\Modules\GoogleAuth\GoogleAuthModule;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
@@ -34,7 +35,7 @@ defined( 'ABSPATH' ) || exit;
  * through panel_data() instead (columnChoices), which only runs when the
  * settings page itself is rendered - the same cost class as the key notice.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, SiteHealthInfoInterface, AbilitiesInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, SiteHealthInfoInterface, SiteHealthTestsInterface, AbilitiesInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -405,7 +406,17 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * @return array<string, array<string, mixed>>
 	 */
 	public function site_health_info( Options $options ): array {
-		return ( new SiteHealth( $options, new DestinationHealth(), new CaptureStats(), new KeyVault() ) )->debug_fields();
+		return ( new SiteHealth( $options, new DestinationHealth(), new CaptureStats() ) )->debug_fields();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, callable>
+	 */
+	public function site_health_tests( Options $options ): array {
+		return array( SiteHealth::TEST_KEY => array( new SiteHealth( $options, new DestinationHealth(), new CaptureStats() ), 'run_test' ) );
 	}
 
 	/**

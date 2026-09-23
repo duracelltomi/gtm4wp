@@ -30,10 +30,12 @@ interface SiteHealthInfoInterface {
 
 	/**
 	 * Rows for the plugin's Site Health Info section, in the shape of the
-	 * `debug_information` filter: `label`, `value` (string or list of strings),
-	 * optionally `private` and `debug`. Keys are prefixed with the module id by
-	 * the collector. Called only when the page renders, so a database read is
-	 * affordable; an HTTP request is not.
+	 * `debug_information` filter: `label`, `value` (a string, or key => string
+	 * sub-lines), `debug` (the English twin of the value: the copied text
+	 * prints the row KEY and this, so keys read as names and never '' - build
+	 * rows with Admin\SiteHealthRows) and optionally `private`. Keys are
+	 * prefixed with the module id by the collector. Called only when the page
+	 * renders, so a database read is affordable; an HTTP request is not.
 	 *
 	 * @param Options $options The plugin options service.
 	 * @return array<string, array<string, mixed>> Rows keyed by a module-local id; empty for nothing to report.

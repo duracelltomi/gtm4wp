@@ -18,10 +18,10 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Assembles ONE Site Health Info section for the whole plugin ("paste the
- * Google Tag Manager section" must name a single thing) from the rows each
- * module's admin schema contributes via SiteHealthInfoInterface, in registry
- * order. The disclosure rule is on the interface; this class changes no row.
- * Added only when a module has something to say.
+ * Google Tag Manager section" must name a single thing): two plugin-level
+ * rows, then the rows each module's admin schema contributes via
+ * SiteHealthInfoInterface, in registry order (PA-21). The disclosure rule is
+ * on the interface; this class changes no row.
  */
 final class SiteHealthInfo {
 
@@ -49,7 +49,7 @@ final class SiteHealthInfo {
 	}
 
 	/**
-	 * Adds the section, when any module has rows for it.
+	 * Adds the section.
 	 *
 	 * @param array<string, mixed> $info The registered sections.
 	 * @return array<string, mixed>
@@ -59,28 +59,33 @@ final class SiteHealthInfo {
 			return $info;
 		}
 
-		$fields = $this->fields();
-
-		if ( array() === $fields ) {
-			return $info;
-		}
-
 		$info[ self::SECTION ] = array(
 			'label'       => __( 'Google Tag Manager for WordPress', 'duracelltomi-google-tag-manager' ),
 			'description' => __( 'The state of this plugin\'s features on this site. Statuses, counts and option states only - no keys, no account addresses and no visitor data - so this section is safe to paste into a support thread.', 'duracelltomi-google-tag-manager' ),
-			'fields'      => $fields,
+			'fields'      => $this->fields(),
 		);
 
 		return $info;
 	}
 
 	/**
-	 * Every module's rows, in registry order, keys prefixed with the module id.
+	 * The plugin-level rows, then every module's rows in registry order with
+	 * keys prefixed by the module id.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
 	public function fields(): array {
-		$fields = array();
+		$fields = array(
+			'version'  => SiteHealthRows::text(
+				__( 'Plugin version', 'duracelltomi-google-tag-manager' ),
+				defined( 'GTM4WP_VERSION' ) ? (string) GTM4WP_VERSION : ''
+			),
+			// Codes only: the messages quote configured values.
+			'problems' => SiteHealthRows::items(
+				__( 'Configuration problems', 'duracelltomi-google-tag-manager' ),
+				array_column( ( new ConfigurationChecks( $this->options ) )->problems(), 'code' )
+			),
+		);
 
 		foreach ( $this->registry->all() as $module ) {
 			$schema_class = $module->admin_schema();

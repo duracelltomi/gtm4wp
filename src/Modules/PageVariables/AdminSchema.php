@@ -10,10 +10,13 @@
 
 namespace GTM4WP\Modules\PageVariables;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -21,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the page variables module. Labels and descriptions
  * are ported from the 1.x Basic data admin tab.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation hub of this module on gtm4wp.com, and the pages below it that
@@ -487,5 +490,49 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * ⛔ The header name and the proxy list are infrastructure detail and the
+	 * meta keys name what the site stores: only states and counts leave here.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$switches = array();
+
+		foreach ( ( new PageVariablesModule() )->defaults() as $key => $default_value ) {
+			if ( is_bool( $default_value ) ) {
+				$switches[ $key ] = (bool) $options->get( $key );
+			}
+		}
+
+		$label = __( 'Visitor IP address', 'duracelltomi-google-tag-manager' );
+
+		if ( ! $options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP ) ) {
+			$visitor_ip = SiteHealthRows::on_off( $label, false );
+		} elseif ( '' === trim( (string) $options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_HEADER ) ) ) {
+			$visitor_ip = SiteHealthRows::text( $label, __( 'on, default header', 'duracelltomi-google-tag-manager' ), 'on, default header' );
+		} else {
+			$proxies    = count( VisitorIp::parse_trusted_proxies( (string) $options->get( GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES ) ) );
+			$visitor_ip = SiteHealthRows::text(
+				$label,
+				/* translators: %d: number of trusted proxy addresses. */
+				sprintf( __( 'on, custom header, %d trusted proxies', 'duracelltomi-google-tag-manager' ), $proxies ),
+				sprintf( 'on, custom header, %d trusted proxies', $proxies )
+			);
+		}
+
+		return array(
+			'variables'      => SiteHealthRows::group( __( 'Page variables', 'duracelltomi-google-tag-manager' ), $switches ),
+			'post_meta_keys' => SiteHealthRows::count(
+				__( 'Post meta keys', 'duracelltomi-google-tag-manager' ),
+				count( PageVariablesModule::parse_meta_key_list( (string) $options->get( GTM4WP_OPTION_INCLUDE_POSTMETA_KEYS ) ) )
+			),
+			'visitor_ip'     => $visitor_ip,
+		);
 	}
 }

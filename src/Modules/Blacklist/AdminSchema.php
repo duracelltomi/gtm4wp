@@ -10,9 +10,12 @@
 
 namespace GTM4WP\Modules\Blacklist;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,7 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * Vendor names are product names and are not translated, matching 1.x
  * behavior.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com. Both options deep link
@@ -304,5 +307,52 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The mode and a count of the entries that survive the same re-validation
+	 * the data layer applies.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$modes = array(
+			1 => 'blocklist',
+			2 => 'allowlist',
+		);
+		$mode  = $modes[ (int) $options->get( GTM4WP_OPTION_BLACKLIST_ENABLE ) ] ?? 'disabled';
+
+		$stored = $options->get( GTM4WP_OPTION_BLACKLIST_STATUS );
+
+		if ( ! is_array( $stored ) ) {
+			$stored = explode( ',', (string) $stored );
+		}
+
+		$valid = count( array_intersect( array_map( 'strval', $stored ), BlacklistModule::valid_restrictions() ) );
+
+		return array(
+			'mode'         => SiteHealthRows::text( __( 'Tag restrictions', 'duracelltomi-google-tag-manager' ), self::word( $mode ), $mode ),
+			'restrictions' => SiteHealthRows::count( __( 'Restricted entities', 'duracelltomi-google-tag-manager' ), $valid ),
+		);
+	}
+
+	/**
+	 * The mode word, translated.
+	 *
+	 * @param string $mode The English word.
+	 * @return string
+	 */
+	private static function word( string $mode ): string {
+		switch ( $mode ) {
+			case 'blocklist':
+				return __( 'blocklist', 'duracelltomi-google-tag-manager' );
+			case 'allowlist':
+				return __( 'allowlist', 'duracelltomi-google-tag-manager' );
+			default:
+				return __( 'disabled', 'duracelltomi-google-tag-manager' );
+		}
 	}
 }

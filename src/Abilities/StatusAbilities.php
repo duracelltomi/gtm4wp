@@ -12,14 +12,11 @@ namespace GTM4WP\Abilities;
 
 use GTM4WP\Admin\ConfigurationChecks;
 use GTM4WP\Admin\SiteHealthInfo;
+use GTM4WP\Admin\SiteHealthTests;
 use GTM4WP\Capability;
-use GTM4WP\Google\KeyVault;
 use GTM4WP\Module\Registry;
 use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Modules\Container\StatusReport;
-use GTM4WP\Modules\GoogleDataManager\CaptureStats;
-use GTM4WP\Modules\GoogleDataManager\DestinationHealth;
-use GTM4WP\Modules\GoogleDataManager\SiteHealth;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,8 +29,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * Both assemble only: every module-specific fact comes from the module that
  * owns it (Container\StatusReport, each schema's StatusInfoInterface, the
- * Data Manager's SiteHealth, the SiteHealthInfo collector), and this class
- * keeps no per-module list (PA-21).
+ * two Site Health collectors), and this class keeps no per-module list
+ * (PA-21).
  *
  * ⛔ An ability's output ends up in an AI assistant's transcript. Same rule
  * as the Site Health Info section: option states, statuses, counts,
@@ -47,20 +44,11 @@ final class StatusAbilities implements ProviderInterface {
 	public const GET_SITE_HEALTH = Registrar::NAMESPACE_PREFIX . 'get-site-health';
 
 	/**
-	 * Constructor. The Site Health collaborators are injectable for tests;
-	 * production builds them the way Admin::boot() does.
+	 * Constructor.
 	 *
-	 * @param Registry               $registry The module registry.
-	 * @param KeyVault|null          $vault    The service-account store.
-	 * @param DestinationHealth|null $health   Per-destination health records.
-	 * @param CaptureStats|null      $stats    Attribution capture-rate counters.
+	 * @param Registry $registry The module registry.
 	 */
-	public function __construct(
-		private Registry $registry,
-		private ?KeyVault $vault = null,
-		private ?DestinationHealth $health = null,
-		private ?CaptureStats $stats = null
-	) {
+	public function __construct( private Registry $registry ) {
 	}
 
 	/**
@@ -174,7 +162,7 @@ final class StatusAbilities implements ProviderInterface {
 			self::GET_SITE_HEALTH,
 			array(
 				'label'               => __( 'Get the Site Health state of Google Tag Manager', 'duracelltomi-google-tag-manager' ),
-				'description'         => __( 'Returns the plugin\'s own Site Health status tests and its section of the Site Health Info tab, as an administrator sees them under Tools -> Site Health. Read-only and safe to quote: statuses, counts, timestamps and short reason codes only - no keys, no account addresses, no visitor data. Call gtm4wp/get-status first for the configuration itself.', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Returns the plugin\'s own Site Health status tests (the configuration, the Google service account keys, Google Data Manager sending) and every row of its section of the Site Health Info tab - the state of every module - as an administrator sees them under Tools -> Site Health. Read-only and safe to quote: statuses, counts, timestamps and short reason codes only - no keys, no account addresses, no visitor data. Call gtm4wp/get-status first for the configuration itself.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
 				'input_schema'        => Registrar::no_input_schema(),
 				'output_schema'       => array(
@@ -237,24 +225,24 @@ final class StatusAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/get-site-health ability. The status test is built the way
-	 * Admin::boot() builds it, not collected through the site_status_tests
-	 * filter: on a REST request core registers no tests and the admin path is
-	 * not booted, so the filter would answer with nothing.
+	 * The gtm4wp/get-site-health ability. The tests are run through the
+	 * collector's run_all(), not the site_status_tests filter: on a REST
+	 * request core registers no tests and the admin path is not booted.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public function get_site_health(): array {
 		$options = $this->options();
+		$tests   = array();
 
-		$site_health = new SiteHealth(
-			$options,
-			$this->health ?? new DestinationHealth(),
-			$this->stats ?? new CaptureStats(),
-			$this->vault ?? new KeyVault()
-		);
-
-		$test = $site_health->run_test();
+		foreach ( ( new SiteHealthTests( $this->registry, $options ) )->run_all() as $id => $result ) {
+			$tests[] = array(
+				'id'          => (string) $id,
+				'status'      => (string) ( $result['status'] ?? 'good' ),
+				'label'       => (string) ( $result['label'] ?? '' ),
+				'description' => trim( wp_strip_all_tags( (string) ( $result['description'] ?? '' ) ) ),
+			);
+		}
 
 		$info = array();
 
@@ -265,26 +253,41 @@ final class StatusAbilities implements ProviderInterface {
 				continue;
 			}
 
-			$value = $row['value'] ?? '';
-
 			$info[] = array(
 				'key'   => (string) $key,
 				'label' => (string) ( $row['label'] ?? '' ),
-				'value' => is_array( $value ) ? array_values( array_map( 'strval', $value ) ) : (string) $value,
+				'value' => self::copy_value( $row ),
 			);
 		}
 
 		return array(
-			'tests' => array(
-				array(
-					'id'          => SiteHealth::TEST_ID,
-					'status'      => (string) ( $test['status'] ?? 'good' ),
-					'label'       => (string) ( $test['label'] ?? '' ),
-					'description' => trim( wp_strip_all_tags( (string) ( $test['description'] ?? '' ) ) ),
-				),
-			),
+			'tests' => $tests,
 			'info'  => $info,
 		);
+	}
+
+	/**
+	 * A row's value as the Info tab's copy-to-clipboard text carries it: the
+	 * English `debug` twin when the row has one, and named sub-lines as
+	 * "key: value" strings.
+	 *
+	 * @param array<string, mixed> $row The row.
+	 * @return string|string[]
+	 */
+	private static function copy_value( array $row ) {
+		$value = $row['debug'] ?? ( $row['value'] ?? '' );
+
+		if ( ! is_array( $value ) ) {
+			return (string) $value;
+		}
+
+		$lines = array();
+
+		foreach ( $value as $key => $item ) {
+			$lines[] = is_int( $key ) ? (string) $item : $key . ': ' . (string) $item;
+		}
+
+		return $lines;
 	}
 
 	/**

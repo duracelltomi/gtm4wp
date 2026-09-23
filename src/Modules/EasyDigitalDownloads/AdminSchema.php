@@ -10,8 +10,10 @@
 
 namespace GTM4WP\Modules\EasyDigitalDownloads;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Module\StatusInfoInterface;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
@@ -24,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
  * starts at beta (or experimental) per the option maturity policy: a brand
  * new integration has no field usage yet, so nothing may claim stable.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, StatusInfoInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation hub of this module on gtm4wp.com. The page does not exist
@@ -397,6 +399,45 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				'active'  => defined( 'EDD_VERSION' ),
 				'version' => defined( 'EDD_VERSION' ) ? (string) constant( 'EDD_VERSION' ) : null,
 			),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * The WooCommerce rows for the options EDD shares; text options set/empty.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$info     = $this->status_info( $options );
+		$switches = array(
+			GTM4WP_OPTION_INTEGRATE_EDDUSESKU,
+			GTM4WP_OPTION_INTEGRATE_EDDUSEFULLCATEGORYPATH,
+			GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE,
+			GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION,
+			GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL,
+			GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA,
+			GTM4WP_OPTION_INTEGRATE_EDDORDERDATA,
+			GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX,
+			GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG,
+			GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE,
+			GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL,
+		);
+
+		return array(
+			'plugin'                  => SiteHealthRows::plugin( 'Easy Digital Downloads', $info['integration'], EasyDigitalDownloadsModule::MIN_EDD_VERSION ),
+			'tracking'                => SiteHealthRows::on_off( __( 'E-commerce tracking', 'duracelltomi-google-tag-manager' ), $info['enabled'] ),
+			'options'                 => SiteHealthRows::group( __( 'Options', 'duracelltomi-google-tag-manager' ), SiteHealthRows::states( $options, $switches ) ),
+			'brand_taxonomy'          => SiteHealthRows::items( __( 'Brand taxonomy', 'duracelltomi-google-tag-manager' ), array( (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDBRANDTAXONOMY ) ) ),
+			'business_vertical'       => SiteHealthRows::text( __( 'Google Ads business vertical', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDBUSINESSVERTICAL ) ),
+			'products_per_impression' => SiteHealthRows::count( __( 'Products per impression', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION ) ),
+			'order_max_age'           => SiteHealthRows::count( __( 'Maximum order age (days)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERMAXAGE ) ),
+			'datalayer_timeout'       => SiteHealthRows::count( __( 'Data layer timeout (ms)', 'duracelltomi-google-tag-manager' ), (int) $options->get( GTM4WP_OPTION_INTEGRATE_EDDDLMAXTIMEOUT ) ),
+			'purchase_statuses'       => SiteHealthRows::items( __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ), (array) $options->get( GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES ) ),
+			'product_id_prefix'       => SiteHealthRows::set_or_empty( __( 'Product ID prefix', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDPRODIDPREFIX ) ),
+			'transaction_id_prefix'   => SiteHealthRows::set_or_empty( __( 'Transaction ID prefix', 'duracelltomi-google-tag-manager' ), (string) $options->get( GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX ) ),
 		);
 	}
 }

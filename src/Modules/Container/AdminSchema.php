@@ -10,9 +10,12 @@
 
 namespace GTM4WP\Modules\Container;
 
+use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
+use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * Field definitions of the container module. Labels and descriptions are
  * ported from the 1.x General and Advanced admin tabs.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com.
@@ -463,5 +466,73 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function unavailable_message(): string {
 		return '';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * StatusReport's facts as rows: container ids, domains and paths are in
+	 * the loader URL of every page; the environment tokens are reported as
+	 * set/not set, never by value.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function site_health_info( Options $options ): array {
+		$report     = ( new StatusReport( $options ) )->report();
+		$containers = array();
+		$debug      = array();
+
+		foreach ( $report['containers'] as $container ) {
+			$facts = array(
+				$container['environment'] ? 'yes' : 'no',
+				( '' !== $container['domain'] ) ? $container['domain'] : '-',
+				( '' !== $container['path'] ) ? $container['path'] : '-',
+				$container['omit_id'] ? 'yes' : 'no',
+			);
+
+			$containers[ $container['id'] ] = sprintf(
+				/* translators: 1: yes/no - whether a GTM environment is configured. 2: custom loader domain or a dash. 3: custom loader path or a dash. 4: yes/no - whether the container ID is left out of the loader URL. */
+				__( 'environment: %1$s, domain: %2$s, path: %3$s, ID omitted: %4$s', 'duracelltomi-google-tag-manager' ),
+				...$facts
+			);
+			$debug[ $container['id'] ] = sprintf( 'environment: %1$s, domain: %2$s, path: %3$s, ID omitted: %4$s', ...$facts );
+		}
+
+		$name  = $report['datalayer_name'];
+		$roles = array_filter( array_map( 'trim', explode( ',', (string) $options->get( GTM4WP_OPTION_NOGTMFORLOGGEDIN ) ) ) );
+
+		return array(
+			'containers'            => SiteHealthRows::assoc( __( 'Containers', 'duracelltomi-google-tag-manager' ), $containers, $debug ),
+			'placement'             => SiteHealthRows::text( __( 'Container code placement', 'duracelltomi-google-tag-manager' ), $report['placement'] ),
+			'container_code_output' => SiteHealthRows::yes_no( __( 'Container code output', 'duracelltomi-google-tag-manager' ), $report['container_code_output'] ),
+			'datalayer_name'        => $name['valid']
+				? SiteHealthRows::text( __( 'Data layer variable', 'duracelltomi-google-tag-manager' ), $name['effective'] )
+				: SiteHealthRows::text(
+					__( 'Data layer variable', 'duracelltomi-google-tag-manager' ),
+					/* translators: 1: the configured name. 2: the name in use. */
+					sprintf( __( 'configured "%1$s", using "%2$s" (invalid)', 'duracelltomi-google-tag-manager' ), $name['configured'], $name['effective'] ),
+					sprintf( 'configured "%1$s", using "%2$s" (invalid)', $name['configured'], $name['effective'] )
+				),
+			'hardcoded'             => $report['hardcoded']['active']
+				? SiteHealthRows::assoc(
+					__( 'wp-config.php overrides', 'duracelltomi-google-tag-manager' ),
+					array(
+						'columns'     => implode( ', ', $report['hardcoded']['locked_columns'] ),
+						'rows_locked' => SiteHealthRows::yes_no( '', $report['hardcoded']['locked_rows'] )['value'],
+					),
+					array(
+						'columns'     => implode( ', ', $report['hardcoded']['locked_columns'] ),
+						'rows_locked' => $report['hardcoded']['locked_rows'] ? 'yes' : 'no',
+					)
+				)
+				: SiteHealthRows::on_off( __( 'wp-config.php overrides', 'duracelltomi-google-tag-manager' ), false ),
+			'hardcoded_errors'      => SiteHealthRows::items( __( 'Rejected wp-config.php constants', 'duracelltomi-google-tag-manager' ), $report['hardcoded']['errors'] ),
+			'options'               => SiteHealthRows::group(
+				__( 'Loading options', 'duracelltomi-google-tag-manager' ),
+				SiteHealthRows::states( $options, array( GTM4WP_OPTION_LOADEARLY, GTM4WP_OPTION_NOCONSOLELOG, GTM4WP_OPTION_PRODUCTIONONLY ) )
+			),
+			'disabled_for_roles'    => SiteHealthRows::items( __( 'Container disabled for roles', 'duracelltomi-google-tag-manager' ), $roles ),
+		);
 	}
 }

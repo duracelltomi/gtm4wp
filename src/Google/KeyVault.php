@@ -282,6 +282,25 @@ final class KeyVault {
 	}
 
 	/**
+	 * The name an account is reported under outside the settings screen (Site
+	 * Health, an ability). An account uploaded without a label is stored under
+	 * its e-mail address, which names the owner's Cloud project, so a label
+	 * that is an address is replaced by the account id.
+	 *
+	 * @param array<string, mixed> $account An account as all() lists it.
+	 * @return string
+	 */
+	public static function safe_label( array $account ): string {
+		$label = (string) ( $account['label'] ?? '' );
+
+		if ( ( '' === $label ) || ( false !== strpos( $label, '@' ) ) ) {
+			return (string) ( $account['id'] ?? '' );
+		}
+
+		return $label;
+	}
+
+	/**
 	 * Decrypts and returns the key of an account for signing: the only method
 	 * that hands out key material. A key that no longer decrypts marks the
 	 * account as needing a fresh upload.
