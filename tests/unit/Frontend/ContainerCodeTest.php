@@ -997,6 +997,35 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	/**
+	 * The Google tag developer ID (U165) is pushed as a gtag arguments object
+	 * onto the CONFIGURED data layer (RI-14, the #269 lesson), after the array
+	 * exists and before anything else in the block. The literal is pinned so a
+	 * typo in the ID or the command shape breaks the suite rather than Google's
+	 * attribution silently.
+	 *
+	 * @return void
+	 */
+	public function test_header_top_sets_the_google_tag_developer_id(): void {
+		$this->assertSame( 'dNGJiYT', ContainerCode::DEVELOPER_ID );
+
+		$container = $this->make_container(
+			array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' )
+		);
+
+		ob_start();
+		$container->header_top();
+		$output = ob_get_clean();
+
+		$command = "gtag('set', 'developer_id.dNGJiYT', true);";
+		$this->assertStringContainsString( 'function gtag(){customDL.push(arguments);}' . $command, $output );
+		$this->assertStringNotContainsString( 'dataLayer.push', $output );
+
+		$init = strpos( $output, 'var customDL = customDL || [];' );
+		$this->assertNotFalse( $init );
+		$this->assertGreaterThan( $init, strpos( $output, $command ) );
+	}
+
+	/**
 	 * Findings #114 and #117 at the sink they actually matter for. This block
 	 * emits the data layer name twice over in two different grammars - once as a
 	 * string VALUE (json_literal + hex flags, RI-4 pile b) and twice as a bare

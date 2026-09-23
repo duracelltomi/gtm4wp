@@ -63,6 +63,7 @@
 * Fixed: the browser, OS and device data script reported all three signals when a page optimiser removed its inline configuration, ignoring which of them were enabled. It now reports nothing in that case.
 * Fixed: with the cache-safe data layer, a logged-in visitor served a cached page kept requesting their visitor data on every page view after WordPress refused the page's nonce. When WordPress itself reports the rejected nonce, the data is requested once more anonymously and that page stops asking.
 * Updated: tested with WooCommerce 11.1.2.
+* Added: the data layer initialisation block carries the plugin's Google tag developer ID, `gtag('set', 'developer_id.dNGJiYT', true)`, so Google can tell which platform installed the tag. It identifies GTM4WP only and adds nothing about the site or its visitors.
 
 ## 2.0.2
 
