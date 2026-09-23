@@ -34,18 +34,6 @@ define( 'GTM4WP_VERSION', '2.0.0' );
 define( 'GTM4WP_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GTM4WP_PLUGIN_FILE', __FILE__ );
 
-/*
- * Deprecated in 2.0, to be removed in 2.1. These globals carry a 1.x typo
- * (gtp4wp_) and exist only for third-party code written against 1.x; a global
- * cannot raise a deprecation notice, so this comment is the only warning.
- * Replacements: plugin_dir_url( GTM4WP_PLUGIN_FILE ),
- * plugin_basename( GTM4WP_PLUGIN_FILE ), plugin_dir_url( GTM4WP_PLUGIN_FILE ) . 'build/'.
- */
-global $gtp4wp_plugin_url, $gtp4wp_plugin_basename, $gtp4wp_script_path;
-$gtp4wp_plugin_url      = plugin_dir_url( __FILE__ );
-$gtp4wp_plugin_basename = plugin_basename( __FILE__ );
-$gtp4wp_script_path     = $gtp4wp_plugin_url . 'build/';
-
 /**
  * Outputs an admin notice when the site does not fulfill the minimum
  * PHP or WordPress version requirements of GTM4WP 2.x.
