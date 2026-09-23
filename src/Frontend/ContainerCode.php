@@ -299,7 +299,7 @@ final class ContainerCode {
 		}
 
 		if ( $this->consent->enabled() ) {
-			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag ) );
+			$this->script_tag->print_script_block( $this->consent->script_block( $this->script_tag, $datalayer_name ) );
 		}
 
 		if ( ( array() !== $containers ) && $output_container_code ) {

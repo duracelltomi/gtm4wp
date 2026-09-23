@@ -725,6 +725,28 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertLessThan( $loader_pos, $consent_pos, 'Consent defaults must be output before the container loader.' );
 	}
 
+	/**
+	 * #269 (RI-14): with a renamed data layer the consent shim, the header and
+	 * the loader must all name the same array, or the defaults never reach GTM.
+	 */
+	public function test_header_begin_binds_the_consent_shim_to_the_renamed_data_layer(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE              => 'GTM-AAA111',
+				GTM4WP_OPTION_DATALAYER_NAME        => 'customDL',
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'function gtag(){customDL.push(arguments);}', $output );
+		$this->assertStringContainsString( "'customDL','GTM-AAA111'", $output );
+		$this->assertStringNotContainsString( 'dataLayer.push(arguments)', $output );
+	}
+
 	public function test_header_begin_custom_domain_and_path_in_loader(): void {
 		$container = $this->make_container(
 			array(

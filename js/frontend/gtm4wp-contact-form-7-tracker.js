@@ -163,17 +163,36 @@ function gtm4wp_cf7_ga4_form_fields( form ) {
 	return {
 		form_id: idinput ? idinput.value : '',
 		form_name: gtm4wp_cf7_form_name( form ),
-		form_destination:
-			form && form.action ? form.action : window.location.href,
+		form_destination: gtm4wp_cf7_form_destination( form ),
 	};
 }
 
 /**
- * Pushes a GA4 recommended form event for the given form element.
+ * The form's action as an absolute URL, the current page when it has none.
+ * The attribute, resolved against document.baseURI: a control named `action`
+ * shadows the DOM property (#280).
  *
- * The Contact Form 7 status is added as form_status when there is one. form_start
- * fires on the first field interaction, long before a status exists, so the key is
- * omitted there rather than pushed as an empty placeholder.
+ * @param {Element} form The Contact Form 7 <form> element.
+ * @return {string} Absolute URL.
+ */
+function gtm4wp_cf7_form_destination( form ) {
+	const action =
+		form && form.getAttribute ? form.getAttribute( 'action' ) || '' : '';
+
+	if ( '' === action ) {
+		return window.location.href;
+	}
+
+	try {
+		return new URL( action, document.baseURI ).href;
+	} catch ( e ) {
+		return window.location.href;
+	}
+}
+
+/**
+ * Pushes a GA4 recommended form event; form_status is added when there is a
+ * status (form_start has none, and the key is omitted, not emptied).
  *
  * @param {Object}  w      Window.
  * @param {string}  name   GA4 event name.

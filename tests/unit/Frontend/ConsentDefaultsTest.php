@@ -131,4 +131,18 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$this->assertStringContainsString( '"personalization_storage": "denied"', $block );
 		$this->assertStringContainsString( 'function gtag(){dataLayer.push(arguments);}', $block );
 	}
+
+	/**
+	 * #269 (RI-14): the gtag shim must push to the CONFIGURED data layer, the
+	 * array the container reads via `&l=`. 1.x hardcoded `dataLayer`, so a site
+	 * with a renamed data layer never applied its consent defaults.
+	 */
+	public function test_script_block_binds_the_shim_to_the_configured_data_layer_name(): void {
+		$options = $this->make_options( array( GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true ) );
+
+		$block = ( new ConsentDefaults( $options ) )->script_block( new ScriptTag( $options ), 'myDL' );
+
+		$this->assertStringContainsString( 'function gtag(){myDL.push(arguments);}', $block );
+		$this->assertStringNotContainsString( 'dataLayer.push(arguments)', $block );
+	}
 }

@@ -171,7 +171,10 @@ final class Helpers {
 	 * The cookie is deliberately NOT HttpOnly (the client must read it) and carries
 	 * no visitor value — only the fact that a fetch is due. The client clears it
 	 * after delivery; the 2-day expiry only bounds the case where delivery never
-	 * happened, and comfortably covers a WooCommerce session.
+	 * happened, and comfortably covers a WooCommerce session. Host-only on
+	 * purpose (no Domain attribute, unlike the login-gate cookie): the JS clearer
+	 * writes no Domain either, and a cookie set with one is a different cookie
+	 * the clear would never remove (#270, RI-14).
 	 *
 	 * @param bool $cache_safe_enabled Whether GTM4WP_OPTION_CACHE_SAFE_DATALAYER is on.
 	 * @return void
@@ -187,7 +190,6 @@ final class Helpers {
 			array(
 				'expires'  => time() + ( 2 * DAY_IN_SECONDS ),
 				'path'     => '/',
-				'domain'   => defined( 'COOKIE_DOMAIN' ) ? COOKIE_DOMAIN : '',
 				'secure'   => is_ssl(),
 				'httponly' => false,
 				'samesite' => 'Lax',

@@ -148,6 +148,41 @@ describe( 'gtm4wp-form-move-tracker', () => {
 		expect( push.formID ).toBe( '(no form ID)' );
 	} );
 
+	it( 'reads the form identity from attributes, so a control named action or id cannot shadow it', () => {
+		// In a browser a control named `action`/`id` shadows form.action /
+		// form.id (HTMLFormElement is [LegacyOverrideBuiltIns]) and the element
+		// itself would be pushed (#280). jsdom does not implement that override,
+		// so this passes before and after the fix: it pins the attribute read
+		// and the string type, not the browser shadowing.
+		document.body.innerHTML =
+			'<form id="signup" action="/subscribe">' +
+			'<input type="hidden" name="action" value="x" />' +
+			'<input name="id" />' +
+			'<input id="email" name="email" /></form>';
+
+		dispatchFocus( document.getElementById( 'email' ), 'focusin' );
+
+		const push = window.dataLayer[ 0 ];
+
+		expect( push[ 'gtm.elementUrl' ] ).toBe( 'http://localhost/subscribe' );
+		expect( push[ 'gtm.elementId' ] ).toBe( 'signup' );
+		expect( typeof push[ 'gtm.elementUrl' ] ).toBe( 'string' );
+		expect( typeof push[ 'gtm.elementId' ] ).toBe( 'string' );
+	} );
+
+	it( 'reports an empty Form URL for an action that does not parse, without throwing', () => {
+		document.body.innerHTML =
+			'<form id="f" action="http://[bad"><input id="email" /></form>';
+
+		expect( () =>
+			dispatchFocus( document.getElementById( 'email' ), 'focusin' )
+		).not.toThrow();
+
+		expect( window.dataLayer ).toHaveLength( 1 );
+		expect( window.dataLayer[ 0 ][ 'gtm.elementUrl' ] ).toBe( '' );
+		expect( window.dataLayer[ 0 ][ 'gtm.elementId' ] ).toBe( 'f' );
+	} );
+
 	it( 'sends no gtm.elementName, because GTM has no Form Name built-in', () => {
 		// formName stays our own key. Guards against someone "completing the
 		// set" later by inventing a key inside Google's namespace that no

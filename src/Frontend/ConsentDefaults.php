@@ -107,16 +107,20 @@ final class ConsentDefaults {
 
 	/**
 	 * Returns the consent mode default script block. Byte-identical to the
-	 * block output by gtm4wp_wp_header_begin() in 1.x.
+	 * block output by gtm4wp_wp_header_begin() in 1.x for the default data
+	 * layer name; the gtag shim pushes to the CONFIGURED array, which is the
+	 * one the container reads (`&l=`). 1.x hardcoded `dataLayer` here, so a
+	 * renamed data layer silently lost its consent defaults (RI-14, #269).
 	 *
-	 * @param ScriptTag $script_tag The script tag helper.
+	 * @param ScriptTag $script_tag     The script tag helper.
+	 * @param string    $datalayer_name Validated data layer variable name (DataLayer::name()).
 	 * @return string
 	 */
-	public function script_block( ScriptTag $script_tag ): string {
+	public function script_block( ScriptTag $script_tag, string $datalayer_name = 'dataLayer' ): string {
 		return '
 ' . $script_tag->opening_tag() . '
 		if (typeof gtag == "undefined") {
-			function gtag(){dataLayer.push(arguments);}
+			function gtag(){' . $datalayer_name . '.push(arguments);}
 		}
 
 		gtag("consent", "default", {

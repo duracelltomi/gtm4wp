@@ -152,6 +152,9 @@ final class UserEventsModuleTest extends TestCase {
 			}
 		);
 		Functions\when( 'is_ssl' )->justReturn( $ssl );
+		// The registrant's own request: nobody logged in (#279).
+		Functions\when( 'is_user_logged_in' )->justReturn( false );
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
 
 		$options = new Options( ( new UserEventsModule() )->defaults() );
 
@@ -378,6 +381,23 @@ final class UserEventsModuleTest extends TestCase {
 		$this->assertSame( '', $domain );
 		$this->assertTrue( $secure, 'An https site must get a Secure cookie.' );
 		$this->assertTrue( $httponly, 'The flag cookie is never read by script, so it must be HttpOnly.' );
+	}
+
+	/**
+	 * #279: user_register also fires when a logged-in administrator creates the
+	 * account (REST, a React admin UI); the cookie would ride the CREATOR's
+	 * response. A logged-in user registering nobody but themselves still counts.
+	 */
+	public function test_on_register_sets_no_cookie_when_a_logged_in_user_created_someone_else(): void {
+		$module = $this->make_module();
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'get_current_user_id' )->justReturn( 5 );
+
+		$module->on_register( 9 );
+		$this->assertSame( array(), $this->cookie_writes, 'The creator is not the registrant.' );
+
+		$module->on_register( 5 );
+		$this->assertCount( 1, $this->cookie_writes, 'Registering oneself while logged in (a checkout account) counts.' );
 	}
 
 	public function test_on_register_sets_its_own_session_cookie(): void {

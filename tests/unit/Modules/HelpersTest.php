@@ -90,6 +90,9 @@ final class HelpersTest extends TestCase {
 		$this->assertFalse( $this->cookie_writes[0][2]['httponly'], 'The event cookie must be JS-readable.' );
 		$this->assertSame( '/', $this->cookie_writes[0][2]['path'], 'Site-wide path so the next page (anywhere) sees it and the client can clear it.' );
 		$this->assertGreaterThan( time(), $this->cookie_writes[0][2]['expires'] );
+		// #270 (RI-14): the JS clearer writes no Domain attribute, and a cookie set
+		// with one is a different cookie it can never remove - so none is set here.
+		$this->assertArrayNotHasKey( 'domain', $this->cookie_writes[0][2], 'Host-only, so the client-side clear matches the cookie it removes.' );
 		// Reflected into $_COOKIE so a later same-request read sees it.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- test assertion reading the value the code under test just set.
 		$this->assertSame( '1', $_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ] );

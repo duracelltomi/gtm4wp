@@ -97,7 +97,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'New user registration', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a new user registration has been completed on the frontend of your site (admin events not included)', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include a Tag Manager event when a new user registration has been completed on the frontend of your site (a user created by a logged-in administrator does not count)', 'duracelltomi-google-tag-manager' ),
 				group: 'events',
 				doc: self::DOC_PAGE
 			),

@@ -629,11 +629,15 @@ import {
 				activeGates.push( { cookie: gate.cookie, value: current } );
 
 				const cached = store.gates[ gate.cookie ];
+				// An entry fetched anonymously after a nonce rejection (#291) is
+				// valid only for the page that carried that nonce; another page
+				// (an uncached one with a fresh nonce) asks again.
 				if (
 					cached &&
 					cached.v === current &&
 					cached.data &&
-					'object' === typeof cached.data
+					'object' === typeof cached.data &&
+					( ! cached.anon || cached.anonNonce === config.nonce )
 				) {
 					Object.assign( replay, cached.data );
 				} else {
@@ -685,19 +689,34 @@ import {
 			return;
 		}
 
-		const headers = { Accept: 'application/json' };
-		// Send the (baked) nonce ONLY when there is identity-bound data to fetch — an
-		// active Tier 3 gate cookie, i.e. a logged-in visitor. Their page is never
-		// full-page cached, so the baked nonce is fresh and WordPress can authenticate
-		// their auth cookie so the user fields resolve. An anonymous fetch (Tier 2, or
-		// a guest one-shot) sends NO nonce: it needs none, and sending a stale nonce
-		// baked into a long-lived cached page would 403 the read (issue #398). The
-		// fresh nonce for any confirm beacon comes from the response below, not here.
-		if ( config.nonce && activeGates.length ) {
-			headers[ 'X-WP-Nonce' ] = config.nonce;
-		}
+		// The baked nonce ONLY for a logged-in visitor (active Tier 3 gate; their
+		// page is never cached, so it is fresh). An anonymous fetch sends none: a
+		// stale nonce from a long-lived cached page would 403 the read.
+		const sendNonce = !! ( config.nonce && activeGates.length );
+		let anonymousRetry = false;
 
-		fetch( config.endpoint, { credentials: 'same-origin', headers } )
+		const request = function ( withNonce ) {
+			const headers = { Accept: 'application/json' };
+			if ( withNonce ) {
+				headers[ 'X-WP-Nonce' ] = config.nonce;
+			}
+			return fetch( config.endpoint, {
+				credentials: 'same-origin',
+				headers,
+			} );
+		};
+
+		request( sendNonce )
+			.then( function ( response ) {
+				// A 403 with the nonce: a cache handed this logged-in visitor an
+				// anonymous page, so its nonce is not theirs (#291). Ask once more
+				// as anonymous: the session fields still arrive and the loop stops.
+				if ( sendNonce && response && 403 === response.status ) {
+					anonymousRetry = true;
+					return request( false );
+				}
+				return response;
+			} )
 			.then( function ( response ) {
 				return response && response.ok ? response.json() : null;
 			} )
@@ -752,6 +771,10 @@ import {
 						v: active.value,
 						data: subset,
 					};
+					if ( anonymousRetry ) {
+						next.gates[ gate.cookie ].anon = true;
+						next.gates[ gate.cookie ].anonNonce = config.nonce;
+					}
 				} );
 
 				try {
