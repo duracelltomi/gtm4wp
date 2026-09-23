@@ -16,13 +16,9 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The configuration states the plugin knows are wrong or risky, as data.
- *
- * Two consumers read this list: the admin notices, which render each problem
- * as a notice on every wp-admin page, and the gtm4wp/get-status ability, which
- * hands the same list to an AI assistant asked why tracking does not work. One
- * definition, so the assistant can never disagree with the screen about what
- * is wrong (PA-2).
+ * The configuration states the plugin knows are wrong or risky, as data, for
+ * the admin notices and the gtm4wp/get-status ability alike - one definition,
+ * so an assistant cannot disagree with the screen about what is wrong (PA-2).
  *
  * A problem is an array with:
  *
@@ -77,12 +73,9 @@ final class ConfigurationChecks {
 	}
 
 	/**
-	 * No container ID while the container code is emitted.
-	 *
-	 * Placement OFF is the deliberate "data layer only" setup: the container
-	 * code is never emitted, so the site needs no container ID and the prompt
-	 * would be advice no setting can act on. Compared strictly against the int
-	 * constant, exactly the way ContainerCode decides the same thing.
+	 * No container ID while the container code is emitted. Placement OFF is the
+	 * deliberate "data layer only" setup, where no container ID is needed;
+	 * compared strictly against the int constant, as ContainerCode does.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -145,9 +138,8 @@ final class ConfigurationChecks {
 
 	/**
 	 * A malformed GTM4WP_HARDCODED_* constant is ignored while the options are
-	 * built, which is invisible from the outside: the operator sees a container
-	 * that quietly disregards their wp-config and has nothing to search for.
-	 * Named instead; stays until wp-config is fixed.
+	 * built, which is invisible from the outside, so it is named instead. Stays
+	 * until wp-config is fixed.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -207,13 +199,11 @@ final class ConfigurationChecks {
 	}
 
 	/**
-	 * A stored data layer variable name that is not a usable JavaScript
-	 * identifier is ignored by the frontend, which falls back to dataLayer.
-	 * 1.x accepted names containing a hyphen and the migration stores them
-	 * verbatim, so an upgrading site reaches this state without having done
-	 * anything wrong. Silently substituting a different global would be the
-	 * same undiagnosable failure the name itself caused, so it is named (PA-2:
-	 * validation without a signal is half a fix). Clears itself on the next save.
+	 * A stored data layer name that is not a usable JavaScript identifier is
+	 * ignored by the frontend, which falls back to dataLayer. 1.x accepted
+	 * hyphens and the migration stores them verbatim, so an upgrading site lands
+	 * here without doing anything wrong; named rather than silently substituted
+	 * (PA-2). Clears itself on the next save.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -240,13 +230,10 @@ final class ConfigurationChecks {
 	}
 
 	/**
-	 * Plugins that send their own Google Analytics hits next to a container
-	 * that tracks e-commerce: every purchase is then counted twice.
-	 *
-	 * The is_plugin_active() function lives in wp-admin/includes/plugin.php, which
-	 * WordPress loads on admin requests only; on a REST request (an ability
-	 * asking for the status) it is loaded here, the same way core's own REST
-	 * plugin controller does, so the answer is the same on both paths.
+	 * Plugins sending their own Google Analytics hits next to a container that
+	 * tracks e-commerce: every purchase is counted twice. is_plugin_active()
+	 * lives in an admin-only file, so a REST request (an ability asking for the
+	 * status) loads it here the way core's own plugin controller does.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */

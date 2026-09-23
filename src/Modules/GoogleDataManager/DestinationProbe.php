@@ -15,16 +15,13 @@ use GTM4WP\Google\KeyVault;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The one definition of "test this destination": the test route of the
- * destinations panel and the gtm4wp/test-google-data-manager-destination
- * ability are thin adapters over this class (UC-6). The route hands over a
- * row the admin is still editing, the ability a stored row it looked up by
- * measurement ID; from here on both do the same thing - refuse a row whose
- * service account is gone before anything leaves the site, send the
- * validateOnly probe, and end the destination's failure streak when Google
- * accepts it. The answer carries the outcome and a sentence about it, never
- * a token and never Google's raw response body (EventsIngest keeps only a
- * capped summary).
+ * The one definition of "test this destination" (UC-6): the panel's test
+ * route hands over a row still being edited, the ability a stored row looked
+ * up by measurement ID, and from here both refuse a row whose service
+ * account is gone before anything leaves the site, send the validateOnly
+ * probe, and end the destination's failure streak when Google accepts. The
+ * answer carries the outcome and a sentence, never a token and never
+ * Google's raw response body.
  */
 final class DestinationProbe {
 

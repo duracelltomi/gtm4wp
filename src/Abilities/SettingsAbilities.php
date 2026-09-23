@@ -20,36 +20,22 @@ use GTM4WP\Options\Field;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The gtm4wp/get-settings ability: every option with its current value and, on request,
- * its schema - the label, description, type, default, choices and
- * documentation link the settings screen shows. A thin adapter over
- * SettingsStore, the same service the settings REST routes use.
+ * The four settings abilities, thin adapters over SettingsStore (the service
+ * the settings REST routes use):
  *
- * Only registered options are returned: the option row can carry keys a third
- * party wrote next to ours, and those are not the plugin's to hand to an
- * assistant. The derived 1.x mirror keys are left out for the same reason -
- * they are not settings, they are computed from the container rows.
- *
- * The gtm4wp/update-settings ability is the write half: a sparse patch of option key =>
- * new value through SettingsStore::save(), the exact path of the settings
- * screen's save button, so no value reaches the row without its Field
- * sanitizer and the wp-config.php container locks hold. Two guards on top:
- * the site-wide write switch (Registrar::can_write(), checked again when the
- * ability runs) and an optional expected_hash, the values_hash of the
- * get-settings call the assistant read the current values from - a mismatch
- * means somebody saved in between, and the call is refused with 409 instead
- * of overwriting their change. The ability's description carries the
- * confirmation protocol the assistant has to follow (show current and new
- * value, wait for an explicit yes); the annotations mark it destructive, so
- * an MCP client asks before calling it even if the assistant would not.
- *
- * gtm4wp/export-settings and gtm4wp/import-settings are the settings screen's
- * Export and Import buttons: the same envelope SettingsStore::export_data()
- * builds (the site's own stored values, never a service-account key), and
- * the same import path - size cap, depth cap, type marker, every value
- * through its Field sanitizer onto the module defaults. The import is a
- * SITE-WIDE replace, so on top of the write switch it requires confirm: true
- * in the call itself.
+ * - `get-settings`: every registered option with its value and, on request,
+ *   its admin schema. Registered options only - never the third-party keys
+ *   the row may carry, never the derived 1.x mirrors.
+ * - `update-settings`: a sparse patch through SettingsStore::save(), the save
+ *   button's own path, so every value meets its Field sanitizer and the
+ *   wp-config container locks hold. Guarded by the write switch (re-checked
+ *   when the ability runs) and an optional expected_hash, which refuses with
+ *   409 when somebody saved in between. Annotated destructive, and its
+ *   description carries the confirmation protocol.
+ * - `export-settings` / `import-settings`: the screen's own envelope (stored
+ *   values, never a service-account key) and import path - size cap, depth
+ *   cap, type marker, Field sanitizers onto the module defaults. The import
+ *   is a SITE-WIDE replace, so it needs confirm: true as well.
  */
 final class SettingsAbilities implements ProviderInterface {
 
@@ -76,11 +62,9 @@ final class SettingsAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * Registers the abilities. The module and option enums are read from the
-	 * registry at registration time, so a client sees exactly the ids this
-	 * install has and a typo is refused by the schema before anything runs.
-	 * The write is registered only while the site allows writes, so a client
-	 * never discovers an ability it may not run.
+	 * Registers the abilities. The module and option enums come from the
+	 * registry, so a client sees this install's ids and a typo is refused by the
+	 * schema; the writes are registered only while the site allows them.
 	 *
 	 * @return void
 	 */
@@ -336,12 +320,9 @@ final class SettingsAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/get-settings ability.
-	 *
-	 * The enums in the input schema already refuse an unknown module or option
-	 * when core validates the call; the checks here repeat that for a caller
-	 * that reaches the method another way, so the answer is a named refusal
-	 * rather than a silently empty result.
+	 * The gtm4wp/get-settings ability. The input-schema enums already refuse an
+	 * unknown module or option; the checks here answer a caller that reached the
+	 * method another way with a named refusal rather than an empty result.
 	 *
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
@@ -418,15 +399,11 @@ final class SettingsAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/update-settings ability.
-	 *
-	 * The order of the guards is the order of the cheapest refusal: the write
-	 * switch (also the permission callback's first check, repeated here so a
-	 * caller that reaches the method directly gets the named 403 rather than
-	 * a write), the shape of the patch, then the stale check against the row
-	 * as it is now. Only then does the store run the patch through the Field
-	 * sanitizers - SettingsStore::save(), the settings screen's own path,
-	 * container locks included.
+	 * The gtm4wp/update-settings ability. Guards in cheapest-refusal order: the
+	 * write switch (repeated from the permission callback, so a direct caller
+	 * gets the named 403), the shape of the patch, the stale check against the
+	 * row as it is now, then SettingsStore::save() with its Field sanitizers and
+	 * container locks.
 	 *
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
@@ -500,12 +477,9 @@ final class SettingsAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/import-settings ability. Refusals in the order of the
-	 * cheapest one: the write switch, the missing confirmation, then the
-	 * store's own checks of the payload (size, depth, type marker) - and only
-	 * then the replace, which runs every value of the envelope through its
-	 * Field sanitizer onto the module defaults, exactly as the settings
-	 * screen's Import button does.
+	 * The gtm4wp/import-settings ability. Refusals in cheapest-first order: the
+	 * write switch, the missing confirmation, the store's payload checks (size,
+	 * depth, type marker), then the replace - the Import button's own path.
 	 *
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error

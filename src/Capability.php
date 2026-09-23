@@ -13,15 +13,11 @@ namespace GTM4WP;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The one place the capability that guards the plugin's settings is resolved.
- *
- * Every gate that decides whether a user may see or change GTM4WP settings -
- * the admin code path, the settings page, the settings and Google REST routes,
- * the notice dismissal handler and the abilities - asks this class, so the
- * filter has a single definition and a site that delegates the settings to a
- * non-admin role (issue #143) is honoured by all of them at once. Before this
- * class each site spelled the filter call out itself, and a sixth copy was one
- * more place to forget.
+ * The one place the capability guarding the plugin's settings is resolved:
+ * the admin path, the settings page, the settings and Google REST routes,
+ * the notice dismissal handler and the abilities all ask this class, so a
+ * site delegating the settings to a non-admin role (#143) is honoured by all
+ * of them at once.
  */
 final class Capability {
 
@@ -56,12 +52,9 @@ final class Capability {
 	}
 
 	/**
-	 * Whether the current user holds the settings capability.
-	 *
-	 * Takes no parameter on purpose: it doubles as an ability permission
-	 * callback, which is handed the ability's input, and PHP lets a userland
-	 * function ignore arguments it does not declare. The input plays no part in
-	 * the decision - every ability is gated on the capability alone.
+	 * Whether the current user holds the settings capability. Takes no parameter
+	 * on purpose: it doubles as an ability permission callback, which core hands
+	 * the input, and the decision never depends on it.
 	 *
 	 * @return bool
 	 */

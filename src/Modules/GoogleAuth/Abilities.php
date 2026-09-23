@@ -21,24 +21,17 @@ use GTM4WP\Google\WpTransport;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The module's abilities, handed to the plugin-wide Registrar through
- * AdminSchema::abilities() (Module\AbilitiesInterface) the way the Data
- * Manager module hands over its own.
+ * The module's abilities, handed to the Registrar through
+ * AdminSchema::abilities() (Module\AbilitiesInterface): a read listing the
+ * stored accounts, and a write minting a token the way the panel's Test
+ * button does (TokenService::test_account(), shared with the REST route).
  *
- * The read, gtm4wp/get-service-accounts, lists the stored accounts; the
- * write, gtm4wp/test-service-account, mints a token with one of them the
- * way the panel's Test button does (TokenService::test_account(), shared
- * with the REST route).
- *
- * ⛔ Disclosure: everything returned here goes into an assistant's transcript
- * on somebody else's servers. An account is named by its id, its label,
- * its status and when it was last tested - never its e-mail address or key
- * id (identifiers of the owner's Cloud project, which the settings screen
- * shows because the admin uploaded them, but an assistant needs neither to
- * pick an account), and never key material, which leaves the vault through
- * no read path at all. Upload, relabel and delete are deliberately not
- * abilities: key material must not transit a transcript, and the delete
- * veto lives in the panel's flow.
+ * ⛔ Transcript rule: an account is named by id, label, status and last-test
+ * time - never its e-mail address or key id (identifiers of the owner's
+ * Cloud project, and an assistant needs neither to pick an account), never
+ * key material, which no read path exposes at all. Upload, relabel and
+ * delete are deliberately not abilities: key material must not transit a
+ * transcript, and the delete veto lives in the panel's flow.
  */
 final class Abilities implements ProviderInterface {
 
@@ -71,10 +64,9 @@ final class Abilities implements ProviderInterface {
 	}
 
 	/**
-	 * Registers the abilities. The test is registered only while the site
-	 * allows writes: it changes nothing stored beyond the account's status,
-	 * but it contacts Google with the site's credentials, which is the
-	 * class of action the write switch withholds.
+	 * Registers the abilities. The test is registered only while writes are
+	 * allowed: it stores nothing but the account's status, yet it spends the
+	 * site's credentials against Google.
 	 *
 	 * @return void
 	 */
@@ -185,10 +177,9 @@ final class Abilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/test-service-account ability. The write switch is checked
-	 * again here (the permission callback's first check, repeated so a caller
-	 * that reaches the method directly gets the named 403), then the shared
-	 * test runs: an unknown id is refused before anything leaves the site.
+	 * The gtm4wp/test-service-account ability: the write switch again (so a
+	 * direct caller gets the named 403), then the shared test, which refuses an
+	 * unknown id before anything leaves the site.
 	 *
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error

@@ -15,17 +15,13 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The one definition of "send these refunds again": the replay route of the
- * destinations panel and the gtm4wp/replay-google-data-manager-refunds
- * ability are thin adapters over this class (UC-6), so what the button does
- * and what an assistant does cannot drift apart.
- *
- * Nothing is sent from the calling request. Every refund the log's replay
- * plan names is queued as a fresh first attempt aimed at the destinations
- * still missing it, and the sender applies every gate again when the job
- * runs - consent, the destination list, the health threshold. The only
- * check made here is the lane's master switch: a job queued while sending
- * is off would be dropped by the sender with no row to say so.
+ * The one definition of "send these refunds again" (UC-6), behind both the
+ * panel's replay route and the replay ability. Nothing is sent from the
+ * calling request: each refund the log's replay plan names is queued as a
+ * fresh first attempt at the destinations still missing it, and the sender
+ * applies every gate again when the job runs. The only check made here is
+ * the lane's master switch, since a job queued while sending is off would be
+ * dropped with no row to say so.
  */
 final class RefundReplay {
 

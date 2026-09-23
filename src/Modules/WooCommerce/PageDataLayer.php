@@ -817,13 +817,12 @@ final class PageDataLayer {
 	 * prevent double counting.
 	 *
 	 * Also seeded by an order-received render for an order that got there before
-	 * its status became trackable (Stripe with webhooks). The marker is consumed on
-	 * every outcome but one: an order that is not trackable YET
-	 * (ProductData::may_become_trackable()) is left in the session with nothing
-	 * emitted - not even orderData, which GTM setups use as the "confirmation"
-	 * signal - so the next page view asks again. Bounded: a terminal status, the
-	 * re-check window, "Maximum order age" or a tracked flag written elsewhere all
-	 * consume it on the next check.
+	 * its status became trackable (Stripe with webhooks). Every outcome consumes
+	 * the marker except one: an order not trackable YET
+	 * (ProductData::may_become_trackable()) stays in the session with nothing
+	 * emitted - not even orderData, the "confirmation" signal of many GTM setups
+	 * - so the next page view asks again. Bounded by a terminal status, the
+	 * re-check window, "Maximum order age" or a tracked flag.
 	 *
 	 * @param array<string, mixed> $data_layer The data layer collected so far.
 	 * @return array<string, mixed>
@@ -905,22 +904,18 @@ final class PageDataLayer {
 		// The canonical eligibility gauntlet (age / already-tracked / status); the
 		// separate age check above only keeps orderData off too-old orders as well.
 		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
-			// Withheld on the status alone, with the order still able to reach a
-			// tracked status (the customer arrived before the gateway's webhook moved
-			// it out of "Pending payment"): remember it in the buyer's session so the
-			// reliable-purchase fallback re-checks it on their next page views. The
-			// order stays unflagged, so a revisit of this page fires as before, and
-			// orderData above was still written for this render. No-op unless
-			// "Reliable purchase tracking" is on, and for every other reason to
-			// withhold (already tracked, terminal, too old).
+			// Withheld on the status alone, with the order still able to become
+			// trackable (the buyer arrived before the gateway's webhook): remember it
+			// in their session so the fallback re-checks it. The order stays
+			// unflagged, and orderData was still written for this render. No-op
+			// unless "Reliable purchase tracking" is on, or for any other reason to
+			// withhold.
 			//
-			// Not for a visitor WooCommerce itself would hide the order from: the
-			// re-check emits from the SESSION, where the order is taken to be the
-			// buyer's own and the customer identity blocks are not withheld, so
-			// seeding here for a holder of a forwarded confirmation URL would hand
-			// them, on their next page view, exactly the identity data this render
-			// just kept from them. The buyer arriving from checkout is logged in or
-			// inside the verification grace period and passes this gate.
+			// NOT for a visitor WooCommerce hides the order from: the re-check emits
+			// from the SESSION, where the order counts as the buyer's own and the
+			// identity blocks are not withheld, so seeding for a holder of a
+			// forwarded confirmation URL would hand them, one page view later, the
+			// identity data this render just kept from them.
 			if ( ! $withhold_customer_data ) {
 				$this->product_data->remember_if_may_become_trackable( $order, $order_id );
 			}
@@ -1299,14 +1294,11 @@ final class PageDataLayer {
 		}
 
 		if ( ! $this->product_data->is_order_trackable( $order, $order_id ) ) {
-			// Not trackable YET (the order-received render remembered a still-pending
-			// order): tell the client so, with no event to push. The client then keeps
-			// the event cookie instead of clearing it, so the next page view fetches
-			// again - one request per page view, never a loop, and bounded by the
-			// re-check window, after which this returns null and the client clears
-			// the cookie. Still read-only: the marker is not consumed here for a
-			// terminal or expired order either; it simply stops resolving, the
-			// client stops asking, and the session expires with it.
+			// Not trackable YET: tell the client so, with no event. It keeps the
+			// event cookie and fetches again next page view - one request per view,
+			// never a loop, bounded by the re-check window, after which this returns
+			// null and the cookie is cleared. Read-only: the marker is not consumed
+			// here, it simply stops resolving.
 			if ( $this->product_data->may_become_trackable( $order, $order_id ) ) {
 				return array( 'pending' => true );
 			}

@@ -35,32 +35,24 @@ final class ProductData {
 	public const PENDING_PURCHASE_SESSION_KEY = 'gtm4wp_pending_purchase';
 
 	/**
-	 * WooCommerce order statuses an order cannot leave towards a paid one, so
-	 * a remembered order in one of them is dropped instead of re-checked: the
-	 * three core statuses that mean "this sale is not happening". Mirrors the
-	 * status list in wc_get_order_statuses() (WooCommerce 11.1.1) minus the
-	 * placement and pending statuses - registry row U160 in
-	 * .upstream/upstream-review-checklist.md, pinned by ProductDataTest.
-	 * WooCommerce's own cleanup of an abandoned order lands here as well:
-	 * wc_cancel_unpaid_orders() moves a still-pending order to `cancelled`
-	 * after the "hold stock" minutes.
+	 * Statuses an order cannot leave towards a paid one, so a remembered order
+	 * in one of them is dropped rather than re-checked. Mirrors
+	 * wc_get_order_statuses() (WooCommerce 11.1.1) minus the placement and
+	 * pending statuses (U160, pinned by ProductDataTest); WooCommerce's own
+	 * wc_cancel_unpaid_orders() lands an abandoned order here too.
 	 *
 	 * @var string[]
 	 */
 	public const PENDING_PURCHASE_TERMINAL_STATUSES = array( 'failed', 'cancelled', 'refunded' );
 
 	/**
-	 * How long (in minutes, from the order's creation) an order that reached an
+	 * How long (minutes from the order's creation) an order that reached the
 	 * order-received page before its status became trackable is re-checked on
-	 * the buyer's later page views. The thing being waited for is a gateway's
-	 * server-to-server confirmation, which is a matter of seconds to minutes, so
-	 * the bound is a clock and not a page-view count: a customer who browses
-	 * twenty pages in the first minute must not exhaust the budget before the
-	 * webhook lands, and one who comes back the next week must not be re-checked
-	 * for a sale that never closed. A logged-in customer's WooCommerce session
-	 * renews on every visit, so without this ceiling a never-paid order would
-	 * be re-checked on every page view for as long as they keep shopping.
-	 * The "Maximum order age" option, when set, still applies on top of this.
+	 * later page views. A clock, not a page-view count: the gateway's webhook is
+	 * a matter of minutes, a customer may browse twenty pages in the first one,
+	 * and a logged-in customer's session renews on every visit, so without this
+	 * ceiling a never-paid order would be re-checked forever. "Maximum order
+	 * age", when set, applies on top.
 	 */
 	public const PENDING_PURCHASE_RECHECK_WINDOW_MINUTES = 24 * 60;
 

@@ -18,34 +18,22 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Hooks the plugin's ability category and abilities into the Abilities API
- * (WordPress 6.9+): a standard way for AI assistants and other clients to
- * discover what the plugin can do, through the wp-abilities/v1 REST routes
- * or, with the WordPress MCP Adapter installed, as MCP tools.
+ * (WordPress 6.9+): discovery for AI assistants and other clients through
+ * wp-abilities/v1, or as MCP tools with the MCP Adapter. Wired from
+ * Plugin::boot() before the admin/frontend split, since an ability runs on
+ * REST, MCP and WP-CLI requests where neither branch is taken; below 6.9 the
+ * two actions never fire, so no version check (U155).
  *
- * Wired from Plugin::boot() on every request, before the admin/frontend
- * split: an ability runs on REST, MCP and WP-CLI requests, where neither
- * branch is taken. Registering is two add_action() calls; the registry itself
- * is built lazily by core the first time something asks for abilities, and
- * only then do the providers run. Below WordPress 6.9 the two actions never
- * fire, so nothing here needs a version check (U155).
- *
- * Two kinds of provider register under the one `gtm4wp` category: the
- * plugin-wide ones named here (status and settings, which belong to no
- * module, like Admin\RestController), and one per module whose admin schema
- * opts in through Module\AbilitiesInterface - the collector-plus-opt-in
- * shape of Admin\SiteHealthInfo, so a third-party module registered through
- * 'gtm4wp_register_modules' contributes under the same category and the
- * same switches. Every ability is gated on the settings capability. Two
- * filters let a site opt out: GTM4WP_WPFILTER_ABILITIES_ENABLED switches the
- * whole surface off, GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE keeps the
- * read-only abilities and withholds the ones that change anything. The
- * write switch is enforced at both ends: a provider registers a write only
- * while writes_allowed() says so, and every write names can_write() as its
- * permission callback and refuses with write_disabled_error() when run
- * after the switch flipped. ContractTest pins the permission callback of
- * every write; RegistrarTest pins that a read-only site registers no write;
- * the refusal of a write run after the switch flipped is pinned per write in
- * RegistrarTest and in each provider's own test.
+ * Providers register under the one `gtm4wp` category: the plugin-wide ones
+ * named here, plus one per module whose admin schema opts in through
+ * Module\AbilitiesInterface (the Admin\SiteHealthInfo collector shape, so a
+ * third-party module lands under the same category and switches). Every
+ * ability is gated on the settings capability;
+ * GTM4WP_WPFILTER_ABILITIES_ENABLED switches the surface off,
+ * GTM4WP_WPFILTER_ABILITIES_ALLOW_WRITE keeps it read-only. That switch is
+ * enforced at both ends - a write is registered only while writes_allowed(),
+ * and re-checks it at run time through write_disabled_error() - which
+ * ContractTest and RegistrarTest pin.
  */
 final class Registrar {
 
@@ -129,17 +117,13 @@ final class Registrar {
 	}
 
 	/**
-	 * The permission callback of every ability that changes something: the
-	 * write switch first (a filter that flipped since registration still
-	 * denies), then the same settings capability as the reads.
+	 * The permission callback of every write: the write switch (a filter that
+	 * flipped since registration still denies), then the settings capability.
 	 *
-	 * Returns a bool and never a WP_Error on purpose: core discards a WP_Error
-	 * from a permission callback (it becomes a generic permission denial plus
-	 * a _doing_it_wrong() notice, U155), so the named refusal a client can act
-	 * on - gtm4wp_abilities_write_disabled, 403 - is issued by the write's
-	 * execute callback, which re-checks writes_allowed() itself. No parameter
-	 * declared, like Capability::can_manage_settings(): core hands the input
-	 * over and the decision never depends on it.
+	 * Returns a bool, never a WP_Error: core discards a WP_Error from a
+	 * permission callback (generic denial plus _doing_it_wrong(), U155), so the
+	 * named 403 comes from the write's execute callback instead. No parameter
+	 * declared, like Capability::can_manage_settings().
 	 *
 	 * @return bool
 	 */
@@ -163,12 +147,10 @@ final class Registrar {
 	}
 
 	/**
-	 * The refusal an ability with a `confirm` input returns when the call
-	 * does not carry `confirm: true`: the site-wide operations (a settings
-	 * import, a refund replay) ask for the user's explicit yes in the call
-	 * itself, so an assistant that skipped the confirmation protocol in the
-	 * description still cannot run them by accident. One definition, so the
-	 * code and the wording are the same for every such ability.
+	 * The refusal of a `confirm` ability called without `confirm: true`: the
+	 * site-wide operations want the user's yes in the call itself, so an
+	 * assistant that skipped the protocol in the description cannot run them by
+	 * accident. One definition, so every such ability refuses alike.
 	 *
 	 * @return \WP_Error
 	 */
@@ -181,16 +163,13 @@ final class Registrar {
 	}
 
 	/**
-	 * The input schema of an ability that takes no input, shared by every
-	 * provider (#253). The empty-object default is what core applies when a
-	 * client sends nothing at all, so a bare call validates instead of failing
-	 * on a null input (U155).
+	 * The input schema of an ability that takes no input (#253). The
+	 * empty-object default is what core applies when a client sends nothing, so
+	 * a bare call validates instead of failing on null input (U155).
 	 *
-	 * No `properties` key on purpose: an empty PHP array serialises as `[]`,
-	 * and while core's REST route turns the empty `default` into `{}` it leaves
-	 * `properties` alone, so the published schema would carry an invalid
-	 * fragment (JSON Schema wants an object there). Core validates the absent
-	 * key the same way it validates an empty one, and `additionalProperties`
+	 * No `properties` key on purpose: an empty PHP array serialises as `[]`, and
+	 * core's REST route leaves it alone, publishing an invalid schema fragment.
+	 * The absent key validates like an empty one and `additionalProperties`
 	 * still refuses every input key (U155). ContractTest pins the shape.
 	 *
 	 * @return array<string, mixed>

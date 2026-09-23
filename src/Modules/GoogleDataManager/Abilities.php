@@ -22,26 +22,19 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The module's abilities, handed to the plugin-wide Registrar through
- * AdminSchema::abilities() (Module\AbilitiesInterface) the way the module's
- * Site Health rows travel through SiteHealthInfoInterface.
+ * The module's abilities, handed to the Registrar through
+ * AdminSchema::abilities() (Module\AbilitiesInterface).
  *
- * The read, gtm4wp/get-google-data-manager-log, is the recent server-side
- * sends and what became of them, the same rows the settings screen lists
- * under the destinations table. What a row may carry is decided where it is
- * written (SendLog): statuses, counts, reason codes and the store's own
- * order and refund ids - never a token, key material or a response body
- * from Google.
+ * The read (`get-google-data-manager-log`) is the rows the settings screen
+ * lists under the destinations table; what a row may carry is decided in
+ * SendLog - never a token, key material or Google's response body.
  *
- * The two writes are the panel's buttons. gtm4wp/test-google-data-manager-destination
- * is the Test button for one STORED destination, named by its measurement
- * ID; the assistant supplies no account or property id of its own
- * (DestinationProbe, shared with the REST route).
- * gtm4wp/replay-google-data-manager-refunds is the "send again" button,
- * behind confirm: true (RefundReplay, shared with the REST route). Both are
- * registered only while the site allows writes: they change little on the
- * site, but they cause requests to Google with the site's credentials,
- * which is the class of action the write switch withholds.
+ * The two writes are the panel's buttons over the same shared services as
+ * the REST routes: the Test button for one STORED destination named by its
+ * measurement ID (DestinationProbe, so the ids sent to Google are always the
+ * site's own), and "send again" behind confirm: true (RefundReplay). Both
+ * are registered only while writes are allowed: they change little here, but
+ * they spend the site's credentials against Google.
  */
 final class Abilities implements ProviderInterface {
 
@@ -307,12 +300,10 @@ final class Abilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/test-google-data-manager-destination ability. The write
-	 * switch first (the permission callback's first check, repeated so a
-	 * caller that reaches the method directly gets the named 403), then the
-	 * measurement ID is resolved against the destinations the plugin sends
-	 * to; only a row found there reaches the probe, so the account and
-	 * property ids in the request to Google are always the site's own.
+	 * The gtm4wp/test-google-data-manager-destination ability: the write switch
+	 * (repeated from the permission callback, so a direct caller gets the named
+	 * 403), then the measurement ID resolved against the stored destinations -
+	 * only a row found there reaches the probe.
 	 *
 	 * @param mixed $input The validated input.
 	 * @return array<string, mixed>|\WP_Error
@@ -362,10 +353,9 @@ final class Abilities implements ProviderInterface {
 	}
 
 	/**
-	 * The options the two actions read: the injected service, or a fresh
-	 * read of the row (the Options service loads it once, at construction,
-	 * so a destination stored earlier in the same request is only seen by a
-	 * new one).
+	 * The options the two actions read: the injected service, or a fresh one -
+	 * Options loads the row at construction, so a destination stored earlier in
+	 * the same request is only seen by a new service.
 	 *
 	 * @return Options
 	 */

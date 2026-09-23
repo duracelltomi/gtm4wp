@@ -16,22 +16,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Declares that a module has a master switch and/or integrates another
- * plugin, for the per-module rows of the gtm4wp/get-status ability
- * (assembled by Abilities\StatusAbilities, which walks the module registry
- * with instanceof). A separate opt-in interface for the reason
- * DocumentedSchemaInterface gives; on the admin schema, not the module,
- * like the other opt-ins. Without it a module's row reports `enabled` and
- * `integration` as null: unknown, not off.
+ * plugin, for the per-module rows of gtm4wp/get-status (PA-21: the facts
+ * belong to the module, never to a plugin-wide map that third-party modules
+ * cannot join). Without it a row reports both as null - unknown, not off.
  *
- * The facts belong to the module: which of its options is the one switch
- * that turns the whole feature on, and which plugin it integrates. A
- * plugin-wide class listing them per module id is the deviation this
- * interface replaced, and it left every third-party module unable to report
- * either.
- *
- * ⛔ The answer ends up in an AI assistant's transcript. Option states and
- * a version string only: nothing else about the host plugin, its
- * configuration or its data.
+ * ⛔ The answer ends up in an AI assistant's transcript. Option states and a
+ * version string only: nothing else about the host plugin or its data.
  */
 interface StatusInfoInterface {
 

@@ -18,22 +18,18 @@ use GTM4WP\Options\Field;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The one path through which the plugin's settings are read for editing and
- * written back: the settings REST routes, the settings screen bootstrap and
- * the abilities are thin adapters over this class, so no writer can bypass a
- * Field sanitizer and no reader can disagree with another about what a site
- * has configured.
+ * The one path through which the settings are read for editing and written
+ * back (the REST routes, the screen bootstrap and the abilities are thin
+ * adapters), so no writer bypasses a Field sanitizer and no two readers
+ * disagree about what a site has configured.
  *
- * Sanitization and validation is schema driven: each submitted value runs
- * through its Field sanitizer (ported from gtm4wp_sanitize_options() of 1.x).
- * Sanitizers may return WP_Error; those values are rejected and reported back,
- * the stored value stays unchanged - mirroring how add_settings_error() flows
- * worked in 1.x.
+ * Validation is schema driven: each value runs through its Field sanitizer
+ * (ported from 1.x's gtm4wp_sanitize_options()), and a WP_Error rejects that
+ * value and reports it back with the stored one unchanged.
  *
  * Every read goes to the option row afresh, never to the request-scoped
- * Options service, so a write followed by a read in the same request - a
- * settings save answering with the new values, an agent changing an option
- * and reading it back - sees the write.
+ * Options service, so a write followed by a read in the same request sees
+ * the write.
  */
 final class SettingsStore {
 
@@ -262,16 +258,11 @@ final class SettingsStore {
 
 	/**
 	 * The Field definitions of every registered module, keyed by module id in
-	 * registry order - the order the settings screen lists the modules in.
-	 *
-	 * Built once per instance: the definitions are static for a request
-	 * (fields() is database-free by design, and nothing mutates a Field after
-	 * it is built), while the VALUES this class reads always come from the
-	 * option row afresh. Without the memo one abilities registration walked
-	 * the registry four times and built every Field three times (#257). The
-	 * boundary it draws: a module added to the registry after this instance's
-	 * first walk is invisible to it, which is already true of the enums the
-	 * abilities publish and of the module defaults the Options service loads.
+	 * registry order. Built once per instance (#257: one abilities registration
+	 * otherwise walked the registry four times); the definitions are static for
+	 * a request while the VALUES still come from the option row afresh. The
+	 * boundary: a module registered after the first walk is invisible to this
+	 * instance, as it already is to the abilities' enums.
 	 *
 	 * @return array<string, Field[]>
 	 */

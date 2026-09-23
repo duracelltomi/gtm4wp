@@ -13,21 +13,16 @@ namespace GTM4WP\Abilities;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Builds the `meta` argument of wp_register_ability() in one place, so every
- * ability of the plugin is exposed the same way and its annotations cannot be
- * forgotten.
+ * Builds the `meta` argument of wp_register_ability() in one place, so no
+ * ability can be exposed differently or lose its annotations.
  *
- * Three flags are written, because three consumers read three different keys
- * (U156): `show_in_rest` is what WordPress 6.9 and 7.0 read to expose an
- * ability on the wp-abilities/v1 routes, `public` is what 7.1 reads for the
- * same routes, and `mcp.public` is what the WordPress MCP Adapter reads to
- * turn the ability into an MCP tool. Leaving one out hides the ability from
- * one client with no error anywhere.
+ * Three flags, because three consumers read three keys (U156):
+ * `show_in_rest` (WordPress 6.9/7.0), `public` (7.1) and `mcp.public` (the
+ * MCP Adapter). Leaving one out hides the ability from one client silently.
  *
- * The annotations are a promise about behaviour that MCP clients act on
- * (U157): a client may call a read-only ability without asking, and asks
- * before a destructive one. ContractTest pins each ability's annotations to
- * what it does, so a write cannot be registered as read-only.
+ * The annotations are a promise MCP clients act on (U157): a read-only
+ * ability may be called without asking, a destructive one is confirmed.
+ * ContractTest pins each ability's annotations to what it does.
  */
 final class Meta {
 

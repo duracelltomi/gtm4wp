@@ -15,18 +15,14 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * What the Container module reports about itself to the gtm4wp/get-status
- * ability: the containers as they load, the placement, the data layer name
- * and the wp-config.php overrides in effect. The module owns this shaping
- * the way GoogleDataManager\SiteHealth owns its Site Health rows; the
- * ability only assembles. Reads the Options service it is given, so the
- * caller decides whether the answer is request-scoped or fresh.
+ * What the Container module reports to gtm4wp/get-status: the containers as
+ * they load, the placement, the data layer name and the wp-config overrides
+ * in effect. The module owns the shaping, the ability only assembles
+ * (PA-21). Reads the Options service it is given.
  *
- * ⛔ The answer ends up in an AI assistant's transcript. Nothing leaves here
- * that is not already in the site's public HTML: container ids, domains and
- * paths travel in the loader URL. The environment auth and preview tokens
- * travel there too, but an assistant only needs to know they are set, so
- * they are reported as one boolean and never by value.
+ * ⛔ Transcript rule: nothing here that is not already in the site's public
+ * HTML. The environment auth and preview tokens travel in the loader URL
+ * too, but are reported as one boolean and never by value.
  */
 final class StatusReport {
 

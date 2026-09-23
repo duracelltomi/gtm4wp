@@ -25,26 +25,21 @@ use GTM4WP\Options\Options;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The gtm4wp/get-status and gtm4wp/get-site-health abilities: what the plugin loads on
- * this site, what is wrong with it, and what Site Health says about it.
+ * The gtm4wp/get-status and gtm4wp/get-site-health abilities: what the plugin
+ * loads here, what is wrong with it, and what Site Health says. Both are
+ * read-only and answer from the option row afresh (a new Options service per
+ * call), so a change made earlier in the session is reflected.
  *
- * Both are read-only and both answer from the option row afresh (a new
- * Options service per call, never the request-scoped one), so a change made
- * earlier in the same session is reflected.
+ * Both assemble only: every module-specific fact comes from the module that
+ * owns it (Container\StatusReport, each schema's StatusInfoInterface, the
+ * Data Manager's SiteHealth, the SiteHealthInfo collector), and this class
+ * keeps no per-module list (PA-21).
  *
- * Both are thin adapters. Every module-specific part of the answer comes
- * from the module that owns the fact: the Container module's StatusReport,
- * each schema's StatusInfoInterface (master switch, host plugin), the Data
- * Manager's SiteHealth and the SiteHealthInfo collector. This class
- * assembles; it keeps no per-module list of its own.
- *
- * ⛔ **What may not appear in the output.** Everything an ability returns
- * ends up in an AI assistant's transcript, on somebody else's servers. The
- * rule is the one the Site Health Info section already follows: option
- * states, statuses, counts, timestamps, bare code names and identifiers that
- * are already in the site's public HTML (container IDs, measurement IDs).
- * Never key material, never a service-account address, never a raw error
- * body from a third party, never visitor data.
+ * ⛔ An ability's output ends up in an AI assistant's transcript. Same rule
+ * as the Site Health Info section: option states, statuses, counts,
+ * timestamps, code names and identifiers already in the site's public HTML.
+ * Never key material, a service-account address, a third party's raw error
+ * body or visitor data.
  */
 final class StatusAbilities implements ProviderInterface {
 
@@ -242,12 +237,10 @@ final class StatusAbilities implements ProviderInterface {
 	}
 
 	/**
-	 * The gtm4wp/get-site-health ability.
-	 *
-	 * The status test is built the way Admin::boot() builds it rather than
-	 * collected through the site_status_tests filter: on a REST request core
-	 * registers no Site Health tests and the plugin's admin path is not
-	 * booted, so the filter would answer with nothing.
+	 * The gtm4wp/get-site-health ability. The status test is built the way
+	 * Admin::boot() builds it, not collected through the site_status_tests
+	 * filter: on a REST request core registers no tests and the admin path is
+	 * not booted, so the filter would answer with nothing.
 	 *
 	 * @return array<string, mixed>
 	 */
