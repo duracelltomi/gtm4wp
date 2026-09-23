@@ -1170,7 +1170,7 @@ the cost #306's disposition never had. **Maintainer's call recorded as open on #
 
 | # | Sev | Status | Actor | Area | Summary |
 |---|---|---|---|---|---|
-| 323 | Low | open | — | `src/Google/*`, `Abilities/SettingsAbilities.php`, `Admin/{RestController,SettingsStore}.php`, `Modules/{GoogleAuth,GoogleDataManager}/*` | 36 methods whose docblock promises `X\|\WP_Error` carry no native return type on an 8.0 floor that has union types; verifier-measured green with the union types added (39 signatures / 18 files — the `Transport` fake must be typed in the same change or the suite fatals at class load) |
+| 323 | Low | fixed (`c420137`; the #315 test also made order-independent, TS-7/TS-16) | — | `src/Google/*`, `Abilities/SettingsAbilities.php`, `Admin/{RestController,SettingsStore}.php`, `Modules/{GoogleAuth,GoogleDataManager}/*` | 36 methods whose docblock promises `X\|\WP_Error` carry no native return type on an 8.0 floor that has union types; verifier-measured green with the union types added (39 signatures / 18 files — the `Transport` fake must be typed in the same change or the suite fatals at class load) |
 | 325 | Low | open (needs design; U35) | — | `Frontend/ContainerCode.php:596-601` + `ConsentDefaults.php:121-140` | The WP Rocket inline-JS exclusion names the literal `dataLayer`; since the #269 fix the consent-defaults block pushes to the configured name, so under a custom name that one block is no longer covered (on `2.0` too). Drafted "append the configured name" refuted (identifier grammar admits `$` and single letters; duplicate with the default; breaks the existing pin); the surviving shapes need WP Rocket's consumer read (U35, never verified, drift class should be `silent-wrong`) |
 | 326 | Low | accepted (observation) | — | `ContainerCode.php:153` / `ConsentDefaults.php:125` | The two `gtag` shims differ in scope on purpose (IIFE-local vs block-level global); Node probe: both arrangements push in order, no failure — recorded so a future "deduplicate" keeps the consent guard |
 
@@ -1190,8 +1190,13 @@ Handed to `/upstream-review`: **U35** (WP Rocket's consumer of `rocket_excluded_
 — `strpos` vs regex, its default list, where combined inline JS lands; drift class → `silent-wrong`).
 Handed to `/test-review`: a test that every block `header_top()`/`header_begin()` emits under a
 custom data layer name contains at least one returned exclusion pattern (the property behind #325).
-**Fixes: pending — the base for the next review is this run's fix commit; if that line is left
-unfilled, the base is `245e2e8`.**
+**Fix session (2026-09-23, same evening):** #323 landed as `c420137` (39 signatures / 18 files,
+`[skip changelog]` — annotations only; post-fix PHP 3256 / 17962 twice under `--order-by=random`,
+`phpcs` 0). The first random run surfaced a pre-existing order dependence in R37's #315 test
+(reaches `wp_unslash` when another file leaks `$_SERVER['HTTP_REFERER']`); it stubs its own
+referer leg now. #326 accepted. #325 and the #306 reaffirm-or-reverse question put to the
+maintainer with options. **Claims that changed shape after the report was written: 0.**
+**The base for the next review is the last commit of this fix session.**
 
 ### Report 37: `.security/code-review-report-2026-09-23-1852.md`
 
