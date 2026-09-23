@@ -130,14 +130,12 @@ final class ContainerCode {
 	 * Function executed during wp_head with high priority.
 	 * Outputs some global JavaScript variables that need to be accessible by other parts of the plugin.
 	 *
-	 * On an AMP page nothing is output or returned (the AMP module reads
-	 * DataLayer::compiled() instead). The returned form skips the
-	 * print_script_block() sanitizer: the caller owns the escaping.
+	 * On an AMP page nothing is output (the AMP module reads
+	 * DataLayer::compiled() instead).
 	 *
-	 * @param bool $echo_output True prints the block; false returns it.
-	 * @return string|void The block when $echo_output is false, otherwise nothing.
+	 * @return void
 	 */
-	public function header_top( bool $echo_output = true ) {
+	public function header_top(): void {
 		$datalayer_name = $this->datalayer->name();
 
 		// 'var', not 'let': 'let' breaks related browser extensions and third party
@@ -187,14 +185,10 @@ final class ContainerCode {
 <!-- End Google Tag Manager for WordPress by gtm4wp.com -->';
 
 		if ( ! apply_filters( self::FILTER_AMP_RUNNING, false ) ) {
-			if ( $echo_output ) {
-				// Through print_script_block(), like header_begin(): wp_kses() alone
-				// would turn every bare & into &amp; and break && in the consent JS
-				// added via FILTER_HEADER_TOP_JS (RI-3).
-				$this->script_tag->print_script_block( $_gtm_top_content );
-			} else {
-				return $_gtm_top_content;
-			}
+			// Through print_script_block(), like header_begin(): wp_kses() alone
+			// would turn every bare & into &amp; and break && in the consent JS
+			// added via FILTER_HEADER_TOP_JS (RI-3).
+			$this->script_tag->print_script_block( $_gtm_top_content );
 		}
 	}
 
@@ -596,6 +590,9 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	public function rocket_excluded_inline_js_content( $pattern ) {
 		$pattern[] = 'dataLayer';
 		$pattern[] = 'gtm4wp';
+		// The consent block names neither once it pushes to a custom data layer
+		// name (#325, RI-34); a fixed plugin token, never the user's identifier.
+		$pattern[] = ConsentDefaults::CONSENT_DEFAULT_COMMAND;
 
 		return $pattern;
 	}
