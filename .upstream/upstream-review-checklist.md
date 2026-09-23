@@ -830,10 +830,15 @@ unambiguous — *"Passing `__next40pxDefaultSize` is ignored at runtime."*
 
 ### U6 — `wp_kses()` ampersand behavior
 
-- **We depend on:** `wp_kses()` entity-encoding bare `&` in script bodies and leaving
-  other characters alone, so `ScriptTag::print_script_block()` can `str_replace`
-  `&amp;` back to `&` and `restore_script_ampersands()` can undo it in markup.
-- **Claim:** core kses still encodes `&` and only `&`, in the paths this file uses.
+- **We depend on:** `wp_kses()` entity-encoding bare `&` in script bodies, so
+  `ScriptTag::print_script_block()` can `str_replace` `&amp;` back to `&` and
+  `restore_script_ampersands()` can undo it in markup. It does NOT leave other
+  characters alone: real kses rewrites a bare `>` / `<` and strips tag-like spans
+  (measured R36/#271); the path is safe only because the plugin's own blocks contain
+  no `<`/`>`, which `ContainerCodeTest` now pins with a bracket-aware kses model, and
+  the `FILTER_HEADER_TOP_JS` docblock states the constraint for contributors.
+- **Claim:** core kses still encodes `&` in script bodies (and the plugin's own
+  blocks still contain no `<`/`>`), in the paths this file uses.
 - **Failure:** `silent-wrong` — emitted JavaScript changes byte-for-byte. This is the
   foundation the whole inline-script output path stands on.
 - **Check via:** Make/core dev notes (U82), not a version number (UD-8).
