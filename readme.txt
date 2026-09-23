@@ -76,6 +76,7 @@ Optional page variables that help with behavior tracking and Google Analytics 4 
 * page template, featured image presence, page hierarchy and sticky flag
 * primary category, detected from Yoast SEO or Rank Math
 * page language, detected from WPML or Polylang
+* optionally, titles, categories and terms in the default language of a WPML or Polylang site, so reports combine across translations
 
 = Browser / OS / Device data =
 
@@ -131,10 +132,12 @@ Google Tag Manager for WordPress integrates with several popular plugins. More i
 	* Support for the Cart, Checkout, Mini-Cart, Product Collection and cross-sell blocks, not only the classic shortcode based pages
 	* Enhanced Conversions user data on the purchase event for Google Ads
 	* Compatibility with High Performance Order Storage (HPOS)
+	* Refunds reported from the server through the Google Data Manager API (see below)
 	* Does not support promotions, since WooCommerce does not have such a feature (yet)
-	* Does not support refunds
+* Easy Digital Downloads (EDD 3.0+, beta): the same GA4 e-commerce events from view_item to purchase for the classic shortcodes and the EDD blocks, with Enhanced Conversions user data and reliable purchase tracking
 * CheckoutWC: optional support for its multi step checkout template
 * PublishPress Authors: co-author and guest author data in the page variables
+* WPML and Polylang: page language detection, plus optional default-language values for page variables, WooCommerce and EDD items and Contact Form 7 form names
 * AMP: load your AMP container on the AMP version of your pages
 * Google Consent Mode v2: fire the "default" command with specific consent flags to integrate with non-certified Consent Management Platforms (CMPs) and plugins
 * Cookiebot: use automatic cookie blocking mode if needed
@@ -164,6 +167,37 @@ browser instead, under the same data layer variable names, so your existing Goog
 You can export all plugin settings into a JSON file and import them on another site, which makes it easy to roll out the same
 configuration across several websites. Imported files are treated as untrusted and every value is validated before it is stored.
 
+= Server-side events with the Google Data Manager API =
+
+(experimental, off by default)
+
+Some signals never reach a browser tag. A refund is issued in the store admin, where no page is loaded and no tag fires, so
+Google Analytics keeps counting revenue you have given back. The plugin can send such events from the server through the
+Google Data Manager API:
+
+* Google service accounts: upload the JSON key of a Google Cloud service account, several side by side. Keys are stored encrypted and never shown again.
+* Data Manager destinations: one row per GA4 property, each with a Test button that validates the setup before anything is sent.
+* Attribution capture: each new WooCommerce or EDD order stores the Analytics client and session IDs, the Google Ads click IDs and the consent state it was placed with, so a later server-side event is matched to the right session.
+* Refund events: a refund issued in WooCommerce or EDD is sent to every destination as a GA4 refund event with amount, items, shipping and tax. Google Analytics itself currently processes only the first of several refunds on one order; this is reported to Google.
+* Consent requirement: choose whether orders from the EEA, the UK and Switzerland, every order, or no order need analytics consent before anything is sent.
+* Recent sends: what was sent, what Google did with it, and the reason for every deliberate skip. Failed refunds can be queued again.
+
+= Site Health =
+
+Tools → Site Health reports the whole plugin: every module's option states, the containers and their placement, the data
+layer name and any wp-config.php overrides in the Info section, plus status tests for the configuration, the Google service
+account keys and Data Manager sending. The copied text carries no keys, addresses or visitor data, so it can be pasted into a
+support thread as it is.
+
+= AI assistants (WordPress Abilities API) =
+
+(experimental)
+
+On WordPress 6.9 and newer the plugin registers eleven abilities with the WordPress Abilities API, so an AI assistant
+connected through the WordPress MCP Adapter or another client can read the configuration, help work out why an event is
+not firing, and change a setting once you have confirmed it. Six abilities are read-only, every one requires the settings
+capability, and none returns keys or visitor data. Two filters switch the surface off or keep it read-only.
+
 = Exclude specific user roles from being tracked =
 
 You can set which user roles need to be excluded from tracking when a user with that role visits the frontend. This will completely disable the container code for that user.
@@ -177,7 +211,8 @@ your production Google Tag Manager container. This relies on the WP_ENVIRONMENT_
 
 Version 2.0 is a complete object oriented rewrite. Every feature is a module, and third party plugins can register their own
 modules through the gtm4wp_register_modules action. All public template functions, filter and action names, wp-config constants
-and the option storage key of the 1.x versions are unchanged, so existing integrations keep working.
+and the option storage key of the 1.x versions are unchanged, so existing integrations keep working. A third party module can
+report into Site Health and register its own abilities through the same interfaces the built-in modules use.
 
 == Installation ==
 
@@ -211,6 +246,18 @@ Since version 2.0 the plugin also offers two settings that work around this with
 received (thank-you) page" fires the purchase event on a bespoke confirmation page, and "Reliable purchase tracking" emits a
 missed purchase event on the next page the customer views in the same browser session. Both are de-duplicated, so an order is
 never counted twice.
+
+= Can the plugin report refunds to Google Analytics? =
+
+Yes, since 2.1, from the server: a refund is issued in the store admin where no tag can fire, so the plugin sends a GA4 refund
+event through the Google Data Manager API instead. It needs a Google Cloud service account with access to your GA4 property and
+attribution capture switched on before the order was placed. Note that Google Analytics itself currently processes only the
+first of several refunds on one order; this has been reported to Google and needs no plugin change once fixed.
+
+= Does the plugin support Easy Digital Downloads? =
+
+Yes, since 2.1: Easy Digital Downloads 3.0 and newer gets the same GA4 e-commerce events as WooCommerce, for the classic
+shortcodes and the EDD blocks alike, with its own settings section.
 
 = Why isn't there an option to blocklist tag/variable classes =
 
@@ -265,7 +312,6 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Added: an optional **"Report products in the default language"** setting (WooCommerce → Product data): the whole GA4 item, `item_id` included, reports the master language, so one product combines across its translations. Review any product feed or dynamic-remarketing setup keyed on the translated id before switching it on. Off by default (experimental) (#145).
 * Added: an optional **"Report downloads in the default language"** setting (Easy Digital Downloads → Product data), the EDD counterpart of the WooCommerce option above and with the same caveat about setups keyed on the translated `item_id`. Off by default (experimental) (#145).
 * Added: an optional **"Report the form name in the default language"** setting (Contact Form 7), so `form_name` carries the master-language title and submissions of one form combine across languages. Works for forms translated as separate entries. Off by default (experimental) (#145).
-* Fixed: an Easy Digital Downloads category named "Shirts & Ties" reached the data layer as `Shirts &amp; Ties`, and that is the literal string GA4 reported. The name is decoded once where it is read, exactly as 2.0.2 already does for WooCommerce categories and brands.
 * Changed: `pagePostTerms` and `pagePrimaryCategoryName` report term names as they were typed, the same string the e-commerce items have carried since 2.0.2. A GTM trigger that matched the encoded form on either variable needs the plain text now; the slug variables are unchanged.
 * Removed: the `$gtp4wp_plugin_url`, `$gtp4wp_plugin_basename` and `$gtp4wp_script_path` globals, deprecated in 2.0 as announced. Third-party code still reading them uses `plugin_dir_url( GTM4WP_PLUGIN_FILE )`, `plugin_basename( GTM4WP_PLUGIN_FILE )` and `plugin_dir_url( GTM4WP_PLUGIN_FILE ) . 'build/'` instead.
 
