@@ -72,7 +72,7 @@ change already carries its own. Then an annotated tag: `git tag -a X.Y.Z -m X.Y.
    The GitHub auto-generated source archive is **not installable** (`build/` is
    git-ignored) — always attach this ZIP. Its top folder is the wp.org slug
    `duracelltomi-google-tag-manager/`, never the long git name, so a GitHub install
-   still receives wp.org updates (U168); zips up to 2.0.3 used the long name.
+   lands where a wp.org install lives (U168); zips before the 2.0.3 re-upload used the long name.
 2. Push: `git push origin <branch> X.Y.Z` (+ the new maintenance branch, step 5).
 3. `gh release create X.Y.Z <zip> --title "GTM4WP X.Y.Z" --notes-file <file>`
    with `--prerelease` or `--latest` per type. Release-note voice: the

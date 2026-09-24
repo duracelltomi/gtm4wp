@@ -709,7 +709,7 @@ false gap and the maintainer answers the same question again.
 domain-does-not-match-slug defect. **It is not. Do not "fix" it.**
 
 The one place the directory name *is* the contract is the release zip's top folder, which
-must be the short slug so a GitHub install gets wp.org updates (U168).
+must be the short slug so a GitHub zip lands where a wp.org install lives (U168).
 
 Measured 2026-08-06:
 
