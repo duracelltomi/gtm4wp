@@ -220,7 +220,8 @@ export default function ModulePanel( {
 		</div>
 	) : null;
 
-	if ( CustomPanel && ! hasFields ) {
+	// A module with no fields (the services section) is its header alone.
+	if ( ! hasFields ) {
 		return (
 			<div className="gtm4wp-panel">
 				{ head }

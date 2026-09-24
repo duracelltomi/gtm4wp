@@ -717,6 +717,35 @@ describe( 'ModulePanel custom panels', () => {
 		expect( apiFetch ).not.toHaveBeenCalled();
 	} );
 
+	it( 'renders the header alone for a module with neither fields nor a panel', () => {
+		const { container } = render(
+			<ModulePanel
+				module={ {
+					id: 'services',
+					title: 'Services',
+					available: true,
+					intro: 'First sentence. <a href="https://gtm4wp.com/gtm4wp-services">Discover</a>',
+					panel: '',
+					groups: [],
+					fields: [],
+				} }
+				values={ {} }
+				errors={ {} }
+				activeGroupId={ null }
+				focusFieldKey={ null }
+				onGroupSelect={ jest.fn() }
+				onChange={ jest.fn() }
+			/>
+		);
+
+		expect(
+			screen.getByRole( 'link', { name: 'Discover' } )
+		).toHaveAttribute( 'href', 'https://gtm4wp.com/gtm4wp-services' );
+		expect(
+			container.querySelector( '.gtm4wp-panel__body' )
+		).not.toBeInTheDocument();
+	} );
+
 	it( 'renders the fields when the module declares no panel', () => {
 		renderPanel( {
 			panel: '',

@@ -212,6 +212,7 @@ final class ModuleConsistencyTest extends TestCase {
 				'blacklist',
 				'google-auth',
 				'google-data-manager',
+				'services',
 			),
 			array_keys( $modules )
 		);
