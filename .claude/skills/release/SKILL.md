@@ -107,6 +107,9 @@ Run after the release is published (stable releases; pre-releases only do a):
 
 a. **`.claude/RELEASE-STATE.md`**: Facts table, branch/bugfix flow, a History
    row; a new Epoch line if the branch model or a maintenance policy changed.
+   On `master` the `Stable tag` follows too, and if the version quartet (header,
+   `GTM4WP_VERSION`, package files) is behind the release it is raised to it
+   (`npm version` + the two hand edits); a test fails when the header is behind.
 b. **Marker sweep**: `grep -rn "release-coupled" .claude CLAUDE.md` — visit
    every hit and update the embedded value. The grep is the registry; do not
    maintain a separate list that can go stale.

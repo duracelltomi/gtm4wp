@@ -114,6 +114,22 @@ final class ReleaseStateConsistencyTest extends TestCase {
 	}
 
 	/**
+	 * The plugin header may run ahead of the Stable tag, never behind it:
+	 * master sat at 2.0.0 through three 2.0.x releases unnoticed.
+	 *
+	 * @return void
+	 */
+	public function test_header_version_is_not_behind_stable_tag(): void {
+		$stable_tag = $this->header_field( $this->read_file( 'readme.txt' ), 'Stable tag', 'readme.txt' );
+		$header     = $this->header_field( $this->read_file( 'duracelltomi-google-tag-manager-for-wordpress.php' ), 'Version', 'the plugin header' );
+
+		$this->assertTrue(
+			version_compare( $header, $stable_tag, '>=' ),
+			"Plugin header Version {$header} is behind the released Stable tag {$stable_tag}."
+		);
+	}
+
+	/**
 	 * The requirement floors and tested-up-to claims in RELEASE-STATE.md match
 	 * the plugin header and readme.txt.
 	 *
