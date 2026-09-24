@@ -323,7 +323,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Changed: with trusted proxy addresses configured, the Cloudflare country code is read only for requests that arrived through one of them, so add Cloudflare's IP ranges to the list; one admin notice asks for it while either proxy header is read without one. `geoCloudflareCountryCode` only ever carries Cloudflare's two-letter form (plus `XX` and `T1`).
 * Changed: a `gtm4wp_admin_page_capability` callback returning something other than a capability name is reported through `_doing_it_wrong()` and the default applies instead of locking every administrator out.
 * Changed: the Axeptio project ID field looks up the cookie versions 400 ms after typing stops instead of on every keystroke.
-* Added: a **Services for agencies and freelancers** section on the settings screen, with no options, linking to the services the developers of GTM4WP offer to agencies and freelancers who build tracking for their clients.
+* Added: a **Services for agencies and freelancers** section on the settings screen, with no options, introducing the services the developers of GTM4WP offer to agencies and freelancers and linking to them on gtm4wp.com.
 * Removed: the `$gtp4wp_plugin_url`, `$gtp4wp_plugin_basename` and `$gtp4wp_script_path` globals, deprecated in 2.0 as announced. Third-party code still reading them uses `plugin_dir_url( GTM4WP_PLUGIN_FILE )`, `plugin_basename( GTM4WP_PLUGIN_FILE )` and `plugin_dir_url( GTM4WP_PLUGIN_FILE ) . 'build/'` instead.
 
 **Easy Digital Downloads**

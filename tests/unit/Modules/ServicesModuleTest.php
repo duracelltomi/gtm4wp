@@ -50,10 +50,10 @@ final class ServicesModuleTest extends TestCase {
 		$this->assertSame( 'gtm4wp-services', $schema->doc_url() );
 	}
 
-	public function test_the_intro_repeats_the_first_sentence_and_links_to_the_services_page(): void {
+	public function test_the_intro_repeats_the_first_paragraph_and_links_to_the_services_page(): void {
 		$intro = ( new AdminSchema() )->intro();
 
-		$this->assertStringStartsWith( 'Many agencies and freelancers use GTM4WP to build tracking for their clients. ', $intro );
+		$this->assertStringStartsWith( 'Many agencies and freelancers use GTM4WP to build tracking for their clients. When a project needs more than the documentation can offer, you can bring in the people who develop the plugin. We work alongside you, not in place of you: you keep the client relationship, and we help you deliver. ', $intro );
 		$this->assertStringContainsString( 'href="https://gtm4wp.com/gtm4wp-services"', $intro );
 		$this->assertStringContainsString( 'target="_blank" rel="noopener noreferrer"', $intro );
 	}
