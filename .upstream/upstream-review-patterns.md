@@ -570,6 +570,9 @@ false gap and the maintainer answers the same question again.
 `duracelltomi-google-tag-manager-for-wordpress` looks like the classic
 domain-does-not-match-slug defect. **It is not. Do not "fix" it.**
 
+The one place the directory name *is* the contract is the release zip's top folder, which
+must be the short slug so a GitHub install gets wp.org updates (U168).
+
 Measured 2026-08-06:
 
 | Check | Result |
