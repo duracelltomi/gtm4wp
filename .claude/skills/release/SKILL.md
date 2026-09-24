@@ -68,9 +68,11 @@ change already carries its own. Then an annotated tag: `git tag -a X.Y.Z -m X.Y.
 
 ## 4. Build, publish, verify
 
-1. `npm run release` → `release/duracelltomi-google-tag-manager-for-wordpress-X.Y.Z.zip`.
+1. `npm run release` → `release/duracelltomi-google-tag-manager-X.Y.Z.zip`.
    The GitHub auto-generated source archive is **not installable** (`build/` is
-   git-ignored) — always attach this ZIP.
+   git-ignored) — always attach this ZIP. Its top folder is the wp.org slug
+   `duracelltomi-google-tag-manager/`, never the long git name, so a GitHub install
+   still receives wp.org updates (U168); zips up to 2.0.3 used the long name.
 2. Push: `git push origin <branch> X.Y.Z` (+ the new maintenance branch, step 5).
 3. `gh release create X.Y.Z <zip> --title "GTM4WP X.Y.Z" --notes-file <file>`
    with `--prerelease` or `--latest` per type. Release-note voice: the
@@ -80,7 +82,8 @@ change already carries its own. Then an annotated tag: `git tag -a X.Y.Z -m X.Y.
    incidents while reads still work — retry with a bounded loop.
 4. **Post-upload verification (never skip):** `gh release download` the asset,
    SHA256-compare against the local ZIP, and read the plugin header `Version:`
-   out of the downloaded ZIP. Confirm `isPrerelease`/`Latest` via
+   out of the downloaded ZIP, and that its single top folder is
+   `duracelltomi-google-tag-manager/`. Confirm `isPrerelease`/`Latest` via
    `gh release view --json` / `gh release list`.
 
 ## 5. Branch mechanics (stable minor/major only)

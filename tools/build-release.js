@@ -15,17 +15,21 @@ const path = require( 'path' );
 const AdmZip = require( 'adm-zip' );
 
 const ROOT = path.resolve( __dirname, '..' );
-const SLUG = 'duracelltomi-google-tag-manager-for-wordpress';
-const MAIN_FILE = path.join( ROOT, `${ SLUG }.php` );
+// The wordpress.org slug names the zip's top folder: WordPress matches updates
+// on that folder, so a GitHub zip installed under any other name never updates
+// (U168). The main file keeps its own, longer name, exactly as in wp.org SVN.
+const WPORG_SLUG = 'duracelltomi-google-tag-manager';
+const MAIN_FILE_NAME = 'duracelltomi-google-tag-manager-for-wordpress.php';
+const MAIN_FILE = path.join( ROOT, MAIN_FILE_NAME );
 const RELEASE_DIR = path.join( ROOT, 'release' );
-const STAGE_DIR = path.join( RELEASE_DIR, SLUG );
+const STAGE_DIR = path.join( RELEASE_DIR, WPORG_SLUG );
 
 /**
  * Everything that ships. Directories are copied recursively; missing
  * optional entries are skipped with a note.
  */
 const DIST_FILES = [
-	{ source: `${ SLUG }.php`, required: true },
+	{ source: MAIN_FILE_NAME, required: true },
 	{ source: 'uninstall.php', required: true },
 	{ source: 'readme.txt', required: true },
 	{ source: 'license.txt', required: true },
@@ -193,11 +197,14 @@ function main() {
 	DIST_FILES.forEach( copyEntry );
 
 	console.log( '\n3/3 Creating zip…' );
-	const zipFile = path.join( RELEASE_DIR, `${ SLUG }-${ version }.zip` );
+	const zipFile = path.join(
+		RELEASE_DIR,
+		`${ WPORG_SLUG }-${ version }.zip`
+	);
 	fs.rmSync( zipFile, { force: true } );
 
 	const zip = new AdmZip();
-	zip.addLocalFolder( STAGE_DIR, SLUG );
+	zip.addLocalFolder( STAGE_DIR, WPORG_SLUG );
 	zip.writeZip( zipFile );
 
 	fs.rmSync( STAGE_DIR, { recursive: true, force: true } );
@@ -205,7 +212,7 @@ function main() {
 	const sizeKb = Math.round( fs.statSync( zipFile ).size / 1024 );
 	console.log( `\n✔ ${ path.relative( ROOT, zipFile ) } (${ sizeKb } KB)` );
 	console.log(
-		`  Contains a single top level "${ SLUG }/" folder, ready for wordpress.org SVN or manual upload.`
+		`  Contains a single top level "${ WPORG_SLUG }/" folder, ready for wordpress.org SVN or manual upload.`
 	);
 }
 
