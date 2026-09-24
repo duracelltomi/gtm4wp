@@ -62,6 +62,7 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Date | Event |
 |---|---|
+| 2026-09-24 | 2.0.3 patch released on GitHub, cut from `2.0` (release commit `3da558c`, asset SHA256-verified); wordpress.org SVN push pending; all fixes also on `master` |
 | 2026-09-14 | 2.0.2 patch released, cut from `2.0` (GitHub 2026-09-14 evening, wordpress.org SVN 2026-09-15 07:35 CEST, verified: 108 files per-file identical in `tags/2.0.2` + `trunk`, plugins API 2.0.2 the same hour); all fixes also on `master` |
 | 2026-09-03 | 2.0.1 patch released (GitHub + wordpress.org), cut from `2.0`; both fixes also on `master` |
 | 2026-09-01 | 2.0.0 stable released (GitHub + wordpress.org); `2.0` branch created; `1.x` declared frozen (reported-security-fixes only) |
