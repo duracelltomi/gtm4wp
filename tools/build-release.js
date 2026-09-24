@@ -15,9 +15,9 @@ const path = require( 'path' );
 const AdmZip = require( 'adm-zip' );
 
 const ROOT = path.resolve( __dirname, '..' );
-// The wordpress.org slug names the zip's top folder: WordPress matches updates
-// on that folder, so a GitHub zip installed under any other name never updates
-// (U168). The main file keeps its own, longer name, exactly as in wp.org SVN.
+// The wordpress.org slug names the zip's top folder, so a GitHub zip lands in
+// the folder a wp.org install uses and an upload replaces it instead of adding
+// a second copy (U168). The main file keeps its longer name, as in wp.org SVN.
 const WPORG_SLUG = 'duracelltomi-google-tag-manager';
 const MAIN_FILE_NAME = 'duracelltomi-google-tag-manager-for-wordpress.php';
 const MAIN_FILE = path.join( ROOT, MAIN_FILE_NAME );

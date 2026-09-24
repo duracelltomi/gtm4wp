@@ -8,10 +8,10 @@
 namespace GTM4WP\Tests\unit;
 
 /**
- * WordPress matches a plugin to its wordpress.org updates by the folder it is
- * installed in, so a GitHub release zip whose top folder is not the wp.org slug
- * installs as a plugin that never updates, with no error anywhere (U168). The
- * slug is the text domain (U97), so the two are compared here.
+ * WordPress decides whether an uploaded zip replaces an installed plugin by
+ * its folder, so a GitHub release zip whose top folder is not the wp.org slug
+ * installs as a second copy beside a wp.org install, silently (U168). The slug
+ * is the text domain (U97), so the two are compared here.
  */
 final class ReleaseZipSlugTest extends TestCase {
 
