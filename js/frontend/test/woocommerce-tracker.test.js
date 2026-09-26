@@ -1062,6 +1062,107 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 	} );
 } );
 
+describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () => {
+	// WooCommerce's classic submit handler calls checkout_place_order with no
+	// try/catch; a throw there posts the form natively and skips gateway JS.
+	let jqHandlers;
+
+	const setGlobals = () => {
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+		window.gtm4wp_checkout_products = [ { item_id: 1, price: 25 } ];
+		window.gtm4wp_checkout_value = 50;
+		delete window.gtm4wp_checkout_step_fired;
+
+		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_read_json_from_node = () => false;
+
+		jqHandlers = {};
+		const jq = {
+			on: ( events, fn ) => {
+				String( events )
+					.split( ' ' )
+					.forEach( ( evt ) => ( jqHandlers[ evt ] = fn ) );
+				return jq;
+			},
+			trigger: () => jq,
+			ajaxSuccess: () => jq,
+		};
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+	};
+
+	const CHECKOUT_DOM =
+		'<form class="checkout">' +
+		'<input type="radio" name="shipping_method[0]" value="flat_rate:1" checked />' +
+		'<div class="payment_methods">' +
+		'<input type="radio" name="payment_method" value="stripe" checked />' +
+		'</div></form>';
+
+	const boot = ( bodyClass ) => {
+		document.body.className = bodyClass;
+		document.body.innerHTML = CHECKOUT_DOM;
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers(); // process_pages() binds the jQuery handlers
+	};
+
+	const calls = ( event ) =>
+		global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === event
+		);
+
+	afterEach( () => {
+		jest.useRealTimers();
+		global.gtm4wp_currency = 'EUR';
+		delete window.gtm4wp_checkoutwc;
+		delete window.gtm4wp_datalayer_max_timeout;
+		delete window.gtm4wp_checkout_products;
+		delete window.gtm4wp_checkout_value;
+	} );
+
+	it( 'still reports both steps on a classic checkout submit', () => {
+		setGlobals();
+		boot( 'woocommerce-checkout' );
+
+		expect( jqHandlers.checkout_place_order() ).toBeUndefined();
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 1 );
+	} );
+
+	it( 'does not throw into WooCommerce when a head-block global is missing', () => {
+		setGlobals();
+		boot( 'woocommerce-checkout' );
+		delete global.gtm4wp_currency;
+
+		let result;
+		expect( () => {
+			result = jqHandlers.checkout_place_order();
+		} ).not.toThrow();
+		expect( result ).not.toBe( false );
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+		// The error is not swallowed: it surfaces on a timer instead.
+		expect( () => jest.runOnlyPendingTimers() ).toThrow( ReferenceError );
+	} );
+
+	it( 'does not throw from the CheckoutWC submit fallback either', () => {
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+		boot( '' );
+		delete global.gtm4wp_currency;
+
+		expect( () => jqHandlers.cfw_before_submit() ).not.toThrow();
+		expect( () => jest.runOnlyPendingTimers() ).toThrow( ReferenceError );
+	} );
+} );
+
 // ---------------------------------------------------------------------------
 // Branch/isolation coverage for the classic tracker's cart-page quantity change,
 // remove-from-cart links, grouped/variable/disabled add_to_cart, view_item_list
