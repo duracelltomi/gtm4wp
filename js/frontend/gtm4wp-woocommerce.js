@@ -177,6 +177,25 @@ function gtm4wp_woocommerce_handle_shipping_method_change() {
 }
 
 /**
+ * Runs tracking code inside WooCommerce's order submission without letting it throw
+ * there (#472). The classic checkout calls checkout_place_order handlers with no
+ * try/catch, so a throw skips its `return false`, the browser posts the form itself
+ * and payment gateway scripts (Stripe) never add their data. The error is re-thrown
+ * on a timer so it still reaches the console.
+ *
+ * @param {Function} callback The tracking code to run.
+ */
+function gtm4wp_woocommerce_run_during_submit( callback ) {
+	try {
+		callback();
+	} catch ( e ) {
+		setTimeout( function () {
+			throw e;
+		}, 0 );
+	}
+}
+
+/**
  * Reads the step identifier from a CheckoutWC cfw_step_changed event (#385). The
  * payload shape is not verified against a live install, so the likely places
  * (string detail, or detail.step / current / to / name) are tried.
@@ -1364,20 +1383,23 @@ function gtm4wp_woocommerce_process_pages() {
 		// We need to use jQuery where since the checkout_place_order event is only triggered using jQuery
 		const checkout_form = jQuery( 'form.checkout' );
 		checkout_form.on( 'checkout_place_order', function () {
-			if (
-				gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) == -1
-			) {
-				// shipping methods are not visible if only one is available
-				// and if the user has already a pre-selected method, no click event will fire to report the checkout step
-				gtm4wp_woocommerce_handle_shipping_method_change();
-			}
+			gtm4wp_woocommerce_run_during_submit( function () {
+				if (
+					gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) ==
+					-1
+				) {
+					// shipping methods are not visible if only one is available
+					// and if the user has already a pre-selected method, no click event will fire to report the checkout step
+					gtm4wp_woocommerce_handle_shipping_method_change();
+				}
 
-			if (
-				gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) == -1
-			) {
-				// if the user has already a pre-selected method, no click event will fire to report the checkout step
-				gtm4wp_woocommerce_handle_payment_method_change();
-			}
+				if (
+					gtm4wp_checkout_step_fired.indexOf( 'payment_method' ) == -1
+				) {
+					// if the user has already a pre-selected method, no click event will fire to report the checkout step
+					gtm4wp_woocommerce_handle_payment_method_change();
+				}
+			} );
 		} );
 	}
 
@@ -1413,8 +1435,10 @@ function gtm4wp_woocommerce_process_pages() {
 		jQuery( document.body ).on(
 			'cfw_before_submit checkout_place_order',
 			function () {
-				gtm4wp_woocommerce_handle_shipping_method_change();
-				gtm4wp_woocommerce_handle_payment_method_change();
+				gtm4wp_woocommerce_run_during_submit( function () {
+					gtm4wp_woocommerce_handle_shipping_method_change();
+					gtm4wp_woocommerce_handle_payment_method_change();
+				} );
 			}
 		);
 	}
