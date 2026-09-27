@@ -1163,6 +1163,77 @@ describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () =
 	} );
 } );
 
+describe( 'gtm4wp-woocommerce found_variation never throws into WooCommerce (#327)', () => {
+	// WooCommerce triggers found_variation mid-way through its variation form
+	// code (reset link, has_changed event, the AJAX path's unblock).
+	afterEach( () => {
+		jest.useRealTimers();
+		delete window.gtm4wp_datalayer_max_timeout;
+	} );
+
+	it( 'contains a throw and still surfaces it on a timer', () => {
+		document.body.className = '';
+		document.body.innerHTML =
+			'<form class="cart variations_form">' +
+			'<input type="hidden" name="gtm4wp_product_data" />' +
+			'</form>';
+		document.querySelector( '[name=gtm4wp_product_data]' ).value =
+			JSON.stringify( {
+				item_id: 10,
+				id: 10,
+				price: 5,
+				internal_id: 10,
+			} );
+
+		global.gtm4wp_datalayer_name = 'dataLayer';
+		global.gtm4wp_currency = 'EUR';
+		global.gtm4wp_product_per_impression = 0;
+		global.gtm4wp_clear_ecommerce = false;
+		global.gtm4wp_console_log = false;
+		global.gtm4wp_use_sku_instead = false;
+		global.gtm4wp_remarketing_prod_id_prefix = '';
+		global.gtm4wp_make_sure_is_float = ( v ) => parseFloat( v ) || 0;
+		window.dataLayer = [];
+		window.gtm4wp_datalayer_max_timeout = 0;
+
+		// A third-party push wrapper that throws.
+		global.gtm4wp_push_ecommerce = jest.fn( () => {
+			throw new TypeError( 'push wrapper failed' );
+		} );
+
+		const handlers = {};
+		const jq = {
+			on: ( ...args ) => {
+				const fn = args[ args.length - 1 ];
+				if ( typeof fn === 'function' ) {
+					handlers[ args[ 0 ] ] = fn;
+				}
+				return jq;
+			},
+			trigger: () => jq,
+			ajaxSuccess: () => jq,
+		};
+		global.jQuery = jest.fn( () => jq );
+
+		jest.useFakeTimers();
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+
+		expect( () =>
+			handlers.found_variation(
+				{ target: document.querySelector( 'form' ) },
+				{ variation_id: 456, sku: '', display_price: 9, attributes: {} }
+			)
+		).not.toThrow();
+		expect( global.gtm4wp_push_ecommerce ).toHaveBeenCalledWith(
+			'view_item',
+			expect.any( Array ),
+			expect.any( Object )
+		);
+		expect( () => jest.runOnlyPendingTimers() ).toThrow( TypeError );
+	} );
+} );
+
 // ---------------------------------------------------------------------------
 // Branch/isolation coverage for the classic tracker's cart-page quantity change,
 // remove-from-cart links, grouped/variable/disabled add_to_cart, view_item_list

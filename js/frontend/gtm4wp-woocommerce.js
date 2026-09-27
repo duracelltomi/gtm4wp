@@ -1,4 +1,5 @@
 import { gtm4wp_parse_block_item } from './lib/gtm4wp-blocks-cart-diff';
+import { gtm4wp_run_isolated } from './lib/gtm4wp-isolate';
 
 let gtm4wp_last_selected_product_variation;
 
@@ -194,25 +195,6 @@ function gtm4wp_woocommerce_handle_shipping_method_change() {
 	);
 
 	gtm4wp_checkout_step_fired.push( 'shipping_method' );
-}
-
-/**
- * Runs tracking code inside WooCommerce's order submission without letting it throw
- * there (#472). The classic checkout calls checkout_place_order handlers with no
- * try/catch, so a throw skips its `return false`, the browser posts the form itself
- * and payment gateway scripts (Stripe) never add their data. The error is re-thrown
- * on a timer so it still reaches the console.
- *
- * @param {Function} callback The tracking code to run.
- */
-function gtm4wp_woocommerce_run_during_submit( callback ) {
-	try {
-		callback();
-	} catch ( e ) {
-		setTimeout( function () {
-			throw e;
-		}, 0 );
-	}
 }
 
 /**
@@ -1201,134 +1183,138 @@ function gtm4wp_woocommerce_process_pages() {
 
 	// track variable products on their detail pages
 	// currently, we need to use jQuery here since WooCommerce is firing this event using jQuery
-	// that can not be caught using vanilla JS
+	// that can not be caught using vanilla JS. Isolated (#327): it runs inside
+	// WooCommerce's variation form code, which a throw here would cut short.
 	jQuery( document ).on(
 		'found_variation',
 		function ( event, product_variation ) {
-			if ( 'undefined' === typeof product_variation ) {
-				// some ither plugins trigger this event without variation data
-				return;
-			}
+			gtm4wp_run_isolated( function () {
+				if ( 'undefined' === typeof product_variation ) {
+					// some ither plugins trigger this event without variation data
+					return;
+				}
 
-			if (
-				document.readyState === 'interactive' &&
-				gtm4wp_view_item_fired_during_pageload
-			) {
-				// some custom attribute rendering plugins fire this event multiple times during page load
-				return;
-			}
+				if (
+					document.readyState === 'interactive' &&
+					gtm4wp_view_item_fired_during_pageload
+				) {
+					// some custom attribute rendering plugins fire this event multiple times during page load
+					return;
+				}
 
-			// event target is the <form> element of the add to cart button.
-			const product_form = event.target;
-			if ( ! product_form ) {
-				return true;
-			}
+				// event target is the <form> element of the add to cart button.
+				const product_form = event.target;
+				if ( ! product_form ) {
+					return true;
+				}
 
-			// Same span-first, input-fallback pair as the simple product path (#462).
-			const product_data_el = product_form.querySelector(
-				'.gtm4wp_single_productdata,[name=gtm4wp_product_data]'
-			);
-			if ( ! product_data_el ) {
-				return true;
-			}
-
-			let current_product_detail_data;
-			try {
-				current_product_detail_data = JSON.parse(
-					( product_data_el.dataset &&
-						product_data_el.dataset.gtm4wp_product_data ) ||
-						product_data_el.value
+				// Same span-first, input-fallback pair as the simple product path (#462).
+				const product_data_el = product_form.querySelector(
+					'.gtm4wp_single_productdata,[name=gtm4wp_product_data]'
 				);
-			} catch ( e ) {
-				console && console.error && console.error( e.message );
-				return true;
-			}
+				if ( ! product_data_el ) {
+					return true;
+				}
 
-			// #190: a parse can SUCCEED with null - the attribute is the literal
-			// string "null" when a site filter returns null and the server
-			// wp_json_encode()s it - which passes the catch above and then threw
-			// on the first property access below. Treat it as "no product data",
-			// like the catch does.
-			if ( ! current_product_detail_data ) {
-				return true;
-			}
+				let current_product_detail_data;
+				try {
+					current_product_detail_data = JSON.parse(
+						( product_data_el.dataset &&
+							product_data_el.dataset.gtm4wp_product_data ) ||
+							product_data_el.value
+					);
+				} catch ( e ) {
+					console && console.error && console.error( e.message );
+					return true;
+				}
 
-			current_product_detail_data.price = gtm4wp_make_sure_is_float(
-				current_product_detail_data.price
-			);
+				// #190: a parse can SUCCEED with null - the attribute is the literal
+				// string "null" when a site filter returns null and the server
+				// wp_json_encode()s it - which passes the catch above and then threw
+				// on the first property access below. Treat it as "no product data",
+				// like the catch does.
+				if ( ! current_product_detail_data ) {
+					return true;
+				}
 
-			current_product_detail_data.item_group_id =
-				current_product_detail_data.id;
-			// Re-apply the dynamic-remarketing product-id prefix to the selected
-			// variation's id: the server prefixes the parent id, but here we swap in
-			// the variation id, so the prefix would otherwise be lost (#383). item_id
-			// stays unprefixed (server contract), and the prefix is only prepended
-			// when set, so an unprefixed id keeps its original type.
-			current_product_detail_data.id = gtm4wp_remarketing_prod_id_prefix
-				? gtm4wp_remarketing_prod_id_prefix +
-				  product_variation.variation_id
-				: product_variation.variation_id;
-			current_product_detail_data.item_id =
-				product_variation.variation_id;
-			current_product_detail_data.sku = product_variation.sku;
-			if (
-				gtm4wp_use_sku_instead &&
-				product_variation.sku &&
-				'' !== product_variation.sku
-			) {
+				current_product_detail_data.price = gtm4wp_make_sure_is_float(
+					current_product_detail_data.price
+				);
+
+				current_product_detail_data.item_group_id =
+					current_product_detail_data.id;
+				// Re-apply the dynamic-remarketing product-id prefix to the selected
+				// variation's id: the server prefixes the parent id, but here we swap in
+				// the variation id, so the prefix would otherwise be lost (#383). item_id
+				// stays unprefixed (server contract), and the prefix is only prepended
+				// when set, so an unprefixed id keeps its original type.
 				current_product_detail_data.id =
 					gtm4wp_remarketing_prod_id_prefix
 						? gtm4wp_remarketing_prod_id_prefix +
-						  product_variation.sku
-						: product_variation.sku;
-				current_product_detail_data.item_id = product_variation.sku;
-			}
-			current_product_detail_data.price = gtm4wp_make_sure_is_float(
-				product_variation.display_price
-			);
-
-			const product_variation_attribute_values = [];
-			for ( const attrib_key in product_variation.attributes ) {
-				product_variation_attribute_values.push(
-					product_variation.attributes[ attrib_key ]
-				);
-			}
-			current_product_detail_data.item_variant =
-				product_variation_attribute_values.join( ',' );
-			gtm4wp_last_selected_product_variation =
-				current_product_detail_data;
-
-			// #405: the parent product id (internal_id, about to be deleted) is what
-			// the list stored the attribution under; use it to enrich this view_item
-			// (and the add_to_cart that reuses this object) from the cookie. Opt-in.
-			const list_product_id = current_product_detail_data.internal_id;
-
-			delete current_product_detail_data.internal_id;
-
-			// GA4 expects a quantity on the view_item item; a product view is a single
-			// unit (#348). add_to_cart later overwrites this with the chosen quantity.
-			current_product_detail_data.quantity = 1;
-
-			if ( gtm4wp_list_attribution_enabled() ) {
-				gtm4wp_apply_stored_item_list(
-					current_product_detail_data,
-					list_product_id
-				);
-			}
-
-			// fire ga4 version
-			gtm4wp_push_ecommerce(
-				'view_item',
-				[ current_product_detail_data ],
-				{
-					currency: gtm4wp_currency,
-					value: current_product_detail_data.price,
+						  product_variation.variation_id
+						: product_variation.variation_id;
+				current_product_detail_data.item_id =
+					product_variation.variation_id;
+				current_product_detail_data.sku = product_variation.sku;
+				if (
+					gtm4wp_use_sku_instead &&
+					product_variation.sku &&
+					'' !== product_variation.sku
+				) {
+					current_product_detail_data.id =
+						gtm4wp_remarketing_prod_id_prefix
+							? gtm4wp_remarketing_prod_id_prefix +
+							  product_variation.sku
+							: product_variation.sku;
+					current_product_detail_data.item_id = product_variation.sku;
 				}
-			);
+				current_product_detail_data.price = gtm4wp_make_sure_is_float(
+					product_variation.display_price
+				);
 
-			if ( document.readyState === 'interactive' ) {
-				gtm4wp_view_item_fired_during_pageload = true;
-			}
+				const product_variation_attribute_values = [];
+				for ( const attrib_key in product_variation.attributes ) {
+					product_variation_attribute_values.push(
+						product_variation.attributes[ attrib_key ]
+					);
+				}
+				current_product_detail_data.item_variant =
+					product_variation_attribute_values.join( ',' );
+				gtm4wp_last_selected_product_variation =
+					current_product_detail_data;
+
+				// #405: the parent product id (internal_id, about to be deleted) is what
+				// the list stored the attribution under; use it to enrich this view_item
+				// (and the add_to_cart that reuses this object) from the cookie. Opt-in.
+				const list_product_id = current_product_detail_data.internal_id;
+
+				delete current_product_detail_data.internal_id;
+
+				// GA4 expects a quantity on the view_item item; a product view is a single
+				// unit (#348). add_to_cart later overwrites this with the chosen quantity.
+				current_product_detail_data.quantity = 1;
+
+				if ( gtm4wp_list_attribution_enabled() ) {
+					gtm4wp_apply_stored_item_list(
+						current_product_detail_data,
+						list_product_id
+					);
+				}
+
+				// fire ga4 version
+				gtm4wp_push_ecommerce(
+					'view_item',
+					[ current_product_detail_data ],
+					{
+						currency: gtm4wp_currency,
+						value: current_product_detail_data.price,
+					}
+				);
+
+				if ( document.readyState === 'interactive' ) {
+					gtm4wp_view_item_fired_during_pageload = true;
+				}
+			} );
 		}
 	);
 	jQuery( '.variations select' ).trigger( 'change' );
@@ -1489,7 +1475,7 @@ function gtm4wp_woocommerce_process_pages() {
 		// We need to use jQuery where since the checkout_place_order event is only triggered using jQuery
 		const checkout_form = jQuery( 'form.checkout' );
 		checkout_form.on( 'checkout_place_order', function () {
-			gtm4wp_woocommerce_run_during_submit( function () {
+			gtm4wp_run_isolated( function () {
 				if (
 					gtm4wp_checkout_step_fired.indexOf( 'shipping_method' ) ==
 					-1
@@ -1546,7 +1532,7 @@ function gtm4wp_woocommerce_process_pages() {
 		jQuery( document.body ).on(
 			'cfw_before_submit checkout_place_order',
 			function () {
-				gtm4wp_woocommerce_run_during_submit( function () {
+				gtm4wp_run_isolated( function () {
 					gtm4wp_woocommerce_handle_shipping_method_change();
 					gtm4wp_woocommerce_handle_payment_method_change();
 				} );
