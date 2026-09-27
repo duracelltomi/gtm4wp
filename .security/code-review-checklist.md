@@ -1164,9 +1164,9 @@ contained the throw in the two handlers it touched and not in their siblings.
 
 | # | Sev | Status | Actor | Area | Summary |
 |---|---|---|---|---|---|
-| 327 | Low | fixed (R39 fix session; shared `js/frontend/lib/gtm4wp-isolate.js`) | — | `js/frontend/gtm4wp-woocommerce.js:1113-1236` | The `found_variation` handler runs inside WooCommerce's synchronous variation-form trigger with no containment; a throw there skips WooCommerce code after the trigger (sibling of #472, RI-35) |
-| 328 | Low | fixed (R39 fix session: maintainer chose to drop the dead event; U33 still open) | — | `js/frontend/gtm4wp-woocommerce.js:1434-1442` | The CheckoutWC fallback's `checkout_place_order` listener on `body` can never fire (WooCommerce uses a non-bubbling `triggerHandler` on the form); the jQuery stand-in in the tests cannot see it (UC-3) |
-| 329 | Low | fixed (R39 fix session, same helper) | — | `js/frontend/gtm4wp-edd.js:614-629` | The `edd_gateway_loaded` handler has the same uncontained shape on EDD's checkout (2.1-only) |
+| 327 | Low | fixed (`99cf121`; shared `js/frontend/lib/gtm4wp-isolate.js`; backported to `2.0` `7209ba0`) | — | `js/frontend/gtm4wp-woocommerce.js:1113-1236` | The `found_variation` handler runs inside WooCommerce's synchronous variation-form trigger with no containment; a throw there skips WooCommerce code after the trigger (sibling of #472, RI-35) |
+| 328 | Low | fixed (`99cf121`: maintainer chose to drop the dead event; U33 still open) | — | `js/frontend/gtm4wp-woocommerce.js:1434-1442` | The CheckoutWC fallback's `checkout_place_order` listener on `body` can never fire (WooCommerce uses a non-bubbling `triggerHandler` on the form); the jQuery stand-in in the tests cannot see it (UC-3) |
+| 329 | Low | fixed (`99cf121`, same helper) | — | `js/frontend/gtm4wp-edd.js:614-629` | The `edd_gateway_loaded` handler has the same uncontained shape on EDD's checkout (2.1-only) |
 
 **Adjudication: 2 drafts → 2 `finding-verifier`s (read-only, probes under `<scratchpad>/fv-<id>/`, no
 worktree) · 0 mechanisms refuted · 2 reach/impact statements corrected · 0 recommendations refuted
@@ -1189,7 +1189,7 @@ regression tests watched **red** on the pre-fix trackers (2 failed) and green af
 `## 2.0.4` now covers the variation selection (both files); #329 repairs unreleased 2.1 EDD code, no
 bullet. #328: the maintainer chose to drop the dead event (no behaviour change, no bullet); the #472 test
 stand-in now records the bound target, and a test pins the binding (red on the old one). #327 backported
-to `2.0`. Post-fix: JS 995 / 40 suites, build + `lint:js` clean; no PHP changed.
+to `2.0` as `7209ba0` (`2.0` after: JS 765 / 35 suites, build clean). Post-fix: JS 995 / 40 suites, build + `lint:js` clean; no PHP changed.
 
 ### Report 38: `.security/code-review-report-2026-09-23-2028.md`
 
