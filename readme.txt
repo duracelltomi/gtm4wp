@@ -356,7 +356,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 = 2.0.4 =
 
-* Fixed: on the classic WooCommerce checkout, an error in the plugin's checkout step tracking could stop WooCommerce from submitting the order the normal way, so a payment gateway that adds the card details in the browser, such as Stripe, rejected the order. That tracking can no longer interrupt the order submission, and any error in it still shows in the browser console. (#472)
+* Fixed: on the classic WooCommerce checkout, an error in the plugin's checkout step tracking could stop the order from being submitted the normal way, so a gateway that adds card details in the browser, such as Stripe, rejected it. Tracking errors can no longer interrupt the checkout or a variation selection, and still show in the browser console. (#472)
 
 = 2.0.3 =
 

@@ -12,6 +12,8 @@
  * jQuery's own event system.
  */
 
+import { gtm4wp_run_isolated } from './lib/gtm4wp-isolate';
+
 // Double-init guard (#218, PA-9): the whole module body is wrapped (the
 // gtm4wp-form-move-tracker.js shape), so a re-injected bundle runs nothing.
 if ( ! window.gtm4wp_edd_inited ) {
@@ -610,7 +612,8 @@ if ( ! window.gtm4wp_edd_inited ) {
 		);
 
 		// Gateway tracking: EDD announces the AJAX-loaded gateway form with a
-		// jQuery event on body.
+		// jQuery event on body. Isolated (#329): a throw here would skip EDD's
+		// loader cleanup and the gateway scripts bound after this handler.
 		if ( window.jQuery ) {
 			window
 				.jQuery( document.body )
@@ -623,9 +626,11 @@ if ( ! window.gtm4wp_edd_inited ) {
 						return;
 					}
 
-					gtm4wp_edd_track_payment_info(
-						gateway || gtm4wp_edd_selected_gateway()
-					);
+					gtm4wp_run_isolated( function () {
+						gtm4wp_edd_track_payment_info(
+							gateway || gtm4wp_edd_selected_gateway()
+						);
+					} );
 				} );
 		}
 

@@ -659,6 +659,29 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 	} );
 
+	it( 'never throws a gateway-switch error into EDD (#329)', () => {
+		// EDD triggers edd_gateway_loaded before its loader cleanup, and the
+		// gateway scripts bound after this handler run in the same dispatch.
+		window.gtm4wp_checkout_products = [ { item_id: '55' } ];
+		window.gtm4wp_checkout_value = 9.99;
+		global.gtm4wp_push_ecommerce = jest.fn( () => {
+			throw new TypeError( 'push wrapper failed' );
+		} );
+
+		boot_tracker();
+
+		const gateway_handler = body_event_handlers.edd_gateway_loaded;
+		gateway_handler( {}, 'stripe' );
+
+		expect( () => gateway_handler( {}, 'paypal' ) ).not.toThrow();
+		expect( global.gtm4wp_push_ecommerce ).toHaveBeenCalledWith(
+			'add_payment_info',
+			expect.any( Array ),
+			expect.objectContaining( { payment_type: 'paypal' } )
+		);
+		expect( () => jest.runOnlyPendingTimers() ).toThrow( TypeError );
+	} );
+
 	it( 'reports the payment info at the latest on purchase submit', () => {
 		window.gtm4wp_checkout_products = [ { item_id: '55' } ];
 		window.gtm4wp_checkout_value = 9.99;
