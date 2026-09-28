@@ -306,6 +306,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 = 2.1 =
 
+* Changed: for developers, `ContainerCode::header_top()` always prints its block; the never-used argument that made it return the block instead is gone.
 * Changed: the container loader requests `gtm.js` over `https://` instead of the protocol-relative `//` form the plugin has emitted since 1.x, matching the snippet Google publishes today. Only a site still served over plain http sees a difference; the `<noscript>` iframe already used `https://`.
 * Fixed: the plugin no longer buffers every WooCommerce template part on every page. That buffering only fed the classic "Products" widget, whose tracking had been dead since 2017. If a GTM trigger filters on an `item_list_name` ending in "(widget)", remove that condition.
 * Added: an optional **"Output values in the default language"** setting (Page variables → Content & engagement data): `pageTitle`, `pageCategory`, `pageAttributes`, `pagePostTerms` and `pagePrimaryCategory` report the master language instead of the current translation, so Google Analytics combines reports across languages. WPML and Polylang, plus the `gtm4wp_master_language_post_id` / `gtm4wp_master_language_term_id` filters. Off by default (experimental). Thanks to @loran750 (#145).
