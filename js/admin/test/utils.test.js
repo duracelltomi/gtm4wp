@@ -361,6 +361,47 @@ describe( 'dependencyLabel', () => {
 			dependencyLabel( field, [ { key: 'gdm-destinations' } ] )
 		).toBe( '' );
 	} );
+
+	describe( 'with several comma separated dependencies', () => {
+		// A marking _x, so the separator's translation is visible: the shared
+		// stand-in is identity and would hide a hardcoded ' / ' (TS-22).
+		let markedDependencyLabel;
+
+		beforeAll( () => {
+			jest.isolateModules( () => {
+				jest.doMock( '@wordpress/i18n', () => ( {
+					...jest.requireActual( '../../admin/test-support/wp-i18n' ),
+					_x: ( text ) => '[' + text + ']',
+				} ) );
+				markedDependencyLabel = require( '../utils' ).dependencyLabel;
+			} );
+		} );
+
+		afterAll( () => jest.dontMock( '@wordpress/i18n' ) );
+
+		const SEVERAL = [
+			{ key: 'a', label: 'A' },
+			{ key: 'b', label: 'B' },
+		];
+
+		it( 'joins every label with the translated separator', () => {
+			expect(
+				markedDependencyLabel(
+					{ key: 'k', depends_on: 'a, b' },
+					SEVERAL
+				)
+			).toBe( 'A [/] B' );
+		} );
+
+		it( 'drops a dependency that resolves to no label', () => {
+			expect(
+				markedDependencyLabel(
+					{ key: 'k', depends_on: 'a, zz, b' },
+					SEVERAL
+				)
+			).toBe( 'A [/] B' );
+		} );
+	} );
 } );
 
 describe( 'isCellLocked', () => {

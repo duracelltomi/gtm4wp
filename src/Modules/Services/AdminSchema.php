@@ -51,10 +51,18 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * @return string
 	 */
 	public function intro(): string {
+		$paragraph = esc_html__( 'Many agencies and freelancers use GTM4WP to build tracking for their clients. When a project needs more than the documentation can offer, you can bring in the people who develop the plugin. We work alongside you, not in place of you: you keep the client relationship, and we help you deliver.', 'duracelltomi-google-tag-manager' );
+		$url       = esc_url( Docs::url( self::PAGE ) );
+
+		// '' from the doc URL filter means "remove the help link" (Docs::url()).
+		if ( '' === $url ) {
+			return $paragraph;
+		}
+
 		return sprintf(
 			'%1$s <a href="%2$s" target="_blank" rel="noopener noreferrer">%3$s<span class="screen-reader-text"> %4$s</span></a>',
-			esc_html__( 'Many agencies and freelancers use GTM4WP to build tracking for their clients. When a project needs more than the documentation can offer, you can bring in the people who develop the plugin. We work alongside you, not in place of you: you keep the client relationship, and we help you deliver.', 'duracelltomi-google-tag-manager' ),
-			esc_url( Docs::url( self::PAGE ) ),
+			$paragraph,
+			$url,
 			esc_html__( 'Discover the services we offer to agencies and freelancers.', 'duracelltomi-google-tag-manager' ),
 			esc_html__( '(opens in a new tab)', 'duracelltomi-google-tag-manager' )
 		);

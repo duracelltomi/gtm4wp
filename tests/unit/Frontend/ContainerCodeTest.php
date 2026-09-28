@@ -387,11 +387,10 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	public function test_header_begin_does_not_decode_html_entities_in_datalayer_values(): void {
-		// get_search_query() returns esc_attr'd output, so a double quote in the
-		// ?s= parameter reaches the data layer already encoded as &quot;. Because
-		// ScriptTag::print_script_block() runs htmlspecialchars_decode() on the whole
-		// block, the JSON must hex-encode the ampersand; otherwise &quot; is decoded
-		// back into a raw " that breaks out of the JS string (reflected XSS via ?s=).
+		// A value that is already entity-encoded (&quot;) must survive
+		// print_script_block()'s htmlspecialchars_decode(): the JSON hex-encodes the
+		// ampersand, otherwise &quot; is decoded back into a raw " that breaks out
+		// of the JS string. Raw characters are the next test.
 		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
 			->andReturn( array( 'siteSearchTerm' => '&quot;-alert(document.domain)-&quot;' ) );
 
@@ -414,6 +413,36 @@ final class ContainerCodeTest extends FrontendTestCase {
 			'"'
 		);
 		$this->assertStringContainsString( $safe_fragment, $output );
+	}
+
+	/**
+	 * T116: since #274 (raw search term) and #273 (decoded title) raw <, >, " and '
+	 * reach this sink, so every hex flag is the guard, not only JSON_HEX_AMP.
+	 */
+	public function test_header_begin_hex_encodes_raw_breakout_characters_in_datalayer_values(): void {
+		$hostile = 'q"1\'2</script><x-marker>';
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn(
+				array(
+					'siteSearchTerm' => $hostile,
+					'pageTitle'      => $hostile,
+				)
+			);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$safe_fragment = (string) wp_json_encode( $hostile, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+		$this->assertSame( 2, substr_count( $output, $safe_fragment ), 'Both values are printed in their hex-encoded form.' );
+
+		// TS-2: no raw break-out character from the value survives.
+		$this->assertStringNotContainsString( '<x-marker', $output );
+		$this->assertStringNotContainsString( 'q"1', $output );
+		$this->assertStringNotContainsString( "1'2", $output );
+		$this->assertSame( 1, substr_count( $output, 'var dataLayer_content' ), 'The data layer block is printed once.' );
 	}
 
 	public function test_header_begin_preserves_numeric_looking_strings_in_datalayer(): void {
@@ -777,23 +806,34 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	/**
+	 * T119: since #269 the consent shim prints the name as a bare identifier, so
+	 * an unusable stored name must fall back there too, not only in header_top().
+	 */
+	public function test_header_begin_never_binds_the_consent_shim_to_a_name_that_is_not_a_js_identifier(): void {
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE              => 'GTM-AAA111',
+				GTM4WP_OPTION_DATALAYER_NAME        => 'my-layer',
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'function gtag(){dataLayer.push(arguments);}', $output );
+		$this->assertStringNotContainsString( 'my-layer', $output, 'The unusable name must not reach the script in any position.' );
+	}
+
+	/**
 	 * #271: print_script_block() runs wp_kses(), which rewrites a bare `<`/`>`
 	 * and strips tag-like spans. The identity stub in FrontendTestCase cannot
 	 * see that, so this pins the plugin's own head block against a model that
 	 * does; a `<` or `>` sneaking into the JavaScript would fail here.
 	 */
 	public function test_header_top_javascript_survives_a_kses_pass_that_rewrites_angle_brackets(): void {
-		Functions\when( 'wp_kses' )->alias(
-			static function ( $content, $allowed_html ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- model matches the real signature
-				// Keep the <script> element and the HTML comments, encode every
-				// other angle bracket (kses keeps allowed tags and comments too).
-				return preg_replace_callback(
-					'#(<script[^>]*>|</script>|<!--.*?-->)|([<>])#s',
-					static fn ( $m ) => '' !== $m[1] ? $m[1] : ( '<' === $m[2] ? '&lt;' : '&gt;' ),
-					$content
-				);
-			}
-		);
+		$this->stub_kses_angle_bracket_model();
 
 		$container = $this->make_container( array( GTM4WP_OPTION_DATALAYER_NAME => 'customDL' ) );
 
@@ -804,6 +844,46 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( 'var customDL = customDL || [];', $output );
 		$this->assertStringNotContainsString( '&lt;', $output );
 		$this->assertStringNotContainsString( '&gt;', $output );
+	}
+
+	/**
+	 * #271 for header_begin(): the data layer, consent and loader blocks pass
+	 * through the same print_script_block() (T123d).
+	 */
+	public function test_header_begin_javascript_survives_a_kses_pass_that_rewrites_angle_brackets(): void {
+		$this->stub_kses_angle_bracket_model();
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE              => 'GTM-AAA111',
+				GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'gtag("consent", "default"', $output );
+		$this->assertStringContainsString( "'dataLayer','GTM-AAA111'", $output );
+		$this->assertStringNotContainsString( '&lt;', $output );
+		$this->assertStringNotContainsString( '&gt;', $output );
+	}
+
+	/**
+	 * A wp_kses() model that keeps the <script> element and HTML comments and
+	 * encodes every other angle bracket, as the real kses does to script text.
+	 */
+	private function stub_kses_angle_bracket_model(): void {
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- model matches the real signature
+				return preg_replace_callback(
+					'#(<script[^>]*>|</script>|<!--.*?-->)|([<>])#s',
+					static fn ( $m ) => '' !== $m[1] ? $m[1] : ( '<' === $m[2] ? '&lt;' : '&gt;' ),
+					$content
+				);
+			}
+		);
 	}
 
 	public function test_header_begin_custom_domain_and_path_in_loader(): void {
@@ -1017,7 +1097,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$output = ob_get_clean();
 
 		$command = "gtag('set', 'developer_id.dNGJiYT', true);";
-		$this->assertStringContainsString( 'function gtag(){customDL.push(arguments);}' . $command, $output );
+		// IIFE-local gtag: a global declaration would shadow the consent shim's (#326).
+		$this->assertStringContainsString( '(function(){function gtag(){customDL.push(arguments);}' . $command . '})();', $output );
 		$this->assertStringNotContainsString( 'dataLayer.push', $output );
 
 		$init = strpos( $output, 'var customDL = customDL || [];' );

@@ -189,6 +189,20 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertTrue( $datalayer->queue_push( 'event', array(), null, 42 ) );
 		$this->assertSame( '', $GLOBALS['gtm4wp_additional_datalayer_pushes'][0]['js_before'] );
 		$this->assertSame( '42', $GLOBALS['gtm4wp_additional_datalayer_pushes'][0]['js_after'] );
+
+		// A Stringable object is the third form that always worked (T123b).
+		$stringable = new class() {
+			/**
+			 * The JS leg.
+			 *
+			 * @return string
+			 */
+			public function __toString(): string {
+				return 'before();';
+			}
+		};
+		$this->assertTrue( $datalayer->queue_push( 'event', array(), $stringable ) );
+		$this->assertSame( 'before();', $GLOBALS['gtm4wp_additional_datalayer_pushes'][1]['js_before'] );
 	}
 
 	public function test_queue_push_appends_to_compat_global(): void {

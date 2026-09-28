@@ -148,6 +148,37 @@ describe( 'gtm4wp-contact-form-7-tracker', () => {
 		expect( lead[ 0 ].form_id ).toBe( '42' );
 	} );
 
+	it( 'pushes the action attribute as form_destination when a control shadows form.action, as in a browser', () => {
+		// jsdom lacks [LegacyOverrideBuiltIns], so an own getter models the
+		// browser shadowing; a property read would push the control (TS-17).
+		window.gtm4wp_cf7_config.ga4events = true;
+		document.body.innerHTML =
+			'<form class="wpcf7-form" id="contact" target="_self" action="https://example.com/contact">' +
+			'<input type="hidden" name="_wpcf7" value="42" />' +
+			'<input type="hidden" name="action" value="x" />' +
+			'<input name="id" /><input name="target" />' +
+			'</form>';
+		const f = form();
+		[ 'action', 'id', 'target' ].forEach( ( prop ) =>
+			Object.defineProperty( f, prop, {
+				get: () => f.elements.namedItem( prop ),
+				configurable: true,
+			} )
+		);
+
+		fireCf7( 'wpcf7submit', f, { contactFormId: 42, status: 'mail_sent' } );
+
+		const lead = window.dataLayer.filter(
+			( entry ) => entry.event === 'generate_lead'
+		);
+		expect( lead ).toHaveLength( 1 );
+		expect( lead[ 0 ].form_destination ).toBe(
+			'https://example.com/contact'
+		);
+		expect( typeof lead[ 0 ].form_destination ).toBe( 'string' );
+		expect( lead[ 0 ].form_id ).toBe( '42' );
+	} );
+
 	it( 'pushes form_submit before the generate_lead it produced', () => {
 		// Both GA4 submission events are derived from wpcf7submit precisely so they
 		// land in GA4's order. Firing the full CF7 sequence a successful send

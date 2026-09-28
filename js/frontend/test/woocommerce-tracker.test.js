@@ -1165,6 +1165,18 @@ describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () =
 		expect( () => jest.runOnlyPendingTimers() ).toThrow( ReferenceError );
 	} );
 
+	it( 'reports both steps from the CheckoutWC submit fallback', () => {
+		// The presence half of the missing-global case below.
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+		boot( '' );
+
+		jqHandlers.cfw_before_submit();
+
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 1 );
+	} );
+
 	it( 'does not throw from the CheckoutWC submit fallback either', () => {
 		setGlobals();
 		window.gtm4wp_checkoutwc = 1;
@@ -1172,6 +1184,8 @@ describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () =
 		delete global.gtm4wp_currency;
 
 		expect( () => jqHandlers.cfw_before_submit() ).not.toThrow();
+		// The handler did run and fail: nothing pushed, the error deferred.
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 		expect( () => jest.runOnlyPendingTimers() ).toThrow( ReferenceError );
 	} );
 

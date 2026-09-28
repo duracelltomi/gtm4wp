@@ -22,10 +22,18 @@ final class MigrationTest extends TestCase {
 	 */
 	private array $option_store = array();
 
+	/**
+	 * The autoload argument of each update_option() call, by key (TS-20).
+	 *
+	 * @var array<string, mixed>
+	 */
+	private array $autoload_store = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->option_store = array();
+		$this->option_store   = array();
+		$this->autoload_store = array();
 
 		Functions\when( 'get_option' )->alias(
 			function ( $key, $fallback = false ) {
@@ -33,8 +41,9 @@ final class MigrationTest extends TestCase {
 			}
 		);
 		Functions\when( 'update_option' )->alias(
-			function ( $key, $value, $autoload = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- mock matches the real update_option() signature
-				$this->option_store[ $key ] = $value;
+			function ( $key, $value, $autoload = null ) {
+				$this->option_store[ $key ]   = $value;
+				$this->autoload_store[ $key ] = $autoload;
 				return true;
 			}
 		);
@@ -76,6 +85,8 @@ final class MigrationTest extends TestCase {
 		$this->assertSame( 'html,gaawe,mf', $options[ GTM4WP_OPTION_BLACKLIST_STATUS ], 'Stale ua is stripped; still-documented mf is preserved.' );
 
 		$this->assertSame( GTM4WP_VERSION, $this->option_store['gtm4wp-plugin-version'] );
+		// #292: read on every admin request, so it is autoloaded.
+		$this->assertTrue( $this->autoload_store['gtm4wp-plugin-version'] );
 	}
 
 	public function test_seeds_container_rows_from_legacy_options(): void {

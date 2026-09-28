@@ -729,9 +729,9 @@ describe( 'gtm4wp-edd tracker', () => {
 
 	it( 'skips a grid span with malformed JSON and still reports its valid sibling', () => {
 		// Hostile-input shape: the assertion is the ABSENCE/PRESENCE of pushes,
-		// never not.toThrow() - the shipped bundle is a non-strict classic
-		// script, so a throw-shaped assertion would measure jest's language
-		// mode, not production (R26/L18).
+		// never not.toThrow() - a throw-shaped assertion measures the language
+		// mode (build/gtm4wp-edd.js is "use strict" since the lib/gtm4wp-isolate
+		// import), not the effect (R26/L18).
 		document.body.innerHTML =
 			'<div class="edd_download">' +
 			'<span class="gtm4wp_edd_productdata" data-gtm4wp_product_data=\'{not json\'></span>' +

@@ -170,6 +170,41 @@ describe( 'gtm4wp-form-move-tracker', () => {
 		expect( typeof push[ 'gtm.elementId' ] ).toBe( 'string' );
 	} );
 
+	it( 'reports attribute strings when named controls shadow the form properties, as in a browser', () => {
+		// jsdom lacks [LegacyOverrideBuiltIns], so own getters model the browser
+		// shadowing and a property read would push the control element (TS-17).
+		document.body.innerHTML =
+			'<form id="signup" class="fcls" target="_blank" action="/subscribe">' +
+			'<input type="hidden" name="action" value="x" />' +
+			'<input name="id" /><input name="className" />' +
+			'<input name="target" />' +
+			'<input id="email" name="email" /></form>';
+		const form = document.getElementById( 'signup' );
+		[ 'action', 'id', 'className', 'target' ].forEach( ( prop ) =>
+			Object.defineProperty( form, prop, {
+				get: () => form.elements.namedItem( prop ),
+				configurable: true,
+			} )
+		);
+
+		dispatchFocus( document.getElementById( 'email' ), 'focusin' );
+
+		const push = window.dataLayer[ 0 ];
+
+		expect( push ).toMatchObject( {
+			'gtm.elementId': 'signup',
+			'gtm.elementClasses': 'fcls',
+			'gtm.elementUrl': 'http://localhost/subscribe',
+			'gtm.elementTarget': '_blank',
+		} );
+		[
+			'gtm.elementId',
+			'gtm.elementClasses',
+			'gtm.elementUrl',
+			'gtm.elementTarget',
+		].forEach( ( key ) => expect( typeof push[ key ] ).toBe( 'string' ) );
+	} );
+
 	it( 'reports an empty Form URL for an action that does not parse, without throwing', () => {
 		document.body.innerHTML =
 			'<form id="f" action="http://[bad"><input id="email" /></form>';

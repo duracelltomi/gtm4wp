@@ -174,7 +174,8 @@ final class PageVariablesModuleTest extends TestCase {
 
 		// #274: the RAW query is read (get_search_query( false )) so the classic
 		// and the cache-safe tier report one string; the hex-flag JSON sink is
-		// what neutralises it (ContainerCodeTest pins that encoding).
+		// what neutralises it (ContainerCodeTest::
+		// test_header_begin_hex_encodes_raw_breakout_characters_in_datalayer_values).
 		$malicious_term = '<script>alert("xss")</script>';
 		Functions\when( 'get_search_query' )->alias(
 			static function ( $escaped = true ) use ( $malicious_term ) {
@@ -394,6 +395,269 @@ final class PageVariablesModuleTest extends TestCase {
 		} finally {
 			unset( $_SERVER['HTTP_CF_IPCOUNTRY'], $_SERVER['REMOTE_ADDR'] );
 		}
+	}
+
+	/**
+	 * T117: the archive pagePostType2 chain and the date parts, unchanged by the
+	 * #294 split (1.x values).
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: array<string, string>}>
+	 */
+	public static function archive_type_provider(): array {
+		$full_date = array(
+			'pagePostDate'      => 'September 28, 2026',
+			'pagePostDateYear'  => '2026',
+			'pagePostDateMonth' => '09',
+			'pagePostDateDay'   => '28',
+		);
+
+		return array(
+			'category' => array( 'is_category', 'category-post', array() ),
+			'tag'      => array( 'is_tag', 'tag-post', array() ),
+			'tax'      => array( 'is_tax', 'tax-post', array() ),
+			'author'   => array( 'is_author', 'author-post', array() ),
+			'year'     => array( 'is_year', 'year-post', array( 'pagePostDateYear' => '2026' ) ),
+			'month'    => array(
+				'is_month',
+				'month-post',
+				array(
+					'pagePostDateYear'  => '2026',
+					'pagePostDateMonth' => '09',
+				),
+			),
+			'day'      => array( 'is_day', 'day-post', $full_date ),
+			'time'     => array( 'is_time', 'time-post', array() ),
+			'date'     => array( 'is_date', 'date-post', $full_date ),
+		);
+	}
+
+	/**
+	 * One archive type per case, with the post type and date options on.
+	 *
+	 * @param string                $tag        The conditional tag that is true.
+	 * @param string                $post_type2 Expected pagePostType2.
+	 * @param array<string, string> $date_keys  Expected date variables, exactly.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'archive_type_provider' )]
+	public function test_archive_page_types_and_date_parts( string $tag, string $post_type2, array $date_keys ): void {
+		Functions\when( 'is_archive' )->justReturn( true );
+		Functions\when( $tag )->justReturn( true );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+		Functions\when( 'get_the_date' )->alias(
+			static fn ( $format = '' ) => array(
+				''  => 'September 28, 2026',
+				'Y' => '2026',
+				'm' => '09',
+				'd' => '28',
+			)[ $format ]
+		);
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE   => true,
+				GTM4WP_OPTION_INCLUDE_POSTDATE   => true,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR     => false,
+				GTM4WP_OPTION_INCLUDE_AUTHORID   => false,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 'post', $data_layer['pagePostType'] );
+		$this->assertSame( $post_type2, $data_layer['pagePostType2'] );
+		$this->assertSame(
+			$date_keys,
+			array_intersect_key( $data_layer, array_flip( array( 'pagePostDate', 'pagePostDateYear', 'pagePostDateMonth', 'pagePostDateDay' ) ) )
+		);
+	}
+
+	public function test_date_archive_parts_are_omitted_with_the_date_option_off(): void {
+		Functions\when( 'is_archive' )->justReturn( true );
+		Functions\when( 'is_day' )->justReturn( true );
+		Functions\when( 'get_post_type' )->justReturn( 'post' );
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE => true,
+				GTM4WP_OPTION_INCLUDE_POSTDATE => false,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 'day-post', $data_layer['pagePostType2'] );
+		$this->assertArrayNotHasKey( 'pagePostDate', $data_layer );
+		$this->assertArrayNotHasKey( 'pagePostDateYear', $data_layer );
+	}
+
+	/**
+	 * T117: the query-level pagePostType values and their precedence - search,
+	 * then the front page / blog home, then 404 overwrite one another.
+	 */
+	public function test_front_page_blog_home_and_404_page_types_and_their_precedence(): void {
+		$posttype_on = array( GTM4WP_OPTION_INCLUDE_POSTTYPE => true );
+
+		Functions\when( 'is_front_page' )->justReturn( true );
+		Functions\when( 'is_home' )->justReturn( true );
+		$this->assertSame( 'frontpage', $this->make_module( $posttype_on )->add_datalayer_data( array() )['pagePostType'] );
+		$this->assertArrayNotHasKey(
+			'pagePostType',
+			$this->make_module( array( GTM4WP_OPTION_INCLUDE_POSTTYPE => false ) )->add_datalayer_data( array() )
+		);
+
+		Functions\when( 'is_front_page' )->justReturn( false );
+		$this->assertSame( 'bloghome', $this->make_module( $posttype_on )->add_datalayer_data( array() )['pagePostType'] );
+
+		Functions\when( 'is_home' )->justReturn( false );
+		Functions\when( 'is_front_page' )->justReturn( true );
+		Functions\when( 'is_search' )->justReturn( true );
+		$this->assertSame( 'frontpage', $this->make_module( $posttype_on )->add_datalayer_data( array() )['pagePostType'], 'The front page overwrites search-results.' );
+
+		Functions\when( 'is_404' )->justReturn( true );
+		$this->assertSame( '404-error', $this->make_module( $posttype_on )->add_datalayer_data( array() )['pagePostType'], '404 overwrites everything before it.' );
+	}
+
+	public function test_search_page_type_is_set_with_the_search_data_option_off(): void {
+		Functions\when( 'is_search' )->justReturn( true );
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_SEARCHDATA => false ) )->add_datalayer_data( array() );
+
+		$this->assertSame( 'search-results', $data_layer['pagePostType'] );
+		$this->assertArrayNotHasKey( 'siteSearchTerm', $data_layer );
+		$this->assertArrayNotHasKey( 'siteSearchResults', $data_layer );
+	}
+
+	/**
+	 * T117 / T123e: the classic tier's logged-out values - the login state is
+	 * reported, the user id of a visitor who has none is omitted.
+	 */
+	public function test_classic_tier_reports_logged_out_and_omits_a_zero_user_id(): void {
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_LOGGEDIN => true,
+				GTM4WP_OPTION_INCLUDE_USERID   => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 'logged-out', $data_layer['visitorLoginState'] );
+		$this->assertArrayNotHasKey( 'visitorId', $data_layer );
+	}
+
+	/**
+	 * T123g: is_user_logged_in() is pluggable and can disagree with the user
+	 * object; a user with no id is refused even when its other fields are filled.
+	 */
+	public function test_user_resolvers_refuse_a_user_without_an_id_whatever_its_fields(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'              => 0,
+				'roles'           => array(),
+				'user_email'      => 'ghost@example.com',
+				'user_registered' => '2020-01-01 00:00:00',
+				'user_login'      => 'ghost',
+			)
+		);
+
+		$module = $this->make_module();
+
+		$this->assertNull( $module->resolve_visitor_email() );
+		$this->assertNull( $module->resolve_visitor_registration_date() );
+		$this->assertNull( $module->resolve_visitor_username() );
+	}
+
+	/**
+	 * T123h: tags are stripped BEFORE the entities are decoded, so markup the
+	 * title filters encoded stays text and real tags are removed.
+	 */
+	public function test_page_title_strips_tags_before_decoding_entities(): void {
+		Functions\when( 'wp_title' )->justReturn( 'A <em>B</em> &lt;b&gt;' );
+		Functions\when( 'wp_strip_all_tags' )->alias( static fn ( $text ) => strip_tags( (string) $text ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- models the core function.
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_POSTTITLE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( 'A B <b>', $data_layer['pageTitle'] );
+	}
+
+	/**
+	 * T121: the immediate peer is normally the operator's own proxy on a private
+	 * address, so the trusted-proxy check must accept private ranges.
+	 */
+	public function test_cloudflare_country_is_read_behind_a_private_trusted_proxy(): void {
+		$_SERVER['HTTP_CF_IPCOUNTRY'] = 'HU';
+		$_SERVER['REMOTE_ADDR']       = '10.0.0.5';
+		Functions\when( 'sanitize_text_field' )->returnArg();
+		Functions\when( 'wp_unslash' )->returnArg();
+
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_MISCGEOCF          => true,
+				GTM4WP_OPTION_INCLUDE_VISITOR_IP_PROXIES => '10.0.0.0/8',
+			)
+		);
+
+		$this->assertSame( 'HU', $module->add_datalayer_data( array() )['geoCloudflareCountryCode'] );
+		$this->assertSame( 'HU', $module->resolve_cloudflare_country() );
+	}
+
+	/**
+	 * T123f: Rank Math's primary category is used when Yoast has none.
+	 */
+	public function test_primary_category_from_rank_math_meta(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_meta' )->alias(
+			static fn ( $id, $key ) => 'rank_math_primary_category' === $key ? '9' : ''
+		);
+		Functions\when( 'get_the_category' )->justReturn( array( (object) array( 'term_id' => 3 ) ) );
+		Functions\when( 'get_term' )->alias(
+			static fn ( $term_id ) => new \WP_Term(
+				array(
+					'term_id' => (int) $term_id,
+					'slug'    => 9 === (int) $term_id ? 'guides' : 'first',
+					'name'    => 9 === (int) $term_id ? 'Guides' : 'First',
+				)
+			)
+		);
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 'guides', $data_layer['pagePrimaryCategory'], 'Rank Math wins over the first category.' );
+	}
+
+	/**
+	 * T123f: a words-per-minute filter below 1 falls back to 200, never a
+	 * division by zero or a negative reading time.
+	 */
+	public function test_reading_time_falls_back_to_200_wpm_on_a_filtered_rate_below_one(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'strip_shortcodes' )->returnArg();
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+		Functions\when( 'get_post_field' )->justReturn( implode( ' ', array_fill( 0, 450, 'word' ) ) );
+		Filters\expectApplied( 'gtm4wp_reading_time_wpm' )->andReturn( 0 );
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE    => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES  => false,
+				GTM4WP_OPTION_INCLUDE_TAGS        => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR      => false,
+				GTM4WP_OPTION_INCLUDE_READINGTIME => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 3, $data_layer['pageReadingTime'], '450 words at the 200 wpm fallback.' );
 	}
 
 	public function test_singular_post_data(): void {
@@ -2801,7 +3065,7 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 'editor,shop_manager', $module->resolve_visitor_type() );
 		$this->assertSame( 'user@example.com', $module->resolve_visitor_email() );
 		$this->assertSame( hash( 'sha256', 'user@example.com' ), $module->resolve_visitor_email_hash() );
-		$this->assertSame( strtotime( '2020-01-01 00:00:00' ), $module->resolve_visitor_registration_date() );
+		$this->assertSame( 1577836800, $module->resolve_visitor_registration_date(), '2020-01-01 00:00:00 UTC.' );
 		$this->assertSame( 'editoruser', $module->resolve_visitor_username() );
 		$this->assertSame( 3, $module->resolve_visitor_id() );
 	}

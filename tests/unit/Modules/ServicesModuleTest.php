@@ -66,4 +66,14 @@ final class ServicesModuleTest extends TestCase {
 		$this->assertStringContainsString( 'https://example.com/&quot;&gt;&lt;img src=x&gt;', $intro );
 		$this->assertStringNotContainsString( '"><img', $intro );
 	}
+
+	public function test_a_removed_doc_url_leaves_the_paragraph_without_a_link(): void {
+		Filters\expectApplied( 'gtm4wp_admin_doc_url' )->andReturn( '' );
+
+		$intro = ( new AdminSchema() )->intro();
+
+		$this->assertStringStartsWith( 'Many agencies and freelancers use GTM4WP', $intro );
+		$this->assertStringEndsWith( 'and we help you deliver.', $intro );
+		$this->assertStringNotContainsString( '<a ', $intro );
+	}
 }

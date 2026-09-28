@@ -286,6 +286,24 @@ final class VisitorIpTest extends TestCase {
 	}
 
 	/**
+	 * T121 (#272): the peer check accepts a private proxy address, refuses a peer
+	 * outside the list, an empty list and a missing REMOTE_ADDR.
+	 */
+	public function test_request_via_trusted_proxy_grants_a_private_peer_in_the_list_and_denies_the_rest(): void {
+		$private = VisitorIp::parse_trusted_proxies( '10.0.0.0/8' );
+
+		$_SERVER['REMOTE_ADDR'] = '10.0.0.5';
+		$this->assertTrue( VisitorIp::request_via_trusted_proxy( $private ) );
+		$this->assertFalse( VisitorIp::request_via_trusted_proxy( array() ) );
+
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+		$this->assertFalse( VisitorIp::request_via_trusted_proxy( $private ) );
+
+		unset( $_SERVER['REMOTE_ADDR'] );
+		$this->assertFalse( VisitorIp::request_via_trusted_proxy( $private ) );
+	}
+
+	/**
 	 * The back-compat contract: an existing site that has a header configured and has
 	 * not yet filled in the proxy list must see exactly the value it saw before, so
 	 * upgrading changes nothing silently. The admin is warned instead (Notices).

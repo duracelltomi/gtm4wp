@@ -73,6 +73,7 @@ on every review before anything else.
 - **TC-15 (JS/admin)** — an admin React component is tested with `@testing-library/react` against the local `@wordpress/*` stand-ins in `js/admin/test-support/` (mapped in `jest.config.js`), never against an installed `@wordpress/components`: those packages are build-time externals, so no installed version is "the real one". Assert a guard through its **effect** (`onChange` not called), never through a rendered `disabled`/`readOnly` prop.
 - **TC-14** — code gated on a WordPress conditional tag that then reads the companion global (`is_singular()` → `$GLOBALS['post']`) ships a tag-true/global-null case: promote warnings to failures via a throwing error handler, assert the affected keys are **absent** (omission, not placeholders) and the global-independent keys still emit.
 - **TC-16 (JS/frontend)** — a global the PHP side prints as a top-level `const` is tested by injecting a real classic `<script>` (jsdom runs it synchronously, creating a true lexical binding) and planting the **opposite** value on `window.<name>` as a decoy, in its own test file. Indirect `eval` cannot substitute — measured; `let`/`const` never escape eval's declarative environment.
+- **TC-17 (JS)** — a DOM fixture pins one render mode of an upstream component; when a change flips upstream into another mode (classic `form.cart` → Interactivity API form), the suite gains a fixture in the NEW mode in the same change and keeps the old one. A double that keeps only the last call of an accumulating function is the same narrowness.
 
 **Blessed Exceptions (BE) — do NOT flag:**
 - **BE-4** — snapshotting `$_POST`/`$_GET` in a test `setUp` (for TS-7 isolation) trips `WordPress.Security.NonceVerification.Missing` (a phpcs *error*, not warning). Suppress with a scoped `// phpcs:ignore WordPress.Security.NonceVerification.Missing -- test isolation snapshot; the handler's own nonce check is asserted`.
@@ -262,6 +263,14 @@ gap. This is the single failure mode a coverage tool cannot see; it is the revie
 core value. Mutation testing (Infection, optional) surfaces the same class
 mechanically: mutate the flag, does a test die?
 
+**Corollary — removing a source-side escape moves the guard to the sink (Run 15,
+2026-09-28).** #274 stopped `esc_attr()`-ing the search term and #273 started decoding
+`pageTitle`, both correctly: the hex-flag JSON sink is the control. But the sink's only
+hostile pin fed an entity-form value, so three of its four flags were deletable green, and
+a test comment claimed the pin existed elsewhere (T116). When a change removes or narrows
+an escape upstream of a sink, re-pin the **sink** with the characters that now arrive raw,
+in the same change — and grep for any comment that credits a pin before trusting it.
+
 ### TS-2: Escaping tests need both directions ⭐
 An XSS/escaping guard must assert the **safe** form is present **and** the **raw**
 break-out is absent. Asserting only "the encoded value appears" misses a case where
@@ -387,6 +396,12 @@ No reliance on wall-clock time, randomness, or the order tests run in. The codeb
 already mocks time-dependent WordPress functions; a new test needing "now" or an ID
 must inject a fixed value, not read the real clock. Order-dependence is usually a
 TS-7 leak in disguise.
+
+- **The machine's timezone is an input too (Run 15, T122).** A literal Unix timestamp for a
+  `Y-m-d` fixture passes only where the default timezone is UTC; `--order-by=random` cannot
+  see it. Probe: `php -d date.timezone=Europe/Budapest vendor/bin/phpunit`. Pin the zone in
+  the bootstrap (core does in `wp-settings.php`) rather than computing the expectation with
+  `strtotime()` (TS-21).
 
 ### TS-9: Over-coupling to rendered output
 Asserting a full exact string where the intent is behavioral makes the test brittle:
@@ -590,7 +605,14 @@ the payload then continues into the dataLayer as `items: [5], value: NaN`.
   measurement above is stale — `build/gtm4wp-woocommerce.js` now contains **one** `"use strict"`
   (woocommerce-blocks 1, attribution 1, **edd still 0**). The three `not.toThrow` sites in the WC
   suite each pair with an absence-of-push assertion, so they stayed valid; re-run the litmus on
-  every bundle each review and record the counts in the Frontend JS row.
+  every bundle each review and record the counts in the Frontend JS row. **Again at Run 15:**
+  the `gtm4wp-isolate` import flipped `gtm4wp-edd.js` to **1**.
+- **jsdom does not implement `[LegacyOverrideBuiltIns]` (Run 15, T118).** In a browser a form
+  control named `action`, `id` or `target` shadows the form's property of that name; in jsdom
+  it does not, so a fix that reads `getAttribute()` instead of the property is revert-green.
+  Model it with an own property on the fixture form (`Object.defineProperty( form, 'action',
+  { get: () => form.elements.namedItem( 'action' ) } )`) — an own property wins over the
+  prototype getter, as the named-property override does.
 
 ### TS-19: A declaration asserted on one side of the language boundary ⭐
 A setting whose *declaration* lives in PHP and whose *behaviour* lives in JavaScript
@@ -962,6 +984,35 @@ Do **not** try indirect `eval` (`(0, eval)( 'const x = 1' )`) — measured and r
 2026-08-06: `PerformEval` puts `let`/`const` in a throwaway declarative environment, so
 only `var` ever reaches the global object. It cannot create a persistent lexical global.
 
+
+### TC-17: A fixture pins one render mode of an upstream component, and the other mode is where the bug is
+
+A DOM fixture is a claim about what a third party renders. When that third party has more
+than one render mode, a fixture is evidence about **one** of them, and the suite's green is
+scoped to that one just as narrowly.
+
+Confirmed 2026-09-05. Every add-to-cart fixture in the classic tracker's suite was built as
+`<form class="cart">`, which is what WooCommerce renders in its legacy mode. GTM4WP 2.0.0
+had just removed the hidden input that *forced* legacy mode, so on a block store WooCommerce
+now rendered the Interactivity API form, which carries no `cart` class. The tracker's
+product-form lookup found nothing and returned before it read the product data. The suite
+stayed green through all of it, because no fixture had ever been written in the mode the
+plugin's own fix had just switched those stores into.
+
+- **When a change flips upstream into a different mode, the suite gains a fixture in the NEW
+  mode in the same change.** The old fixture keeps passing and keeps proving what it always
+  proved, which is now the less interesting half.
+- **Both fixtures stay.** The classic-form case is still live on classic stores, so the pair
+  is what pins the branch: the interactive form reports only after confirmation, the classic
+  form still reports on the click.
+- Same family as UC-3 (a test double no more permissive than the real collaborator): here
+  the double was not too permissive, it was too *narrow*, and narrowness reads as green.
+- **A double that keeps only the last call is the same defect in the other direction.** The
+  same session's `wp_add_inline_script` stub stored `$inline[ $handle ] = $code`, so the
+  moment a second inline script was attached to one handle the first became invisible to
+  every assertion, while WordPress prints both. Three tests went red for the *right* reason
+  and named the double, not the code. A stub of an accumulating function has to accumulate.
+
 ---
 
 ## Blessed Exceptions
@@ -993,6 +1044,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-09-28 (Run 15 — gaps closed) | Closed T116–T123 on the maintainer's "close straightforward, ask with options otherwise" go-ahead (two forks: UTC pinned in the bootstrap; the Services intro omits its link when the doc URL is removed — one production change, unreleased bullet edited). **PHP 3263/18049 → 3286/18118; JS 995 → 1001**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean; `build/` byte-identical. **Every survivor re-probed red.** TS-15 earned its keep once more: the first T123g draft asserted `null` from the resolvers and stayed green with the id check deleted, because the pluggable `is_user_logged_in()` gate in front of it answered first — a guard behind another guard needs the first one held open. |
+| 2026-09-28 (Run 15 — reviews 36–39 pass, report only) | Reviewed `3c31165..94d9251` (30 commits; findings #269–#329, Services module, developer ID, the #294 PageVariables split, jQuery-trigger containment) with 3 parallel read-only deep-reads, **PCOV coverage (97.37% lines — the scan-dir env makes it load)** and **31 serial main-thread probes (26 survived → T116–T123)**; no tests written. No new number: **TS-1 corollary** (removing a source-side escape moves the guard to the sink — re-pin the sink; T116, High, the main dataLayer sink had only `HEX_AMP` pinned), **TS-8 bullet** (timezone as a non-determinism axis seeds cannot see), **TS-17 bullets** (EDD bundle flipped to strict; jsdom lacks `[LegacyOverrideBuiltIns]`). Housekeeping: **TC-17** moved from below the Changelog into the conventions section and given a Quick Index line. |
 | 2026-09-23 (Run 14 — gaps closed) | Closed T106–T115 on the maintainer's "fix straightforward, ask with options otherwise" go-ahead (one fork: T110 → the confirm POST skips flag + consume while the order may still become trackable, a production change with an edited changelog bullet). **PHP 3204/16332 → 3226/17836**, declaration + 3 seeds identical; **JS 976 → 979**; `phpcs` exit 0; `lint:js` clean. **Every survivor mutation re-probed red**, T110 red on revert; SH-18 recorded `[-]` (unreachable behind the health store's own refusal). TS-22's recipe applied in the shape it prescribes: the marking translator now lives in the shared `ModuleSiteHealthTestCase`, the GDM Site Health test and the abilities test, and no `debug` line may carry the mark — no producer was leaking. Harness lesson: a jest loop over payloads trips the tracker's boot guard on the second pass; one case per `it`. |
 | 2026-09-23 (Run 14 — Site Health + pending re-check pass, report only) | Reviewed `9541679..3c31165` (11 commits; the plugin-wide Site Health surface + R35 fixes, the WooCommerce pending-purchase re-check, the EDD receipt hash) with 2 parallel read-only deep-reads and **37 valid main-thread mutation probes (25 survived → T106–T115, 4 N/A on boolean/enum-only sinks, 8 red incl. 1 control and 1 refuted candidate); no tests written.** Added **TS-22** (a stub that collapses two outputs the code must keep distinct — the identity translator hiding the English `debug` twin of every Site Health row; the marking-translator recipe belongs in the shared base case). Deep pass on the oldest `[x]` components: every `JSON_HEX_*` guard in the 2026-08-13 batch red on drop or docblock-blessed N/A. No latent production bug; T110 (confirm POST while the marker holds a pending order) routed to `/code-review` as a design question. |
 | 2026-09-22 (Run 13 — gaps closed) | Closed T97–T105 on the maintainer's "fix straightforward, ask with options otherwise" go-ahead (four forks answered up front). **PHP 3075/9675 → 3114/13316**; declaration + 3 seeds identical; `phpcs` exit 0; no JS or behavioural production change (one docblock, `[skip changelog]`). Every survivor mutation of the report re-probed red. New harness: `AbilitiesTestCase::execute()` validates every ability result against its output schema the way core's `WP_Ability::validate_output()` does, and the `wp_register_ability` fake refuses a duplicate name. TS-21 gained the fixture corollary (a boundary payload sized from the constant it must exceed). |
@@ -1025,31 +1078,3 @@ coverage-chasing junk.
 | 2026-07-13 (Run 1 continued) | Full remaining-gap sweep. Added **TC-8** (reflection injection for `Plugin`-singleton-coupled code — AMP finding #11), **TC-9** (JS side-effect tracker harness under `js/frontend/test/`), and extended **TC-2** with the `\xNN` + `json_encode`-computed-expected corollary (from the AMP test, after tooling HTML-encoded literal break-out chars). Derived from closing T9/T11/T12/T13(AMP)/T14 and starting T10 (JS). |
 | 2026-07-13 (Run 1) | Module/admin security-sink pass. Added **TS-11** (upstream raw-passthrough contract — the `geoCloudflareCountryCode` benign-only sink), **TC-6** (PA-7 `addcslashes` regression needs a `$n` input; JSON doubles `\`), **TC-7** (test `wp_die`/exit handlers by stubbing to throw + asserting no post-halt side effect), **BE-4** (`$_POST` snapshot in test setUp trips NonceVerification — scoped `phpcs:ignore`). Derived from closing T7 (`ListTrackingTest`, finding #16), T8 (`NoticesTest`, finding #18) and the PageVariables finding-#12 regression. |
 | 2026-07-13 | Seeded the patterns file from the `tests/unit/Frontend/` coverage review. Added TS-1..TS-10 (covered-≠-asserted, both-direction escaping, assert-the-effect, tautological, happy-path-only, zero-test class, state leakage, non-determinism, over-coupling, untested method/branch), TC-1..TC-4 (regression-with-change, build-expected-encoding, right base case, hook-both-ways) and BE-1..BE-3 (1.x byte-exact blessing, unused stub params, intentionally-untested classes). Derived from the session that added `VisitorIpTest` and 31 Frontend tests + fixed the OFF-placement iframe leak. |
-
-### TC-17: A fixture pins one render mode of an upstream component, and the other mode is where the bug is
-
-A DOM fixture is a claim about what a third party renders. When that third party has more
-than one render mode, a fixture is evidence about **one** of them, and the suite's green is
-scoped to that one just as narrowly.
-
-Confirmed 2026-09-05. Every add-to-cart fixture in the classic tracker's suite was built as
-`<form class="cart">`, which is what WooCommerce renders in its legacy mode. GTM4WP 2.0.0
-had just removed the hidden input that *forced* legacy mode, so on a block store WooCommerce
-now rendered the Interactivity API form, which carries no `cart` class. The tracker's
-product-form lookup found nothing and returned before it read the product data. The suite
-stayed green through all of it, because no fixture had ever been written in the mode the
-plugin's own fix had just switched those stores into.
-
-- **When a change flips upstream into a different mode, the suite gains a fixture in the NEW
-  mode in the same change.** The old fixture keeps passing and keeps proving what it always
-  proved, which is now the less interesting half.
-- **Both fixtures stay.** The classic-form case is still live on classic stores, so the pair
-  is what pins the branch: the interactive form reports only after confirmation, the classic
-  form still reports on the click.
-- Same family as UC-3 (a test double no more permissive than the real collaborator): here
-  the double was not too permissive, it was too *narrow*, and narrowness reads as green.
-- **A double that keeps only the last call is the same defect in the other direction.** The
-  same session's `wp_add_inline_script` stub stored `$inline[ $handle ] = $code`, so the
-  moment a second inline script was attached to one handle the first became invisible to
-  every assertion, while WordPress prints both. Three tests went red for the *right* reason
-  and named the double, not the code. A stub of an accumulating function has to accumulate.

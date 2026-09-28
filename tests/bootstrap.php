@@ -11,6 +11,10 @@
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
+// WordPress runs in UTC (wp-settings.php); without this a date fixture's
+// timestamp depends on the machine's date.timezone (T122).
+date_default_timezone_set( 'UTC' ); // phpcs:ignore WordPress.DateTime.RestrictedFunctions.timezone_change_date_default_timezone_set -- mirrors core.
+
 // Satisfy the direct-access guards of the plugin files.
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', sys_get_temp_dir() . '/wordpress/' );

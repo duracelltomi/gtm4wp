@@ -497,6 +497,36 @@ describe( 'gtm4wp-visitor-data — session endpoint (Tier 2/3)', () => {
 		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
 	} );
 
+	it( 'does not retry a nonce rejection on a fetch that sent no nonce', async () => {
+		// Anonymous (no gate cookie): the retry would repeat the same request.
+		window.gtm4wp_visitordata_config = {
+			events: EVENTS,
+			fields: {},
+			endpoint: 'https://site.example/wp-json/gtm4wp/v2/visitor-data',
+			nonce: 'stale-baked-nonce',
+			sessionKey: 'gtm4wp_visitor_session',
+			session: [ 'visitorIP' ],
+			gates: [ { cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] } ],
+		};
+		global.fetch.mockResolvedValueOnce( {
+			ok: false,
+			status: 403,
+			json: async () => ( { code: 'rest_cookie_invalid_nonce' } ),
+		} );
+		mockEndpointOnce( { visitorIP: '8.8.4.4' } );
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect(
+			global.fetch.mock.calls[ 0 ][ 1 ].headers[ 'X-WP-Nonce' ]
+		).toBeUndefined();
+		expect(
+			visitorEvents().find( ( e ) => e.visitorIP === '8.8.4.4' )
+		).toBeUndefined();
+	} );
+
 	it( 'retries once without the nonce when WordPress rejects it, and stops looping on that page', async () => {
 		// #291 (PA-12 residual): a full-page cache serving anonymous HTML to a
 		// logged-in visitor bakes a nonce that is not theirs; core answers 403 to
