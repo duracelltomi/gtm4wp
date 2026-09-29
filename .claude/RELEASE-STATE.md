@@ -26,9 +26,9 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Key | Value |
 |---|---|
-| Released stable version | 2.0.3 |
+| Released stable version | 2.0.4 |
 | Released stable branch | `2.0` |
-| wordpress.org Stable tag | 2.0.3 |
+| wordpress.org Stable tag | 2.0.4 |
 | Development branch | `master` |
 | Development target | 2.1 |
 | Frozen line | `1.x` (last release 1.22.5) |
@@ -62,6 +62,7 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Date | Event |
 |---|---|
+| 2026-09-29 | 2.0.4 patch released, cut from `2.0` (release commit `ccd7c0a`; GitHub asset SHA256-verified, header + `GTM4WP_VERSION` 2.0.4, single slug top folder; gate: reviews 39/40 cover both fixes, upstream drift check no blockers); both fixes (#472, #327) also on `master`; wordpress.org SVN pending |
 | 2026-09-28 | 2.1.0-beta1 (GitHub pre-release from `master`, release commit `35ea912`; asset SHA256-verified, header + `GTM4WP_VERSION` 2.1.0-beta1, single slug top folder; `Stable tag` stays 2.0.3; gate: security review 40 clean, upstream drift check no blockers) |
 | 2026-09-24 | 2.0.3 patch released, cut from `2.0` (release commit `3da558c`; GitHub asset replaced the same morning by the slug-folder zip, U168, SHA256-verified; wordpress.org SVN 2026-09-24 08:17 CEST, verified: `tags/2.0.3` zip 108 files per-file identical, SVN `trunk` files identical, plugins API 2.0.3 the same hour); all fixes also on `master` |
 | 2026-09-14 | 2.0.2 patch released, cut from `2.0` (GitHub 2026-09-14 evening, wordpress.org SVN 2026-09-15 07:35 CEST, verified: 108 files per-file identical in `tags/2.0.2` + `trunk`, plugins API 2.0.2 the same hour); all fixes also on `master` |
