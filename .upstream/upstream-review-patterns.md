@@ -25,7 +25,7 @@ breakage · Blessed Couplings (**UB**) — deliberate, do **not** flag.
 
 Each row is `ID — one-line litmus`.
 
-**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3, UC-8
+**⭐ Highest impact — check first:** UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UD-24, UC-1, UC-3, UC-8
 
 **Upstream Drift (UD):**
 
@@ -35,6 +35,7 @@ Each row is `ID — one-line litmus`.
 | UD-21 | Our own output can be an input to *their* render decision, so both branches of that decision are our problem. |
 | UD-22 ⭐ | Registry ids are assigned from `max(id on master)+1` at the moment of writing, and a merge touching a ledger re-runs the duplicate-id check first; when it has happened, the earliest row keeps its id and every cross-reference is re-pointed by meaning. |
 | UD-23 | A behaviour whose spec page sunset is a coupling with no source: the row records the nearest documented cousin plus a measurement recipe, and is rated as drifted until the measurement has run. |
+| UD-24 ⭐ | A drift sensor is itself coupled to our file layout: a scheduled diff over a path that no longer exists exits clean forever. Audit a sensor by running its generator once and diffing **what it actually writes**, never by reading its last green run. |
 | UD-2 ⭐ | Silent failure needs a canary, not a comment. A code comment recording the last manual sync does not fire when the sync goes stale. |
 | UD-3 | A documentation page is a spec with no version and no changelog; diff the *claim*, never the page. |
 | UD-4 | An upstream deprecation notice is a dated obligation, not news — it belongs in the ledger with the removal release as its due date. |
@@ -535,6 +536,33 @@ documented anywhere. The behaviour had been load-bearing for years and had no ro
   documented mechanism first; where none exists, say so in the row and keep the fallback
   defined (the guard here returns early and the link still works).
 
+### UD-24: A drift sensor that diffs a moved path is green forever ⭐
+
+UD-2 says a silent coupling needs something that breaks. This is how that something
+stops breaking without anyone noticing: the sensor names files, and files move.
+`git diff --quiet -- <path>` on a path that no longer exists exits 0 — no error, no
+warning, a green run.
+
+**Confirmed 2026-09-28 (S6).** `upstream-drift.yml` (U110) diffed the phone table at its
+pre-`36a0c83` path for six weeks. The generator had followed the move; the workflow and
+the `composer.json` script description had not. Its one scheduled run since then was
+green on the test corpus alone. Regenerating in a scratch copy found the table two
+territories behind libphonenumber while the corpus was byte-identical — the one half the
+job could still see was the half that had not moved (D44/D45).
+
+**Rules:**
+- A sensor's path list is a coupling to our own layout. A rename that moves a file a
+  scheduled job reads updates the job **in the same change** — grep `.github/` for the
+  old path before committing a move.
+- Prefer one definition: the job should diff what the generator reports it wrote (or a
+  test should pin the job's paths to the generator's constants), so the two cannot part.
+- **Audit a sensor by running it, not by reading its history.** A green run proves only
+  that the diff was empty — UC-3's "a check that cannot fail reads as evidence", in CI.
+
+Corollary to UD-9, same sweep: a watch channel can be reachable from one shell and not
+another (`gh`/`curl` from Bash could not reach GitHub while PowerShell could). Try the
+other transport before recording `fetch-failed`.
+
 ### UC-1: A version floor written in N places drifts ⭐
 
 The PHP floor appears in the plugin header, the runtime `version_compare` gate, and
@@ -760,6 +788,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-09-28 (S6) | Added **UD-24** (⭐ a drift sensor that diffs a moved path is green forever; audit a sensor by running its generator, not by reading its last run) after finding `upstream-drift.yml` diffing the pre-`36a0c83` phone-table path (D44) and, by regenerating in a scratch copy, the table two territories behind libphonenumber while the corpus it could still see was unchanged (D45). UD-9 corollary: try the other shell's transport before `fetch-failed`. Sweep 6 itself: WC 11.2.0-beta.2 package grepped whole — no anchor moved; `is_returning_customer()` changes two edge cases in the corrective direction (D46); the #472/#328 fixes' dependence on `triggerHandler` recorded on U25 (D47); Gutenberg 24.1.0-rc.1 deprecates the `@wordpress/scripts` Jest tooling (D48); `npm audit` run for the first time (0). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UD-24, UC-1, UC-3, UC-8. |
 | 2026-09-23 (S5) | Added **UD-23** (a behaviour whose spec page sunset is a coupling with no source: record the documented cousin + a measurement recipe, rate as drifted until measured) after registering the GTM `eventCallback`/`eventTimeout` contract from R35 #261 (U163, D33) and finding no current Google page for it. Sweep 5 itself: WooCommerce 11.1.2 shipped a day after S4 (D32, claim one patch behind); the full-tree coupling inventory — not the diff-scoped hunt — surfaced four unrowed couplings older than the base (OpenSSL → U164, the WC session-cookie prefix → U147, core `_get_cron_array()` → U139, page-conditional wording → U12/U115); U161 gained the R35 #266 selector sentence and lost three unescaped pipes (D39 — the cell-count check must ignore `\|`). |
 | 2026-09-22 (S4) | Added **UC-8** (⭐ a formula copied from upstream's source is a mirror with no row; delegate the day upstream wraps it in a method) after EDD 3.7.1 replaced the receipt-link `md5` our success-page resolver had copied inline with a site-keyed HMAC behind `Order::is_receipt_hash_valid()` — D23 / new row U159, fixed the same day (delegation + digest fallback, both shapes tested). Added the **UD-14 second corollary** (two truncations on one source = change the transport: raw HTML + heading-id grep carried the sentinel the summariser dropped twice). New-coupling regex in `.claude/commands/upstream-review.md` extended with `md5\(\|hash_hmac\(\|hash_equals\(`. Sweep 4 itself: the UD-7 window used on three upstreams in one day (WC 11.2.0-beta.1 package grepped whole — nothing moved; CF7 v6.2.0-rc — contract untouched, rc floors WP 7.1 / PHP 8.3; EDD 3.7.1 — D23), U52–U55 verified for the first time, U10 retired (D25), `overrides` necessity re-derived and two dead pins dropped (D26). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3, UC-8. |
 | 2026-09-21 (S3) | Renumbered the duplicated **UD-20** (the 2026-09-05 "our output is an input to their render decision" entry → **UD-21**; the 2026-09-01 presence-check entry keeps UD-20; `.security/code-review-patterns.md`'s citation re-pointed). Added **UD-22** (⭐ registry ids are assigned on `master` at the moment of writing; a merge touching a ledger re-runs the duplicate-id check; the earliest row keeps its id when it has already happened) after Sweep 3 found eleven duplicated `U#` ids across the WP/WC, EDD and Google sections plus this file's own UD-20. Added the **UD-14 corollary** (ask for tokens, never for the block — the fetch summariser refused a verbatim public snippet and answered a token probe). Sweep 3 itself: registry renumbered (U142–U151), two unregistered couplings rowed (U152 WC refund model, U153 EDD order-meta API + `__isset`), three anchors moved to `src/Ecommerce/`, Release Radar fully refreshed (WP 7.1.1, WC 11.1.1 → D14, CF7 6.1.7 packaging-only, Gutenberg 24.0.0, EDD 3.7.0, AS 4.2.0). |

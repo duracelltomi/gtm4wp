@@ -38,6 +38,8 @@ Pay special attention to (⭐ = highest impact):
   and ignores the very prop, key or argument the coupling depends on, the suite is
   green *because* the thing is untested. That is worse than no test — a green suite
   reads as evidence. Make the double no more permissive than the real collaborator.
+- **Moving a file a scheduled job reads (UD-24):** grep `.github/` for the old path in
+  the same change. A drift job diffing a path that no longer exists stays green forever.
 - **Measure, do not copy (UD-13):** any count you write down is measured from the file
   now, with its counting rule beside it. An unmeasured field is `[ ]`, never a
   plausible-looking value.

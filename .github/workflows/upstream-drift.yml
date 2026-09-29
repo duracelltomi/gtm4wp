@@ -62,7 +62,7 @@ jobs:
       # still fails on a real entry change.
       - name: Report any drift
         env:
-          GENERATED: src/Modules/WooCommerce/CountryPhoneData.php tests/unit/Modules/phone-corpus.php
+          GENERATED: src/Ecommerce/CountryPhoneData.php tests/unit/Modules/phone-corpus.php
           IGNORE_STAMP: '^ \* Generated: '
         run: |
           if git diff --quiet -I "$IGNORE_STAMP" -- $GENERATED; then
@@ -77,7 +77,7 @@ jobs:
           echo
           # Full diff of the table, which is small and readable. The test corpus
           # is 489 lines and would bury it, so only its shape is summarised.
-          git --no-pager diff -I "$IGNORE_STAMP" -- src/Modules/WooCommerce/CountryPhoneData.php
+          git --no-pager diff -I "$IGNORE_STAMP" -- src/Ecommerce/CountryPhoneData.php
           echo
           git --no-pager diff --stat -I "$IGNORE_STAMP" -- tests/unit/Modules/phone-corpus.php
           echo
