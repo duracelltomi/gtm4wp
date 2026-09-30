@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Frontend;
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\ScriptTag;
+use GTM4WP\Tests\unit\WpJsonEncodeWithRepair;
 
 /**
  * Ports the behavioral contract of gtm4wp_generate_script_opening_tag() from 1.x.
@@ -304,6 +305,54 @@ final class ScriptTagTest extends FrontendTestCase {
 			wp_json_encode( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ),
 			ScriptTag::json_literal( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS )
 		);
+	}
+
+	/**
+	 * An empty or list array would encode as `[...]`; json_object() makes both an
+	 * object, and keeps the list's values under their indexes.
+	 *
+	 * @return void
+	 */
+	public function test_json_object_casts_an_empty_or_list_array_to_an_object(): void {
+		$this->assertSame( '{}', wp_json_encode( ScriptTag::json_object( array() ) ) );
+		$this->assertSame( '{"0":"a","1":"b"}', wp_json_encode( ScriptTag::json_object( array( 'a', 'b' ) ) ) );
+	}
+
+	/**
+	 * Any other array already encodes as an object and is returned as the same
+	 * array, never cast (#330): the cast changes wp_json_encode()'s repair pass.
+	 * A non-zero-based integer key is not a list either.
+	 *
+	 * @return void
+	 */
+	public function test_json_object_returns_any_other_array_unchanged(): void {
+		$assoc  = array(
+			'pagePostType' => 'post',
+			'nested'       => array( 1, 2 ),
+		);
+		$sparse = array( 1 => 'a' );
+
+		$this->assertSame( $assoc, ScriptTag::json_object( $assoc ) );
+		$this->assertSame( $sparse, ScriptTag::json_object( $sparse ) );
+	}
+
+	/**
+	 * The failure json_object() exists to avoid, measured through a double of
+	 * core's repair pass: with invalid UTF-8 in a value, the map still encodes
+	 * (repaired) instead of throwing. Against a plain (object) cast this throws.
+	 *
+	 * @return void
+	 */
+	public function test_json_object_survives_the_wp_json_encode_repair_pass(): void {
+		$data = array(
+			"\0k" => 1,
+			's'   => "caf\xE9",
+		);
+
+		$json = WpJsonEncodeWithRepair::encode( ScriptTag::json_object( $data ) );
+
+		$this->assertIsString( $json );
+		$this->assertStringContainsString( '"s":"caf', $json );
 	}
 
 	/**

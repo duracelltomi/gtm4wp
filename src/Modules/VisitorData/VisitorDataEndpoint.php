@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\VisitorData;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
@@ -115,9 +116,9 @@ final class VisitorDataEndpoint {
 				// The actual visitor data is serialized here with the full hex flag
 				// set (RI-2) and parsed back by the client, so the request-header
 				// values it carries never reach the client as a raw break-out char.
-				// Cast to object so an empty map still serializes as {} (not []).
+				// json_object() so an empty map still serializes as {} (not []).
 				'payload' => (string) wp_json_encode(
-					(object) $data,
+					ScriptTag::json_object( $data ),
 					JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 				),
 				// A FRESH wp_rest nonce for the client's one-shot confirm beacons.

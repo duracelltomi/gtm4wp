@@ -103,6 +103,26 @@ final class ScriptTag {
 	}
 
 	/**
+	 * Prepares a key => value map for wp_json_encode() so it always encodes as
+	 * a JSON object: an empty or list array is cast to an object (it would
+	 * otherwise encode as `[...]`), any other array is returned unchanged,
+	 * since it already encodes as an object. Do not cast associative arrays:
+	 * wp_json_encode()'s invalid-UTF-8 repair walks objects differently from
+	 * arrays and can throw an Error on a key an array handles, which no
+	 * `false ===` guard catches (#330, RI-21).
+	 *
+	 * @param array<int|string, mixed> $data The map to encode.
+	 * @return array<string, mixed>|object The map itself, or an object for an empty or list array.
+	 */
+	public static function json_object( array $data ): array|object {
+		if ( array() === $data || array_keys( $data ) === range( 0, count( $data ) - 1 ) ) {
+			return (object) $data;
+		}
+
+		return $data;
+	}
+
+	/**
 	 * Safely outputs an inline script block.
 	 *
 	 * The block is sanitized with wp_kses() so only the allow-listed <script>

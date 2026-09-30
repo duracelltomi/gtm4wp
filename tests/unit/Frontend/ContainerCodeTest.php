@@ -15,6 +15,7 @@ use GTM4WP\Frontend\ContainerCode;
 use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Options\Options;
+use GTM4WP\Tests\unit\WpJsonEncodeWithRepair;
 
 /**
  * Ports the behavioral contract of the container output functions of 1.x:
@@ -510,6 +511,34 @@ final class ContainerCodeTest extends FrontendTestCase {
 
 		$this->assertStringContainsString( 'var dataLayer_content = {"0":"a","1":"b"};', $output );
 		$this->assertStringNotContainsString( 'var dataLayer_content = [', $output );
+	}
+
+	/**
+	 * An associative compile result is encoded as the array, not cast to an
+	 * object (#330): through a double of core's invalid-UTF-8 repair pass, a
+	 * cast map throws an Error that the `false !==` guard cannot catch, taking
+	 * the whole head output. The array is repaired and pushed.
+	 *
+	 * @return void
+	 */
+	public function test_header_begin_survives_the_wp_json_encode_repair_pass(): void {
+		Functions\when( 'wp_json_encode' )->alias( array( WpJsonEncodeWithRepair::class, 'encode' ) );
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn(
+			array(
+				"\0k"          => 1,
+				'pagePostType' => "caf\xE9",
+			)
+		);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( '"pagePostType":"caf', $output );
+		$this->assertStringContainsString( 'dataLayer.push( dataLayer_content );', $output );
+		$this->assertStringContainsString( "'GTM-AAA111'", $output, 'The container still loads.' );
 	}
 
 	public function test_header_begin_keeps_typed_numbers_as_json_numbers(): void {

@@ -362,10 +362,10 @@ final class ContainerCode {
 			// really are numbers (prices, totals, counts) are typed at their source
 			// instead - the same contract the additional-push and cart-fragments
 			// sinks have always had, so all sinks now agree on types.
-			// The (object) cast keeps the top level an object literal: an empty or
+			// json_object() keeps the top level an object literal: an empty or
 			// list array would encode as `[...]`, which GTM reads as a command
 			// array, not a message. Nested arrays are untouched.
-			$datalayer_json = wp_json_encode( (object) $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+			$datalayer_json = wp_json_encode( ScriptTag::json_object( $gtm4wp_datalayer_data ), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
 			// Omit the whole block rather than emit a literal we do not have (#141).
 			// wp_json_encode() returns false for a value it cannot encode - INF/NAN,
