@@ -1128,7 +1128,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	/**
-	 * The Google tag developer ID (U165) is pushed as a gtag arguments object
+	 * The Google tag developer ID (U165) is pushed as a gtag-style arguments object
 	 * onto the CONFIGURED data layer (RI-14, the #269 lesson), after the array
 	 * exists and before anything else in the block. The literal is pinned so a
 	 * typo in the ID or the command shape breaks the suite rather than Google's
@@ -1147,10 +1147,12 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$container->header_top();
 		$output = ob_get_clean();
 
-		$command = "gtag('set', 'developer_id.dNGJiYT', true);";
-		// IIFE-local gtag: a global declaration would shadow the consent shim's (#326).
-		$this->assertStringContainsString( '(function(){function gtag(){customDL.push(arguments);}' . $command . '})();', $output );
+		$command = "(function(){customDL.push(arguments);})('set', 'developer_id.dNGJiYT', true);";
+		$this->assertStringContainsString( $command, $output );
 		$this->assertStringNotContainsString( 'dataLayer.push', $output );
+		// A `gtag` keyword in a JS delay tool's list must not match this block, and
+		// no global gtag may be declared here (it would shadow the consent shim's, #326).
+		$this->assertStringNotContainsString( 'gtag', $output );
 
 		$init = strpos( $output, 'var customDL = customDL || [];' );
 		$this->assertNotFalse( $init );
