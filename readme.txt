@@ -257,6 +257,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 == Changelog ==
 
+= 2.0.5 =
+
+* Fixed: a page with no data layer variables to report no longer pushes an empty array into the data layer; `dataLayer_content` is then an empty object and is not pushed. Content that is pushed is always an object, never an array, which GTM would read as a command.
+
 = 2.0.4 =
 
 * Fixed: on the classic WooCommerce checkout, an error in the plugin's checkout step tracking could stop the order from being submitted the normal way, so a gateway that adds card details in the browser, such as Stripe, rejected it. Tracking errors can no longer interrupt the checkout or a variation selection, and still show in the browser console. (#472)

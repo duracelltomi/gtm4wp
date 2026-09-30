@@ -343,8 +343,7 @@ final class ContainerCode {
 	private function datalayer_block( array $containers, string $datalayer_name ): string {
 		$script_tag = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
-<!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
-' . $this->script_tag->opening_tag();
+<!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->';
 
 		if ( array() !== $containers ) {
 			$gtm4wp_datalayer_data = $this->datalayer->compile();
@@ -361,9 +360,12 @@ final class ContainerCode {
 			// really are numbers (prices, totals, counts) are typed at their source
 			// instead - the same contract the additional-push and cart-fragments
 			// sinks have always had, so all sinks now agree on types.
-			$datalayer_json = wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+			// The (object) cast keeps the top level an object literal: an empty or
+			// list array would encode as `[...]`, which GTM reads as a command
+			// array, not a message. Nested arrays are untouched.
+			$datalayer_json = wp_json_encode( (object) $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
-			// Omit BOTH lines rather than emit a literal we do not have (#141).
+			// Omit the whole block rather than emit a literal we do not have (#141).
 			// wp_json_encode() returns false for a value it cannot encode - INF/NAN,
 			// a resource, or nesting past its depth limit, all of which reach the
 			// data layer only through the public compile filter - and PHP renders
@@ -372,18 +374,22 @@ final class ContainerCode {
 			// the data layer initialization in it, and every container loader after
 			// it. Dropping the push instead costs one page's data layer content and
 			// leaves the container loading. See ScriptTag::json_literal() for the
-			// assignment-position half of this rule.
+			// assignment-position half of this rule. Empty content keeps the variable
+			// for custom code reading it, but is not pushed.
 			if ( false !== $datalayer_json ) {
 				$script_tag .= '
+' . $this->script_tag->opening_tag() . '
 	var dataLayer_content = ' . $datalayer_json . ';';
 
-				$script_tag .= '
+				if ( array() !== $gtm4wp_datalayer_data ) {
+					$script_tag .= '
 	' . esc_js( $datalayer_name ) . '.push( dataLayer_content );';
+				}
+
+				$script_tag .= '
+</script>';
 			}
 		}
-
-		$script_tag .= '
-</script>';
 
 		return $script_tag;
 	}

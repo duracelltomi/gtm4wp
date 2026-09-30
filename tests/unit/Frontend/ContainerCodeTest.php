@@ -324,13 +324,16 @@ final class ContainerCodeTest extends FrontendTestCase {
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_CONTAINER_CODE )->once();
 
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn( array( 'pagePostType' => 'post' ) );
+
 		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111,GTM-BBB222' ) );
 
 		ob_start();
 		$container->header_begin();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'var dataLayer_content = [];', $output );
+		$this->assertStringContainsString( 'var dataLayer_content = {"pagePostType":"post"};', $output );
 		$this->assertStringContainsString( 'dataLayer.push( dataLayer_content );', $output );
 		$this->assertStringContainsString( "'//www.googletagmanager.com/gtm.js?id='+i+dl", $output );
 		$this->assertStringContainsString( "'GTM-AAA111'", $output );
@@ -468,6 +471,47 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( '</script>', $output );
 	}
 
+	/**
+	 * An empty compile result used to print `var dataLayer_content = [];` and push
+	 * an array, which GTM reads as a command array rather than a message. The
+	 * variable stays (as an object) for custom code reading it; the push goes.
+	 *
+	 * @return void
+	 */
+	public function test_header_begin_omits_the_datalayer_push_when_the_content_is_empty(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array() );
+		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content = {};', $output );
+		$this->assertStringNotContainsString( 'var dataLayer_content = [];', $output );
+		$this->assertStringNotContainsString( 'dataLayer.push( dataLayer_content );', $output );
+		$this->assertStringContainsString( "'GTM-AAA111'", $output, 'The container still loads.' );
+	}
+
+	/**
+	 * A compile filter returning a list must still push an object, never an array.
+	 *
+	 * @return void
+	 */
+	public function test_header_begin_pushes_a_list_compile_result_as_an_object(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'a', 'b' ) );
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content = {"0":"a","1":"b"};', $output );
+		$this->assertStringNotContainsString( 'var dataLayer_content = [', $output );
+	}
+
 	public function test_header_begin_keeps_typed_numbers_as_json_numbers(): void {
 		// The counter-direction of dropping JSON_NUMERIC_CHECK: values the
 		// builders type as PHP floats/ints (prices, totals, quantities) must
@@ -501,6 +545,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	public function test_header_begin_omits_loader_when_placement_off(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'pagePostType' => 'post' ) );
+
 		$container = $this->make_container(
 			array(
 				GTM4WP_OPTION_GTM_CODE      => 'GTM-AAA111',
@@ -538,6 +584,8 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	public function test_header_begin_off_placement_silent_when_console_log_disabled(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'pagePostType' => 'post' ) );
+
 		$container = $this->make_container(
 			array(
 				GTM4WP_OPTION_GTM_CODE      => 'GTM-AAA111',
@@ -582,6 +630,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		// loader - so it never sends hits to the live GTM container.
 		Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'pagePostType' => 'post' ) );
 
 		$container = $this->make_container(
 			array(
@@ -647,6 +696,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		Filters\expectApplied( GTM4WP_WPFILTER_OUTPUT_CONTAINER )
 			->andReturn( false );
 		Actions\expectDone( GTM4WP_WPACTION_AFTER_DATALAYER )->once();
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'pagePostType' => 'post' ) );
 
 		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
 
@@ -664,6 +714,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		// logging is turned off; the loader is still omitted.
 		Filters\expectApplied( GTM4WP_WPFILTER_OUTPUT_CONTAINER )
 			->andReturn( false );
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'pagePostType' => 'post' ) );
 
 		$container = $this->make_container(
 			array(
@@ -1549,6 +1600,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 	 */
 	public function test_every_inline_block_carries_a_rocket_exclusion_pattern_under_a_custom_data_layer_name(): void {
 		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->andReturn( array( 'pagePostType' => 'post' ) );
 
 		$container = $this->make_container(
 			array(
