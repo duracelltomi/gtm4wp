@@ -68,9 +68,6 @@ final class MediaEventsAdminSchemaTest extends TestCase {
 
 	public function test_media_field_phases_are_pinned(): void {
 		$expected = array(
-			// Google ships a native YouTube Video trigger; migrate to that.
-			GTM4WP_OPTION_EVENTS_YOUTUBE              => Field::PHASE_DEPRECATED,
-
 			// The two players carried over from 1.x, proven in the field.
 			GTM4WP_OPTION_EVENTS_VIMEO                => Field::PHASE_STABLE,
 			GTM4WP_OPTION_EVENTS_SOUNDCLOUD           => Field::PHASE_STABLE,

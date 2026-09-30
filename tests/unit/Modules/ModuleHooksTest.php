@@ -195,14 +195,10 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertFalse( has_action( 'init', array( $disabled, 'maintain_login_gate_cookie' ) ) );
 	}
 
-	public function test_media_events_youtube_filter_active_when_enabled(): void {
-		$enabled = $this->boot( new MediaEventsModule(), array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
-		$this->assertNotFalse( has_filter( 'oembed_result', array( $enabled, 'enable_youtube_js_api' ) ) );
-	}
-
-	public function test_media_events_youtube_filter_inactive_when_disabled(): void {
-		$disabled = $this->boot( new MediaEventsModule() );
-		$this->assertFalse( has_filter( 'oembed_result', array( $disabled, 'enable_youtube_js_api' ) ) );
+	public function test_stored_youtube_option_no_longer_rewrites_oembed_results(): void {
+		// Removed in 2.1 together with the enablejsapi rewrite of YouTube embeds.
+		$this->boot( new MediaEventsModule(), array( GTM4WP_OPTION_EVENTS_YOUTUBE => true ) );
+		$this->assertFalse( has_filter( 'oembed_result' ) );
 	}
 
 	protected function tearDown(): void {

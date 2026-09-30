@@ -30,7 +30,7 @@ final class Migration {
 	 * scroll tracking and the non-functional 1.x blacklist-sandboxed flag (not
 	 * migrated to the `sandboxedScripts` group on purpose: a fresh opt-in avoids
 	 * silently blocking custom templates on upgrade). 2.1: the WebToffee v2.x
-	 * consent bridge.
+	 * consent bridge and the YouTube tracker.
 	 *
 	 * @var string[]
 	 */
@@ -49,6 +49,7 @@ final class Migration {
 		GTM4WP_OPTION_SCROLLER_CONTENTID,
 		GTM4WP_OPTION_SCROLLER_READERTIME,
 		GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
+		GTM4WP_OPTION_EVENTS_YOUTUBE,
 	);
 
 	/**

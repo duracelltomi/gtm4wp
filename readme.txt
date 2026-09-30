@@ -327,6 +327,8 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Added: a **Services for agencies and freelancers** section on the settings screen, with no options, introducing the services the developers of GTM4WP offer to agencies and freelancers and linking to them on gtm4wp.com; the link is left out when a site removes the documentation links with `gtm4wp_admin_doc_url`.
 * Removed: the `$gtp4wp_plugin_url`, `$gtp4wp_plugin_basename` and `$gtp4wp_script_path` globals, deprecated in 2.0 as announced. Third-party code still reading them uses `plugin_dir_url( GTM4WP_PLUGIN_FILE )`, `plugin_basename( GTM4WP_PLUGIN_FILE )` and `plugin_dir_url( GTM4WP_PLUGIN_FILE ) . 'build/'` instead.
 * Removed: the WebToffee GDPR Cookie Consent (v2.x) integration, deprecated in 2.0. WebToffee v3.x and later connect to Google Tag Manager on their own, so upgrade WebToffee if a site still runs v2.x. The stored setting is deleted on upgrade, and the `cookie_consent_update` and `cookie_consent_<category>` events it pushed stop; review GTM triggers built on them.
+* Removed: the "YouTube video events" option, deprecated in 2.0 as announced. Use Google Tag Manager's built-in YouTube Video trigger with its "Add JavaScript API support to all YouTube videos" setting on, since the plugin no longer adds `enablejsapi` to YouTube embeds. Triggers on the plugin's YouTube `gtm4wp.media*` events stop firing; the `gtm4wp_youtube` filter is gone too.
+* Removed: `orderData.customer.billing.emailhash`, deprecated since 1.20. GTM variables still reading it switch to `orderData.customer.billing.email_hash`, which carries the same value.
 
 **Easy Digital Downloads**
 

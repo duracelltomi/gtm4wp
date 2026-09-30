@@ -18,8 +18,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Loads the embedded media player interaction tracking scripts.
  *
- * YouTube, Vimeo, SoundCloud and native HTML5 media are ports of the 1.x
- * integration/*.php trackers. Dailymotion, Mixcloud, Cloudflare Stream, Wistia,
+ * Vimeo, SoundCloud and native HTML5 media are ports of the 1.x
+ * integration/*.php trackers (YouTube was removed in 2.1: GTM's native YouTube
+ * Video trigger replaces it). Dailymotion, Mixcloud, Cloudflare Stream, Wistia,
  * JW Player, VideoPress, Spotify and Twitch are 2.0 additions; every tracker
  * pushes the same gtm4wp.media* data layer shape and populates GTM's built-in
  * Video variables via js/frontend/lib/native-video-params.js.
@@ -68,7 +69,6 @@ final class MediaEventsModule extends AbstractModule {
 	 */
 	public function defaults(): array {
 		return array(
-			GTM4WP_OPTION_EVENTS_YOUTUBE              => false,
 			GTM4WP_OPTION_EVENTS_VIMEO                => false,
 			GTM4WP_OPTION_EVENTS_SOUNDCLOUD           => false,
 			GTM4WP_OPTION_EVENTS_HTML5MEDIA           => false,
@@ -91,10 +91,6 @@ final class MediaEventsModule extends AbstractModule {
 	 * @return void
 	 */
 	protected function register_frontend_hooks(): void {
-		if ( $this->opt( GTM4WP_OPTION_EVENTS_YOUTUBE ) ) {
-			add_filter( 'oembed_result', array( $this, 'enable_youtube_js_api' ), 10, 3 );
-		}
-
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 	}
 
@@ -105,49 +101,6 @@ final class MediaEventsModule extends AbstractModule {
 	 */
 	public function admin_schema(): string {
 		return AdminSchema::class;
-	}
-
-	/**
-	 * Adds loading of the JS API of the YouTube player into the embed codes.
-	 *
-	 * @see https://developer.wordpress.org/reference/hooks/oembed_result/
-	 *
-	 * @param string|false $return_value The returned oEmbed HTML (false if unsafe).
-	 * @param string       $url URL of the content to be embedded.
-	 * @param string|array $data Additional arguments for retrieving embed HTML.
-	 * @return string|false
-	 */
-	public function enable_youtube_js_api( $return_value, $url, $data ) {
-		if ( ! is_string( $return_value ) || false === strpos( $return_value, 'youtube.com' ) ) {
-			return $return_value;
-		}
-
-		$site_url_parts = wp_parse_url( site_url() );
-		$site_url_parts = is_array( $site_url_parts ) ? $site_url_parts : array();
-
-		$scheme = (string) ( $site_url_parts['scheme'] ?? '' );
-		$host   = (string) ( $site_url_parts['host'] ?? '' );
-
-		// No usable origin: leave the embed as the oEmbed handler returned it.
-		if ( '' === $scheme || '' === $host ) {
-			return $return_value;
-		}
-
-		// esc_url() AT the point of injection (RI-17): the splice runs after the
-		// oEmbed handler's escaping finished. Separators stay raw & (1.x bytes).
-		$origin = esc_url( $scheme . '://' . $host );
-
-		// esc_url() returns '' for a scheme a plugin narrowed out of
-		// wp_allowed_protocols(); the gate above cannot see that.
-		if ( '' === $origin ) {
-			return $return_value;
-		}
-
-		return str_replace(
-			'feature=oembed',
-			'feature=oembed&enablejsapi=1&origin=' . $origin,
-			$return_value
-		);
 	}
 
 	/**
@@ -270,12 +223,6 @@ final class MediaEventsModule extends AbstractModule {
 	 * @return void
 	 */
 	public function enqueue_scripts(): void {
-		if ( $this->opt( GTM4WP_OPTION_EVENTS_YOUTUBE ) ) {
-			$in_footer = (bool) apply_filters( 'gtm4wp_youtube', true );
-
-			$this->enqueue_media_tracker( 'gtm4wp-youtube', 'gtm4wp-youtube.js', array(), $in_footer );
-		}
-
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_VIMEO ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_vimeo', true );
 

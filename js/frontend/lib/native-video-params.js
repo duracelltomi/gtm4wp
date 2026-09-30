@@ -169,7 +169,7 @@ export function gtm4wpMediaVisible( target ) {
  * milliseconds: convert first); `percent` is derived when not supplied.
  *
  * @param {Object}               args
- * @param {string}               args.provider    Video provider, e.g. 'youtube'.
+ * @param {string}               args.provider    Video provider, e.g. 'vimeo'.
  * @param {string}               args.status      Already-mapped `gtm.videoStatus` (may be '').
  * @param {string}               args.url         Video URL.
  * @param {string}               args.title       Video title.
@@ -304,8 +304,8 @@ export function gtm4wpOnReady( callback ) {
  *                                    to contain a matching embed: a script URL (ready
  *                                    on its load event), or `{ src, subscribe }` for
  *                                    an SDK signalling readiness through a global
- *                                    callback (onYouTubeIframeAPIReady,
- *                                    onSpotifyIframeApiReady): `subscribe` receives a
+ *                                    callback (onSpotifyIframeApiReady):
+ *                                    `subscribe` receives a
  *                                    rescan function to call from there. Omit when
  *                                    there is nothing to fetch (HTML5, Wistia, JW
  *                                    Player, VideoPress).
@@ -461,7 +461,7 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 
 		// Attach to a tag for this src already in flight (the site's own, or
 		// ours before a bundle re-execution). Compared on the literal attribute,
-		// not the resolved .src: YouTube's URL is protocol-relative.
+		// not the resolved .src, which differs for a protocol-relative URL.
 		let tag = null;
 		const scripts = document.getElementsByTagName( 'script' );
 
@@ -480,8 +480,8 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		}
 
 		// `load` is too early for an SDK that hands its API to a global
-		// callback (YouTube sets YT and only THEN calls onYouTubeIframeAPIReady;
-		// that is what `subscribe` is for). Both are registered; a rescan while
+		// callback (Spotify defines its API and only THEN calls
+		// onSpotifyIframeApiReady; that is what `subscribe` is for). Both are registered; a rescan while
 		// isReady() is still false wires and marks nothing.
 		tag.addEventListener( 'load', rescan );
 	};

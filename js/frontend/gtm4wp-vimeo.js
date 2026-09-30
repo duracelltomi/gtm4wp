@@ -122,7 +122,7 @@ function gtm4wp_initVimeoTracking() {
 			} ); // end of api call getVideoTitle
 
 		// "playing" (real start, after buffering), not "play" (requested),
-		// matching the YouTube and SoundCloud trackers.
+		// matching the SoundCloud tracker.
 		vimeoapi.on( 'playing', function ( data ) {
 			gtm4wp_onVimeoPlayerStateChange( 'play', data );
 		} );

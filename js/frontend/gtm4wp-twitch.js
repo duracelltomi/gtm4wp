@@ -92,8 +92,8 @@ function gtm4wp_bindTwitchPlayer(
 		} );
 	};
 
-	// No periodic time event: milestones are polled while playing (like
-	// YouTube). Live streams report no duration, so nothing fires for them.
+	// No periodic time event: milestones are polled while playing. Live
+	// streams report no duration, so nothing fires for them.
 	const gtm4wp_onTwitchPercentageChange = function () {
 		const videoDuration = gtm4wp_twitchDuration();
 		if ( ! videoDuration ) {

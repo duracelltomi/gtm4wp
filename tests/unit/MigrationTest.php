@@ -63,6 +63,8 @@ final class MigrationTest extends TestCase {
 			GTM4WP_OPTION_SCROLLER_CONTENTID       => 'content',
 			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR => true,
 			GTM4WP_OPTION_INTEGRATE_COOKIEYES      => true,
+			GTM4WP_OPTION_EVENTS_YOUTUBE           => true,
+			GTM4WP_OPTION_EVENTS_VIMEO             => true,
 			GTM4WP_OPTION_BLACKLIST_STATUS         => 'html,ua,gaawe,mf',
 		);
 
@@ -78,6 +80,8 @@ final class MigrationTest extends TestCase {
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_ENABLED, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_CONTENTID, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR, $options, 'The WebToffee v2.x option removed in 2.1 is cleaned up.' );
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_EVENTS_YOUTUBE, $options, 'The YouTube option removed in 2.1 is cleaned up.' );
+		$this->assertTrue( $options[ GTM4WP_OPTION_EVENTS_VIMEO ], 'Sibling media player options stay untouched.' );
 		$this->assertTrue( $options[ GTM4WP_OPTION_INTEGRATE_COOKIEYES ], 'Sibling consent tool options stay untouched.' );
 
 		/*

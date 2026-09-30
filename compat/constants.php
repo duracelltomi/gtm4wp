@@ -109,7 +109,9 @@ define( 'GTM4WP_OPTION_EVENTS_FORMMOVE_FILLEDONLY', 'event-form-move-filled-only
 define( 'GTM4WP_OPTION_EVENTS_NEWUSERREG', 'event-new-user-registration' );
 define( 'GTM4WP_OPTION_EVENTS_USERLOGIN', 'event-user-logged-in' );
 
+// Removed in 2.1: YouTube tracker (use GTM's native YouTube Video trigger). Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_EVENTS_YOUTUBE', 'event-youtube' );
+
 define( 'GTM4WP_OPTION_EVENTS_VIMEO', 'event-vimeo' );
 define( 'GTM4WP_OPTION_EVENTS_SOUNDCLOUD', 'event-soundcloud' );
 define( 'GTM4WP_OPTION_EVENTS_HTML5MEDIA', 'event-html5-media' );

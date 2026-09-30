@@ -56,7 +56,7 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$rows = $this->rows(
 			new MediaEventsModule(),
 			array(
-				GTM4WP_OPTION_EVENTS_YOUTUBE              => true,
+				GTM4WP_OPTION_EVENTS_VIMEO                => true,
 				GTM4WP_OPTION_EVENTS_DAILYMOTION_PLAYERID => 'x1abc2',
 			)
 		);
@@ -64,7 +64,6 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$this->assertSame( array( 'players', 'dynamic_media', 'dailymotion_player_id' ), array_keys( $rows ) );
 		$this->assertSame(
 			array(
-				GTM4WP_OPTION_EVENTS_YOUTUBE,
 				GTM4WP_OPTION_EVENTS_VIMEO,
 				GTM4WP_OPTION_EVENTS_SOUNDCLOUD,
 				GTM4WP_OPTION_EVENTS_HTML5MEDIA,
@@ -79,7 +78,7 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 			),
 			array_keys( $rows['players']['debug'] )
 		);
-		$this->assertSame( 'on', $rows['players']['debug'][ GTM4WP_OPTION_EVENTS_YOUTUBE ] );
+		$this->assertSame( 'on', $rows['players']['debug'][ GTM4WP_OPTION_EVENTS_VIMEO ] );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_EVENTS_MEDIA_DYNAMIC, $rows['players']['debug'], 'Not a player: its own row.' );
 		$this->assertSame( 'off', $rows['dynamic_media']['debug'] );
 		$this->assertSame( 'set', $rows['dailymotion_player_id']['debug'] );

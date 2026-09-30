@@ -516,7 +516,6 @@ final class ProductData {
 					'postcode'        => $order->get_billing_postcode(),
 					'country'         => $order->get_billing_country(),
 					'email'           => $order->get_billing_email(),
-					'emailhash'       => $billing_email_hash, // deprecated.
 					'email_hash'      => $billing_email_hash,
 					'phone'           => $order->get_billing_phone(),
 					'phone_hash'      => $billing_phone_hash,

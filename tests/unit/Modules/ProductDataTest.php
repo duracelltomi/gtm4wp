@@ -885,8 +885,8 @@ final class ProductDataTest extends TestCase {
 
 		$this->assertArrayHasKey( 'email_hash', $raw['customer']['billing'] );
 		$this->assertSame( '', $raw['customer']['billing']['email_hash'] );
-		// The deprecated spelling rides along unchanged - it is the same value.
-		$this->assertSame( '', $raw['customer']['billing']['emailhash'] );
+		// The spelling deprecated in 1.20 is gone since 2.1.
+		$this->assertArrayNotHasKey( 'emailhash', $raw['customer']['billing'] );
 	}
 
 	public function test_order_status_trackable_is_filterable(): void {

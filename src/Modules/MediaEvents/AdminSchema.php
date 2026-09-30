@@ -78,16 +78,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	public function fields(): array {
 		return array(
 			new Field(
-				key: GTM4WP_OPTION_EVENTS_YOUTUBE,
-				type: Field::TYPE_CHECKBOX,
-				default_value: false,
-				label: __( 'YouTube video events', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include a Tag Manager event when a visitor interacts with a YouTube video embedded on your site. Each event also populates Google Tag Manager\'s built-in Video variables (Video Status, Video URL, Video Title, Video Provider, Video Duration, Video Current Time, Video Percent). Deprecated: Google Tag Manager now ships its own native YouTube Video trigger, which is the recommended way to measure YouTube playback going forward.', 'duracelltomi-google-tag-manager' ),
-				group: 'players',
-				phase: Field::PHASE_DEPRECATED,
-				doc: self::DOC_BASE . '/youtube-video-tracking'
-			),
-			new Field(
 				key: GTM4WP_OPTION_EVENTS_VIMEO,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
@@ -236,7 +226,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 */
 	public function site_health_info( Options $options ): array {
 		$players = array(
-			GTM4WP_OPTION_EVENTS_YOUTUBE,
 			GTM4WP_OPTION_EVENTS_VIMEO,
 			GTM4WP_OPTION_EVENTS_SOUNDCLOUD,
 			GTM4WP_OPTION_EVENTS_HTML5MEDIA,

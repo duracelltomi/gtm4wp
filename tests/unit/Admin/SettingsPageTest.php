@@ -555,8 +555,8 @@ final class SettingsPageTest extends TestCase {
 		$prefix = 'https://gtm4wp.com/track-embedded-media-players-in-google-tag-manager/';
 
 		$this->assertSame(
-			$prefix . 'youtube-video-tracking#' . GTM4WP_OPTION_EVENTS_YOUTUBE,
-			$media[ GTM4WP_OPTION_EVENTS_YOUTUBE ]
+			$prefix . 'vimeo-video-tracking#' . GTM4WP_OPTION_EVENTS_VIMEO,
+			$media[ GTM4WP_OPTION_EVENTS_VIMEO ]
 		);
 		$this->assertSame(
 			$prefix . 'spotify-tracking#' . GTM4WP_OPTION_EVENTS_SPOTIFY,
