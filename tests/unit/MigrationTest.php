@@ -51,17 +51,19 @@ final class MigrationTest extends TestCase {
 
 	public function test_removes_dropped_option_keys_and_stale_blacklist_entries(): void {
 		$this->option_store[ GTM4WP_OPTIONS ] = array(
-			GTM4WP_OPTION_GTM_CODE              => 'GTM-KEEP1',
-			GTM4WP_OPTION_INCLUDE_MISCGEO       => true,
-			GTM4WP_OPTION_INCLUDE_MISCGEOAPI    => 'api-key',
-			GTM4WP_OPTION_INCLUDE_WEATHER       => true,
-			GTM4WP_OPTION_INCLUDE_WEATHERUNITS  => 1,
-			GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI => 'owm-key',
-			GTM4WP_OPTION_INTEGRATE_WPECOMMERCE => true,
-			GTM4WP_OPTION_BLACKLIST_SANDBOXED   => true,
-			GTM4WP_OPTION_SCROLLER_ENABLED      => true,
-			GTM4WP_OPTION_SCROLLER_CONTENTID    => 'content',
-			GTM4WP_OPTION_BLACKLIST_STATUS      => 'html,ua,gaawe,mf',
+			GTM4WP_OPTION_GTM_CODE                 => 'GTM-KEEP1',
+			GTM4WP_OPTION_INCLUDE_MISCGEO          => true,
+			GTM4WP_OPTION_INCLUDE_MISCGEOAPI       => 'api-key',
+			GTM4WP_OPTION_INCLUDE_WEATHER          => true,
+			GTM4WP_OPTION_INCLUDE_WEATHERUNITS     => 1,
+			GTM4WP_OPTION_INCLUDE_WEATHEROWMAPI    => 'owm-key',
+			GTM4WP_OPTION_INTEGRATE_WPECOMMERCE    => true,
+			GTM4WP_OPTION_BLACKLIST_SANDBOXED      => true,
+			GTM4WP_OPTION_SCROLLER_ENABLED         => true,
+			GTM4WP_OPTION_SCROLLER_CONTENTID       => 'content',
+			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR => true,
+			GTM4WP_OPTION_INTEGRATE_COOKIEYES      => true,
+			GTM4WP_OPTION_BLACKLIST_STATUS         => 'html,ua,gaawe,mf',
 		);
 
 		Migration::maybe_run();
@@ -75,6 +77,8 @@ final class MigrationTest extends TestCase {
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_BLACKLIST_SANDBOXED, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_ENABLED, $options );
 		$this->assertArrayNotHasKey( GTM4WP_OPTION_SCROLLER_CONTENTID, $options );
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR, $options, 'The WebToffee v2.x option removed in 2.1 is cleaned up.' );
+		$this->assertTrue( $options[ GTM4WP_OPTION_INTEGRATE_COOKIEYES ], 'Sibling consent tool options stay untouched.' );
 
 		/*
 		 * `ua` is stripped; `mf` must survive. Mouseflow was dropped alongside

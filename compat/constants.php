@@ -203,6 +203,7 @@ define( 'GTM4WP_OPTION_INTEGRATE_AMPID', 'integrate-amp-id' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_COOKIEBOT', 'integrate-cookiebot' );
 
+// Removed in 2.1: WebToffee GDPR Cookie Consent v2.x integration. Constant kept for third party compatibility.
 define( 'GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR', 'integrate-webtoffee-gdpr' );
 
 define( 'GTM4WP_OPTION_INTEGRATE_COOKIEYES', 'integrate-cookieyes' );

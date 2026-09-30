@@ -49,14 +49,12 @@ final class ModuleHooksTest extends TestCase {
 		return $module;
 	}
 
-	public function test_consent_mode_registers_webtoffee_js_when_enabled(): void {
-		$enabled = $this->boot( new ConsentModeModule(), array( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR => true ) );
-		$this->assertNotFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $enabled, 'add_webtoffee_header_js' ) ) );
-	}
+	public function test_stored_webtoffee_option_wires_no_head_js(): void {
+		// Removed in 2.1; a site that saved it on before upgrading gets nothing.
+		$module = $this->boot( new ConsentModeModule(), array( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR => true ) );
 
-	public function test_consent_mode_inactive_when_disabled(): void {
-		$disabled = $this->boot( new ConsentModeModule() );
-		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $disabled, 'add_webtoffee_header_js' ) ) );
+		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR, $module->defaults() );
 	}
 
 	public function test_consent_mode_wires_axeptio_when_enabled(): void {
@@ -77,19 +75,6 @@ final class ModuleHooksTest extends TestCase {
 		$this->boot( new ConsentModeModule() );
 
 		$this->assertFalse( has_filter( ContainerCode::FILTER_HEADER_TOP_JS ) );
-	}
-
-	public function test_webtoffee_header_js_uses_custom_datalayer_name(): void {
-		Functions\stubEscapeFunctions();
-
-		$module = new ConsentModeModule();
-		$this->boot( $module, array( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR => true ) );
-
-		$js = $module->add_webtoffee_header_js( '', 'customDL' );
-
-		$this->assertStringContainsString( 'window.customDL = window.customDL || [];', $js );
-		$this->assertStringContainsString( '"event": "cookie_consent_update"', $js );
-		$this->assertStringContainsString( 'CookieLawInfo_Accept_Callback', $js );
 	}
 
 	/**

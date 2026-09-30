@@ -363,7 +363,7 @@ evaluating before the next block-markup break, not after.
 | U38 | Yoast `yoast_get_primary_term_id()`; Rank Math **raw meta key** `rank_math_primary_{taxonomy}` | `src/Modules/WooCommerce/Helpers.php`, `src/Modules/PageVariables/PageVariablesModule.php` | Yoast / Rank Math | — | silent-missing | quarterly | [ ] |
 | U39 | PublishPress Authors `get_multiple_authors()` (guarded) | `src/Modules/PageVariables/PageVariablesModule.php` | — | — | silent-missing | on-demand | [-] UB-3 |
 | U40 | Cookiebot attribute `data-cookieconsent="ignore"` | `src/Frontend/ScriptTag.php` | Cookiebot | — | loud | quarterly | [ ] |
-| U41 | CookieLawInfo: overrides global `CookieLawInfo_Accept_Callback`, reads `window.CLI.consent` | `src/Modules/ConsentMode/ConsentModeModule.php` | WebToffee GDPR | — | silent-wrong | quarterly | [ ] |
+| ~~U41~~ | ~~CookieLawInfo: overrides global `CookieLawInfo_Accept_Callback`, reads `window.CLI.consent`~~ | — | — | — | — | — | **Retired 2026-09-30**: the WebToffee GDPR Cookie Consent v2.x integration was removed in 2.1 (deprecated in 2.0); the coupling no longer exists in the code. Kept so the id is not re-used |
 | U42 | CookieYes events `cookieyes_consent_update` / `cookieyes_banner_load` + detail fields | `src/Modules/ConsentMode/ConsentModeModule.php` | CookieYes | — | silent-wrong | quarterly | [ ] |
 | U43 | Axeptio: SDK URL, `window.axeptioSettings` / `window._axcb`, `cookies:complete` event | `src/Modules/ConsentMode/Axeptio.php` | Axeptio | — | silent-wrong | quarterly | [ ] |
 | U44 | Axeptio admin API `https://client.axept.io/{projectId}.json` → `data.cookies[]` shape | `js/admin/components/AxeptioVersionControl.js` | Axeptio | — | loud | quarterly | [ ] |

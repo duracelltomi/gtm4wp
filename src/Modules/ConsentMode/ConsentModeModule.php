@@ -17,13 +17,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Owns the Google consent mode default flags and the consent tool
- * integrations (Cookiebot, WebToffee GDPR Cookie Consent).
+ * integrations (Cookiebot, CookieYes, Axeptio).
  *
  * The consent mode default block itself is output by the core
  * GTM4WP\Frontend\ConsentDefaults service before the container code; the
  * Cookiebot flag is consumed by the core ScriptTag service. This module
- * adds the WebToffee consent update callback to the head block.
- * Port of the WebToffee part of gtm4wp_wp_header_top() from 1.x.
+ * adds the CookieYes and Axeptio bridges to the head block.
  */
 final class ConsentModeModule extends AbstractModule {
 
@@ -52,7 +51,6 @@ final class ConsentModeModule extends AbstractModule {
 			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_FUNC      => false,
 			GTM4WP_OPTION_INTEGRATE_CONSENTMODE_SECURUTY  => false,
 			GTM4WP_OPTION_INTEGRATE_COOKIEBOT             => false,
-			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR        => false,
 			GTM4WP_OPTION_INTEGRATE_COOKIEYES             => false,
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO               => false,
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO_PROJECTID     => '',
@@ -67,10 +65,6 @@ final class ConsentModeModule extends AbstractModule {
 	 * @return void
 	 */
 	protected function register_frontend_hooks(): void {
-		if ( $this->opt( GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR ) ) {
-			add_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $this, 'add_webtoffee_header_js' ), 20, 2 );
-		}
-
 		if ( $this->opt( GTM4WP_OPTION_INTEGRATE_COOKIEYES ) ) {
 			add_filter( ContainerCode::FILTER_HEADER_TOP_JS, array( $this, 'add_cookieyes_header_js' ), 20, 2 );
 		}
@@ -90,49 +84,10 @@ final class ConsentModeModule extends AbstractModule {
 	}
 
 	/**
-	 * Adds the WebToffee GDPR Cookie Consent callback to the data layer
-	 * initialization block. Byte-identical to the 1.x block inside
-	 * gtm4wp_wp_header_top().
-	 *
-	 * @param string $inline_js      Inline JS collected so far.
-	 * @param string $datalayer_name Name of the data layer JS variable.
-	 * @return string
-	 */
-	public function add_webtoffee_header_js( $inline_js, $datalayer_name ) {
-		return $inline_js . '
-	var CookieLawInfo_Accept_Callback = (function() {
-		var gtm4wp_original_cli_callback = CookieLawInfo_Accept_Callback;
-
-		return function() {
-			if ( !window.CLI.consent ) {
-				return false;
-			}
-
-			window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];
-			window.' . esc_js( $datalayer_name ) . '.push({
-				"event": "cookie_consent_update",
-				"consent_data": window.CLI.consent
-			});
-
-			for(var i in window.CLI.consent) {
-				window.' . esc_js( $datalayer_name ) . '.push({
-					"event": "cookie_consent_" + i
-				});
-			}
-
-			if ( "function" == typeof gtm4wp_original_cli_callback ) {
-				gtm4wp_original_cli_callback();
-			}
-		}
-	})();';
-	}
-
-	/**
 	 * Bridges CookieYes' public Consent Banner Action API (the DOM events
 	 * cookieyes_consent_update and cookieyes_banner_load on document) to a
-	 * cookie_consent_update push, the same event name the WebToffee and
-	 * Cookiebot paths emit. Only the data layer name comes from PHP; the consent
-	 * payload is read from the browser event.
+	 * cookie_consent_update push. Only the data layer name comes from PHP; the
+	 * consent payload is read from the browser event.
 	 *
 	 * @param string $inline_js      Inline JS collected so far.
 	 * @param string $datalayer_name Name of the data layer JS variable.

@@ -113,7 +113,7 @@ final class SmallModulesSiteHealthInfoTest extends ModuleSiteHealthTestCase {
 		$this->assertSame( 'on', $rows['granted_by_default']['debug'][ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ANALYTICS ] );
 		$this->assertSame( 'off', $rows['granted_by_default']['debug'][ GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ] );
 		$this->assertSame(
-			array( GTM4WP_OPTION_INTEGRATE_COOKIEBOT, GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR, GTM4WP_OPTION_INTEGRATE_COOKIEYES, GTM4WP_OPTION_INTEGRATE_AXEPTIO ),
+			array( GTM4WP_OPTION_INTEGRATE_COOKIEBOT, GTM4WP_OPTION_INTEGRATE_COOKIEYES, GTM4WP_OPTION_INTEGRATE_AXEPTIO ),
 			array_keys( $rows['consent_tools']['debug'] )
 		);
 		$this->assertSame( 'on', $rows['consent_tools']['debug'][ GTM4WP_OPTION_INTEGRATE_COOKIEBOT ] );

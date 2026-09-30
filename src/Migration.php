@@ -26,10 +26,11 @@ final class Migration {
 	public const VERSION_OPTION = 'gtm4wp-plugin-version';
 
 	/**
-	 * Option keys of features removed in 2.0: weather + geo data, WP e-Commerce,
+	 * Option keys of removed features. 2.0: weather + geo data, WP e-Commerce,
 	 * scroll tracking and the non-functional 1.x blacklist-sandboxed flag (not
 	 * migrated to the `sandboxedScripts` group on purpose: a fresh opt-in avoids
-	 * silently blocking custom templates on upgrade).
+	 * silently blocking custom templates on upgrade). 2.1: the WebToffee v2.x
+	 * consent bridge.
 	 *
 	 * @var string[]
 	 */
@@ -47,6 +48,7 @@ final class Migration {
 		GTM4WP_OPTION_SCROLLER_DISTANCE,
 		GTM4WP_OPTION_SCROLLER_CONTENTID,
 		GTM4WP_OPTION_SCROLLER_READERTIME,
+		GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
 	);
 
 	/**

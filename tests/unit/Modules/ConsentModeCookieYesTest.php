@@ -22,7 +22,7 @@ use GTM4WP\Tests\unit\TestCase;
  * There is no PHP-side JSON sink here (unlike Axeptio's settings object): the
  * consent payload is read from the browser event (e.detail), so the RI-2
  * hex-flag regression does not apply — the security-relevant guard is that the
- * data layer name is escaped, mirroring the WebToffee/Axeptio bridges.
+ * data layer name is escaped, mirroring the Axeptio bridge.
  */
 final class ConsentModeCookieYesTest extends TestCase {
 

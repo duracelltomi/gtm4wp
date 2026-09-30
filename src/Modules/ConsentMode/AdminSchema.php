@@ -36,12 +36,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	private const DOC_AXEPTIO   = self::DOC_BASE . '/axeptio-gtm4wp-how-to-setup';
 
 	/**
-	 * The WebToffee guide predates the consent hub and still lives beside it
-	 * rather than under it.
-	 */
-	private const DOC_WEBTOFFEE = 'setup-gtm4wp-features/webtoffee-gdpr-cookie-consent-plugin-gtm4wp-how-to-setup';
-
-	/**
 	 * Module documentation page.
 	 *
 	 * @return string
@@ -77,7 +71,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		return array(
 			'consent-mode' => __( 'Google Consent Mode', 'duracelltomi-google-tag-manager' ),
 			'cookiebot'    => __( 'Cookiebot', 'duracelltomi-google-tag-manager' ),
-			'webtoffee'    => __( 'WebToffee GDPR Cookie Consent', 'duracelltomi-google-tag-manager' ),
 			'cookieyes'    => __( 'CookieYes', 'duracelltomi-google-tag-manager' ),
 			'axeptio'      => __( 'Axeptio', 'duracelltomi-google-tag-manager' ),
 		);
@@ -188,19 +181,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				doc: self::DOC_COOKIEBOT
 			),
 			new Field(
-				key: GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
-				type: Field::TYPE_CHECKBOX,
-				default_value: false,
-				label: __( 'WebToffee GDPR Cookie Consent (v2.x)', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__(
-					'Enabling this feature will fire a GTM event (cookie_consent_update) when the consent banner has been closed with consents being set or during pageload when previously set consents have been found. Deprecated: this integration only targets the long-outdated WebToffee GDPR Cookie Consent v2.x product line. You do not need it with v3.x or above, which ships all the necessary code to integrate the consent banner with Google Tag Manager natively - please upgrade the WebToffee plugin instead of using this option.',
-					'duracelltomi-google-tag-manager'
-				),
-				group: 'webtoffee',
-				phase: Field::PHASE_DEPRECATED,
-				doc: self::DOC_WEBTOFFEE
-			),
-			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_COOKIEYES,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
@@ -299,7 +279,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		);
 		$tools   = array(
 			GTM4WP_OPTION_INTEGRATE_COOKIEBOT,
-			GTM4WP_OPTION_INTEGRATE_WEBTOFFEE_GDPR,
 			GTM4WP_OPTION_INTEGRATE_COOKIEYES,
 			GTM4WP_OPTION_INTEGRATE_AXEPTIO,
 		);
