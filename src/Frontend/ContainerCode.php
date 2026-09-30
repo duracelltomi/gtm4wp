@@ -313,8 +313,7 @@ final class ContainerCode {
 	private function datalayer_block( array $containers, string $datalayer_name ): string {
 		$script_tag = '
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
-<!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->
-' . $this->script_tag->opening_tag();
+<!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->';
 
 		if ( array() !== $containers ) {
 			$gtm4wp_datalayer_data = $this->datalayer->compile();
@@ -324,23 +323,29 @@ final class ContainerCode {
 			// add JSON_NUMERIC_CHECK: it coerced identifier-like strings (a SKU of
 			// "000035180", postcodes, phone numbers) into numbers; real numbers are
 			// typed at their source instead, like every other sink.
-			$datalayer_json = wp_json_encode( $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+			// The (object) cast keeps the top level an object literal: an empty or
+			// list array would encode as `[...]`, which GTM reads as a command
+			// array, not a message. Nested arrays are untouched.
+			$datalayer_json = wp_json_encode( (object) $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
-			// Omit BOTH lines on an encode failure (#141, RI-21): false renders as
-			// '' and `var dataLayer_content = ;` is a SyntaxError that would take
-			// every container loader after it. Dropping the push costs one page's
-			// data layer content and leaves the container loading.
+			// Omit the whole block on an encode failure (#141, RI-21): false renders
+			// as '' and `var dataLayer_content = ;` is a SyntaxError that would take
+			// every container loader after it. Empty content keeps the variable for
+			// custom code reading it, but is not pushed.
 			if ( false !== $datalayer_json ) {
 				$script_tag .= '
+' . $this->script_tag->opening_tag() . '
 	var dataLayer_content = ' . $datalayer_json . ';';
 
-				$script_tag .= '
+				if ( array() !== $gtm4wp_datalayer_data ) {
+					$script_tag .= '
 	' . esc_js( $datalayer_name ) . '.push( dataLayer_content );';
+				}
+
+				$script_tag .= '
+</script>';
 			}
 		}
-
-		$script_tag .= '
-</script>';
 
 		return $script_tag;
 	}

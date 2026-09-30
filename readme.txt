@@ -355,6 +355,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Added: the plugin registers **abilities** with the WordPress Abilities API (WordPress 6.9+; nothing changes below that), so an AI assistant connected through the WordPress MCP Adapter or another client can read the configuration, help work out why tracking is not firing, and change a setting once you have confirmed it. Eleven abilities, six of them read-only, all requiring the settings capability and returning no keys and no visitor data. `gtm4wp_abilities_enabled` and `gtm4wp_abilities_allow_write` switch the surface off or keep it read-only. **Experimental.**
 * Changed: the admin notices about a missing container ID, an incomplete environment configuration, a malformed `GTM4WP_HARDCODED_*` constant, a visitor IP header with no trusted proxies and an unusable data layer variable name now carry a separate "Open the setting" link after the message. The same checks feed `gtm4wp/get-status`, so an assistant and the screen report the same problems.
 
+= 2.0.5 =
+
+* Fixed: a page with no data layer variables to report no longer pushes an empty array into the data layer; `dataLayer_content` is then an empty object and is not pushed. Content that is pushed is always an object, never an array, which GTM would read as a command.
+
 = 2.0.4 =
 
 * Fixed: on the classic WooCommerce checkout, an error in the plugin's checkout step tracking could stop the order from being submitted the normal way, so a gateway that adds card details in the browser, such as Stripe, rejected it. Tracking errors can no longer interrupt the checkout or a variation selection, and still show in the browser console. (#472)
