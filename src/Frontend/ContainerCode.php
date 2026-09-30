@@ -325,10 +325,10 @@ final class ContainerCode {
 			// add JSON_NUMERIC_CHECK: it coerced identifier-like strings (a SKU of
 			// "000035180", postcodes, phone numbers) into numbers; real numbers are
 			// typed at their source instead, like every other sink.
-			// The (object) cast keeps the top level an object literal: an empty or
+			// json_object() keeps the top level an object literal: an empty or
 			// list array would encode as `[...]`, which GTM reads as a command
 			// array, not a message. Nested arrays are untouched.
-			$datalayer_json = wp_json_encode( (object) $gtm4wp_datalayer_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+			$datalayer_json = wp_json_encode( ScriptTag::json_object( $gtm4wp_datalayer_data ), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
 			// Omit the whole block on an encode failure (#141, RI-21): false renders
 			// as '' and `var dataLayer_content = ;` is a SyntaxError that would take

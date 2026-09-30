@@ -11,6 +11,7 @@ use Brain\Monkey\Functions;
 use GTM4WP\Modules\VisitorData\VisitorDataEndpoint;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Tests\unit\TestCase;
+use GTM4WP\Tests\unit\WpJsonEncodeWithRepair;
 
 /**
  * The endpoint delivers the Tier 2/3 visitor fields for the CURRENT request only.
@@ -233,5 +234,41 @@ final class VisitorDataEndpointTest extends TestCase {
 			has_filter( 'rest_pre_serve_request' ),
 			'The CORS policy must be registered at plugin level, not by this module.'
 		);
+	}
+
+	/**
+	 * A request whose resolvers all gate out still gets a JSON object, never an
+	 * empty array (the client reads the payload as a key => value map).
+	 */
+	public function test_an_empty_map_serializes_as_an_object(): void {
+		$this->stub_declared_fields(
+			array(
+				new VisitorField( 'visitorEmail', VisitorField::TIER_ACTION, '', static fn () => null, 'gtm4wp_login' ),
+			)
+		);
+
+		$body = ( new VisitorDataEndpoint() )->get_visitor_data()->get_data();
+
+		$this->assertSame( '{}', $body['payload'] );
+	}
+
+	/**
+	 * #330: the map is encoded as the array, not cast to an object. Through a
+	 * double of core's invalid-UTF-8 repair pass, a cast map throws an Error
+	 * (the REST request fatals); the array is repaired and returned.
+	 */
+	public function test_payload_survives_the_wp_json_encode_repair_pass(): void {
+		Functions\when( 'wp_json_encode' )->alias( array( WpJsonEncodeWithRepair::class, 'encode' ) );
+
+		$this->stub_declared_fields(
+			array(
+				new VisitorField( "\0k", VisitorField::TIER_SESSION, '', static fn () => 1 ),
+				new VisitorField( 'visitorCountry', VisitorField::TIER_SESSION, '', static fn () => "caf\xE9" ),
+			)
+		);
+
+		$body = ( new VisitorDataEndpoint() )->get_visitor_data()->get_data();
+
+		$this->assertStringContainsString( '"visitorCountry":"caf', $body['payload'] );
 	}
 }

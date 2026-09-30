@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\VisitorData;
 
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,10 +82,10 @@ final class VisitorDataEndpoint {
 
 		$response = new \WP_REST_Response(
 			array(
-				// Hex-flagged (RI-2), parsed back by the client; cast to object so an
+				// Hex-flagged (RI-2), parsed back by the client; json_object() so an
 				// empty map serializes as {} not [].
 				'payload' => (string) wp_json_encode(
-					(object) $data,
+					ScriptTag::json_object( $data ),
 					JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
 				),
 				// FRESH nonce for the confirm beacons: the config nonce baked into a
