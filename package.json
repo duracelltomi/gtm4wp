@@ -49,6 +49,7 @@
     "puppeteer-core": "^25.0.0",
     "serialize-javascript": "^7.0.5",
     "svgo@^3.0.0": "^3.3.5",
+    "webpack-dev-middleware": "^8.3.0",
     "webpack-dev-server": "^6.0.0"
   }
 }
