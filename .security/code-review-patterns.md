@@ -657,12 +657,15 @@ but rate the *blast radius*, which is the whole block rather than the value.
   `null` literal, which every JS reader already handles as absent). Where the whole statement
   can be left out, call the encoder directly, test `false ===`, and **omit** — an absent key
   is honest where an invented `null` is not (RI-13's omit-don't-invent).
-- **The encoder can also THROW, not only return `false` (#330, R41).** `_wp_json_sanity_check()`'s
-  repair path treats an object differently from an array, so casting an associative array to
-  `(object)` before `wp_json_encode()` changes what happens on the fallback, and an `Error`
-  passes both `wp_json_encode`'s `catch ( Exception )` and a `false !==` guard. Cast only what
-  needs it (an empty or list array, to force `{}`), and test the fallback with a double that
-  models it: the suite's `wp_json_encode` stubs are plain `json_encode` (UC-3).
+- **The encoder can also THROW, not only return `false` (#330, R41, fixed).** `_wp_json_sanity_check()`'s
+  repair path walks an object differently from an array: its object branch can throw an `Error`
+  on a key the array branch handles, and an `Error` passes both `wp_json_encode`'s
+  `catch ( Exception )` and any `false !==` guard. **Never `(object)`-cast a whole map to force
+  `{}`; use `ScriptTag::json_object()`**, which casts only an empty or list array. Test the
+  repair pass with `tests/unit/WpJsonEncodeWithRepair.php` (core's port, U169): the suite's
+  other `wp_json_encode` stubs are plain `json_encode` and never reach it (UC-3). Ledger at
+  the fix: 2 whole-map casts fed to `wp_json_encode`, both migrated; the remaining `(object)`
+  casts in `src/` are REST/abilities/admin payloads keyed by option or module names.
 - **A failed encode must not be recorded as a success.** `PurchaseTracking` flagged
   `_ga_tracked` after emitting a `.push()` that pushed nothing, which suppresses that purchase
   **permanently**, on every later page view. When a sink writes a de-dupe marker, the marker

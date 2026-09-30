@@ -1164,11 +1164,15 @@ digest `4c635d2f8470c1b0` = R39/R40 pin; allowlists unchanged (10 entries; the o
 **0 Critical / High / Medium. 1 Low (#330), no security finding.** Adjudication: 1 draft, 1 read-only
 verifier; mechanism widened, recommendation and disposition refuted (the draft's "accept" became a
 narrowed cast). Snapshots clean. **Suite: `master` PHP 3288 / 18126 (worktree with its own vendor),
-`2.0` PHP 2082 / 5017, `phpcs` 0 on both; no `js/` change.**
+`2.0` PHP 2082 / 5017, `phpcs` 0 on both; no `js/` change.** **Fixes:** `e21eea5` (`master`) / `e9ffeff`
+(`2.0`): #330 at both sites through one helper, the endpoint sibling included at the maintainer's request;
+6 new tests, red-probed on both branches (4 red against an always-cast helper, the 2 empty/list tests
+green by design); suite after the fix `master` **3294 / 18137**, `2.0` **2088 / 5028**, random order
+stable, `phpcs` 0. Base for the next review: `e21eea5`.
 
 | # | Sev | Status | Actor | Area | Summary |
 |---|---|---|---|---|---|
-| 330 | Low | open | A4 | `src/Frontend/ContainerCode.php` `datalayer_block()` (both branches); sibling shape in `VisitorDataEndpoint` | The new top-level `(object)` cast before `wp_json_encode` changes the encoder's failure mode for one filter-supplied input shape (RI-21 family); detail in the R41 report |
+| 330 | Low | fixed (`e21eea5` on `master`, `e9ffeff` on `2.0`; shared `ScriptTag::json_object()`, both sites; U169) | A4 | `src/Frontend/ContainerCode.php` `datalayer_block()` + `src/Modules/VisitorData/VisitorDataEndpoint.php` (both branches) | A top-level `(object)` cast of an associative map before `wp_json_encode` sent core's invalid-UTF-8 repair pass down its object branch, which can throw an `Error` no `false` guard catches (RI-21 family) |
 
 ### Report 40: `.security/code-review-report-2026-09-28-1430.md`
 
