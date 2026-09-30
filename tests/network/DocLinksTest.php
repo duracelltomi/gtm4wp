@@ -105,6 +105,17 @@ final class DocLinksTest extends TestCase {
 			}
 
 			foreach ( $schema->fields() as $field ) {
+				// Inline gtm4wp.com links in a description get the same probe; one
+				// pointing at a retired path survived for years behind a redirect.
+				preg_match_all( '#href="https://gtm4wp\.com/([^"\#]+)(?:\#([^"]+))?"#', $field->description, $inline, PREG_SET_ORDER );
+				foreach ( $inline as $i => $match ) {
+					$targets[ 'inline:' . $field->key . ':' . $i ] = array(
+						'path'   => $match[1],
+						'anchor' => $match[2] ?? '',
+						'what'   => "description link of option '{$field->key}'",
+					);
+				}
+
 				if ( '' === $field->doc ) {
 					continue;
 				}

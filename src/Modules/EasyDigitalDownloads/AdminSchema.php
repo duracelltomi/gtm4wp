@@ -43,6 +43,12 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	private const DOC_REFERENCE = self::DOC_PAGE . '/easy-digital-downloads-settings-reference';
 
 	/**
+	 * The EDD Google Ads guide (conversion tracking, dynamic remarketing,
+	 * enhanced conversions), linked from a field description.
+	 */
+	private const DOC_GOOGLE_ADS = self::DOC_PAGE . '/google-ads-for-easy-digital-downloads';
+
+	/**
 	 * Module documentation page.
 	 *
 	 * @return string
@@ -234,7 +240,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 						'Select which vertical category to add next to each download to utilize dynamic remarketing for Google Ads. Use the plugin\'s %1$sofficial setup guide for dynamic remarketing%2$s to setup your Google Tag Manager container.',
 						'duracelltomi-google-tag-manager'
 					),
-					'<a href="https://gtm4wp.com/how-to-articles/how-to-setup-dynamic-remarketing-in-google-ads-adwords" target="_blank" rel="noopener">',
+					'<a href="https://gtm4wp.com/' . self::DOC_GOOGLE_ADS . '#dynamic-remarketing" target="_blank" rel="noopener">',
 					'</a>'
 				),
 				group: 'products',

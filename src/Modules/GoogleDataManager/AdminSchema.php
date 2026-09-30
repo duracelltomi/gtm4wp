@@ -38,9 +38,10 @@ defined( 'ABSPATH' ) || exit;
 final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, PanelSchemaInterface, SiteHealthInfoInterface, SiteHealthTestsInterface, AbilitiesInterface {
 
 	/**
-	 * Documentation page of this module on gtm4wp.com.
+	 * Documentation hub of this module on gtm4wp.com; it also carries the anchors
+	 * of the options below.
 	 */
-	private const DOC_PAGE = 'setup-gtm4wp-features/google-data-manager';
+	private const DOC_PAGE = 'google-data-manager-for-wordpress';
 
 	/**
 	 * Id of the React component rendering the test panel, defined in
