@@ -289,7 +289,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add all order attributes into the data layer on the order received page regardless and independently from ecommerce tracking', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this to add all order attributes into the data layer on the order received page, even when the purchase event itself is not sent, for example because the order was already tracked. Requires "Track e-commerce" to be on.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				doc: self::DOC_REFERENCE
 			),

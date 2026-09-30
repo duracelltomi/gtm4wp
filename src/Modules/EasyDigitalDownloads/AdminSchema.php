@@ -224,7 +224,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Persist download list attribution across the funnel', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'When a visitor clicks a download in a list, remember which list it was (item_list_name / item_list_id) in a first-party cookie and carry it onto the later view_item, add_to_cart, begin_checkout, add_payment_info and purchase events, so GA4 can attribute the whole funnel to the originating list. On a download page the list is merged in by the browser rather than by the server, so the attribution also works when the page is served from a full-page cache. Only enable this if you are NOT already doing the same with custom JavaScript in Google Tag Manager, otherwise the attribution would be set twice. If the WooCommerce integration is also active, its setting of the same name shares the browser flag with this one.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'When a visitor clicks a download in a list, remember which list it was (item_list_name / item_list_id) in a first-party cookie and carry it onto the later view_item, add_to_cart, remove_from_cart, view_cart, begin_checkout, add_payment_info and purchase events and the cart content variable, so GA4 can attribute the whole funnel to the originating list. On a download page the list is merged in by the browser rather than by the server, so the attribution also works when the page is served from a full-page cache. Only enable this if you are NOT already doing the same with custom JavaScript in Google Tag Manager, otherwise the attribution would be set twice. If the WooCommerce integration is also active, its setting of the same name shares the browser flag with this one.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE
@@ -263,7 +263,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this option to include the content of the Easy Digital Downloads cart in the data layer on each page. Especially useful for site personalization tools. Not included on cacheable pages when the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this option to include the content of the Easy Digital Downloads cart in the data layer on each page. Especially useful for site personalization tools. Left out on every page while the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -273,7 +273,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add data of the logged in customer (name, email and hashed email, total number of orders and order value) into the data layer, and the Enhanced Conversions user_data block onto the purchase event. A phone number stored by a checkout-field extension is included as an E.164 hash. Not included on cacheable pages when the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this to add data of the logged in customer (name, email and hashed email, total number of orders and order value) into the data layer, and the Enhanced Conversions user_data block onto the purchase event. A phone number from the Easy Digital Downloads Phone field or a checkout-field extension is included as an E.164 hash. The customer variables are left out on every page while the cache-safe data layer mode is on; the user_data block of the purchase event is not affected.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -283,7 +283,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add all order attributes into the data layer on the purchase confirmation page regardless and independently from ecommerce tracking. The payment key of the order is never included, as it authorizes viewing the receipt.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this to add all order attributes into the data layer on the purchase confirmation page, even when the purchase event itself is not sent, for example because the order was already tracked. Requires "Track e-commerce" to be on. The payment key of the order is never included, as it authorizes viewing the receipt.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -344,7 +344,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to measure the purchase on the next page the buyer visits when the confirmation page was never reached - for example an abandoned offsite payment redirect. The order is resolved from the buyer\'s own purchase session, every duplicate-prevention check still applies, and the raw order data block stays exclusive to the confirmation page. Has no effect while "Do not flag orders as being tracked" is enabled or, on cacheable pages, while the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this to measure the purchase on the next page the buyer visits when the confirmation page was never reached - for example an abandoned offsite payment redirect. The order is resolved from the buyer\'s own purchase session, every duplicate-prevention check still applies, and the raw order data block stays exclusive to the confirmation page. Has no effect while "Do not flag orders as being tracked" is enabled or while the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE
