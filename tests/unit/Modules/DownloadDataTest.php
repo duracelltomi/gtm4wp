@@ -605,8 +605,8 @@ final class DownloadDataTest extends TestCase {
 		$order_data = $download_data->get_raw_order_datalayer( $order, $download_data->process_order_items( $order ) );
 
 		$this->assertSame( '77', (string) $order_data['attributes']['order_number'] );
-		$this->assertSame( 'stripe', $order_data['attributes']['payment_gateway'] );
-		$this->assertSame( 'buyer@example.com', $order_data['customer']['email'] );
+		$this->assertSame( 'stripe', $order_data['attributes']['payment_method'] );
+		$this->assertSame( 'buyer@example.com', $order_data['customer']['billing']['email'] );
 
 		// The payment key authorizes viewing the receipt; the data layer is
 		// readable by every tag on the page, so the key must never appear -
@@ -614,6 +614,52 @@ final class DownloadDataTest extends TestCase {
 		$serialized = (string) wp_json_encode( $order_data );
 		$this->assertStringNotContainsString( 'pk_super_secret_key', $serialized );
 		$this->assertStringNotContainsString( 'payment_key', $serialized );
+	}
+
+	/**
+	 * The EDD orderData uses the WooCommerce key names, so the "Order Data -"
+	 * variables of the GTM4WP container template read both stores. Pins the
+	 * paths the template reads and that the pre-alignment names are gone.
+	 *
+	 * @return void
+	 */
+	public function test_raw_order_datalayer_uses_the_woocommerce_key_names(): void {
+		Functions\when( 'edd_get_order_meta' )->alias(
+			static fn ( $order_id, $key ) => '_edd_phone' === $key ? '030 12345678' : ''
+		);
+
+		$download_data = $this->make_download_data();
+		$order         = $this->make_order(
+			array(
+				'date_created' => '2026-10-01 08:30:00',
+				'address'      => array(
+					'first_name' => 'John',
+					'country'    => 'DE',
+				),
+			)
+		);
+
+		$order_data = $download_data->get_raw_order_datalayer( $order, $download_data->process_order_items( $order ) );
+
+		$this->assertSame( '2026-10-01T08:30:00+00:00', $order_data['attributes']['date'] );
+		$this->assertSame( 4.0, $order_data['totals']['total_discount'] );
+		$this->assertSame( 4.0, $order_data['totals']['discount_total'] );
+		$this->assertSame( 2.0, $order_data['totals']['total_tax'] );
+		$this->assertSame( 2.0, $order_data['totals']['cart_tax'] );
+		$this->assertSame( 38.0, $order_data['totals']['total'] );
+		$this->assertSame( 12, $order_data['customer']['id'] );
+
+		$billing = $order_data['customer']['billing'];
+		$this->assertSame( hash( 'sha256', 'buyer@example.com' ), $billing['email_hash'] );
+		$this->assertSame( hash( 'sha256', 'john' ), $billing['first_name_hash'] );
+		$this->assertSame( 'DE', $billing['country'] );
+		$this->assertSame( '030 12345678', $billing['phone'] );
+		$this->assertSame( hash( 'sha256', '+493012345678' ), $billing['phone_hash'] );
+
+		$this->assertArrayNotHasKey( 'payment_gateway', $order_data['attributes'] );
+		$this->assertArrayNotHasKey( 'discount', $order_data['totals'] );
+		$this->assertArrayNotHasKey( 'tax', $order_data['totals'] );
+		$this->assertArrayNotHasKey( 'email', $order_data['customer'] );
 	}
 
 	public function test_raw_order_datalayer_passes_customer_and_coupon_values_raw(): void {
@@ -649,11 +695,11 @@ final class DownloadDataTest extends TestCase {
 
 		$order_data = $download_data->get_raw_order_datalayer( $order, $download_data->process_order_items( $order ) );
 
-		$this->assertSame( $hostile_name, $order_data['customer']['first_name'] );
-		$this->assertSame( $hostile_name, $order_data['customer']['city'] );
+		$this->assertSame( $hostile_name, $order_data['customer']['billing']['first_name'] );
+		$this->assertSame( $hostile_name, $order_data['customer']['billing']['city'] );
 		$this->assertSame( $hostile_coupon, $order_data['attributes']['coupons'] );
 
-		foreach ( array( $order_data['customer']['first_name'], $order_data['attributes']['coupons'] ) as $value ) {
+		foreach ( array( $order_data['customer']['billing']['first_name'], $order_data['attributes']['coupons'] ) as $value ) {
 			$this->assertStringNotContainsString( '&amp;', $value );
 			$this->assertStringNotContainsString( '&quot;', $value );
 			$this->assertStringNotContainsString( '&lt;', $value );

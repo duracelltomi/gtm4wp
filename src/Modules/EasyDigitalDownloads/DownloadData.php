@@ -502,38 +502,54 @@ final class DownloadData {
 		$email_hash = Helpers::normalize_and_hash_email_address( 'sha256', $email );
 		$first_name = (string) self::row_prop( $address, 'first_name' );
 		$last_name  = (string) self::row_prop( $address, 'last_name' );
+		$country    = (string) self::row_prop( $address, 'country' );
+		$phone      = $this->order_phone( $order );
+		$discount   = (float) self::row_prop( $order, 'discount', 0 );
+		$tax        = (float) self::row_prop( $order, 'tax', 0 );
 
-		// Values are passed raw: the sink escapes with wp_json_encode() + hex flags.
+		// EDD stores dates in UTC; ISO 8601 like the WooCommerce orderData.
+		$date_created = (string) self::row_prop( $order, 'date_created' );
+		$timestamp    = '' !== $date_created ? strtotime( $date_created . ' UTC' ) : false;
+
+		// Same key names as the WooCommerce orderData, so one GTM container serves
+		// both stores; EDD has no shipping, company or order key to map. Values are
+		// passed raw: the sink escapes with wp_json_encode() + hex flags.
 		$order_data = array(
 			'attributes' => array(
-				'date'            => (string) self::row_prop( $order, 'date_created' ),
-				'order_number'    => (string) $order->get_number(),
-				'payment_gateway' => (string) self::row_prop( $order, 'gateway' ),
-				'mode'            => (string) self::row_prop( $order, 'mode' ),
-				'status'          => (string) self::row_prop( $order, 'status' ),
-				'coupons'         => implode( ', ', $this->order_discount_codes( $order ) ),
+				'date'           => false !== $timestamp ? gmdate( 'c', $timestamp ) : $date_created,
+				'order_number'   => (string) $order->get_number(),
+				'payment_method' => (string) self::row_prop( $order, 'gateway' ),
+				'mode'           => (string) self::row_prop( $order, 'mode' ),
+				'status'         => (string) self::row_prop( $order, 'status' ),
+				'coupons'        => implode( ', ', $this->order_discount_codes( $order ) ),
 			),
 			'totals'     => array(
-				'currency' => (string) self::row_prop( $order, 'currency' ),
-				'subtotal' => (float) self::row_prop( $order, 'subtotal', 0 ),
-				'discount' => (float) self::row_prop( $order, 'discount', 0 ),
-				'tax'      => (float) self::row_prop( $order, 'tax', 0 ),
-				'total'    => (float) self::row_prop( $order, 'total', 0 ),
+				'currency'       => (string) self::row_prop( $order, 'currency' ),
+				'discount_total' => $discount,
+				'cart_tax'       => $tax,
+				'total'          => (float) self::row_prop( $order, 'total', 0 ),
+				'total_tax'      => $tax,
+				'total_discount' => $discount,
+				'subtotal'       => (float) self::row_prop( $order, 'subtotal', 0 ),
 			),
 			'customer'   => array(
-				'id'              => (int) self::row_prop( $order, 'customer_id', 0 ),
-				'first_name'      => $first_name,
-				'first_name_hash' => Helpers::normalize_and_hash( 'sha256', $first_name, false ),
-				'last_name'       => $last_name,
-				'last_name_hash'  => Helpers::normalize_and_hash( 'sha256', $last_name, false ),
-				'address_1'       => (string) self::row_prop( $address, 'address' ),
-				'address_2'       => (string) self::row_prop( $address, 'address2' ),
-				'city'            => (string) self::row_prop( $address, 'city' ),
-				'state'           => (string) self::row_prop( $address, 'region' ),
-				'postcode'        => (string) self::row_prop( $address, 'postal_code' ),
-				'country'         => (string) self::row_prop( $address, 'country' ),
-				'email'           => $email,
-				'email_hash'      => $email_hash,
+				'id'      => (int) self::row_prop( $order, 'customer_id', 0 ),
+				'billing' => array(
+					'first_name'      => $first_name,
+					'first_name_hash' => Helpers::normalize_and_hash( 'sha256', $first_name, false ),
+					'last_name'       => $last_name,
+					'last_name_hash'  => Helpers::normalize_and_hash( 'sha256', $last_name, false ),
+					'address_1'       => (string) self::row_prop( $address, 'address' ),
+					'address_2'       => (string) self::row_prop( $address, 'address2' ),
+					'city'            => (string) self::row_prop( $address, 'city' ),
+					'state'           => (string) self::row_prop( $address, 'region' ),
+					'postcode'        => (string) self::row_prop( $address, 'postal_code' ),
+					'country'         => $country,
+					'email'           => $email,
+					'email_hash'      => $email_hash,
+					'phone'           => $phone,
+					'phone_hash'      => '' !== $phone ? Helpers::normalize_and_hash_phone_number( 'sha256', $phone, $country ) : '',
+				),
 			),
 			'items'      => $order_items,
 		);
@@ -708,9 +724,9 @@ final class DownloadData {
 
 		/**
 		 * Filters the buyer phone number used for the Enhanced Conversions
-		 * user_data block of an EDD purchase. The number is normalized to
-		 * E.164 and SHA-256 hashed before it reaches the data layer; returning
-		 * '' removes the phone from the block.
+		 * user_data block of an EDD purchase (normalized to E.164 and SHA-256
+		 * hashed) and for orderData.customer.billing.phone / phone_hash;
+		 * returning '' removes the phone from both.
 		 *
 		 * @param string            $phone The phone number found in order/payment meta, or ''.
 		 * @param \EDD\Orders\Order $order The order being tracked.
