@@ -112,7 +112,7 @@ final class ScriptTag {
 	 * `false ===` guard catches (#330, RI-21).
 	 *
 	 * @param array<int|string, mixed> $data The map to encode.
-	 * @return array<string, mixed>|object The map itself, or an object for an empty or list array.
+	 * @return array<int|string, mixed>|object The map itself, or an object for an empty or list array.
 	 */
 	public static function json_object( array $data ): array|object {
 		if ( array() === $data || array_keys( $data ) === range( 0, count( $data ) - 1 ) ) {
