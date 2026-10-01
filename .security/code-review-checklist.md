@@ -1148,6 +1148,28 @@ Deep-pass re-audit of the oldest `[x]` rows (MediaEvents 07-13, ContactForm7 07-
 ConsentMode 07-14/15, Module Framework 07-10) produced #112 and nothing else; the
 ConsentMode bridges interpolate only the validated data-layer identifier.
 
+### Report 42: `.security/code-review-report-2026-10-01-1516.md`
+
+**Reviewed at:** `97e6312` (`master`) + `e9ffeff` (`2.0`, same production change) · **Base:** `26468f4`
+(R41's ledger commit; range `26468f4..97e6312`, 2 commits; production: R41's #330 fix session `e21eea5`
+read as new code — `ScriptTag::json_object()` and its two call sites). Release gate for 2.0.5, **scoped
+by the maintainer to the fix session, shipping PHP/JS only**: the 2.1 commits after it on `master`
+(`5a08cd0`, `edd80cf`, `6988eb3`, `4442cc0`) are NOT covered, and the toolchain-trust and new-surface
+sweeps were not run (their R41 dates stand). Branch parity: statements byte-identical, one comment line
+and the U169 row differ by design. `json_object()` probed against `json_encode()`'s list rule on 8 key
+shapes: casts exactly the `[...]` cases, output an object in all 8. RI-21 family re-enumerated: the two
+`RestController` `(object) $errors` casts take schema-owned keys only, not siblings. **FP-4 re-derived**
+(rotation, oldest live): AMP untouched in range, raw `vars` passthrough to amp-wp unchanged, holds.
+
+**0 Critical / High / Medium. 1 Low (#331), no security finding.** Adjudication: 1 draft, 1 read-only
+verifier, mechanism and recommendation confirmed. Snapshots clean. **Suite: `2.0` PHP 2088 / 5028, JS
+765 / 35, `phpcs` 0.** **Fixes:** `3416c4a` (`2.0`) / `e6ab211` (`master`), docblock only. Base for the
+next review: `97e6312`.
+
+| # | Sev | Status | Actor | Area | Summary |
+|---|---|---|---|---|---|
+| 331 | Low | fixed (`3416c4a` on `2.0`, `e6ab211` on `master`) | — | `src/Frontend/ScriptTag.php` `json_object()` (both branches) | The `@return` typed the unchanged-array case as string-keyed while integer-keyed non-list arrays also pass through; now `array<int\|string, mixed>\|object`, matching the `@param` |
+
 ### Report 41: `.security/code-review-report-2026-09-30-0834.md`
 
 **Reviewed at:** `3c22305` (`master`) + `8c42d23` (`2.0`, same production change) · **Base:** `65f22fb`
