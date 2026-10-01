@@ -11,6 +11,9 @@
  *   anonymous visitor never fetches user data.
  * - WooCommerce customer & cart: read from the cart-fragments payload
  *   WooCommerce already refreshes.
+ * - Other stores' customer & cart (Easy Digital Downloads): a Tier 3 field
+ *   listed in config.blocks, whose value is the same { customer, cart } pair;
+ *   re-fetched on GTM4WP_VISITOR_REFRESH_EVENT after a same-page cart change.
  * - WooCommerce one-shots (the add_to_cart after a cart "Undo", the
  *   reliable-purchase fallback): the same endpoint, only while the event
  *   cookie is present, fired ONCE with a de-dupe guard (the purchase reuses
@@ -22,10 +25,10 @@
  * Each family is its own event so a GTM setup can tell from the name alone
  * which keys arrived: gtm4wp.visitorData (Tier 1 + endpoint fields, ONE push,
  * synchronous when replayed from the cache), gtm4wp.customerData and
- * gtm4wp.cartData. The WooCommerce families arrive later than the flush (the
- * placeholder in the HTML is empty by design) and are re-pushed on a cart
- * change, each gated on ITS OWN half having changed; an absent family fires
- * no event, but an empty cart IS delivered, with items: [].
+ * gtm4wp.cartData. The store families are pushed after the visitor event and
+ * re-pushed on a cart change, each gated on ITS OWN half having changed, per
+ * source; an absent family fires no event, but an empty cart IS delivered,
+ * with items: [].
  *
  * The config VisitorDataModule bakes into the page carries no visitor value.
  */
@@ -34,6 +37,7 @@ import {
 	gtm4wp_write_cookie,
 	gtm4wp_clear_cookie,
 } from './lib/gtm4wp-cookies';
+import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 
 ( function () {
 	'use strict';
@@ -48,6 +52,10 @@ import {
 	const config = window.gtm4wp_visitordata_config || { fields: {} };
 	const datalayerName = window.gtm4wp_datalayer_name || 'dataLayer';
 	const fields = config.fields || {};
+
+	// Endpoint keys whose value is a { customer, cart } pair for the store
+	// events, never merged into the visitor push.
+	const blockKeys = Array.isArray( config.blocks ) ? config.blocks : [];
 
 	/**
 	 * Resolves one data layer event name from the config. After an update the
@@ -107,13 +115,15 @@ import {
 
 	/**
 	 * The single accumulated visitor push (Tier 1 + endpoint fields), flushed
-	 * once when the endpoint is ready. The WooCommerce families are not
-	 * collected here.
+	 * once when the endpoint is ready. The store blocks are set aside in
+	 * collectedBlocks and delivered after it.
 	 */
 	const collected = {};
+	const collectedBlocks = {};
 
 	/**
-	 * Merges a key => value map into the pending single push.
+	 * Merges a key => value map into the pending single push, routing the
+	 * config.blocks keys aside.
 	 *
 	 * @param {Object} map The keys to add.
 	 * @return {void}
@@ -124,6 +134,10 @@ import {
 		}
 
 		Object.keys( map ).forEach( function ( key ) {
+			if ( -1 !== blockKeys.indexOf( key ) ) {
+				collectedBlocks[ key ] = map[ key ];
+				return;
+			}
 			collected[ key ] = map[ key ];
 		} );
 	}
@@ -482,6 +496,83 @@ import {
 		readdedToCart: handleReaddedToCart,
 	};
 
+	const sessionKey = config.sessionKey || 'gtm4wp_visitor_session';
+	const configGates = Array.isArray( config.gates ) ? config.gates : [];
+
+	/**
+	 * Reads the sessionStorage cache, normalized to an object with a gates map.
+	 *
+	 * @return {Object} The cache.
+	 */
+	function readStore() {
+		let store;
+		try {
+			store = JSON.parse(
+				window.sessionStorage.getItem( sessionKey ) || '{}'
+			);
+		} catch ( e ) {
+			store = {};
+		}
+		if ( ! store || 'object' !== typeof store ) {
+			store = {};
+		}
+		if ( ! store.gates || 'object' !== typeof store.gates ) {
+			store.gates = {};
+		}
+		return store;
+	}
+
+	/**
+	 * Writes the sessionStorage cache; a full or blocked storage is ignored.
+	 *
+	 * @param {Object} store The cache.
+	 * @return {void}
+	 */
+	function writeStore( store ) {
+		try {
+			window.sessionStorage.setItem(
+				sessionKey,
+				JSON.stringify( store )
+			);
+		} catch ( e ) {}
+	}
+
+	/**
+	 * Whether a fetch with these active gates sends the baked nonce: only for a
+	 * logged-in visitor (the login gate; their page is never cached, so it is
+	 * fresh). Any other gate (a guest's cart) rides cacheable pages, where a
+	 * stale nonce would 403 the read. A config without loginGate (cached HTML
+	 * from before it existed) treats every gate as the login gate.
+	 *
+	 * @param {Array} activeGates The { cookie, value } gates present now.
+	 * @return {boolean} True when X-WP-Nonce is sent.
+	 */
+	function sendsNonceFor( activeGates ) {
+		if ( ! config.nonce ) {
+			return false;
+		}
+		return activeGates.some( function ( gate ) {
+			return ! config.loginGate || gate.cookie === config.loginGate;
+		} );
+	}
+
+	/**
+	 * GETs the session endpoint.
+	 *
+	 * @param {boolean} withNonce Whether to send the baked nonce.
+	 * @return {Promise} The fetch promise.
+	 */
+	function requestEndpoint( withNonce ) {
+		const headers = { Accept: 'application/json' };
+		if ( withNonce ) {
+			headers[ 'X-WP-Nonce' ] = config.nonce;
+		}
+		return fetch( config.endpoint, {
+			credentials: 'same-origin',
+			headers,
+		} );
+	}
+
 	/**
 	 * Tier 2/3: gather the server-only fields into the pending push, fetching
 	 * only when needed (Tier 2 once per session, a Tier 3 gate only when its
@@ -497,11 +588,10 @@ import {
 			return;
 		}
 
-		const sessionKey = config.sessionKey || 'gtm4wp_visitor_session';
 		const sessionFields = Array.isArray( config.session )
 			? config.session
 			: [];
-		const gates = Array.isArray( config.gates ) ? config.gates : [];
+		const gates = configGates;
 		const actions = Array.isArray( config.actions ) ? config.actions : [];
 
 		// One-shot field names (routed to their handlers, kept out of the merged
@@ -518,20 +608,7 @@ import {
 			} );
 		} );
 
-		let store;
-		try {
-			store = JSON.parse(
-				window.sessionStorage.getItem( sessionKey ) || '{}'
-			);
-		} catch ( e ) {
-			store = {};
-		}
-		if ( ! store || 'object' !== typeof store ) {
-			store = {};
-		}
-		if ( ! store.gates || 'object' !== typeof store.gates ) {
-			store.gates = {};
-		}
+		const store = readStore();
 
 		let needFetch = false;
 		let dirty = false;
@@ -591,12 +668,7 @@ import {
 
 		if ( ! needFetch ) {
 			if ( dirty ) {
-				try {
-					window.sessionStorage.setItem(
-						sessionKey,
-						JSON.stringify( store )
-					);
-				} catch ( e ) {}
+				writeStore( store );
 			}
 			collect( replay );
 			done();
@@ -610,22 +682,9 @@ import {
 			return;
 		}
 
-		// The baked nonce ONLY for a logged-in visitor (active Tier 3 gate; their
-		// page is never cached, so it is fresh). An anonymous fetch sends none: a
-		// stale nonce from a long-lived cached page would 403 the read.
-		const sendNonce = !! ( config.nonce && activeGates.length );
+		const sendNonce = sendsNonceFor( activeGates );
 		let anonymousRetry = false;
-
-		const request = function ( withNonce ) {
-			const headers = { Accept: 'application/json' };
-			if ( withNonce ) {
-				headers[ 'X-WP-Nonce' ] = config.nonce;
-			}
-			return fetch( config.endpoint, {
-				credentials: 'same-origin',
-				headers,
-			} );
-		};
+		const request = requestEndpoint;
 
 		request( sendNonce )
 			.then( function ( response ) {
@@ -807,22 +866,18 @@ import {
 		return parsed;
 	}
 
-	// Last delivered state per family, so each event fires only when ITS OWN
-	// half changed (WooCommerce re-applies the whole fragment as one blob).
-	let lastCustomerJson = null;
-	let lastCartJson = null;
-
 	/**
-	 * Pushes one WooCommerce family under its own event name when it changed
-	 * since the last delivery. Compared as JSON (a fresh object arrives on every
-	 * refresh); an absent part is left alone, never "changed to nothing".
+	 * Pushes one store family under its own event name when it changed since
+	 * the last delivery from the same source. Compared as JSON (a fresh object
+	 * arrives on every refresh); an absent part is left alone, never "changed to
+	 * nothing".
 	 *
-	 * @param {*}       part The family payload from the fragment, if any.
+	 * @param {*}       part The family payload, if any.
 	 * @param {string}  name The data layer event name for this family.
 	 * @param {?string} last The serialization delivered last time.
 	 * @return {?string} The serialization to remember as delivered.
 	 */
-	function deliverWooFamily( part, name, last ) {
+	function deliverStoreFamily( part, name, last ) {
 		if ( ! part || 'object' !== typeof part || Array.isArray( part ) ) {
 			return last;
 		}
@@ -844,28 +899,174 @@ import {
 	}
 
 	/**
-	 * Pushes the WooCommerce customer and cart families from a raw fragment payload,
-	 * each under its own event name and each only when that half changed. Used for
-	 * both the initial read and every later cart change.
+	 * Pushes the customer and cart families of one { customer, cart } block,
+	 * each only when that half changed since the source's last delivery. The
+	 * state is per source, so two stores on one site never suppress each other.
+	 *
+	 * @param {*}      block The parsed block.
+	 * @param {Object} state The source's { customer, cart } last serializations.
+	 * @return {void}
+	 */
+	function deliverStoreBlock( block, state ) {
+		if ( ! block || 'object' !== typeof block || Array.isArray( block ) ) {
+			return;
+		}
+
+		state.customer = deliverStoreFamily(
+			block.customer,
+			customerEventName,
+			state.customer
+		);
+		state.cart = deliverStoreFamily(
+			block.cart,
+			cartEventName,
+			state.cart
+		);
+	}
+
+	const wooState = { customer: null, cart: null };
+	const blockStates = {};
+
+	/**
+	 * Pushes the WooCommerce families from a raw fragment payload. Used for both
+	 * the initial read and every later cart change.
 	 *
 	 * @param {?string} raw The raw data attribute value.
 	 * @return {void}
 	 */
 	function deliverWooBlock( raw ) {
-		const parsed = parseWoo( raw );
-		if ( ! parsed ) {
+		deliverStoreBlock( parseWoo( raw ), wooState );
+	}
+
+	/**
+	 * Pushes the families of one config.blocks endpoint value.
+	 *
+	 * @param {string} key   The endpoint key.
+	 * @param {*}      block Its { customer, cart } value.
+	 * @return {void}
+	 */
+	function deliverEndpointBlock( key, block ) {
+		if ( ! blockStates[ key ] ) {
+			blockStates[ key ] = { customer: null, cart: null };
+		}
+		deliverStoreBlock( block, blockStates[ key ] );
+	}
+
+	/**
+	 * Re-fetches the endpoint after a same-page cart change and delivers the
+	 * config.blocks values that changed. Read-only like the page-load fetch;
+	 * the visitor push and the one-shots are left to the next page view. The
+	 * cache entry of each gate carrying a block is rewritten (or dropped when
+	 * the gate cookie is gone or the block absent) so the next page replays
+	 * the new state.
+	 *
+	 * @return {void}
+	 */
+	function refreshBlocks() {
+		if ( 'function' !== typeof fetch ) {
 			return;
 		}
 
-		lastCustomerJson = deliverWooFamily(
-			parsed.customer,
-			customerEventName,
-			lastCustomerJson
-		);
-		lastCartJson = deliverWooFamily(
-			parsed.cart,
-			cartEventName,
-			lastCartJson
+		const activeGates = [];
+		configGates.forEach( function ( gate ) {
+			const current = gtm4wp_read_cookie( gate.cookie );
+			if ( current ) {
+				activeGates.push( { cookie: gate.cookie, value: current } );
+			}
+		} );
+
+		requestEndpoint( sendsNonceFor( activeGates ) )
+			.then( function ( response ) {
+				return response && response.ok ? response.json() : null;
+			} )
+			.then( function ( body ) {
+				if ( ! body || 'string' !== typeof body.payload ) {
+					return;
+				}
+
+				if ( 'string' === typeof body.nonce && body.nonce ) {
+					beaconNonce = body.nonce;
+				}
+
+				let data;
+				try {
+					data = JSON.parse( body.payload );
+				} catch ( e ) {
+					return;
+				}
+				if ( ! data || 'object' !== typeof data ) {
+					return;
+				}
+
+				const store = readStore();
+				configGates.forEach( function ( gate ) {
+					const keys = gate.keys || [];
+					const carriesBlock = keys.some( function ( key ) {
+						return -1 !== blockKeys.indexOf( key );
+					} );
+					if ( ! carriesBlock ) {
+						return;
+					}
+
+					const active = activeGates.filter( function ( entry ) {
+						return entry.cookie === gate.cookie;
+					} )[ 0 ];
+					const complete = keys.every( function ( key ) {
+						return key in data;
+					} );
+
+					if ( ! active || ! complete ) {
+						delete store.gates[ gate.cookie ];
+						return;
+					}
+
+					const subset = {};
+					keys.forEach( function ( key ) {
+						subset[ key ] = data[ key ];
+					} );
+					store.gates[ gate.cookie ] = {
+						v: active.value,
+						data: subset,
+					};
+				} );
+				writeStore( store );
+
+				blockKeys.forEach( function ( key ) {
+					if ( key in data ) {
+						deliverEndpointBlock( key, data[ key ] );
+					}
+				} );
+			} )
+			.catch( function () {
+				// Network error: the next page view delivers from its own fetch.
+			} );
+	}
+
+	// A refresh asked for before the first delivery waits for it, so the page
+	// load's own events land first; bursts (EDD fires several events per cart
+	// action) collapse into one fetch.
+	let booted = false;
+	let refreshPending = false;
+	let refreshTimer = null;
+
+	/**
+	 * Schedules refreshBlocks(), debounced. Bound to GTM4WP_VISITOR_REFRESH_EVENT.
+	 *
+	 * @return {void}
+	 */
+	function requestRefresh() {
+		if ( ! booted ) {
+			refreshPending = true;
+			return;
+		}
+		window.clearTimeout( refreshTimer );
+		refreshTimer = window.setTimeout( refreshBlocks, 50 );
+	}
+
+	if ( blockKeys.length && config.endpoint && storageAvailable() ) {
+		document.addEventListener(
+			GTM4WP_VISITOR_REFRESH_EVENT,
+			requestRefresh
 		);
 	}
 
@@ -891,17 +1092,25 @@ import {
 	}
 
 	// Tier 1, then the endpoint completes the push, flushed as one visitor
-	// event, and only then the WooCommerce families: the visitor event must
-	// land FIRST so a tag triggered on customerData/cartData can read
-	// visitorId from GTM's model. The initial read and the observer stay in
-	// one synchronous block, read first, so no fragment is missed or
-	// re-delivered in between.
+	// event, and only then the store families: the visitor event must land
+	// FIRST so a tag triggered on customerData/cartData can read visitorId from
+	// GTM's model. The initial read and the observer stay in one synchronous
+	// block, read first, so no fragment is missed or re-delivered in between.
 	collectClientFields();
 
 	collectEndpointFields( function () {
 		pushEvent( visitorEventName, collected );
 
+		Object.keys( collectedBlocks ).forEach( function ( key ) {
+			deliverEndpointBlock( key, collectedBlocks[ key ] );
+		} );
+
 		deliverWooBlock( currentWooRaw() );
 		observeWooChanges();
+
+		booted = true;
+		if ( refreshPending ) {
+			requestRefresh();
+		}
 	} );
 } )();

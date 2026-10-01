@@ -238,20 +238,103 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'customerEmail', $disabled );
 	}
 
-	public function test_customer_and_cart_blocks_are_omitted_under_cache_safe_mode(): void {
+	/**
+	 * A logged-in customer with one download in the cart.
+	 *
+	 * @return void
+	 */
+	private function arrange_customer_with_cart(): void {
 		Functions\when( 'get_current_user_id' )->justReturn( 5 );
-		Functions\when( 'edd_get_cart_content_details' )->justReturn( array() );
+		Functions\when( 'edd_get_customer_by' )->justReturn(
+			new \EDD_Customer(
+				array(
+					'name'           => 'Jane Doe',
+					'email'          => 'jane@example.com',
+					'purchase_count' => 4,
+					'purchase_value' => 100.5,
+				)
+			)
+		);
+		Functions\when( 'edd_get_cart_subtotal' )->justReturn( 9.99 );
+		Functions\when( 'edd_get_cart_total' )->justReturn( 9.99 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+	}
 
-		$data_layer = $this->make_page_datalayer(
+	public function test_cache_safe_mode_keeps_customer_and_cart_out_of_the_page_html(): void {
+		$this->arrange_customer_with_cart();
+		$both = array(
+			GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA    => true,
+			GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL => true,
+		);
+
+		$rendered = $this->make_page_datalayer( $both )->add_datalayer_data( array() );
+		$this->assertSame( 'jane@example.com', $rendered['customerEmail'], 'Without cache-safe mode the page keeps rendering the customer.' );
+		$this->assertCount( 1, $rendered['cartContent']['items'] );
+
+		$cache_safe = $this->make_page_datalayer( $both + array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )->add_datalayer_data( array() );
+		$this->assertSame( array(), preg_grep( '/^customer/', array_keys( $cache_safe ) ), 'Visitor-specific data must not be baked into cacheable HTML.' );
+		$this->assertArrayNotHasKey( 'cartContent', $cache_safe );
+	}
+
+	public function test_visitor_cart_block_carries_exactly_what_the_page_html_shows(): void {
+		$this->arrange_customer_with_cart();
+		$both = array(
+			GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA    => true,
+			GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL => true,
+		);
+
+		$rendered = $this->make_page_datalayer( $both )->add_datalayer_data( array() );
+		$block    = $this->make_page_datalayer( $both + array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )->visitor_cart_datalayer();
+
+		// RI-11 parity: the same keys and values, split per family, nothing more.
+		$customer_keys = array_flip( preg_grep( '/^customer/', array_keys( $rendered ) ) );
+		$this->assertSame( array_intersect_key( $rendered, $customer_keys ), $block['customer'] );
+		$this->assertSame( array( 'cartContent' => $rendered['cartContent'] ), $block['cart'] );
+		$this->assertSame( array( 'customer', 'cart' ), array_keys( $block ) );
+	}
+
+	public function test_visitor_cart_block_has_no_customer_part_for_a_logged_out_visitor(): void {
+		$this->arrange_customer_with_cart();
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+
+		$block = $this->make_page_datalayer(
 			array(
 				GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA    => true,
 				GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL => true,
-				GTM4WP_OPTION_CACHE_SAFE_DATALAYER         => true,
 			)
-		)->add_datalayer_data( array() );
+		)->visitor_cart_datalayer();
 
-		$this->assertArrayNotHasKey( 'customerEmail', $data_layer, 'Visitor-specific data must not be baked into cacheable HTML.' );
-		$this->assertArrayNotHasKey( 'cartContent', $data_layer );
+		$this->assertArrayNotHasKey( 'customer', $block );
+		$this->assertCount( 1, $block['cart']['cartContent']['items'] );
+	}
+
+	public function test_visitor_cart_block_delivers_an_empty_cart_rather_than_omitting_it(): void {
+		Functions\when( 'edd_get_cart_subtotal' )->justReturn( 0.0 );
+		Functions\when( 'edd_get_cart_total' )->justReturn( 0.0 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( array() );
+
+		$block = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDINCLUDECARTINDL => true )
+		)->visitor_cart_datalayer();
+
+		$this->assertSame( array(), $block['cart']['cartContent']['items'], '"Now empty" is the signal after the last remove.' );
+		$this->assertArrayNotHasKey( 'customer', $block );
+	}
+
+	public function test_visitor_cart_block_is_empty_when_both_features_are_off(): void {
+		$this->arrange_customer_with_cart();
+
+		$this->assertSame( array(), $this->make_page_datalayer()->visitor_cart_datalayer() );
 	}
 
 	public function test_cart_content_lists_items_and_respects_the_exclusion_filter(): void {

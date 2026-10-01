@@ -632,6 +632,54 @@ describe( 'gtm4wp-edd tracker', () => {
 		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 	} );
 
+	it( 'asks the visitor-data runtime to refresh on every EDD cart change event (U170)', () => {
+		boot_tracker();
+
+		const refreshes = jest.fn();
+		document.addEventListener( 'gtm4wp:visitordata-refresh', refreshes );
+
+		// The exact jQuery set, pinned: a missing name is a silent stale cart.
+		const key = Object.keys( body_event_handlers ).find( ( name ) =>
+			name.includes( 'edd_cart_item_added' )
+		);
+		expect( key.split( ' ' ).sort() ).toEqual( [
+			'edd_cart_item_added',
+			'edd_cart_item_removed',
+			'edd_discount_applied',
+			'edd_discount_removed',
+			'edd_quantity_updated',
+			'edd_taxes_recalculated',
+		] );
+
+		// jQuery passes ( event, response ); the handler must cope.
+		body_event_handlers[ key ]( {}, { cart_item: '<li>' } );
+		expect( refreshes ).toHaveBeenCalledTimes( 1 );
+
+		// The opt-in Cart Preview only signals natively.
+		document.dispatchEvent(
+			new window.CustomEvent( 'edd:cart-item-removed' )
+		);
+		document.dispatchEvent(
+			new window.CustomEvent( 'edd:cart-quantity-updated' )
+		);
+		expect( refreshes ).toHaveBeenCalledTimes( 3 );
+
+		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
+	it( 'still listens to the native Cart Preview events without jQuery', () => {
+		delete window.jQuery;
+		boot_tracker();
+
+		const refreshes = jest.fn();
+		document.addEventListener( 'gtm4wp:visitordata-refresh', refreshes );
+		document.dispatchEvent(
+			new window.CustomEvent( 'edd:cart-item-removed' )
+		);
+
+		expect( refreshes ).toHaveBeenCalledTimes( 1 );
+	} );
+
 	it( 'skips the initial gateway load and reports later gateway picks once', () => {
 		window.gtm4wp_checkout_products = [ { item_id: '55' } ];
 		window.gtm4wp_checkout_value = 9.99;

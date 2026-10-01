@@ -31,10 +31,11 @@ defined( 'ABSPATH' ) || exit;
  * $resolver is the field's own identity gate: it returns null to omit the
  * field (a user field on an anonymous request).
  *
- * WooCommerce customer/cart data ride the cart-fragments AJAX instead (see
- * WooCommerce\PageDataLayer) and must STAY off this list: every non-one-shot
- * field here merges into the single EVENT_VISITOR_DATA push, which would move
- * them off their own event.
+ * A non-one-shot field merges into the single EVENT_VISITOR_DATA push, unless
+ * it is a $block: its value is a store's { customer, cart } pair, pushed as
+ * EVENT_CUSTOMER_DATA / EVENT_CART_DATA like the WooCommerce cart fragment
+ * (EasyDigitalDownloads\VisitorCart). WooCommerce itself stays on its
+ * cart-fragments channel (WooCommerce\PageDataLayer).
  */
 final class VisitorField {
 
@@ -66,6 +67,8 @@ final class VisitorField {
 	 * @param bool   $one_shot      Tier 3 only: a one-shot EVENT (see the class docblock).
 	 * @param string $confirm_url   One-shot only: URL of the POST beacon fired after delivery
 	 *                              (empty = no beacon).
+	 * @param bool   $block         Tier 3 only: the value is a { customer, cart } pair (see the
+	 *                              class docblock).
 	 */
 	public function __construct(
 		public string $key,
@@ -74,7 +77,8 @@ final class VisitorField {
 		public mixed $resolver = null,
 		public string $cookie_gate = '',
 		public bool $one_shot = false,
-		public string $confirm_url = ''
+		public string $confirm_url = '',
+		public bool $block = false
 	) {
 	}
 }

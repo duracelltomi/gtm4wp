@@ -52,8 +52,10 @@ final class PageDataLayer {
 		}
 
 		// Cache-safe data layer (issue #398): customer details and the cart are
-		// visitor-specific and omitted; the content-driven events below are
-		// URL-scoped or fire on cache-excluded pages, so they stay server-side.
+		// visitor-specific, so they reach the browser through the session
+		// endpoint instead (VisitorCart) as gtm4wp.customerData / gtm4wp.cartData.
+		// The content-driven events below are URL-scoped or fire on
+		// cache-excluded pages, so they stay server-side.
 		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
 
 		if ( ! $cache_safe ) {
@@ -89,6 +91,31 @@ final class PageDataLayer {
 		$this->datalayer->flush_pushes();
 
 		return apply_filters( GTM4WP_WPFILTER_EDD_DATALAYER_PAGELOAD, $data_layer );
+	}
+
+	/**
+	 * The customer + cart block of the current visitor for the cache-safe data
+	 * layer, built by the same builders as the page HTML so the values match.
+	 * Same shape as the WooCommerce one: each family is its own part (its own
+	 * event), built from a fresh array; a part is omitted only when its builder
+	 * wrote nothing, so an empty cart still yields a cart part.
+	 *
+	 * @return array<string, array<string, mixed>> The 'customer' and/or 'cart' part.
+	 */
+	public function visitor_cart_datalayer(): array {
+		$data = array();
+
+		$customer = $this->add_customer_data( array() );
+		if ( array() !== $customer ) {
+			$data['customer'] = $customer;
+		}
+
+		$cart = $this->add_cart_content( array() );
+		if ( array() !== $cart ) {
+			$data['cart'] = $cart;
+		}
+
+		return $data;
 	}
 
 	/**

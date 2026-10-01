@@ -263,7 +263,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this option to include the content of the Easy Digital Downloads cart in the data layer on each page. Especially useful for site personalization tools. Left out on every page while the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this option to include the content of the Easy Digital Downloads cart in the data layer on each page. Especially useful for site personalization tools. While the cache-safe data layer mode is on, the cart content is not part of the page but arrives in the separate gtm4wp.cartData event.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -273,7 +273,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add data of the logged in customer (name, email and hashed email, total number of orders and order value) into the data layer, and the Enhanced Conversions user_data block onto the purchase event. A phone number from the Easy Digital Downloads Phone field or a checkout-field extension is included as an E.164 hash. The customer variables are left out on every page while the cache-safe data layer mode is on; the user_data block of the purchase event is not affected.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this to add data of the logged in customer (name, email and hashed email, total number of orders and order value) into the data layer, and the Enhanced Conversions user_data block onto the purchase event. A phone number from the Easy Digital Downloads Phone field or a checkout-field extension is included as an E.164 hash. While the cache-safe data layer mode is on, the customer variables are not part of the page but arrive in the separate gtm4wp.customerData event; the user_data block of the purchase event is not affected.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE

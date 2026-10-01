@@ -106,6 +106,11 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 
 		add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, array( $page_datalayer, 'add_datalayer_data' ) );
 
+		// Cache-safe data layer (issue #398): the customer/cart block for the
+		// session endpoint; no-ops unless the mode is on. Its gate cookie is kept
+		// by VisitorCart::register_state_hooks(), wired from Plugin::boot().
+		add_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array( new VisitorCart( $this->options, $page_datalayer ), 'declare_visitor_scoped_fields' ) );
+
 		// Hidden product data markup: one span per item in the [downloads] grid
 		// (view_item_list / select_item), a hidden input inside every purchase
 		// form (add_to_cart) and a span in every checkout cart row

@@ -120,7 +120,16 @@ function flushObservers() {
 // Track every observer the tracker creates and disconnect it after each test.
 let trackedObservers = [];
 const RealMutationObserver = window.MutationObserver;
+// The refresh listener on document leaks across reloads the same way, and an
+// earlier instance would answer a later test's refresh event with its own fetch.
+let trackedListeners = [];
+const realAddEventListener = document.addEventListener;
 beforeEach( () => {
+	trackedListeners = [];
+	document.addEventListener = function ( type, listener, options ) {
+		trackedListeners.push( [ type, listener, options ] );
+		return realAddEventListener.call( document, type, listener, options );
+	};
 	// The bundle guards its boot with window.gtm4wp_visitordata_inited so a
 	// re-injected copy cannot push, re-fetch and re-observe a second time (#83). That
 	// flag lives on window, which jsdom keeps for the whole file, so it has to be
@@ -137,6 +146,10 @@ beforeEach( () => {
 afterEach( () => {
 	trackedObservers.forEach( ( observer ) => observer.disconnect() );
 	window.MutationObserver = RealMutationObserver;
+	trackedListeners.forEach( ( [ type, listener, options ] ) =>
+		document.removeEventListener( type, listener, options )
+	);
+	document.addEventListener = realAddEventListener;
 } );
 
 describe( 'gtm4wp-visitor-data', () => {
@@ -1657,5 +1670,284 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 			'1001'
 		);
 		expect( confirmBeacon() ).toBeTruthy();
+	} );
+} );
+
+/**
+ * A store without cart fragments (Easy Digital Downloads) delivers its
+ * { customer, cart } pair as a Tier 3 endpoint field listed in config.blocks:
+ * pushed as the same two family events, never merged into the visitor push,
+ * replayed from the gate cache on later pages, and re-fetched on the refresh
+ * event a store tracker dispatches after a same-page cart change.
+ */
+describe( 'gtm4wp-visitor-data — store blocks from the endpoint', () => {
+	const ENDPOINT = 'https://site.example/wp-json/gtm4wp/v2/visitor-data';
+	const REFRESH_EVENT = 'gtm4wp:visitordata-refresh';
+
+	const block = ( items, email = 'jane@example.com' ) => ( {
+		customer: { customerEmail: email, customerTotalOrders: 4 },
+		cart: {
+			cartContent: { totals: { subtotal: 9.99, total: 9.99 }, items },
+		},
+	} );
+
+	const emptyCartBlock = () => ( {
+		cart: {
+			cartContent: { totals: { subtotal: 0, total: 0 }, items: [] },
+		},
+	} );
+
+	const eddConfig = ( extra = {} ) => ( {
+		events: EVENTS,
+		fields: {},
+		endpoint: ENDPOINT,
+		nonce: 'baked-nonce',
+		sessionKey: 'gtm4wp_visitor_session',
+		loginGate: 'gtm4wp_login',
+		gates: [ { cookie: 'gtm4wp_edd_state', keys: [ 'eddVisitorCart' ] } ],
+		blocks: [ 'eddVisitorCart' ],
+		...extra,
+	} );
+
+	const waitForRefresh = () =>
+		new Promise( ( resolve ) => setTimeout( resolve, 80 ) );
+
+	const refresh = () =>
+		document.dispatchEvent( new window.CustomEvent( REFRESH_EVENT ) );
+
+	beforeEach( () => {
+		resetBrowserState();
+		global.fetch = jest.fn();
+	} );
+
+	it( 'pushes the block as customerData and cartData, never inside visitorData', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: block( [ { item_id: '55' } ] ) } );
+
+		loadTracker();
+		await flush();
+
+		expect( customerEvents() ).toHaveLength( 1 );
+		expect( customerEvents()[ 0 ].customerEmail ).toBe(
+			'jane@example.com'
+		);
+		expect( cartEvents() ).toHaveLength( 1 );
+		expect( cartEvents()[ 0 ].cartContent.items ).toEqual( [
+			{ item_id: '55' },
+		] );
+		expect(
+			window.dataLayer.some( ( entry ) => 'eddVisitorCart' in entry )
+		).toBe( false );
+		expect(
+			visitorEvents().some( ( entry ) => 'customerEmail' in entry )
+		).toBe( false );
+	} );
+
+	it( 'delivers an EMPTY cart rather than omitting it', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: emptyCartBlock() } );
+
+		loadTracker();
+		await flush();
+
+		expect( cartEvents() ).toHaveLength( 1 );
+		expect( cartEvents()[ 0 ].cartContent.items ).toEqual( [] );
+		expect( customerEvents() ).toHaveLength( 0 );
+	} );
+
+	it( 'replays the block on a later page with no request while the gate is unchanged', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: block( [ { item_id: '55' } ] ) } );
+		loadTracker();
+		await flush();
+
+		delete window.gtm4wp_visitordata_inited;
+		window.dataLayer = [];
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( customerEvents() ).toHaveLength( 1 );
+		expect( cartEvents() ).toHaveLength( 1 );
+	} );
+
+	it( 'never fetches for a visitor without the gate cookie', async () => {
+		window.gtm4wp_visitordata_config = eddConfig();
+
+		loadTracker();
+		await flush();
+
+		expect( global.fetch ).not.toHaveBeenCalled();
+		expect( cartEvents() ).toHaveLength( 0 );
+	} );
+
+	it( 'sends NO nonce for a guest whose only active gate is the cart gate', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: emptyCartBlock() } );
+
+		loadTracker();
+		await flush();
+
+		const [ , options ] = global.fetch.mock.calls[ 0 ];
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBeUndefined();
+	} );
+
+	it( 'sends the nonce once the login gate is active too', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		setCookie( 'gtm4wp_login', 'abc' );
+		window.gtm4wp_visitordata_config = eddConfig( {
+			gates: [
+				{ cookie: 'gtm4wp_edd_state', keys: [ 'eddVisitorCart' ] },
+				{ cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] },
+			],
+		} );
+		mockEndpointOnce( { eddVisitorCart: emptyCartBlock() } );
+
+		loadTracker();
+		await flush();
+
+		const [ , options ] = global.fetch.mock.calls[ 0 ];
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'baked-nonce' );
+	} );
+
+	it( 'treats every gate as the login gate for a cached config without loginGate', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		const config = eddConfig();
+		delete config.loginGate;
+		window.gtm4wp_visitordata_config = config;
+		mockEndpointOnce( { eddVisitorCart: emptyCartBlock() } );
+
+		loadTracker();
+		await flush();
+
+		const [ , options ] = global.fetch.mock.calls[ 0 ];
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'baked-nonce' );
+	} );
+
+	it( 're-fetches on the refresh event and pushes only the half that changed', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: block( [ { item_id: '55' } ] ) } );
+		loadTracker();
+		await flush();
+
+		// The add-to-cart response rewrote the gate cookie; EDD fires several
+		// events per action, which collapse into one fetch.
+		setCookie( 'gtm4wp_edd_state', 'h2' );
+		mockEndpointOnce( {
+			eddVisitorCart: block( [ { item_id: '55' }, { item_id: '66' } ] ),
+		} );
+		refresh();
+		refresh();
+		await waitForRefresh();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 2 );
+		expect( cartEvents() ).toHaveLength( 2 );
+		expect( cartEvents()[ 1 ].cartContent.items ).toHaveLength( 2 );
+		expect( customerEvents() ).toHaveLength( 1 );
+
+		// The next page replays the refreshed state, tagged with the new value.
+		const store = JSON.parse(
+			window.sessionStorage.getItem( 'gtm4wp_visitor_session' )
+		);
+		expect( store.gates.gtm4wp_edd_state.v ).toBe( 'h2' );
+		expect(
+			store.gates.gtm4wp_edd_state.data.eddVisitorCart.cart.cartContent
+				.items
+		).toHaveLength( 2 );
+	} );
+
+	it( 'defers a refresh asked for before the first delivery', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		let resolveFirst;
+		global.fetch.mockReturnValueOnce(
+			new Promise( ( resolve ) => {
+				resolveFirst = resolve;
+			} )
+		);
+		loadTracker();
+
+		refresh();
+		await waitForRefresh();
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+
+		mockEndpointOnce( { eddVisitorCart: block( [ { item_id: '66' } ] ) } );
+		resolveFirst( {
+			ok: true,
+			json: () =>
+				Promise.resolve( {
+					payload: JSON.stringify( {
+						eddVisitorCart: block( [ { item_id: '55' } ] ),
+					} ),
+					nonce: 'n',
+				} ),
+		} );
+		await flush();
+		await waitForRefresh();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 2 );
+		expect( cartEvents()[ 0 ].cartContent.items[ 0 ].item_id ).toBe( '55' );
+		expect( cartEvents()[ 1 ].cartContent.items[ 0 ].item_id ).toBe( '66' );
+	} );
+
+	it( 'drops the cache entry when the refresh finds the gate cookie gone', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: block( [ { item_id: '55' } ] ) } );
+		loadTracker();
+		await flush();
+
+		// The last remove: the server cleared the gate, the cart is now empty.
+		document.cookie =
+			'gtm4wp_edd_state=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+		mockEndpointOnce( { eddVisitorCart: emptyCartBlock() } );
+		refresh();
+		await waitForRefresh();
+		await flush();
+
+		expect( cartEvents()[ 1 ].cartContent.items ).toEqual( [] );
+		const store = JSON.parse(
+			window.sessionStorage.getItem( 'gtm4wp_visitor_session' )
+		);
+		expect( store.gates.gtm4wp_edd_state ).toBeUndefined();
+	} );
+
+	it( 'ignores the refresh event when no block is configured', async () => {
+		setCookie( 'gtm4wp_login', 'abc' );
+		window.gtm4wp_visitordata_config = eddConfig( {
+			gates: [ { cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] } ],
+			blocks: undefined,
+		} );
+		mockEndpointOnce( { visitorEmail: 'jane@example.com' } );
+		loadTracker();
+		await flush();
+
+		refresh();
+		await waitForRefresh();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 1 );
+	} );
+
+	it( 'keeps WooCommerce and endpoint blocks apart, so neither suppresses the other', async () => {
+		setCartFragment( block( [ { item_id: 'same' } ] ) );
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( {
+			eddVisitorCart: block( [ { item_id: 'same' } ] ),
+		} );
+
+		loadTracker();
+		await flush();
+
+		// Identical payloads from two sources still fire once per source.
+		expect( cartEvents() ).toHaveLength( 2 );
+		expect( customerEvents() ).toHaveLength( 2 );
 	} );
 } );

@@ -13,6 +13,7 @@
  */
 
 import { gtm4wp_run_isolated } from './lib/gtm4wp-isolate';
+import { gtm4wp_request_visitor_refresh } from './lib/gtm4wp-visitor-refresh';
 
 // Double-init guard (#218, PA-9): the whole module body is wrapped (the
 // gtm4wp-form-move-tracker.js shape), so a re-injected bundle runs nothing.
@@ -633,6 +634,26 @@ if ( ! window.gtm4wp_edd_inited ) {
 					} );
 				} );
 		}
+
+		// Cache-safe data layer: a same-page cart change asks the visitor-data
+		// runtime to re-fetch the customer/cart blocks (U170). The jQuery events
+		// cover every EDD 3.x cart; the opt-in Cart Preview only signals natively.
+		if ( window.jQuery ) {
+			window
+				.jQuery( document.body )
+				.on(
+					'edd_cart_item_added edd_cart_item_removed edd_quantity_updated edd_discount_applied edd_discount_removed edd_taxes_recalculated',
+					gtm4wp_request_visitor_refresh
+				);
+		}
+		[ 'edd:cart-item-removed', 'edd:cart-quantity-updated' ].forEach(
+			function ( event_name ) {
+				document.addEventListener(
+					event_name,
+					gtm4wp_request_visitor_refresh
+				);
+			}
+		);
 
 		// Fallback on purchase submit (single-gateway checkouts).
 		document.addEventListener(

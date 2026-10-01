@@ -171,6 +171,7 @@ final class VisitorDataModule extends AbstractModule {
 		$gates          = array();
 		$actions        = array();
 		$action_confirm = array();
+		$blocks         = array();
 
 		if ( is_array( $fields ) ) {
 			foreach ( $fields as $field ) {
@@ -194,6 +195,10 @@ final class VisitorDataModule extends AbstractModule {
 						}
 					} else {
 						$gates[ $field->cookie_gate ][] = $field->key;
+
+						if ( $field->block ) {
+							$blocks[] = $field->key;
+						}
 					}
 				}
 			}
@@ -221,6 +226,10 @@ final class VisitorDataModule extends AbstractModule {
 			$config['nonce']      = wp_create_nonce( 'wp_rest' );
 			$config['sessionKey'] = self::SESSION_STORAGE_KEY;
 
+			// The only gate whose fetch carries the nonce: another gate (a guest's
+			// cart) is set on cacheable pages, where the baked nonce is stale.
+			$config['loginGate'] = self::LOGIN_GATE_COOKIE;
+
 			if ( array() !== $session_keys ) {
 				$config['session'] = array_values( array_unique( $session_keys ) );
 			}
@@ -233,6 +242,10 @@ final class VisitorDataModule extends AbstractModule {
 						'keys'   => array_values( array_unique( $keys ) ),
 					);
 				}
+			}
+
+			if ( array() !== $blocks ) {
+				$config['blocks'] = array_values( array_unique( $blocks ) );
 			}
 
 			if ( array() !== $actions ) {

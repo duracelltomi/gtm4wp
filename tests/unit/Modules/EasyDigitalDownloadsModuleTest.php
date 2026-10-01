@@ -115,6 +115,7 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertFalse( has_action( 'edd_purchase_link_end' ) );
 		$this->assertFalse( has_action( 'edd_checkout_cart_item_title_after' ) );
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY ) );
+		$this->assertFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS ) );
 	}
 
 	public function test_wires_datalayer_markup_and_script_hooks_when_tracking_enabled(): void {
@@ -127,6 +128,7 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertNotFalse( has_action( 'edd_checkout_cart_item_title_after' ), 'The checkout cart row data must be injected.' );
 		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $module, 'enqueue_scripts' ) ) );
 		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array( $module, 'add_global_vars' ) ) );
+		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS ), 'The cache-safe customer/cart block must be declared (it self-gates on the mode).' );
 	}
 
 	public function test_global_vars_carry_the_edd_settings(): void {

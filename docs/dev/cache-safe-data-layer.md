@@ -22,7 +22,7 @@ new tiers slot in behind the same option + client runtime without rework.
 |---|---|---|---|
 | 1 — client | The browser already knows it (referrer, search term, anything derived from `location.*`). | Pushed client-side as `gtm4wp.visitorData`. | **Zero network.** |
 | 2 — session | Server-only but constant per session (visitor IP, Cloudflare country). | One fetch per session, cached in `sessionStorage`. | One request / session. |
-| 3 — action | Server-only, changes on an action (logged-in user data; WooCommerce customer & cart; one-shot events). | Fetch **gated by an existing cookie** (WP logged-in cookie for user data; an event cookie for one-shots) — except the WooCommerce customer & cart, which ride WooCommerce's own `woocommerce_add_to_cart_fragments` response and so need no fetch of ours at all. | One request only when the gating cookie changed. |
+| 3 — action | Server-only, changes on an action (logged-in user data; store customer & cart; one-shot events). | Fetch **gated by a JS-readable cookie** (the login gate for user data; the EDD state cookie for the Easy Digital Downloads customer & cart; an event cookie for one-shots) — except the WooCommerce customer & cart, which ride WooCommerce's own `woocommerce_add_to_cart_fragments` response and so need no fetch of ours at all. | One request only when the gating cookie changed. |
 
 ### Hard constraint (all phases)
 
@@ -41,8 +41,8 @@ Custom Event trigger is enough. The names are the public contract; they live as
 | Event | Keys | Gated by |
 |---|---|---|
 | `gtm4wp.visitorData` | `siteSearchTerm`, `siteSearchFrom`, `visitorIP`, `geoCloudflareCountryCode`, `visitorLoginState`, `visitorType`, `visitorEmail`, `visitorEmailHash`, `visitorRegistrationDate`, `visitorUsername`, `visitorId` | the individual Page-variables options |
-| `gtm4wp.customerData` | the 25 `customer*` keys | `GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA` |
-| `gtm4wp.cartData` | `cartContent` | `GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL` |
+| `gtm4wp.customerData` | the 25 WooCommerce `customer*` keys; the 6 EDD ones (name, email + hash, order count and value) | `GTM4WP_OPTION_INTEGRATE_WCCUSTOMERDATA` / `…_EDDCUSTOMERDATA` |
+| `gtm4wp.cartData` | `cartContent` | `GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL` / `…_EDDINCLUDECARTINDL` |
 
 Why not one event for everything: the WooCommerce families do not exist until
 WooCommerce has applied its cart fragment, which is **always** later than the
@@ -285,3 +285,39 @@ suppresses the second purchase in both orderings; the confirm beacon fires with 
 nonce after a fallback delivery, and is skipped on `flag=false` / when suppressed as
 already tracked / degrades gracefully on failure; one-shots stay out of all three
 data-family events and out of the cache; stale cookie cleared).
+
+## Easy Digital Downloads customer & cart (2.1)
+
+EDD has no cart fragments, and every cookie it sets is HttpOnly (`\EDD\Utils\Cookies`,
+U170), so the browser cannot tell that a guest has a cart. The EDD block therefore
+rides the **session endpoint** as one Tier 3 field, `eddVisitorCart`
+(`EasyDigitalDownloads\VisitorCart`), whose value is the same `{ customer, cart }`
+envelope WooCommerce puts on its fragment, built by `PageDataLayer::visitor_cart_datalayer()`
+from the page builders.
+
+1. **Routing.** The field sets `VisitorField::$block`; `build_config()` lists it in
+   `config.blocks`, and the runtime pushes that value as `gtm4wp.customerData` /
+   `gtm4wp.cartData` (per-family de-dupe, per source) instead of merging it into the
+   visitor push, on the first fetch and on every replay from the gate cache.
+2. **Gate cookie.** `gtm4wp_edd_state` is a JS-readable fingerprint
+   (`wp_hash()` of user id, login session token and the encoded block), rewritten by
+   EDD's cart and discount actions and on `wp_logout`, and on `template_redirect` for a
+   logged-in visitor (order totals change without a cart change). It is cleared when
+   there is no customer part and no cart line, so an idle guest never fetches. EDD's
+   cart AJAX runs on admin-ajax, where only the admin path boots, so these hooks are
+   registered from `Plugin::boot()` (`VisitorCart::register_state_hooks()`), gated on
+   the options. A write on a page request sends `nocache_headers()` (#44).
+3. **Nonce.** The config names the login gate (`loginGate`); only that gate sends the
+   baked nonce. A guest's cart gate rides cacheable pages, where the nonce is stale.
+4. **Resolver.** No request parameter: the customer is the authenticated user, the
+   cart is the caller's EDD session. A caller neither logged in nor holding an EDD
+   session cookie gets `null` before the session is touched (PA-11).
+5. **Same-page changes.** `gtm4wp-edd.js` dispatches `gtm4wp:visitordata-refresh` on
+   EDD's jQuery cart events and the Cart Preview's native ones; the runtime re-fetches
+   once (debounced), pushes the family that changed and rewrites the gate cache entry.
+
+Regression tests: `EddVisitorCartTest` (declaration, resolver identity gates, cookie
+set / unchanged / changed / cleared / headers sent / no-store, hook set),
+`EddPageDataLayerTest` (HTML omission both directions, block parity with the page,
+guest, empty cart), `VisitorDataModuleTest` (`blocks`, `loginGate`), and the JS suite
+(block routing, replay, nonce rule, refresh, per-source de-dupe, the EDD event set).

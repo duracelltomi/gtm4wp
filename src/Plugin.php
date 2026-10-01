@@ -90,6 +90,10 @@ final class Plugin {
 			$this->boot_refund_lane();
 		}
 
+		// EDD changes the cart on admin-ajax too, so the cache-safe gate cookie
+		// it keeps cannot wait for the frontend branch; self-gated on the options.
+		Modules\EasyDigitalDownloads\VisitorCart::register_state_hooks( $this->options );
+
 		// REST routes must exist on REST requests, where is_admin() is false.
 		// RestCors is registered here unconditionally on purpose: it withdraws
 		// core's reflected cross-origin grant for the WHOLE gtm4wp/v2 namespace,

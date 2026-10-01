@@ -242,6 +242,41 @@ final class VisitorDataModuleTest extends TestCase {
 		$this->assertStringNotContainsString( 'x@example.com', $code, 'The Tier 3 value must not be in the cacheable config.' );
 	}
 
+	public function test_block_field_is_listed_in_blocks_and_rides_its_gate(): void {
+		$this->scoped_fields = array(
+			new VisitorField( 'eddVisitorCart', VisitorField::TIER_ACTION, '', static fn () => null, 'gtm4wp_edd_state', false, '', true ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$code = $this->inline_for( 'gtm4wp-visitor-data' );
+		$this->assertStringContainsString( '"gates":[{"cookie":"gtm4wp_edd_state","keys":["eddVisitorCart"]}]', $code );
+		$this->assertStringContainsString( '"blocks":["eddVisitorCart"]', $code );
+	}
+
+	public function test_a_plain_gate_field_produces_no_blocks_list(): void {
+		$this->scoped_fields = array(
+			new VisitorField( 'visitorEmail', VisitorField::TIER_ACTION, '', static fn () => null, 'gtm4wp_login' ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$this->assertStringNotContainsString( '"blocks"', $this->inline_for( 'gtm4wp-visitor-data' ), 'Only a block field may route a key off the visitor push.' );
+	}
+
+	public function test_endpoint_config_names_the_login_gate_as_the_only_nonce_gate(): void {
+		$this->scoped_fields = array(
+			new VisitorField( 'visitorIP', VisitorField::TIER_SESSION, '', static fn () => null ),
+		);
+
+		$module = $this->make_module( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) );
+		$module->enqueue_scripts();
+
+		$this->assertStringContainsString( '"loginGate":"' . VisitorDataModule::LOGIN_GATE_COOKIE . '"', $this->inline_for( 'gtm4wp-visitor-data' ) );
+	}
+
 	public function test_one_shot_action_field_produces_the_actions_config_not_a_gate(): void {
 		// Phase 3: a one-shot Tier 3 field (the $one_shot flag on VisitorField) is
 		// routed into the config `actions` list — gated by its event cookie but never
