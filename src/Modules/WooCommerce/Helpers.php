@@ -108,37 +108,17 @@ final class Helpers {
 	public const ONESHOT_EVENT_COOKIE = 'gtm4wp_woo_event';
 
 	/**
-	 * Flags a pending one-shot event by setting ONESHOT_EVENT_COOKIE, only when the
-	 * cache-safe data layer is on (otherwise the event renders server-side). Called
-	 * from the hooks that seed the session markers, which run only on non-cached
-	 * requests. Not HttpOnly on purpose (the client reads it); it carries no
-	 * visitor value. The 2-day expiry only bounds an undelivered event. Host-only
-	 * on purpose (no Domain attribute, unlike the login-gate cookie): the JS
-	 * clearer writes no Domain either, and a cookie set with one is a different
-	 * cookie the clear would never remove (#270, RI-14).
+	 * Flags a pending WooCommerce one-shot event by setting ONESHOT_EVENT_COOKIE,
+	 * only when the cache-safe data layer is on (otherwise the event renders
+	 * server-side). Called from the hooks that seed the session markers, which
+	 * run only on non-cached requests. Cookie attributes:
+	 * EcommerceHelpers::flag_oneshot_event().
 	 *
 	 * @param bool $cache_safe_enabled Whether GTM4WP_OPTION_CACHE_SAFE_DATALAYER is on.
 	 * @return void
 	 */
 	public static function flag_oneshot_event( bool $cache_safe_enabled ): void {
-		if ( ! $cache_safe_enabled || headers_sent() ) {
-			return;
-		}
-
-		setcookie(
-			self::ONESHOT_EVENT_COOKIE,
-			'1',
-			array(
-				'expires'  => time() + ( 2 * DAY_IN_SECONDS ),
-				'path'     => '/',
-				'secure'   => is_ssl(),
-				'httponly' => false,
-				'samesite' => 'Lax',
-			)
-		);
-
-		// Reflect it into $_COOKIE so any later same-request read sees it set.
-		$_COOKIE[ self::ONESHOT_EVENT_COOKIE ] = '1';
+		EcommerceHelpers::flag_oneshot_event( self::ONESHOT_EVENT_COOKIE, $cache_safe_enabled );
 	}
 
 	/**

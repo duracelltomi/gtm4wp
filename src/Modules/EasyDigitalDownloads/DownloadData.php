@@ -38,6 +38,20 @@ final class DownloadData {
 	public const ORDER_TRACKED_META = '_ga_tracked';
 
 	/**
+	 * Statuses that end the reliable-purchase re-check: edd_get_payment_statuses()
+	 * (EDD 3.7.0) minus the waiting ones (U132, pinned by a test).
+	 *
+	 * @var string[]
+	 */
+	public const PENDING_PURCHASE_TERMINAL_STATUSES = array( 'refunded', 'partially_refunded', 'revoked', 'failed', 'abandoned' );
+
+	/**
+	 * Minutes from creation a not-yet-trackable order is re-checked (the
+	 * WooCommerce window).
+	 */
+	public const PENDING_PURCHASE_RECHECK_WINDOW_MINUTES = 24 * 60;
+
+	/**
 	 * The never-cached item contexts the server-side list-attribution merge
 	 * applies to (#405); the cacheable detail page and list markup are
 	 * enriched client-side instead.
@@ -748,6 +762,17 @@ final class DownloadData {
 			return false;
 		}
 
+		return $this->is_order_older_than( $order, $max_age );
+	}
+
+	/**
+	 * Whether the order was created more than $minutes ago (unreadable date: no).
+	 *
+	 * @param \EDD\Orders\Order $order   The order to check.
+	 * @param int               $minutes The age limit in minutes.
+	 * @return bool
+	 */
+	private function is_order_older_than( \EDD\Orders\Order $order, int $minutes ): bool {
 		$date_created = (string) self::row_prop( $order, 'date_created' );
 		if ( '' === $date_created ) {
 			return false;
@@ -759,11 +784,47 @@ final class DownloadData {
 			return false;
 		}
 
-		$now     = new \DateTime( 'now', new \DateTimeZone( 'UTC' ) );
-		$diff    = $now->diff( $reference );
-		$minutes = ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i;
+		$now  = new \DateTime( 'now', new \DateTimeZone( 'UTC' ) );
+		$diff = $now->diff( $reference );
 
-		return $minutes > $max_age;
+		return ( ( $diff->days * 24 * 60 ) + ( $diff->h * 60 ) + $diff->i ) > $minutes;
+	}
+
+	/**
+	 * The purchase eligibility gauntlet for the session-endpoint fallback: not
+	 * too old, not already tracked, status trackable. The confirmation page keeps
+	 * its own sequence, because orderData sits between the age and tracked checks.
+	 *
+	 * @param \EDD\Orders\Order $order The order to check.
+	 * @return bool
+	 */
+	public function is_order_trackable( \EDD\Orders\Order $order ): bool {
+		return ! $this->is_order_older_than_max_age( $order )
+			&& ! $this->is_purchase_already_tracked( $order )
+			&& $this->is_order_status_trackable( $order );
+	}
+
+	/**
+	 * Whether an order NOT trackable now may still become so (a store that does
+	 * not track `pending`, awaiting the webhook). Mirrors ProductData's.
+	 *
+	 * @param \EDD\Orders\Order $order The order to check.
+	 * @return bool
+	 */
+	public function may_become_trackable( \EDD\Orders\Order $order ): bool {
+		if ( $this->is_order_older_than_max_age( $order ) || $this->is_purchase_already_tracked( $order ) ) {
+			return false;
+		}
+
+		if ( $this->is_order_status_trackable( $order ) ) {
+			return false;
+		}
+
+		if ( in_array( (string) self::row_prop( $order, 'status' ), self::PENDING_PURCHASE_TERMINAL_STATUSES, true ) ) {
+			return false;
+		}
+
+		return ! $this->is_order_older_than( $order, self::PENDING_PURCHASE_RECHECK_WINDOW_MINUTES );
 	}
 
 	/**

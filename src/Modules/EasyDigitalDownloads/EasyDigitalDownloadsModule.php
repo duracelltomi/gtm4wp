@@ -111,6 +111,12 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 		// by VisitorCart::register_state_hooks(), wired from Plugin::boot().
 		add_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array( new VisitorCart( $this->options, $page_datalayer ), 'declare_visitor_scoped_fields' ) );
 
+		// Reliable purchase tracking under the cache-safe data layer: the one-shot
+		// field and its confirm beacon; the event cookie is set from Plugin::boot().
+		$reliable_purchase = new ReliablePurchase( $this->options, $download_data );
+		add_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, array( $reliable_purchase, 'declare_visitor_scoped_fields' ) );
+		add_action( 'rest_api_init', array( $reliable_purchase, 'register_confirm_route' ) );
+
 		// Hidden product data markup: one span per item in the [downloads] grid
 		// (view_item_list / select_item), a hidden input inside every purchase
 		// form (add_to_cart) and a span in every checkout cart row

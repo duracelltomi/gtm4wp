@@ -14,8 +14,8 @@
  * - Other stores' customer & cart (Easy Digital Downloads): a Tier 3 field
  *   listed in config.blocks, whose value is the same { customer, cart } pair;
  *   re-fetched on GTM4WP_VISITOR_REFRESH_EVENT after a same-page cart change.
- * - WooCommerce one-shots (the add_to_cart after a cart "Undo", the
- *   reliable-purchase fallback): the same endpoint, only while the event
+ * - One-shots (WooCommerce: the add_to_cart after a cart "Undo"; WooCommerce
+ *   and EDD: the reliable-purchase fallback): the same endpoint, only while the event
  *   cookie is present, fired ONCE with a de-dupe guard (the purchase reuses
  *   gtm4wp_orderid_tracked), then the cookie is cleared and a POST beacon
  *   lets the server flag the order while the GET stays read-only.
@@ -493,6 +493,7 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 	 */
 	const actionHandlers = {
 		pendingPurchase: handlePendingPurchase,
+		eddPendingPurchase: handlePendingPurchase,
 		readdedToCart: handleReaddedToCart,
 	};
 

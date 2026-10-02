@@ -22,7 +22,7 @@ new tiers slot in behind the same option + client runtime without rework.
 |---|---|---|---|
 | 1 — client | The browser already knows it (referrer, search term, anything derived from `location.*`). | Pushed client-side as `gtm4wp.visitorData`. | **Zero network.** |
 | 2 — session | Server-only but constant per session (visitor IP, Cloudflare country). | One fetch per session, cached in `sessionStorage`. | One request / session. |
-| 3 — action | Server-only, changes on an action (logged-in user data; store customer & cart; one-shot events). | Fetch **gated by a JS-readable cookie** (the login gate for user data; the EDD state cookie for the Easy Digital Downloads customer & cart; an event cookie for one-shots) — except the WooCommerce customer & cart, which ride WooCommerce's own `woocommerce_add_to_cart_fragments` response and so need no fetch of ours at all. | One request only when the gating cookie changed. |
+| 3 — action | Server-only, changes on an action (logged-in user data; store customer & cart; one-shot events). | Fetch **gated by a JS-readable cookie** (the login gate for user data; the EDD state cookie for the Easy Digital Downloads customer & cart; an event cookie per store for one-shots) — except the WooCommerce customer & cart, which ride WooCommerce's own `woocommerce_add_to_cart_fragments` response and so need no fetch of ours at all. | One request only when the gating cookie changed. |
 
 ### Hard constraint (all phases)
 
@@ -321,3 +321,33 @@ set / unchanged / changed / cleared / headers sent / no-store, hook set),
 `EddPageDataLayerTest` (HTML omission both directions, block parity with the page,
 guest, empty cart), `VisitorDataModuleTest` (`blocks`, `loginGate`), and the JS suite
 (block routing, replay, nonce rule, refresh, per-source de-dupe, the EDD event set).
+
+## Easy Digital Downloads reliable purchase tracking (2.1)
+
+The WooCommerce reliable-purchase one-shot, for EDD (`EasyDigitalDownloads\ReliablePurchase`),
+active while the mode, "Reliable purchase tracking" and the tracked flag are all on.
+
+1. **Event cookie.** `gtm4wp_edd_event` (host-only, JS-readable, set through
+   `Ecommerce\Helpers::flag_oneshot_event()`) is set on `edd_built_order` (U132), which
+   runs in the buyer's checkout request for every core gateway, including the
+   admin-ajax and REST checkouts; hence registered from `Plugin::boot()`.
+2. **Field.** `eddPendingPurchase`, its own key because the endpoint merges resolver
+   values by key; the runtime maps it to the same handler as `pendingPurchase`.
+3. **Resolver.** Read-only. The order comes from `edd_get_purchase_session()` only
+   (U116), touched only while the event cookie is present, through
+   `DownloadData::is_order_trackable()` (age, `_ga_tracked`, the
+   `gtm4wp_orderid_tracked` cookie, status). Payload: the purchase push plus the
+   customer signals, the order **number** for the shared guard; no `orderData`.
+   `{ pending: true }` while `may_become_trackable()` (untracked status, not
+   terminal, inside the 24 h window), so the client keeps the cookie.
+4. **Confirm.** `POST gtm4wp/v2/confirm-edd-purchase-tracked`, the WooCommerce
+   beacons' gate (`RequestOrigin`). It flags the session order only while its age and
+   status are trackable; it does not check the event or tracked cookies, which the
+   client clears or writes as the beacon leaves.
+
+Regression tests: `EddReliablePurchaseTest` (declaration per option, cookie gate,
+payload and order number, request ids ignored, every guard, pending window and
+terminal statuses against EDD's status list, confirm flag-once and refusals,
+permission grant/deny, route binding, event cookie), `EddPageDataLayerTest` (still
+nothing in the cached HTML), and the JS suite (`eddPendingPurchase` fires once beside a
+WooCommerce action, guard suppression, pending keeps the cookie).

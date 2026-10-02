@@ -1499,6 +1499,94 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 		expect( document.cookie ).not.toContain( EVENT_COOKIE + '=1' );
 	} );
 
+	describe( 'EDD reliable-purchase fallback (eddPendingPurchase)', () => {
+		const EDD_COOKIE = 'gtm4wp_edd_event';
+		const EDD_CONFIRM_URL =
+			'https://site.example/wp-json/gtm4wp/v2/confirm-edd-purchase-tracked';
+
+		// Both stores declared, as on a site running both integrations: each
+		// one-shot rides its own cookie, key and beacon.
+		const bothStoresConfig = () => ( {
+			events: EVENTS,
+			fields: {},
+			endpoint: ENDPOINT,
+			nonce: 'n1',
+			sessionKey: 'gtm4wp_visitor_session',
+			actions: [
+				{
+					cookie: EVENT_COOKIE,
+					keys: [ 'pendingPurchase' ],
+					confirm: { pendingPurchase: CONFIRM_URL },
+				},
+				{
+					cookie: EDD_COOKIE,
+					keys: [ 'eddPendingPurchase' ],
+					confirm: { eddPendingPurchase: EDD_CONFIRM_URL },
+				},
+			],
+		} );
+
+		const eddPayload = ( orderNumber ) => ( {
+			eddPendingPurchase: purchasePayload( orderNumber, true )
+				.pendingPurchase,
+		} );
+
+		it( 'fires once, writes the shared guard, beacons its own route and clears only its cookie', async () => {
+			window.gtm4wp_visitordata_config = bothStoresConfig();
+			setCookie( EDD_COOKIE, '1' );
+			mockEndpointOnce( eddPayload( 'EDD-42' ) );
+
+			loadTracker();
+			await flush();
+
+			expect( global.fetch.mock.calls[ 0 ][ 0 ] ).toBe( ENDPOINT );
+			expect( eventsNamed( 'purchase' ) ).toHaveLength( 1 );
+			expect(
+				window.localStorage.getItem( 'gtm4wp_orderid_tracked' )
+			).toBe( 'EDD-42' );
+			expect(
+				global.fetch.mock.calls.find(
+					( call ) => call[ 0 ] === EDD_CONFIRM_URL
+				)
+			).toBeTruthy();
+			expect( confirmBeacon() ).toBeUndefined();
+			expect( document.cookie ).not.toContain( EDD_COOKIE + '=1' );
+			expect(
+				visitorEvents().find( ( e ) => 'eddPendingPurchase' in e )
+			).toBeFalsy();
+		} );
+
+		it( 'does not re-push an order the shared guard already recorded', async () => {
+			window.localStorage.setItem( 'gtm4wp_orderid_tracked', 'EDD-42' );
+			window.gtm4wp_visitordata_config = bothStoresConfig();
+			setCookie( EDD_COOKIE, '1' );
+			mockEndpointOnce( eddPayload( 'EDD-42' ) );
+
+			loadTracker();
+			await flush();
+
+			expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+			expect(
+				global.fetch.mock.calls.find(
+					( call ) => call[ 0 ] === EDD_CONFIRM_URL
+				)
+			).toBeUndefined();
+			expect( document.cookie ).not.toContain( EDD_COOKIE + '=1' );
+		} );
+
+		it( 'keeps its cookie while the order is pending', async () => {
+			window.gtm4wp_visitordata_config = bothStoresConfig();
+			setCookie( EDD_COOKIE, '1' );
+			mockEndpointOnce( { eddPendingPurchase: { pending: true } } );
+
+			loadTracker();
+			await flush();
+
+			expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
+			expect( document.cookie ).toContain( EDD_COOKIE + '=1' );
+		} );
+	} );
+
 	it( 'clears the event cookie for a push-less object without the pending flag', async () => {
 		// T112: the flag is `true === pending`. An empty object is nothing to
 		// wait for: no push, no beacon, cookie cleared.

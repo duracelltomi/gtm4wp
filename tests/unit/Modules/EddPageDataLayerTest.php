@@ -709,7 +709,8 @@ final class EddPageDataLayerTest extends TestCase {
 		);
 
 		// Cache-safe mode: a visitor-specific purchase must not be baked into
-		// cacheable HTML.
+		// cacheable HTML; it rides the session endpoint instead
+		// (EddReliablePurchaseTest).
 		$this->inline_scripts = array();
 		$this->make_page_datalayer(
 			array(

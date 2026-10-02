@@ -344,7 +344,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to measure the purchase on the next page the buyer visits when the confirmation page was never reached - for example an abandoned offsite payment redirect. The order is resolved from the buyer\'s own purchase session, every duplicate-prevention check still applies, and the raw order data block stays exclusive to the confirmation page. Has no effect while "Do not flag orders as being tracked" is enabled or while the cache-safe data layer mode is on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Enable this to measure the purchase on the next page the buyer visits when the confirmation page was never reached - for example an abandoned offsite payment redirect. The order is resolved from the buyer\'s own purchase session, every duplicate-prevention check still applies, and the raw order data block stays exclusive to the confirmation page. Has no effect while "Do not flag orders as being tracked" is enabled.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE

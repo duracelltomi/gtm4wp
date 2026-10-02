@@ -445,6 +445,39 @@ final class Helpers {
 	}
 
 	/**
+	 * Sets a store's one-shot event cookie for the cache-safe data layer (issue
+	 * #398): its presence makes the client runtime fetch the session endpoint on
+	 * the next page, and the client clears it after delivery. Not HttpOnly (the
+	 * client reads it) and carries no visitor value; the 2-day expiry only
+	 * bounds an undelivered event. Host-only on purpose: the JS clearer writes no
+	 * Domain, and a cookie set with one would never be removed (#270, RI-14).
+	 *
+	 * @param string $cookie_name        The store's event cookie name.
+	 * @param bool   $cache_safe_enabled Whether GTM4WP_OPTION_CACHE_SAFE_DATALAYER is on.
+	 * @return void
+	 */
+	public static function flag_oneshot_event( string $cookie_name, bool $cache_safe_enabled ): void {
+		if ( ! $cache_safe_enabled || headers_sent() ) {
+			return;
+		}
+
+		setcookie(
+			$cookie_name,
+			'1',
+			array(
+				'expires'  => time() + ( 2 * DAY_IN_SECONDS ),
+				'path'     => '/',
+				'secure'   => is_ssl(),
+				'httponly' => false,
+				'samesite' => 'Lax',
+			)
+		);
+
+		// Reflect it into $_COOKIE so any later same-request read sees it set.
+		$_COOKIE[ $cookie_name ] = '1';
+	}
+
+	/**
 	 * Digit-count bounds of an E.164 number, excluding the "+". The maximum is the
 	 * standard's limit; the minimum is deliberately below the shortest real number
 	 * (Saint Helena, +290 plus four digits) so it only rejects junk (UC-5).

@@ -77,8 +77,9 @@ final class PageDataLayer {
 
 		// Reliable purchase tracking: a purchase whose confirmation page was
 		// never reached is delivered on the buyer's next visit from their own
-		// purchase session. Skipped under cache-safe mode and while order-tracked
-		// flags are disabled (the event would repeat on every page view).
+		// purchase session. Under cache-safe mode the session endpoint delivers
+		// it (ReliablePurchase); skipped while order-tracked flags are disabled
+		// (the event would repeat on every page view).
 		if (
 			! $is_success_page
 			&& ! $cache_safe
