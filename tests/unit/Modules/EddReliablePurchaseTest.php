@@ -450,7 +450,22 @@ final class EddReliablePurchaseTest extends TestCase {
 		$this->assertSame( array( $purchase, 'confirm_purchase_tracked' ), $args['callback'] );
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_no_event_cookie_hook_without_edd_even_with_the_options_on(): void {
+		// Own process: an EDD() stub or EDD_VERSION from another test is process-wide.
+		Functions\when( 'get_option' )->justReturn( self::ALL_ON );
+		ReliablePurchase::register_flag_hooks( new Options( ( new EasyDigitalDownloadsModule() )->defaults() ) );
+
+		$this->assertFalse( has_action( 'edd_built_order' ) );
+	}
+
 	public function test_the_event_cookie_is_set_on_edd_built_order_only_when_enabled(): void {
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		if ( ! defined( 'EDD_VERSION' ) ) {
+			define( 'EDD_VERSION', '3.7.0' );
+		}
+
 		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => false ) + self::ALL_ON );
 		ReliablePurchase::register_flag_hooks( new Options( ( new EasyDigitalDownloadsModule() )->defaults() ) );
 		$this->assertFalse( has_action( 'edd_built_order' ) );

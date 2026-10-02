@@ -334,7 +334,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 **Easy Digital Downloads**
 
 * Added: **Easy Digital Downloads integration** (EDD 3.0+, beta) as its own settings section, covering the classic shortcodes and the EDD blocks with the full GA4 event set from `view_item` to `purchase`. Purchases resolve through EDD's own payment-key chain and are deduplicated three ways. The purchase-status default includes Pending and Processing, because offsite gateways return buyers before the order completes.
-* Added: Easy Digital Downloads settings mirroring the WooCommerce ones: `orderData` in the same key names, persistent list attribution, Enhanced Conversions `user_data` (phone via EDD's field or the new `gtm4wp_edd_order_phone` filter) and reliable purchase tracking; customer, cart and missed purchases also arrive under the cache-safe data layer. Customer identity reaches only a visitor EDD would show the receipt to.
+* Added: Easy Digital Downloads settings mirroring the WooCommerce ones: `orderData` in the same key names, persistent list attribution, Enhanced Conversions `user_data` (phone via EDD's field or the new `gtm4wp_edd_order_phone` filter) and reliable purchase tracking; the cache-safe data layer also delivers the customer, the cart and missed purchases. Customer identity reaches only a visitor EDD would show the receipt to.
 * Added: for developers, the Easy Digital Downloads filters `gtm4wp_eec_edd_cart_item`, `gtm4wp_eec_edd_order_item`, `gtm4wp_eec_edd_order_data`, `gtm4wp_edd_purchase_datalayer`, `gtm4wp_edd_datalayer_on_pageload` and `gtm4wp_edd_purchase_trackable_statuses`.
 
 **Google service accounts**

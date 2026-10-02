@@ -1902,6 +1902,81 @@ describe( 'gtm4wp-visitor-data — store blocks from the endpoint', () => {
 		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'baked-nonce' );
 	} );
 
+	it( 'sends the nonce for a logged-in visitor when no login-gated field is configured (#332)', async () => {
+		// The login cookie exists whenever the module is on; the customer part
+		// needs the user, so the fetch must be authenticated.
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		setCookie( 'gtm4wp_login', 'abc' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: block( [] ) } );
+
+		loadTracker();
+		await flush();
+
+		const [ , options ] = global.fetch.mock.calls[ 0 ];
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBe( 'baked-nonce' );
+		expect( customerEvents() ).toHaveLength( 1 );
+	} );
+
+	it( 'sends no nonce on a fetch with no active gate, even for a logged-in visitor', async () => {
+		setCookie( 'gtm4wp_login', 'abc' );
+		window.gtm4wp_visitordata_config = eddConfig( {
+			session: [ 'visitorIP' ],
+		} );
+		mockEndpointOnce( { visitorIP: '8.8.4.4' } );
+
+		loadTracker();
+		await flush();
+
+		const [ , options ] = global.fetch.mock.calls[ 0 ];
+		expect( options.headers[ 'X-WP-Nonce' ] ).toBeUndefined();
+	} );
+
+	it( 'retries a refresh anonymously when the nonce is rejected (#291, #333)', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		setCookie( 'gtm4wp_login', 'abc' );
+		window.gtm4wp_visitordata_config = eddConfig( {
+			gates: [
+				{ cookie: 'gtm4wp_edd_state', keys: [ 'eddVisitorCart' ] },
+				{ cookie: 'gtm4wp_login', keys: [ 'visitorEmail' ] },
+			],
+		} );
+		mockEndpointOnce( {
+			eddVisitorCart: block( [ { item_id: '55' } ] ),
+			visitorEmail: 'jane@example.com',
+		} );
+		loadTracker();
+		await flush();
+
+		// A cached page carried a stale nonce: core rejects it on the refresh.
+		setCookie( 'gtm4wp_edd_state', 'h2' );
+		global.fetch.mockResolvedValueOnce( {
+			ok: false,
+			status: 403,
+			json: async () => ( { code: 'rest_cookie_invalid_nonce' } ),
+		} );
+		mockEndpointOnce( {
+			eddVisitorCart: block( [ { item_id: '55' }, { item_id: '66' } ] ),
+		} );
+		refresh();
+		await waitForRefresh();
+		await flush();
+
+		expect( global.fetch ).toHaveBeenCalledTimes( 3 );
+		expect(
+			global.fetch.mock.calls[ 2 ][ 1 ].headers[ 'X-WP-Nonce' ]
+		).toBeUndefined();
+		expect( cartEvents() ).toHaveLength( 2 );
+		expect( cartEvents()[ 1 ].cartContent.items ).toHaveLength( 2 );
+
+		// Fetched anonymously: valid only for the page that carried that nonce.
+		const store = JSON.parse(
+			window.sessionStorage.getItem( 'gtm4wp_visitor_session' )
+		);
+		expect( store.gates.gtm4wp_edd_state.anon ).toBe( true );
+		expect( store.gates.gtm4wp_edd_state.anonNonce ).toBe( 'baked-nonce' );
+	} );
+
 	it( 'treats every gate as the login gate for a cached config without loginGate', async () => {
 		setCookie( 'gtm4wp_edd_state', 'h1' );
 		const config = eddConfig();

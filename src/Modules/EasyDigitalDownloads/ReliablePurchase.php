@@ -80,7 +80,8 @@ final class ReliablePurchase {
 	 * @return void
 	 */
 	public static function register_flag_hooks( Options $options ): void {
-		if ( ! self::is_enabled( $options ) ) {
+		// The platform check sits here: the module path is gated by Registry::frontend().
+		if ( ! self::is_enabled( $options ) || ! ( new EasyDigitalDownloadsModule() )->is_available() ) {
 			return;
 		}
 

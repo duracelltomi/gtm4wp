@@ -399,6 +399,11 @@ final class EddVisitorCartTest extends TestCase {
 	}
 
 	public function test_state_hooks_are_registered_on_every_edd_cart_mutation_when_enabled(): void {
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		if ( ! defined( 'EDD_VERSION' ) ) {
+			define( 'EDD_VERSION', '3.7.0' );
+		}
+
 		VisitorCart::register_state_hooks( $this->options( self::ALL_ON ) );
 
 		// U170: the exact set of EDD actions the gate follows.
@@ -406,6 +411,17 @@ final class EddVisitorCartTest extends TestCase {
 			$this->assertSame( 20, has_action( $hook, VisitorCart::class . '->maintain_state_cookie()' ), $hook );
 		}
 		$this->assertNotFalse( has_action( 'template_redirect', VisitorCart::class . '->maintain_state_cookie_on_page()' ) );
+	}
+
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_no_state_hooks_without_edd_even_with_the_options_on(): void {
+		// Own process: an EDD() stub or EDD_VERSION from another test is process-wide.
+		VisitorCart::register_state_hooks( $this->options( self::ALL_ON ) );
+
+		$this->assertFalse( has_action( 'edd_post_add_to_cart' ) );
+		$this->assertFalse( has_action( 'template_redirect' ) );
+		$this->assertFalse( has_action( 'wp_logout' ) );
 	}
 
 	public function test_no_state_hooks_while_the_mode_is_off(): void {

@@ -226,8 +226,8 @@ final class VisitorDataModule extends AbstractModule {
 			$config['nonce']      = wp_create_nonce( 'wp_rest' );
 			$config['sessionKey'] = self::SESSION_STORAGE_KEY;
 
-			// The only gate whose fetch carries the nonce: another gate (a guest's
-			// cart) is set on cacheable pages, where the baked nonce is stale.
+			// Its cookie, listed in the gates or not, is what makes a fetch carry the
+			// nonce: a guest's cart rides cacheable pages, where the baked nonce is stale.
 			$config['loginGate'] = self::LOGIN_GATE_COOKIE;
 
 			if ( array() !== $session_keys ) {

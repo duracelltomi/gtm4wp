@@ -539,22 +539,21 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 	}
 
 	/**
-	 * Whether a fetch with these active gates sends the baked nonce: only for a
-	 * logged-in visitor (the login gate; their page is never cached, so it is
-	 * fresh). Any other gate (a guest's cart) rides cacheable pages, where a
-	 * stale nonce would 403 the read. A config without loginGate (cached HTML
-	 * from before it existed) treats every gate as the login gate.
+	 * Whether a fetch with these active gates sends the baked nonce: when a gate
+	 * is active and the visitor is logged in, read from the login gate cookie
+	 * itself, which the server keeps whatever fields are configured (a store
+	 * block needs the user too, #332). A guest's cart rides cacheable pages,
+	 * where a stale nonce would 403 the read. A config without loginGate (cached
+	 * HTML from before it existed) treats every gate as the login gate.
 	 *
 	 * @param {Array} activeGates The { cookie, value } gates present now.
 	 * @return {boolean} True when X-WP-Nonce is sent.
 	 */
 	function sendsNonceFor( activeGates ) {
-		if ( ! config.nonce ) {
+		if ( ! config.nonce || ! activeGates.length ) {
 			return false;
 		}
-		return activeGates.some( function ( gate ) {
-			return ! config.loginGate || gate.cookie === config.loginGate;
-		} );
+		return ! config.loginGate || !! gtm4wp_read_cookie( config.loginGate );
 	}
 
 	/**
@@ -572,6 +571,49 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 			credentials: 'same-origin',
 			headers,
 		} );
+	}
+
+	/**
+	 * GETs the endpoint and parses the JSON body, for every fetch path (RI-36).
+	 * A nonce rejection means a cache handed a logged-in visitor an anonymous
+	 * page, so its nonce is not theirs (#291): asked once more as anonymous.
+	 * Only core's own error code (#319): a security layer's 403 would refuse
+	 * the retry too.
+	 *
+	 * @param {boolean} withNonce Whether to send the baked nonce.
+	 * @return {Promise} Resolves to { body, anon }; body is null on a failure.
+	 */
+	function fetchEndpoint( withNonce ) {
+		let anon = false;
+
+		return requestEndpoint( withNonce )
+			.then( function ( response ) {
+				if ( ! withNonce || ! response || 403 !== response.status ) {
+					return response;
+				}
+				const body =
+					'function' === typeof response.json
+						? response.json().catch( function () {
+								return null;
+						  } )
+						: Promise.resolve( null );
+				return body.then( function ( error ) {
+					if (
+						! error ||
+						'rest_cookie_invalid_nonce' !== error.code
+					) {
+						return response;
+					}
+					anon = true;
+					return requestEndpoint( false );
+				} );
+			} )
+			.then( function ( response ) {
+				return response && response.ok ? response.json() : null;
+			} )
+			.then( function ( body ) {
+				return { body, anon };
+			} );
 	}
 
 	/**
@@ -683,41 +725,11 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 			return;
 		}
 
-		const sendNonce = sendsNonceFor( activeGates );
-		let anonymousRetry = false;
-		const request = requestEndpoint;
+		fetchEndpoint( sendsNonceFor( activeGates ) )
+			.then( function ( result ) {
+				const body = result.body;
+				const anonymousRetry = result.anon;
 
-		request( sendNonce )
-			.then( function ( response ) {
-				// A nonce rejection: a cache handed this logged-in visitor an
-				// anonymous page, so its nonce is not theirs (#291). Ask once more
-				// as anonymous: the session fields still arrive and the loop stops.
-				// Only core's own error code (#319): a security layer's 403 would
-				// refuse the retry too.
-				if ( ! sendNonce || ! response || 403 !== response.status ) {
-					return response;
-				}
-				const body =
-					'function' === typeof response.json
-						? response.json().catch( function () {
-								return null;
-						  } )
-						: Promise.resolve( null );
-				return body.then( function ( error ) {
-					if (
-						! error ||
-						'rest_cookie_invalid_nonce' !== error.code
-					) {
-						return response;
-					}
-					anonymousRetry = true;
-					return request( false );
-				} );
-			} )
-			.then( function ( response ) {
-				return response && response.ok ? response.json() : null;
-			} )
-			.then( function ( body ) {
 				if ( ! body || 'string' !== typeof body.payload ) {
 					return;
 				}
@@ -772,12 +784,7 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 					}
 				} );
 
-				try {
-					window.sessionStorage.setItem(
-						sessionKey,
-						JSON.stringify( next )
-					);
-				} catch ( e ) {}
+				writeStore( next );
 
 				// One-shots go to their handlers, stay OUT of the merged push, and
 				// their event cookies are cleared so a later page makes no request.
@@ -976,11 +983,10 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 			}
 		} );
 
-		requestEndpoint( sendsNonceFor( activeGates ) )
-			.then( function ( response ) {
-				return response && response.ok ? response.json() : null;
-			} )
-			.then( function ( body ) {
+		fetchEndpoint( sendsNonceFor( activeGates ) )
+			.then( function ( result ) {
+				const body = result.body;
+
 				if ( ! body || 'string' !== typeof body.payload ) {
 					return;
 				}
@@ -1029,6 +1035,10 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 						v: active.value,
 						data: subset,
 					};
+					if ( result.anon ) {
+						store.gates[ gate.cookie ].anon = true;
+						store.gates[ gate.cookie ].anonNonce = config.nonce;
+					}
 				} );
 				writeStore( store );
 
