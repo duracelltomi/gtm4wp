@@ -49,7 +49,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-20** — a key name the plugin writes for a third-party runtime to read is a contract with only one end in this repo: a wrong name fails **silently**, so the only check is the vendor's documentation. Open the page a docblock cites; prefer the documented name over the merely-observed one.
 - **RI-22** — a `TABLE[$key] ?? DEFAULT` is a claim about **every key not in the table**, and the table is the only half that gets reviewed. Count the domain's categories: if it has three and the code models "listed" plus "everything else", the third silently inherits a rule written for the second. Test the default, not only the entries.
 - **RI-23** — RI-22's sequel: when the model grows the third category, its branch arrives near the top of the function and **returns**, silently opting its inputs out of every test below. Diff the branches, not the values; count the rows that enter the new branch before calling it a special case; and remember a test named for a general property now asserts it for one category only.
-- **RI-25** — ⭐ when you re-apply somebody else's filter, the argument list is theirs too. `WP_Hook` never pads: a callback with N required params reached from a caller supplying fewer raises an uncaught `ArgumentCountError`. Passing *more* is free (it slices down), so pass exactly what upstream passes. A mocked `apply_filters` with an optional-param stand-in cannot see this. Ledger: **13** third-party hook sites (re-derive with the `grep -v gtm4wp` litmus) — the count lives in TWO files, so correct both.
+- **RI-25** — ⭐ when you re-apply somebody else's filter, the argument list is theirs too. `WP_Hook` never pads: a callback with N required params reached from a caller supplying fewer raises an uncaught `ArgumentCountError`. Passing *more* is free (it slices down), so pass exactly what upstream passes. A mocked `apply_filters` with an optional-param stand-in cannot see this. Ledger: **14** third-party hook sites (re-derive with the multi-line litmus in the entry; a single-line grep reads 13, a multi-line one without `-r '$2'` reads 15) — the count lives in TWO files, so correct both.
 - **RI-18** — sanitizing a request value proves it is *safe to handle*, never that it is *what it claims to be*. For a proxy-chain header, know which end the infrastructure guarantees; a docblock asserting "not spoofable" is a claim to test, not a fact. Name the superglobal behind every value in a gate (a convenience helper may read `$_REQUEST` before the header), then pick the sanitizer for the value's **grammar** — a text sanitizer on a URL rewrites what the gate is judging.
 - **RI-28** — an "untouched / empty row" predicate is a claim about the state the UI actually creates, not about all-fields-empty. A schema default seeded into a fresh row (a select column's `default`, a prefilled cell) makes `'' === implode( '', $row )` unreachable for the natural untouched state, so the silent-drop path goes dead and the user gets a validation error for a row they never touched. Derive "empty" from the columns the user must fill, and test the drop path with the exact shape the UI submits (#232 — the drop test omitted the seeded type cell and passed forever).
 - **RI-30** — an empty array handed to a third-party query/cancel call is a *predicate* ("value IS empty"), not "no filter", unless the callee says so; `as_unschedule_all_actions( $hook, array(), $group )` cancels nothing (#240). Open the callee, pass the documented "any" form, and stub with every parameter recorded.
@@ -58,6 +58,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-27** — PHP int-coerces a numeric-string ARRAY KEY, so a `foreach ( $map as $key => … )` over a DB-derived map (`get_post_meta( $id )`, `$_COOKIE`, any `meta_key`-keyed cache) hands you an int where the source column held a string: a strict `in_array( $key, $list, true )` against string entries never matches, and a filter promised a string gets an int. Cast the key at the top of the loop — and note `$out[ (string) $key ]` re-coerces, so the cast fixes comparisons, not the container's shape (#211).
 - **RI-33** — every sub-schema core's validator can reach from a value (`properties`, `items`, `additionalProperties`, recursively) carries a `type` (or `anyOf`/`oneOf`): an empty `array()` sub-schema is published as `[]` (not a schema object) and makes `rest_validate_value_from_schema()` read `$args['type']` unguarded — three PHP warnings and two `_doing_it_wrong` per value, validation still passing, so a green suite and a working call both hide it (#251). Pin it recursively; a shallow per-property loop misses one level down.
 - **RI-35** — a jQuery handler on an event a third party triggers synchronously runs inside their code: a throw skips everything after their trigger, so contain it (catch + rethrow on a timer); and `triggerHandler()` does not bubble, so bind where they dispatch (#472, #327–#329).
+- **RI-37** — a control sits on one transport; list every transport core offers for the same route or store (REST args vs raw import, `/run` vs MCP, other response wrappers) and put the control at the sink or the dispatch. Measure reach before rating (#337 drafted Medium, measured Low).
 - **RI-36** — a second request path built beside a working one copies its happy path, not its recovery branches; and an auth decision keyed on "is X in this config list" is wrong when X exists outside the list. Enumerate every fetch of the endpoint and diff their error handling (#332, #333).
 - **RI-34** — a pattern/exclusion list we hand to a third party that names a literal we used to hardcode is a second reader of it: when the literal becomes an option (RI-14), the list is silently narrowed on every non-default site (#325). Grep the literal as a string in every list we emit; prefer a fixed plugin-owned token over the user value.
 
@@ -721,6 +722,15 @@ but rate the *blast radius*, which is the whole block rather than the value.
   two-line comment naming the reason. **An undocumented exemption is indistinguishable from an
   oversight**, and the next reviewer pays for the difference every time. Prefer routing through
   the helper anyway: it costs nothing and needs no reader to re-derive the argument.
+- **The encoder-less sibling (R44, #339): a numeric cast concatenated into script.** `'= ' . (float) $x . ';'`
+  has no encoder call on the line, so an encoder grep never selects it, yet a non-finite float prints
+  as `INF`/`NAN`, which are undeclared JS identifiers (`ReferenceError`). A finite input can get there
+  through our own arithmetic (`1e308 * 2`). **Do not "fix" it with `json_literal( (float) $x )`**:
+  under `serialize_precision=-1` that changes ~12% of ordinary totals (0.15 → 0.15000000000000002).
+  `json_literal( round( $x, 2 ), … )` or an `is_finite()` guard kept 50,000/50,000 normal values
+  byte-identical. Ledger at `1e8806b` (rule: `grep -rn "\. (float)" src/`, script-context lines): **2**,
+  WC `PageDataLayer.php:554`, EDD `PageDataLayer.php:438`. **Fixed the same day:** both go through
+  `ScriptTag::number_literal()` (`is_finite()` guard); re-derived after the fix, the rule finds **0**.
 
 ### RI-18: Sanitized is not the same as authentic — know which end of a request value the infrastructure guarantees
 RI-6 asks whether a request value is *safe to handle*. It never asks whether the value is *what it claims to be*, and for anything the client can set outright those are different questions with different answers. A perfectly `wp_unslash`'d, `sanitize_text_field`'d, `FILTER_VALIDATE_IP`'d value can still be entirely attacker-chosen — validation constrains the *shape*, not the *provenance*.
@@ -790,11 +800,16 @@ stage as collateral while verifying an unrelated documentation claim about the s
   either way (UC-3). The discriminating test declares the parameters **required**, exactly as a
   documented site callback would — that reproduces the real `ArgumentCountError` and goes red on
   the unfixed source.
-- **Litmus (re-derive, don't read):** `grep -rnoE "(apply_filters|do_action)\( '[a-z_]+'" src/ compat/ | grep -v gtm4wp`
+- **Litmus (re-derive, don't read):** `rg -U -o --no-filename -r '$2' "(apply_filters|do_action)\(\s*'([a-z_]+)'" src/ compat/ | grep -v gtm4wp | wc -l`
   — every hook name **without** the `gtm4wp` prefix is somebody else's contract. Counting rule:
-  matching **lines**, so a site is one member. **Ledger re-derived 2026-09-02 (R28): 13
+  one match per **call**, multi-line (`-U`), and `-r '$2'` prints each match as its hook name on ONE
+  line — without it a two-line match prints two lines and `wc -l` reads 15. `ListTracking.php:542`
+  puts `'the_permalink'` on the line after `apply_filters(`, which the old single-line grep never
+  saw (#351, R44). **Ledger re-derived
+  2026-10-02 (R44): 14 sites, all correct** — R28's 13 plus that site, present since `d02eb81`
+  (2-arg, matching core). Previously: **re-derived 2026-09-02 (R28): 13
   sites, all correct** — the widget `the_permalink` site left with #215's removal (ListTracking
-  keeps one `the_permalink` at :165) and `DefaultLanguage` added two WPML applications, both
+  keeps one single-line `the_permalink`, now at :150) and `DefaultLanguage` added two WPML applications, both
   arities verified against WPML's own documentation: `wpml_default_language` **1** arg
   (`null`) · `wpml_object_id` **4** args (`$id, $type, $return_original_if_missing,
   $language_code`). The Polylang half of the same resolver uses plain *functions*
@@ -930,6 +945,13 @@ A fetch extracted or cloned for a new trigger (a same-page refresh beside the pa
 - **A comment stating a precondition ("their page is never cached, so the nonce is fresh") is a claim**: if a recovery branch exists for the opposite case, the comment is already false.
 - Test the configuration that lacks the coincidence. The only nonce test with the login cookie set also configured a login-gated field, the one setup where the defect cannot show.
 
+### RI-37: A control written for one transport covers only that transport
+RI-36's mirror: the second path is not one we wrote, it is one the platform already offers. A control fixed to how a request *usually* arrives says nothing about the other ways core lets the same request arrive or the same response leave. R44 found two instances (#337, #338; detail in the report while open):
+- **Read side:** a namespace-wide response control covered the channel it was written against, and core serves the same routes through another channel it never sees.
+- **Write side:** a sanitizer relied on the REST argument layer having coerced the value first, and two write paths (import, and the abilities through a transport that does not coerce) hand it raw input.
+- **The check:** for every control, list the transports core gives the same route or store (REST args vs raw body, `/run` vs MCP, CORS vs other response wrappers, admin-ajax vs REST), and ask which one the control actually sits on. Put it at the sink or the dispatch, not at the transport.
+- **Measure reach before rating.** #337 was drafted Medium and measured Low: explicit `SameSite=Lax` on the gate cookies, set by this plugin, stops the cross-site case in three browsers. A recorded premise ("browser defaults") can understate the real control as easily as overstate it (#359).
+
 ## Project-Specific Anti-Patterns
 
 ### RI-26: A filterable predicate borrowed as a privacy gate can be moved by the site — in BOTH directions ⭐
@@ -1061,6 +1083,8 @@ The escaping is not at fault and cannot help: `esc_attr()` runs on the JSON *bef
 **Call-site ledger (re-derive, don't read).** As of 2026-07-29: `ListTracking.php:610` (`addcslashes`), `:650` (`preg_replace_callback`), and `:108` / `:187` via `Helpers::str_replace_first()`, which no longer uses a regex at all. Regression tests: `HelpersTest::test_str_replace_first_treats_backreference_sequences_in_the_replacement_literally`, `ListTrackingTest::test_cart_item_remove_link_filter_keeps_backreference_sequences_out_of_the_attribute`.
 
 ### PA-8: `wc_enqueue_js()` is deprecated (WC 10.4) — don't reintroduce it
+**R44 (#340):** `wp_add_inline_script()` returns **true** for a handle that was already printed (core only checks it is registered), so a fallback keyed on the return value never fires. Any attach from the data-layer compile (`wp_head` 10) onto a handle whose placement is filterable must check `wp_script_is( $handle, 'done' )` explicitly, as WC's `add_begin_checkout()` does. Ledger at `1e8806b`: WC 1 site guarded; EDD 2 sites (`PageDataLayer.php:378`, `:434`) unguarded. **Fixed the same day:** both EDD sites go through `PageDataLayer::attach_tracker_js()`; 3 of 3 guarded.
+
 WooCommerce deprecated `wc_enqueue_js()` in 10.4 (removal in a future version): it always wrapped the injected JS in a jQuery `ready()` handler even when jQuery wasn't needed. New WooCommerce-facing code that must emit inline JS uses the WordPress-core path instead — register/enqueue a handle, then `wp_add_inline_script( $handle, $code, 'before'|'after' )`. The plugin's only call — the checkout `window.gtm4wp_checkout_*` globals in `PageDataLayer::add_begin_checkout()` — was migrated to `wp_add_inline_script( 'gtm4wp-woocommerce', …, 'before' )` on 2026-07-13. It was ALSO a raw-`<script>` sink, so remember: whichever inline-script API you use, JSON embedded in the body still needs the full RI-2 hex flags. Guard test: `PageDataLayerTest::test_checkout_adds_hex_encoded_products_inline_and_fires_begin_checkout` asserts `wc_enqueue_js()` is never called.
 
 ---
@@ -1781,3 +1805,4 @@ Reference: `PageDataLayer::confirm_pending_purchase_tracked()` (#398) writes the
 | 2026-09-30 (Review 41) | Reviewed `65f22fb..3c22305` on `master` + the same change on `2.0` (`8c42d23`): the no-`gtag` developer-ID push and the object-typed `dataLayer_content`. **1 Low (#330), no security finding.** Extended **RI-21**: `wp_json_encode` can throw on its fallback path for an object, so a top-level `(object)` cast is narrowed to what needs it. FP-1 re-derived (12 callers). Adjudication: 1 draft, mechanism widened, recommendation + disposition refuted. |
 | 2026-09-28 (Review 40, release gate 2.1.0-beta1) | Reviewed `77b5aaf..65f22fb` on `master` (4 commits; R39's RI-35 fix session read as new code, the Services intro's filtered-link branch). **0 findings.** RI-35 call-site ledger re-derived (5 jQuery bindings, 4 contained, 1 safe by construction). FP-2 re-derived. No pattern change. |
 | 2026-10-02 (Review 43) | Reviewed `97e6312..6234fc5` on `master` (11 commits; the WebToffee/YouTube removals, EDD orderData keys, EDD customer/cart + reliable purchase under the cache-safe data layer and its new `confirm-edd-purchase-tracked` route). **1 Medium (#332), 3 Low (#333–#335), no security finding.** Added **RI-36** (a second fetch path loses the first one's recovery branch; an auth decision keyed on list membership). FP-2 and FP-5 re-derived. Adjudication refuted #332's first recommendation. |
+| 2026-10-02 (Review 44) | Reviewed `6234fc5..1e8806b` (R43's fix session) and ran in deep mode: all sweeps, the oldest matrix cells, every ⭐ ledger. **1 Medium (#336, open, product decision), 24 Low (#337–#360).** Added **RI-37** (a control sits on one transport; #337, #338). Extended **RI-21** with the encoder-less numeric-cast sibling (#339), including the measured reason not to use `json_literal((float))`. Extended **PA-8**: `wp_add_inline_script()` returns true for an already-printed handle (#340; refutes R14's "family clean"). **RI-25** ledger corrected 13 → 14 with a multi-line litmus (#351). FP-1 re-derived (12, holds). |

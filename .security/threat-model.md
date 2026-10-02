@@ -193,11 +193,16 @@ Apply it mechanically:
   through GTM itself; `unfiltered_html` makes this explicit. Rate such an issue on
   correctness/robustness grounds (Low), and say *why* it isn't security — don't
   silently drop it. This is the rule behind #32 (`Low`, "admin-only, not a security
-  vulnerability") and #30 (`wontfix`).
+  vulnerability"). (Until R44 this line also cited #30, which is the CF7 PII default,
+  not an admin-equivalence decision — #358.)
   - **Caveat — multisite:** `unfiltered_html` is restricted to *super* admins on
     multisite, so a single-site admin's assumption does not transfer. If a finding
     depends on the admin already being able to inject script, note that it changes
-    on multisite rather than treating A4 → A4 as universally inert.
+    on multisite rather than treating A4 → A4 as universally inert. **Recorded
+    decision (#336, R44):** the container settings are a script path a sub-site
+    admin holds by default; accepted as a design property of a tag manager, with a
+    multisite Site Health row naming the capability and the
+    `gtm4wp_admin_page_capability` → `manage_network_options` lever documented.
 - **A0/A1 → A3/A4** (visitor-supplied input rendered in an admin/shop-manager
   screen): **real, and usually High.** Stored XSS against an administrator is
   privilege escalation — it borrows A4's capabilities. Checkout billing fields are
