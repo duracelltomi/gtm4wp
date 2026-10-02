@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\EasyDigitalDownloads;
 
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\VisitorData\VisitorDataModule;
 use GTM4WP\Modules\VisitorData\VisitorField;
 use GTM4WP\Options\Options;
@@ -100,7 +101,7 @@ final class VisitorCart {
 
 		$visitor_cart = new self(
 			$options,
-			new PageDataLayer( $options, new DownloadData( $options ), new DataLayer( $options ) )
+			new PageDataLayer( $options, new DownloadData( $options ), new DataLayer( $options ), new ScriptTag( $options ) )
 		);
 
 		// Priority 20: after EDD's own callbacks have settled the session.
@@ -256,17 +257,6 @@ final class VisitorCart {
 	 * @return void
 	 */
 	private function set_state_cookie( string $value, int $expires ): void {
-		setcookie(
-			self::STATE_COOKIE,
-			$value,
-			array(
-				'expires'  => $expires,
-				'path'     => defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/',
-				'domain'   => defined( 'COOKIE_DOMAIN' ) ? COOKIE_DOMAIN : '',
-				'secure'   => is_ssl(),
-				'httponly' => false,
-				'samesite' => 'Lax',
-			)
-		);
+		VisitorDataModule::set_gate_cookie( self::STATE_COOKIE, $value, $expires );
 	}
 }

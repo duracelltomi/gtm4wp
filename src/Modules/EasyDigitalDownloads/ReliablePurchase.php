@@ -189,7 +189,7 @@ final class ReliablePurchase {
 	}
 
 	/**
-	 * Permission callback, the WooCommerce confirm beacons' gate (FP-5): the
+	 * Permission callback, the EDD confirm beacon's gate (FP-5): the
 	 * wp_rest nonce is only a malformed-request filter, the same-origin check is
 	 * the CSRF gate. Not a capability check: guests buy too.
 	 *
@@ -197,11 +197,7 @@ final class ReliablePurchase {
 	 * @return bool
 	 */
 	public function check_confirm_permission( \WP_REST_Request $request ): bool {
-		if ( ! RequestOrigin::has_rest_nonce( $request ) ) {
-			return false;
-		}
-
-		return RequestOrigin::is_same_origin_request();
+		return RequestOrigin::is_nonced_same_origin_request( $request );
 	}
 
 	/**

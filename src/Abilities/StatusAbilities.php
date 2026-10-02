@@ -67,8 +67,8 @@ final class StatusAbilities implements ProviderInterface {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'plugin_version'        => array( 'type' => 'string' ),
-						'containers'            => array(
+						'plugin_version'            => array( 'type' => 'string' ),
+						'containers'                => array(
 							'type'        => 'array',
 							'description' => __( 'The containers that load, in load order, wp-config.php overrides applied.', 'duracelltomi-google-tag-manager' ),
 							'items'       => array(
@@ -85,15 +85,19 @@ final class StatusAbilities implements ProviderInterface {
 								),
 							),
 						),
-						'placement'             => array(
+						'placement'                 => array(
 							'type' => 'string',
 							'enum' => StatusReport::PLACEMENTS,
 						),
-						'container_code_output' => array(
+						'container_code_output'     => array(
 							'type'        => 'boolean',
-							'description' => __( 'False when the placement is off: the data layer is written but no container code is emitted.', 'duracelltomi-google-tag-manager' ),
+							'description' => __( 'False when the placement is off, or when "only output on production environments" is on and this is not production: the data layer is written but no container code is emitted. The gtm4wp_output_container filter can still suppress it per request; that is not reflected here.', 'duracelltomi-google-tag-manager' ),
 						),
-						'datalayer_name'        => array(
+						'suppressed_on_environment' => array(
+							'type'        => 'string',
+							'description' => __( 'The environment type when "only output on production environments" suppresses the container on this site, otherwise empty.', 'duracelltomi-google-tag-manager' ),
+						),
+						'datalayer_name'            => array(
 							'type'       => 'object',
 							'properties' => array(
 								'configured' => array( 'type' => 'string' ),
@@ -101,7 +105,7 @@ final class StatusAbilities implements ProviderInterface {
 								'valid'      => array( 'type' => 'boolean' ),
 							),
 						),
-						'hardcoded'             => array(
+						'hardcoded'                 => array(
 							'type'        => 'object',
 							'description' => __( 'The GTM4WP_HARDCODED_* wp-config.php constants in effect.', 'duracelltomi-google-tag-manager' ),
 							'properties'  => array(
@@ -118,7 +122,7 @@ final class StatusAbilities implements ProviderInterface {
 								),
 							),
 						),
-						'modules'               => array(
+						'modules'                   => array(
 							'type'  => 'array',
 							'items' => array(
 								'type'       => 'object',
@@ -134,7 +138,7 @@ final class StatusAbilities implements ProviderInterface {
 								),
 							),
 						),
-						'problems'              => array(
+						'problems'                  => array(
 							'type'  => 'array',
 							'items' => array(
 								'type'       => 'object',

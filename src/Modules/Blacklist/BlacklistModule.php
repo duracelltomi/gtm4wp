@@ -238,6 +238,30 @@ final class BlacklistModule extends AbstractModule {
 	}
 
 	/**
+	 * The stored entries that survive re-validation against the allow-list: what
+	 * the sink emits, and what the admin side counts (PA-2, #344).
+	 *
+	 * @param mixed $stored The stored GTM4WP_OPTION_BLACKLIST_STATUS value.
+	 * @return string[]
+	 */
+	public static function restriction_items( $stored ): array {
+		if ( ! is_array( $stored ) ) {
+			$stored = explode( ',', (string) $stored );
+		}
+
+		$valid_restrictions = self::valid_restrictions();
+		$items              = array();
+
+		foreach ( $stored as $listed_entity ) {
+			if ( in_array( $listed_entity, $valid_restrictions, true ) ) {
+				$items[] = $listed_entity;
+			}
+		}
+
+		return $items;
+	}
+
+	/**
 	 * Adds the selected restriction list (gtm.allowlist or gtm.blocklist) to
 	 * the data layer.
 	 *
@@ -245,20 +269,7 @@ final class BlacklistModule extends AbstractModule {
 	 * @return array
 	 */
 	public function add_datalayer_data( $data_layer ) {
-		$_gtmrestrictlistitems = array();
-
-		// Re-validated against the allow-list at the sink.
-		$valid_restrictions = self::valid_restrictions();
-		$stored_entities    = $this->opt( GTM4WP_OPTION_BLACKLIST_STATUS );
-		if ( ! is_array( $stored_entities ) ) {
-			$stored_entities = explode( ',', (string) $stored_entities );
-		}
-
-		foreach ( $stored_entities as $listed_entity ) {
-			if ( in_array( $listed_entity, $valid_restrictions, true ) ) {
-				$_gtmrestrictlistitems[] = $listed_entity;
-			}
-		}
+		$_gtmrestrictlistitems = self::restriction_items( $this->opt( GTM4WP_OPTION_BLACKLIST_STATUS ) );
 
 		// gtm.allowlist / gtm.blocklist are the documented key names (the legacy
 		// gtm.whitelist / gtm.blacklist pair is documented nowhere). Emit ONE key

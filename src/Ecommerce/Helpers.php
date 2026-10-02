@@ -67,6 +67,12 @@ final class Helpers {
 	public const ORDER_TRACKED_COOKIE = 'gtm4wp_orderid_tracked';
 
 	/**
+	 * Order meta key flagging an order as already tracked, shared by both stores
+	 * so a store owner finds one familiar flag (RI-14, #350).
+	 */
+	public const ORDER_TRACKED_META = '_ga_tracked';
+
+	/**
 	 * First-party cookie carrying GA4 list attribution across the funnel (#405),
 	 * written client-side on select_item; must match the literal in
 	 * js/frontend/gtm4wp-ecommerce-generic.js.

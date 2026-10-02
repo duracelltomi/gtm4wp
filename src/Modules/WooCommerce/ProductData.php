@@ -65,6 +65,11 @@ final class ProductData {
 	public const ORDER_TRACKED_COOKIE = \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_COOKIE;
 
 	/**
+	 * The order meta key flagging an order as tracked, shared with EDD (#350).
+	 */
+	public const ORDER_TRACKED_META = \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META;
+
+	/**
 	 * The process_product() contexts built on never-cached pages/requests, where
 	 * the list attribution cookie may be merged server-side. Product detail / list are
 	 * excluded on purpose and enriched client-side instead (#405): the view_item
@@ -766,7 +771,7 @@ final class ProductData {
 			return false;
 		}
 
-		if ( 1 === (int) $order->get_meta( '_ga_tracked', true ) ) {
+		if ( 1 === (int) $order->get_meta( self::ORDER_TRACKED_META, true ) ) {
 			return true;
 		}
 
@@ -914,7 +919,7 @@ final class ProductData {
 			return;
 		}
 
-		$order->update_meta_data( '_ga_tracked', 1 );
+		$order->update_meta_data( self::ORDER_TRACKED_META, 1 );
 		$order->save();
 	}
 

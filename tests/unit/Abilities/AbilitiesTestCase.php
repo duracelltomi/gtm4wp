@@ -56,6 +56,7 @@ abstract class AbilitiesTestCase extends TestCase {
 		Functions\when( 'wc_get_order_statuses' )->justReturn( array() );
 		Functions\when( 'get_pages' )->justReturn( array() );
 		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+		Functions\when( 'is_multisite' )->justReturn( false );
 		Functions\when( 'wp_roles' )->justReturn(
 			new class() {
 				public function get_names(): array {

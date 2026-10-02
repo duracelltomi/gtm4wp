@@ -105,6 +105,28 @@ final class SettingsStoreTest extends TestCase {
 		$this->assertSame( 'old', $this->options[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_DATALAYER_NAME ], 'The rejected value never reaches the row.' );
 	}
 
+	/**
+	 * #338: the settings route's REST args coerce "false" to false before the field
+	 * sanitizer; import and the abilities (over MCP) hand it the raw string. Both
+	 * write verbs must agree with the route, or "switch it off" switches a PII
+	 * option on.
+	 */
+	public function test_both_write_verbs_store_the_string_false_as_off(): void {
+		$this->options[ GTM4WP_OPTIONS ] = array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => true );
+
+		$this->store()->save( array( GTM4WP_OPTION_INCLUDE_VISITOR_IP => 'false' ) );
+		$this->assertFalse( $this->options[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_INCLUDE_VISITOR_IP ], 'save()' );
+
+		$payload = json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			array(
+				'type'    => SettingsStore::EXPORT_TYPE,
+				'options' => array( GTM4WP_OPTION_INCLUDE_USEREMAIL => 'FALSE' ),
+			)
+		);
+		$this->store()->replace( $this->store()->decode_import( $payload ) );
+		$this->assertFalse( $this->options[ GTM4WP_OPTIONS ][ GTM4WP_OPTION_INCLUDE_USEREMAIL ], 'decode_import() + replace()' );
+	}
+
 	public function test_replace_rebuilds_the_row_onto_the_module_defaults(): void {
 		$this->options[ GTM4WP_OPTIONS ] = array(
 			GTM4WP_OPTION_DATALAYER_NAME => 'keepMe',

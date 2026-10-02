@@ -43,6 +43,24 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 require_once dirname( __DIR__ ) . '/compat/constants.php';
 require_once __DIR__ . '/unit/wp-class-stubs.php';
 
+// Verbatim copy of core's rest_sanitize_boolean() (wp-includes/rest-api.php),
+// which WordPress always loads before plugins; Field's checkbox sanitizer
+// calls it (#338). Defined here so no test depends on another stubbing it.
+if ( ! function_exists( 'rest_sanitize_boolean' ) ) {
+	function rest_sanitize_boolean( $value ) { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound -- core function stand-in.
+		// String values are translated to `true`; make sure 'false' is false.
+		if ( is_string( $value ) ) {
+			$value = strtolower( $value );
+			if ( in_array( $value, array( 'false', '0' ), true ) ) {
+				$value = false;
+			}
+		}
+
+		// Everything else will map nicely to boolean.
+		return (bool) $value;
+	}
+}
+
 // Namespaced method_exists() shim for the WooCommerce module's feature guards.
 // Required here, not from a test file: loading it lazily would make behaviour
 // depend on test order (TS-16). It delegates to the builtin unless a test hides

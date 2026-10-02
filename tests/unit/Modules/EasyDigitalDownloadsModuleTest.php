@@ -148,7 +148,8 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 
 		$vars = $module->add_global_vars( array() );
 
-		$this->assertSame( 1, $vars['gtm4wp_use_sku_instead'] );
+		// #341: only the WooCommerce tracker reads it; EDD applies the SKU server-side.
+		$this->assertArrayNotHasKey( 'gtm4wp_use_sku_instead', $vars );
 		$this->assertSame( 'EUR', $vars['gtm4wp_currency'] );
 		$this->assertSame( 25, $vars['gtm4wp_product_per_impression'] );
 		$this->assertTrue( $vars['gtm4wp_clear_ecommerce'] );
@@ -173,7 +174,6 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 
 		$this->assertFalse( $vars['gtm4wp_console_log'] );
 		$this->assertSame( 0, $vars['gtm4wp_list_attribution'] );
-		$this->assertSame( 0, $vars['gtm4wp_use_sku_instead'] );
 		$this->assertFalse( $vars['gtm4wp_clear_ecommerce'] );
 	}
 

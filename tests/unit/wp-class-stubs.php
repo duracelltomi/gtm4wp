@@ -98,6 +98,21 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 		public function get_route(): string {
 			return $this->route;
 		}
+
+		/**
+		 * The GET parameters, which core's JSONP handling reads `_jsonp` from.
+		 *
+		 * @var array
+		 */
+		private array $query_params = array();
+
+		public function set_query_params( array $params ): void {
+			$this->query_params = $params;
+		}
+
+		public function get_query_params(): array {
+			return $this->query_params;
+		}
 	}
 }
 

@@ -10,10 +10,12 @@
 
 namespace GTM4WP\Modules\Blacklist;
 
+use GTM4WP\Admin\SettingsPage;
 use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\SiteHealthInfoInterface;
+use GTM4WP\Module\SiteHealthTestsInterface;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
 
@@ -28,7 +30,7 @@ defined( 'ABSPATH' ) || exit;
  * Vendor names are product names and are not translated, matching 1.x
  * behavior.
  */
-final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface {
+final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterface, SiteHealthInfoInterface, SiteHealthTestsInterface {
 
 	/**
 	 * Documentation page of this module on gtm4wp.com. Both options deep link
@@ -325,17 +327,51 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 		);
 		$mode  = $modes[ (int) $options->get( GTM4WP_OPTION_BLACKLIST_ENABLE ) ] ?? 'disabled';
 
-		$stored = $options->get( GTM4WP_OPTION_BLACKLIST_STATUS );
-
-		if ( ! is_array( $stored ) ) {
-			$stored = explode( ',', (string) $stored );
-		}
-
-		$valid = count( array_intersect( array_map( 'strval', $stored ), BlacklistModule::valid_restrictions() ) );
+		$valid = count( BlacklistModule::restriction_items( $options->get( GTM4WP_OPTION_BLACKLIST_STATUS ) ) );
 
 		return array(
 			'mode'         => SiteHealthRows::text( __( 'Tag restrictions', 'duracelltomi-google-tag-manager' ), SiteHealthRows::word( $mode ), $mode ),
 			'restrictions' => SiteHealthRows::count( __( 'Restricted entities', 'duracelltomi-google-tag-manager' ), $valid ),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Allowlist mode only: an allowlist that no stored entry survives blocks
+	 * every tag in the container, which may be meant but is never obvious (#344).
+	 * The data layer keeps emitting the empty list: omitting it would fail open.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return array<string, callable>
+	 */
+	public function site_health_tests( Options $options ): array {
+		if ( 2 !== (int) $options->get( GTM4WP_OPTION_BLACKLIST_ENABLE ) ) {
+			return array();
+		}
+
+		return array(
+			'allowlist' => static function () use ( $options ): array {
+				if ( array() !== BlacklistModule::restriction_items( $options->get( GTM4WP_OPTION_BLACKLIST_STATUS ) ) ) {
+					return array(
+						'status'      => 'good',
+						'label'       => __( 'The Google Tag Manager allowlist permits at least one entity', 'duracelltomi-google-tag-manager' ),
+						'description' => '<p>' . esc_html__( 'Tag restrictions are in allowlist mode and at least one listed tag, trigger or variable type is allowed.', 'duracelltomi-google-tag-manager' ) . '</p>',
+						'actions'     => '',
+					);
+				}
+
+				return array(
+					'status'      => 'recommended',
+					'label'       => __( 'The Google Tag Manager allowlist blocks every tag', 'duracelltomi-google-tag-manager' ),
+					'description' => '<p>' . esc_html__( 'Tag restrictions are in allowlist mode, but no entity is allowed, so Google Tag Manager blocks every tag, trigger and variable in your container. If this is not intended, select the entities to allow or switch the restrictions off.', 'duracelltomi-google-tag-manager' ) . '</p>',
+					'actions'     => sprintf(
+						'<p><a href="%1$s">%2$s</a></p>',
+						esc_url( SettingsPage::url( GTM4WP_OPTION_BLACKLIST_STATUS ) ),
+						esc_html__( 'Open the tag restrictions', 'duracelltomi-google-tag-manager' )
+					),
+				);
+			},
 		);
 	}
 }

@@ -6,6 +6,10 @@
 * Changed: the container loader requests `gtm.js` over `https://` instead of the protocol-relative `//` form the plugin has emitted since 1.x, matching the snippet Google publishes today. Only a site still served over plain http sees a difference; the `<noscript>` iframe already used `https://`.
 * Fixed: the plugin no longer buffers every WooCommerce template part on every page. That buffering only fed the classic "Products" widget, whose tracking had been dead since 2017. If a GTM trigger filters on an `item_list_name` ending in "(widget)", remove that condition.
 * Fixed: the description of the WooCommerce **"Order data in data layer"** setting no longer says it works independently of ecommerce tracking. It needs "Track e-commerce", and still writes `orderData` when the purchase event is not sent again.
+* Fixed: a settings import file with a checkbox written as the text "false" switched that option on; it now means off, as it does when saving the settings screen.
+* Fixed: a WooCommerce checkout total that is not a finite number no longer breaks the inline checkout script; `gtm4wp_checkout_value` is `null` then.
+* Fixed: hardened how the plugin's REST endpoints answer requests made from other pages. Details are withheld until the change reaches the 2.0 line.
+* Changed: with the cache-safe data layer on, the WooCommerce customer and cart data are re-read only when the cart fragment changed, not on every change to the page.
 * Added: an optional **"Output values in the default language"** setting (Page variables → Content & engagement data): `pageTitle`, `pageCategory`, `pageAttributes`, `pagePostTerms` and `pagePrimaryCategory` report the master language instead of the current translation, so Google Analytics combines reports across languages. WPML and Polylang, plus the `gtm4wp_master_language_post_id` / `gtm4wp_master_language_term_id` filters. Off by default (experimental). Thanks to @loran750 (#145).
 * Added: an optional **"Report products in the default language"** setting (WooCommerce → Product data): the whole GA4 item, `item_id` included, reports the master language, so one product combines across its translations. Review any product feed or dynamic-remarketing setup keyed on the translated id before switching it on. Off by default (experimental) (#145).
 * Added: an optional **"Report downloads in the default language"** setting (Easy Digital Downloads → Product data), the EDD counterpart of the WooCommerce option above and with the same caveat about setups keyed on the translated `item_id`. Off by default (experimental) (#145).
@@ -49,7 +53,7 @@
 
 ### Site Health
 
-* Added: **Tools → Site Health** reports the whole plugin: every module's option states, the containers, placement, data layer name and wp-config overrides in the Info section (English copy text; no keys, addresses or visitor data), plus status tests for the configuration, the Google service account keys and Data Manager sending. Third-party modules report through `SiteHealthInfoInterface` and `SiteHealthTestsInterface`.
+* Added: **Tools → Site Health** reports the whole plugin: option states, containers, placement, data layer name and wp-config overrides (no keys, addresses or visitor data), plus status tests for the configuration, Google service account keys, Data Manager sending and an allowlist blocking every tag; on multisite, who can change the container. Modules report through `SiteHealthInfoInterface` / `SiteHealthTestsInterface`.
 
 ### AI assistants (WordPress Abilities API)
 

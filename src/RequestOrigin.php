@@ -65,13 +65,13 @@ final class RequestOrigin {
 	/**
 	 * Whether a URL's host and port are this site's. Scheme is deliberately not
 	 * compared (TLS-terminating proxies make it unreliable); a subdomain is a
-	 * different host and is refused.
+	 * different host and is refused. Shared with RestCors (#347).
 	 *
 	 * @param string               $url  The Origin or Referer value.
 	 * @param array<string, mixed> $site Parsed home_url() parts.
 	 * @return bool
 	 */
-	private static function url_matches_site( string $url, array $site ): bool {
+	public static function url_matches_site( string $url, array $site ): bool {
 		$parts = wp_parse_url( $url );
 
 		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
@@ -110,6 +110,19 @@ final class RequestOrigin {
 		$scheme = strtolower( (string) ( $parts['scheme'] ?? '' ) );
 
 		return ( isset( $defaults[ $scheme ] ) && $defaults[ $scheme ] === $port ) ? null : $port;
+	}
+
+	/**
+	 * The guest-beacon check every such route shares: a valid REST nonce, then a
+	 * same-origin request. Whether that is the route's gate (the confirm beacons)
+	 * or a filter in front of it (the attribution backfill) is the caller's to
+	 * say in its own docblock (#356).
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return bool
+	 */
+	public static function is_nonced_same_origin_request( \WP_REST_Request $request ): bool {
+		return self::has_rest_nonce( $request ) && self::is_same_origin_request();
 	}
 
 	/**

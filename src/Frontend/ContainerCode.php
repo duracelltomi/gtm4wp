@@ -638,16 +638,7 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			return false;
 		}
 
-		if ( $this->options->get( GTM4WP_OPTION_PRODUCTIONONLY ) ) {
-			// The guard keeps the unit tests (no WordPress loaded) working.
-			$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
-
-			if ( 'production' !== $environment ) {
-				return false;
-			}
-		}
-
-		return true;
+		return '' === ContainerRows::environment_suppression( $this->options->get( GTM4WP_OPTION_PRODUCTIONONLY ) );
 	}
 
 	/**

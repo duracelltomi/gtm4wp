@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
 use GTM4WP\Modules\EasyDigitalDownloads\PageDataLayer;
@@ -205,7 +206,7 @@ final class EddVisitorCartTest extends TestCase {
 	private function make( array $stored = self::ALL_ON ): VisitorCart {
 		$options = $this->options( $stored );
 
-		return new VisitorCart( $options, new PageDataLayer( $options, new DownloadData( $options ), new DataLayer( $options ) ) );
+		return new VisitorCart( $options, new PageDataLayer( $options, new DownloadData( $options ), new DataLayer( $options ), new ScriptTag( $options ) ) );
 	}
 
 	public function test_is_enabled_needs_the_mode_tracking_and_one_feature(): void {

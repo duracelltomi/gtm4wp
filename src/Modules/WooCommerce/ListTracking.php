@@ -21,9 +21,10 @@ defined( 'ABSPATH' ) || exit;
  * add_to_cart and remove_from_cart events.
  *
  * Port of the product list related functions of integration/woocommerce.php
- * from 1.x. The list state globals ($gtm4wp_product_counter,
- * $gtm4wp_grouped_product_ix, $gtm4wp_cart_item_proddata) are kept for
- * third party compatibility.
+ * from 1.x. The list state globals $gtm4wp_grouped_product_ix and
+ * $gtm4wp_cart_item_proddata are kept for third party compatibility;
+ * $gtm4wp_product_counter is only seeded (0) since the widget tracking it
+ * counted was removed, so a 1.x reader finds it set but inert (#354).
  */
 final class ListTracking {
 

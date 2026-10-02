@@ -55,6 +55,12 @@ final class FieldTest extends TestCase {
 		$this->assertTrue( $field->sanitize( 'on' ) );
 		$this->assertFalse( $field->sanitize( '' ) );
 		$this->assertFalse( $field->sanitize( 0 ) );
+		// #338: the REST route's coercion, so a raw "false" is off on every write path.
+		$this->assertFalse( $field->sanitize( 'false' ) );
+		$this->assertFalse( $field->sanitize( 'FALSE' ) );
+		$this->assertFalse( $field->sanitize( '0' ) );
+		$this->assertTrue( $field->sanitize( 'true' ) );
+		$this->assertTrue( $field->sanitize( true ) );
 	}
 
 	public function test_integer_sanitizes_to_int(): void {

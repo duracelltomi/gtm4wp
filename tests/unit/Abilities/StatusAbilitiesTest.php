@@ -105,7 +105,7 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( GTM4WP_VERSION, $status['plugin_version'] );
 		$this->assertSame( $report, array_intersect_key( $status, $report ), 'The module\'s report arrives as the module built it - nothing added, nothing reshaped.' );
 		$this->assertSame(
-			array( 'plugin_version', 'containers', 'placement', 'container_code_output', 'datalayer_name', 'hardcoded', 'modules', 'problems' ),
+			array( 'plugin_version', 'containers', 'placement', 'container_code_output', 'suppressed_on_environment', 'datalayer_name', 'hardcoded', 'modules', 'problems' ),
 			array_keys( $status ),
 			'The key order of the contract.'
 		);

@@ -65,6 +65,18 @@ final class ScriptTag {
 	}
 
 	/**
+	 * A float as a JavaScript number literal, `null` when not finite: PHP prints
+	 * INF/NAN as bare identifiers, a ReferenceError in JS (RI-21, #339). Not
+	 * json_literal(): serialize_precision=-1 turns 0.15 into 0.15000000000000002.
+	 *
+	 * @param float $value The number.
+	 * @return string A JavaScript literal.
+	 */
+	public static function number_literal( float $value ): string {
+		return is_finite( $value ) ? (string) $value : 'null';
+	}
+
+	/**
 	 * Encodes one value as a JavaScript literal, never returning an empty string
 	 * (RI-21, #141). wp_json_encode() returns FALSE for INF/NAN, a resource or
 	 * over-deep nesting (a filter-supplied value; invalid UTF-8 is repaired by

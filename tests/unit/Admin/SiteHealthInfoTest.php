@@ -29,8 +29,31 @@ final class SiteHealthInfoTest extends TestCase {
 
 		Functions\stubTranslationFunctions();
 		Functions\when( 'get_option' )->justReturn( array() );
+		Functions\when( 'is_multisite' )->justReturn( false );
 
 		ReportingThirdPartySchema::$received = null;
+	}
+
+	/**
+	 * #336: on multisite the container settings are a script path core otherwise
+	 * keeps from a sub-site admin, so the section names who holds them; a
+	 * single site gets no such row.
+	 */
+	public function test_multisite_names_the_capability_that_can_change_the_container(): void {
+		Functions\when( 'is_multisite' )->justReturn( true );
+
+		$fields = $this->collector( array() )->fields();
+
+		$this->assertArrayHasKey( 'settings_capability', $fields );
+		$this->assertSame( 'manage_options', $fields['settings_capability']['debug'] );
+		$this->assertStringContainsString( 'manage_network_options', $fields['settings_capability']['value'] );
+
+		\Brain\Monkey\Filters\expectApplied( 'gtm4wp_admin_page_capability' )->andReturn( 'manage_network_options' );
+		$fields = $this->collector( array() )->fields();
+		$this->assertSame( 'manage_network_options', $fields['settings_capability']['value'] );
+
+		Functions\when( 'is_multisite' )->justReturn( false );
+		$this->assertArrayNotHasKey( 'settings_capability', $this->collector( array() )->fields() );
 	}
 
 	/**

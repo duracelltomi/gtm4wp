@@ -144,7 +144,8 @@ final class Field {
 
 		switch ( $this->type ) {
 			case self::TYPE_CHECKBOX:
-				return (bool) $value;
+				// Core's REST coercion, so import and the abilities match the settings route (#338).
+				return rest_sanitize_boolean( $value );
 
 			case self::TYPE_INTEGER:
 				return (int) $value;

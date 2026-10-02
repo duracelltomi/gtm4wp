@@ -111,14 +111,15 @@ final class MediaEventsModule extends AbstractModule {
 	 *
 	 * @param string $handle      Script handle.
 	 * @param string $file        File name inside the build directory.
-	 * @param array  $deps        Script dependencies.
 	 * @param bool   $in_footer   Whether to print the script in the footer.
 	 * @param bool   $fetches_sdk Whether this tracker requests a third-party SDK at
 	 *                            runtime. False for the fetch-nothing trackers, which
 	 *                            get no gate (#143); flip it the moment one gains an SDK.
 	 * @return void
 	 */
-	private function enqueue_media_tracker( string $handle, string $file, array $deps, bool $in_footer, bool $fetches_sdk = true ): void {
+	private function enqueue_media_tracker( string $handle, string $file, bool $in_footer, bool $fetches_sdk = true ): void {
+		$deps = array();
+
 		// The gate only has a job where a vendor request exists to refuse (#143).
 		if ( $fetches_sdk ) {
 			$this->enqueue_gate( $in_footer );
@@ -226,13 +227,13 @@ final class MediaEventsModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_VIMEO ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_vimeo', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-vimeo', 'gtm4wp-vimeo.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-vimeo', 'gtm4wp-vimeo.js', $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_SOUNDCLOUD ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_soundcloud', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-soundcloud', 'gtm4wp-soundcloud.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-soundcloud', 'gtm4wp-soundcloud.js', $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_HTML5MEDIA ) ) {
@@ -240,13 +241,13 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Vanilla tracker: it binds to <video>/<audio> elements with the
 			// native addEventListener API and has no SDK to fetch at all.
-			$this->enqueue_media_tracker( 'gtm4wp-html5media', 'gtm4wp-html5media.js', array(), $in_footer, false );
+			$this->enqueue_media_tracker( 'gtm4wp-html5media', 'gtm4wp-html5media.js', $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_DAILYMOTION ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_dailymotion', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-dailymotion', 'gtm4wp-dailymotion.js', $in_footer );
 
 			// Dailymotion's library URL depends on the configured Player ID, so it
 			// is built here and handed to the tracker; the id never reaches JS.
@@ -272,13 +273,13 @@ final class MediaEventsModule extends AbstractModule {
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_MIXCLOUD ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_mixcloud', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-mixcloud', 'gtm4wp-mixcloud.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-mixcloud', 'gtm4wp-mixcloud.js', $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_CLOUDFLARESTREAM ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_cloudflarestream', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-cloudflarestream', 'gtm4wp-cloudflarestream.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-cloudflarestream', 'gtm4wp-cloudflarestream.js', $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_WISTIA ) ) {
@@ -286,7 +287,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Nothing to fetch: Wistia's embed loads its own runtime and the
 			// tracker binds through the `window._wq` ready queue.
-			$this->enqueue_media_tracker( 'gtm4wp-wistia', 'gtm4wp-wistia.js', array(), $in_footer, false );
+			$this->enqueue_media_tracker( 'gtm4wp-wistia', 'gtm4wp-wistia.js', $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_JWPLAYER ) ) {
@@ -294,7 +295,7 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Nothing to fetch: the site already loads its own JW Player
 			// library; the tracker only hooks the existing `jwplayer` global.
-			$this->enqueue_media_tracker( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', array(), $in_footer, false );
+			$this->enqueue_media_tracker( 'gtm4wp-jwplayer', 'gtm4wp-jwplayer.js', $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_VIDEOPRESS ) ) {
@@ -302,19 +303,19 @@ final class MediaEventsModule extends AbstractModule {
 
 			// Nothing to fetch: VideoPress uses a postMessage API, so the
 			// tracker listens for messages from the player iframes directly.
-			$this->enqueue_media_tracker( 'gtm4wp-videopress', 'gtm4wp-videopress.js', array(), $in_footer, false );
+			$this->enqueue_media_tracker( 'gtm4wp-videopress', 'gtm4wp-videopress.js', $in_footer, false );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_SPOTIFY ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_spotify', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-spotify', 'gtm4wp-spotify.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-spotify', 'gtm4wp-spotify.js', $in_footer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_EVENTS_TWITCH ) ) {
 			$in_footer = (bool) apply_filters( 'gtm4wp_twitch', true );
 
-			$this->enqueue_media_tracker( 'gtm4wp-twitch', 'gtm4wp-twitch.js', array(), $in_footer );
+			$this->enqueue_media_tracker( 'gtm4wp-twitch', 'gtm4wp-twitch.js', $in_footer );
 		}
 	}
 }

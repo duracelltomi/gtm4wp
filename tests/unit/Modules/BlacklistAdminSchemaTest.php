@@ -11,6 +11,7 @@ use Brain\Monkey\Functions;
 use GTM4WP\Modules\Blacklist\AdminSchema;
 use GTM4WP\Modules\Blacklist\BlacklistModule;
 use GTM4WP\Options\Field;
+use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
@@ -258,5 +259,47 @@ final class BlacklistAdminSchemaTest extends TestCase {
 				"Admin string still uses the retired wording: '{$string}'"
 			);
 		}
+	}
+
+	/**
+	 * The status tests over the stored settings.
+	 *
+	 * @param array<string, mixed> $stored Stored option values.
+	 * @return array<string, callable>
+	 */
+	private function health_tests( array $stored ): array {
+		Functions\when( 'get_option' )->justReturn( $stored );
+		Functions\when( 'admin_url' )->alias( static fn ( $path = '' ) => 'https://example.com/wp-admin/' . $path );
+		Functions\when( 'add_query_arg' )->alias( static fn ( $key, $value, $url ) => $url . '&' . $key . '=' . $value );
+
+		return ( new AdminSchema() )->site_health_tests( new Options( ( new BlacklistModule() )->defaults() ) );
+	}
+
+	/**
+	 * #344: an allowlist no stored entry survives blocks the whole container, and
+	 * the admin is told; the same check is quiet when something is allowed and
+	 * does not exist outside allowlist mode.
+	 */
+	public function test_an_allowlist_with_no_valid_entry_is_flagged_in_site_health(): void {
+		$tests = $this->health_tests(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 2,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'not-an-entity',
+			)
+		);
+
+		$this->assertSame( array( 'allowlist' ), array_keys( $tests ) );
+		$this->assertSame( 'recommended', ( $tests['allowlist'] )()['status'] );
+
+		$tests = $this->health_tests(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 2,
+				GTM4WP_OPTION_BLACKLIST_STATUS => BlacklistModule::valid_entity_ids()[0],
+			)
+		);
+		$this->assertSame( 'good', ( $tests['allowlist'] )()['status'] );
+
+		$this->assertSame( array(), $this->health_tests( array( GTM4WP_OPTION_BLACKLIST_ENABLE => 1 ) ), 'Blocklist mode: an empty list blocks nothing.' );
+		$this->assertSame( array(), $this->health_tests( array( GTM4WP_OPTION_BLACKLIST_ENABLE => 0 ) ) );
 	}
 }

@@ -121,6 +121,28 @@ final class ContainerStatusReportTest extends AbilitiesTestCase {
 		$this->assertTrue( $report['container_code_output'], 'Placement, not the table, decides whether container code is emitted.' );
 	}
 
+	/**
+	 * #343: the production-only option suppresses the container at the sink, so
+	 * the report must say "not output" and name the environment, in both
+	 * directions of the option and the environment.
+	 */
+	public function test_production_only_on_a_non_production_site_reports_no_container_output(): void {
+		\Brain\Monkey\Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
+
+		$report = $this->report( array( GTM4WP_OPTION_PRODUCTIONONLY => true ) );
+		$this->assertFalse( $report['container_code_output'] );
+		$this->assertSame( 'staging', $report['suppressed_on_environment'] );
+
+		$report = $this->report( array( GTM4WP_OPTION_PRODUCTIONONLY => false ) );
+		$this->assertTrue( $report['container_code_output'], 'Option off: the environment does not matter.' );
+		$this->assertSame( '', $report['suppressed_on_environment'] );
+
+		\Brain\Monkey\Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+		$report = $this->report( array( GTM4WP_OPTION_PRODUCTIONONLY => true ) );
+		$this->assertTrue( $report['container_code_output'], 'Production with the option on still outputs.' );
+		$this->assertSame( '', $report['suppressed_on_environment'] );
+	}
+
 	public function test_a_placement_value_outside_the_known_ones_falls_back_to_the_footer(): void {
 		$report = $this->report(
 			array(
@@ -160,7 +182,7 @@ final class ContainerStatusReportTest extends AbilitiesTestCase {
 	public function test_the_report_keeps_the_ability_key_order(): void {
 		$report = $this->report( array( GTM4WP_OPTION_GTM_CONTAINERS => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ) ) );
 
-		$this->assertSame( array( 'containers', 'placement', 'container_code_output', 'datalayer_name', 'hardcoded' ), array_keys( $report ) );
+		$this->assertSame( array( 'containers', 'placement', 'container_code_output', 'suppressed_on_environment', 'datalayer_name', 'hardcoded' ), array_keys( $report ) );
 	}
 
 	/**

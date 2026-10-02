@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Admin;
 
+use GTM4WP\Capability;
 use GTM4WP\Module\Registry;
 use GTM4WP\Module\SiteHealthInfoInterface;
 use GTM4WP\Options\Options;
@@ -86,6 +87,20 @@ final class SiteHealthInfo {
 				array_column( ( new ConfigurationChecks( $this->options ) )->problems(), 'code' )
 			),
 		);
+
+		// Multisite only: core keeps script out of a sub-site admin's hands, and the
+		// container settings load script, so name who holds them (#336, accepted).
+		if ( is_multisite() ) {
+			$capability = Capability::settings();
+
+			$fields['settings_capability'] = SiteHealthRows::text(
+				__( 'Capability to change the container', 'duracelltomi-google-tag-manager' ),
+				Capability::DEFAULT_CAPABILITY === $capability
+					? __( 'manage_options: every site administrator of this site can load scripts through the container settings. Return manage_network_options from the gtm4wp_admin_page_capability filter to limit this to network administrators.', 'duracelltomi-google-tag-manager' )
+					: $capability,
+				$capability
+			);
+		}
 
 		foreach ( $this->registry->all() as $module ) {
 			$schema_class = $module->admin_schema();

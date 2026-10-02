@@ -934,16 +934,23 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 
 	const wooState = { customer: null, cart: null };
 	const blockStates = {};
+	let lastWooRaw;
 
 	/**
 	 * Pushes the WooCommerce families from a raw fragment payload. Used for both
-	 * the initial read and every later cart change.
+	 * the initial read and every later cart change. An unchanged payload is
+	 * skipped (the observer fires on every DOM change, #345); it is remembered
+	 * only AFTER delivery, so a push that threw is retried on the next change.
 	 *
 	 * @param {?string} raw The raw data attribute value.
 	 * @return {void}
 	 */
 	function deliverWooBlock( raw ) {
+		if ( raw === lastWooRaw ) {
+			return;
+		}
 		deliverStoreBlock( parseWoo( raw ), wooState );
+		lastWooRaw = raw;
 	}
 
 	/**

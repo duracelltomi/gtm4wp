@@ -251,7 +251,7 @@ as backlog for parity.
   conditional-loading design decision — no combining, `defer` where the jQuery
   dependency allows.
 - Global JS vars: reuse the existing shared names
-  (`gtm4wp_currency` via `edd_get_currency()`, `gtm4wp_use_sku_instead`,
+  (`gtm4wp_currency` via `edd_get_currency()`,
   `gtm4wp_product_per_impression`, `gtm4wp_clear_ecommerce`,
   `gtm4wp_datalayer_max_timeout`, `gtm4wp_console_log`,
   `gtm4wp_remarketing_prod_id_prefix`) through

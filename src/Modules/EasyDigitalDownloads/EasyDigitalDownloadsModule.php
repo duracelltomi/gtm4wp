@@ -101,7 +101,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 		$frontend = Plugin::instance()->frontend();
 
 		$download_data  = new DownloadData( $this->options );
-		$page_datalayer = new PageDataLayer( $this->options, $download_data, $frontend->datalayer() );
+		$page_datalayer = new PageDataLayer( $this->options, $download_data, $frontend->datalayer(), $frontend->script_tag() );
 		$list_tracking  = new ListTracking( $this->options, $download_data );
 
 		add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, array( $page_datalayer, 'add_datalayer_data' ) );
@@ -141,14 +141,15 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 
 	/**
 	 * Outputs the EDD global JavaScript variables on gtm4wp_add_global_vars_array.
-	 * The shared names are the ones the WooCommerce module sets (the generic
-	 * tracker reads them); with both integrations on, this later module wins.
+	 * The shared names are the ones the WooCommerce module sets (the generic and
+	 * EDD trackers read them); with both integrations on, this later module wins,
+	 * which the WooCommerce tracker then reads too (#342). A name only the
+	 * WooCommerce tracker reads is not set here (#341).
 	 *
 	 * @param array $return_vars The already added variables as key-value pairs in an associative array.
 	 * @return array The parameter with added global JavaScript variables as key-value pairs.
 	 */
 	public function add_global_vars( $return_vars ) {
-		$return_vars['gtm4wp_use_sku_instead']        = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDUSESKU );
 		$return_vars['gtm4wp_list_attribution']       = (int) ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION ) );
 		$return_vars['gtm4wp_currency']               = function_exists( 'edd_get_currency' ) ? edd_get_currency() : '';
 		$return_vars['gtm4wp_product_per_impression'] = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_EDDPRODPERIMPRESSION );

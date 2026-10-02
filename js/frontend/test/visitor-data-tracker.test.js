@@ -876,6 +876,79 @@ describe( 'gtm4wp-visitor-data — WooCommerce cart fragment', () => {
 		expect( cartEvents() ).toHaveLength( 1 );
 	} );
 
+	it( 'does not re-parse an unchanged fragment on unrelated DOM changes (#345)', async () => {
+		window.gtm4wp_visitordata_config = { events: EVENTS, fields: {} };
+
+		const block = {
+			customer: { customerTotalOrders: 3 },
+			cart: { cartContent: { items: [] } },
+		};
+		setCartFragment( block );
+		loadTracker();
+
+		const raw = JSON.stringify( block );
+		const parse = jest.spyOn( JSON, 'parse' );
+		for ( let i = 0; i < 5; i++ ) {
+			document.body.appendChild( document.createElement( 'span' ) );
+			await flushObservers();
+		}
+
+		expect(
+			parse.mock.calls.filter( ( args ) => args[ 0 ] === raw )
+		).toHaveLength( 0 );
+		parse.mockRestore();
+	} );
+
+	it( 'retries a push that threw on the next DOM change, though the fragment is unchanged (#345)', async () => {
+		// The skip must not swallow a failed delivery: another script's push wrapper
+		// throwing leaves the update undelivered, and the next mutation retries it.
+		window.gtm4wp_visitordata_config = { events: EVENTS, fields: {} };
+
+		// A browser reports an exception thrown in an observer callback and keeps
+		// observing; jest would fail the test on it instead, so model the browser.
+		const caught = [];
+		window.MutationObserver = function ( callback ) {
+			const observer = new RealMutationObserver( function ( ...args ) {
+				try {
+					callback( ...args );
+				} catch ( e ) {
+					caught.push( e );
+				}
+			} );
+			trackedObservers.push( observer );
+			return observer;
+		};
+
+		setCartFragment( { cart: { cartContent: { items: [] } } } );
+		loadTracker();
+		expect( cartEvents() ).toHaveLength( 1 );
+
+		let throwOnce = true;
+		const realPush = window.dataLayer.push;
+		window.dataLayer.push = function ( entry ) {
+			if ( throwOnce && entry.event === 'gtm4wp.cartData' ) {
+				throwOnce = false;
+				throw new Error( 'third-party push wrapper failed' );
+			}
+			return realPush.call( this, entry );
+		};
+
+		replaceCartFragment( {
+			cart: { cartContent: { items: [ { item_name: 'Mug' } ] } },
+		} );
+		await flushObservers();
+		expect( caught ).toHaveLength( 1 );
+		expect( cartEvents() ).toHaveLength( 1 );
+
+		document.body.appendChild( document.createElement( 'span' ) );
+		await flushObservers();
+
+		expect( cartEvents() ).toHaveLength( 2 );
+		expect( cartEvents()[ 1 ].cartContent.items[ 0 ].item_name ).toBe(
+			'Mug'
+		);
+	} );
+
 	it( 'passes a hostile customer field through raw (structured sink, TC-11)', () => {
 		window.gtm4wp_visitordata_config = {
 			events: EVENTS,

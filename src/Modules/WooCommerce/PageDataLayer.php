@@ -551,7 +551,7 @@ final class PageDataLayer {
 
 		$checkout_js = '
 			window.gtm4wp_checkout_products = ' . ScriptTag::json_literal( $gtm4wp_checkout_products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
-			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';';
+			window.gtm4wp_checkout_value    = ' . ScriptTag::number_literal( (float) $gtm4wp_checkout_total ) . ';';
 
 		// Only the classic tracker reads these globals. On a block checkout
 		// WooCommerceModule::enqueue_scripts() loads gtm4wp-woocommerce-blocks instead
@@ -565,7 +565,7 @@ final class PageDataLayer {
 
 		// Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4, PA-8). An inline
 		// script can only attach while its handle is pending; this runs from wp_head
-		// priority 10, after wp_print_head_scripts() (9), so a site that filters the
+		// priority 10 (2 with load-early), after wp_print_head_scripts() (9), so a site that filters the
 		// tracker into the <head> already has the handle done and the attach would
 		// silently drop the checkout data (add_shipping_info / add_payment_info with
 		// empty items). Print the block in the footer ourselves in that case. The
@@ -1370,11 +1370,7 @@ final class PageDataLayer {
 	 * @return bool
 	 */
 	public function check_confirm_purchase_permission( \WP_REST_Request $request ): bool {
-		if ( ! RequestOrigin::has_rest_nonce( $request ) ) {
-			return false;
-		}
-
-		return RequestOrigin::is_same_origin_request();
+		return RequestOrigin::is_nonced_same_origin_request( $request );
 	}
 
 	/**

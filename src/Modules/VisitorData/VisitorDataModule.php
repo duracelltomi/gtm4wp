@@ -318,16 +318,28 @@ final class VisitorDataModule extends AbstractModule {
 
 	/**
 	 * Sets (or, with an empty value and past expiry, clears) the login gate cookie.
-	 * The cookie is deliberately NOT HttpOnly (the client must read it) and scoped
-	 * like the WordPress auth cookies.
 	 *
 	 * @param string $value   Cookie value.
 	 * @param int    $expires Expiry timestamp.
 	 * @return void
 	 */
 	private function set_login_gate_cookie( string $value, int $expires ): void {
+		self::set_gate_cookie( self::LOGIN_GATE_COOKIE, $value, $expires );
+	}
+
+	/**
+	 * Sets (or, with an empty value and past expiry, clears) a Tier 3 gate cookie:
+	 * deliberately NOT HttpOnly (the runtime reads it), scoped like the WordPress
+	 * auth cookies. The one writer of the gate cookies' attributes (#355).
+	 *
+	 * @param string $name    Cookie name.
+	 * @param string $value   Cookie value.
+	 * @param int    $expires Expiry timestamp.
+	 * @return void
+	 */
+	public static function set_gate_cookie( string $name, string $value, int $expires ): void {
 		setcookie(
-			self::LOGIN_GATE_COOKIE,
+			$name,
 			$value,
 			array(
 				'expires'  => $expires,

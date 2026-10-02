@@ -13,16 +13,13 @@ namespace GTM4WP;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Stops WordPress handing this plugin's REST responses to third-party origins.
+ * Stops WordPress handing this plugin's REST responses to other origins.
  * Core's rest_send_cors_headers() REFLECTS the request Origin with
- * Access-Control-Allow-Credentials: true, so any page could read a visitor's
- * session-derived data from the public routes with their cookies attached, and
- * harvest any token they issue (#78); SameSite=Lax is a browser default, not a
- * control this plugin owns. Removing the headers makes the browser refuse the
- * cross-origin read; same-origin requests are unaffected. Scoped to this
- * namespace only. Lives at plugin level because the policy protects a
- * NAMESPACE that outlives any one feature; registering it from a module tied
- * it to that module's feature flag (#97).
+ * Access-Control-Allow-Credentials: true, so another origin could read a
+ * visitor's session data from the public routes and harvest any token they
+ * issue (#78); removing the headers makes the browser refuse that read. Core's
+ * JSONP wrapper is a channel CORS does not govern, so it is refused (#337).
+ * Namespace-scoped, at plugin level because it protects a NAMESPACE (#97).
  */
 final class RestCors {
 
@@ -42,6 +39,48 @@ final class RestCors {
 	public static function register(): void {
 		// Priority 11: after core's rest_send_cors_headers() at 10.
 		add_filter( 'rest_pre_serve_request', array( self::class, 'restrict_cors' ), 11, 3 );
+		add_filter( 'rest_pre_dispatch', array( self::class, 'refuse_jsonp' ), 10, 3 );
+	}
+
+	/**
+	 * Refuses a JSONP request to this namespace before its callback runs, so the
+	 * wrapped response carries an error and no data. No client of ours uses JSONP.
+	 * rest_jsonp_enabled cannot do this: it runs before the route is known.
+	 *
+	 * @param mixed            $result  The pre-dispatch result; null when nothing short-circuited.
+	 * @param mixed            $server  The REST server (unused).
+	 * @param \WP_REST_Request $request The request being dispatched.
+	 * @return mixed The unchanged $result, or a WP_Error for a JSONP request to this namespace.
+	 */
+	public static function refuse_jsonp( $result, $server, $request ) {
+		if ( null !== $result || ! ( $request instanceof \WP_REST_Request ) ) {
+			return $result;
+		}
+
+		$query = $request->get_query_params();
+
+		if ( ! is_array( $query ) || ! array_key_exists( '_jsonp', $query ) || ! self::in_namespace( (string) $request->get_route() ) ) {
+			return $result;
+		}
+
+		return new \WP_Error(
+			'rest_jsonp_refused',
+			__( 'JSONP is not supported by this API.', 'duracelltomi-google-tag-manager' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	/**
+	 * Whether a route is the namespace index (/gtm4wp/v2) or under it; the slash
+	 * keeps gtm4wp/v22 out. Lowercased: WordPress matches routes case-insensitively.
+	 *
+	 * @param string $route The REST route, e.g. /gtm4wp/v2/visitor-data.
+	 * @return bool
+	 */
+	private static function in_namespace( string $route ): bool {
+		$path = strtolower( ltrim( $route, '/' ) );
+
+		return self::REST_NAMESPACE === $path || 0 === strpos( $path, self::REST_NAMESPACE . '/' );
 	}
 
 	/**
@@ -87,17 +126,7 @@ final class RestCors {
 			return false;
 		}
 
-		// Two shapes: the namespace's auto-registered index route (/gtm4wp/v2)
-		// and everything under it. The trailing slash keeps a future gtm4wp/v22
-		// out. Lowercased because WordPress matches routes case-INSENSITIVELY
-		// (WP_REST_Server::match_request_to_handler() uses the i modifier), so a
-		// case-sensitive test would serve the request while leaving it outside
-		// the policy.
-		$path = strtolower( ltrim( $route, '/' ) );
-
-		if ( self::REST_NAMESPACE !== $path
-			&& 0 !== strpos( $path, self::REST_NAMESPACE . '/' )
-		) {
+		if ( ! self::in_namespace( $route ) ) {
 			return false;
 		}
 
@@ -107,15 +136,7 @@ final class RestCors {
 			return true;
 		}
 
-		$parts = wp_parse_url( $origin );
-		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
-			return true;
-		}
-
-		if ( strtolower( (string) $parts['host'] ) !== strtolower( (string) $site['host'] ) ) {
-			return true;
-		}
-
-		return ( $parts['port'] ?? null ) !== ( $site['port'] ?? null );
+		// The beacons' matcher: host + default-normalised port, scheme not compared (#130, #347).
+		return ! RequestOrigin::url_matches_site( $origin, $site );
 	}
 }

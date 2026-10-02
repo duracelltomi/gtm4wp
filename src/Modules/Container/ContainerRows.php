@@ -71,6 +71,34 @@ final class ContainerRows {
 	}
 
 	/**
+	 * The environment type WordPress reports; 'production' when unset, as core
+	 * does. The function_exists() guard keeps the unit tests working.
+	 *
+	 * @return string
+	 */
+	public static function environment_type(): string {
+		return function_exists( 'wp_get_environment_type' ) ? (string) wp_get_environment_type() : 'production';
+	}
+
+	/**
+	 * The environment type when "only output on production environments"
+	 * suppresses the container on this install, '' otherwise. One definition
+	 * for the sink, the option description and the status report (#343, PA-2).
+	 *
+	 * @param mixed $production_only The stored option value.
+	 * @return string
+	 */
+	public static function environment_suppression( $production_only ): string {
+		if ( ! $production_only ) {
+			return '';
+		}
+
+		$environment = self::environment_type();
+
+		return 'production' === $environment ? '' : $environment;
+	}
+
+	/**
 	 * Resolves the data layer variable name from its stored value, falling back
 	 * to `dataLayer`. Re-validated at the reader (PA-2) because a 1.x install
 	 * stored names this rule rejects; Admin\Notices tells the admin when the

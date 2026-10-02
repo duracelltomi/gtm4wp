@@ -26,16 +26,25 @@ defined( 'ABSPATH' ) || exit;
 final class PageDataLayer {
 
 	/**
+	 * Tracker globals that could not attach to a printed handle, for the footer.
+	 *
+	 * @var string
+	 */
+	private string $deferred_js = '';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options      $options       The plugin options service.
 	 * @param DownloadData $download_data The download data builder.
 	 * @param DataLayer    $datalayer     The data layer service.
+	 * @param ScriptTag    $script_tag    The script tag helper (footer fallback).
 	 */
 	public function __construct(
 		private Options $options,
 		private DownloadData $download_data,
-		private DataLayer $datalayer
+		private DataLayer $datalayer,
+		private ScriptTag $script_tag
 	) {
 	}
 
@@ -375,11 +384,7 @@ final class PageDataLayer {
 		// this flag scopes its change listener to the download's own detail
 		// page, so option clicks inside download grids stay list events.
 		if ( $download->has_variable_prices() ) {
-			wp_add_inline_script(
-				'gtm4wp-edd',
-				'window.gtm4wp_edd_variable_view_item = true;',
-				'before'
-			);
+			$this->attach_tracker_js( 'window.gtm4wp_edd_variable_view_item = true;' );
 		}
 
 		return $data_layer;
@@ -431,13 +436,53 @@ final class PageDataLayer {
 			);
 		}
 
-		wp_add_inline_script(
-			'gtm4wp-edd',
+		$this->attach_tracker_js(
 			'
 			window.gtm4wp_checkout_products = ' . ScriptTag::json_literal( $cart['items'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
-			window.gtm4wp_checkout_value    = ' . (float) $cart['value'] . ';',
-			'before'
+			window.gtm4wp_checkout_value    = ' . ScriptTag::number_literal( (float) $cart['value'] ) . ';'
 		);
+	}
+
+	/**
+	 * Attaches globals the EDD tracker reads before its handle; when the handle is
+	 * already printed (a site that filters the tracker into the <head>), prints
+	 * them in the footer instead (#340, PA-8). Core's wp_add_inline_script()
+	 * returns true even for a printed handle, hence the explicit 'done' check.
+	 *
+	 * @param string $js The JavaScript statements.
+	 * @return void
+	 */
+	private function attach_tracker_js( string $js ): void {
+		// No handle means no reader, not a missed attach.
+		if ( ! wp_script_is( 'gtm4wp-edd', 'enqueued' ) ) {
+			return;
+		}
+
+		if ( wp_script_is( 'gtm4wp-edd', 'done' ) || ! wp_add_inline_script( 'gtm4wp-edd', $js, 'before' ) ) {
+			if ( '' === $this->deferred_js ) {
+				add_action( 'wp_footer', array( $this, 'print_deferred_js' ), 5 );
+			}
+
+			$this->deferred_js .= $js;
+		}
+	}
+
+	/**
+	 * Prints the globals attach_tracker_js() could not attach, as one footer block.
+	 *
+	 * @return void
+	 */
+	public function print_deferred_js(): void {
+		if ( '' === $this->deferred_js ) {
+			return;
+		}
+
+		$block = "\n" . $this->script_tag->opening_tag() . $this->deferred_js . "\n</script>";
+
+		// Cleared before printing so a second wp_footer pass cannot repeat the block.
+		$this->deferred_js = '';
+
+		$this->script_tag->print_script_block( $block );
 	}
 
 	/**

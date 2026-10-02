@@ -143,6 +143,101 @@ final class RestCorsTest extends TestCase {
 	}
 
 	/**
+	 * #337: core's JSONP wrapper is a response channel CORS does not govern, so a
+	 * JSONP request to the namespace is refused before its callback runs.
+	 */
+	public function test_register_hooks_the_jsonp_refusal_before_dispatch(): void {
+		RestCors::register();
+
+		$this->assertSame( 10, has_filter( 'rest_pre_dispatch', array( RestCors::class, 'refuse_jsonp' ) ) );
+	}
+
+	/**
+	 * A JSONP request to any route of the namespace is refused with a 400.
+	 *
+	 * @param string $route The REST route.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_namespace_routes' )]
+	public function test_refuse_jsonp_refuses_a_jsonp_request_to_the_namespace( string $route ): void {
+		Functions\when( '__' )->returnArg();
+
+		$request = new \WP_REST_Request();
+		$request->set_route( $route );
+		$request->set_query_params( array( '_jsonp' => 'cb' ) );
+
+		$result = RestCors::refuse_jsonp( null, null, $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_jsonp_refused', $result->get_error_code() );
+		$this->assertSame( array( 'status' => 400 ), $result->get_error_data() );
+	}
+
+	/**
+	 * Routes of the namespace, in casings WordPress also matches.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function provide_namespace_routes(): array {
+		return array(
+			'public GET'      => array( '/gtm4wp/v2/visitor-data' ),
+			'namespace index' => array( '/gtm4wp/v2' ),
+			'upper-case'      => array( '/GTM4WP/V2/VISITOR-DATA' ),
+		);
+	}
+
+	/**
+	 * Both directions: everything that is not a JSONP request to OUR namespace, and
+	 * any earlier short-circuit, passes through untouched.
+	 *
+	 * @param string             $route  The REST route.
+	 * @param array<string,mixed> $query The GET parameters.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_jsonp_passthrough' )]
+	public function test_refuse_jsonp_leaves_other_requests_alone( string $route, array $query ): void {
+		$request = new \WP_REST_Request();
+		$request->set_route( $route );
+		$request->set_query_params( $query );
+
+		$this->assertNull( RestCors::refuse_jsonp( null, null, $request ) );
+	}
+
+	/**
+	 * Requests the refusal must leave alone.
+	 *
+	 * @return array<string, array{0: string, 1: array<string, mixed>}>
+	 */
+	public static function provide_jsonp_passthrough(): array {
+		return array(
+			'our route without _jsonp' => array( '/gtm4wp/v2/visitor-data', array() ),
+			'core route with _jsonp'   => array( '/wp/v2/posts', array( '_jsonp' => 'cb' ) ),
+			'look-alike namespace'     => array( '/gtm4wp/v22/x', array( '_jsonp' => 'cb' ) ),
+		);
+	}
+
+	public function test_refuse_jsonp_keeps_an_earlier_short_circuit_and_ignores_non_requests(): void {
+		$request = new \WP_REST_Request();
+		$request->set_route( '/gtm4wp/v2/visitor-data' );
+		$request->set_query_params( array( '_jsonp' => 'cb' ) );
+
+		$earlier = array( 'already' => 'served' );
+
+		$this->assertSame( $earlier, RestCors::refuse_jsonp( $earlier, null, $request ) );
+		$this->assertNull( RestCors::refuse_jsonp( null, null, null ) );
+	}
+
+	/**
+	 * #347: the same default-port normalisation the beacons use (#130). A home_url
+	 * carrying :443 explicitly is the same origin a browser reports without it.
+	 */
+	public function test_should_restrict_cors_normalises_the_default_port(): void {
+		$this->stub_url_helpers();
+		Functions\when( 'home_url' )->justReturn( 'https://shop.example:443' );
+
+		$this->assertFalse( RestCors::should_restrict_cors( '/gtm4wp/v2/visitor-data', 'https://shop.example' ) );
+		$this->assertTrue( RestCors::should_restrict_cors( '/gtm4wp/v2/visitor-data', 'https://shop.example:8443' ) );
+	}
+
+	/**
 	 * One definition of the namespace string: three classes register routes into it,
 	 * and the policy matches on it by prefix. Two spellings would mean routes silently
 	 * outside the policy (RI-14).

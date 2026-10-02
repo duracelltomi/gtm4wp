@@ -42,6 +42,7 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 
 		Functions\stubTranslationFunctions();
 		Functions\stubEscapeFunctions();
+		Functions\when( 'is_multisite' )->justReturn( false );
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) preg_replace( '/<[^>]*>/', '', (string) $value ) ) );
 
 		// The vault only needs to answer has(); a metadata-shaped row is enough.

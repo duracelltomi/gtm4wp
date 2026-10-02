@@ -14,6 +14,7 @@ use GTM4WP\Admin\SiteHealthRows;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
 use GTM4WP\Module\SiteHealthInfoInterface;
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
 
@@ -98,7 +99,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					}
 
 					foreach ( explode( ',', $value ) as $one_amp_id ) {
-						if ( ! preg_match( '/^GTM-[A-Z0-9]+$/', $one_amp_id ) ) {
+						// The shared pattern, with D: a bare $ also matches before a newline (#346, PA-2).
+						if ( ! preg_match( ContainerRows::GTM_ID_PATTERN, $one_amp_id ) ) {
 							return new \WP_Error(
 								'gtm4wp_invalid_amp_id',
 								__( 'Invalid AMP Google Tag Manager Container ID. Valid ID format: GTM-XXXXX. Use comma without additional space (,) to enter more than one ID.', 'duracelltomi-google-tag-manager' )

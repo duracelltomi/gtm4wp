@@ -91,11 +91,7 @@ final class BackfillEndpoint {
 	 * @return bool
 	 */
 	public function check_permission( \WP_REST_Request $request ): bool {
-		if ( ! RequestOrigin::has_rest_nonce( $request ) ) {
-			return false;
-		}
-
-		return RequestOrigin::is_same_origin_request();
+		return RequestOrigin::is_nonced_same_origin_request( $request );
 	}
 
 	/**

@@ -35,7 +35,7 @@ final class DownloadData {
 	 * same key the WooCommerce integration uses, so store owners find one
 	 * familiar flag regardless of the store plugin.
 	 */
-	public const ORDER_TRACKED_META = '_ga_tracked';
+	public const ORDER_TRACKED_META = Helpers::ORDER_TRACKED_META;
 
 	/**
 	 * Statuses that end the reliable-purchase re-check: edd_get_payment_statuses()
@@ -876,8 +876,8 @@ final class DownloadData {
 			return true;
 		}
 
-		if ( isset( $_COOKIE['gtm4wp_orderid_tracked'] ) ) {
-			$tracked_order = sanitize_text_field( wp_unslash( $_COOKIE['gtm4wp_orderid_tracked'] ) );
+		if ( isset( $_COOKIE[ Helpers::ORDER_TRACKED_COOKIE ] ) ) {
+			$tracked_order = sanitize_text_field( wp_unslash( $_COOKIE[ Helpers::ORDER_TRACKED_COOKIE ] ) );
 
 			// The browser guard stores the order number (which equals the id
 			// unless sequential order numbers are enabled), so compare on both.

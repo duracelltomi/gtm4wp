@@ -72,17 +72,21 @@ final class StatusReport {
 		$configured = trim( (string) $this->options->get( GTM4WP_OPTION_DATALAYER_NAME ) );
 		$effective  = ContainerRows::datalayer_name( $configured );
 		$locks      = HardcodedContainers::locks();
+		$suppressed = ContainerRows::environment_suppression( $this->options->get( GTM4WP_OPTION_PRODUCTIONONLY ) );
 
+		// Site-level gates only: the gtm4wp_output_container filter answers per
+		// request, so its admin-context value says nothing about the frontend (#343).
 		return array(
-			'containers'            => $containers,
-			'placement'             => $placement,
-			'container_code_output' => self::PLACEMENT_OFF !== $placement,
-			'datalayer_name'        => array(
+			'containers'                => $containers,
+			'placement'                 => $placement,
+			'container_code_output'     => self::PLACEMENT_OFF !== $placement && '' === $suppressed,
+			'suppressed_on_environment' => $suppressed,
+			'datalayer_name'            => array(
 				'configured' => $configured,
 				'effective'  => $effective,
 				'valid'      => ( '' === $configured ) || ( $configured === $effective ),
 			),
-			'hardcoded'             => array(
+			'hardcoded'                 => array(
 				'active'         => HardcodedContainers::locks_any( $locks ),
 				'locked_columns' => array_keys( $locks['columns'] ),
 				'locked_rows'    => array() !== $locks['rows'],

@@ -11,6 +11,7 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Frontend\DataLayer;
+use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
 use GTM4WP\Modules\EasyDigitalDownloads\PageDataLayer;
@@ -33,6 +34,13 @@ final class EddPageDataLayerTest extends TestCase {
 	 * @var array<int, array{handle: string, script: string}>
 	 */
 	private array $inline_scripts = array();
+
+	/**
+	 * Whether the stubbed gtm4wp-edd handle was already printed.
+	 *
+	 * @var bool
+	 */
+	private bool $tracker_done = false;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -111,6 +119,14 @@ final class EddPageDataLayerTest extends TestCase {
 			}
 		);
 
+		// The tracker handle is enqueued and still pending unless a test says it was
+		// printed already (#340). 'enqueued' stays true after printing, as in core.
+		$this->tracker_done = false;
+		Functions\when( 'wp_script_is' )->alias(
+			fn ( $handle, $status = 'enqueued' ) => 'gtm4wp-edd' === $handle
+				&& ( 'enqueued' === $status || ( 'done' === $status && $this->tracker_done ) )
+		);
+
 		// Isolate the request/queue state between tests (TS-7).
 		unset( $_SERVER['HTTP_X_REQUESTED_WITH'], $_GET['payment_key'], $_GET['order'], $_GET['id'], $_COOKIE['gtm4wp_orderid_tracked'] );
 		$GLOBALS['gtm4wp_additional_datalayer_pushes'] = array();
@@ -134,7 +150,7 @@ final class EddPageDataLayerTest extends TestCase {
 
 		$options = new Options( ( new EasyDigitalDownloadsModule() )->defaults() );
 
-		return new PageDataLayer( $options, new DownloadData( $options ), new DataLayer( $options ) );
+		return new PageDataLayer( $options, new DownloadData( $options ), new DataLayer( $options ), new ScriptTag( $options ) );
 	}
 
 	/**
@@ -736,6 +752,104 @@ final class EddPageDataLayerTest extends TestCase {
 			'"event":"purchase"',
 			$this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' )
 		);
+	}
+
+	/**
+	 * #340: a site can filter the EDD tracker into the <head>, where it is printed
+	 * at wp_head 9, before this runs at 10. Core's wp_add_inline_script() still
+	 * returns true for the printed handle, so the globals must go to the footer
+	 * through the explicit 'done' check, once, still hex-encoded.
+	 */
+	public function test_tracker_globals_go_to_the_footer_when_the_handle_is_already_printed(): void {
+		Functions\when( 'edd_is_checkout' )->justReturn( true );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => new \EDD_Download(
+				array(
+					'id'    => (int) $id,
+					'name'  => 'Poster</script>',
+					'price' => 9.99,
+				)
+			)
+		);
+		Functions\when( 'wp_kses' )->alias( static fn ( $content ) => str_replace( '&', '&amp;', (string) $content ) );
+		Functions\when( 'current_theme_supports' )->justReturn( true );
+
+		$this->tracker_done = true;
+
+		$page_datalayer = $this->make_page_datalayer();
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertSame( '', $this->inline_script_output( 'gtm4wp-edd' ), 'A printed handle must not be given an inline script.' );
+		$this->assertSame( 5, has_action( 'wp_footer', array( $page_datalayer, 'print_deferred_js' ) ) );
+
+		ob_start();
+		$page_datalayer->print_deferred_js();
+		$printed = ob_get_clean();
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $printed );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value', $printed );
+		$this->assertStringContainsString( '</script>', $printed );
+		$this->assertStringNotContainsString( 'Poster</script>', $printed, 'JSON_HEX_TAG on the fallback sink too.' );
+
+		ob_start();
+		$page_datalayer->print_deferred_js();
+		$this->assertSame( '', ob_get_clean(), 'Printed exactly once.' );
+	}
+
+	public function test_tracker_globals_attach_inline_while_the_handle_is_pending(): void {
+		Functions\when( 'edd_is_checkout' )->justReturn( true );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( array() );
+
+		$page_datalayer = $this->make_page_datalayer();
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $this->inline_script_output( 'gtm4wp-edd' ) );
+		$this->assertFalse( has_action( 'wp_footer', array( $page_datalayer, 'print_deferred_js' ) ) );
+	}
+
+	/**
+	 * #339: EDD's own price sanitizer keeps a 309-digit price as 1e308, and
+	 * price * quantity overflows to INF, which PHP prints as an undeclared JS
+	 * identifier. It must print `null`.
+	 */
+	public function test_checkout_value_is_null_when_the_total_is_not_finite(): void {
+		Functions\when( 'edd_is_checkout' )->justReturn( true );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 2,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['price'] = 1.0E+308;
+					return $item;
+				}
+			);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$checkout = $this->inline_script_output( 'gtm4wp-edd' );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value    = null;', $checkout );
+		$this->assertStringNotContainsString( 'INF', $checkout );
 	}
 
 	/**
