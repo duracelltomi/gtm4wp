@@ -38,13 +38,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	private const DOC_SEARCH    = self::DOC_BASE . '/site-search-usage-on-your-wordpress-site';
 	private const DOC_TAXONOMY  = self::DOC_BASE . '/wordpress-taxonomy-llisting-page-post-count-in-google-tag-manager';
 	private const DOC_MULTISITE = self::DOC_BASE . '/wordpress-multisite-information';
-
-	/**
-	 * The Cloudflare country code is the one option of this module documented
-	 * under the third party data hub rather than the basic data one, because it
-	 * is the surviving part of the retired geo integration.
-	 */
-	private const DOC_GEO = 'use-special-3rd-party-data-in-google-tag-manager/track-country-city-and-other-geo-data-of-the-current-visitor';
+	private const DOC_GEO       = self::DOC_BASE . '/track-country-city-and-other-geo-data-of-the-current-visitor';
 
 	/**
 	 * Module documentation page.

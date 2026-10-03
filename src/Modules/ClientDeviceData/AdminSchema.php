@@ -28,7 +28,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * Documentation hub of this module on gtm4wp.com. Each of the three options
 	 * has a page of its own below it.
 	 */
-	private const DOC_PAGE = 'use-special-3rd-party-data-in-google-tag-manager';
+	private const DOC_PAGE = 'use-basic-wordpress-data-in-google-tag-manager';
 
 	/**
 	 * Module documentation page.
