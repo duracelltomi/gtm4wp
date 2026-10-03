@@ -99,7 +99,7 @@ final class DefaultLanguage {
 		 * gtm4wp_master_language_post_id for posts and
 		 * gtm4wp_master_language_term_id for terms.
 		 *
-		 * @since 2.0
+		 * @since 2.1.0
 		 *
 		 * @param int    $resolved Resolved master-language id (the original id when nothing was resolved).
 		 * @param int    $id       Original post/term id in the current language.
