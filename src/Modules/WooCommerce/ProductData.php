@@ -166,10 +166,9 @@ final class ProductData {
 			$data_parent_id = $parent_product_id;
 		}
 
-		if (
-			true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE )
-			&& DefaultLanguage::is_active()
-		) {
+		// No DefaultLanguage::is_active() gate: the resolution filters must work
+		// without WPML/Polylang, as in the other master-language options.
+		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE ) ) {
 			$master_id = DefaultLanguage::post_id( $product_id, $is_variation ? 'product_variation' : 'product' );
 			if ( $master_id !== $product_id ) {
 				$master_product = wc_get_product( $master_id );

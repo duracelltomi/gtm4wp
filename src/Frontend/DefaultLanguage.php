@@ -23,12 +23,27 @@ final class DefaultLanguage {
 
 	/**
 	 * Whether a supported multilingual plugin (WPML or Polylang) is active.
-	 * Lets callers skip all resolution work on a single-language site.
+	 * Not a gate for post_id()/term_id(): their filters must run without one.
 	 *
 	 * @return bool
 	 */
 	public static function is_active(): bool {
 		return has_filter( 'wpml_current_language' ) || function_exists( 'pll_get_post' );
+	}
+
+	/**
+	 * Admin note for the master-language options: '' while WPML, Polylang or a
+	 * callback on the resolution filters can resolve ids, otherwise the reason
+	 * the option has no effect (rendered as a disabled control).
+	 *
+	 * @return string
+	 */
+	public static function unavailable_reason(): string {
+		if ( self::is_active() || has_filter( 'gtm4wp_master_language_post_id' ) || has_filter( 'gtm4wp_master_language_term_id' ) ) {
+			return '';
+		}
+
+		return __( 'Needs WPML or Polylang, and neither is active.', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**

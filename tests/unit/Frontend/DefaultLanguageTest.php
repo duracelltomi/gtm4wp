@@ -37,6 +37,38 @@ final class DefaultLanguageTest extends TestCase {
 		$this->assertSame( 30, DefaultLanguage::term_id( 30, 'category' ) );
 	}
 
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_unavailable_reason_names_the_missing_plugins_when_nothing_can_resolve(): void {
+		Functions\stubTranslationFunctions();
+
+		$this->assertStringContainsString( 'WPML or Polylang', DefaultLanguage::unavailable_reason() );
+	}
+
+	public function test_unavailable_reason_is_empty_with_wpml(): void {
+		Functions\stubTranslationFunctions();
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+
+		$this->assertSame( '', DefaultLanguage::unavailable_reason() );
+	}
+
+	/**
+	 * A third-party callback on either resolution filter keeps the options
+	 * available: the filters are public API for other multilingual plugins.
+	 *
+	 * @param string $filter The resolution filter a third party hooks.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_post_id' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_term_id' ) )]
+	public function test_unavailable_reason_is_empty_with_a_resolution_filter_callback( string $filter ): void {
+		Functions\stubTranslationFunctions();
+		add_filter( $filter, static fn ( $resolved ) => $resolved );
+
+		$this->assertSame( '', DefaultLanguage::unavailable_reason() );
+	}
+
 	public function test_non_positive_ids_are_returned_unchanged(): void {
 		$this->assertSame( 0, DefaultLanguage::post_id( 0, 'post' ) );
 		$this->assertSame( -5, DefaultLanguage::term_id( -5, 'category' ) );

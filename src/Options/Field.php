@@ -93,6 +93,9 @@ final class Field {
 	 *                                     WITHOUT a fragment: the anchor is always this field's $key
 	 *                                     (frozen public API), appended by Docs::url(). Empty renders no
 	 *                                     help icon.
+	 * @param string        $unavailable   Translated reason the option cannot take effect on this site
+	 *                                     (a host plugin is missing): the admin UI disables the control
+	 *                                     and shows it. Empty when available. UX only, like $depends_on.
 	 */
 	public function __construct(
 		public string $key,
@@ -109,7 +112,8 @@ final class Field {
 		public string $depends_on = '',
 		public bool $rows_locked = false,
 		public array $choice_sections = array(),
-		public string $doc = ''
+		public string $doc = '',
+		public string $unavailable = ''
 	) {
 	}
 
@@ -258,6 +262,7 @@ final class Field {
 			'columns'     => $this->columns,
 			'depends_on'  => $this->depends_on,
 			'rows_locked' => $this->rows_locked,
+			'unavailable' => $this->unavailable,
 			'value'       => $current_value,
 		);
 	}

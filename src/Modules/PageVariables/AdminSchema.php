@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\PageVariables;
 
 use GTM4WP\Admin\SiteHealthRows;
+use GTM4WP\Frontend\DefaultLanguage;
 use GTM4WP\Frontend\VisitorIp;
 use GTM4WP\Module\AdminSchemaInterface;
 use GTM4WP\Module\DocumentedSchemaInterface;
@@ -336,7 +337,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				description: esc_html__( 'On multilingual sites (WPML or Polylang), output the language dependent page variables - post title, category slugs, tags and taxonomy terms - in the site\'s default (master) language instead of the translated one, so Google Analytics can combine reports across all languages instead of splitting them per translation. The values are replaced in place (no extra data layer variables). Requires WPML or Polylang; on a single-language site or an untranslated page the current values are unchanged. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
 				group: 'content',
 				phase: Field::PHASE_EXPERIMENTAL,
-				doc: self::DOC_POST
+				doc: self::DOC_POST,
+				unavailable: DefaultLanguage::unavailable_reason()
 			),
 			new Field(
 				key: GTM4WP_OPTION_INCLUDE_SEARCHDATA,

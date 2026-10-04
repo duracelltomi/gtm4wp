@@ -80,6 +80,47 @@ final class ModuleConsistencyTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Without WPML, Polylang or a resolution filter callback, exactly the four
+	 * master-language options are marked unavailable. Own process: a leaked
+	 * pll_* stub would make them available (TS-16).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_master_language_options_are_unavailable_without_a_multilingual_plugin(): void {
+		$unavailable = array();
+		foreach ( $this->builtin_modules() as $module ) {
+			$schema_class = $module->admin_schema();
+			foreach ( ( new $schema_class() )->fields() as $field ) {
+				if ( '' !== $field->unavailable ) {
+					$unavailable[] = $field->key;
+				}
+			}
+		}
+		sort( $unavailable );
+
+		$expected = array(
+			GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE,
+			GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE,
+			GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE,
+			GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE,
+		);
+		sort( $expected );
+
+		$this->assertSame( $expected, $unavailable );
+	}
+
+	public function test_master_language_options_are_available_with_wpml(): void {
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+
+		foreach ( $this->builtin_modules() as $module ) {
+			$schema_class = $module->admin_schema();
+			foreach ( ( new $schema_class() )->fields() as $field ) {
+				$this->assertSame( '', $field->unavailable, "Field '{$field->key}' must be available with WPML active." );
+			}
+		}
+	}
+
 	public function test_every_field_references_a_declared_group(): void {
 		foreach ( $this->builtin_modules() as $module_id => $module ) {
 			$schema_class = $module->admin_schema();

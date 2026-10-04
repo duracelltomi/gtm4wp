@@ -42,18 +42,36 @@ function FieldLabel( { field } ) {
  * unable to run would otherwise read as active, so the two states get
  * different sentences.
  *
- * @param {Object}  props           Component props.
- * @param {boolean} props.disabled  Whether the control is disabled by a dependency.
- * @param {*}       props.value     The stored value of the dependent field.
- * @param {string}  props.dependsOn Label of the field it depends on.
+ * @param {Object}  props             Component props.
+ * @param {boolean} props.disabled    Whether the control is disabled by a dependency.
+ * @param {*}       props.value       The stored value of the dependent field.
+ * @param {string}  props.dependsOn   Label of the field it depends on.
+ * @param {string}  props.unavailable Server-side reason the option cannot take effect.
  * @return {JSX.Element|null} The note, or null when there is nothing to explain.
  */
-function DependencyNote( { disabled, value, dependsOn } ) {
+function DependencyNote( { disabled, value, dependsOn, unavailable } ) {
+	const isOn = Array.isArray( value ) ? 0 < value.length : Boolean( value );
+
+	if ( unavailable ) {
+		return (
+			<span className="gtm4wp-field-dependency">
+				{ isOn
+					? sprintf(
+							/* translators: %s: why the setting cannot take effect, e.g. "Needs WPML or Polylang, and neither is active." */
+							__(
+								'Saved as on, but not in effect. %s',
+								'duracelltomi-google-tag-manager'
+							),
+							unavailable
+					  )
+					: unavailable }
+			</span>
+		);
+	}
+
 	if ( ! disabled || ! dependsOn ) {
 		return null;
 	}
-
-	const isOn = Array.isArray( value ) ? 0 < value.length : Boolean( value );
 
 	return (
 		<span className="gtm4wp-field-dependency">
@@ -86,6 +104,9 @@ function FieldHelp( { field, error, disabled, value, dependsOn } ) {
 				disabled={ disabled }
 				value={ value }
 				dependsOn={ dependsOn }
+				unavailable={
+					field.unavailable ? String( field.unavailable ) : ''
+				}
 			/>
 			{ /*
 			   Descriptions carry markup (links, <code>, <br />), so they go in as

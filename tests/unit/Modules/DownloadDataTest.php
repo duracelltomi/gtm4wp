@@ -307,6 +307,38 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( 9.99, $item['price'], 'The price stays per language.' );
 	}
 
+	/**
+	 * The documented gtm4wp_master_language_post_id filter alone drives the
+	 * resolution with no WPML/Polylang. Own process: a leaked pll_* stub would
+	 * make DefaultLanguage::is_active() true and hide a restored gate (TS-16).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_master_language_filter_resolves_without_a_multilingual_plugin(): void {
+		Filters\expectApplied( 'gtm4wp_master_language_post_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $resolved, $id ) => 55 === (int) $id ? 100 : $resolved
+		);
+		Functions\when( 'edd_get_download' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? new \EDD_Download(
+					array(
+						'id'    => 100,
+						'name'  => 'Master eBook',
+						'price' => 9.99,
+					)
+				)
+				: null
+		);
+
+		$item = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE => true )
+		)->process_download( $this->make_download(), array(), 'productdetail' );
+
+		$this->assertSame( '100', $item['item_id'], 'A third-party multilingual plugin resolves through the filter alone.' );
+		$this->assertSame( 'Master eBook', $item['item_name'] );
+		$this->assertSame( 55, $item['internal_id'] );
+	}
+
 	public function test_master_language_variant_reads_the_master_price_option_with_fallback(): void {
 		$this->activate_wpml( array( 55 => 100 ) );
 		Functions\when( 'edd_get_price_option_amount' )->justReturn( 15.0 );

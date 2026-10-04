@@ -118,6 +118,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( '', $field['default'] );
 		$this->assertStringNotContainsString( '<', $field['description'], 'The settings screen renders limited HTML in a description; an assistant gets the text.' );
 		$this->assertIsObject( $field['choices'] );
+		$this->assertSame( '', $field['unavailable'], 'Always present; empty for an option that needs no other plugin.' );
 		$this->assertStringStartsWith( 'https://gtm4wp.com/', $field['doc_url'] );
 		$this->assertStringEndsWith( '#' . GTM4WP_OPTION_DATALAYER_NAME, $field['doc_url'], 'The anchor is the option key, the deep link the settings screen uses.' );
 	}

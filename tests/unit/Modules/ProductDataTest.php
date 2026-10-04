@@ -1922,6 +1922,38 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'Master Brand', $item['item_brand'] );
 	}
 
+	/**
+	 * The documented gtm4wp_master_language_post_id filter alone drives the
+	 * resolution with no WPML/Polylang. Own process: a leaked pll_* stub would
+	 * make DefaultLanguage::is_active() true and hide a restored gate (TS-16).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_master_language_filter_resolves_without_a_multilingual_plugin(): void {
+		Filters\expectApplied( 'gtm4wp_master_language_post_id' )->zeroOrMoreTimes()->andReturnUsing(
+			static fn ( $resolved, $id ) => 123 === (int) $id ? 100 : $resolved
+		);
+		Functions\when( 'wc_get_product' )->alias(
+			static fn ( $id ) => 100 === (int) $id
+				? new \WC_Product(
+					array(
+						'id'    => 100,
+						'title' => 'Master Product',
+						'sku'   => 'SKU-MASTER',
+					)
+				)
+				: null
+		);
+
+		$item = $this->make_product_data(
+			array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE => true )
+		)->process_product( $this->make_product(), array(), 'productdetail' );
+
+		$this->assertSame( '100', $item['item_id'], 'A third-party multilingual plugin resolves through the filter alone.' );
+		$this->assertSame( 'Master Product', $item['item_name'] );
+		$this->assertSame( 123, $item['internal_id'] );
+	}
+
 	public function test_master_language_variation_resolves_parent_and_variant_via_wpml(): void {
 		// Variation 456 (parent 99) -> master variation 400 (parent 300).
 		$this->activate_wpml(

@@ -134,6 +134,10 @@ final class SettingsAbilities implements ProviderInterface {
 										'description' => __( 'The key of the setting this field depends on in the settings screen, or several keys comma separated (the field is enabled while any one of them is on); empty when it stands alone. Informational: a value is stored either way.', 'duracelltomi-google-tag-manager' ),
 									),
 									'rows_locked' => array( 'type' => 'boolean' ),
+									'unavailable' => array(
+										'type'        => 'string',
+										'description' => __( 'Why the option cannot take effect on this site (a required plugin is missing); empty when it can. Informational: a value is stored either way.', 'duracelltomi-google-tag-manager' ),
+									),
 									'doc_url'     => array( 'type' => 'string' ),
 								),
 							),
@@ -535,6 +539,7 @@ final class SettingsAbilities implements ProviderInterface {
 			'columns'     => array_values( $field->columns ),
 			'depends_on'  => $field->depends_on,
 			'rows_locked' => $field->rows_locked,
+			'unavailable' => $field->unavailable,
 			'doc_url'     => Docs::url( $field->doc, $field->key ),
 		);
 	}

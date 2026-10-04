@@ -144,10 +144,9 @@ final class DownloadData {
 		$data_download    = $download;
 		$data_download_id = $download_id;
 
-		if (
-			true === $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE )
-			&& DefaultLanguage::is_active()
-		) {
+		// No DefaultLanguage::is_active() gate: the resolution filters must work
+		// without WPML/Polylang, as in the WooCommerce module.
+		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE ) ) {
 			$master_id = DefaultLanguage::post_id( $download_id, 'download' );
 			if ( $master_id !== $download_id ) {
 				$master_download = edd_get_download( $master_id );

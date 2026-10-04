@@ -392,6 +392,36 @@ final class FieldTest extends TestCase {
 	}
 
 	/**
+	 * $unavailable is the last parameter (no positional caller shifts) and
+	 * reaches the UI array under the key the admin app reads to disable the
+	 * control and show the reason.
+	 */
+	public function test_unavailable_defaults_to_empty_and_reaches_the_ui_array(): void {
+		$this->assertSame( '', $this->make_field( Field::TYPE_CHECKBOX, false )->to_ui_array( false )['unavailable'] );
+
+		$positional = new Field(
+			'gtm4wp-options-example',
+			Field::TYPE_CHECKBOX,
+			false,
+			'Example',
+			'',
+			'general',
+			Field::PHASE_STABLE,
+			array(),
+			null,
+			array(),
+			null,
+			'',
+			false,
+			array(),
+			'',
+			'Needs another plugin.'
+		);
+
+		$this->assertSame( 'Needs another plugin.', $positional->to_ui_array( false )['unavailable'] );
+	}
+
+	/**
 	 * T48: the 'sections' pass-through was asserted nowhere - the Blacklist
 	 * schema declares choice_sections and the admin FieldControl renders them,
 	 * but no test pinned that to_ui_array() actually ships them, so dropping

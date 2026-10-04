@@ -457,6 +457,52 @@ describe( 'FieldControl dependencies and annotations', () => {
 		expect( screen.queryByText( /not in effect/ ) ).not.toBeInTheDocument();
 	} );
 
+	it( 'disables an unavailable field and shows the server reason', () => {
+		renderField(
+			{
+				key: 'k',
+				type: 'checkbox',
+				label: 'Master language',
+				unavailable: 'Needs WPML or Polylang, and neither is active.',
+			},
+			{ value: false }
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeDisabled();
+		expect(
+			screen.getByText( 'Needs WPML or Polylang, and neither is active.' )
+		).toBeInTheDocument();
+	} );
+
+	it( 'says an unavailable field stored as on is not in effect', () => {
+		renderField(
+			{
+				key: 'k',
+				type: 'checkbox',
+				label: 'Master language',
+				unavailable: 'Needs WPML or Polylang, and neither is active.',
+			},
+			{ value: true }
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeChecked();
+		expect(
+			screen.getByText(
+				'Saved as on, but not in effect. Needs WPML or Polylang, and neither is active.'
+			)
+		).toBeInTheDocument();
+	} );
+
+	it( 'keeps a field with an empty unavailable reason enabled', () => {
+		renderField(
+			{ key: 'k', type: 'checkbox', label: 'Field', unavailable: '' },
+			{ value: true }
+		);
+
+		expect( screen.getByRole( 'switch' ) ).toBeEnabled();
+		expect( screen.queryByText( /not in effect/ ) ).not.toBeInTheDocument();
+	} );
+
 	it( 'shows the stored value of a disabled field rather than forcing it off', () => {
 		// The display must never disagree with what would be saved.
 		renderField(
