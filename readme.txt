@@ -314,7 +314,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Fixed: a WooCommerce checkout total that is not a finite number no longer breaks the inline checkout script; `gtm4wp_checkout_value` is `null` then.
 * Fixed: hardened how the plugin's REST endpoints answer requests made from other pages. Details are withheld until the change reaches the 2.0 line.
 * Changed: with the cache-safe data layer on, the WooCommerce customer and cart data are re-read only when the cart fragment changed, not on every change to the page.
-* Added: an optional **"Output values in the default language"** setting (Page variables → Content & engagement data): `pageTitle`, `pageCategory`, `pageAttributes`, `pagePostTerms` and `pagePrimaryCategory` report the master language, so Google Analytics combines reports across translations. Needs WPML, Polylang or the `gtm4wp_master_language_post_id` / `gtm4wp_master_language_term_id` filters (the three settings below: only the first). Off by default (experimental). Thanks to @loran750 (#145).
+* Added: an optional **"Output values in the default language"** setting (Page variables → Content & engagement data): `pageTitle`, `pageCategory`, `pageAttributes`, `pagePostTerms` and `pagePrimaryCategory` report the master language, so Google Analytics combines reports across translations. Needs WPML, Polylang or the `gtm4wp_master_language_post_id` / `gtm4wp_master_language_term_id` filters (the three settings below: post filter only). Off by default (experimental). Thanks to @loran750 (#145).
 * Added: an optional **"Report products in the default language"** setting (WooCommerce → Product data): the whole GA4 item, `item_id` included, reports the master language, so one product combines across its translations. Review any product feed or dynamic-remarketing setup keyed on the translated id before switching it on. Off by default (experimental) (#145).
 * Added: an optional **"Report downloads in the default language"** setting (Easy Digital Downloads → Product data), the EDD counterpart of the WooCommerce option above and with the same caveat about setups keyed on the translated `item_id`. Off by default (experimental) (#145).
 * Added: an optional **"Report the form name in the default language"** setting (Contact Form 7), so `form_name` carries the master-language title and submissions of one form combine across languages. Works for forms translated as separate entries. Off by default (experimental) (#145).
@@ -423,41 +423,6 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 * Added: an Axeptio consent management platform integration and a CookieYes consent bridge; the WebToffee v2.x integration is deprecated. Media events cover more embedded players, and a player's script is requested only on pages that contain one of its embeds.
 * Removed: the weather and geo data features and the scroll tracking feature (use the built-in Scroll Depth trigger of Google Tag Manager instead). Browser, OS and device data is now collected in the browser with User-Agent Client Hints, which replaces the bundled WhichBrowser library.
 * Deprecated: the "YouTube video events" option (Google Tag Manager ships a native YouTube Video trigger) and the `$gtp4wp_plugin_url`, `$gtp4wp_plugin_basename` and `$gtp4wp_script_path` global variables, which will be removed in 2.1.
-
-= 1.22.5 =
-
-A maintenance release for the 1.x line. 1.22.4 was intended to be the last one before GTM4WP 2.0; this release exists because the fixes below are worth shipping to 1.x users rather than holding for 2.0.
-
-* Fixed (security): hardened how the hidden product-data attribute is built for WooCommerce product lists and cart remove links, so that no product field value can affect the surrounding HTML. Certain values were not guaranteed to stay inside the attribute.
-* Fixed: when a custom X-Forwarded-For header is configured as the visitor IP source, all entries of the header are now evaluated. Only the first entry was ever considered, because the remaining ones were not trimmed of the space that follows each comma and therefore failed IP validation.
-* Fixed: the custom visitor IP header name is now validated in full. The check accepted any value that contained at least one valid character, so an invalid header name passed validation and was then simply never found. Setups with a working header name are unaffected.
-
-= 1.22.4 =
-
-* Fixed: hardened how values are encoded into the data layer and into inline script blocks. Script blocks are no longer HTML entity decoded after sanitization, and every value written into a script context is now JSON encoded with the full set of hex escaping flags. Thanks [cyn](https://github.com/cyn8)
-* Fixed: nonce attribute should not be sanitized. Thanks [oxyc](https://github.com/oxyc)
-* Fixed: avoid warnings when saving settings. Thanks [mircobabini](https://github.com/mircobabini)
-* Fixed: only float number is returned in JavaScript processing. Thanks [gkipouros](https://github.com/gkipouros)
-* Updated: only load plugin files on frontend or on admin when the admin user has sufficient permissions.
-* Updated: WooCommerce 10.4+ compatibility - the checkout inline script no longer uses the deprecated wc_enqueue_js() function. The old function is still used as a fallback on setups where the tracker script is loaded in the page head.
-* Updated: WordPress and WooCommerce compatibility.
-* Deprecated: geo data (ipstack.com) and weather data (OpenWeatherMap) integrations. They still work in this version but will be removed in GTM4WP 2.0. There is no direct replacement: collect this data in Google Tag Manager or with a dedicated service instead.
-* Deprecated: scroll tracking. It still works in this version but will be removed in GTM4WP 2.0. Use the Scroll Depth trigger built into Google Tag Manager instead.
-* Deprecated: the "Custom tag/variable templates" blacklist option, plus the Universal Analytics and Mouseflow entries of the tag blacklist. These will be removed in GTM4WP 2.0.
-* Added: a dismissable admin notice announcing the upcoming GTM4WP 2.0 release. If your site uses one of the deprecated features above, the notice names it.
-
-= 1.22.3 =
-
-* Fixed: when timeout for the select_item event with WooCommerce is set to 0, plugin does not halt the browser from loading the product page
-* Fixed: properly reading timeout for select_item eventCallback
-
-= 1.22.2 =
-
-* Fixed: purchase event was not fired when is_order_received_page() WooCommerce tag was not supported by the template and the fallback method had to activate.
-
-= 1.22.1 =
-
-* Fixed: yet another fix to the purchase tracking. Thanks [Khnaz35](https://github.com/Khnaz35)
 
 Older releases are listed in the full changelog on GitHub: https://github.com/duracelltomi/gtm4wp/blob/master/CHANGELOG.md
 

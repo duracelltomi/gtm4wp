@@ -1149,6 +1149,23 @@ Deep-pass re-audit of the oldest `[x]` rows (MediaEvents 07-13, ContactForm7 07-
 ConsentMode 07-14/15, Module Framework 07-10) produced #112 and nothing else; the
 ConsentMode bridges interpolate only the validated data-layer identifier.
 
+### Report 47: `.security/code-review-report-2026-10-05-1412.md`
+
+**Reviewed at:** `5326393` · **Base:** `9d37a43` (range `9d37a43..5326393`, 2 commits: R46's fix session
+`f2fdccd` (#366) read as new code, plus the R46 ledger/skill commit). Release gate for 2.1.0-beta2. No new
+surface. #366's fix confirmed: four callers, and only PageVariables reaches `term_id()`. The Frontend Core and
+Module Admin Schemas `[x]` cells stand with the fix read. **FP-4 re-derived** (rotation; our half, amp-wp half
+inherited from R45). Toolchain scopes unchanged (claude-security 0.12.0, digest `4c635d2f8470c1b0`).
+
+**0 Critical / High / Medium, 1 Low (#386, wording).** Adjudication: 1 draft, 1 verifier; recommendation
+refuted on the 60-word ceiling and replaced. Snapshots clean. **Suite:** PHP 3398 / 18973, JS 1009 / 39,
+`phpcs` 0. **Fix session (same day):** #386 fixed with the verifier's wording, docs only; readme.txt changelog
+trimmed to 3,894 words (1.22.x sections dropped, release pre-flight). **Base for the next review:** the release-gate commit.
+
+| # | Sev | Status | Actor | Where | Summary |
+|---|---|---|---|---|---|
+| 386 | Low | fixed (R47 fix session; "post filter only", 59 words, both files) | — | 2.1 master-language bullet, `CHANGELOG.md` + `readme.txt` | Parenthetical naming which filter the other three settings use reads ambiguously |
+
 ### Report 46: `.security/code-review-report-2026-10-05-1305.md`
 
 **Reviewed at:** `9d37a43` · **Base:** `b74c154` (range `b74c154..9d37a43`, 3 commits: R45's fix session
