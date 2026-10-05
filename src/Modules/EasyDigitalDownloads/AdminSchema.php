@@ -168,7 +168,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_INTEGER,
 				default_value: 10,
 				label: __( 'Products per impression', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Splits product impression data into several events of this many downloads each, so a large download grid cannot make Google Analytics drop page views. Enter 0 to send it in one event; at least 10 to 15 is recommended.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Splits the view_item_list data of a long download list into several events of this many items each, so the impressions do not exceed what one measurement request can hold. Enter 0 to send one event; 10 to 15 is a sensible floor.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
