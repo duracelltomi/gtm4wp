@@ -301,12 +301,14 @@ final class GoogleDataManagerIngestSendTest extends TestCase {
 
 		$chunks = EventsIngest::chunk( $rows );
 
-		$this->assertCount( 2, $chunks, 'One request per service account: a request carries one bearer token.' );
-		$this->assertSame( array( 'G-AAA', 'G-CCC' ), array_column( $chunks[0], DestinationRows::COLUMN_MEASUREMENT ) );
-		$this->assertSame( array( 'G-BBB' ), array_column( $chunks[1], DestinationRows::COLUMN_MEASUREMENT ) );
+		$this->assertSame(
+			array( array( 'G-AAA' ), array( 'G-CCC' ), array( 'G-BBB' ) ),
+			array_map( static fn ( $chunk ) => array_column( $chunk, DestinationRows::COLUMN_MEASUREMENT ), $chunks ),
+			'Grouped per service account (one bearer token per request), one GA4 destination each.'
+		);
 	}
 
-	public function test_more_than_ten_destinations_of_one_account_are_split(): void {
+	public function test_every_ga4_destination_of_one_account_gets_its_own_request(): void {
 		$rows = array();
 		for ( $i = 0; $i < 23; $i++ ) {
 			$rows[] = self::row( 'G-' . $i, 'sa_111111111111' );
@@ -314,11 +316,33 @@ final class GoogleDataManagerIngestSendTest extends TestCase {
 
 		$chunks = EventsIngest::chunk( $rows );
 
-		$this->assertCount( 3, $chunks );
-		$this->assertCount( EventsIngest::MAX_DESTINATIONS_PER_REQUEST, $chunks[0] );
-		$this->assertCount( EventsIngest::MAX_DESTINATIONS_PER_REQUEST, $chunks[1] );
-		$this->assertCount( 3, $chunks[2] );
-		$this->assertSame( 10, EventsIngest::MAX_DESTINATIONS_PER_REQUEST, 'The cap is the documented one (U125).' );
+		$this->assertCount( 23, $chunks );
+		$this->assertSame( array( 1 ), array_values( array_unique( array_map( 'count', $chunks ) ) ) );
+		$this->assertSame( 10, EventsIngest::MAX_DESTINATIONS_PER_REQUEST, 'The request cap is the documented one (U125).' );
+		$this->assertSame( 1, EventsIngest::MAX_GA4_DESTINATIONS_PER_EVENT, 'Google refuses an event reaching 2+ GA4 destinations (U125).' );
+	}
+
+	/**
+	 * The 2.1 regression on the wire: two GA4 destinations sharing a key used
+	 * to travel in one request, which Google refuses as a whole.
+	 */
+	public function test_two_ga4_destinations_on_one_account_are_sent_as_two_requests(): void {
+		$ingest  = $this->ingest();
+		$account = $this->stored_account();
+
+		$this->queue_token();
+		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-a' ) );
+		$this->queue_token();
+		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-b' ) );
+
+		$results = $ingest->send( array( self::row( 'G-AAA', $account ), self::row( 'G-BBB', $account ) ), self::full_event() );
+
+		$ingests = array_values( array_filter( $this->transport->requests, static fn ( $r ) => EventsIngest::ENDPOINT === $r['url'] ) );
+
+		$this->assertCount( 2, $ingests );
+		$this->assertSame( array( 'G-AAA' ), array_column( $ingests[0]['body']['destinations'], 'productDestinationId' ) );
+		$this->assertSame( array( 'G-BBB' ), array_column( $ingests[1]['body']['destinations'], 'productDestinationId' ) );
+		$this->assertSame( array( 'req-a', 'req-b' ), array_column( $results, 'request_id' ) );
 	}
 
 	public function test_a_row_without_a_service_account_is_never_sent(): void {
@@ -332,10 +356,7 @@ final class GoogleDataManagerIngestSendTest extends TestCase {
 		$this->queue_token();
 		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-ok' ) );
 
-		$rows = array();
-		for ( $i = 0; $i < 11; $i++ ) {
-			$rows[] = self::row( 'G-' . $i, $account );
-		}
+		$rows = array( self::row( 'G-0', $account ), self::row( 'G-1', $account ) );
 
 		// The second chunk mints its own token here because the transient stub
 		// never caches; in production it would reuse the first one. Then it is
@@ -348,9 +369,10 @@ final class GoogleDataManagerIngestSendTest extends TestCase {
 
 		$this->assertCount( 2, $results );
 		$this->assertTrue( $results[0]['ok'] );
+		$this->assertSame( array( 'G-0' ), $results[0]['measurements'] );
 		$this->assertFalse( $results[1]['ok'] );
 		$this->assertTrue( $results[1]['retryable'] );
-		$this->assertSame( array( 'G-10' ), $results[1]['measurements'] );
+		$this->assertSame( array( 'G-1' ), $results[1]['measurements'] );
 	}
 
 	// ---- Failure classification --------------------------------------------

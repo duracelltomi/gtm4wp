@@ -81,7 +81,37 @@ final class FakeTransport implements Transport {
 	 * {@inheritDoc}
 	 */
 	public function post_json( string $url, array $body, array $headers = array() ): array|\WP_Error {
+		self::refuse_multiple_ga4_destinations( $body );
+
 		return $this->record( 'POST_JSON', $url, null, $body, $headers );
+	}
+
+	/**
+	 * Google refuses a whole ingest request in which one event reaches two or
+	 * more Google Analytics destinations (U125); answering it here instead
+	 * kept the 2.1 refund lane green while every such send failed.
+	 *
+	 * @param array $body JSON body.
+	 * @return void
+	 * @throws \LogicException When an event targets 2+ GA4 destinations.
+	 */
+	private static function refuse_multiple_ga4_destinations( array $body ): void {
+		$ga4 = array();
+
+		foreach ( (array) ( $body['destinations'] ?? array() ) as $i => $destination ) {
+			if ( 'GOOGLE_ANALYTICS_PROPERTY' === ( $destination['operatingAccount']['accountType'] ?? '' ) ) {
+				$ga4[] = (string) ( $destination['reference'] ?? '#' . $i );
+			}
+		}
+
+		foreach ( (array) ( $body['events'] ?? array() ) as $event ) {
+			$refs    = (array) ( $event['destinationReferences'] ?? array() );
+			$targets = array() === $refs ? $ga4 : array_intersect( $ga4, $refs );
+
+			if ( count( $targets ) > 1 ) {
+				throw new \LogicException( 'FakeTransport: Google refuses this request (MULTIPLE_DESTINATIONS_FOR_GOOGLE_ANALYTICS_EVENT).' );
+			}
+		}
 	}
 
 	/**

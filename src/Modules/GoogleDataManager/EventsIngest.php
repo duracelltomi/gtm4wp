@@ -52,6 +52,13 @@ final class EventsIngest {
 	public const MAX_DESTINATIONS_PER_REQUEST = 10;
 
 	/**
+	 * An event without destinationReferences goes to every destination of its
+	 * request, and Google refuses the whole request when that is two or more
+	 * Google Analytics destinations (MULTIPLE_DESTINATIONS_FOR_GOOGLE_ANALYTICS_EVENT, U125).
+	 */
+	public const MAX_GA4_DESTINATIONS_PER_EVENT = 1;
+
+	/**
 	 * The requestStatus:retrieve endpoint (U136). A fixed constant on the same
 	 * allow-listed host as the ingest endpoint.
 	 */
@@ -181,9 +188,9 @@ final class EventsIngest {
 
 	/**
 	 * Sends one assembled event to a set of destination rows, split per service
-	 * account (one bearer token per request) and per
-	 * MAX_DESTINATIONS_PER_REQUEST (U125). Every request reports its own
-	 * outcome: one property can accept an event while another refuses it.
+	 * account (one bearer token per request) and per the request caps of
+	 * chunk() (U125). Every request reports its own outcome: one property can
+	 * accept an event while another refuses it.
 	 *
 	 * @param array<int, array<string, string>> $rows    Validated destination rows.
 	 * @param array<string, mixed>              $event   One assembled event, already in API shape.
@@ -202,12 +209,15 @@ final class EventsIngest {
 
 	/**
 	 * Splits destination rows into the request groups send() makes: one group
-	 * per service account, each within the per-request cap, order preserved.
+	 * per service account, each within the per-request caps, order preserved.
+	 * Every row is a Google Analytics destination, so the per-event GA4 cap
+	 * binds and each row gets a request of its own.
 	 *
 	 * @param array<int, array<string, string>> $rows Validated destination rows.
 	 * @return array<int, array<int, array<string, string>>>
 	 */
 	public static function chunk( array $rows ): array {
+		$size       = min( self::MAX_DESTINATIONS_PER_REQUEST, self::MAX_GA4_DESTINATIONS_PER_EVENT );
 		$by_account = array();
 
 		foreach ( $rows as $row ) {
@@ -223,7 +233,7 @@ final class EventsIngest {
 		$chunks = array();
 
 		foreach ( $by_account as $account_rows ) {
-			foreach ( array_chunk( $account_rows, self::MAX_DESTINATIONS_PER_REQUEST ) as $chunk ) {
+			foreach ( array_chunk( $account_rows, $size ) as $chunk ) {
 				$chunks[] = $chunk;
 			}
 		}

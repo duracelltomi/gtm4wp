@@ -653,12 +653,13 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( SendLog::OUTCOME_FAILED, $this->entry()['outcome'] );
 	}
 
-	public function test_two_destinations_on_one_account_share_one_accepted_request(): void {
+	public function test_two_destinations_on_one_account_are_each_accepted_in_their_own_request(): void {
 		$source = $this->source( self::refund() );
 
-		// Two destinations on the same account fit in one request, and one
-		// accepted request answers for both.
-		$this->queue_send( 200, array( 'requestId' => 'req-ok' ) );
+		// Google refuses one event reaching two GA4 destinations (U125), so
+		// each destination gets its own request and its own accepted answer.
+		$this->queue_send( 200, array( 'requestId' => 'req-a' ) );
+		$this->queue_send( 200, array( 'requestId' => 'req-b' ) );
 
 		$sender = $this->sender(
 			$source,
@@ -672,12 +673,23 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$sender->run( self::job() );
 
-		// Both destinations shared the accepted request, so there is nothing to
-		// retry and both carry a success record.
+		// Both were accepted, so there is nothing to retry; each request is
+		// polled and logged under its own id.
 		$this->assertSame( array(), $this->scheduled_sends() );
 		$this->assertSame( self::NOW, $this->health->get( 'G-AAA' )['last_success'] );
 		$this->assertSame( self::NOW, $this->health->get( 'G-BBB' )['last_success'] );
-		$this->assertCount( 2, $this->log->all(), 'One entry per destination: they can genuinely differ.' );
+		$this->assertSame( array( 34 => 'req-a' ), $source->sent );
+
+		$polls = array_values( array_filter( $this->scheduled, static fn ( $job ) => SendQueue::HOOK_STATUS === $job['hook'] ) );
+		$this->assertSame( array( 'req-a', 'req-b' ), array_map( static fn ( $job ) => $job['payload']['request_id'], $polls ) );
+		$this->assertSame(
+			array(
+				'G-AAA' => 'req-a',
+				'G-BBB' => 'req-b',
+			),
+			array_column( $this->log->all(), 'request_id', 'destination' ),
+			'One entry per destination: they can genuinely differ.'
+		);
 	}
 
 	/**
