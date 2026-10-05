@@ -251,7 +251,7 @@ never counted twice.
 
 Yes, since 2.1, from the server: a refund is issued in the store admin where no tag can fire, so the plugin sends a GA4 refund
 event through the Google Data Manager API instead. It needs a Google Cloud service account with access to your GA4 property and
-attribution capture switched on before the order was placed. Note that Google Analytics itself currently processes only the
+refund sending switched on before the order was placed. Note that Google Analytics itself currently processes only the
 first of several refunds on one order; this has been reported to Google and needs no plugin change once fixed.
 
 = Does the plugin support Easy Digital Downloads? =
@@ -348,7 +348,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 **Google Data Manager**
 
 * Added: a **Google Data Manager** section on the settings screen (experimental), where each destination row names a GA4 property ID, a measurement ID and the service account authenticating to it. A per-row Test button sends a validation-only request, so a missing permission or mistyped ID is reported before anything is saved. Repeated failures raise an admin notice.
-* Added: **attribution capture** (experimental, off by default) on the Data Manager's **Attribution capture** tab: each new order stores what a later server-side event needs to be matched to it in Google Analytics - the Analytics client and session IDs, the Google Ads click IDs and the consent state. The IDs come from the official `gtag('get', ...)` API, so a GA4 tag has to fire in your container. Storing is consent-gated in both directions, and `gtm4wp_gdm_order_consent` overrides the recorded state.
+* Added: **attribution capture** (experimental): while refund sending is on, each new order stores the Analytics client and session IDs, the Google Ads click IDs and the consent state, so a server-side event can be matched to it. A GA4 tag has to fire in your container. Storing is consent-gated, and `gtm4wp_gdm_order_consent` overrides the recorded state.
 * Added: **server-side refund events** (experimental): every store refund is sent separately to each Data Manager destination as a GA4 `refund` event with amount, items, shipping and tax, matched by transaction ID and client ID. Google Analytics itself processes only the first of several refunds on one order; reported to Google, no update needed once fixed.
 * Changed: the settings screen shows **Unsaved changes** next to the Save button while anything is waiting, and the browser asks before a tab with unsaved edits is closed or reloaded.
 * Changed: removing a row from a settings table now asks first: the trash icon becomes a Remove/Cancel pair for that row. A row nobody has typed into is still removed straight away.

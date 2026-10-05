@@ -194,7 +194,6 @@ define( 'GTM4WP_OPTION_INTEGRATE_EDDLISTATTRIBUTION', 'integrate-edd-persist-lis
 
 // Google Data Manager API integration (new in 2.1).
 define( 'GTM4WP_OPTION_GDM_DESTINATIONS', 'gdm-destinations' );
-define( 'GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION', 'gdm-capture-attribution' );
 define( 'GTM4WP_OPTION_GDM_CONSENT_POLICY', 'gdm-consent-policy' );
 define( 'GTM4WP_OPTION_GDM_SEND_REFUNDS', 'gdm-send-refunds' );
 

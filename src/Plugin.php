@@ -122,9 +122,9 @@ final class Plugin {
 					new Modules\GoogleDataManager\DestinationHealth()
 				) )->register_routes();
 
-				// Guest-facing, so it exists only while capture is on. Gated on the
-				// option alone: the callback resolves the platform per request.
-				if ( $this->options->get( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION ) ) {
+				// Guest-facing, so it exists only while capture runs. Gated on the
+				// options alone: the callback resolves the platform per request.
+				if ( Modules\GoogleDataManager\GoogleDataManagerModule::capture_enabled( $this->options ) ) {
 					( new Modules\GoogleDataManager\BackfillEndpoint() )->register_routes();
 				}
 

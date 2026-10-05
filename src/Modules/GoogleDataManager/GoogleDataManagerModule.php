@@ -12,6 +12,7 @@ namespace GTM4WP\Modules\GoogleDataManager;
 
 use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Module\AbstractModule;
+use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,6 +33,30 @@ final class GoogleDataManagerModule extends AbstractModule {
 	public const ID = 'google-data-manager';
 
 	/**
+	 * The send lanes. Attribution capture has no switch of its own: it runs
+	 * while any lane is on, since a lane cannot work without it. A new lane
+	 * joins this list.
+	 */
+	public const SEND_LANES = array( GTM4WP_OPTION_GDM_SEND_REFUNDS );
+
+	/**
+	 * Whether attribution capture runs: any send lane on. The one definition
+	 * behind the frontend hooks, the backfill route and Site Health.
+	 *
+	 * @param Options $options Plugin options.
+	 * @return bool
+	 */
+	public static function capture_enabled( Options $options ): bool {
+		foreach ( self::SEND_LANES as $lane ) {
+			if ( $options->get( $lane ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Module id.
 	 *
 	 * @return string
@@ -48,23 +73,22 @@ final class GoogleDataManagerModule extends AbstractModule {
 	 */
 	public function defaults(): array {
 		return array(
-			GTM4WP_OPTION_GDM_DESTINATIONS        => array(),
-			GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false,
-			GTM4WP_OPTION_GDM_CONSENT_POLICY      => ConsentPolicy::POLICY_EEA_ONLY,
-			GTM4WP_OPTION_GDM_SEND_REFUNDS        => false,
+			GTM4WP_OPTION_GDM_DESTINATIONS   => array(),
+			GTM4WP_OPTION_GDM_CONSENT_POLICY => ConsentPolicy::POLICY_EEA_ONLY,
+			GTM4WP_OPTION_GDM_SEND_REFUNDS   => false,
 		);
 	}
 
 	/**
-	 * Registers the attribution capture when it is on AND can work: a commerce
-	 * platform and at least one destination. depends_on only greys the admin
-	 * checkbox; a destination deleted after saving leaves capture on with
-	 * nothing to ask for.
+	 * Registers the attribution capture when a send lane is on AND it can
+	 * work: a commerce platform and at least one destination. depends_on only
+	 * greys the admin checkbox; a destination deleted after saving leaves a
+	 * lane on with nothing to ask for.
 	 *
 	 * @return void
 	 */
 	protected function register_frontend_hooks(): void {
-		if ( ! $this->opt( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION ) ) {
+		if ( null === $this->options || ! self::capture_enabled( $this->options ) ) {
 			return;
 		}
 

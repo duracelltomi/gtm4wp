@@ -86,7 +86,7 @@ final class SiteHealth {
 			);
 		}
 
-		if ( $this->options->get( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION ) && $this->stats->is_failing() ) {
+		if ( GoogleDataManagerModule::capture_enabled( $this->options ) && $this->stats->is_failing() ) {
 			$record = $this->stats->get();
 
 			return $this->problem(
@@ -126,7 +126,7 @@ final class SiteHealth {
 		);
 
 		$fields = array(
-			'capture_attribution' => SiteHealthRows::on_off( __( 'Attribution capture', 'duracelltomi-google-tag-manager' ), (bool) $this->options->get( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION ) ),
+			'capture_attribution' => SiteHealthRows::on_off( __( 'Attribution capture', 'duracelltomi-google-tag-manager' ), GoogleDataManagerModule::capture_enabled( $this->options ) ),
 			'send_refunds'        => SiteHealthRows::on_off( __( 'Refund sending', 'duracelltomi-google-tag-manager' ), (bool) $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ),
 			'consent_policy'      => SiteHealthRows::text( __( 'Consent requirement', 'duracelltomi-google-tag-manager' ), (string) $this->options->get( GTM4WP_OPTION_GDM_CONSENT_POLICY ) ),
 			'capture_rate'        => SiteHealthRows::text(

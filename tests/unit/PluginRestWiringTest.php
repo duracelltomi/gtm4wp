@@ -284,7 +284,7 @@ final class PluginRestWiringTest extends TestCase {
 	 */
 	public function test_the_backfill_route_is_registered_only_while_capture_is_on(): void {
 		$this->run_rest_api_init(
-			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true ) )
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) )
 		);
 
 		$this->assertNotSame(
@@ -327,7 +327,7 @@ final class PluginRestWiringTest extends TestCase {
 	 * turned off again.
 	 */
 	public function test_the_privacy_wiring_does_not_depend_on_the_capture_setting(): void {
-		$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false ) );
+		$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) );
 
 		$this->assertNotFalse(
 			has_filter( 'wp_privacy_personal_data_erasers', 'GTM4WP\Modules\GoogleDataManager\PrivacyData->register_eraser()' )

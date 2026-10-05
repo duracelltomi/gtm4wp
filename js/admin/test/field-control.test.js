@@ -316,9 +316,9 @@ describe( 'FieldControl dependencies and annotations', () => {
 	it( 'disables a checkbox whose table dependency has been emptied', () => {
 		renderField(
 			{
-				key: 'gdm-capture-attribution',
+				key: 'gdm-send-refunds',
 				type: 'checkbox',
-				label: 'Store attribution data with each order',
+				label: 'Send refunds to Google Analytics',
 				depends_on: 'gdm-destinations',
 			},
 			{ value: false, values: { 'gdm-destinations': [] } }
@@ -330,9 +330,9 @@ describe( 'FieldControl dependencies and annotations', () => {
 	it( 'enables it again once the table holds a row', () => {
 		renderField(
 			{
-				key: 'gdm-capture-attribution',
+				key: 'gdm-send-refunds',
 				type: 'checkbox',
-				label: 'Store attribution data with each order',
+				label: 'Send refunds to Google Analytics',
 				depends_on: 'gdm-destinations',
 			},
 			{
@@ -357,9 +357,9 @@ describe( 'FieldControl dependencies and annotations', () => {
 	it( 'says a setting stored as on is not in effect, naming what it needs', () => {
 		renderField(
 			{
-				key: 'gdm-capture-attribution',
+				key: 'gdm-send-refunds',
 				type: 'checkbox',
-				label: 'Store attribution data with each order',
+				label: 'Send refunds to Google Analytics',
 				depends_on: 'gdm-destinations',
 			},
 			{
@@ -386,9 +386,9 @@ describe( 'FieldControl dependencies and annotations', () => {
 	it( 'tells an off setting what to set first', () => {
 		renderField(
 			{
-				key: 'gdm-capture-attribution',
+				key: 'gdm-send-refunds',
 				type: 'checkbox',
-				label: 'Store attribution data with each order',
+				label: 'Send refunds to Google Analytics',
 				depends_on: 'gdm-destinations',
 			},
 			{
@@ -413,9 +413,9 @@ describe( 'FieldControl dependencies and annotations', () => {
 	it( 'explains nothing while the dependency is satisfied', () => {
 		renderField(
 			{
-				key: 'gdm-capture-attribution',
+				key: 'gdm-send-refunds',
 				type: 'checkbox',
-				label: 'Store attribution data with each order',
+				label: 'Send refunds to Google Analytics',
 				depends_on: 'gdm-destinations',
 			},
 			{

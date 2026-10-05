@@ -111,51 +111,43 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 	}
 
 	/**
-	 * Capture is off by default and, per the capture design, needs a
-	 * destination to read a measurement ID from - so the checkbox declares the
-	 * dependency to the admin UI. That declaration only greys the control; the
-	 * module guards the value itself at hook-registration time.
+	 * Capture has no switch of its own: the only thing it is for is a send
+	 * lane, so it runs while one is on (GoogleDataManagerModule::capture_enabled()).
+	 * Two tabs remain, and no field may come back under the old key.
 	 */
-	public function test_the_capture_field_is_an_experimental_checkbox_depending_on_the_destinations(): void {
-		$field = $this->field_by_key( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION );
+	public function test_there_is_no_capture_switch_and_no_capture_tab(): void {
+		$schema = new AdminSchema();
 
-		$this->assertSame( Field::TYPE_CHECKBOX, $field->type );
-		$this->assertFalse( $field->default_value, 'Capture starts off: it is part of the first data-leaves-the-site feature.' );
-		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
-		$this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $field->depends_on );
-
-		// Declaring the dependency is only half of it: what the string MEANS is
-		// implemented in js/admin/utils.js, and this is the first dependency in
-		// the plugin to name a table rather than a checkbox. The value shape it
-		// therefore has to handle - an empty array - is pinned on the JS side
-		// by `utils.test.js`, because an empty array is truthy there and the
-		// control silently stayed enabled without it (TS-19).
-		$this->assertSame(
-			Field::TYPE_TABLE,
-			$this->field_by_key( $field->depends_on )->type,
-			'A dependency on a table is the case the client-side helper had to learn.'
-		);
+		$this->assertSame( array( AdminSchema::GROUP_DESTINATIONS, AdminSchema::GROUP_SENDING ), array_keys( $schema->groups() ) );
+		$this->assertNotContains( 'gdm-capture-attribution', array_map( static fn ( $field ) => $field->key, $schema->fields() ) );
 	}
 
 	/**
-	 * The send lane's switch: off by default (data leaves the site), still
-	 * experimental (the first-refund-only observation is open with Google),
-	 * and dependent on capture - without a stored client id every refund would
-	 * be skipped for want of an identifier (T94g).
+	 * The send lane's switch: off by default (data leaves the site, and it
+	 * starts the capture cookies), still experimental, and dependent on the
+	 * destinations table it sends to and capture asks about.
 	 */
-	public function test_the_send_refunds_field_is_an_experimental_checkbox_depending_on_capture(): void {
+	public function test_the_send_refunds_field_is_an_experimental_checkbox_depending_on_the_destinations(): void {
 		$field = $this->field_by_key( GTM4WP_OPTION_GDM_SEND_REFUNDS );
 
 		$this->assertSame( Field::TYPE_CHECKBOX, $field->type );
 		$this->assertFalse( $field->default_value, 'Sending starts off: nothing leaves the site until the admin says so.' );
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
-		$this->assertSame( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION, $field->depends_on );
+		$this->assertSame( GTM4WP_OPTION_GDM_DESTINATIONS, $field->depends_on );
 		$this->assertSame( AdminSchema::GROUP_SENDING, $field->group );
+
+		// The first dependency in the plugin to name a table rather than a
+		// checkbox; the empty-array case is pinned in `utils.test.js` (TS-19).
+		$this->assertSame( Field::TYPE_TABLE, $this->field_by_key( $field->depends_on )->type );
+
+		// Turning this on now starts the capture, so it carries the cookie notice.
+		$this->assertStringContainsString( 'gtm4wp_gdm_ids', $field->description );
+		$this->assertStringContainsString( 'gtm4wp_gdm_consent', $field->description );
 	}
 
 	/**
 	 * The consent policy is the field description's promise in code: three
-	 * choices, defaulting to the region gate.
+	 * choices, defaulting to the region gate, on the sending tab.
 	 */
 	public function test_the_consent_policy_field_offers_exactly_the_three_policies(): void {
 		$field = $this->field_by_key( GTM4WP_OPTION_GDM_CONSENT_POLICY );
@@ -164,10 +156,11 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 		$this->assertSame( ConsentPolicy::POLICY_EEA_ONLY, $field->default_value );
 		$this->assertSame( Field::PHASE_EXPERIMENTAL, $field->phase );
 		$this->assertSame( ConsentPolicy::policies(), array_keys( $field->choices ) );
+		$this->assertSame( AdminSchema::GROUP_SENDING, $field->group );
 		$this->assertSame(
-			GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
+			implode( ',', GoogleDataManagerModule::SEND_LANES ),
 			$field->depends_on,
-			'The gate reads a consent state that only exists once capture stores one.'
+			'The gate decides on sends, so it is live while any lane is on.'
 		);
 	}
 

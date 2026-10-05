@@ -561,7 +561,7 @@ describe( 'ModulePanel custom panels', () => {
 
 	/**
 	 * A two-tab google-data-manager: the destinations table in one group, the
-	 * attribution-capture settings in another, and the test panel naming the
+	 * send settings in another, and the test panel naming the
 	 * group it belongs to.
 	 *
 	 * @param {string} panelGroup Group the panel declares, '' for none.
@@ -589,21 +589,17 @@ describe( 'ModulePanel custom panels', () => {
 				},
 				groups: [
 					{ id: 'destinations', label: 'Destinations' },
-					{ id: 'attribution', label: 'Attribution capture' },
+					{ id: 'sending', label: 'Sending events' },
 				],
 				fields: [
 					field( 'other-option', 'destinations', 'Field A' ),
-					field(
-						'gdm-capture-attribution',
-						'attribution',
-						'Capture'
-					),
+					field( 'gdm-send-refunds', 'sending', 'Send refunds' ),
 				],
 			},
 			{
 				values: {
 					'other-option': '',
-					'gdm-capture-attribution': '',
+					'gdm-send-refunds': '',
 					'gdm-destinations': [
 						{
 							label: 'Prod',
@@ -621,7 +617,7 @@ describe( 'ModulePanel custom panels', () => {
 	/**
 	 * Once a module has tabs, "below the fields" stops being a place: the panel
 	 * would sit under whichever tab happened to be open, so a Test button for
-	 * destinations appeared under the attribution-capture tab and read as a
+	 * destinations appeared under another tab and read as a
 	 * control belonging to it.
 	 */
 	it( 'keeps a grouped panel inside its own tab', () => {
@@ -633,10 +629,10 @@ describe( 'ModulePanel custom panels', () => {
 		).toBeInTheDocument();
 
 		fireEvent.click(
-			screen.getByRole( 'tab', { name: 'Attribution capture' } )
+			screen.getByRole( 'tab', { name: 'Sending events' } )
 		);
 
-		expect( screen.getByLabelText( 'Capture' ) ).toBeInTheDocument();
+		expect( screen.getByLabelText( 'Send refunds' ) ).toBeInTheDocument();
 		expect(
 			screen.queryByRole( 'button', { name: 'Test Prod' } )
 		).not.toBeInTheDocument();
@@ -661,7 +657,7 @@ describe( 'ModulePanel custom panels', () => {
 		).toBeInTheDocument();
 
 		fireEvent.click(
-			screen.getByRole( 'tab', { name: 'Attribution capture' } )
+			screen.getByRole( 'tab', { name: 'Sending events' } )
 		);
 
 		expect(
@@ -683,7 +679,7 @@ describe( 'ModulePanel custom panels', () => {
 		).toBeInTheDocument();
 
 		fireEvent.click(
-			screen.getByRole( 'tab', { name: 'Attribution capture' } )
+			screen.getByRole( 'tab', { name: 'Sending events' } )
 		);
 
 		expect(

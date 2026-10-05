@@ -136,11 +136,30 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 	// ---- Hook registration -------------------------------------------------
 
+	/**
+	 * Capture has no switch of its own: it runs while any send lane is on,
+	 * and every lane is in SEND_LANES so a new one cannot forget it.
+	 */
+	public function test_capture_runs_exactly_while_a_send_lane_is_on(): void {
+		$this->assertSame( array( GTM4WP_OPTION_GDM_SEND_REFUNDS ), GoogleDataManagerModule::SEND_LANES );
+
+		$defaults = ( new GoogleDataManagerModule() )->defaults();
+
+		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) );
+		$this->assertTrue( GoogleDataManagerModule::capture_enabled( new Options( $defaults ) ) );
+
+		Functions\when( 'get_option' )->justReturn( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) );
+		$this->assertFalse( GoogleDataManagerModule::capture_enabled( new Options( $defaults ) ) );
+
+		Functions\when( 'get_option' )->justReturn( array() );
+		$this->assertFalse( GoogleDataManagerModule::capture_enabled( new Options( $defaults ) ), 'Off by default.' );
+	}
+
 	public function test_no_capture_hook_while_the_option_is_off(): void {
 		$this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => false,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -160,8 +179,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 		$this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -179,8 +198,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -206,8 +225,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 		$this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -224,8 +243,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 		$this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => false,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => false,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -247,8 +266,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 		$this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -266,8 +285,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_the_config_carries_the_measurement_ids_and_the_cookie_contract(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array(
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array(
 					self::row(),
 					self::row( array( DestinationRows::COLUMN_MEASUREMENT => 'G-SECOND' ) ),
 				),
@@ -298,8 +317,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_the_config_is_printed_as_a_window_property(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -322,8 +341,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_a_measurement_id_injected_through_the_filter_is_dropped(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -363,8 +382,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -398,8 +417,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_the_backfill_flag_reaches_the_printed_config(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -413,8 +432,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_no_backfill_flag_away_from_a_confirmation_page(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -458,8 +477,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_nothing_is_enqueued_without_a_usable_destination(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array(),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array(),
 			)
 		);
 
@@ -478,8 +497,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_a_non_analytics_destination_contributes_no_measurement_id(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 
@@ -505,8 +524,8 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	public function test_duplicate_measurement_ids_are_asked_about_once(): void {
 		$module = $this->module(
 			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_DESTINATIONS        => array( self::row() ),
+				GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+				GTM4WP_OPTION_GDM_DESTINATIONS => array( self::row() ),
 			)
 		);
 

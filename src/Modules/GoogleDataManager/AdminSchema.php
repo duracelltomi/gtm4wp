@@ -55,11 +55,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	public const GROUP_DESTINATIONS = 'destinations';
 
 	/**
-	 * Accordion group of the attribution-capture settings.
-	 */
-	public const GROUP_ATTRIBUTION = 'attribution';
-
-	/**
 	 * Accordion group of the server-side send lanes.
 	 */
 	public const GROUP_SENDING = 'sending';
@@ -110,7 +105,6 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	public function groups(): array {
 		return array(
 			self::GROUP_DESTINATIONS => __( 'Destinations', 'duracelltomi-google-tag-manager' ),
-			self::GROUP_ATTRIBUTION  => __( 'Attribution capture', 'duracelltomi-google-tag-manager' ),
 			self::GROUP_SENDING      => __( 'Sending events', 'duracelltomi-google-tag-manager' ),
 		);
 	}
@@ -178,15 +172,15 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				doc: self::DOC_PAGE
 			),
 			new Field(
-				key: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
+				key: GTM4WP_OPTION_GDM_SEND_REFUNDS,
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
-				label: __( 'Store attribution data with each order', 'duracelltomi-google-tag-manager' ),
+				label: __( 'Send refunds to Google Analytics', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Stores the Google Analytics client and session IDs, the Google Ads click IDs (gclid, gbraid, wbraid) of the visit and the consent state with every new order, so that events sent later from the server - a refund, for example - can be matched to the original purchase in Google Analytics. The IDs are read through the official Google tag API, so this needs at least one destination on the Destinations tab whose measurement ID belongs to a Google Analytics 4 tag that actually fires in your container: without that the browser never answers and nothing is stored. Turning this on loads a small script on every page of the site and writes two first-party cookies (gtm4wp_gdm_ids and gtm4wp_gdm_consent, 90 days) in every visitor\'s browser, not only for those who reach the checkout - the second one records the visitor\'s consent answer and is written even when that answer is no, because it is what the consent rule below is then read against. Mention both in your cookie notice. The stored values are written into the order and are never shown on the site.',
+					'Sends a refund event to every destination on the Destinations tab whenever a refund is issued in your store, so that Google Analytics stops counting revenue you have given back. This is the signal browser-side tracking can never report: a refund happens in the store admin, where no tag fires. Every refund reports its own amount, the items it covers and the shipping and tax it returned. To match a refund to its purchase, turning this on also stores with every new order the Google Analytics client and session IDs, the Google Ads click IDs (gclid, gbraid, wbraid) of the visit and the consent state, so only refunds of orders placed after that can be sent. The IDs are read through the official Google tag API: a Google Analytics 4 tag for a destination\'s measurement ID has to fire in your container, or nothing is stored. This loads a small script on every page of the site and writes two first-party cookies (gtm4wp_gdm_ids and gtm4wp_gdm_consent, 90 days) in every visitor\'s browser - the second records the consent answer, even a no, because the consent rule below is read against it. Mention both in your cookie notice. The stored values are written into the order and never shown on the site. Known limitation of Google Analytics data processing itself, reported to Google: when one order is refunded in several steps, Google Analytics processes only the first of them, although it accepts every one; each step is still sent, so no plugin update is needed once Google fixes this. Sending happens in the background a minute after the refund, and the Recent sends list below the destinations table shows what became of each one.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: self::GROUP_ATTRIBUTION,
+				group: self::GROUP_SENDING,
 				phase: Field::PHASE_EXPERIMENTAL,
 				depends_on: GTM4WP_OPTION_GDM_DESTINATIONS,
 				doc: self::DOC_PAGE
@@ -200,26 +194,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 					'Decides for which orders the stored consent state has to allow analytics storage before anything about them is sent to Google. The billing country of the order decides the region, which is more reliable than guessing from the visitor\'s IP address. Choosing "Never" means you assert your own lawful basis for the transfer, so the plugin sends whatever it holds regardless of the stored answer - pick it only if that is a decision you have made deliberately. It governs sending, not collecting, and there is one thing it cannot do: an order whose buyer refused analytics storage has no client ID stored at all, because the browser was never allowed to keep one, so nothing can be sent for it under any rule here. Where this setting does make the difference is an order whose consent answer was never recorded - a visitor who ordered before your banner loaded, or a site running no consent tool at all.',
 					'duracelltomi-google-tag-manager'
 				),
-				group: self::GROUP_ATTRIBUTION,
-				phase: Field::PHASE_EXPERIMENTAL,
-				choices: self::consent_policy_choices(),
-				// With capture off nothing is ever stored for this gate to decide on.
-				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
-				doc: self::DOC_PAGE
-			),
-			new Field(
-				key: GTM4WP_OPTION_GDM_SEND_REFUNDS,
-				type: Field::TYPE_CHECKBOX,
-				default_value: false,
-				label: __( 'Send refunds to Google Analytics', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__(
-					'Sends a refund event to every destination on the Destinations tab whenever a refund is issued in your store, so that Google Analytics stops counting revenue you have given back. This is the signal browser-side tracking can never report: a refund happens in the store admin, where no page is loaded and no tag fires. Every refund reports its own amount, the items it covers and the shipping and tax it returned, whether it returns a single line or the whole order. Known limitation of Google Analytics data processing itself, reported to Google: when one order is refunded in several steps, Google Analytics processes only the first of them, although it accepts and confirms every one. Each step is still sent, so no plugin update is needed once Google fixes this. Nothing is sent for an order that attribution capture stored no client ID for, or where the consent rule on the Attribution capture tab does not allow it - the Recent sends list below the destinations table shows the reason in each case. Sending happens in the background a minute after the refund, so issuing one is never slowed down by it.',
-					'duracelltomi-google-tag-manager'
-				),
 				group: self::GROUP_SENDING,
 				phase: Field::PHASE_EXPERIMENTAL,
-				// Without capture every refund is skipped for want of a client id.
-				depends_on: GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION,
+				choices: self::consent_policy_choices(),
+				// With every lane off nothing is captured or sent for this gate to decide on.
+				depends_on: implode( ',', GoogleDataManagerModule::SEND_LANES ),
 				doc: self::DOC_PAGE
 			),
 		);
@@ -457,8 +436,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'logPath'       => RestCors::REST_NAMESPACE . RestController::LOG_ROUTE,
 			'replayPath'    => RestCors::REST_NAMESPACE . RestController::REPLAY_ROUTE,
 			// The send lanes, so the panel can tell "waiting for the first send"
-			// from "nothing is turned on". A new lane joins this list.
-			'sendKeys'      => array( GTM4WP_OPTION_GDM_SEND_REFUNDS ),
+			// from "nothing is turned on".
+			'sendKeys'      => GoogleDataManagerModule::SEND_LANES,
 			'columnChoices' => array(
 				GTM4WP_OPTION_GDM_DESTINATIONS => array(
 					DestinationRows::COLUMN_ACCOUNT => $accounts,

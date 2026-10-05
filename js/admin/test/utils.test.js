@@ -322,7 +322,7 @@ describe( 'isFieldDisabled', () => {
 describe( 'dependencyLabel', () => {
 	const FIELDS = [
 		{ key: 'gdm-destinations', label: 'Data Manager destinations' },
-		{ key: 'gdm-capture-attribution', label: 'Store attribution data' },
+		{ key: 'gdm-send-refunds', label: 'Send refunds to Google Analytics' },
 	];
 
 	/**
@@ -334,7 +334,7 @@ describe( 'dependencyLabel', () => {
 		expect(
 			dependencyLabel(
 				{
-					key: 'gdm-capture-attribution',
+					key: 'gdm-send-refunds',
 					depends_on: 'gdm-destinations',
 				},
 				FIELDS

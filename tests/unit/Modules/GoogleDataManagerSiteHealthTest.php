@@ -159,7 +159,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$this->stats->record( false );
 		$this->stats->record( false );
 
-		$result = $this->site_health( array( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true ) )->run_test();
+		$result = $this->site_health( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) )->run_test();
 
 		$this->assertSame( 'recommended', $result['status'] );
 		$this->assertStringContainsString( '2', $result['description'] );
@@ -170,7 +170,7 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 		$this->stats->record( false );
 		$this->stats->record( true );
 
-		$this->assertSame( 'good', $this->site_health( array( GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true ) )->run_test()['status'] );
+		$this->assertSame( 'good', $this->site_health( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) )->run_test()['status'] );
 	}
 
 	public function test_the_capture_rate_is_not_reported_while_capture_is_off(): void {
@@ -186,16 +186,16 @@ final class GoogleDataManagerSiteHealthTest extends TestCase {
 	// ---- The rows: what they say -------------------------------------------
 
 	public function test_the_rows_state_which_features_are_on(): void {
-		$fields = $this->site_health(
-			array(
-				GTM4WP_OPTION_GDM_CAPTURE_ATTRIBUTION => true,
-				GTM4WP_OPTION_GDM_SEND_REFUNDS        => false,
-			)
-		)->debug_fields();
+		$fields = $this->site_health( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) )->debug_fields();
 
-		$this->assertSame( 'on', $fields['capture_attribution']['debug'] );
-		$this->assertSame( 'off', $fields['send_refunds']['debug'] );
+		$this->assertSame( 'on', $fields['send_refunds']['debug'] );
+		$this->assertSame( 'on', $fields['capture_attribution']['debug'], 'Capture runs while a send lane is on.' );
 		$this->assertSame( 'eea-only', $fields['consent_policy']['value'] );
+
+		$fields = $this->site_health( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) )->debug_fields();
+
+		$this->assertSame( 'off', $fields['send_refunds']['debug'] );
+		$this->assertSame( 'off', $fields['capture_attribution']['debug'] );
 	}
 
 	public function test_a_destination_is_described_by_label_stream_and_health(): void {
