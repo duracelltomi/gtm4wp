@@ -378,7 +378,7 @@ final class EddReliablePurchaseTest extends TestCase {
 		$response = $this->make()->confirm_purchase_tracked();
 
 		$this->assertSame( 204, $response->get_status() );
-		$this->assertSame( array( array( 77, DownloadData::ORDER_TRACKED_META, 1 ) ), $this->meta_writes );
+		$this->assertSame( array( array( 77, \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, 1 ) ), $this->meta_writes );
 		$this->assertSame( array( array( 'payment_key', self::SESSION_KEY ) ), $this->order_lookups );
 	}
 

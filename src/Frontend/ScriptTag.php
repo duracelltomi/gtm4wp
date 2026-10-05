@@ -67,7 +67,8 @@ final class ScriptTag {
 	/**
 	 * A float as a JavaScript number literal, `null` when not finite: PHP prints
 	 * INF/NAN as bare identifiers, a ReferenceError in JS (RI-21, #339). Not
-	 * json_literal(): serialize_precision=-1 turns 0.15 into 0.15000000000000002.
+	 * json_literal(): (string) keeps the previous (float) output, rounded to
+	 * precision=14, where json_encode prints 0.1+0.05 as 0.15000000000000002.
 	 *
 	 * @param float $value The number.
 	 * @return string A JavaScript literal.

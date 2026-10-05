@@ -83,7 +83,7 @@ final class ContainerRows {
 	/**
 	 * The environment type when "only output on production environments"
 	 * suppresses the container on this install, '' otherwise. One definition
-	 * for the sink, the option description and the status report (#343, PA-2).
+	 * for the sink, the option description and the status report (#343, #363, PA-2).
 	 *
 	 * @param mixed $production_only The stored option value.
 	 * @return string

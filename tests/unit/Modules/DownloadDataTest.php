@@ -849,9 +849,10 @@ final class DownloadDataTest extends TestCase {
 	}
 
 	public function test_flag_order_tracked_writes_the_meta(): void {
+		// The literal, not the constant: store owners see this key, shared with WC (#364).
 		Functions\expect( 'edd_update_order_meta' )
 			->once()
-			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+			->with( 77, '_ga_tracked', 1 );
 
 		$this->make_download_data()->flag_order_tracked( $this->make_order() );
 	}

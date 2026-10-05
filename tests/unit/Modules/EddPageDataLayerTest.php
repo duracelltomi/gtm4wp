@@ -670,7 +670,7 @@ final class EddPageDataLayerTest extends TestCase {
 			->andReturn( $order );
 		Functions\expect( 'edd_update_order_meta' )
 			->once()
-			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+			->with( 77, EcommerceHelpers::ORDER_TRACKED_META, 1 );
 
 		$data_layer = $this->make_page_datalayer()->add_datalayer_data( array() );
 
@@ -694,7 +694,7 @@ final class EddPageDataLayerTest extends TestCase {
 			->andReturn( $this->make_order() );
 		Functions\expect( 'edd_update_order_meta' )
 			->once()
-			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+			->with( 77, EcommerceHelpers::ORDER_TRACKED_META, 1 );
 
 		$data_layer = $this->make_page_datalayer(
 			array(
@@ -914,7 +914,7 @@ final class EddPageDataLayerTest extends TestCase {
 
 		Functions\expect( 'edd_update_order_meta' )
 			->once()
-			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+			->with( 77, EcommerceHelpers::ORDER_TRACKED_META, 1 );
 
 		$this->make_page_datalayer(
 			array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true )
@@ -1017,7 +1017,7 @@ final class EddPageDataLayerTest extends TestCase {
 			->andReturn( $order );
 		Functions\expect( 'edd_update_order_meta' )
 			->once()
-			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+			->with( 77, EcommerceHelpers::ORDER_TRACKED_META, 1 );
 
 		$this->make_page_datalayer()->add_datalayer_data( array() );
 
@@ -1079,7 +1079,7 @@ final class EddPageDataLayerTest extends TestCase {
 			->andReturn( $order );
 		Functions\expect( 'edd_update_order_meta' )
 			->once()
-			->with( 77, DownloadData::ORDER_TRACKED_META, 1 );
+			->with( 77, EcommerceHelpers::ORDER_TRACKED_META, 1 );
 
 		$this->make_page_datalayer()->add_datalayer_data( array() );
 

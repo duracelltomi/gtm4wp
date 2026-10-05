@@ -37,7 +37,7 @@ final class RequestOrigin {
 	 *
 	 * @return bool
 	 */
-	public static function is_same_origin_request(): bool {
+	private static function is_same_origin_request(): bool {
 		$site = wp_parse_url( home_url() );
 
 		if ( ! is_array( $site ) || empty( $site['host'] ) ) {
@@ -133,7 +133,7 @@ final class RequestOrigin {
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return bool
 	 */
-	public static function has_rest_nonce( \WP_REST_Request $request ): bool {
+	private static function has_rest_nonce( \WP_REST_Request $request ): bool {
 		$nonce = $request->get_header( 'X-WP-Nonce' );
 
 		if ( ! is_string( $nonce ) || '' === $nonce ) {

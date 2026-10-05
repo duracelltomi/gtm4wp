@@ -65,11 +65,6 @@ final class ProductData {
 	public const ORDER_TRACKED_COOKIE = \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_COOKIE;
 
 	/**
-	 * The order meta key flagging an order as tracked, shared with EDD (#350).
-	 */
-	public const ORDER_TRACKED_META = \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META;
-
-	/**
 	 * The process_product() contexts built on never-cached pages/requests, where
 	 * the list attribution cookie may be merged server-side. Product detail / list are
 	 * excluded on purpose and enriched client-side instead (#405): the view_item
@@ -126,13 +121,14 @@ final class ProductData {
 	 * The item's stock status. A Product Bundles bundle whose contents are out of
 	 * stock is `outofstock` even when its own status says otherwise (#474). The
 	 * getter is inferred from the documented `bundled_items_stock_status`
-	 * property, so it is guarded (UC-2, U172).
+	 * property, so it is guarded (UC-2, U172). A non-string from a filter on the
+	 * getter becomes '': a cast would still be fatal on an object (RI-39, #362).
 	 *
 	 * @param \WC_Product $product      The product.
 	 * @param string      $product_type The product type.
 	 * @return string
 	 */
-	private function stock_status( \WC_Product $product, string $product_type ) {
+	private function stock_status( \WC_Product $product, string $product_type ): string {
 		if (
 			'bundle' === $product_type
 			&& method_exists( $product, 'get_bundled_items_stock_status' )
@@ -141,7 +137,9 @@ final class ProductData {
 			return 'outofstock';
 		}
 
-		return $product->get_stock_status();
+		$status = $product->get_stock_status();
+
+		return is_string( $status ) ? $status : '';
 	}
 
 	/**
@@ -792,7 +790,7 @@ final class ProductData {
 			return false;
 		}
 
-		if ( 1 === (int) $order->get_meta( self::ORDER_TRACKED_META, true ) ) {
+		if ( 1 === (int) $order->get_meta( \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, true ) ) {
 			return true;
 		}
 
@@ -940,7 +938,7 @@ final class ProductData {
 			return;
 		}
 
-		$order->update_meta_data( self::ORDER_TRACKED_META, 1 );
+		$order->update_meta_data( \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, 1 );
 		$order->save();
 	}
 

@@ -136,7 +136,7 @@ final class SettingsAbilities implements ProviderInterface {
 									'rows_locked' => array( 'type' => 'boolean' ),
 									'unavailable' => array(
 										'type'        => 'string',
-										'description' => __( 'Why the option cannot take effect on this site (a required plugin is missing); empty when it can. Informational: a value is stored either way.', 'duracelltomi-google-tag-manager' ),
+										'description' => __( 'Why the option may not take effect on this site (a required plugin looks missing); empty when nothing is missing. Informational: a value is stored either way.', 'duracelltomi-google-tag-manager' ),
 									),
 									'doc_url'     => array( 'type' => 'string' ),
 								),

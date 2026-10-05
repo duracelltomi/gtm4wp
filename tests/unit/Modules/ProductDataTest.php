@@ -521,6 +521,36 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'instock', $item['stockstatus'] );
 	}
 
+	/**
+	 * Non-string stock statuses a third-party getter filter could return.
+	 *
+	 * @return array<string, array{mixed}>
+	 */
+	public static function non_string_stock_statuses(): array {
+		return array(
+			'null'   => array( null ),
+			'object' => array( new \stdClass() ),
+			'array'  => array( array( 'instock' ) ),
+		);
+	}
+
+	/**
+	 * #362/RI-39: stock_status() is typed string; a filtered non-string must be
+	 * neither a TypeError nor a cast ("Array", or an Error on an object).
+	 *
+	 * @param mixed $status The getter's return value.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'non_string_stock_statuses' )]
+	public function test_non_string_stock_status_becomes_empty( $status ): void {
+		$item = $this->make_product_data()->process_product(
+			$this->make_product( array( 'stock_status' => $status ) ),
+			array(),
+			'productdetail'
+		);
+
+		$this->assertSame( '', $item['stockstatus'] );
+	}
+
 	public function test_affiliation_absent_by_default(): void {
 		// #348: item-level affiliation is empty by default (WooCommerce has no native
 		// value), so the item carries no affiliation key unless a filter supplies one.

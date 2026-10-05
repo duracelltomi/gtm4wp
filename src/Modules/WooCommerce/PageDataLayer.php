@@ -565,8 +565,9 @@ final class PageDataLayer {
 
 		// Replaces the deprecated wc_enqueue_js() (WooCommerce 10.4, PA-8). An inline
 		// script can only attach while its handle is pending; this runs from wp_head
-		// priority 10 (2 with load-early), after wp_print_head_scripts() (9), so a site that filters the
-		// tracker into the <head> already has the handle done and the attach would
+		// priority 10 (2 with load-early, where the handle is still pending), so only
+		// at 10 is it after wp_print_head_scripts() (9): a site that filters the
+		// tracker into the <head> then already has the handle done and the attach would
 		// silently drop the checkout data (add_shipping_info / add_payment_info with
 		// empty items). Print the block in the footer ourselves in that case. The
 		// wp_add_inline_script() return value is honoured per its documented contract.

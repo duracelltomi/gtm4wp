@@ -457,39 +457,75 @@ describe( 'FieldControl dependencies and annotations', () => {
 		expect( screen.queryByText( /not in effect/ ) ).not.toBeInTheDocument();
 	} );
 
-	it( 'disables an unavailable field and shows the server reason', () => {
+	/**
+	 * #361: the server's `unavailable` note is computed in wp-admin, where a
+	 * frontend-only resolution filter is invisible, so it is shown as a hedge
+	 * and never disables the control or claims the setting is not in effect.
+	 */
+	it( 'shows the server note on an unavailable field but leaves it enabled', () => {
 		renderField(
 			{
 				key: 'k',
 				type: 'checkbox',
 				label: 'Master language',
-				unavailable: 'Needs WPML or Polylang, and neither is active.',
+				unavailable: 'No WPML or Polylang detected.',
 			},
 			{ value: false }
 		);
 
-		expect( screen.getByRole( 'switch' ) ).toBeDisabled();
+		expect( screen.getByRole( 'switch' ) ).toBeEnabled();
 		expect(
-			screen.getByText( 'Needs WPML or Polylang, and neither is active.' )
+			screen.getByText( 'No WPML or Polylang detected.' )
 		).toBeInTheDocument();
 	} );
 
-	it( 'says an unavailable field stored as on is not in effect', () => {
+	it( 'lets an unavailable field stored as on be switched off, without "not in effect"', () => {
+		const { onChange } = renderField(
+			{
+				key: 'k',
+				type: 'checkbox',
+				label: 'Master language',
+				unavailable: 'No WPML or Polylang detected.',
+			},
+			{ value: true }
+		);
+
+		const toggle = screen.getByRole( 'switch' );
+		expect( toggle ).toBeChecked();
+		expect( toggle ).toBeEnabled();
+		expect( screen.queryByText( /not in effect/ ) ).not.toBeInTheDocument();
+		expect(
+			screen.getByText( 'No WPML or Polylang detected.' )
+		).toBeInTheDocument();
+
+		fireEvent.click( toggle );
+		expect( onChange ).toHaveBeenCalledWith( false );
+	} );
+
+	it( 'shows both the dependency note and the unavailable note', () => {
 		renderField(
 			{
 				key: 'k',
 				type: 'checkbox',
 				label: 'Master language',
-				unavailable: 'Needs WPML or Polylang, and neither is active.',
+				depends_on: 'parent',
+				unavailable: 'No WPML or Polylang detected.',
 			},
-			{ value: true }
+			{
+				value: false,
+				values: { parent: false },
+				allFields: [
+					{ key: 'parent', label: 'Parent', type: 'checkbox' },
+				],
+			}
 		);
 
-		expect( screen.getByRole( 'switch' ) ).toBeChecked();
+		expect( screen.getByRole( 'switch' ) ).toBeDisabled();
 		expect(
-			screen.getByText(
-				'Saved as on, but not in effect. Needs WPML or Polylang, and neither is active.'
-			)
+			screen.getByText( 'Available once Parent is set.' )
+		).toBeInTheDocument();
+		expect(
+			screen.getByText( 'No WPML or Polylang detected.' )
 		).toBeInTheDocument();
 	} );
 

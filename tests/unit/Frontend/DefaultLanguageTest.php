@@ -42,7 +42,12 @@ final class DefaultLanguageTest extends TestCase {
 	public function test_unavailable_reason_names_the_missing_plugins_when_nothing_can_resolve(): void {
 		Functions\stubTranslationFunctions();
 
-		$this->assertStringContainsString( 'WPML or Polylang', DefaultLanguage::unavailable_reason() );
+		$reason = DefaultLanguage::unavailable_reason();
+
+		$this->assertStringContainsString( 'WPML or Polylang', $reason );
+		// #361: a hedge, since a frontend-only filter is invisible in wp-admin.
+		$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $reason );
+		$this->assertStringNotContainsString( 'neither is active', $reason );
 	}
 
 	public function test_unavailable_reason_is_empty_with_wpml(): void {

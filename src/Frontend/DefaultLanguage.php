@@ -33,8 +33,9 @@ final class DefaultLanguage {
 
 	/**
 	 * Admin note for the master-language options: '' while WPML, Polylang or a
-	 * callback on the resolution filters can resolve ids, otherwise the reason
-	 * the option has no effect (rendered as a disabled control).
+	 * callback on the resolution filters is visible, otherwise a hedge. Only a
+	 * hedge: it runs in wp-admin, where a frontend-only callback is invisible
+	 * (RI-38, #361), so the control is never disabled on it.
 	 *
 	 * @return string
 	 */
@@ -43,7 +44,7 @@ final class DefaultLanguage {
 			return '';
 		}
 
-		return __( 'Needs WPML or Polylang, and neither is active.', 'duracelltomi-google-tag-manager' );
+		return __( 'No WPML or Polylang detected. Without one, this option only takes effect through the gtm4wp_master_language_post_id / gtm4wp_master_language_term_id filters.', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**

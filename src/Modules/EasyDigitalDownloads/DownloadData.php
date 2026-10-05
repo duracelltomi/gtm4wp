@@ -31,13 +31,6 @@ final class DownloadData {
 	public const CATEGORY_TAXONOMY = 'download_category';
 
 	/**
-	 * Order meta key that flags an order as already tracked. Deliberately the
-	 * same key the WooCommerce integration uses, so store owners find one
-	 * familiar flag regardless of the store plugin.
-	 */
-	public const ORDER_TRACKED_META = Helpers::ORDER_TRACKED_META;
-
-	/**
 	 * Statuses that end the reliable-purchase re-check: edd_get_payment_statuses()
 	 * (EDD 3.7.0) minus the waiting ones (U132, pinned by a test).
 	 *
@@ -871,7 +864,7 @@ final class DownloadData {
 
 		$order_id = (int) self::row_prop( $order, 'id', 0 );
 
-		if ( 1 === (int) edd_get_order_meta( $order_id, self::ORDER_TRACKED_META, true ) ) {
+		if ( 1 === (int) edd_get_order_meta( $order_id, Helpers::ORDER_TRACKED_META, true ) ) {
 			return true;
 		}
 
@@ -901,7 +894,7 @@ final class DownloadData {
 			return;
 		}
 
-		edd_update_order_meta( (int) self::row_prop( $order, 'id', 0 ), self::ORDER_TRACKED_META, 1 );
+		edd_update_order_meta( (int) self::row_prop( $order, 'id', 0 ), Helpers::ORDER_TRACKED_META, 1 );
 	}
 
 	/**

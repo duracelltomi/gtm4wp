@@ -160,22 +160,18 @@ function isValueSet( value ) {
 }
 
 /**
- * Whether a field's control is disabled: the server marked it `unavailable`,
- * or its `depends_on` option is off/empty (the whole-field twin of
- * TableControl's per-column handling).
+ * Whether a field's control is disabled because its `depends_on` option is
+ * off/empty (the whole-field twin of TableControl's per-column handling).
  * Admin affordance only: the module still guards at runtime, and the stored
- * value is greyed, never forced off.
+ * value is greyed, never forced off. A server `unavailable` note does NOT
+ * disable: it is computed in wp-admin and cannot see a frontend-only
+ * resolution filter (#361).
  *
  * @param {Object} field  Field description from the bootstrap data.
  * @param {Object} values Option key => current UI value map.
  * @return {boolean} True when the control must be disabled.
  */
 export function isFieldDisabled( field, values ) {
-	// The server says the option cannot take effect here (host plugin missing).
-	if ( field && field.unavailable ) {
-		return true;
-	}
-
 	const dependency = field && field.depends_on;
 
 	if ( ! dependency ) {

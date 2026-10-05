@@ -93,9 +93,9 @@ final class Field {
 	 *                                     WITHOUT a fragment: the anchor is always this field's $key
 	 *                                     (frozen public API), appended by Docs::url(). Empty renders no
 	 *                                     help icon.
-	 * @param string        $unavailable   Translated reason the option cannot take effect on this site
-	 *                                     (a host plugin is missing): the admin UI disables the control
-	 *                                     and shows it. Empty when available. UX only, like $depends_on.
+	 * @param string        $unavailable   Translated note that the option may not take effect on this
+	 *                                     site (a host plugin looks missing): the admin UI shows it but
+	 *                                     never disables the control on it (#361). Empty when available.
 	 */
 	public function __construct(
 		public string $key,
