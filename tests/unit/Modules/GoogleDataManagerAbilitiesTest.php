@@ -26,7 +26,7 @@ use GTM4WP\Tests\unit\Google\KeyFileFixture;
 /**
  * The gtm4wp/get-google-data-manager-log ability hands over the same rows the settings
  * screen lists, through the one shaping SendLog owns. Pinned: the order, the
- * two derived fields, the problems filter, the cap, the queue summary, and -
+ * three derived fields, the problems filter, the cap, the queue summary, and -
  * the property that matters most for a transcript - that a row carries the
  * stored allow-list of members and nothing else. Plus the hand-over: the
  * module's admin schema is how the Registrar finds this provider.
@@ -273,13 +273,13 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		$this->assertFalse( $result['entries'][1]['replayable'] );
 	}
 
-	public function test_a_row_carries_the_stored_members_and_the_two_derived_ones_only(): void {
+	public function test_a_row_carries_the_stored_members_and_the_three_derived_ones_only(): void {
 		$this->record( 'woocommerce:10:11', SendLog::OUTCOME_ACCEPTED );
 
 		$entry = $this->execute( Abilities::GET_LOG )['entries'][0];
 
 		$this->assertSame(
-			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone', 'replayable' ),
+			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone', 'replayable', 'waiting' ),
 			array_keys( $entry ),
 			'No token, no key material, no response body: the allow-list SendLog writes is the allow-list the ability reads.'
 		);

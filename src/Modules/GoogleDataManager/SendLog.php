@@ -63,6 +63,19 @@ final class SendLog {
 	public const OUTCOME_SKIPPED = 'skipped';
 
 	/**
+	 * Outcome: a replay queued the send and the background job has not run
+	 * yet. The job's own row supersedes it; one older than QUEUED_STALE_AFTER
+	 * is presumed lost (a stalled queue) and may be queued again.
+	 */
+	public const OUTCOME_QUEUED = 'queued';
+
+	/**
+	 * Seconds after which a queued row no longer blocks a replay; the queue
+	 * normally runs a job within a minute.
+	 */
+	public const QUEUED_STALE_AFTER = 900;
+
+	/**
 	 * Tone: nothing needs looking at - Google applied the event.
 	 */
 	public const TONE_OK = 'ok';
@@ -137,6 +150,32 @@ final class SendLog {
 	public function record( array $entry ): void {
 		$entries   = $this->read();
 		$entries[] = $this->clean_entry( $entry );
+
+		$this->write( self::trim( $entries ) );
+	}
+
+	/**
+	 * Records that a replay queued one refund: a row per destination named in
+	 * `only`, or one refund-level row when the whole refund was queued.
+	 *
+	 * @param string   $reference    The refund reference.
+	 * @param string[] $destinations The job's `only` list; empty for the whole refund.
+	 * @return void
+	 */
+	public function record_queued( string $reference, array $destinations ): void {
+		$entries = $this->read();
+
+		foreach ( array() === $destinations ? array( '' ) : $destinations as $destination ) {
+			$entries[] = $this->clean_entry(
+				array(
+					'feature'     => self::FEATURE_REFUND,
+					'reference'   => $reference,
+					'destination' => $destination,
+					'outcome'     => self::OUTCOME_QUEUED,
+					'attempt'     => 1,
+				)
+			);
+		}
 
 		$this->write( self::trim( $entries ) );
 	}
@@ -263,6 +302,10 @@ final class SendLog {
 			return self::TONE_WARN;
 		}
 
+		if ( self::OUTCOME_QUEUED === $outcome ) {
+			return self::TONE_PENDING;
+		}
+
 		if ( (int) ( $entry['errors'] ?? 0 ) > 0 ) {
 			return self::TONE_ERROR;
 		}
@@ -302,16 +345,18 @@ final class SendLog {
 	 * destination per attempt, so only the NEWEST row per destination counts,
 	 * and the job names exactly the destinations still failing in `only`, so a
 	 * destination that already took the event is never sent it twice. A refund
-	 * whose newest word is a replayable skip is queued whole.
+	 * whose newest word is a replayable skip is queued whole; one whose newest
+	 * word is a queued job that has not run yet is left alone.
 	 *
 	 * @param string[] $references Limit to these references; empty means every replayable refund.
 	 * @return array<string, array{platform: string, order_id: int, refund_id: int, only: string[]}> Keyed by reference.
 	 */
 	public function replay_plan( array $references = array() ): array {
+		$all    = $this->all();
 		$latest = array();
 		$order  = array();
 
-		foreach ( $this->all() as $index => $entry ) {
+		foreach ( $all as $index => $entry ) {
 			$reference = (string) ( $entry['reference'] ?? '' );
 
 			if ( '' === $reference || ( array() !== $references && ! in_array( $reference, $references, true ) ) ) {
@@ -326,6 +371,7 @@ final class SendLog {
 		}
 
 		$plan = array();
+		$now  = $this->now();
 
 		foreach ( $latest as $reference => $by_destination ) {
 			$parsed = self::parse_reference( $reference );
@@ -334,10 +380,18 @@ final class SendLog {
 				continue;
 			}
 
+			// A job still waiting in the queue is not queued a second time: its
+			// rows are the newest word about the refund until the job writes.
+			$newest_entry = $all[ $order[ $reference ] ];
+
+			if ( self::is_waiting( $newest_entry, $now ) ) {
+				continue;
+			}
+
 			$only = array();
 
 			foreach ( $by_destination as $destination => $entry ) {
-				if ( '' !== $destination && self::OUTCOME_FAILED === (string) ( $entry['outcome'] ?? '' ) ) {
+				if ( '' !== $destination && self::is_retry_target( $entry ) ) {
 					$only[] = $destination;
 				}
 			}
@@ -348,7 +402,7 @@ final class SendLog {
 
 			if ( null !== $whole
 				&& (int) $whole['index'] === (int) $order[ $reference ]
-				&& self::is_replayable( $whole )
+				&& ( self::is_replayable( $whole ) || self::OUTCOME_QUEUED === (string) ( $whole['outcome'] ?? '' ) )
 			) {
 				$plan[ $reference ] = $parsed + array( 'only' => array() );
 
@@ -361,6 +415,32 @@ final class SendLog {
 		}
 
 		return $plan;
+	}
+
+	/**
+	 * Whether a row is a queued job that has not had time to run yet.
+	 *
+	 * @param array<string, mixed> $entry One stored entry.
+	 * @param int                  $now   Current Unix time.
+	 * @return bool
+	 */
+	private static function is_waiting( array $entry, int $now ): bool {
+		return self::OUTCOME_QUEUED === (string) ( $entry['outcome'] ?? '' )
+			&& ( $now - (int) ( $entry['time'] ?? 0 ) ) < self::QUEUED_STALE_AFTER;
+	}
+
+	/**
+	 * Whether a destination's newest row puts it in a replay's `only` list: a
+	 * failure, or a queued row the job never overtook (a waiting one never
+	 * gets here).
+	 *
+	 * @param array<string, mixed> $entry One stored entry.
+	 * @return bool
+	 */
+	private static function is_retry_target( array $entry ): bool {
+		$outcome = (string) ( $entry['outcome'] ?? '' );
+
+		return self::OUTCOME_FAILED === $outcome || self::OUTCOME_QUEUED === $outcome;
 	}
 
 	/**
@@ -454,9 +534,10 @@ final class SendLog {
 
 	/**
 	 * The ring as a reader wants it: newest first, as stored (what may be in
-	 * it is decided where it is written), plus two derived fields - `tone`,
-	 * how much attention the row deserves, and `replayable`, whether a replay
-	 * would act on it. The second is answered from the replay plan rather than
+	 * it is decided where it is written), plus three derived fields - `tone`,
+	 * how much attention the row deserves, `replayable`, whether a replay
+	 * would act on it, and `waiting`, a queued row with nothing newer about its
+	 * refund yet (the settings screen refreshes itself while one is). The second is answered from the replay plan rather than
 	 * from the row alone, so a failure a later success has overtaken does not
 	 * offer a replay that would queue nothing. The one shaping shared by the
 	 * settings screen's REST route and the ability.
@@ -466,11 +547,29 @@ final class SendLog {
 	public function entries_for_display(): array {
 		$entries    = array();
 		$replayable = $this->replayable_entries();
+		$all        = $this->all();
+		$newest     = array();
+		$now        = $this->now();
 
-		foreach ( array_reverse( $this->all(), true ) as $index => $entry ) {
+		// The rows one replay writes share a time; a newer row about the same
+		// refund means the job has run.
+		foreach ( $all as $index => $entry ) {
+			$newest[ (string) ( $entry['reference'] ?? '' ) ] = $index;
+		}
+
+		foreach ( array_reverse( $all, true ) as $index => $entry ) {
+			$last = $all[ $newest[ (string) ( $entry['reference'] ?? '' ) ] ];
+
 			$entry['tone']       = self::tone( $entry );
 			$entry['replayable'] = isset( $replayable[ $index ] );
-			$entries[]           = $entry;
+			$entry['waiting']    = self::is_waiting( $entry, $now ) && self::is_waiting( $last, $now );
+
+			// A queued job the queue never ran needs a look, unlike a waiting one.
+			if ( self::OUTCOME_QUEUED === $entry['outcome'] && $entry['replayable'] ) {
+				$entry['tone'] = self::TONE_WARN;
+			}
+
+			$entries[] = $entry;
 		}
 
 		return $entries;

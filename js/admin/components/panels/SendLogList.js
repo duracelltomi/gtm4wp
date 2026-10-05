@@ -7,7 +7,7 @@
 
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice, ToggleControl } from '@wordpress/components';
-import { useCallback, useEffect, useState } from '@wordpress/element';
+import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
 /**
@@ -30,6 +30,8 @@ function outcomeLabel( outcome ) {
 			return __( 'Failed', 'duracelltomi-google-tag-manager' );
 		case 'skipped':
 			return __( 'Not sent', 'duracelltomi-google-tag-manager' );
+		case 'queued':
+			return __( 'Queued', 'duracelltomi-google-tag-manager' );
 		default:
 			return outcome || '';
 	}
@@ -129,6 +131,40 @@ function resultLabel( entry ) {
 }
 
 /**
+ * What a queued row is waiting for. A queued row that is no longer waiting
+ * but still replayable was never picked up by the background queue.
+ *
+ * @param {Object} entry Stored entry.
+ * @return {string} Text to show, empty for any other row.
+ */
+function queuedLabel( entry ) {
+	if ( 'queued' !== entry.outcome ) {
+		return '';
+	}
+
+	if ( entry.waiting ) {
+		return __(
+			'Waiting for the background queue. This list updates by itself once it has run.',
+			'duracelltomi-google-tag-manager'
+		);
+	}
+
+	return entry.replayable
+		? __(
+				'The background queue has not run this job. Check that WP-Cron or Action Scheduler runs on this site, then send it again.',
+				'duracelltomi-google-tag-manager'
+		  )
+		: '';
+}
+
+/**
+ * Seconds between two automatic refreshes while a queued row is waiting, and
+ * how many of them at most, so a stalled queue does not poll forever.
+ */
+const WAITING_POLL_SECONDS = 10;
+const WAITING_POLL_MAX = 18;
+
+/**
  * The CSS suffix for an entry's tone. The judgement is the server's
  * (SendLog::tone); an unknown word draws as neutral, never as a success.
  *
@@ -171,48 +207,74 @@ export default function SendLogList( {
 	const [ problemsOnly, setProblemsOnly ] = useState( false );
 	const [ replaying, setReplaying ] = useState( false );
 	const [ replayNotice, setReplayNotice ] = useState( null );
+	const polls = useRef( 0 );
 
-	const load = useCallback( async () => {
-		// The effect is registered before the early return below: no network
-		// without a log path.
-		if ( ! logPath ) {
-			return;
-		}
+	// `quiet` is the automatic refresh: no busy state on the Refresh button.
+	const load = useCallback(
+		async ( quiet = false ) => {
+			// The effect is registered before the early return below: no network
+			// without a log path.
+			if ( ! logPath ) {
+				return;
+			}
 
-		setBusy( true );
-		setError( '' );
+			if ( ! quiet ) {
+				setBusy( true );
+			}
+			setError( '' );
 
-		try {
-			const response = await apiFetch( { path: logPath } );
+			try {
+				const response = await apiFetch( { path: logPath } );
 
-			// A non-envelope answer (proxy, exhausted worker) reads as "no
-			// entries", not as a TypeError in render.
-			setEntries(
-				Array.isArray( response && response.entries )
-					? response.entries
-					: []
-			);
-		} catch ( caught ) {
-			setEntries( [] );
-			setError(
-				( caught && caught.message ) ||
-					__(
-						'The list of recent sends could not be loaded.',
-						'duracelltomi-google-tag-manager'
-					)
-			);
-		} finally {
-			setBusy( false );
-		}
-	}, [ logPath ] );
+				// A non-envelope answer (proxy, exhausted worker) reads as "no
+				// entries", not as a TypeError in render.
+				setEntries(
+					Array.isArray( response && response.entries )
+						? response.entries
+						: []
+				);
+			} catch ( caught ) {
+				setEntries( [] );
+				setError(
+					( caught && caught.message ) ||
+						__(
+							'The list of recent sends could not be loaded.',
+							'duracelltomi-google-tag-manager'
+						)
+				);
+			} finally {
+				if ( ! quiet ) {
+					setBusy( false );
+				}
+			}
+		},
+		[ logPath ]
+	);
 
 	useEffect( () => {
 		load();
 	}, [ load ] );
 
+	// While a queued job has not run, refresh by itself: the Refresh button
+	// cannot make the background queue run any sooner.
+	const waiting = ( entries || [] ).some( ( entry ) => entry.waiting );
+
+	useEffect( () => {
+		if ( ! waiting || polls.current >= WAITING_POLL_MAX ) {
+			return undefined;
+		}
+
+		const timer = setTimeout( () => {
+			polls.current += 1;
+			load( true );
+		}, WAITING_POLL_SECONDS * 1000 );
+
+		return () => clearTimeout( timer );
+	}, [ waiting, entries, load ] );
+
 	// Re-queues the failed and fixable refunds (all, or the ones named).
-	// Nothing is sent from here; the sender applies every gate again a minute
-	// later, so the reload shows the same rows until the next Refresh.
+	// Nothing is sent from here; the server logs each one as queued, and the
+	// list reloads at once to show those rows.
 	const replay = async ( references ) => {
 		if ( ! replayPath || replaying ) {
 			return;
@@ -236,8 +298,8 @@ export default function SendLogList( {
 						? sprintf(
 								/* translators: %d: number of refunds queued to be sent again. */
 								_n(
-									'%d refund is queued to be sent again. It runs in the background within a minute; press Refresh afterwards to see what became of it.',
-									'%d refunds are queued to be sent again. They run in the background within a minute; press Refresh afterwards to see what became of them.',
+									'%d refund is queued to be sent again. It runs in the background, usually within a minute, and this list updates by itself.',
+									'%d refunds are queued to be sent again. They run in the background, usually within a minute, and this list updates by itself.',
 									queued,
 									'duracelltomi-google-tag-manager'
 								),
@@ -248,6 +310,11 @@ export default function SendLogList( {
 								'duracelltomi-google-tag-manager'
 						  ),
 			} );
+
+			if ( queued > 0 ) {
+				polls.current = 0;
+				load();
+			}
 		} catch ( caught ) {
 			setReplayNotice( {
 				status: 'error',
@@ -448,6 +515,7 @@ export default function SendLogList( {
 								<td className="gtm4wp-send-log__details">
 									{ reasonLabel( entry.reason ) }
 									{ resultLabel( entry ) }
+									{ queuedLabel( entry ) }
 									{ replayPath && entry.replayable && (
 										<Button
 											variant="link"

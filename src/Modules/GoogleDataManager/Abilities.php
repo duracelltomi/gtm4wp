@@ -100,7 +100,7 @@ final class Abilities implements ProviderInterface {
 			self::GET_LOG,
 			array(
 				'label'               => __( 'Get the Google Data Manager send log', 'duracelltomi-google-tag-manager' ),
-				'description'         => __( 'Returns the recent server-side sends of the Google Data Manager integration (refund events sent to Google Analytics), newest first, with what became of each one: accepted by Google, applied, being retried, failed, or deliberately skipped with the reason. Set problems_only to true to see only the entries that need attention. An entry with replayable true can be sent again with replay-google-data-manager-refunds. Also reports how many sends and status checks are queued. Read-only; the log is empty on a site that does not use the Google Data Manager section.', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Returns the recent server-side sends of the Google Data Manager integration (refund events sent to Google Analytics), newest first, with what became of each one: queued to be sent again (waiting true until the background job has run), accepted by Google, applied, being retried, failed, or deliberately skipped with the reason. Set problems_only to true to see only the entries that need attention. An entry with replayable true can be sent again with replay-google-data-manager-refunds. Also reports how many sends and status checks are queued. Read-only; the log is empty on a site that does not use the Google Data Manager section.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -145,6 +145,7 @@ final class Abilities implements ProviderInterface {
 										'enum' => array( SendLog::TONE_OK, SendLog::TONE_PENDING, SendLog::TONE_WARN, SendLog::TONE_ERROR ),
 									),
 									'replayable'  => array( 'type' => 'boolean' ),
+									'waiting'     => array( 'type' => 'boolean' ),
 								),
 							),
 						),
@@ -227,7 +228,7 @@ final class Abilities implements ProviderInterface {
 			self::REPLAY_REFUNDS,
 			array(
 				'label'               => __( 'Send failed Google Data Manager refunds again', 'duracelltomi-google-tag-manager' ),
-				'description'         => __( 'Queues again the refund events that failed, or were skipped for a reason a configuration change can fix, so the sender tries them afresh against the destinations still missing them - the "send again" action of the settings screen. Nothing is sent by this call itself: the jobs run in the background and every gate (consent, destinations, health) applies again. Protocol, in this order: 1) call get-google-data-manager-log with problems_only true and show the user which refunds would be sent again - every entry with replayable true, or only the ones named in references (the reference values of the log, platform:order:refund); 2) ask "Send these refunds to Google again?" and wait for an explicit yes in the same turn - a general instruction such as "fix it" is not a confirmation; 3) call this ability with confirm true. Without confirm true the call is refused with 400 and nothing is queued; while the "Send refunds" option is off it is refused with 409. Not idempotent: each call queues the refunds again, so call it once per confirmation. The answer lists the references queued.', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Queues again the refund events that failed, or were skipped for a reason a configuration change can fix, so the sender tries them afresh against the destinations still missing them - the "send again" action of the settings screen. Nothing is sent by this call itself: the jobs run in the background and every gate (consent, destinations, health) applies again; the log shows each queued refund at once as queued. Protocol, in this order: 1) call get-google-data-manager-log with problems_only true and show the user which refunds would be sent again - every entry with replayable true, or only the ones named in references (the reference values of the log, platform:order:refund); 2) ask "Send these refunds to Google again?" and wait for an explicit yes in the same turn - a general instruction such as "fix it" is not a confirmation; 3) call this ability with confirm true. Without confirm true the call is refused with 400 and nothing is queued; while the "Send refunds" option is off it is refused with 409. Not idempotent: each call queues the refunds again, so call it once per confirmation. The answer lists the references queued.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',

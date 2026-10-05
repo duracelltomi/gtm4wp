@@ -8,7 +8,13 @@
  * and never falling over on a shape it did not expect.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from '@testing-library/react';
 
 import apiFetch from '@wordpress/api-fetch';
 
@@ -528,6 +534,7 @@ describe( 'SendLogList sending failed refunds again', () => {
 	it( 'asks the server to queue every replayable refund', async () => {
 		renderWithReplay( rows );
 		apiFetch.mockResolvedValueOnce( { queued: 2, references: [] } );
+		apiFetch.mockResolvedValueOnce( { entries: rows } );
 
 		fireEvent.click(
 			await screen.findByRole( 'button', {
@@ -535,8 +542,8 @@ describe( 'SendLogList sending failed refunds again', () => {
 			} )
 		);
 
-		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 2 ) );
-		expect( apiFetch ).toHaveBeenLastCalledWith( {
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 3 ) );
+		expect( apiFetch ).toHaveBeenNthCalledWith( 2, {
 			path: REPLAY_PATH,
 			method: 'POST',
 			data: {},
@@ -552,17 +559,62 @@ describe( 'SendLogList sending failed refunds again', () => {
 			queued: 1,
 			references: [ 'edd:3:4' ],
 		} );
+		apiFetch.mockResolvedValueOnce( { entries: rows } );
 
 		fireEvent.click(
 			await screen.findByRole( 'button', { name: 'Send edd:3:4 again' } )
 		);
 
-		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 2 ) );
-		expect( apiFetch ).toHaveBeenLastCalledWith( {
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 3 ) );
+		expect( apiFetch ).toHaveBeenNthCalledWith( 2, {
 			path: REPLAY_PATH,
 			method: 'POST',
 			data: { references: [ 'edd:3:4' ] },
 		} );
+	} );
+
+	it( 'shows the queued rows at once instead of the unchanged list', async () => {
+		renderWithReplay( rows );
+		apiFetch.mockResolvedValueOnce( {
+			queued: 1,
+			references: [ 'edd:3:4' ],
+		} );
+		apiFetch.mockResolvedValueOnce( {
+			entries: [
+				entry( {
+					reference: 'edd:3:4',
+					destination: '',
+					outcome: 'queued',
+					tone: 'pending',
+					waiting: true,
+				} ),
+				...rows,
+			],
+		} );
+
+		fireEvent.click(
+			await screen.findByRole( 'button', { name: 'Send edd:3:4 again' } )
+		);
+
+		expect( await screen.findByText( 'Queued' ) ).toBeInTheDocument();
+		expect(
+			screen.getByText( /Waiting for the background queue/ )
+		).toBeInTheDocument();
+		expect( apiFetch ).toHaveBeenNthCalledWith( 3, { path: LOG_PATH } );
+	} );
+
+	it( 'does not reload when nothing was queued', async () => {
+		renderWithReplay( rows );
+		apiFetch.mockResolvedValueOnce( { queued: 0, references: [] } );
+
+		fireEvent.click(
+			await screen.findByRole( 'button', {
+				name: 'Send again what can be sent (2)',
+			} )
+		);
+
+		await screen.findByText( /Nothing was queued/ );
+		expect( apiFetch ).toHaveBeenCalledTimes( 2 );
 	} );
 
 	it( 'offers nothing to send again on a row the server did not mark', async () => {
@@ -648,5 +700,85 @@ describe( 'SendLogList sending failed refunds again', () => {
 		expect(
 			screen.queryByRole( 'button', { name: /again/ } )
 		).not.toBeInTheDocument();
+	} );
+} );
+
+describe( 'SendLogList while a queued job waits', () => {
+	const waitingRow = entry( {
+		outcome: 'queued',
+		tone: 'pending',
+		waiting: true,
+	} );
+
+	beforeEach( () => {
+		jest.useFakeTimers();
+	} );
+
+	afterEach( () => {
+		jest.useRealTimers();
+	} );
+
+	// The timer fires, then the fetch resolves and React re-arms the next one.
+	async function tick() {
+		await act( async () => {
+			jest.advanceTimersByTime( 10000 );
+		} );
+		await act( async () => {} );
+	}
+
+	it( 'refreshes by itself, and stops once the job has written its row', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [ waitingRow ] } );
+		render( <SendLogList logPath={ LOG_PATH } /> );
+		await screen.findByText( 'Queued' );
+
+		// What the server says once the job ran: a newer row ends the wait.
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ entry(), { ...waitingRow, waiting: false } ],
+		} );
+		await tick();
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 2 ) );
+		expect( apiFetch ).toHaveBeenLastCalledWith( { path: LOG_PATH } );
+
+		// The job's row arrived: nothing waits any more, so no third call.
+		await tick();
+		await tick();
+		expect( apiFetch ).toHaveBeenCalledTimes( 2 );
+	} );
+
+	it( 'gives up after a few minutes so a stalled queue is not polled forever', async () => {
+		// Once values only (see the top of the file): a 20th call would reject.
+		for ( let i = 0; i < 19; i++ ) {
+			apiFetch.mockResolvedValueOnce( { entries: [ waitingRow ] } );
+		}
+		render( <SendLogList logPath={ LOG_PATH } /> );
+		await screen.findByText( 'Queued' );
+
+		for ( let i = 0; i < 25; i++ ) {
+			await tick();
+		}
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 18 );
+	} );
+
+	it( 'explains a queued job the queue never ran', async () => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [
+				entry( {
+					outcome: 'queued',
+					tone: 'warn',
+					waiting: false,
+					replayable: true,
+				} ),
+			],
+		} );
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		expect(
+			await screen.findByText(
+				/The background queue has not run this job/
+			)
+		).toBeInTheDocument();
+		await tick();
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
 	} );
 } );

@@ -19,7 +19,9 @@ defined( 'ABSPATH' ) || exit;
  * panel's replay route and the replay ability. Nothing is sent from the
  * calling request: each refund the log's replay plan names is queued as a
  * fresh first attempt at the destinations still missing it, and the sender
- * applies every gate again when the job runs. The only check made here is
+ * applies every gate again when the job runs. Each queued refund gets a
+ * "queued" log row at once, so the list shows the click took effect and a
+ * second click cannot queue it twice. The only check made here is
  * the lane's master switch, since a job queued while sending is off would be
  * dropped with no row to say so.
  */
@@ -28,7 +30,7 @@ final class RefundReplay {
 	/**
 	 * Constructor.
 	 *
-	 * @param SendLog      $log     The diagnostics ring the plan is read from.
+	 * @param SendLog      $log     The diagnostics ring the plan is read from and the queued rows written to.
 	 * @param Options|null $options Plugin options; null skips the sending-on check (tests).
 	 */
 	public function __construct( private SendLog $log, private ?Options $options = null ) {
@@ -86,6 +88,7 @@ final class RefundReplay {
 
 			if ( SendQueue::schedule( SendQueue::HOOK_SEND, $payload ) ) {
 				$queued[] = $reference;
+				$this->log->record_queued( $reference, $job['only'] );
 			}
 		}
 

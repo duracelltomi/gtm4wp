@@ -633,9 +633,9 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$entries = $this->make_controller()->send_log()->get_data()['entries'];
 
 		$this->assertSame(
-			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone', 'replayable' ),
+			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone', 'replayable', 'waiting' ),
 			array_keys( $entries[0] ),
-			'The route adds exactly two derived fields to what the ring stores, and nothing else joins it.'
+			'The route adds exactly three derived fields to what the ring stores, and nothing else joins it.'
 		);
 	}
 
@@ -881,6 +881,121 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 
 		$this->assertSame( 0, $response->get_data()['queued'] );
 		$this->assertSame( array(), $response->get_data()['references'] );
+	}
+
+	// ---- Queued rows: the click shows at once ------------------------------
+
+	/**
+	 * Two destinations failed; the replay queues them and the list shows a
+	 * waiting "queued" row for each before the job has run.
+	 *
+	 * @return SendLog
+	 */
+	private function replayed_log(): SendLog {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record( self::row( array( 'destination' => 'G-ABC123' ) ) );
+		$log->record( self::row( array( 'destination' => 'G-XYZ789' ) ) );
+
+		$this->replay_controller( $log )->replay( new \WP_REST_Request() );
+
+		return $log;
+	}
+
+	public function test_a_replay_shows_a_waiting_queued_row_per_destination_at_once(): void {
+		$entries = array_slice( $this->replayed_log()->entries_for_display(), 0, 2 );
+
+		$this->assertSame( array( 'G-XYZ789', 'G-ABC123' ), array_column( $entries, 'destination' ) );
+		foreach ( $entries as $entry ) {
+			$this->assertSame( SendLog::OUTCOME_QUEUED, $entry['outcome'] );
+			$this->assertTrue( $entry['waiting'] );
+			$this->assertFalse( $entry['replayable'], 'A waiting job offers no second Send again.' );
+			$this->assertSame( SendLog::TONE_PENDING, $entry['tone'] );
+		}
+	}
+
+	public function test_a_second_replay_while_the_job_waits_queues_nothing(): void {
+		$log = $this->replayed_log();
+
+		$response = $this->replay_controller( $log )->replay( new \WP_REST_Request() );
+
+		$this->assertSame( 0, $response->get_data()['queued'], 'A double click must not send the refund twice.' );
+		$this->assertSame( array(), $this->scheduled, 'Nothing was scheduled by the second click.' );
+	}
+
+	public function test_the_jobs_own_row_ends_the_wait(): void {
+		$log = $this->replayed_log();
+		$log->record(
+			self::row(
+				array(
+					'destination' => 'G-ABC123',
+					'outcome'     => SendLog::OUTCOME_ACCEPTED,
+					'reason'      => '',
+					'attempt'     => 1,
+				)
+			)
+		);
+
+		$waiting = array_filter( $log->entries_for_display(), static fn ( $entry ) => $entry['waiting'] );
+
+		$this->assertSame( array(), $waiting, 'Any newer row about the refund means the job ran.' );
+		$this->assertSame( array( 'G-XYZ789' ), $log->replay_plan()['woocommerce:12:34']['only'], 'The destination the job never answered for stays owed.' );
+	}
+
+	public function test_a_whole_refund_queued_row_is_overtaken_by_the_destination_rows_of_its_job(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record(
+			self::row(
+				array(
+					'destination' => '',
+					'outcome'     => SendLog::OUTCOME_SKIPPED,
+					'reason'      => 'no_destination',
+				)
+			)
+		);
+		$this->replay_controller( $log )->replay( new \WP_REST_Request() );
+		$log->record(
+			self::row(
+				array(
+					'outcome' => SendLog::OUTCOME_ACCEPTED,
+					'reason'  => '',
+					'attempt' => 1,
+				)
+			)
+		);
+
+		$queued = array_values( array_filter( $log->entries_for_display(), static fn ( $entry ) => SendLog::OUTCOME_QUEUED === $entry['outcome'] ) );
+
+		$this->assertCount( 1, $queued );
+		$this->assertSame( '', $queued[0]['destination'] );
+		$this->assertFalse( $queued[0]['waiting'] );
+		$this->assertFalse( $queued[0]['replayable'] );
+		$this->assertSame( array(), $log->replay_plan() );
+	}
+
+	public function test_a_queued_job_the_queue_never_ran_can_be_sent_again(): void {
+		$this->replayed_log();
+		$later = new SendLog( static fn () => self::NOW + SendLog::QUEUED_STALE_AFTER );
+
+		$entries = array_slice( $later->entries_for_display(), 0, 2 );
+
+		foreach ( $entries as $entry ) {
+			$this->assertFalse( $entry['waiting'] );
+			$this->assertTrue( $entry['replayable'] );
+			$this->assertSame( SendLog::TONE_WARN, $entry['tone'], 'A stalled queue is something to look at.' );
+		}
+		$this->assertSame( array( 'G-ABC123', 'G-XYZ789' ), $later->replay_plan()['woocommerce:12:34']['only'] );
+	}
+
+	public function test_a_refund_the_scheduler_refuses_gets_no_queued_row(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record( self::row( array() ) );
+
+		$controller = $this->replay_controller( $log );
+		Functions\when( 'as_schedule_single_action' )->justReturn( 0 );
+
+		$controller->replay( new \WP_REST_Request() );
+
+		$this->assertSame( array( SendLog::OUTCOME_FAILED ), array_column( $log->all(), 'outcome' ) );
 	}
 
 	public function test_replay_refuses_while_sending_is_off(): void {
