@@ -1,5 +1,9 @@
 # Full changelog for GTM4WP
 
+## 2.0.6
+
+* Fixed: a WooCommerce Product Bundles bundle reported `stockstatus` as `instock` in the e-commerce items even when one of its bundled products was out of stock and the bundle could not be bought; it now reports `outofstock`. Thanks to @KingWehsops for the report (#474).
+
 ## 2.0.5
 
 * Fixed: the data layer initialisation block no longer contains the word `gtag`. Since 2.0.3, a JavaScript delay plugin with `gtag` on its keyword list, such as Flying Scripts, delayed the whole block and the browser console showed `dataLayer is not defined`. The Google tag developer ID is still set.

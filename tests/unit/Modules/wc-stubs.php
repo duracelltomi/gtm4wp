@@ -73,6 +73,23 @@ if ( ! class_exists( 'WC_Product_Variation' ) ) {
 	class WC_Product_Variation extends WC_Product {}
 }
 
+if ( ! class_exists( 'WC_Product_Bundle' ) ) {
+	// WooCommerce Product Bundles (separate extension). Only the getter #474 reads;
+	// its name is inferred from the documented bundled_items_stock_status property (U172).
+	class WC_Product_Bundle extends WC_Product {
+		private string $bundled_items_stock_status;
+
+		public function __construct( array $data = array() ) {
+			parent::__construct( array_merge( array( 'type' => 'bundle' ), $data ) );
+			$this->bundled_items_stock_status = $data['bundled_items_stock_status'] ?? 'instock';
+		}
+
+		public function get_bundled_items_stock_status() {
+			return $this->bundled_items_stock_status;
+		}
+	}
+}
+
 if ( ! class_exists( 'WC_Order' ) ) {
 	class WC_Order {
 		public function __construct( private array $data = array() ) {}

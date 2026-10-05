@@ -150,6 +150,28 @@ final class ProductData {
 	}
 
 	/**
+	 * The item's stock status. A Product Bundles bundle whose contents are out of
+	 * stock is `outofstock` even when its own status says otherwise (#474). The
+	 * getter is inferred from the documented `bundled_items_stock_status`
+	 * property, so it is guarded (UC-2, U172).
+	 *
+	 * @param \WC_Product $product      The product.
+	 * @param string      $product_type The product type.
+	 * @return string
+	 */
+	private function stock_status( \WC_Product $product, string $product_type ) {
+		if (
+			'bundle' === $product_type
+			&& method_exists( $product, 'get_bundled_items_stock_status' )
+			&& 'outofstock' === $product->get_bundled_items_stock_status()
+		) {
+			return 'outofstock';
+		}
+
+		return $product->get_stock_status();
+	}
+
+	/**
 	 * Given a WC_Product instance, this function returns an array of product attributes in the format of
 	 * GA4 ecommerce item data.
 	 *
@@ -219,7 +241,7 @@ final class ProductData {
 			'sku'                      => (string) ( $product_sku ? $product_sku : $product_id ),
 			'price'                    => round( $display_price, 2 ), // Unfortunately this does not force a .00 postfix for integers.
 			'stocklevel'               => $product->get_stock_quantity(),
-			'stockstatus'              => $product->get_stock_status(),
+			'stockstatus'              => $this->stock_status( $product, $product_type ),
 			'google_business_vertical' => $this->business_vertical(),
 		);
 
