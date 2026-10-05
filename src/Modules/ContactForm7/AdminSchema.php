@@ -83,7 +83,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Contact Form 7', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this to fire dataLayer events for Contact Form 7 submissions (supported events: before submit, invalid input, unaccepted terms, spam detected, submission aborted, form submitted, mail sent, mail send failed). Each event carries the form ID, form name, unit tag, container post ID, locale and submission status.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Pushes data layer events for Contact Form 7 submissions, from the attempt to the outcome (sent, failed, invalid, spam). Each event carries the form ID and name, unit tag, container post ID, locale and submission status.', 'duracelltomi-google-tag-manager' ),
 				group: 'cf7',
 				doc: self::DOC_PAGE
 			),
@@ -115,7 +115,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Report the form name in the default language', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'On multilingual sites (WPML or Polylang), report the Contact Form 7 form name (form_name in the data layer) in the site\'s default (master) language instead of the translated form title, so submissions of the same form in several languages combine in Google Analytics reports. Requires WPML, Polylang or a callback on the gtm4wp_master_language_post_id filter, and forms translated as separate form entries; on a single-language site, an untranslated form, or a form translated only through string translation the current title is unchanged. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'On WPML or Polylang sites, reports the form name in the site\'s default language, so one form translated into several languages shows as a single form in Google Analytics. Needs forms translated as separate form entries.', 'duracelltomi-google-tag-manager' ),
 				group: 'cf7',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_PAGE,

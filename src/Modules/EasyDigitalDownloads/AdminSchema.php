@@ -168,7 +168,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_INTEGER,
 				default_value: 10,
 				label: __( 'Products per impression', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'If you have many downloads shown in your download grids, you could miss pageviews in Google Analytics due to the amount of data that is needed to be sent. To prevent this, you can split product impression data into multiple Google Analytics events by entering a number here (minimum 10-15 recommended). Leave this value 0 to include product impression data in one single event.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Splits product impression data into several events of this many downloads each, so a large download grid cannot make Google Analytics drop page views. Enter 0 to send it in one event; at least 10 to 15 is recommended.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -215,7 +215,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Report downloads in the default language', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'On multilingual stores (WPML or Polylang), report every GA4 ecommerce item - item_id, item_name, item_category, item_brand and item_variant - in the store\'s default (master) language instead of the translated one. Because Google Analytics groups items by item_id, this is what actually combines a download sold in several languages into a single item in your reports (rather than one row per translation). It resolves each download to its default-language equivalent, so the item_id changes on translated pages - review any product feed or dynamic remarketing setup that keys on the translated id. Requires WPML, Polylang or a callback on the gtm4wp_master_language_post_id filter; on a single-language store or an untranslated download nothing changes. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'On WPML or Polylang stores, reports GA4 ecommerce items in the store\'s default language, so a download sold in several languages is one item in your reports. Translated pages then send a different item_id: check feeds and remarketing that use it.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE,
@@ -226,7 +226,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Persist download list attribution across the funnel', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'When a visitor clicks a download in a list, remember which list it was (item_list_name / item_list_id) in a first-party cookie and carry it onto the later view_item, add_to_cart, remove_from_cart, view_cart, begin_checkout, add_payment_info and purchase events and the cart content variable, so GA4 can attribute the whole funnel to the originating list. On a download page the list is merged in by the browser rather than by the server, so the attribution also works when the page is served from a full-page cache. Only enable this if you are NOT already doing the same with custom JavaScript in Google Tag Manager, otherwise the attribution would be set twice. If the WooCommerce integration is also active, its setting of the same name shares the browser flag with this one.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Remembers which list a download was clicked in (item_list_name, item_list_id) in a first-party cookie and adds it to the later ecommerce events up to the purchase. Leave it off if your container already does this with custom JavaScript.', 'duracelltomi-google-tag-manager' ),
 				group: 'products',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE
@@ -265,7 +265,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Cart content in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this option to include the content of the Easy Digital Downloads cart in the data layer on each page. Especially useful for site personalization tools. While the cache-safe data layer mode is on, the cart content is not part of the page but arrives in the separate gtm4wp.cartData event.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the Easy Digital Downloads cart content to the data layer on every page, for example for personalization tools. With the cache-safe data layer on, it arrives in the gtm4wp.cartData event instead.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -275,7 +275,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add data of the logged in customer (name, email and hashed email, total number of orders and order value) into the data layer, and the Enhanced Conversions user_data block onto the purchase event. A phone number from the Easy Digital Downloads Phone field or a checkout-field extension is included as an E.164 hash. While the cache-safe data layer mode is on, the customer variables are not part of the page but arrive in the separate gtm4wp.customerData event; the user_data block of the purchase event is not affected.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the logged-in customer\'s name, email, hashed email and phone, order count and total value to the data layer, and the Enhanced Conversions user_data block to the purchase event. With the cache-safe data layer on, they arrive in gtm4wp.customerData.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -285,7 +285,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add all order attributes into the data layer on the purchase confirmation page, even when the purchase event itself is not sent, for example because the order was already tracked. Requires "Track e-commerce" to be on. The payment key of the order is never included, as it authorizes viewing the receipt.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds every order attribute to the data layer on the purchase confirmation page, even when the purchase event is not sent again. Needs "Track e-commerce"; the payment key of the order is never included.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -295,7 +295,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_INTEGER,
 				default_value: 30,
 				label: __( 'Only track orders younger than', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'To prevent duplicate transaction tracking on the purchase confirmation page, enter the maximum age (in minutes) of the order for the transaction to be measured. Viewing the confirmation page of older orders will be ignored from transaction tracking, as it is considered to be measured in an earlier session.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Orders older than this many minutes are not tracked when their confirmation page is viewed again, so a revisited receipt does not count the purchase twice.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE
@@ -315,7 +315,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_TEXT,
 				default_value: '',
 				label: __( 'Transaction ID prefix', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Text to prepend to the transaction_id sent with the purchase event, for example to tell several stores apart in one GA4 property. Leave this empty to send the Easy Digital Downloads order number unchanged. Only the purchase event is affected: the order number in the orderData variable and the duplicate tracking guards of the plugin keep using the raw order number.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Text added before the transaction_id of the purchase event, for example to tell several stores apart in one GA4 property. Leave it empty to send the order number unchanged; orderData keeps the raw number.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -335,7 +335,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_MULTISELECT,
 				default_value: array( 'pending', 'processing', 'complete' ),
 				label: __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'The purchase event is sent when the buyer reaches the confirmation page with an order in one of these statuses. Offsite gateways like PayPal can land the buyer there while the order is still Pending, which is why Pending is included by default - the duplicate tracking guards ensure the order is not counted again once it completes. Remove Pending and Processing to only ever count completed orders.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The purchase event is sent when the buyer reaches the confirmation page with an order in one of these statuses. Pending is included for offsite gateways like PayPal; remove Pending and Processing to count only completed orders.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
 				choices: $order_status_choices,
@@ -346,7 +346,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to measure the purchase on the next page the buyer visits when the confirmation page was never reached - for example an abandoned offsite payment redirect. The order is resolved from the buyer\'s own purchase session, every duplicate-prevention check still applies, and the raw order data block stays exclusive to the confirmation page. Has no effect while "Do not flag orders as being tracked" is enabled.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Measures the purchase on the buyer\'s next page view when the confirmation page was never reached, for example after an abandoned offsite payment redirect. Has no effect while "Do not flag orders as being tracked" is on.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE
@@ -359,7 +359,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				description: sprintf(
 					/* translators: 1: anchor element linking to the official GA4 doc about clearing the ecommerce object. 2: closing anchor element. */
 					esc_html__(
-						'Clear the ecommerce object before any new event being pushed into the data layer. Although it is %1$srecommended by Google%2$s, it is not mandatory to activate this feature as the GA4 event tag reads only the last pushed ecommerce data on any new event. Use it if you encounter issues with your GTM implementation. If the WooCommerce integration is also active, its setting for this behavior is overridden by this one.',
+						'Clears the ecommerce object before each new event is pushed, as %1$srecommended by Google%2$s, although GA4 tags do not need it. If the WooCommerce integration is active too, this setting overrides its own.',
 						'duracelltomi-google-tag-manager'
 					),
 					'<a href="https://developers.google.com/analytics/devguides/collection/ga4/ecommerce?client_type=gtm#clear_the_ecommerce_object" target="_blank" rel="noopener">',
@@ -374,7 +374,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_INTEGER,
 				default_value: 2000,
 				label: __( 'Set maximum timeout for select_item event', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'When a user clicks on a download in a download grid, the select_item event uses a callback function with Google Tag Manager (GTM). This ensures that GTM can fire all related tags before the browser navigates to the download detail page. You can customize a timeout period (in milliseconds). Set this to 0 to open the download immediately without waiting for GTM: the select_item event is still pushed to the data layer, but the click is no longer held back.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'How long (in milliseconds) a click on a download in a grid waits for Google Tag Manager to fire the select_item tags before the download page opens. Enter 0 to open it at once; the event is still pushed.', 'duracelltomi-google-tag-manager' ),
 				group: 'advanced',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE

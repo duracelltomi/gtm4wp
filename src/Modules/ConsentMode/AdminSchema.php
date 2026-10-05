@@ -204,7 +204,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: false,
 				label: __( 'Enable Axeptio', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Enable this to let GTM4WP load the Axeptio CMP SDK directly. No separate Axeptio plugin is required. Enter your Axeptio project ID and cookies version below. A dedicated dataLayer event (gtm4wp.axeptioConsentUpdate) is pushed whenever the visitor updates their choices.',
+					'Loads the Axeptio CMP SDK directly, without a separate Axeptio plugin; enter your project ID and cookies version below. A gtm4wp.axeptioConsentUpdate event is pushed whenever the visitor updates their choices.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: 'axeptio',

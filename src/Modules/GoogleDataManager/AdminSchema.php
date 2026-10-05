@@ -122,7 +122,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: array(),
 				label: __( 'Data Manager destinations', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Add one row for each Google Analytics 4 property the plugin should be able to send events to. The property ID is the numeric ID shown in the GA admin, the measurement ID (G-XXXXXXX) identifies the web data stream of that property. The service account of the row must be added to the property with the Editor role, and the Data Manager API must be enabled in the Google Cloud project the account belongs to - the Test button below the table checks all of that with a validation request that stores nothing on the Google side.',
+					'One row per Google Analytics 4 property: its numeric property ID, the measurement ID (G-XXXXXXX) of its web data stream, and a service account with the Editor role on the property. The Test button below the table checks the setup without storing anything.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: self::GROUP_DESTINATIONS,
@@ -177,7 +177,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: false,
 				label: __( 'Send refunds to Google Analytics', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Sends a refund event to every destination on the Destinations tab whenever a refund is issued in your store, so that Google Analytics stops counting revenue you have given back. This is the signal browser-side tracking can never report: a refund happens in the store admin, where no tag fires. Every refund reports its own amount, the items it covers and the shipping and tax it returned. To match a refund to its purchase, turning this on also stores with every new order the Google Analytics client and session IDs, the Google Ads click IDs (gclid, gbraid, wbraid) of the visit and the consent state, so only refunds of orders placed after that can be sent. The IDs are read through the official Google tag API: a Google Analytics 4 tag for a destination\'s measurement ID has to fire in your container, or nothing is stored. This loads a small script on every page of the site and writes two first-party cookies (gtm4wp_gdm_ids and gtm4wp_gdm_consent, 90 days) in every visitor\'s browser - the second records the consent answer, even a no, because the consent rule below is read against it. Mention both in your cookie notice. The stored values are written into the order and never shown on the site. Known limitation of Google Analytics data processing itself, reported to Google: when one order is refunded in several steps, Google Analytics processes only the first of them, although it accepts every one; each step is still sent, so no plugin update is needed once Google fixes this. Sending happens in the background a minute after the refund, and the Recent sends list below the destinations table shows what became of each one.',
+					'Sends every refund from your store to your destinations, so Google Analytics stops counting revenue you gave back. It also stores Google IDs and the consent state with new orders and sets two cookies for every visitor (gtm4wp_gdm_ids, gtm4wp_gdm_consent): add them to your cookie notice.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: self::GROUP_SENDING,
@@ -191,7 +191,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: ConsentPolicy::POLICY_EEA_ONLY,
 				label: __( 'Require consent before sending', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Decides for which orders the stored consent state has to allow analytics storage before anything about them is sent to Google. The billing country of the order decides the region, which is more reliable than guessing from the visitor\'s IP address. Choosing "Never" means you assert your own lawful basis for the transfer, so the plugin sends whatever it holds regardless of the stored answer - pick it only if that is a decision you have made deliberately. It governs sending, not collecting, and there is one thing it cannot do: an order whose buyer refused analytics storage has no client ID stored at all, because the browser was never allowed to keep one, so nothing can be sent for it under any rule here. Where this setting does make the difference is an order whose consent answer was never recorded - a visitor who ordered before your banner loaded, or a site running no consent tool at all.',
+					'Which orders need analytics storage granted before anything about them is sent to Google, decided by the billing country. Choose Never only if you have your own lawful basis for the transfer.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: self::GROUP_SENDING,

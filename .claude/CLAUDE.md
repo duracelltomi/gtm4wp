@@ -145,7 +145,10 @@ narrative ("measured, it does not…"), phase history, proofs of a rule already
 stated, and anything the code below already says. A "do NOT do X" survives as one
 line with a half-sentence reason; never sharpen a defect description (RI-24).
 
-The same budget governs changelog bullets (60 words; see the `changelog` skill).
+The same budget governs changelog bullets (60 words; see the `changelog` skill) and settings
+field descriptions: at most 45 words, saying what the option does and what to know before
+turning it on; the rest goes on the docs page behind the "?". Pinned by
+`ModuleConsistencyTest::test_field_descriptions_stay_short` (its 2.0 allowlist is shortened in 2.2).
 
 Enforced advisory-style by the `prose-budget` Stop hook, which reports only what the
 working tree ADDS: `bash .claude/hooks/prose-budget.sh check` runs the same check by

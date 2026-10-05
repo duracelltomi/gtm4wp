@@ -111,9 +111,10 @@ final class ModuleConsistencyTest extends TestCase {
 	}
 
 	/**
-	 * Each master-language note and description names only the resolution
-	 * filters its option reaches: page variables resolve terms, the other three
-	 * only posts (#366).
+	 * Each master-language note names only the resolution filters its option
+	 * reaches: page variables resolve terms, the other three only posts (#366).
+	 * The note shows exactly when a filter is the way in; the short description
+	 * names none, and must never name one the option cannot reach.
 	 */
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
@@ -122,11 +123,9 @@ final class ModuleConsistencyTest extends TestCase {
 
 		foreach ( $fields as $key => $field ) {
 			$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $field->unavailable, $key );
-			$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $field->description, $key );
 		}
 
 		$this->assertStringContainsString( 'gtm4wp_master_language_term_id', $fields[ GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE ]->unavailable );
-		$this->assertStringContainsString( 'gtm4wp_master_language_term_id', $fields[ GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE ]->description );
 
 		foreach ( array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE ) as $key ) {
 			$this->assertStringNotContainsString( 'gtm4wp_master_language_term_id', $fields[ $key ]->unavailable, $key );
@@ -420,5 +419,71 @@ final class ModuleConsistencyTest extends TestCase {
 				$seen[ $option_key ] = $module_id;
 			}
 		}
+	}
+
+	/**
+	 * Longest field description, in words: what the option does and what to
+	 * know before turning it on. Everything else lives behind the "?" link.
+	 */
+	private const DESCRIPTION_MAX_WORDS = 45;
+
+	/**
+	 * Descriptions that shipped in 2.0 and are still longer: shortening them
+	 * breaks their translations, so it is batched for 2.2 (decided 2026-10-05).
+	 * A field leaves this list the moment it fits.
+	 */
+	private const LONG_DESCRIPTIONS_UNTIL_2_2 = array(
+		'gtm-containers',
+		'gtm-production-only',
+		'integrate-consent-mode',
+		'integrate-cookieyes',
+		'include-postmeta',
+		'include-postmeta-keys',
+		'integrate-woocommerce-purchase-track-on-any-page',
+		'integrate-woocommerce-datalayer-max-timeout',
+		'event-form-move',
+		'integrate-woocommerce-persist-list-attribution',
+		'include-visitor-ip-header',
+		'include-visitor-ip-proxies',
+		'event-dailymotion',
+		'event-form-move-filled-only',
+		'integrate-wpcf7-ga4events',
+		'gtm-code-placement',
+		'event-spotify',
+		'event-media-dynamic',
+		'event-html5-media',
+		'integrate-woocommerce-transaction-id-prefix',
+		'integrate-woocommerce-product-per-impression',
+		'event-dailymotion-playerid',
+		'integrate-woocommerce-purchase-track-statuses',
+		'integrate-woocommerce-checkoutwc',
+		'integrate-woocommerce-clear-ecommerce-datalayer',
+		'include-visitor-ip',
+		'integrate-woocommerce-order-max-age',
+		'integrate-wpcf7-inputs',
+		'include-primary-category',
+		'event-twitch',
+	);
+
+	public function test_field_descriptions_stay_short(): void {
+		$long = array();
+
+		foreach ( $this->builtin_modules() as $module ) {
+			$schema_class = $module->admin_schema();
+
+			foreach ( ( new $schema_class() )->fields() as $field ) {
+				$words = count( preg_split( '/\s+/', trim( strip_tags( (string) $field->description ) ), -1, PREG_SPLIT_NO_EMPTY ) );
+
+				if ( $words > self::DESCRIPTION_MAX_WORDS ) {
+					$long[ $field->key ] = $words;
+				}
+			}
+		}
+
+		$unexpected = array_diff_key( $long, array_flip( self::LONG_DESCRIPTIONS_UNTIL_2_2 ) );
+		$this->assertSame( array(), $unexpected, 'Over ' . self::DESCRIPTION_MAX_WORDS . ' words: keep what to know before turning it on, move the rest to the docs page behind the "?".' );
+
+		$shortened = array_diff( self::LONG_DESCRIPTIONS_UNTIL_2_2, array_keys( $long ) );
+		$this->assertSame( array(), array_values( $shortened ), 'Now short enough (or gone): remove it from LONG_DESCRIPTIONS_UNTIL_2_2.' );
 	}
 }

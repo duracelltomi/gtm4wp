@@ -334,7 +334,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Output values in the default language', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'On multilingual sites (WPML or Polylang), output the language dependent page variables - post title, category slugs, tags and taxonomy terms - in the site\'s default (master) language instead of the translated one, so Google Analytics can combine reports across all languages instead of splitting them per translation. The values are replaced in place (no extra data layer variables). Requires WPML, Polylang or a callback on the gtm4wp_master_language_post_id / gtm4wp_master_language_term_id filters; on a single-language site or an untranslated page the current values are unchanged. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'On WPML or Polylang sites, outputs the post title, category slugs, tags and taxonomy terms in the site\'s default language, so Google Analytics combines all translations of a page. The variables keep their names.', 'duracelltomi-google-tag-manager' ),
 				group: 'content',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_POST,
@@ -454,7 +454,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Cloudflare country code', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Add the country code of the user provided by Cloudflare (if Cloudflare is used with your site). With trusted proxy addresses configured above, the header is read only for requests that arrived through one of them; without them it is read as sent.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the visitor\'s country code from Cloudflare, if your site runs behind Cloudflare. With trusted proxy addresses set above, the header is read only from requests that came through them.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_GEO
