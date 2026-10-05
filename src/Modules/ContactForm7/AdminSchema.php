@@ -115,11 +115,11 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Report the form name in the default language', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'On multilingual sites (WPML or Polylang), report the Contact Form 7 form name (form_name in the data layer) in the site\'s default (master) language instead of the translated form title, so submissions of the same form in several languages combine in Google Analytics reports. Requires WPML or Polylang and forms translated as separate form entries; on a single-language site, an untranslated form, or a form translated only through string translation the current title is unchanged. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'On multilingual sites (WPML or Polylang), report the Contact Form 7 form name (form_name in the data layer) in the site\'s default (master) language instead of the translated form title, so submissions of the same form in several languages combine in Google Analytics reports. Requires WPML, Polylang or a callback on the gtm4wp_master_language_post_id filter, and forms translated as separate form entries; on a single-language site, an untranslated form, or a form translated only through string translation the current title is unchanged. Experimental: correctness depends on the multilingual plugin\'s API. Off by default.', 'duracelltomi-google-tag-manager' ),
 				group: 'cf7',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_PAGE,
-				unavailable: DefaultLanguage::unavailable_reason()
+				unavailable: DefaultLanguage::unavailable_reason( false )
 			),
 		);
 	}

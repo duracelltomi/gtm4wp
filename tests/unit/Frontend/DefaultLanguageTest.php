@@ -42,36 +42,68 @@ final class DefaultLanguageTest extends TestCase {
 	public function test_unavailable_reason_names_the_missing_plugins_when_nothing_can_resolve(): void {
 		Functions\stubTranslationFunctions();
 
-		$reason = DefaultLanguage::unavailable_reason();
+		$reason = DefaultLanguage::unavailable_reason( true );
 
 		$this->assertStringContainsString( 'WPML or Polylang', $reason );
 		// #361: a hedge, since a frontend-only filter is invisible in wp-admin.
 		$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $reason );
+		$this->assertStringContainsString( 'gtm4wp_master_language_term_id', $reason );
 		$this->assertStringNotContainsString( 'neither is active', $reason );
+	}
+
+	/**
+	 * An option that resolves posts only is not told about the term filter
+	 * (#366).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_unavailable_reason_names_only_the_post_filter_for_a_post_only_option(): void {
+		Functions\stubTranslationFunctions();
+
+		$reason = DefaultLanguage::unavailable_reason( false );
+
+		$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $reason );
+		$this->assertStringNotContainsString( 'gtm4wp_master_language_term_id', $reason );
 	}
 
 	public function test_unavailable_reason_is_empty_with_wpml(): void {
 		Functions\stubTranslationFunctions();
 		add_filter( 'wpml_current_language', static fn () => 'de' );
 
-		$this->assertSame( '', DefaultLanguage::unavailable_reason() );
+		$this->assertSame( '', DefaultLanguage::unavailable_reason( true ) );
+		$this->assertSame( '', DefaultLanguage::unavailable_reason( false ) );
 	}
 
 	/**
-	 * A third-party callback on either resolution filter keeps the options
+	 * A third-party callback on a resolution filter the option reaches keeps it
 	 * available: the filters are public API for other multilingual plugins.
 	 *
-	 * @param string $filter The resolution filter a third party hooks.
+	 * @param string $filter         The resolution filter a third party hooks.
+	 * @param bool   $resolves_terms Whether the option resolves terms too.
 	 */
 	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
 	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
-	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_post_id' ) )]
-	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_term_id' ) )]
-	public function test_unavailable_reason_is_empty_with_a_resolution_filter_callback( string $filter ): void {
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_post_id', true ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_post_id', false ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'gtm4wp_master_language_term_id', true ) )]
+	public function test_unavailable_reason_is_empty_with_a_resolution_filter_callback( string $filter, bool $resolves_terms ): void {
 		Functions\stubTranslationFunctions();
 		add_filter( $filter, static fn ( $resolved ) => $resolved );
 
-		$this->assertSame( '', DefaultLanguage::unavailable_reason() );
+		$this->assertSame( '', DefaultLanguage::unavailable_reason( $resolves_terms ) );
+	}
+
+	/**
+	 * A term-filter callback cannot affect an option that resolves posts only,
+	 * so its note stays (#366).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_term_filter_callback_keeps_the_note_of_a_post_only_option(): void {
+		Functions\stubTranslationFunctions();
+		add_filter( 'gtm4wp_master_language_term_id', static fn ( $resolved ) => $resolved );
+
+		$this->assertNotSame( '', DefaultLanguage::unavailable_reason( false ) );
 	}
 
 	public function test_non_positive_ids_are_returned_unchanged(): void {

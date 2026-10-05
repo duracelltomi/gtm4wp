@@ -35,16 +35,24 @@ final class DefaultLanguage {
 	 * Admin note for the master-language options: '' while WPML, Polylang or a
 	 * callback on the resolution filters is visible, otherwise a hedge. Only a
 	 * hedge: it runs in wp-admin, where a frontend-only callback is invisible
-	 * (RI-38, #361), so the control is never disabled on it.
+	 * (RI-38, #361), so the control is never disabled on it. Only the filters
+	 * the option reaches count, and only those are named (#366).
 	 *
+	 * @param bool $resolves_terms Whether the option resolves terms (term_id()) as well as posts.
 	 * @return string
 	 */
-	public static function unavailable_reason(): string {
-		if ( self::is_active() || has_filter( 'gtm4wp_master_language_post_id' ) || has_filter( 'gtm4wp_master_language_term_id' ) ) {
+	public static function unavailable_reason( bool $resolves_terms ): string {
+		if (
+			self::is_active()
+			|| has_filter( 'gtm4wp_master_language_post_id' )
+			|| ( $resolves_terms && has_filter( 'gtm4wp_master_language_term_id' ) )
+		) {
 			return '';
 		}
 
-		return __( 'No WPML or Polylang detected. Without one, this option only takes effect through the gtm4wp_master_language_post_id / gtm4wp_master_language_term_id filters.', 'duracelltomi-google-tag-manager' );
+		return $resolves_terms
+			? __( 'No WPML or Polylang detected. Without one, this option only takes effect through the gtm4wp_master_language_post_id / gtm4wp_master_language_term_id filters.', 'duracelltomi-google-tag-manager' )
+			: __( 'No WPML or Polylang detected. Without one, this option only takes effect through the gtm4wp_master_language_post_id filter.', 'duracelltomi-google-tag-manager' );
 	}
 
 	/**

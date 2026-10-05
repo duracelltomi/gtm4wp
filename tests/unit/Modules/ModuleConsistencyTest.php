@@ -110,6 +110,68 @@ final class ModuleConsistencyTest extends TestCase {
 		$this->assertSame( $expected, $unavailable );
 	}
 
+	/**
+	 * Each master-language note and description names only the resolution
+	 * filters its option reaches: page variables resolve terms, the other three
+	 * only posts (#366).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_master_language_notes_name_only_the_filters_each_option_reaches(): void {
+		$fields = $this->master_language_fields();
+
+		foreach ( $fields as $key => $field ) {
+			$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $field->unavailable, $key );
+			$this->assertStringContainsString( 'gtm4wp_master_language_post_id', $field->description, $key );
+		}
+
+		$this->assertStringContainsString( 'gtm4wp_master_language_term_id', $fields[ GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE ]->unavailable );
+		$this->assertStringContainsString( 'gtm4wp_master_language_term_id', $fields[ GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE ]->description );
+
+		foreach ( array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE ) as $key ) {
+			$this->assertStringNotContainsString( 'gtm4wp_master_language_term_id', $fields[ $key ]->unavailable, $key );
+			$this->assertStringNotContainsString( 'gtm4wp_master_language_term_id', $fields[ $key ]->description, $key );
+		}
+	}
+
+	/**
+	 * A term-filter callback can only affect page variables, so it clears that
+	 * note alone (#366).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_term_filter_callback_clears_only_the_option_that_resolves_terms(): void {
+		add_filter( 'gtm4wp_master_language_term_id', static fn ( $resolved ) => $resolved );
+
+		$fields = $this->master_language_fields();
+
+		$this->assertSame( '', $fields[ GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE ]->unavailable );
+		foreach ( array( GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE ) as $key ) {
+			$this->assertNotSame( '', $fields[ $key ]->unavailable, $key );
+		}
+	}
+
+	/**
+	 * The four master-language fields, keyed by option key.
+	 *
+	 * @return array<string, \GTM4WP\Options\Field>
+	 */
+	private function master_language_fields(): array {
+		$keys   = array( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_WCMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_EDDMASTERLANGUAGE, GTM4WP_OPTION_INTEGRATE_WPCF7_MASTERLANGUAGE );
+		$fields = array();
+		foreach ( $this->builtin_modules() as $module ) {
+			$schema_class = $module->admin_schema();
+			foreach ( ( new $schema_class() )->fields() as $field ) {
+				if ( in_array( $field->key, $keys, true ) ) {
+					$fields[ $field->key ] = $field;
+				}
+			}
+		}
+		$this->assertCount( 4, $fields );
+
+		return $fields;
+	}
+
 	public function test_master_language_options_are_available_with_wpml(): void {
 		add_filter( 'wpml_current_language', static fn () => 'de' );
 
