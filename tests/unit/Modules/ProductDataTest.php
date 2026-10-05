@@ -462,6 +462,65 @@ final class ProductDataTest extends TestCase {
 		$this->assertArrayNotHasKey( 'item_list_id', $item, 'No list context means no item_list_id.' );
 	}
 
+	public function test_bundle_with_out_of_stock_contents_reports_outofstock(): void {
+		// #474: the bundle's own status says instock, its contents are sold out.
+		$item = $this->make_product_data()->process_product(
+			new \WC_Product_Bundle(
+				array(
+					'id'                         => 20571,
+					'stock_status'               => 'instock',
+					'bundled_items_stock_status' => 'outofstock',
+				)
+			),
+			array(),
+			'productdetail'
+		);
+
+		$this->assertSame( 'outofstock', $item['stockstatus'] );
+		$this->assertNull( $item['stocklevel'], 'stocklevel still comes from the bundle itself.' );
+	}
+
+	public function test_bundle_with_in_stock_contents_keeps_its_own_status(): void {
+		$item = $this->make_product_data()->process_product(
+			new \WC_Product_Bundle(
+				array(
+					'stock_status'               => 'onbackorder',
+					'bundled_items_stock_status' => 'instock',
+				)
+			),
+			array(),
+			'productdetail'
+		);
+
+		$this->assertSame( 'onbackorder', $item['stockstatus'] );
+	}
+
+	public function test_bundle_type_without_the_bundle_getter_keeps_its_own_status(): void {
+		// UC-2: an older or different bundle plugin without the getter must not fatal.
+		$item = $this->make_product_data()->process_product(
+			$this->make_product( array( 'type' => 'bundle' ) ),
+			array(),
+			'productdetail'
+		);
+
+		$this->assertSame( 'instock', $item['stockstatus'] );
+	}
+
+	public function test_bundled_items_status_is_read_only_for_the_bundle_type(): void {
+		$item = $this->make_product_data()->process_product(
+			new \WC_Product_Bundle(
+				array(
+					'type'                       => 'simple',
+					'bundled_items_stock_status' => 'outofstock',
+				)
+			),
+			array(),
+			'productdetail'
+		);
+
+		$this->assertSame( 'instock', $item['stockstatus'] );
+	}
+
 	public function test_affiliation_absent_by_default(): void {
 		// #348: item-level affiliation is empty by default (WooCommerce has no native
 		// value), so the item carries no affiliation key unless a filter supplies one.

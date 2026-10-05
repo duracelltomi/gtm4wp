@@ -364,6 +364,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Added: the plugin registers **abilities** with the WordPress Abilities API (WordPress 6.9+; nothing changes below that), so an AI assistant connected through the WordPress MCP Adapter or another client can read the configuration, help work out why tracking is not firing, and change a setting once you have confirmed it. Eleven abilities, six of them read-only, all requiring the settings capability and returning no keys and no visitor data. `gtm4wp_abilities_enabled` and `gtm4wp_abilities_allow_write` switch the surface off or keep it read-only. **Experimental.**
 * Changed: the admin notices about a missing container ID, an incomplete environment configuration, a malformed `GTM4WP_HARDCODED_*` constant, a visitor IP header with no trusted proxies and an unusable data layer variable name now carry a separate "Open the setting" link after the message. The same checks feed `gtm4wp/get-status`, so an assistant and the screen report the same problems.
 
+= 2.0.6 =
+
+* Fixed: a WooCommerce Product Bundles bundle reported `stockstatus` as `instock` in the e-commerce items even when one of its bundled products was out of stock and the bundle could not be bought; it now reports `outofstock`. Thanks to @KingWehsops for the report (#474).
+
 = 2.0.5 =
 
 * Fixed: the data layer initialisation block no longer contains the word `gtag`. Since 2.0.3, a JavaScript delay plugin with `gtag` on its keyword list, such as Flying Scripts, delayed the whole block and the browser console showed `dataLayer is not defined`. The Google tag developer ID is still set.
