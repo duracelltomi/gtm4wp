@@ -123,7 +123,9 @@ the check from a **fixed ref** instead, with the entry point outside the tree:
 ```bash
 mkdir -p ~/.githooks/gtm4wp
 # ~/.githooks/gtm4wp/gtm4wp-changelog-check  - materialises the script from a fixed ref:
-#   git show master:.claude/hooks/require-changelog.sh > "$TMP" || exit 1   # fail CLOSED
+#   git show-ref --verify -q refs/tags/master && exit 1                     # a tag would shadow it
+#   C=$(git rev-parse --verify -q 'refs/heads/master^{commit}') || exit 1
+#   git show "$C:.claude/hooks/require-changelog.sh" > "$TMP" || exit 1      # fail CLOSED
 #   exec bash "$TMP" "$@"
 # ~/.githooks/gtm4wp/commit-msg  - exec .../gtm4wp-changelog-check commitmsg "$1"
 git config core.hooksPath ~/.githooks/gtm4wp
@@ -132,11 +134,15 @@ git config core.hooksPath ~/.githooks/gtm4wp
 and point the `Stop` hook in `.claude/settings.json` at the same runner. The logic stays
 here, versioned and reviewed; only the copy that *executes* is pinned.
 
-Three things worth knowing before adopting it:
+Four things worth knowing before adopting it:
 
 - **Fail closed, deliberately.** The tempting one-liner `bash <(git show "$REF:$SRC")`
   fails **open** — an unresolvable path yields an empty script, `bash` runs nothing, exits
   0, and the commit sails through unchecked. Verified by measurement, not assumed.
+- **Pin the branch, never the bare name (#365).** `git show master:<path>` resolves a tag
+  named `master` before the branch, and fetching from a fork can import one. Resolve
+  `refs/heads/master` to a commit id first. Passing `refs/heads/master:<path>` as one
+  argument does not work under Git Bash, which rewrites it as a path list.
 - **An edit to `require-changelog.sh` takes effect once it is committed to the ref**, not
   while it sits uncommitted in your tree.
 - **It is local git config, so it protects one clone and propagates to none.** It is
