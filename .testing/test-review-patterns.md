@@ -186,6 +186,13 @@ Confirmed twice in Run 5 (2026-08-05), both found only by reverting:
   `--colors=never`), and the file was restored (`git checkout -- <file>` after each
   probe, tree clean at the end). Run an expected-red control alongside the
   expected-green ones so a broken harness cannot report every gap as confirmed.
+- **Probe mechanics (Run 16):** regex probes passed through the Bash tool lose
+  backslashes (`\$`, `\Q…\E` around a PHP `Namespace\Class`), so most came back
+  NO-OP; drive probes from a script file with **literal** find/replace strings
+  that must match exactly once. Stopping a background batch does not kill its
+  child shell — find and kill it, then check `git status`. And say before the first
+  probe that `src/` files will change for a moment: the maintainer sees the edits,
+  and the changelog Stop hook fires on an in-flight mutant (not a real change).
 
 ### TS-16: A green suite is not evidence of isolation — check the order ⭐
 TS-7 asks whether a test *resets* the state it writes. This asks the question one
@@ -271,6 +278,13 @@ a test comment claimed the pin existed elsewhere (T116). When a change removes o
 an escape upstream of a sink, re-pin the **sink** with the characters that now arrive raw,
 in the same change — and grep for any comment that credits a pin before trusting it.
 
+**Corollary — a presence check satisfied by a sibling block (Run 16, 2026-10-05).**
+`assertStringContainsString( '</script>', $output )` was written when the data-layer
+block always closed itself; after a refactor moved its opening tag inside a
+condition, the loader block's `</script>` satisfies it, and an unclosed data-layer
+`<script>` stays green (T128). On output that carries several blocks, assert the
+structure (`<script` and `</script>` counts equal), not one token's presence.
+
 ### TS-2: Escaping tests need both directions ⭐
 An XSS/escaping guard must assert the **safe** form is present **and** the **raw**
 break-out is absent. Asserting only "the encoded value appears" misses a case where
@@ -322,6 +336,13 @@ value the literal expects.
   with the cap: raise it to 512 and the fixture is 512 deep, still refused, still
   green. Caught by the close-time probe of T105b. The number in a boundary
   fixture is a literal, and the comment says which contract it is one past.
+- **The same tautology hides in a shared constant (Run 16).** `assertSame(
+  ReliablePurchase::FIELD_KEY, $field->key )` cannot fail when the constant's
+  value changes, and that value is a contract with something outside the class
+  (a JS handler map, a stored option key, a third party). Probe-green twice in
+  one run: the EDD one-shot key the JS hardcodes (T126) and the compat constants
+  (T133: 6 of 187 values appear as literals in any test). Where the value crosses
+  a boundary, the test writes the literal.
 
 ### TS-22: A stub that collapses two outputs the code must keep distinct
 
@@ -1044,6 +1065,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-10-05 (Run 16 — gaps closed) | Closed T124–T137 (one fork: T132 pinned as-is, stub made faithful to `WC_DateTime::date()`). **PHP 3360/18478 → 3393/18945; JS 1008 → 1009**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean. **31/31 survivors re-probed red.** Two reusable shapes: a cross-store contract lives in ONE test-support list both suites assert against (`OrderDataKeys`), and a public-constant table pins values with a completeness guard over the `define()`s, so a new constant cannot land unpinned. |
+| 2026-10-05 (Run 16 — reviews 40–45 pass, report only) | Reviewed `94d9251..ff09e37` (42 commits; findings #330–#364, EDD cache-safe delivery, WebToffee/YouTube removals, the object-only initial push) with 3 parallel read-only deep-reads, PCOV (97.78% lines) and **35 valid serial probes (30 survived → T124–T137)**; no tests written. No new number: **TS-21 bullet** (a shared constant on both sides of the assertion — T126/T133), **TS-1 corollary** (a presence check satisfied by a sibling block — T128), **TS-15 probe-mechanics bullet** (literal-string driver; kill the child shell; announce the temporary `src/` edits). The attachment lesson (T66/T75/T82) recurred a fifth time on the EDD wiring (T124/T125). |
 | 2026-09-28 (Run 15 — gaps closed) | Closed T116–T123 on the maintainer's "close straightforward, ask with options otherwise" go-ahead (two forks: UTC pinned in the bootstrap; the Services intro omits its link when the doc URL is removed — one production change, unreleased bullet edited). **PHP 3263/18049 → 3286/18118; JS 995 → 1001**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean; `build/` byte-identical. **Every survivor re-probed red.** TS-15 earned its keep once more: the first T123g draft asserted `null` from the resolvers and stayed green with the id check deleted, because the pluggable `is_user_logged_in()` gate in front of it answered first — a guard behind another guard needs the first one held open. |
 | 2026-09-28 (Run 15 — reviews 36–39 pass, report only) | Reviewed `3c31165..94d9251` (30 commits; findings #269–#329, Services module, developer ID, the #294 PageVariables split, jQuery-trigger containment) with 3 parallel read-only deep-reads, **PCOV coverage (97.37% lines — the scan-dir env makes it load)** and **31 serial main-thread probes (26 survived → T116–T123)**; no tests written. No new number: **TS-1 corollary** (removing a source-side escape moves the guard to the sink — re-pin the sink; T116, High, the main dataLayer sink had only `HEX_AMP` pinned), **TS-8 bullet** (timezone as a non-determinism axis seeds cannot see), **TS-17 bullets** (EDD bundle flipped to strict; jsdom lacks `[LegacyOverrideBuiltIns]`). Housekeeping: **TC-17** moved from below the Changelog into the conventions section and given a Quick Index line. |
 | 2026-09-23 (Run 14 — gaps closed) | Closed T106–T115 on the maintainer's "fix straightforward, ask with options otherwise" go-ahead (one fork: T110 → the confirm POST skips flag + consume while the order may still become trackable, a production change with an edited changelog bullet). **PHP 3204/16332 → 3226/17836**, declaration + 3 seeds identical; **JS 976 → 979**; `phpcs` exit 0; `lint:js` clean. **Every survivor mutation re-probed red**, T110 red on revert; SH-18 recorded `[-]` (unreachable behind the health store's own refusal). TS-22's recipe applied in the shape it prescribes: the marking translator now lives in the shared `ModuleSiteHealthTestCase`, the GDM Site Health test and the abilities test, and no `debug` line may carry the mark — no producer was leaking. Harness lesson: a jest loop over payloads trips the tracker's boot guard on the second pass; one case per `it`. |

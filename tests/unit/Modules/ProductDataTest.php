@@ -495,6 +495,22 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'onbackorder', $item['stockstatus'] );
 	}
 
+	public function test_bundle_with_backordered_contents_keeps_its_own_status(): void {
+		// Only sold-out contents override; backordered ones can still be bought (T137h).
+		$item = $this->make_product_data()->process_product(
+			new \WC_Product_Bundle(
+				array(
+					'stock_status'               => 'instock',
+					'bundled_items_stock_status' => 'onbackorder',
+				)
+			),
+			array(),
+			'productdetail'
+		);
+
+		$this->assertSame( 'instock', $item['stockstatus'] );
+	}
+
 	public function test_bundle_type_without_the_bundle_getter_keeps_its_own_status(): void {
 		// UC-2: an older or different bundle plugin without the getter must not fatal.
 		$item = $this->make_product_data()->process_product(
@@ -930,6 +946,52 @@ final class ProductDataTest extends TestCase {
 
 		$this->assertSame( hash( 'sha256', '+36201234567' ), $raw['customer']['billing']['phone_hash'] );
 		$this->assertNotSame( hash( 'sha256', '06201234567' ), $raw['customer']['billing']['phone_hash'] );
+	}
+
+	/**
+	 * Every path, not a sample: DownloadDataTest pins the EDD side against the
+	 * same list, so one GTM container reads both stores (T131).
+	 *
+	 * @return void
+	 */
+	public function test_raw_order_datalayer_key_paths_match_the_shared_store_contract(): void {
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'total'        => 100.0,
+				'currency'     => 'EUR',
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		$this->assertSame( OrderDataKeys::expected( OrderDataKeys::WOOCOMMERCE_ONLY ), OrderDataKeys::paths( $raw ) );
+	}
+
+	/**
+	 * WooCommerce's own WC_DateTime::date() formats the offset timestamp with
+	 * gmdate(), so a non-UTC store's orderData date is local wall time labelled
+	 * +00:00. Pinned as WooCommerce emits it; EDD emits true UTC (T132, routed
+	 * to /code-review).
+	 *
+	 * @return void
+	 */
+	public function test_raw_order_datalayer_date_is_woocommerce_offset_time(): void {
+		$created = new \WC_DateTime( '2026-10-01 08:30:00', new \DateTimeZone( 'UTC' ) );
+		$created->setTimezone( new \DateTimeZone( 'Europe/Budapest' ) );
+
+		$order = new \WC_Order(
+			array(
+				'order_number' => '1001',
+				'total'        => 100.0,
+				'currency'     => 'EUR',
+				'date_created' => $created,
+			)
+		);
+
+		$raw = $this->make_product_data()->get_raw_order_datalayer( $order, array() );
+
+		$this->assertSame( '2026-10-01T10:30:00+00:00', $raw['attributes']['date'] );
 	}
 
 	public function test_raw_order_datalayer_keeps_the_phone_hash_key_when_not_normalizable(): void {

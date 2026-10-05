@@ -527,7 +527,31 @@ final class ContainerCodeTest extends FrontendTestCase {
 		// still closes and the container still loads. This is what separates the
 		// fix from the defect - both omit a usable data layer, only one keeps GTM.
 		$this->assertStringContainsString( "'GTM-AAA111'", $output );
-		$this->assertStringContainsString( '</script>', $output );
+		// Balance, not presence: the loader block's own </script> would satisfy a
+		// presence check while an unclosed data-layer tag swallows the loader (T128).
+		$this->assertSame( substr_count( $output, '<script' ), substr_count( $output, '</script>' ) );
+	}
+
+	public function test_an_encode_failure_leaves_no_unclosed_script_without_a_loader(): void {
+		// Production-only on staging: no loader block follows, so nothing else
+		// can close a data-layer tag opened before the encode check (T128).
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn( array( 'brokenValue' => NAN ) );
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE       => 'GTM-AAA111',
+				GTM4WP_OPTION_PRODUCTIONONLY => true,
+			)
+		);
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringNotContainsString( 'var dataLayer_content', $output );
+		$this->assertSame( substr_count( $output, '<script' ), substr_count( $output, '</script>' ) );
 	}
 
 	/**

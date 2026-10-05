@@ -269,18 +269,6 @@ final class ScriptTagTest extends FrontendTestCase {
 	}
 
 	/**
-	 * #141: the guard that makes an unencodable value survivable.
-	 *
-	 * NAN is used deliberately rather than an invalid UTF-8 sequence: real
-	 * wp_json_encode() REPAIRS bad UTF-8 (_wp_json_sanity_check), so a test built
-	 * on that trigger would pass against the stub and prove nothing about
-	 * production. NAN fails in both, which is what makes this case faithful
-	 * (test-review TS-13 - the double must be no more permissive than the real
-	 * collaborator).
-	 *
-	 * @return void
-	 */
-	/**
 	 * #339: non-finite floats become `null`; every finite one prints exactly as
 	 * the plain cast did, so ordinary totals keep their short form (json_encode
 	 * under serialize_precision=-1 would print 0.15000000000000002 for 3 x 0.05).
@@ -296,6 +284,18 @@ final class ScriptTagTest extends FrontendTestCase {
 		$this->assertSame( '0.15', ScriptTag::number_literal( 3 * 0.05 ) );
 	}
 
+	/**
+	 * #141: the guard that makes an unencodable value survivable.
+	 *
+	 * NAN is used deliberately rather than an invalid UTF-8 sequence: real
+	 * wp_json_encode() REPAIRS bad UTF-8 (_wp_json_sanity_check), so a test built
+	 * on that trigger would pass against the stub and prove nothing about
+	 * production. NAN fails in both, which is what makes this case faithful
+	 * (test-review TS-13 - the double must be no more permissive than the real
+	 * collaborator).
+	 *
+	 * @return void
+	 */
 	public function test_json_literal_falls_back_to_the_null_literal_when_the_value_cannot_be_encoded(): void {
 		$literal = ScriptTag::json_literal( array( 'value' => NAN ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
 
@@ -369,6 +369,30 @@ final class ScriptTagTest extends FrontendTestCase {
 
 		$this->assertIsString( $json );
 		$this->assertStringContainsString( '"s":"caf', $json );
+	}
+
+	/**
+	 * The harness half of the test above: the plain (object) cast must still
+	 * throw in the double, as it does in core, or the #330 guards here, in
+	 * ContainerCodeTest and in VisitorDataEndpointTest prove nothing (T134).
+	 *
+	 * @return void
+	 */
+	public function test_the_repair_double_throws_on_a_plain_object_cast_like_core(): void {
+		$this->expectException( \Error::class );
+
+		// Iterating the NUL-keyed object raises a notice first, in core as here.
+		set_error_handler( static fn () => true, E_NOTICE | E_WARNING ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- scoped to this call.
+		try {
+			WpJsonEncodeWithRepair::encode(
+				(object) array(
+					"\0k" => 1,
+					's'   => "caf\xE9",
+				)
+			);
+		} finally {
+			restore_error_handler();
+		}
 	}
 
 	/**

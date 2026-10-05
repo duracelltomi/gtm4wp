@@ -235,7 +235,8 @@ final class EddReliablePurchaseTest extends TestCase {
 
 		$this->assertCount( 1, $fields );
 		$field = $fields[0];
-		$this->assertSame( ReliablePurchase::FIELD_KEY, $field->key );
+		// The literal: gtm4wp-visitor-data.js names this key in its action handlers (T126, TS-19).
+		$this->assertSame( 'eddPendingPurchase', $field->key );
 		$this->assertSame( VisitorField::TIER_ACTION, $field->tier );
 		$this->assertSame( ReliablePurchase::EVENT_COOKIE, $field->cookie_gate );
 		$this->assertTrue( $field->one_shot );
@@ -281,6 +282,33 @@ final class EddReliablePurchaseTest extends TestCase {
 		$this->assertArrayNotHasKey( 'orderData', $payload['push'], 'orderData stays on the confirmation page.' );
 		$this->assertSame( array(), $this->meta_writes, 'The GET is read-only: the flag is the beacon\'s job.' );
 		$this->assertSame( array(), $this->cookie_writes );
+	}
+
+	/**
+	 * Defense in depth behind the declaration gate: the resolver itself refuses
+	 * while the feature is off, before it reads the session (T137c).
+	 *
+	 * @return void
+	 */
+	public function test_resolver_returns_nothing_while_the_feature_is_off(): void {
+		$_COOKIE[ ReliablePurchase::EVENT_COOKIE ] = '1';
+		Functions\expect( 'edd_get_purchase_session' )->never();
+
+		$this->assertNull( $this->make( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => false ) + self::ALL_ON )->resolve_pending_purchase() );
+	}
+
+	/**
+	 * TS-11: the order number reaches the shared endpoint encoder raw; a
+	 * pre-escape here would corrupt the guard key the JS writes (T137d).
+	 *
+	 * @return void
+	 */
+	public function test_resolver_passes_a_special_character_order_number_raw(): void {
+		$_COOKIE[ ReliablePurchase::EVENT_COOKIE ] = '1';
+		$number                                    = "EDD\x26\x22\x3C0077\x27";
+		$this->set_order( $this->make_order( array( 'order_number' => $number ) ) );
+
+		$this->assertSame( $number, $this->make()->resolve_pending_purchase()['orderNumber'] );
 	}
 
 	public function test_resolver_ignores_request_supplied_order_identifiers(): void {
@@ -472,7 +500,8 @@ final class EddReliablePurchaseTest extends TestCase {
 
 		Functions\when( 'get_option' )->justReturn( self::ALL_ON );
 		ReliablePurchase::register_flag_hooks( new Options( ( new EasyDigitalDownloadsModule() )->defaults() ) );
-		$this->assertTrue( has_action( 'edd_built_order' ) );
+		// The binding itself, not just "something is hooked" (T125, TS-3).
+		$this->assertSame( 20, has_action( 'edd_built_order', ReliablePurchase::class . '->flag_event()' ) );
 
 		$this->make()->flag_event();
 

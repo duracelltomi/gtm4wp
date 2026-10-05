@@ -380,5 +380,8 @@ final class ContainerAdminSchemaTest extends TestCase {
 
 		// Nothing checked stores an empty string, matching the default.
 		$this->assertSame( '', $field->sanitize( array() ) );
+
+		// #349: entries that sanitize to nothing leave no empty slot (T137f).
+		$this->assertSame( 'administrator,editor', $field->sanitize( array( 'administrator', '', '<>', 'editor' ) ) );
 	}
 }

@@ -382,14 +382,29 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
-	 * T40 (#141 at the call site): the encode-failure guard is pinned at
-	 * ScriptTag::json_literal() itself, but reverting THIS call site to a bare
-	 * wp_json_encode() left the whole suite green - and this is the one checkout
-	 * sink third-party code can actually poison, because every item passes the
-	 * public product-array filter. An unencodable value must cost the value, not
-	 * the block: `= null;`, never `= ;` (a SyntaxError that would take the
-	 * checkout globals and their reader down with it).
+	 * #339 kept the finite output byte-identical to the old `(float)` print: an
+	 * imprecise sum stays `0.15`, never `null` nor `0.15000000000000002` (T127).
 	 */
+	public function test_checkout_value_prints_a_finite_total_as_before(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ) ); // phpcs:ignore
+
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->andReturnUsing(
+				static function ( $product_array ) {
+					$product_array['price'] = 0.05;
+					return $product_array;
+				}
+			);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value    = 0.15;', $this->inline_for( 'gtm4wp-woocommerce' )['code'] );
+	}
+
 	/**
 	 * #339: a non-finite total printed as a PHP float is `INF`/`NAN`, an undeclared
 	 * identifier in JS (ReferenceError). It must print `null`.
@@ -416,6 +431,15 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'INF', $checkout );
 	}
 
+	/**
+	 * T40 (#141 at the call site): the encode-failure guard is pinned at
+	 * ScriptTag::json_literal() itself, but reverting THIS call site to a bare
+	 * wp_json_encode() left the whole suite green - and this is the one checkout
+	 * sink third-party code can actually poison, because every item passes the
+	 * public product-array filter. An unencodable value must cost the value, not
+	 * the block: `= null;`, never `= ;` (a SyntaxError that would take the
+	 * checkout globals and their reader down with it).
+	 */
 	public function test_checkout_products_fall_back_to_null_when_an_item_cannot_be_encoded(): void {
 		Functions\when( 'is_checkout' )->justReturn( true );
 

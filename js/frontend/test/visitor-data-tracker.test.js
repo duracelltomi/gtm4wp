@@ -2155,6 +2155,27 @@ describe( 'gtm4wp-visitor-data — store blocks from the endpoint', () => {
 		expect( store.gates.gtm4wp_edd_state ).toBeUndefined();
 	} );
 
+	it( 'drops the cache entry when a refresh answer lacks a gated key', async () => {
+		setCookie( 'gtm4wp_edd_state', 'h1' );
+		window.gtm4wp_visitordata_config = eddConfig();
+		mockEndpointOnce( { eddVisitorCart: block( [ { item_id: '55' } ] ) } );
+		loadTracker();
+		await flush();
+
+		// The gate moved on, but the answer is incomplete: caching it under h2
+		// would replay nothing until the gate changes again (T137a).
+		setCookie( 'gtm4wp_edd_state', 'h2' );
+		mockEndpointOnce( {} );
+		refresh();
+		await waitForRefresh();
+		await flush();
+
+		const store = JSON.parse(
+			window.sessionStorage.getItem( 'gtm4wp_visitor_session' )
+		);
+		expect( store.gates.gtm4wp_edd_state ).toBeUndefined();
+	} );
+
 	it( 'ignores the refresh event when no block is configured', async () => {
 		setCookie( 'gtm4wp_login', 'abc' );
 		window.gtm4wp_visitordata_config = eddConfig( {

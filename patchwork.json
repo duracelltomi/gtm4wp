@@ -1,3 +1,3 @@
 {
-	"redefinable-internals": ["headers_sent", "setcookie"]
+	"redefinable-internals": ["headers_sent", "setcookie", "header_remove"]
 }

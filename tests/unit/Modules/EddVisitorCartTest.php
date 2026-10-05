@@ -426,6 +426,13 @@ final class EddVisitorCartTest extends TestCase {
 	}
 
 	public function test_no_state_hooks_while_the_mode_is_off(): void {
+		// EDD present, so only the mode can refuse: without the stub this passed
+		// alone on platform absence (T135, TS-16).
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		if ( ! defined( 'EDD_VERSION' ) ) {
+			define( 'EDD_VERSION', '3.7.0' );
+		}
+
 		VisitorCart::register_state_hooks( $this->options( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => false ) + self::ALL_ON ) );
 
 		$this->assertFalse( has_action( 'edd_post_add_to_cart' ) );

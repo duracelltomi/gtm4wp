@@ -98,6 +98,29 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 400, $result->get_error_data()['status'] );
 	}
 
+	/**
+	 * The field's note reaches the assistant: without WPML, Polylang or a
+	 * resolution filter the master-language option says it is not in effect
+	 * (T137j; the case below only ever saw ''). Own process: several suites
+	 * stub pll_get_post process-wide (TS-16).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_include_schema_passes_the_unavailable_note_through(): void {
+		$this->assertFalse( function_exists( 'pll_get_post' ), 'Precondition: no Polylang in this process.' );
+
+		$result = $this->execute(
+			SettingsAbilities::GET_SETTINGS,
+			array(
+				'keys'           => array( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE ),
+				'include_schema' => true,
+			)
+		);
+
+		$this->assertSame( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE, $result['fields'][0]['key'] );
+		$this->assertStringContainsString( 'No WPML or Polylang detected', $result['fields'][0]['unavailable'] );
+	}
+
 	public function test_include_schema_describes_each_returned_option_in_plain_text(): void {
 		$result = $this->execute(
 			SettingsAbilities::GET_SETTINGS,

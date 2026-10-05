@@ -694,6 +694,36 @@ final class DownloadDataTest extends TestCase {
 		$this->assertArrayNotHasKey( 'email', $order_data['customer'] );
 	}
 
+	/**
+	 * Every path, not a sample: ProductDataTest pins the WooCommerce side against
+	 * the same list (T131).
+	 *
+	 * @return void
+	 */
+	public function test_raw_order_datalayer_key_paths_match_the_shared_store_contract(): void {
+		$download_data = $this->make_download_data();
+		$order         = $this->make_order();
+
+		$order_data = $download_data->get_raw_order_datalayer( $order, $download_data->process_order_items( $order ) );
+
+		$this->assertSame( OrderDataKeys::expected( OrderDataKeys::EDD_ONLY ), OrderDataKeys::paths( $order_data ) );
+	}
+
+	/**
+	 * An unparseable creation date is passed through as stored, not dropped
+	 * (T137i). EDD's own dates are UTC, so a parseable one is true UTC.
+	 *
+	 * @return void
+	 */
+	public function test_raw_order_datalayer_passes_an_unparseable_date_through(): void {
+		$download_data = $this->make_download_data();
+		$order         = $this->make_order( array( 'date_created' => 'not a date' ) );
+
+		$order_data = $download_data->get_raw_order_datalayer( $order, $download_data->process_order_items( $order ) );
+
+		$this->assertSame( 'not a date', $order_data['attributes']['date'] );
+	}
+
 	public function test_raw_order_datalayer_passes_customer_and_coupon_values_raw(): void {
 		// TS-11 raw-passthrough contract: these values feed the shared
 		// hex-flag wp_json_encode() sink, which escapes once and correctly for

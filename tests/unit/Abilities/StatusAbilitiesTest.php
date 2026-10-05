@@ -109,6 +109,9 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 			array_keys( $status ),
 			'The key order of the contract.'
 		);
+		// The schema declares exactly what the answer carries: the output walker
+		// accepts an undeclared key, so a dropped schema entry was green (T137g).
+		$this->assertSame( array_keys( $status ), array_keys( $this->registered[ StatusAbilities::GET_STATUS ]['output_schema']['properties'] ) );
 		$this->assertStringNotContainsString( 'auth-token', (string) json_encode( $status ), 'The environment parameters travel to the browser in the loader URL, but an assistant only needs to know they are set.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	}
 

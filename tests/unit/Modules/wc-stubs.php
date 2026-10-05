@@ -11,10 +11,16 @@
 // phpcs:disable
 
 if ( ! class_exists( 'WC_DateTime' ) ) {
-	// WooCommerce's WC_DateTime extends \DateTime and adds a date() helper.
+	// WooCommerce's WC_DateTime extends \DateTime and adds a date() helper. Same
+	// bodies as WooCommerce: date() is gmdate() on the OFFSET timestamp, so 'c'
+	// labels local wall time +00:00 (T132; format( 'c' ) would be more correct
+	// than the real class, TS-13).
 	class WC_DateTime extends \DateTime {
+		public function getOffsetTimestamp() {
+			return $this->getTimestamp() + $this->getOffset();
+		}
 		public function date( $format ) {
-			return $this->format( $format );
+			return gmdate( $format, $this->getOffsetTimestamp() );
 		}
 	}
 }

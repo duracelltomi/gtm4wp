@@ -20,8 +20,8 @@ use GTM4WP\RestCors;
  * WooCommerce-session-derived data, and any token the route hands out (#78/#90).
  *
  * The decision to strip those headers is split out from the header calls so it can be
- * asserted; the header() calls themselves have no observable effect in a unit test,
- * which is exactly why the logic does not live inside them.
+ * asserted on its own; the removals themselves are recorded through Patchwork
+ * (header_remove is redefinable in patchwork.json).
  */
 final class RestCorsTest extends TestCase {
 
@@ -118,6 +118,48 @@ final class RestCorsTest extends TestCase {
 
 		$this->assertTrue( RestCors::restrict_cors( true, null, $request ) );
 		$this->assertFalse( RestCors::restrict_cors( false, null, $request ) );
+	}
+
+	/**
+	 * The header calls are observable through Patchwork (patchwork.json makes
+	 * header_remove redefinable): a revoked grant removes all three, a kept one
+	 * none (T136).
+	 *
+	 * @param string   $route    The REST route.
+	 * @param string   $origin   The request Origin.
+	 * @param string[] $expected The headers that must be removed, in order.
+	 */
+	#[\PHPUnit\Framework\Attributes\TestWith( array( '/gtm4wp/v2/visitor-data', 'https://evil.example', array( 'Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials', 'Access-Control-Allow-Methods' ) ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( '/gtm4wp/v2/visitor-data', 'https://shop.example', array() ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( '/wp/v2/posts', 'https://evil.example', array() ) )]
+	public function test_restrict_cors_removes_the_reflected_headers_only_when_restricted( string $route, string $origin, array $expected ): void {
+		$this->stub_url_helpers();
+		Functions\when( 'get_http_origin' )->justReturn( $origin );
+
+		$removed = array();
+		Functions\when( 'header_remove' )->alias(
+			static function ( $name = null ) use ( &$removed ) {
+				$removed[] = $name;
+			}
+		);
+
+		$request = new \WP_REST_Request();
+		$request->set_route( $route );
+
+		RestCors::restrict_cors( true, null, $request );
+
+		$this->assertSame( $expected, $removed );
+	}
+
+	/**
+	 * Both callbacks take three arguments; registered with fewer, WordPress
+	 * would call them short and refuse_jsonp() would throw on every REST request.
+	 */
+	public function test_register_passes_all_three_hook_arguments(): void {
+		\Brain\Monkey\Filters\expectAdded( 'rest_pre_serve_request' )->once()->with( array( RestCors::class, 'restrict_cors' ), 11, 3 );
+		\Brain\Monkey\Filters\expectAdded( 'rest_pre_dispatch' )->once()->with( array( RestCors::class, 'refuse_jsonp' ), 10, 3 );
+
+		RestCors::register();
 	}
 
 	public function test_restrict_cors_ignores_a_non_request_argument(): void {

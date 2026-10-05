@@ -159,6 +159,28 @@ final class BlacklistModuleTest extends TestCase {
 		$this->assertArrayNotHasKey( 'gtm.blocklist', $data_layer );
 	}
 
+	/**
+	 * #344 added a Site Health warning and kept the output: an allowlist with no
+	 * valid entry still emits an EMPTY allowlist, which blocks everything. Leaving
+	 * the key out would let every tag run - the restriction failing open (T129).
+	 *
+	 * @param mixed $stored The stored status, in either shape.
+	 */
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'evil,nope' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( array( 'evil', 'nope' ) ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( '' ) )]
+	public function test_allowlist_with_no_valid_entry_still_emits_an_empty_allowlist( $stored ): void {
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 2,
+				GTM4WP_OPTION_BLACKLIST_STATUS => $stored,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'gtm.allowlist', $data_layer );
+		$this->assertSame( array(), $data_layer['gtm.allowlist'] );
+	}
+
 	public function test_sandboxed_scripts_group_class_is_restrictable(): void {
 		// sandboxedScripts is a valid GTM group class with no individual entity
 		// ID equivalent - it lives in the group-class list, not the entity table.

@@ -13,6 +13,8 @@ use GTM4WP\Frontend\DataLayer;
 use GTM4WP\Frontend\Frontend;
 use GTM4WP\Frontend\ScriptTag;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
+use GTM4WP\Modules\EasyDigitalDownloads\ReliablePurchase;
+use GTM4WP\Modules\EasyDigitalDownloads\VisitorCart;
 use GTM4WP\Options\Options;
 use GTM4WP\Plugin;
 use GTM4WP\Tests\unit\TestCase;
@@ -116,6 +118,7 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertFalse( has_action( 'edd_checkout_cart_item_title_after' ) );
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY ) );
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS ) );
+		$this->assertFalse( has_action( 'rest_api_init' ) );
 	}
 
 	public function test_wires_datalayer_markup_and_script_hooks_when_tracking_enabled(): void {
@@ -128,7 +131,11 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertNotFalse( has_action( 'edd_checkout_cart_item_title_after' ), 'The checkout cart row data must be injected.' );
 		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( $module, 'enqueue_scripts' ) ) );
 		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array( $module, 'add_global_vars' ) ) );
-		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS ), 'The cache-safe customer/cart block must be declared (it self-gates on the mode).' );
+		// Each declarer by class: a callback-less has_filter() is satisfied by either one (T124).
+		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, VisitorCart::class . '->declare_visitor_scoped_fields()' ), 'The cache-safe customer/cart block must be declared (it self-gates on the mode).' );
+		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, ReliablePurchase::class . '->declare_visitor_scoped_fields()' ), 'The reliable-purchase one-shot must be declared (it self-gates on the mode).' );
+		// The A0 confirm beacon's route: rung 3 of TS-12, the WooCommerce sibling is ModuleHooksTest (T39).
+		$this->assertNotFalse( has_action( 'rest_api_init', ReliablePurchase::class . '->register_confirm_route()' ) );
 	}
 
 	public function test_global_vars_carry_the_edd_settings(): void {

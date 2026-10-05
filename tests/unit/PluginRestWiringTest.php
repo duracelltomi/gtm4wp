@@ -392,6 +392,53 @@ final class PluginRestWiringTest extends TestCase {
 	}
 
 	/**
+	 * EDD changes the cart and builds orders on admin-ajax and REST requests, so
+	 * the two cache-safe cookie registrars run from Plugin::boot(), not the
+	 * frontend branch. EddVisitorCartTest and EddReliablePurchaseTest call them
+	 * directly; this is the boot-level half that could be deleted with both
+	 * green (T125). Both directions of the option gate.
+	 */
+	public function test_boot_wires_the_edd_cache_safe_cookie_hooks_while_the_mode_is_on(): void {
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		if ( ! defined( 'EDD_VERSION' ) ) {
+			define( 'EDD_VERSION', '3.7.0' );
+		}
+
+		$this->boot_and_capture_rest_api_init(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER        => true,
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA   => true,
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true,
+			)
+		);
+
+		$this->assertSame( 20, has_action( 'edd_post_add_to_cart', 'GTM4WP\Modules\EasyDigitalDownloads\VisitorCart->maintain_state_cookie()' ) );
+		$this->assertSame( 20, has_action( 'wp_logout', 'GTM4WP\Modules\EasyDigitalDownloads\VisitorCart->maintain_state_cookie()' ) );
+		$this->assertSame( 20, has_action( 'edd_built_order', 'GTM4WP\Modules\EasyDigitalDownloads\ReliablePurchase->flag_event()' ) );
+	}
+
+	public function test_boot_wires_no_edd_cache_safe_cookie_hooks_while_the_mode_is_off(): void {
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		if ( ! defined( 'EDD_VERSION' ) ) {
+			define( 'EDD_VERSION', '3.7.0' );
+		}
+
+		$this->boot_and_capture_rest_api_init(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER        => false,
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA   => true,
+				GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true,
+			)
+		);
+
+		$this->assertFalse( has_action( 'edd_post_add_to_cart' ) );
+		$this->assertFalse( has_action( 'wp_logout' ) );
+		$this->assertFalse( has_action( 'edd_built_order' ) );
+	}
+
+	/**
 	 * The permission callbacks bound to methods of the given controller class.
 	 *
 	 * @param string $controller_class Controller class name.

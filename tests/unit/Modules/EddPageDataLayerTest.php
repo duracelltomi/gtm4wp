@@ -755,6 +755,32 @@ final class EddPageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * No tracker handle means no reader: neither an inline script nor a footer
+	 * block (the WooCommerce sibling's case, T137b).
+	 */
+	public function test_tracker_globals_are_dropped_when_the_tracker_is_not_enqueued(): void {
+		Functions\when( 'edd_is_checkout' )->justReturn( true );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+		Functions\when( 'wp_script_is' )->justReturn( false );
+
+		$page_datalayer = $this->make_page_datalayer();
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertSame( '', $this->inline_script_output( 'gtm4wp-edd' ) );
+		$this->assertFalse( has_action( 'wp_footer', array( $page_datalayer, 'print_deferred_js' ) ) );
+	}
+
+	/**
 	 * #340: a site can filter the EDD tracker into the <head>, where it is printed
 	 * at wp_head 9, before this runs at 10. Core's wp_add_inline_script() still
 	 * returns true for the printed handle, so the globals must go to the footer
@@ -816,6 +842,37 @@ final class EddPageDataLayerTest extends TestCase {
 
 		$this->assertStringContainsString( 'window.gtm4wp_checkout_products', $this->inline_script_output( 'gtm4wp-edd' ) );
 		$this->assertFalse( has_action( 'wp_footer', array( $page_datalayer, 'print_deferred_js' ) ) );
+	}
+
+	/**
+	 * #339 kept the finite output byte-identical to the old `(float)` print: an
+	 * imprecise sum stays `0.15`, never `null` nor `0.15000000000000002` (T127).
+	 */
+	public function test_checkout_value_prints_a_finite_total_as_before(): void {
+		Functions\when( 'edd_is_checkout' )->justReturn( true );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 3,
+					'price'    => 0.05,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )
+			->andReturnUsing(
+				static function ( $item ) {
+					$item['price'] = 0.05;
+					return $item;
+				}
+			);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value    = 0.15;', $this->inline_script_output( 'gtm4wp-edd' ) );
 	}
 
 	/**
