@@ -36,6 +36,7 @@ Each row is `ID — one-line litmus`.
 | UD-22 ⭐ | Registry ids are assigned from `max(id on master)+1` at the moment of writing, and a merge touching a ledger re-runs the duplicate-id check first; when it has happened, the earliest row keeps its id and every cross-reference is re-pointed by meaning. |
 | UD-23 | A behaviour whose spec page sunset is a coupling with no source: the row records the nearest documented cousin plus a measurement recipe, and is rated as drifted until the measurement has run. |
 | UD-24 ⭐ | A drift sensor is itself coupled to our file layout: a scheduled diff over a path that no longer exists exits clean forever. Audit a sensor by running its generator once and diffing **what it actually writes**, never by reading its last green run. |
+| UD-25 | A comment justifying a dependency by upstream's implementation technology ("React-only") is an unregistered coupling: upstream rewrites the implementation, the dependency keeps loading. Register it and re-check at each release. |
 | UD-2 ⭐ | Silent failure needs a canary, not a comment. A code comment recording the last manual sync does not fire when the sync goes stale. |
 | UD-3 | A documentation page is a spec with no version and no changelog; diff the *claim*, never the page. |
 | UD-4 | An upstream deprecation notice is a dated obligation, not news — it belongs in the ledger with the removal release as its due date. |
@@ -456,6 +457,12 @@ An exclusivity inference breaks in the **appear** direction, which nothing watch
   code also misbehaves if the dependency shows up in MORE places. If yes, the row is
   understating its claim.
 
+**Second example, 2026-10-06 (S7, D50).** `store_uses_cart_blocks()` reads a site-level
+cart/checkout setting as the presence of a *different* block, the Mini-Cart in the
+header. The claim fails in both directions — Mini-Cart without the cart/checkout block,
+and the cart/checkout block without a Mini-Cart — so the probe tests **co-occurrence**,
+not existence.
+
 ---
 
 ## Upstream Coupling anti-patterns
@@ -562,6 +569,18 @@ job could still see was the half that had not moved (D44/D45).
 Corollary to UD-9, same sweep: a watch channel can be reachable from one shell and not
 another (`gh`/`curl` from Bash could not reach GitHub while PowerShell could). Try the
 other transport before recording `fetch-failed`.
+
+### UD-25: A rationale that names an upstream's implementation technology is a coupling
+
+A comment such as "the Mini-Cart drawer is React-only" justifies a dependency (`wp-data`)
+by how upstream happens to build something today. Upstream can rewrite it — WooCommerce
+moved the Mini-Cart front end to the Interactivity API with no deprecation — and the
+dependency keeps loading as dead weight, where a third-party optimizer can then break it
+(D50, S7). Nothing fails on our side, because the rationale lives only in a comment (UD-2).
+
+**Litmus:** grep comments for `React`, `jQuery`, `iAPI`/`Interactivity` sitting next to an
+enqueue dependency or a mode switch, register each as a claim, and re-check it at every
+release of that upstream.
 
 ### UC-1: A version floor written in N places drifts ⭐
 
@@ -788,6 +807,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-10-06 (S7) | Amended **UD-20** (second example: a site-level cart/checkout setting read as the presence of the Mini-Cart block; probe co-occurrence, not existence — D50). Added **UD-25** (a rationale naming upstream's implementation technology is a coupling). Sweep 7 itself: WC 11.2 GA not tagged on its calendar day; the 11.1.2 → 11.2.0-rc.1 diff of the coupled files is clean, so the claim stays 11.1.2 until the tag. CF7 6.2.0 and WP 7.1.3 shipped the same day, both clean. Four unrowed couplings registered (U173–U176); `npm audit` back to 80 dev-only (D51). |
 | 2026-09-28 (S6) | Added **UD-24** (⭐ a drift sensor that diffs a moved path is green forever; audit a sensor by running its generator, not by reading its last run) after finding `upstream-drift.yml` diffing the pre-`36a0c83` phone-table path (D44) and, by regenerating in a scratch copy, the table two territories behind libphonenumber while the corpus it could still see was unchanged (D45). UD-9 corollary: try the other shell's transport before `fetch-failed`. Sweep 6 itself: WC 11.2.0-beta.2 package grepped whole — no anchor moved; `is_returning_customer()` changes two edge cases in the corrective direction (D46); the #472/#328 fixes' dependence on `triggerHandler` recorded on U25 (D47); Gutenberg 24.1.0-rc.1 deprecates the `@wordpress/scripts` Jest tooling (D48); `npm audit` run for the first time (0). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UD-24, UC-1, UC-3, UC-8. |
 | 2026-09-23 (S5) | Added **UD-23** (a behaviour whose spec page sunset is a coupling with no source: record the documented cousin + a measurement recipe, rate as drifted until measured) after registering the GTM `eventCallback`/`eventTimeout` contract from R35 #261 (U163, D33) and finding no current Google page for it. Sweep 5 itself: WooCommerce 11.1.2 shipped a day after S4 (D32, claim one patch behind); the full-tree coupling inventory — not the diff-scoped hunt — surfaced four unrowed couplings older than the base (OpenSSL → U164, the WC session-cookie prefix → U147, core `_get_cron_array()` → U139, page-conditional wording → U12/U115); U161 gained the R35 #266 selector sentence and lost three unescaped pipes (D39 — the cell-count check must ignore `\|`). |
 | 2026-09-22 (S4) | Added **UC-8** (⭐ a formula copied from upstream's source is a mirror with no row; delegate the day upstream wraps it in a method) after EDD 3.7.1 replaced the receipt-link `md5` our success-page resolver had copied inline with a site-keyed HMAC behind `Order::is_receipt_hash_valid()` — D23 / new row U159, fixed the same day (delegation + digest fallback, both shapes tested). Added the **UD-14 second corollary** (two truncations on one source = change the transport: raw HTML + heading-id grep carried the sentinel the summariser dropped twice). New-coupling regex in `.claude/commands/upstream-review.md` extended with `md5\(\|hash_hmac\(\|hash_equals\(`. Sweep 4 itself: the UD-7 window used on three upstreams in one day (WC 11.2.0-beta.1 package grepped whole — nothing moved; CF7 v6.2.0-rc — contract untouched, rc floors WP 7.1 / PHP 8.3; EDD 3.7.1 — D23), U52–U55 verified for the first time, U10 retired (D25), `overrides` necessity re-derived and two dead pins dropped (D26). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UC-1, UC-3, UC-8. |
