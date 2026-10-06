@@ -25,8 +25,8 @@
  *     must not decide them (#463).
  *   - "checkout" (block Checkout page): owns every event above, including
  *     add_shipping_info / add_payment_info.
- *   - "minicart" (any other page on a block store, where the Mini-Cart block is
- *     usually in the header): it fires remove_from_cart only. The classic tracker
+ *   - "minicart" (any other page rendering the Mini-Cart block): it fires
+ *     remove_from_cart only. The classic tracker
  *     runs alongside and keeps sole ownership of add_to_cart, so an item added on
  *     a product page is never counted twice.
  *
@@ -35,7 +35,6 @@
  * tracking; it retains the old payment-store heuristic for the checkout steps.
  */
 
-import { select, subscribe } from '@wordpress/data';
 import {
 	gtm4wp_normalize_cart_items,
 	gtm4wp_diff_cart_items,
@@ -71,16 +70,33 @@ const CROSS_SELL_LIST_NAME = 'Cross-Sells';
 const CROSS_SELL_LIST_ID = 'cross-sells';
 
 /**
+ * The wp.data module, read at run time instead of imported: PHP leaves out the
+ * wp-data dependency for the Interactivity API Mini-Cart (U173), and an
+ * externalized import would throw before the Store API fallback could start.
+ *
+ * @return {Object|null} wp.data, or null when it is not on the page.
+ */
+function gtm4wp_wp_data() {
+	const wp_data = window.wp && window.wp.data;
+	return wp_data &&
+		typeof wp_data.select === 'function' &&
+		typeof wp_data.subscribe === 'function'
+		? wp_data
+		: null;
+}
+
+/**
  * Reads a data store, returning null instead of throwing when it is not (yet)
  * registered - the block scripts may register their stores after this deferred
  * bundle first runs.
  *
+ * @param {Object} wp_data    The wp.data module.
  * @param {string} store_name The data store name.
  * @return {Object|null} The store's selectors, or null.
  */
-function gtm4wp_safe_select( store_name ) {
+function gtm4wp_safe_select( wp_data, store_name ) {
 	try {
-		return select( store_name ) || null;
+		return wp_data.select( store_name ) || null;
 	} catch ( e ) {
 		return null;
 	}
@@ -381,10 +397,6 @@ function gtm4wp_blocks_init() {
 	}
 	window.gtm4wp_woocommerce_blocks_inited = true;
 
-	if ( typeof subscribe !== 'function' ) {
-		return;
-	}
-
 	// Which surface the PHP side says this is (the contexts are described in the
 	// header comment). The merged "cartcheckout" value is also the default, for
 	// back compatibility.
@@ -426,8 +438,14 @@ function gtm4wp_blocks_init() {
 		() => cart_store_answered
 	);
 
-	subscribe( () => {
-		const cart_store = gtm4wp_safe_select( CART_STORE );
+	// No wp.data: an Interactivity API surface, served by the fallback alone.
+	const wp_data = gtm4wp_wp_data();
+	if ( ! wp_data ) {
+		return;
+	}
+
+	wp_data.subscribe( () => {
+		const cart_store = gtm4wp_safe_select( wp_data, CART_STORE );
 		if ( ! cart_store || typeof cart_store.getCartData !== 'function' ) {
 			return;
 		}
@@ -499,7 +517,7 @@ function gtm4wp_blocks_init() {
 		// The payment store is still required: the active payment method is read
 		// from it, and the legacy merged context has nothing else to tell the two
 		// block pages apart.
-		const payment_store = gtm4wp_safe_select( PAYMENT_STORE );
+		const payment_store = gtm4wp_safe_select( wp_data, PAYMENT_STORE );
 		if ( ! is_checkout_context || ! payment_store || ! current.length ) {
 			return;
 		}

@@ -150,6 +150,7 @@ final class WooCommerceModule extends AbstractModule {
 		add_filter( 'woocommerce_loop_add_to_cart_link', array( $list_tracking, 'add_to_cart_link_filter' ), 10, 2 );
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+		add_filter( 'render_block_woocommerce/mini-cart', array( $this, 'enqueue_minicart_tracker' ) );
 
 		// Runs after every enqueue callback on the default priority, so both handles
 		// it orders are registered by then. See order_generic_before_pushes().
@@ -291,7 +292,7 @@ final class WooCommerceModule extends AbstractModule {
 	 * @return void
 	 */
 	public function enqueue_scripts(): void {
-		$in_footer = (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE, true );
+		$in_footer = $this->scripts_in_footer();
 
 		// Cache-safe data layer (issue #398): when the customer/cart block is being
 		// delivered client-side, load both ends of the cart-fragments channel.
@@ -323,17 +324,42 @@ final class WooCommerceModule extends AbstractModule {
 		} else {
 			$this->enqueue_script( 'gtm4wp-woocommerce', 'gtm4wp-woocommerce.js', array( 'jquery' ), $in_footer, '' );
 			$this->inline_store_api_cart_url( 'gtm4wp-woocommerce' );
-
-			// A block-based store usually renders the Mini-Cart block in its header on
-			// every page. Removing an item (or changing its quantity) in the Mini-Cart
-			// drawer is a React-only interaction the classic tracker never sees, so load
-			// the block tracker in "minicart" mode alongside the classic one. In that
-			// mode it fires remove_from_cart only, from the net cart diff; the classic
-			// tracker keeps sole ownership of add_to_cart, so nothing is counted twice.
-			if ( $this->store_uses_cart_blocks() ) {
-				$this->enqueue_blocks_tracker( 'minicart', $in_footer );
-			}
 		}
+	}
+
+	/**
+	 * Whether the ecommerce trackers print in the footer (filterable).
+	 *
+	 * @return bool
+	 */
+	private function scripts_in_footer(): bool {
+		return (bool) apply_filters( 'gtm4wp_' . GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE, true );
+	}
+
+	/**
+	 * Loads the block tracker in "minicart" mode wherever the Mini-Cart block
+	 * renders: remove_from_cart only, the classic tracker keeps add_to_cart. Gated
+	 * on the block itself, never on the cart/checkout setting (U173). Late
+	 * enqueues still print in the footer, and a page cache stores them with the
+	 * block. wp-data only for the React Mini-Cart (WooCommerce < 11.1): the
+	 * Interactivity API one has no data store and is read via the Store API.
+	 *
+	 * @param string $block_content The rendered Mini-Cart block.
+	 * @return string The block content, unchanged.
+	 */
+	public function enqueue_minicart_tracker( $block_content ) {
+		// Empty: not rendered (coming-soon mode). Cart/Checkout: inert there, and
+		// those pages load their own tracker. Enqueued: a second Mini-Cart.
+		if ( ! is_string( $block_content ) || '' === $block_content
+			|| is_cart() || is_checkout()
+			|| wp_script_is( 'gtm4wp-woocommerce-blocks', 'enqueued' ) ) {
+			return $block_content;
+		}
+
+		$is_interactivity_api = false !== strpos( $block_content, 'data-wp-interactive' );
+		$this->enqueue_blocks_tracker( 'minicart', $this->scripts_in_footer(), ! $is_interactivity_api );
+
+		return $block_content;
 	}
 
 	/**
@@ -456,15 +482,16 @@ final class WooCommerceModule extends AbstractModule {
 	 * add_shipping_info / add_payment_info steps, "minicart" fires remove_from_cart
 	 * only so it can coexist with the classic tracker without double counting.
 	 *
-	 * @param string $context   One of 'cart', 'checkout' or 'minicart'.
-	 * @param bool   $in_footer Whether to print the script in the footer.
+	 * @param string $context       One of 'cart', 'checkout' or 'minicart'.
+	 * @param bool   $in_footer     Whether to print the script in the footer.
+	 * @param bool   $needs_wp_data Whether the surface keeps its cart in a wp.data store.
 	 * @return void
 	 */
-	private function enqueue_blocks_tracker( string $context, bool $in_footer ): void {
+	private function enqueue_blocks_tracker( string $context, bool $in_footer, bool $needs_wp_data = true ): void {
 		$this->enqueue_script(
 			'gtm4wp-woocommerce-blocks',
 			'gtm4wp-woocommerce-blocks.js',
-			array( 'wp-data', 'gtm4wp-ecommerce-generic' ),
+			$needs_wp_data ? array( 'wp-data', 'gtm4wp-ecommerce-generic' ) : array( 'gtm4wp-ecommerce-generic' ),
 			$in_footer
 		);
 
@@ -500,28 +527,6 @@ final class WooCommerceModule extends AbstractModule {
 			) . ';',
 			'before'
 		);
-	}
-
-	/**
-	 * Whether the store's cart or checkout is backed by the WooCommerce block (a
-	 * site-level, cache-safe signal). Block-based stores render the Mini-Cart block
-	 * in the header, so this gates loading the block tracker in "minicart" mode on
-	 * ordinary pages. Prefers WooCommerce's canonical CartCheckoutUtils checks.
-	 *
-	 * @return bool
-	 */
-	private function store_uses_cart_blocks(): bool {
-		$utils = '\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils';
-
-		if ( method_exists( $utils, 'is_cart_block_default' ) && $utils::is_cart_block_default() ) {
-			return true;
-		}
-
-		if ( method_exists( $utils, 'is_checkout_block_default' ) && $utils::is_checkout_block_default() ) {
-			return true;
-		}
-
-		return false;
 	}
 
 	/**

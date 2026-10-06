@@ -373,19 +373,141 @@ final class WooCommerceModuleTest extends TestCase {
 		$this->assertStringNotContainsString( 'cartcheckout', $result['inline']['gtm4wp-woocommerce-blocks'], 'The merged 2.0.0 context value must not come back (#463).' );
 	}
 
-	public function test_block_store_ordinary_page_loads_classic_and_minicart_tracker(): void {
-		// A block store (cart is block-based) on a page that is neither cart nor
-		// checkout: the classic tracker runs and the block tracker rides along in
-		// minicart mode to catch Mini-Cart removals.
-		CartCheckoutUtils::$cart_block = true;
+	/**
+	 * U173: a block cart/checkout setting says nothing about a Mini-Cart in the
+	 * header. Loading the block tracker (and wp-data) on that inference put the
+	 * wp-data stack on every page of such a store, Mini-Cart or not.
+	 */
+	public function test_block_store_ordinary_page_without_mini_cart_loads_classic_tracker_only(): void {
+		CartCheckoutUtils::$cart_block     = true;
+		CartCheckoutUtils::$checkout_block = true;
 		Functions\when( 'is_checkout' )->justReturn( false );
 		Functions\when( 'is_cart' )->justReturn( false );
 
 		$result = $this->run_enqueue( $this->make_module() );
 
 		$this->assertContains( 'gtm4wp-woocommerce', $result['scripts'] );
-		$this->assertContains( 'gtm4wp-woocommerce-blocks', $result['scripts'] );
-		$this->assertStringContainsString( 'minicart', $result['inline']['gtm4wp-woocommerce-blocks'] );
+		$this->assertNotContains( 'gtm4wp-woocommerce-blocks', $result['scripts'], 'Only a rendered Mini-Cart block loads the minicart tracker.' );
+	}
+
+	/**
+	 * Renders the Mini-Cart block through enqueue_minicart_tracker() with the
+	 * script machinery stubbed, capturing the enqueued handles, their
+	 * dependencies and the inline context.
+	 *
+	 * @param string $block_content    The rendered Mini-Cart markup.
+	 * @param bool   $already_enqueued Whether the block tracker is already queued.
+	 * @return array{returned: mixed, deps: array<string, array<int, string>>, inline: array<string, string>}
+	 */
+	private function render_mini_cart( string $block_content, bool $already_enqueued = false ): array {
+		$deps   = array();
+		$inline = array();
+
+		Functions\when( 'apply_filters' )->returnArg( 2 );
+		Functions\when( 'plugins_url' )->justReturn( 'https://example.com/build/x.js' );
+		Functions\when( 'rest_url' )->alias( static fn ( $path = '' ) => 'https://example.com/wp-json/' . ltrim( (string) $path, '/' ) );
+		Functions\when( 'wp_json_encode' )->alias(
+			static fn ( $data, $options = 0 ) => json_encode( $data, $options ) // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		);
+		Functions\when( 'wp_script_is' )->justReturn( $already_enqueued );
+		Functions\when( 'wp_enqueue_script' )->alias(
+			static function ( $handle, $src = '', $script_deps = array() ) use ( &$deps ) {
+				$deps[ $handle ] = $script_deps;
+			}
+		);
+		Functions\when( 'wp_add_inline_script' )->alias(
+			static function ( $handle, $code = '' ) use ( &$inline ) {
+				$inline[ $handle ] = ( $inline[ $handle ] ?? '' ) . $code;
+			}
+		);
+
+		$returned = $this->make_module()->enqueue_minicart_tracker( $block_content );
+
+		return array(
+			'returned' => $returned,
+			'deps'     => $deps,
+			'inline'   => $inline,
+		);
+	}
+
+	/**
+	 * U173: the Interactivity API Mini-Cart (WooCommerce 10.4+, the only one
+	 * since 11.1) keeps no wp.data store, so the tracker must not pull in the
+	 * wp-data stack for it - the bundle reads that cart through the Store API.
+	 */
+	public function test_interactivity_api_mini_cart_loads_minicart_tracker_without_wp_data(): void {
+		Functions\when( 'is_cart' )->justReturn( false );
+		Functions\when( 'is_checkout' )->justReturn( false );
+		$markup = '<div data-wp-interactive="woocommerce/mini-cart" class="wc-block-mini-cart"></div>';
+
+		$result = $this->render_mini_cart( $markup );
+
+		$this->assertSame( $markup, $result['returned'], 'The block markup passes through untouched.' );
+		$this->assertArrayHasKey( 'gtm4wp-woocommerce-blocks', $result['deps'] );
+		$this->assertNotContains( 'wp-data', $result['deps']['gtm4wp-woocommerce-blocks'] );
+		$this->assertContains( 'gtm4wp-ecommerce-generic', $result['deps']['gtm4wp-woocommerce-blocks'] );
+		$this->assertStringContainsString( '"minicart"', $result['inline']['gtm4wp-woocommerce-blocks'] );
+	}
+
+	/**
+	 * The React Mini-Cart (WooCommerce before 11.1) keeps its cart in the
+	 * wc/store/cart data store, which the tracker reads through wp.data.
+	 */
+	public function test_react_mini_cart_loads_minicart_tracker_with_wp_data(): void {
+		Functions\when( 'is_cart' )->justReturn( false );
+		Functions\when( 'is_checkout' )->justReturn( false );
+
+		$result = $this->render_mini_cart( '<div class="wc-block-mini-cart wp-block-woocommerce-mini-cart" data-attributes="{}"></div>' );
+
+		$this->assertContains( 'wp-data', $result['deps']['gtm4wp-woocommerce-blocks'] );
+		$this->assertStringContainsString( '"minicart"', $result['inline']['gtm4wp-woocommerce-blocks'] );
+	}
+
+	/**
+	 * U173, the other direction: a store with the classic cart and checkout can
+	 * still put the Mini-Cart block in its header. The old setting-based gate
+	 * never loaded the tracker there, so drawer removals went unreported.
+	 */
+	public function test_mini_cart_on_classic_store_loads_minicart_tracker(): void {
+		CartCheckoutUtils::$cart_block     = false;
+		CartCheckoutUtils::$checkout_block = false;
+		Functions\when( 'is_cart' )->justReturn( false );
+		Functions\when( 'is_checkout' )->justReturn( false );
+
+		$result = $this->render_mini_cart( '<div data-wp-interactive="woocommerce/mini-cart"></div>' );
+
+		$this->assertArrayHasKey( 'gtm4wp-woocommerce-blocks', $result['deps'] );
+	}
+
+	/**
+	 * WooCommerce renders the Mini-Cart inert on the Cart and Checkout pages,
+	 * and those pages load their own tracker; a second copy would double count.
+	 */
+	public function test_mini_cart_on_cart_or_checkout_page_loads_nothing(): void {
+		$markup = '<div data-wp-interactive="woocommerce/mini-cart"></div>';
+
+		Functions\when( 'is_cart' )->justReturn( true );
+		Functions\when( 'is_checkout' )->justReturn( false );
+		$this->assertSame( array(), $this->render_mini_cart( $markup )['deps'], 'Cart page' );
+
+		Functions\when( 'is_cart' )->justReturn( false );
+		Functions\when( 'is_checkout' )->justReturn( true );
+		$this->assertSame( array(), $this->render_mini_cart( $markup )['deps'], 'Checkout page' );
+	}
+
+	public function test_empty_or_repeated_mini_cart_loads_nothing(): void {
+		Functions\when( 'is_cart' )->justReturn( false );
+		Functions\when( 'is_checkout' )->justReturn( false );
+
+		// Empty output: WooCommerce did not render it (coming-soon mode).
+		$empty = $this->render_mini_cart( '' );
+		$this->assertSame( '', $empty['returned'] );
+		$this->assertSame( array(), $empty['deps'] );
+
+		// A second Mini-Cart on the page: the tracker and its context are already in.
+		$repeat = $this->render_mini_cart( '<div data-wp-interactive="woocommerce/mini-cart"></div>', true );
+		$this->assertSame( array(), $repeat['deps'] );
+		$this->assertSame( array(), $repeat['inline'] );
 	}
 
 	public function test_classic_store_ordinary_page_loads_classic_tracker_only(): void {
