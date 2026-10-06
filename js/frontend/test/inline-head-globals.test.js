@@ -29,25 +29,20 @@
 let mockSubscriber;
 let mockCartData;
 
-// @wordpress/data is externalized to window.wp.data by the production build and is
-// not installed in node_modules, so the mock must be virtual (mirrors
-// woocommerce-blocks-tracker.test.js).
-jest.mock(
-	'@wordpress/data',
-	() => ( {
-		select: ( name ) =>
-			name === 'wc/store/cart'
-				? {
-						getCartData: () => mockCartData,
-						hasFinishedResolution: () => true,
-				  }
-				: null,
-		subscribe: ( cb ) => {
-			mockSubscriber = cb;
-		},
-	} ),
-	{ virtual: true }
-);
+// The blocks tracker reads window.wp.data at run time (U173), so the stand-in
+// lives there (mirrors woocommerce-blocks-tracker.test.js).
+const mockWpData = {
+	select: ( name ) =>
+		name === 'wc/store/cart'
+			? {
+					getCartData: () => mockCartData,
+					hasFinishedResolution: () => true,
+			  }
+			: null,
+	subscribe: ( cb ) => {
+		mockSubscriber = cb;
+	},
+};
 
 // The inline head block, as a classic script. The setter is exposed on window on
 // purpose: only code evaluated inside this script can assign to its own lexical
@@ -268,7 +263,9 @@ describe( 'gtm4wp_list_attribution is read as a lexical global, not off window',
 			],
 		};
 
+		window.wp = { data: mockWpData };
 		jest.isolateModules( () => require( '../gtm4wp-woocommerce-blocks' ) );
+		delete window.wp;
 		mockSubscriber(); // fires view_item_list and resolves the click closure
 
 		document.body.innerHTML =

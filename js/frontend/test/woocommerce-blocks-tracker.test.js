@@ -6,9 +6,6 @@
  * select/subscribe so the cart and checkout store changes can be driven and the
  * resulting dataLayer events asserted (the TC-10 capture-and-drive recipe
  * applied to a data-store tracker).
- *
- * The mocked-state variables are mock-prefixed because Jest hoists the
- * jest.mock() factory above the file and only lets it reference such names.
  */
 
 let mockSubscriber;
@@ -19,32 +16,36 @@ let mockHasPaymentStore;
 let mockHasFinishedResolution;
 let mockSubscribeCount;
 
-// @wordpress/data is externalized to window.wp.data by the production build and
-// is not installed in node_modules, so the mock must be virtual.
-jest.mock(
-	'@wordpress/data',
-	() => ( {
-		select: ( name ) => {
-			if ( name === 'wc/store/cart' && mockHasCartStore ) {
-				return {
-					getCartData: () => mockCartData,
-					hasFinishedResolution: () => mockHasFinishedResolution,
-				};
-			}
-			if ( name === 'wc/store/payment' && mockHasPaymentStore ) {
-				return {
-					getActivePaymentMethod: () => mockActivePaymentMethod,
-				};
-			}
-			return null;
-		},
-		subscribe: ( cb ) => {
-			mockSubscribeCount++;
-			mockSubscriber = cb;
-		},
-	} ),
-	{ virtual: true }
-);
+// The tracker reads window.wp.data at run time (U173: PHP omits the wp-data
+// dependency for the Interactivity API Mini-Cart), so the stand-in lives there.
+const mockWpData = {
+	select: ( name ) => {
+		if ( name === 'wc/store/cart' && mockHasCartStore ) {
+			return {
+				getCartData: () => mockCartData,
+				hasFinishedResolution: () => mockHasFinishedResolution,
+			};
+		}
+		if ( name === 'wc/store/payment' && mockHasPaymentStore ) {
+			return {
+				getActivePaymentMethod: () => mockActivePaymentMethod,
+			};
+		}
+		return null;
+	},
+	subscribe: ( cb ) => {
+		mockSubscribeCount++;
+		mockSubscriber = cb;
+	},
+};
+
+beforeEach( () => {
+	window.wp = { data: mockWpData };
+} );
+
+afterEach( () => {
+	delete window.wp;
+} );
 
 // TS-7/TS-14: loading the tracker registers a window listener for the cart sync
 // event, and jest.isolateModules never detaches it - the wp-scripts jest preset
@@ -667,6 +668,33 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		);
 		expect( removed[ 0 ][ 2 ] ).toEqual(
 			expect.objectContaining( { currency: 'EUR', value: 10 } )
+		);
+	} );
+
+	/**
+	 * U173: PHP declares no wp-data dependency for the Interactivity API
+	 * Mini-Cart, so wp.data is often absent. The bundle used to bail out before
+	 * the fallback started, so the drawer's removals went unreported.
+	 */
+	it( 'reports remove_from_cart when wp.data is not on the page at all', async () => {
+		delete window.wp;
+		respondWith( [
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+			cartOf( [] ),
+		] );
+		loadTracker();
+
+		expect( mockSubscriber ).toBeNull();
+
+		syncCart();
+		await settle();
+		syncCart();
+		await settle();
+
+		const removed = pushedEvents( 'remove_from_cart' );
+		expect( removed ).toHaveLength( 1 );
+		expect( removed[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 7, quantity: 1 } )
 		);
 	} );
 
