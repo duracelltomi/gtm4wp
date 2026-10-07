@@ -374,7 +374,7 @@ final class WooCommerceModuleTest extends TestCase {
 	}
 
 	/**
-	 * U173: a block cart/checkout setting says nothing about a Mini-Cart in the
+	 * U182: a block cart/checkout setting says nothing about a Mini-Cart in the
 	 * header. Loading the block tracker (and wp-data) on that inference put the
 	 * wp-data stack on every page of such a store, Mini-Cart or not.
 	 */
@@ -431,7 +431,7 @@ final class WooCommerceModuleTest extends TestCase {
 	}
 
 	/**
-	 * U173: the Interactivity API Mini-Cart (WooCommerce 10.4+, the only one
+	 * U182: the Interactivity API Mini-Cart (WooCommerce 10.4+, the only one
 	 * since 11.1) keeps no wp.data store, so the tracker must not pull in the
 	 * wp-data stack for it - the bundle reads that cart through the Store API.
 	 */
@@ -464,7 +464,7 @@ final class WooCommerceModuleTest extends TestCase {
 	}
 
 	/**
-	 * U173, the other direction: a store with the classic cart and checkout can
+	 * U182, the other direction: a store with the classic cart and checkout can
 	 * still put the Mini-Cart block in its header. The old setting-based gate
 	 * never loaded the tracker there, so drawer removals went unreported.
 	 */

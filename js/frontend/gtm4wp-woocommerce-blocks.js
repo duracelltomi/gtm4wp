@@ -49,7 +49,7 @@ const CROSS_SELL_LIST_ID = 'cross-sells';
 
 /**
  * The wp.data module, read at run time instead of imported: PHP leaves out the
- * wp-data dependency for the Interactivity API Mini-Cart (U173), and an
+ * wp-data dependency for the Interactivity API Mini-Cart (U182), and an
  * externalized import would throw before the Store API fallback could start.
  *
  * @return {Object|null} wp.data, or null when it is not on the page.
