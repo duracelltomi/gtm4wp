@@ -25,6 +25,27 @@ if ( 'undefined' === typeof window.gtm4wp_first_container_id ) {
 	window.gtm4wp_first_container_id = '';
 }
 
+// Classic cart lines removed on this page, by cart item key: WooCommerce's Undo
+// restores one over AJAX and discards the HTML holding the server-side push.
+const gtm4wp_removed_cart_lines = {};
+
+/**
+ * Reads a cart item key from a remove_item / undo_item link.
+ *
+ * @param {string} url   The link or request URL.
+ * @param {string} param The query parameter holding the key.
+ * @return {string} The key, or ''.
+ */
+function gtm4wp_cart_item_key_from_url( url, param ) {
+	try {
+		return (
+			new URL( url, window.location.href ).searchParams.get( param ) || ''
+		);
+	} catch ( e ) {
+		return '';
+	}
+}
+
 /**
  * Read a quantity out of the DOM as a number, or null when there is nothing usable.
  *
@@ -995,6 +1016,17 @@ function gtm4wp_woocommerce_process_pages() {
 					currency: gtm4wp_currency,
 					value: productdata.price * productdata.quantity,
 				} );
+
+				const removed_key = gtm4wp_cart_item_key_from_url(
+					productdata_el.getAttribute( 'href' ) || '',
+					'remove_item'
+				);
+				if ( removed_key ) {
+					gtm4wp_removed_cart_lines[ removed_key ] = Object.assign(
+						{},
+						productdata
+					);
+				}
 			}
 
 			// track clicks in product lists
@@ -1323,6 +1355,22 @@ function gtm4wp_woocommerce_process_pages() {
 	// currently, we need to use jQuery here since WooCommerce Quick View is showing the popup using
 	// jQuery AJAX calls that can not be caught using vanilla JS
 	jQuery( document ).ajaxSuccess( function ( event, xhr, settings ) {
+		// The classic cart's Undo: re-add the line this page saw removed.
+		const undo_key =
+			settings && 'string' === typeof settings.url
+				? gtm4wp_cart_item_key_from_url( settings.url, 'undo_item' )
+				: '';
+		if ( undo_key && gtm4wp_removed_cart_lines[ undo_key ] ) {
+			const restored = gtm4wp_removed_cart_lines[ undo_key ];
+			delete gtm4wp_removed_cart_lines[ undo_key ];
+
+			gtm4wp_push_ecommerce( 'add_to_cart', [ restored ], {
+				currency: gtm4wp_currency,
+				value: restored.price * restored.quantity,
+			} );
+			return;
+		}
+
 		if ( typeof settings !== 'undefined' ) {
 			if ( settings.url.indexOf( 'wc-api=WC_Quick_View' ) > -1 ) {
 				setTimeout( function () {
