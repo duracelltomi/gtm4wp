@@ -29,7 +29,7 @@
 let mockSubscriber;
 let mockCartData;
 
-// The blocks tracker reads window.wp.data at run time (U173), so the stand-in
+// The blocks tracker reads window.wp.data at run time (U182), so the stand-in
 // lives there (mirrors woocommerce-blocks-tracker.test.js).
 const mockWpData = {
 	select: ( name ) =>

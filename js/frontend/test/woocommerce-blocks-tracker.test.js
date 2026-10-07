@@ -16,7 +16,7 @@ let mockHasPaymentStore;
 let mockHasFinishedResolution;
 let mockSubscribeCount;
 
-// The tracker reads window.wp.data at run time (U173: PHP omits the wp-data
+// The tracker reads window.wp.data at run time (U182: PHP omits the wp-data
 // dependency for the Interactivity API Mini-Cart), so the stand-in lives there.
 const mockWpData = {
 	select: ( name ) => {
@@ -672,7 +672,7 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 	} );
 
 	/**
-	 * U173: PHP declares no wp-data dependency for the Interactivity API
+	 * U182: PHP declares no wp-data dependency for the Interactivity API
 	 * Mini-Cart, so wp.data is often absent. The bundle used to bail out before
 	 * the fallback started, so the drawer's removals went unreported.
 	 */

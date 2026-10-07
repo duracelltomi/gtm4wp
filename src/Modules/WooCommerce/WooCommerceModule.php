@@ -339,7 +339,7 @@ final class WooCommerceModule extends AbstractModule {
 	/**
 	 * Loads the block tracker in "minicart" mode wherever the Mini-Cart block
 	 * renders: remove_from_cart only, the classic tracker keeps add_to_cart. Gated
-	 * on the block itself, never on the cart/checkout setting (U173). Late
+	 * on the block itself, never on the cart/checkout setting (U182). Late
 	 * enqueues still print in the footer, and a page cache stores them with the
 	 * block. wp-data only for the React Mini-Cart (WooCommerce < 11.1): the
 	 * Interactivity API one has no data store and is read via the Store API.
