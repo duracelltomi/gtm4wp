@@ -55,9 +55,6 @@ afterEach( () => {
 // detach in afterEach, and every test can count exactly.
 let capturedWindowListeners = [];
 let originalWindowAdd = null;
-// The classic-event bridge listens on document.body: captured the same way.
-let capturedBodyListeners = [];
-let originalBodyAdd = null;
 
 beforeEach( () => {
 	capturedWindowListeners = [];
@@ -66,13 +63,6 @@ beforeEach( () => {
 		capturedWindowListeners.push( { type, fn, opts } );
 		return originalWindowAdd.call( this, type, fn, opts );
 	};
-
-	capturedBodyListeners = [];
-	originalBodyAdd = document.body.addEventListener;
-	document.body.addEventListener = function ( type, fn, opts ) {
-		capturedBodyListeners.push( { type, fn, opts } );
-		return originalBodyAdd.call( this, type, fn, opts );
-	};
 } );
 
 afterEach( () => {
@@ -80,16 +70,6 @@ afterEach( () => {
 		window.addEventListener = originalWindowAdd;
 		originalWindowAdd = null;
 	}
-
-	if ( originalBodyAdd ) {
-		document.body.addEventListener = originalBodyAdd;
-		originalBodyAdd = null;
-	}
-
-	capturedBodyListeners.forEach( ( { type, fn, opts } ) =>
-		document.body.removeEventListener( type, fn, opts )
-	);
-	capturedBodyListeners = [];
 
 	capturedWindowListeners.forEach( ( { type, fn, opts } ) =>
 		window.removeEventListener( type, fn, opts )
@@ -718,9 +698,32 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		);
 	} );
 
+	// A jQuery stand-in recording .on( events, handler ) for the classic
+	// cart events; classicEvent() triggers them like WooCommerce's scripts.
+	let jqueryHandlers = [];
+	beforeEach( () => {
+		jqueryHandlers = [];
+		window.jQuery = () => ( {
+			on: ( events, handler ) =>
+				jqueryHandlers.push( { events: events.split( ' ' ), handler } ),
+		} );
+	} );
+	afterEach( () => {
+		delete window.jQuery;
+	} );
+
 	const classicEvent = ( name ) =>
+		jqueryHandlers
+			.filter( ( h ) => h.events.includes( name ) )
+			.forEach( ( h ) => h.handler() );
+
+	// What the Interactivity API cart store dispatches after its own changes.
+	const iapiAddedEvent = () =>
 		document.body.dispatchEvent(
-			new window.CustomEvent( name, { bubbles: true } )
+			new window.CustomEvent( 'wc-blocks_added_to_cart', {
+				bubbles: true,
+				detail: { preserveCartData: true },
+			} )
 		);
 
 	/**
@@ -735,7 +738,7 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		] );
 		loadTracker();
 
-		classicEvent( 'wc-blocks_added_to_cart' );
+		classicEvent( 'added_to_cart' );
 		await settle();
 		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 
@@ -762,7 +765,7 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 
 		syncCart(); // baseline A + B
 		await settle();
-		classicEvent( 'wc-blocks_removed_from_cart' ); // A removed by a classic link
+		classicEvent( 'removed_from_cart' ); // A removed by a classic link
 		await settle();
 		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 
@@ -776,12 +779,38 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		] );
 	} );
 
+	/**
+	 * A quantity change in the drawer is an "add" to the Interactivity API cart
+	 * store, which then dispatches wc-blocks_added_to_cart as well as the sync
+	 * event. Re-baselining on that event swallowed the decrease (found live).
+	 */
+	it( 'reports a drawer quantity decrease although the store also says added_to_cart', async () => {
+		respondWith( [
+			cartOf( [ cartLine( 'A', 2, { item_id: 7, price: 10 } ) ] ),
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+		] );
+		loadTracker();
+
+		syncCart(); // baseline: two units
+		await settle();
+
+		iapiAddedEvent(); // 2 -> 1 in the drawer
+		syncCart();
+		await settle();
+
+		const removed = pushedEvents( 'remove_from_cart' );
+		expect( removed ).toHaveLength( 1 );
+		expect( removed[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 7, quantity: 1 } )
+		);
+	} );
+
 	it( 'ignores the classic events outside the minicart context', async () => {
 		window.gtm4wp_blocks_context = 'cart';
 		loadTracker();
 
-		classicEvent( 'wc-blocks_added_to_cart' );
-		classicEvent( 'wc-blocks_removed_from_cart' );
+		classicEvent( 'added_to_cart' );
+		classicEvent( 'removed_from_cart' );
 		await settle();
 
 		expect( window.fetch ).not.toHaveBeenCalled();

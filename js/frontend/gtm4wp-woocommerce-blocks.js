@@ -50,12 +50,10 @@ const PAYMENT_STORE = 'wc/store/payment';
 // through the Interactivity API, which is what drives the fallback below.
 const CART_SYNC_EVENT = 'wc-blocks_store_sync_required';
 
-// The classic jQuery cart events, re-dispatched on document.body by the
-// Interactivity API Mini-Cart (WooCommerce 11.1 `setupJQueryEventBridge`).
-const CLASSIC_CART_EVENTS = [
-	'wc-blocks_added_to_cart',
-	'wc-blocks_removed_from_cart',
-];
+// WooCommerce's classic jQuery cart events (add-to-cart.js, cart-fragments).
+// Not their wc-blocks_* bridge: the Interactivity API cart store dispatches
+// wc-blocks_added_to_cart after its own drawer quantity changes too.
+const CLASSIC_CART_EVENTS = 'added_to_cart removed_from_cart';
 
 // WooCommerce writes these while the cart holds something and clears them when
 // it is emptied, so their presence answers "does this visitor have a cart"
@@ -410,16 +408,12 @@ function gtm4wp_blocks_init_store_api_fallback(
 
 	// A classic add-to-cart announces no sync event, so a page that starts with
 	// an empty cart had no baseline and missed the next drawer removal. The
-	// Mini-Cart bridges the classic jQuery events to these; the classic tracker
-	// reports those changes itself, so they only re-baseline (U182).
-	if ( rebaseline_on_classic && document.body ) {
-		const rebaseline = function () {
+	// classic tracker reports those changes itself, so they only re-baseline
+	// (U182). No jQuery means no classic cart buttons either.
+	if ( rebaseline_on_classic && 'function' === typeof window.jQuery ) {
+		window.jQuery( document ).on( CLASSIC_CART_EVENTS, function () {
 			rebaseline_pending = true;
 			refresh();
-		};
-
-		CLASSIC_CART_EVENTS.forEach( function ( event_name ) {
-			document.body.addEventListener( event_name, rebaseline );
 		} );
 	}
 }
