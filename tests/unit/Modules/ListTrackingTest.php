@@ -138,6 +138,37 @@ final class ListTrackingTest extends TestCase {
 		$this->assertContains( Helpers::ONESHOT_EVENT_COOKIE, $cookie_names, 'The one-shot event cookie must be set alongside the marker in cache-safe mode.' );
 	}
 
+	/**
+	 * The classic cart's Undo arrives as a background request whose HTML
+	 * WooCommerce discards; the classic tracker pushes that add_to_cart, so a
+	 * marker or one-shot cookie left here would repeat it on the next page.
+	 */
+	public function test_cart_item_restored_seeds_nothing_for_a_background_request(): void {
+		$session = $this->stub_wc_session();
+
+		Functions\when( 'headers_sent' )->justReturn( false );
+		Functions\when( 'is_ssl' )->justReturn( false );
+		$cookie_names = array();
+		Functions\when( 'setcookie' )->alias(
+			static function ( $name ) use ( &$cookie_names ) {
+				$cookie_names[] = $name;
+				return true;
+			}
+		);
+
+		$server_backup                    = $_SERVER;
+		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+		try {
+			$this->make_list_tracking( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
+				->cart_item_restored( 'hash-1' );
+		} finally {
+			$_SERVER = $server_backup;
+		}
+
+		$this->assertSame( array(), $session->sets, 'No re-add marker for a background Undo.' );
+		$this->assertSame( array(), $cookie_names, 'No one-shot cookie for a background Undo.' );
+	}
+
 	public function test_cart_item_restored_does_not_flag_event_cookie_when_cache_safe_off(): void {
 		$session = $this->stub_wc_session();
 

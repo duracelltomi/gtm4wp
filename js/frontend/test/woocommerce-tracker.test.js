@@ -1611,6 +1611,84 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 	} );
 } );
 
+/**
+ * The classic cart's Undo restores a removed line over AJAX and keeps only the
+ * cart form from the response, so the server-side add_to_cart never reached the
+ * page. The tracker replays the line it saw removed when that request succeeds.
+ */
+describe( 'gtm4wp-woocommerce classic cart Undo', () => {
+	const LINE = { item_id: 55, item_name: 'Removed', price: 8 };
+	let ajaxSuccessCb;
+
+	beforeEach( () => {
+		document.body.className = '';
+		applyWooGlobals();
+		ajaxSuccessCb = undefined;
+		const jq = {
+			on: () => jq,
+			trigger: () => jq,
+			ajaxSuccess: ( fn ) => {
+				ajaxSuccessCb = fn;
+				return jq;
+			},
+		};
+		global.jQuery = jest.fn( () => jq );
+		jest.useFakeTimers();
+
+		document.body.innerHTML =
+			'<table><tbody><tr class="cart_item">' +
+			'<td class="product-remove">' +
+			'<a href="/cart/?remove_item=key-1&amp;_wpnonce=n" class="remove" data-gtm4wp_product_data=\'' +
+			JSON.stringify( LINE ) +
+			"'>x</a></td>" +
+			'<td class="product-quantity">' +
+			'<input type="number" class="qty" value="2" /></td>' +
+			'</tr></tbody></table>';
+	} );
+
+	afterEach( cleanupWooGlobals );
+
+	const removeThenUndo = ( undoUrl ) => {
+		bootWithCapture();
+		global.gtm4wp_push_ecommerce.mockClear();
+		document
+			.querySelector( 'a.remove' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+		ajaxSuccessCb( {}, {}, { url: undoUrl } );
+		return global.gtm4wp_push_ecommerce.mock.calls.filter(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+	};
+
+	it( 'pushes add_to_cart for the removed line when its Undo succeeds', () => {
+		const adds = removeThenUndo( '/cart/?undo_item=key-1&_wpnonce=n' );
+
+		expect( adds ).toHaveLength( 1 );
+		expect( adds[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 55, quantity: 2 } )
+		);
+		expect( adds[ 0 ][ 2 ] ).toEqual(
+			expect.objectContaining( { currency: 'EUR', value: 16 } )
+		);
+
+		// The same Undo answered twice is still one re-add.
+		ajaxSuccessCb( {}, {}, { url: '/cart/?undo_item=key-1&_wpnonce=n' } );
+		expect(
+			global.gtm4wp_push_ecommerce.mock.calls.filter(
+				( c ) => c[ 0 ] === 'add_to_cart'
+			)
+		).toHaveLength( 1 );
+	} );
+
+	it( 'ignores an Undo for a line this page did not see removed', () => {
+		expect(
+			removeThenUndo( '/cart/?undo_item=other-key&_wpnonce=n' )
+		).toHaveLength( 0 );
+	} );
+} );
+
 describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {
 	beforeEach( () => {
 		document.body.className = '';

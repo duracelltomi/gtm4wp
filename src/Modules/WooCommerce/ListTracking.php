@@ -218,6 +218,12 @@ final class ListTracking {
 	 * @return void
 	 */
 	public function cart_item_restored( $cart_item_key ): void {
+		// The classic cart's Undo is a background request; the classic tracker
+		// reports it, and a marker left here would repeat it on the next page.
+		if ( array_key_exists( 'HTTP_X_REQUESTED_WITH', $_SERVER ) ) {
+			return;
+		}
+
 		$woo = WC();
 
 		if ( $woo && $woo->session ) {
