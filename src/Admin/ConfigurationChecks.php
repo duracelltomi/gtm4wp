@@ -311,7 +311,7 @@ final class ConfigurationChecks {
 				'code'        => self::CODE_CONFLICT_WC_GA,
 				'severity'    => self::SEVERITY_WARNING,
 				'option_key'  => '',
-				'message'     => __( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ),
+				'message'     => __( 'Notice: you should deactivate the plugin "Google Analytics for WooCommerce" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ),
 				'dismissible' => true,
 			);
 		}
