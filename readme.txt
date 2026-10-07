@@ -259,6 +259,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 = 2.0.6 =
 
+* Fixed: the plugin conflict notice now calls Google Analytics for WooCommerce by its current name.
 * Fixed: WooCommerce Mini-Cart tracking (`remove_from_cart` from the Mini-Cart drawer) now loads only on pages that show the Mini-Cart block. Stores using the Cart or Checkout block no longer load the WordPress data scripts on every page, and stores with a classic cart now track removals from a Mini-Cart block too.
 * Fixed: a WooCommerce Product Bundles bundle reported `stockstatus` as `instock` in the e-commerce items even when one of its bundled products was out of stock and the bundle could not be bought; it now reports `outofstock`. Thanks to @KingWehsops for the report (#474).
 

@@ -205,7 +205,7 @@ final class Notices {
 
 		if ( function_exists( 'is_plugin_active' ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE ) ) {
 			if ( ( false === $dismisses['wc-ga-plugin-warning'] ) && is_plugin_active( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
-				echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "WooCommerce Google Analytics Integration" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
+				echo '<div class="gtm4wp-notice notice notice-warning is-dismissible" data-href="?wc-ga-plugin-warning"><p><strong>' . esc_html__( 'Notice: you should deactivate the plugin "Google Analytics for WooCommerce" if you are using Google Analytics tags inside Google Tag Manager!', 'duracelltomi-google-tag-manager' ) . '</strong></p></div>';
 			}
 
 			if ( ( false === $dismisses['wc-gayoast-plugin-warning'] ) && is_plugin_active( 'google-analytics-for-wordpress/googleanalytics.php' ) ) {
