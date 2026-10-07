@@ -55,6 +55,9 @@ afterEach( () => {
 // detach in afterEach, and every test can count exactly.
 let capturedWindowListeners = [];
 let originalWindowAdd = null;
+// The classic-event bridge listens on document.body: captured the same way.
+let capturedBodyListeners = [];
+let originalBodyAdd = null;
 
 beforeEach( () => {
 	capturedWindowListeners = [];
@@ -63,6 +66,13 @@ beforeEach( () => {
 		capturedWindowListeners.push( { type, fn, opts } );
 		return originalWindowAdd.call( this, type, fn, opts );
 	};
+
+	capturedBodyListeners = [];
+	originalBodyAdd = document.body.addEventListener;
+	document.body.addEventListener = function ( type, fn, opts ) {
+		capturedBodyListeners.push( { type, fn, opts } );
+		return originalBodyAdd.call( this, type, fn, opts );
+	};
 } );
 
 afterEach( () => {
@@ -70,6 +80,16 @@ afterEach( () => {
 		window.addEventListener = originalWindowAdd;
 		originalWindowAdd = null;
 	}
+
+	if ( originalBodyAdd ) {
+		document.body.addEventListener = originalBodyAdd;
+		originalBodyAdd = null;
+	}
+
+	capturedBodyListeners.forEach( ( { type, fn, opts } ) =>
+		document.body.removeEventListener( type, fn, opts )
+	);
+	capturedBodyListeners = [];
 
 	capturedWindowListeners.forEach( ( { type, fn, opts } ) =>
 		window.removeEventListener( type, fn, opts )
@@ -696,6 +716,75 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		expect( removed[ 0 ][ 1 ][ 0 ] ).toEqual(
 			expect.objectContaining( { item_id: 7, quantity: 1 } )
 		);
+	} );
+
+	const classicEvent = ( name ) =>
+		document.body.dispatchEvent(
+			new window.CustomEvent( name, { bubbles: true } )
+		);
+
+	/**
+	 * U182: a page that starts with an empty cart has no baseline, and a classic
+	 * add-to-cart button announces no sync event, so the first drawer removal
+	 * only recorded the (already empty) cart and was never reported.
+	 */
+	it( 'takes a baseline on a classic add, so the next drawer removal is reported', async () => {
+		respondWith( [
+			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),
+			cartOf( [] ),
+		] );
+		loadTracker();
+
+		classicEvent( 'wc-blocks_added_to_cart' );
+		await settle();
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+		syncCart(); // removed in the drawer
+		await settle();
+
+		const removed = pushedEvents( 'remove_from_cart' );
+		expect( removed ).toHaveLength( 1 );
+		expect( removed[ 0 ][ 1 ][ 0 ] ).toEqual(
+			expect.objectContaining( { item_id: 7, quantity: 1 } )
+		);
+	} );
+
+	it( 'never reports a classic removal itself (the classic tracker owns it), only re-baselines', async () => {
+		respondWith( [
+			cartOf( [
+				cartLine( 'A', 1, { item_id: 7, price: 10 } ),
+				cartLine( 'B', 1, { item_id: 8, price: 5 } ),
+			] ),
+			cartOf( [ cartLine( 'B', 1, { item_id: 8, price: 5 } ) ] ),
+			cartOf( [] ),
+		] );
+		loadTracker();
+
+		syncCart(); // baseline A + B
+		await settle();
+		classicEvent( 'wc-blocks_removed_from_cart' ); // A removed by a classic link
+		await settle();
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+		syncCart(); // B removed in the drawer
+		await settle();
+
+		const removed = pushedEvents( 'remove_from_cart' );
+		expect( removed ).toHaveLength( 1 );
+		expect( removed[ 0 ][ 1 ] ).toEqual( [
+			expect.objectContaining( { item_id: 8, quantity: 1 } ),
+		] );
+	} );
+
+	it( 'ignores the classic events outside the minicart context', async () => {
+		window.gtm4wp_blocks_context = 'cart';
+		loadTracker();
+
+		classicEvent( 'wc-blocks_added_to_cart' );
+		classicEvent( 'wc-blocks_removed_from_cart' );
+		await settle();
+
+		expect( window.fetch ).not.toHaveBeenCalled();
 	} );
 
 	it( 'leaves add_to_cart to the classic tracker outside the block cart pages', async () => {

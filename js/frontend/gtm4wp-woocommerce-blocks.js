@@ -50,6 +50,13 @@ const PAYMENT_STORE = 'wc/store/payment';
 // through the Interactivity API, which is what drives the fallback below.
 const CART_SYNC_EVENT = 'wc-blocks_store_sync_required';
 
+// The classic jQuery cart events, re-dispatched on document.body by the
+// Interactivity API Mini-Cart (WooCommerce 11.1 `setupJQueryEventBridge`).
+const CLASSIC_CART_EVENTS = [
+	'wc-blocks_added_to_cart',
+	'wc-blocks_removed_from_cart',
+];
+
 // WooCommerce writes these while the cart holds something and clears them when
 // it is emptied, so their presence answers "does this visitor have a cart"
 // without reading the cart. The same pair the PHP side checks before it loads
@@ -305,13 +312,15 @@ function gtm4wp_blocks_fetch_cart() {
  * Ownership matches the data store path exactly: add_to_cart only on the block
  * Cart and Checkout pages, because everywhere else the classic tracker owns it.
  *
- * @param {boolean}  is_cartcheckout Whether this is the block Cart or Checkout page.
- * @param {Function} store_is_live   Tells whether the data store answered after all.
+ * @param {boolean}  is_cartcheckout       Whether this is the block Cart or Checkout page.
+ * @param {Function} store_is_live         Tells whether the data store answered after all.
+ * @param {boolean}  rebaseline_on_classic Whether classic cart changes only re-baseline.
  * @return {void}
  */
 function gtm4wp_blocks_init_store_api_fallback(
 	is_cartcheckout,
-	store_is_live
+	store_is_live,
+	rebaseline_on_classic
 ) {
 	// The last cart this tracker knows about. Null means "not established yet",
 	// and the first refresh in that state only records the cart, since a diff
@@ -319,6 +328,8 @@ function gtm4wp_blocks_init_store_api_fallback(
 	let cart_baseline = null;
 	let refresh_running = false;
 	let refresh_again = false;
+	// The next read records the cart without reporting (a classic change).
+	let rebaseline_pending = false;
 
 	const refresh = function () {
 		if ( store_is_live() ) {
@@ -335,13 +346,21 @@ function gtm4wp_blocks_init_store_api_fallback(
 
 		refresh_running = true;
 
+		// Taken as the read starts: a classic change during it queues its own.
+		const silent = rebaseline_pending;
+		rebaseline_pending = false;
+
 		gtm4wp_blocks_fetch_cart().then( function ( cart_data ) {
 			refresh_running = false;
+
+			if ( ! cart_data && silent ) {
+				rebaseline_pending = true;
+			}
 
 			if ( cart_data ) {
 				const current = gtm4wp_normalize_cart_items( cart_data.items );
 
-				if ( null === cart_baseline ) {
+				if ( null === cart_baseline || silent ) {
 					cart_baseline = current;
 				} else {
 					const { added, removed } = gtm4wp_diff_cart_items(
@@ -388,6 +407,21 @@ function gtm4wp_blocks_init_store_api_fallback(
 	}, CART_STORE_WAIT );
 
 	window.addEventListener( CART_SYNC_EVENT, refresh );
+
+	// A classic add-to-cart announces no sync event, so a page that starts with
+	// an empty cart had no baseline and missed the next drawer removal. The
+	// Mini-Cart bridges the classic jQuery events to these; the classic tracker
+	// reports those changes itself, so they only re-baseline (U182).
+	if ( rebaseline_on_classic && document.body ) {
+		const rebaseline = function () {
+			rebaseline_pending = true;
+			refresh();
+		};
+
+		CLASSIC_CART_EVENTS.forEach( function ( event_name ) {
+			document.body.addEventListener( event_name, rebaseline );
+		} );
+	}
 }
 
 function gtm4wp_blocks_init() {
@@ -435,7 +469,8 @@ function gtm4wp_blocks_init() {
 
 	gtm4wp_blocks_init_store_api_fallback(
 		is_cartcheckout,
-		() => cart_store_answered
+		() => cart_store_answered,
+		'minicart' === context
 	);
 
 	// No wp.data: an Interactivity API surface, served by the fallback alone.
