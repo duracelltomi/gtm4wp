@@ -522,4 +522,13 @@ final class EddReliablePurchaseTest extends TestCase {
 
 		$this->assertSame( array(), $this->cookie_writes );
 	}
+
+	public function test_resolver_payload_carries_the_clear_option(): void {
+		$_COOKIE[ ReliablePurchase::EVENT_COOKIE ] = '1';
+
+		$this->assertFalse( $this->make()->resolve_pending_purchase()['clear'] ?? null, 'Off by default.' );
+		$this->assertTrue(
+			$this->make( array_merge( self::ALL_ON, array( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL => true ) ) )->resolve_pending_purchase()['clear'] ?? null
+		);
+	}
 }

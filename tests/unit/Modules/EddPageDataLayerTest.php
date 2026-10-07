@@ -1366,4 +1366,59 @@ final class EddPageDataLayerTest extends TestCase {
 
 		return $post;
 	}
+
+	/**
+	 * Parity with WooCommerce: EDD's own "Clear ecommerce object" option clears
+	 * before its server-side events too.
+	 */
+	public function test_view_cart_is_cleared_only_when_enabled(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '[download_cart]' ) );
+		Functions\when( 'has_shortcode' )->alias(
+			static fn ( $content, $shortcode ) => str_contains( (string) $content, '[' . $shortcode . ']' )
+		);
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL => true ) )->add_datalayer_data( array() );
+		$on = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+
+		$clear = strpos( $on, '{"ecommerce":null}' );
+		$this->assertNotFalse( $clear, 'The clearing push must be printed.' );
+		$this->assertLessThan( strpos( $on, '"event":"view_cart"' ), $clear );
+	}
+
+	public function test_view_cart_is_not_cleared_by_default(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '[download_cart]' ) );
+		Functions\when( 'has_shortcode' )->alias(
+			static fn ( $content, $shortcode ) => str_contains( (string) $content, '[' . $shortcode . ']' )
+		);
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+		$off = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+
+		$this->assertStringContainsString( '"event":"view_cart"', $off, 'Precondition.' );
+		$this->assertStringNotContainsString( '"ecommerce":null', $off );
+	}
 }

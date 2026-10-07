@@ -374,7 +374,7 @@ final class PageDataLayer {
 					'items'    => array( $eec_product_array ),
 				),
 			),
-			'',
+			$this->clear_ecommerce_js(),
 			'',
 			$list_wrapper,
 			$list_wrapper_args
@@ -408,7 +408,8 @@ final class PageDataLayer {
 						'value'    => $cart['value'],
 						'items'    => $cart['items'],
 					),
-				)
+				),
+				$this->clear_ecommerce_js()
 			);
 		}
 	}
@@ -432,7 +433,8 @@ final class PageDataLayer {
 						'value'    => $cart['value'],
 						'items'    => $cart['items'],
 					),
-				)
+				),
+				$this->clear_ecommerce_js()
 			);
 		}
 
@@ -689,12 +691,25 @@ final class PageDataLayer {
 		$this->datalayer->queue_push(
 			$purchase_data_layer['event'],
 			$purchase_data_layer,
-			$before_purchase_dl_push,
+			$before_purchase_dl_push . $this->clear_ecommerce_js(),
 			$after_purchase_dl_push
 		);
 
 		$this->download_data->flag_order_tracked( $order );
 
 		return $data_layer;
+	}
+
+	/**
+	 * The clearing push before a server-side ecommerce event, or '' when "Clear
+	 * ecommerce object before new event" is off. Inside a purchase's dedupe guard
+	 * it lands at the end of js_before, so a skipped repeat clears nothing.
+	 *
+	 * @return string
+	 */
+	private function clear_ecommerce_js(): string {
+		return (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL )
+			? \GTM4WP\Ecommerce\Helpers::clear_ecommerce_js( $this->datalayer->name() )
+			: '';
 	}
 }

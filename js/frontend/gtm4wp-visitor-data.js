@@ -438,7 +438,7 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 			return;
 		}
 
-		dataLayer().push( payload.push );
+		pushEcommerce( payload );
 
 		if ( useGuard && orderNumber ) {
 			writeOrderTracked( orderNumber );
@@ -450,6 +450,21 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 		if ( useGuard && confirmUrl ) {
 			fireConfirmBeacon( confirmUrl );
 		}
+	}
+
+	/**
+	 * Pushes a resolver's ecommerce event, preceded by `{ ecommerce: null }` when
+	 * PHP says "Clear ecommerce object before new event" is on (payload.clear).
+	 *
+	 * @param {Object} payload The resolver payload ({ push, clear }).
+	 * @return {void}
+	 */
+	function pushEcommerce( payload ) {
+		if ( true === payload.clear ) {
+			dataLayer().push( { ecommerce: null } );
+		}
+
+		dataLayer().push( payload.push );
 	}
 
 	/**
@@ -475,7 +490,7 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 			return;
 		}
 
-		dataLayer().push( payload.push );
+		pushEcommerce( payload );
 
 		if ( token ) {
 			recordReaddedToken( token );

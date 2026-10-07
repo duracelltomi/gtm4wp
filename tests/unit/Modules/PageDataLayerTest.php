@@ -3956,4 +3956,123 @@ final class PageDataLayerTest extends TestCase {
 
 		unset( $_REQUEST['_wp_http_referer'], $_GET['_wp_http_referer'] );
 	}
+
+	/**
+	 * Renders one server-side ecommerce event with "Clear ecommerce object before
+	 * new event" on or off and returns the printed pushes. The option used to
+	 * reach only the browser pushes (gtm4wp_push_ecommerce()), so a page with two
+	 * server-side events - view_cart and an "Undo" add_to_cart - merged them.
+	 *
+	 * @param string $event_name The event to render: view_item, view_cart, begin_checkout or purchase.
+	 * @param bool   $clear      The option value.
+	 * @return string The flushed inline pushes.
+	 */
+	private function render_server_side_event( string $event_name, bool $clear ): string {
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+			GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL => $clear,
+		);
+
+		Functions\when( 'is_product' )->justReturn( 'view_item' === $event_name );
+		Functions\when( 'is_cart' )->justReturn( 'view_cart' === $event_name );
+		Functions\when( 'is_checkout' )->justReturn( 'begin_checkout' === $event_name );
+
+		if ( 'purchase' === $event_name ) {
+			Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+			$this->stub_wc_pending( 1001 );
+			$options[ GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ] = true;
+		} else {
+			Functions\when( 'get_the_ID' )->justReturn( 7 );
+			Functions\when( 'wc_get_product' )->justReturn( $product );
+			$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+		}
+
+		$this->make_page_datalayer( $options )->add_datalayer_data( array() );
+
+		return $this->inline_js;
+	}
+
+	public function test_clear_ecommerce_precedes_each_server_side_event_when_enabled(): void {
+		foreach ( array( 'view_item', 'view_cart', 'begin_checkout', 'purchase' ) as $event_name ) {
+			$this->inline_js = '';
+			$output          = $this->render_server_side_event( $event_name, true );
+
+			$event = strpos( $output, '"event":"' . $event_name . '"' );
+			$clear = strpos( $output, 'window.dataLayer.push({"ecommerce":null});' );
+
+			$this->assertNotFalse( $event, $event_name . ': precondition, the event was rendered.' );
+			$this->assertNotFalse( $clear, $event_name . ': the clearing push must be printed.' );
+			$this->assertLessThan( $event, $clear, $event_name . ': the clearing push must come first.' );
+		}
+	}
+
+	public function test_server_side_events_are_not_cleared_by_default(): void {
+		foreach ( array( 'view_item', 'view_cart', 'begin_checkout', 'purchase' ) as $event_name ) {
+			$this->inline_js = '';
+			$output          = $this->render_server_side_event( $event_name, false );
+
+			$this->assertStringContainsString( '"event":"' . $event_name . '"', $output, $event_name . ': precondition.' );
+			$this->assertStringNotContainsString( '"ecommerce":null', $output, $event_name . ': off means no clearing push.' );
+		}
+	}
+
+	/**
+	 * The purchase guard's js_before opens `if ( !gtm4wp_order_already_tracked ) {`,
+	 * so the clearing push belongs inside it: a repeat visit pushes nothing and
+	 * must not clear either.
+	 */
+	public function test_purchase_clearing_sits_inside_the_dedupe_guard(): void {
+		$output = $this->render_server_side_event( 'purchase', true );
+
+		$guard = strpos( $output, 'if ( !gtm4wp_order_already_tracked ) {' );
+		$clear = strpos( $output, '{"ecommerce":null}' );
+
+		$this->assertNotFalse( $guard, 'Precondition: the guard is emitted by default.' );
+		$this->assertGreaterThan( $guard, $clear, 'The clearing push must be inside the guard.' );
+	}
+
+	public function test_readded_to_cart_page_push_is_cleared_when_enabled(): void {
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc_readded( 'hash-1', $product );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$event = strpos( $this->inline_js, '"event":"add_to_cart"' );
+		$clear = strpos( $this->inline_js, '{"ecommerce":null}' );
+
+		$this->assertNotFalse( $event, 'Precondition: the Undo add_to_cart was rendered.' );
+		$this->assertNotFalse( $clear );
+		$this->assertLessThan( $event, $clear );
+	}
+
+	/**
+	 * The cache-safe one-shots are pushed by gtm4wp-visitor-data.js, which clears
+	 * only when the payload says so.
+	 */
+	public function test_cache_safe_payloads_carry_the_clear_option(): void {
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$order   = $this->make_recent_order();
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		foreach ( array( true, false ) as $clear ) {
+			$label   = $clear ? 'on' : 'off';
+			$options = array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL => $clear,
+			);
+
+			$this->stub_wc_readded( 'hash-1', $product );
+			$this->assertSame( $clear, $this->make_page_datalayer( $options )->resolve_readded_to_cart()['clear'] ?? null, 'readded, option ' . $label );
+
+			$this->stub_wc_pending( 1001 );
+			$this->assertSame( $clear, $this->make_page_datalayer( $options )->resolve_pending_purchase()['clear'] ?? null, 'purchase, option ' . $label );
+		}
+	}
 }

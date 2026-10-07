@@ -164,6 +164,7 @@ final class ReliablePurchase {
 			),
 			'orderNumber' => (string) $order->get_number(),
 			'flag'        => true,
+			'clear'       => (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL ),
 		);
 	}
 

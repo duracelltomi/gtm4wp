@@ -617,4 +617,25 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->assertStringContainsString( 'ORD\u003', $output, 'The < character must be hex-encoded (JSON_HEX_TAG).' );
 		$this->assertStringNotContainsString( 'ORD</script>', $output, 'The raw </script> sequence must never appear in the data layer value.' );
 	}
+
+	public function test_thankyou_purchase_is_cleared_only_when_enabled(): void {
+		$on = $this->run_thankyou(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL => true,
+			),
+			$this->make_order()
+		);
+
+		$clear = strpos( $on, 'window.dataLayer.push({"ecommerce":null});' );
+		$this->assertNotFalse( $clear, 'The clearing push must be printed.' );
+		$this->assertLessThan( strpos( $on, '"event":"purchase"' ), $clear );
+
+		// The first render set the once-per-request flag.
+		$GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] = false;
+
+		$off = $this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $this->make_order() );
+		$this->assertStringContainsString( '"event":"purchase"', $off, 'Precondition.' );
+		$this->assertStringNotContainsString( '"ecommerce":null', $off );
+	}
 }

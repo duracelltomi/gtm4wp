@@ -1338,6 +1338,48 @@ describe( 'gtm4wp-visitor-data — one-shot events (Phase 3)', () => {
 		expect( eventsNamed( 'purchase' ) ).toHaveLength( 0 );
 	} );
 
+	/**
+	 * "Clear ecommerce object before new event" reaches these one-shots only through
+	 * the payload: PHP sets clear, and the runtime pushes { ecommerce: null } first.
+	 */
+	it.each( [
+		[ 'readdedToCart', 'add_to_cart', true ],
+		[ 'readdedToCart', 'add_to_cart', false ],
+		[ 'pendingPurchase', 'purchase', true ],
+		[ 'pendingPurchase', 'purchase', false ],
+	] )(
+		'%s: clears the ecommerce object before %s only when the payload says so (clear=%s)',
+		async ( key, eventName, clear ) => {
+			const base =
+				'readdedToCart' === key
+					? readdedPayload( 'hash-1' )
+					: purchasePayload( '1001', false );
+			window.gtm4wp_visitordata_config = actionConfig( [ key ] );
+			setCookie( EVENT_COOKIE, '1' );
+			mockEndpointOnce( {
+				[ key ]: Object.assign( {}, base[ key ], { clear } ),
+			} );
+
+			loadTracker();
+			await flush();
+
+			const at = window.dataLayer.findIndex(
+				( entry ) => entry.event === eventName
+			);
+			expect( at ).toBeGreaterThan( -1 );
+			expect(
+				window.dataLayer.filter(
+					( entry ) => entry && null === entry.ecommerce
+				)
+			).toHaveLength( clear ? 1 : 0 );
+			// With clear on, the entry right before the event is the clearing push.
+			const before = clear
+				? window.dataLayer[ at - 1 ]
+				: { ecommerce: null };
+			expect( before ).toEqual( { ecommerce: null } );
+		}
+	);
+
 	it( 'fires the re-added-to-cart add_to_cart once and clears the event cookie', async () => {
 		window.gtm4wp_visitordata_config = actionConfig( [ 'readdedToCart' ] );
 		setCookie( EVENT_COOKIE, '1' );

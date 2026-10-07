@@ -383,6 +383,18 @@ final class Helpers {
 	}
 
 	/**
+	 * The "Clear ecommerce object before new event" statement for a push printed
+	 * server-side: GA4's recommended `{ecommerce: null}` before an ecommerce event,
+	 * what gtm4wp_push_ecommerce() does in the browser.
+	 *
+	 * @param string $datalayer_name The data layer variable name.
+	 * @return string The JavaScript statement.
+	 */
+	public static function clear_ecommerce_js( string $datalayer_name ): string {
+		return "\n\twindow." . esc_js( $datalayer_name ) . '.push({"ecommerce":null});';
+	}
+
+	/**
 	 * Builds the browser-side duplicate-tracking guard around a purchase push: a
 	 * "before" fragment that pushes only when the order number is not yet
 	 * recorded in localStorage / the cookie, and an "after" fragment that records

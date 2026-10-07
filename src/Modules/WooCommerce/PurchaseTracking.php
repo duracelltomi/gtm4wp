@@ -103,6 +103,9 @@ final class PurchaseTracking {
 			);
 
 			$datalayer_name = $this->datalayer->name();
+			$clear_js       = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL )
+				? \GTM4WP\Ecommerce\Helpers::clear_ecommerce_js( $datalayer_name )
+				: '';
 
 			// An unencodable payload (a filter can inject INF/NAN, a resource) must
 			// not be flagged as tracked (#141, RI-21): false would concatenate as
@@ -116,7 +119,7 @@ final class PurchaseTracking {
 
 			$script_tag = '
 ' . $this->script_tag->opening_tag() . '
-	window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];
+	window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];' . $clear_js . '
 	window.' . esc_js( $datalayer_name ) . '.push(' . $encoded_data_layer . ');
 </script>';
 

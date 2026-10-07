@@ -62,6 +62,7 @@
 
 ## 2.0.6
 
+* Fixed: with "Clear ecommerce object before new event" on, the e-commerce events GTM4WP adds as the page loads (`view_item`, `view_cart`, `begin_checkout`, `purchase`, the cart "Undo" `add_to_cart`) and the Quick View `view_item` are now cleared before too, not only the events fired in the browser.
 * Fixed: the plugin conflict notice now calls Google Analytics for WooCommerce by its current name.
 * Fixed: WooCommerce Mini-Cart tracking (`remove_from_cart` from the Mini-Cart drawer) now loads only on pages that show the Mini-Cart block. Stores using the Cart or Checkout block no longer load the WordPress data scripts on every page, and stores with a classic cart now track removals from a Mini-Cart block too.
 * Fixed: a WooCommerce Product Bundles bundle reported `stockstatus` as `instock` in the e-commerce items even when one of its bundled products was out of stock and the bundle could not be bought; it now reports `outofstock`. Thanks to @KingWehsops for the report (#474).
