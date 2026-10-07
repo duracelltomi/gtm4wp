@@ -1366,6 +1366,12 @@ function gtm4wp_woocommerce_process_pages() {
 								dl_data_obj &&
 								window[ gtm4wp_datalayer_name ]
 							) {
+								if ( gtm4wp_clear_ecommerce ) {
+									window[ gtm4wp_datalayer_name ].push( {
+										ecommerce: null,
+									} );
+								}
+
 								window[ gtm4wp_datalayer_name ].push(
 									dl_data_obj
 								);

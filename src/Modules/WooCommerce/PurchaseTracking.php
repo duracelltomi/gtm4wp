@@ -116,6 +116,9 @@ final class PurchaseTracking {
 			);
 
 			$datalayer_name = $this->datalayer->name();
+			$clear_js       = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL )
+				? \GTM4WP\Modules\WooCommerce\Helpers::clear_ecommerce_js( $datalayer_name )
+				: '';
 
 			// An unencodable payload must not be reported as tracked (#141). Order
 			// data passes through the public GTM4WP_WPFILTER_EEC_ORDER_DATA /
@@ -134,7 +137,7 @@ final class PurchaseTracking {
 
 			$script_tag = '
 ' . $this->script_tag->opening_tag() . '
-	window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];
+	window.' . esc_js( $datalayer_name ) . ' = window.' . esc_js( $datalayer_name ) . ' || [];' . $clear_js . '
 	window.' . esc_js( $datalayer_name ) . '.push(' . $encoded_data_layer . ');
 </script>';
 

@@ -379,7 +379,7 @@ final class PageDataLayer {
 								),
 							),
 						),
-						'',
+						$this->clear_ecommerce_js(),
 						'',
 						$list_wrapper,
 						$list_wrapper_args
@@ -410,7 +410,7 @@ final class PageDataLayer {
 							),
 						),
 					),
-					'',
+					$this->clear_ecommerce_js(),
 					'',
 					$list_wrapper,
 					$list_wrapper_args
@@ -471,7 +471,8 @@ final class PageDataLayer {
 						'value'    => $gtm4wp_cart_total,
 						'items'    => $gtm4wp_cart_products,
 					),
-				)
+				),
+				$this->clear_ecommerce_js()
 			);
 		}
 	}
@@ -518,7 +519,8 @@ final class PageDataLayer {
 						'value'    => $eec_product_array['price'] * $eec_product_array['quantity'],
 						'items'    => array( $eec_product_array ),
 					),
-				)
+				),
+				$this->clear_ecommerce_js()
 			);
 		}
 
@@ -577,7 +579,8 @@ final class PageDataLayer {
 						'value'    => $gtm4wp_checkout_total,
 						'items'    => $gtm4wp_checkout_products,
 					),
-				)
+				),
+				$this->clear_ecommerce_js()
 			);
 		}
 
@@ -1142,7 +1145,7 @@ final class PageDataLayer {
 		$this->datalayer->queue_push(
 			$purchase_data_layer['event'],
 			$purchase_data_layer,
-			$before_purchase_dl_push,
+			$before_purchase_dl_push . $this->clear_ecommerce_js(),
 			$after_purchase_dl_push
 		);
 
@@ -1584,6 +1587,7 @@ final class PageDataLayer {
 			// The de-dupe token: the WC session re-add key. Recorded in localStorage
 			// after the push so a reload with the same token does not re-fire.
 			'token' => (string) $cart_readded_hash,
+			'clear' => (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ),
 		);
 	}
 
@@ -1665,6 +1669,7 @@ final class PageDataLayer {
 			'push'        => $purchase_data_layer,
 			'orderNumber' => (string) $order->get_order_number(),
 			'flag'        => $flag,
+			'clear'       => (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ),
 		);
 	}
 
@@ -1918,5 +1923,18 @@ final class PageDataLayer {
 		}
 
 		return new \WP_REST_Response( null, 204 );
+	}
+
+	/**
+	 * The clearing push before a server-side ecommerce event, or '' when "Clear
+	 * ecommerce object before new event" is off. Inside a purchase's dedupe guard
+	 * it lands at the end of js_before, so a skipped repeat clears nothing.
+	 *
+	 * @return string
+	 */
+	private function clear_ecommerce_js(): string {
+		return (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL )
+			? \GTM4WP\Modules\WooCommerce\Helpers::clear_ecommerce_js( $this->datalayer->name() )
+			: '';
 	}
 }

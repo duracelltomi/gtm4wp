@@ -1849,6 +1849,35 @@ describe( 'gtm4wp-woocommerce QuickView & found_variation JSON.parse guards (T24
 		} );
 	} );
 
+	it( 'clears the ecommerce object before the Quick View push only when enabled', () => {
+		for ( const clear of [ true, false ] ) {
+			global.gtm4wp_clear_ecommerce = clear;
+			bootWithCapture();
+			window.dataLayer = [];
+
+			const el = document.createElement( 'div' );
+			el.id = 'gtm4wp_quickview_data';
+			el.dataset.gtm4wp_datalayer = JSON.stringify( {
+				event: 'view_item',
+				ecommerce: { items: [ { item_id: 7 } ] },
+			} );
+			document.body.appendChild( el );
+
+			ajaxSuccessCb( {}, {}, { url: '/?wc-api=WC_Quick_View' } );
+			jest.advanceTimersByTime( 500 );
+			el.remove();
+
+			const at = window.dataLayer.findIndex(
+				( entry ) => entry.event === 'view_item'
+			);
+			expect( at ).toBeGreaterThan( -1 );
+			expect( window.dataLayer[ at - 1 ] || null ).toEqual(
+				clear ? { ecommerce: null } : null
+			);
+		}
+		global.gtm4wp_clear_ecommerce = false;
+	} );
+
 	describe( 'list attribution (#405)', () => {
 		// Quick View builds its view_item on the server exactly like a product page
 		// does, so it arrives with no idea which list the visitor clicked. Unlike the
