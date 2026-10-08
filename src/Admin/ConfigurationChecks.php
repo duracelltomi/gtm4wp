@@ -11,6 +11,8 @@
 namespace GTM4WP\Admin;
 
 use GTM4WP\Modules\Container\ContainerRows;
+use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
+use GTM4WP\Modules\WooCommerce\WooCommerceModule;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -45,6 +47,7 @@ final class ConfigurationChecks {
 	public const CODE_INVALID_DATALAYER_NAME   = 'invalid-datalayer-name';
 	public const CODE_CONFLICT_WC_GA           = 'wc-ga-plugin-warning';
 	public const CODE_CONFLICT_MONSTERINSIGHTS = 'wc-gayoast-plugin-warning';
+	public const CODE_DUAL_STORE               = 'wc-edd-dual-store';
 
 	public const SEVERITY_ERROR   = 'error';
 	public const SEVERITY_WARNING = 'warning';
@@ -70,7 +73,37 @@ final class ConfigurationChecks {
 			$this->invalid_hardcoded_constants(),
 			$this->untrusted_proxy_headers(),
 			$this->invalid_datalayer_name(),
-			$this->conflicting_plugins()
+			$this->conflicting_plugins(),
+			$this->dual_store()
+		);
+	}
+
+	/**
+	 * WooCommerce and Easy Digital Downloads both tracking e-commerce on one
+	 * site, an unsupported setup: the two modules share the globals the
+	 * browser trackers read (currency, clearing the ecommerce object), and the
+	 * EDD values win. Asked of the modules themselves, under the same gates
+	 * their frontend hooks use.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function dual_store(): array {
+		if ( true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE )
+			|| true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE )
+			|| ! ( new WooCommerceModule() )->is_available()
+			|| ! ( new EasyDigitalDownloadsModule() )->is_available()
+		) {
+			return array();
+		}
+
+		return array(
+			array(
+				'code'        => self::CODE_DUAL_STORE,
+				'severity'    => self::SEVERITY_WARNING,
+				'option_key'  => '',
+				'message'     => __( 'Notice: e-commerce tracking is turned on for both WooCommerce and Easy Digital Downloads. Running both stores on one site is not supported, and some events may not be tracked as intended.', 'duracelltomi-google-tag-manager' ),
+				'dismissible' => true,
+			),
 		);
 	}
 

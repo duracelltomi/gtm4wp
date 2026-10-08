@@ -345,6 +345,102 @@ final class ConfigurationChecksTest extends TestCase {
 	}
 
 	/**
+	 * Makes both store plugins available the way their modules detect them.
+	 * EDD_VERSION and a stubbed EDD() stay defined for the rest of the
+	 * process (TS-16), so every caller runs in a process of its own.
+	 *
+	 * @return void
+	 */
+	private function both_stores_available(): void {
+		$GLOBALS['woocommerce'] = new \stdClass();
+		Functions\when( 'WC' )->justReturn( (object) array( 'version' => '9.9.0' ) );
+		Functions\when( 'EDD' )->justReturn( new \stdClass() );
+		define( 'EDD_VERSION', '3.7.0' );
+	}
+
+	/**
+	 * Stored options with both stores' e-commerce tracking set as given.
+	 *
+	 * @param bool $wc  WooCommerce "Track e-commerce".
+	 * @param bool $edd Easy Digital Downloads "Track e-commerce".
+	 * @return array<string, mixed>
+	 */
+	private function store_tracking( bool $wc, bool $edd ): array {
+		return array(
+			GTM4WP_OPTION_GTM_CONTAINERS              => array( array( ContainerRows::COLUMN_ID => 'GTM-ABC123' ) ),
+			GTM4WP_OPTION_GTM_PLACEMENT               => GTM4WP_PLACEMENT_FOOTER,
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE  => $wc,
+			GTM4WP_OPTION_INTEGRATE_EDDTRACKECOMMERCE => $edd,
+		);
+	}
+
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_both_stores_tracking_is_a_dismissible_warning_with_no_setting_to_point_at(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( false );
+		$this->both_stores_available();
+
+		$problems = $this->checks( $this->store_tracking( true, true ) )->problems();
+
+		$this->assertCount( 1, $problems );
+		$this->assertSame( ConfigurationChecks::CODE_DUAL_STORE, $problems[0]['code'] );
+		$this->assertSame( ConfigurationChecks::SEVERITY_WARNING, $problems[0]['severity'] );
+		$this->assertSame( '', $problems[0]['option_key'] );
+		$this->assertTrue( $problems[0]['dismissible'] );
+		$this->assertStringContainsString( 'not supported', $problems[0]['message'] );
+	}
+
+	/**
+	 * Silent unless BOTH modules track: the shared browser globals are only
+	 * overwritten when the EDD module registers its own, which it does only
+	 * with its tracking on.
+	 *
+	 * @param bool $wc  WooCommerce "Track e-commerce".
+	 * @param bool $edd Easy Digital Downloads "Track e-commerce".
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( true, false ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( false, true ) )]
+	public function test_one_store_tracking_raises_no_dual_store_warning( bool $wc, bool $edd ): void {
+		Functions\when( 'is_plugin_active' )->justReturn( false );
+		$this->both_stores_available();
+
+		$this->assertNotContains( ConfigurationChecks::CODE_DUAL_STORE, $this->codes( $this->store_tracking( $wc, $edd ) ) );
+	}
+
+	/**
+	 * Both options on and EDD available, but the WooCommerce plugin is not
+	 * active (no `$GLOBALS['woocommerce']`): a stale option is not a
+	 * dual-store site. EDD is made available on purpose, so only the
+	 * WooCommerce gate can keep this silent.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_store_option_left_on_without_its_plugin_raises_no_dual_store_warning(): void {
+		Functions\when( 'is_plugin_active' )->justReturn( false );
+		$this->both_stores_available();
+		unset( $GLOBALS['woocommerce'] );
+
+		$this->assertNotContains( ConfigurationChecks::CODE_DUAL_STORE, $this->codes( $this->store_tracking( true, true ) ) );
+	}
+
+	/**
+	 * The mirror case: WooCommerce available, EDD never loaded in this
+	 * process (no EDD() and no EDD_VERSION), both options on.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_edd_option_left_on_without_its_plugin_raises_no_dual_store_warning(): void {
+		$this->assertFalse( defined( 'EDD_VERSION' ), 'Precondition (TS-16): a fresh process has no EDD.' );
+		Functions\when( 'is_plugin_active' )->justReturn( false );
+		$GLOBALS['woocommerce'] = new \stdClass();
+		Functions\when( 'WC' )->justReturn( (object) array( 'version' => '9.9.0' ) );
+
+		$this->assertNotContains( ConfigurationChecks::CODE_DUAL_STORE, $this->codes( $this->store_tracking( true, true ) ) );
+	}
+
+	/**
 	 * The real integration: a malformed wp-config constant, rejected while the
 	 * options are built, surfaced by the checks with the constant named.
 	 */

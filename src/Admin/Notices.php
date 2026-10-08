@@ -37,6 +37,7 @@ final class Notices {
 		ConfigurationChecks::CODE_MISSING_CONTAINER_ID     => false,
 		ConfigurationChecks::CODE_CONFLICT_WC_GA           => false,
 		ConfigurationChecks::CODE_CONFLICT_MONSTERINSIGHTS => false,
+		ConfigurationChecks::CODE_DUAL_STORE               => false,
 	);
 
 	/**
