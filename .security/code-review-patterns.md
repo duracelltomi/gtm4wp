@@ -63,6 +63,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-38** — a `has_filter()` availability check run while wp-admin renders sees only admin-registered callbacks; for a hook integrators may register on frontend requests only, the screen disables an option the frontend applies (#361). Host-plugin APIs load unconditionally; our documented hooks do not.
 - **RI-40** — a "never ran"/"lost" verdict read from the absence of a row is only true if every consumer exit after dequeue writes one; enumerate the `return`s, and follow the screen's own remedy through them once (#388).
 - **RI-41** — when PHP stands down because "the JS reports this", the PHP skip must be no wider than the JS match condition; a request header says some script asked, never which one (#387).
+- **RI-42** — a send-or-not guard must read a durable per-record marker, never a diagnostics ring: the ring is trimmed (routine rows first) and the guard's own skip rows supersede the evidence. If a ring fallback must stay, backfill the marker the first time it answers (#396).
 - **RI-39** — never "fix" a filtered getter under a new `: string` with a `(string)` cast: it is still fatal on an object and emits `"Array"`; guard with `is_string()` (#362).
 - **RI-34** — a pattern/exclusion list we hand to a third party that names a literal we used to hardcode is a second reader of it: when the literal becomes an option (RI-14), the list is silently narrowed on every non-default site (#325). Grep the literal as a string in every list we emit; prefer a fixed plugin-owned token over the user value.
 
@@ -980,6 +981,19 @@ Adding `: string` over a value that has passed through somebody's filter (`get_*
 - **The check:** when PHP stands down because "the JS reports this", state the JS's exact match condition and make the PHP skip no wider (here: header **and** `undo_item`, the parameter the JS keys on). Then name the residual cases neither side reports.
 - Ledger at R48: **1** such stand-down (`ListTracking::cart_item_restored()`). Re-derive with `grep -rn "HTTP_X_REQUESTED_WITH\|wp_doing_ajax()" src`.
 
+### RI-42: A send guard that falls back to a diagnostics ring loses the evidence to its own writes
+Data Manager's `RefundSender::accepted()` treats a destination as already served if the per-refund marker has it **or** the
+send log's newest row for it says `accepted` (kept for refunds accepted before the marker existed). The ring is a
+diagnostic: `trim()` drops routine rows, accepted ones included, before problems, and the sender's own `already_sent`
+skip row becomes the newest row for that destination. Either way the fallback flips to "not accepted" with no marker
+behind it, and a later whole-refund job sends the event again (probe-verified, #396).
+- **The check:** for every guard that decides "do not send / do not repeat", name the store it reads. A ring, cache or
+  log that the same code writes to or trims is not evidence. If a legacy fallback has to read it, the first positive
+  answer writes the durable marker.
+- Ledger at R49: **1** ring read in a send guard (`RefundSender.php` `accepted()` -> `SendLog::latest_is_accepted()`),
+  plus **1** ring read in planning (`RefundReplay` -> `SendLog::replay_plan()`; the sender re-guards every planned job).
+  Re-derive with `grep -rn "latest_is_accepted\|replay_plan(" src`.
+
 ## Project-Specific Anti-Patterns
 
 ### RI-26: A filterable predicate borrowed as a privacy gate can be moved by the site — in BOTH directions ⭐
@@ -1856,3 +1870,4 @@ Running both store integrations on one site is an **unsupported setup** (maintai
 | 2026-10-07 (Review 48) | Reviewed `5326393..dfe20ee` (`master`) and `e9ffeff..f3419d9` (`2.0`). **8 Low (#387–#394), no security finding.** Added **RI-40** (silence-derived diagnostics must enumerate silent exits; the queued-row premise failed re-derivation, #388) and **RI-41** (a header proxy is wider than the JS case it stands down for, #387). FP-1 re-derived: 13 callers; FP-1 is now the single copy of the count, RI-3 and the sweep row point at it (#392). |
 | 2026-10-08 (Review 48, fix session) | Added **FP-6** (dual-store WooCommerce + EDD findings accepted, maintainer decision; premise stated as unmeasured, invalidation conditions named). #387/#391 fixed, #390 half fixed, #389/#342 accepted. |
 | 2026-10-08 (Review 48, second fix session) | RI-40's ledger re-derived after `f6f8a91`: 1 deliberate silent exit left. #388/#390/#394 fixed; #395 opened (ring trim keeps the oldest failure). |
+| 2026-10-08 (Review 49) | Reviewed `dfe20ee..d94a257` (`master`) and `f3419d9..42d38af` (`2.0`), R48's fix sessions. **3 Low (#396–#398), no security finding.** Added **RI-42** (a send guard must not fall back to a diagnostics ring, #396). FP-4 and FP-6 re-derived, both hold. |
