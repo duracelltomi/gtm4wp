@@ -83,7 +83,7 @@ final class PageDataLayer {
 	 * @return array Extended data layer content with WooCommerce data added.
 	 */
 	public function add_datalayer_data( $data_layer ) {
-		if ( array_key_exists( 'HTTP_X_REQUESTED_WITH', $_SERVER ) ) {
+		if ( Helpers::is_xhr_request() ) {
 			return $data_layer;
 		}
 

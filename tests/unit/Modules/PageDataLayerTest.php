@@ -343,6 +343,21 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( '', $this->inline_js, 'AJAX requests must not emit any inline script.' );
 	}
 
+	/**
+	 * Android WebView in-app browsers (Facebook, Instagram) send their package
+	 * name as X-Requested-With on a normal page load. That is not AJAX, so the
+	 * order received page must still carry the purchase (#477).
+	 */
+	public function test_order_received_emits_the_purchase_in_an_android_in_app_browser(): void {
+		$this->stub_order_received_request();
+		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'com.facebook.katana';
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js );
+	}
+
 	public function test_checkout_adds_hex_encoded_products_inline_and_fires_begin_checkout(): void {
 		Functions\when( 'is_checkout' )->justReturn( true );
 

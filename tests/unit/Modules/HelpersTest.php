@@ -44,10 +44,43 @@ final class HelpersTest extends TestCase {
 	protected function tearDown(): void {
 		unset(
 			$_COOKIE[ Helpers::LIST_ATTRIBUTION_COOKIE ],
-			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ]
+			$_COOKIE[ Helpers::ONESHOT_EVENT_COOKIE ],
+			$_SERVER['HTTP_X_REQUESTED_WITH']
 		);
 
 		parent::tearDown();
+	}
+
+	/**
+	 * Only the value a script-sent AJAX call carries counts (#477). An Android
+	 * WebView in-app browser sends its app's package name on every page load,
+	 * and that page must keep its data layer.
+	 *
+	 * @return array<string, array{0: ?string, 1: bool}>
+	 */
+	public static function provide_requested_with_values(): array {
+		return array(
+			'header absent'             => array( null, false ),
+			'jQuery AJAX'               => array( 'XMLHttpRequest', true ),
+			'case-insensitive'          => array( 'xmlhttprequest', true ),
+			'surrounding whitespace'    => array( ' XMLHttpRequest ', true ),
+			'Facebook Android WebView'  => array( 'com.facebook.katana', false ),
+			'Instagram Android WebView' => array( 'com.instagram.android', false ),
+			'empty value'               => array( '', false ),
+			'prefix of the AJAX value'  => array( 'XMLHttpRequestX', false ),
+		);
+	}
+
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'provide_requested_with_values' )]
+	public function test_is_xhr_request_matches_the_header_value_not_its_presence( ?string $value, bool $expected ): void {
+		Functions\when( 'wp_unslash' )->returnArg();
+		Functions\when( 'sanitize_text_field' )->alias( static fn ( $v ) => trim( (string) $v ) );
+
+		if ( null !== $value ) {
+			$_SERVER['HTTP_X_REQUESTED_WITH'] = $value;
+		}
+
+		$this->assertSame( $expected, Helpers::is_xhr_request() );
 	}
 
 	/**
