@@ -565,7 +565,7 @@ final class SendLog {
 			$entry['waiting']    = self::is_waiting( $entry, $now ) && self::is_waiting( $last, $now );
 
 			// A queued job the queue never ran needs a look, unlike a waiting one.
-			if ( self::OUTCOME_QUEUED === $entry['outcome'] && $entry['replayable'] ) {
+			if ( self::OUTCOME_QUEUED === (string) ( $entry['outcome'] ?? '' ) && $entry['replayable'] ) {
 				$entry['tone'] = self::TONE_WARN;
 			}
 

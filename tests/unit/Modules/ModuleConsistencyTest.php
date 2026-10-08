@@ -472,7 +472,7 @@ final class ModuleConsistencyTest extends TestCase {
 			$schema_class = $module->admin_schema();
 
 			foreach ( ( new $schema_class() )->fields() as $field ) {
-				$words = count( preg_split( '/\s+/', trim( strip_tags( (string) $field->description ) ), -1, PREG_SPLIT_NO_EMPTY ) );
+				$words = count( preg_split( '/\s+/', trim( strip_tags( (string) $field->description ) ), -1, PREG_SPLIT_NO_EMPTY ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- no WordPress in the unit suite; only counts words.
 
 				if ( $words > self::DESCRIPTION_MAX_WORDS ) {
 					$long[ $field->key ] = $words;

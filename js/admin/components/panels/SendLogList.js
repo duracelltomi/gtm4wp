@@ -377,6 +377,8 @@ export default function SendLogList( {
 						// Handler-level twin of the disabled prop, which cannot be
 						// trusted across the supported WordPress range.
 						if ( ! busy ) {
+							// A manual refresh starts the automatic one afresh.
+							polls.current = 0;
 							load();
 						}
 					} }

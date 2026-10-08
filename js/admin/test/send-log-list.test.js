@@ -760,6 +760,29 @@ describe( 'SendLogList while a queued job waits', () => {
 		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 18 );
 	} );
 
+	it( 'starts refreshing by itself again after a manual Refresh', async () => {
+		for ( let i = 0; i < 21; i++ ) {
+			apiFetch.mockResolvedValueOnce( { entries: [ waitingRow ] } );
+		}
+		render( <SendLogList logPath={ LOG_PATH } /> );
+		await screen.findByText( 'Queued' );
+
+		for ( let i = 0; i < 25; i++ ) {
+			await tick();
+		}
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 18 );
+
+		await act( async () => {
+			fireEvent.click(
+				screen.getByRole( 'button', { name: 'Refresh' } )
+			);
+		} );
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 20 ) );
+
+		await tick();
+		expect( apiFetch ).toHaveBeenCalledTimes( 21 );
+	} );
+
 	it( 'explains a queued job the queue never ran', async () => {
 		apiFetch.mockResolvedValueOnce( {
 			entries: [

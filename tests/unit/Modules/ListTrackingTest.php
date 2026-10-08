@@ -157,16 +157,41 @@ final class ListTrackingTest extends TestCase {
 		);
 
 		$server_backup                    = $_SERVER;
+		$get_backup                       = $_GET; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- test fixture backup.
 		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+		$_GET['undo_item']                = 'hash-1'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- test fixture.
 		try {
 			$this->make_list_tracking( array( GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true ) )
 				->cart_item_restored( 'hash-1' );
 		} finally {
 			$_SERVER = $server_backup;
+			$_GET    = $get_backup;
 		}
 
 		$this->assertSame( array(), $session->sets, 'No re-add marker for a background Undo.' );
 		$this->assertSame( array(), $cookie_names, 'No one-shot cookie for a background Undo.' );
+	}
+
+	/**
+	 * Any other background restore - a side cart's own undo action posting
+	 * the cart item key, with no undo_item - is never seen by the classic
+	 * tracker, so the marker must still be written (R48 #387).
+	 */
+	public function test_cart_item_restored_keeps_the_marker_for_a_background_restore_that_is_not_the_classic_undo(): void {
+		$session = $this->stub_wc_session();
+
+		$server_backup                    = $_SERVER;
+		$get_backup                       = $_GET; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- test fixture backup.
+		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+		unset( $_GET['undo_item'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- test fixture.
+		try {
+			$this->make_list_tracking()->cart_item_restored( 'hash-1' );
+		} finally {
+			$_SERVER = $server_backup;
+			$_GET    = $get_backup;
+		}
+
+		$this->assertSame( array( 'gtm4wp_product_readded_to_cart' => 'hash-1' ), $session->sets );
 	}
 
 	public function test_cart_item_restored_does_not_flag_event_cookie_when_cache_safe_off(): void {

@@ -762,4 +762,39 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 
 		$this->assertContains( 'woocommerce:7:1', array_column( $log->all(), 'reference' ) );
 	}
+
+	/**
+	 * The ring is read back without cleaning (only writes are), so a stored row
+	 * missing a member - an older format, an out-of-band write - must still
+	 * display without a PHP warning on the settings screen and the ability
+	 * (R48 #391). Warnings are made fatal here so the assertion is the absence
+	 * of one, not a log line.
+	 */
+	public function test_a_stored_row_without_an_outcome_displays_without_a_warning(): void {
+		$this->options[ SendLog::OPTION_NAME ] = array(
+			array(
+				'time'      => self::NOW,
+				'feature'   => SendLog::FEATURE_REFUND,
+				'reference' => 'woocommerce:12:34',
+			),
+		);
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- test-only warning trap, restored below.
+		set_error_handler(
+			static function ( int $errno, string $errstr ): bool {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test-only exception reported by PHPUnit.
+				throw new \ErrorException( $errstr, 0, $errno );
+			}
+		);
+
+		try {
+			$entries = $this->log()->entries_for_display();
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertCount( 1, $entries );
+		$this->assertSame( SendLog::TONE_PENDING, $entries[0]['tone'] );
+		$this->assertFalse( $entries[0]['waiting'] );
+	}
 }
