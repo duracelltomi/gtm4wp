@@ -221,9 +221,9 @@ final class ListTracking {
 		// The classic cart's Undo is a background request carrying undo_item; the
 		// classic tracker reports it, and a marker left here would repeat it on the
 		// next page. Any other background restore (a side cart's own undo action)
-		// keeps the marker: the tracker never sees it. Presence checks only, and
+		// keeps the marker: the tracker never sees it. undo_item is a presence check, and
 		// WooCommerce verified the undo nonce before restoring.
-		if ( array_key_exists( 'HTTP_X_REQUESTED_WITH', $_SERVER ) && isset( $_GET['undo_item'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( Helpers::is_xhr_request() && isset( $_GET['undo_item'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}
 

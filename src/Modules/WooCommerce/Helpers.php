@@ -122,6 +122,16 @@ final class Helpers {
 	}
 
 	/**
+	 * Whether this request was sent by script as an AJAX call.
+	 * See EcommerceHelpers::is_xhr_request().
+	 *
+	 * @return bool
+	 */
+	public static function is_xhr_request(): bool {
+		return EcommerceHelpers::is_xhr_request();
+	}
+
+	/**
 	 * Replace only the first occurrence of the search string, both treated as
 	 * literals. Deliberately NOT preg_replace(): its replacement expands $0/\1
 	 * backreferences, which would let product data break out of an already

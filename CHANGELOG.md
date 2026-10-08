@@ -57,6 +57,7 @@
 
 ## 2.0.6
 
+* Fixed: visitors browsing in the in-app browser of an Android app such as Facebook or Instagram got no WooCommerce data layer, so their `purchase` and other e-commerce events were missing. Thanks to @sw33tr for the report (#477).
 * Fixed: on the classic cart page, re-adding a removed product with "Undo" now sends `add_to_cart`. WooCommerce restores it in the background and discarded the page part that carried the event.
 * Fixed: with "Clear ecommerce object before new event" on, the e-commerce events GTM4WP adds as the page loads (`view_item`, `view_cart`, `begin_checkout`, `purchase`, the cart "Undo" `add_to_cart`) and the Quick View `view_item` are now cleared before too, not only the events fired in the browser.
 * Fixed: the plugin conflict notice now calls Google Analytics for WooCommerce by its current name.

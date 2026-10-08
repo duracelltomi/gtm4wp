@@ -226,6 +226,31 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertSame( array( 'existing' => 1 ), $page_datalayer->add_datalayer_data( array( 'existing' => 1 ) ) );
 	}
 
+	/**
+	 * An Android in-app browser's X-Requested-With (the app's package name) is
+	 * not AJAX, so the data layer is still built (#477).
+	 */
+	public function test_android_in_app_browser_requests_are_not_skipped(): void {
+		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'com.facebook.katana';
+		Functions\when( 'get_current_user_id' )->justReturn( 5 );
+		Functions\when( 'edd_get_customer_by' )->justReturn(
+			new \EDD_Customer(
+				array(
+					'name'           => 'Jane Doe',
+					'email'          => 'jane@example.com',
+					'purchase_count' => 4,
+					'purchase_value' => 100.5,
+				)
+			)
+		);
+
+		$data = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true )
+		)->add_datalayer_data( array( 'existing' => 1 ) );
+
+		$this->assertSame( 4, $data['customerTotalOrders'] );
+	}
+
 	public function test_customer_data_is_added_only_when_enabled(): void {
 		Functions\when( 'get_current_user_id' )->justReturn( 5 );
 		Functions\when( 'edd_get_customer_by' )->justReturn(
