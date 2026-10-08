@@ -7,21 +7,15 @@
 * Fixed: the plugin no longer buffers every WooCommerce template part on every page. That buffering only fed the classic "Products" widget, whose tracking had been dead since 2017. If a GTM trigger filters on an `item_list_name` ending in "(widget)", remove that condition.
 * Fixed: the description of the WooCommerce **"Order data in data layer"** setting no longer says it works independently of ecommerce tracking. It needs "Track e-commerce", and still writes `orderData` when the purchase event is not sent again.
 * Fixed: a settings import file with a checkbox written as the text "false" switched that option on; it now means off, as it does when saving the settings screen.
-* Fixed: a WooCommerce checkout total that is not a finite number no longer breaks the inline checkout script; `gtm4wp_checkout_value` is `null` then.
-* Fixed: hardened how the plugin's REST endpoints answer requests made from other pages. Details are withheld until the change reaches the 2.0 line.
 * Changed: with the cache-safe data layer on, the WooCommerce customer and cart data are re-read only when the cart fragment changed, not on every change to the page.
 * Added: an optional **"Output values in the default language"** setting (Page variables → Content & engagement data): `pageTitle`, `pageCategory`, `pageAttributes`, `pagePostTerms` and `pagePrimaryCategory` report the master language, so Google Analytics combines reports across translations. Needs WPML, Polylang or the `gtm4wp_master_language_post_id` / `gtm4wp_master_language_term_id` filters (the three settings below: post filter only). Off by default (experimental). Thanks to @loran750 (#145).
 * Added: an optional **"Report products in the default language"** setting (WooCommerce → Product data): the whole GA4 item, `item_id` included, reports the master language, so one product combines across its translations. Review any product feed or dynamic-remarketing setup keyed on the translated id before switching it on. Off by default (experimental) (#145).
 * Added: an optional **"Report downloads in the default language"** setting (Easy Digital Downloads → Product data), the EDD counterpart of the WooCommerce option above and with the same caveat about setups keyed on the translated `item_id`. Off by default (experimental) (#145).
 * Added: an optional **"Report the form name in the default language"** setting (Contact Form 7), so `form_name` carries the master-language title and submissions of one form combine across languages. Works for forms translated as separate entries. Off by default (experimental) (#145).
 * Changed: `pagePostTerms` and `pagePrimaryCategoryName` report term names as they were typed, the same string the e-commerce items have carried since 2.0.2. A GTM trigger that matched the encoded form on either variable needs the plain text now; the slug variables are unchanged.
-* Changed: `siteSearchTerm` carries the search term as typed. The classic data layer used to HTML-encode it (`&amp;`, `&quot;`) while the cache-safe one did not; a GTM trigger matching the encoded form needs the plain text now.
 * Changed: `pagePostTerms` is omitted when the post has no terms and no reported meta, instead of being an empty list, so a trigger testing the variable's presence no longer fires on such pages.
-* Changed: the Contact Form 7 tracker script is no longer loaded while Contact Form 7 is not installed.
-* Changed: for developers, `gtm4wp_datalayer_push()` returns `false` for a `$js_before` or `$js_after` argument that is not a string, as documented, instead of printing `Array` into the page; and the consent mode flag override filter also accepts the strings `granted` and `denied`.
 * Changed: on a single site `siteID` and `siteName` carry the site's own id and name instead of 0 and an empty string, and only the variable whose option is on is reported.
 * Changed: `visitorEmail`, `visitorEmailHash`, `visitorUsername` and `visitorRegistrationDate` are omitted for a logged-out visitor or an empty value, and `visitorIP` when no address can be determined, instead of being reported empty. `visitorEmailHash` is now lower-cased and normalised the way Google matches user-provided data, so it changes for mixed-case and Gmail addresses.
-* Changed: `pageTitle` carries the title as the visitor reads it; WordPress's own encoding of ampersands, quotes and dashes (`&#038;`, `&#8217;`) is decoded. A GTM trigger matching the encoded form needs the plain text now.
 * Changed: with trusted proxy addresses configured, the Cloudflare country code is read only for requests that arrived through one of them, so add Cloudflare's IP ranges to the list; one admin notice asks for the list while either proxy header is read without one. `geoCloudflareCountryCode` only ever carries Cloudflare's two-letter form (plus `XX` and `T1`); anything else is omitted.
 * Changed: a `gtm4wp_admin_page_capability` callback returning something other than a capability name is reported through `_doing_it_wrong()` and the default `manage_options` applies, instead of locking every administrator out silently. Return `do_not_allow` to deny everyone.
 * Changed: the Axeptio project ID field looks up the cookie versions 400 ms after typing stops instead of on every keystroke.
@@ -68,6 +62,13 @@
 * Fixed: the plugin conflict notice now calls Google Analytics for WooCommerce by its current name.
 * Fixed: WooCommerce Mini-Cart tracking (`remove_from_cart` from the Mini-Cart drawer) now loads only on pages that show the Mini-Cart block. Stores using the Cart or Checkout block no longer load the WordPress data scripts on every page, and stores with a classic cart now track removals from a Mini-Cart block too.
 * Fixed: a WooCommerce Product Bundles bundle reported `stockstatus` as `instock` in the e-commerce items even when one of its bundled products was out of stock and the bundle could not be bought; it now reports `outofstock`. Thanks to @KingWehsops for the report (#474).
+* Fixed: a `gtm4wp_overwrite_consent_mode_flag` filter callback returning the string `denied` set that consent signal to `granted`. The filter now also accepts the strings `granted` and `denied`.
+* Fixed: a WooCommerce checkout total that is not a finite number no longer breaks the inline checkout script; `gtm4wp_checkout_value` is `null` then.
+* Fixed: hardened how the plugin's REST endpoints answer requests made from other pages.
+* Changed: `siteSearchTerm` carries the search term as typed. The classic data layer used to HTML-encode it (`&amp;`, `&quot;`) while the cache-safe one did not; a GTM trigger matching the encoded form needs the plain text now.
+* Changed: `pageTitle` carries the title as the visitor reads it; WordPress's own encoding of ampersands, quotes and dashes (`&#038;`, `&#8217;`) is decoded. A GTM trigger matching the encoded form needs the plain text now.
+* Changed: the Contact Form 7 tracker script is no longer loaded while Contact Form 7 is not installed.
+* Changed: for developers, `gtm4wp_datalayer_push()` returns `false` for a `$js_before` or `$js_after` argument that is not a string, as documented, instead of printing `Array` into the page.
 
 ## 2.0.5
 
