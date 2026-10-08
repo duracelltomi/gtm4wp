@@ -993,6 +993,8 @@ behind it, and a later whole-refund job sends the event again (probe-verified, #
 - Ledger at R49: **1** ring read in a send guard (`RefundSender.php` `accepted()` -> `SendLog::latest_is_accepted()`),
   plus **1** ring read in planning (`RefundReplay` -> `SendLog::replay_plan()`; the sender re-guards every planned job).
   Re-derive with `grep -rn "latest_is_accepted\|replay_plan(" src`.
+- **After the R49 fix session (`15c10bc`):** the guard's ring leg backfills the marker on its first positive answer; same
+  counts (1 guard read, 1 planning read), re-derived on the committed tree.
 
 ## Project-Specific Anti-Patterns
 
@@ -1871,3 +1873,4 @@ Running both store integrations on one site is an **unsupported setup** (maintai
 | 2026-10-08 (Review 48, fix session) | Added **FP-6** (dual-store WooCommerce + EDD findings accepted, maintainer decision; premise stated as unmeasured, invalidation conditions named). #387/#391 fixed, #390 half fixed, #389/#342 accepted. |
 | 2026-10-08 (Review 48, second fix session) | RI-40's ledger re-derived after `f6f8a91`: 1 deliberate silent exit left. #388/#390/#394 fixed; #395 opened (ring trim keeps the oldest failure). |
 | 2026-10-08 (Review 49) | Reviewed `dfe20ee..d94a257` (`master`) and `f3419d9..42d38af` (`2.0`), R48's fix sessions. **3 Low (#396–#398), no security finding.** Added **RI-42** (a send guard must not fall back to a diagnostics ring, #396). FP-4 and FP-6 re-derived, both hold. |
+| 2026-10-08 (Review 49, fix session) | #396/#397/#398 fixed `15c10bc`; RI-42 ledger re-derived after the fix (1 guard read, now backfilling; 1 planning read). |

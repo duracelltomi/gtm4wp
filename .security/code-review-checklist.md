@@ -1160,14 +1160,15 @@ Toolchain scopes unchanged. Ledgers written on `master` through a detached workt
 **0 Critical / High / Medium, 3 Low, no security finding.** Adjudication: 3 drafts, 3 verifiers (2 in their own
 worktrees outside the repo). 0 mechanisms refuted, 1 widened (#397), 2 recommendations revised (#396, #398). One recorded
 design premise failed (#396: the ring's newest row as acceptance evidence). **Suite (pre-review, full output read):**
-`master` PHP 3438 / 19107, `2.0` PHP 2105 / 5082, `phpcs` exit 0 on both. **Base for the next review:** this ledger
-commit on `master`; `42d38af` on `2.0`.
+`master` PHP 3438 / 19107, `2.0` PHP 2105 / 5082, `phpcs` exit 0 on both. **Fix session (2026-10-08, maintainer: fix all):**
+#396/#397/#398 fixed in `15c10bc`. **Claims that changed shape: 0.** **Suite after:** `master` PHP 3440 / 19138, JS 1030 / 39,
+`phpcs` 0, `lint:js` 0. **Base for the next review:** `15c10bc` + this ledger commit on `master`; `42d38af` on `2.0`.
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
-| 396 | Low | open (fix optional, beta-era data; recommendation verified) | — | Data Manager `RefundSender::accepted()` | The fallback for refunds accepted before the per-refund marker reads the ring's newest row, which the sender's own skip row and the ring trim both erase; the marker is not backfilled |
-| 397 | Low | open | — | `SendLogList.js` stale label, replay ability description, `SendLog` docblock | Short form "Send refunds" for the option labelled "Send refunds to Google Analytics" |
-| 398 | Low | open | — | Data Manager `SendLog` skip-reason lists | Reason codes restated as literals beside their `RefundSender` / `ConsentPolicy` constants; a value change goes unnoticed by the suite |
+| 396 | Low | fixed (R49 fix session `15c10bc`: ring-only answer backfilled into the marker; regression test red before the fix on both its marker and its no-second-send assertion) | — | Data Manager `RefundSender::accepted()` | The fallback for refunds accepted before the per-refund marker reads the ring's newest row, which the sender's own skip row and the ring trim both erase; the marker is not backfilled |
+| 397 | Low | fixed (R49 fix session `15c10bc`: full label at all three sites; Jest green) | — | `SendLogList.js` stale label, replay ability description, `SendLog` docblock | Short form "Send refunds" for the option labelled "Send refunds to Google Analytics" |
+| 398 | Low | fixed (R49 fix session `15c10bc`: lists built from the constants; stored values pinned by a test, red on a value change) | — | Data Manager `SendLog` skip-reason lists | Reason codes restated as literals beside their `RefundSender` / `ConsentPolicy` constants; a value change goes unnoticed by the suite |
 
 Note on #395 (open): the new `already_sent` / `destination_removed` rows are drawn as routine, so the trim drops them before the failure they superseded (code-read).
 
