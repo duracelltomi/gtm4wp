@@ -158,11 +158,14 @@ function queuedLabel( entry ) {
 }
 
 /**
- * Seconds between two automatic refreshes while a queued row is waiting, and
- * how many of them at most, so a stalled queue does not poll forever.
+ * Seconds between two automatic refreshes while a queued row is waiting. What
+ * ends them is the server: a row stops waiting once the job wrote its own row,
+ * or once it is older than SendLog::QUEUED_STALE_AFTER (15 minutes), when it
+ * turns into the "not processed" diagnostic. The cap is only a backstop above
+ * that window, so a server that never clears the flag is not polled forever.
  */
 const WAITING_POLL_SECONDS = 10;
-const WAITING_POLL_MAX = 18;
+const WAITING_POLL_MAX = 100;
 
 /**
  * The CSS suffix for an entry's tone. The judgement is the server's

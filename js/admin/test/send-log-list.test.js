@@ -745,42 +745,61 @@ describe( 'SendLogList while a queued job waits', () => {
 		expect( apiFetch ).toHaveBeenCalledTimes( 2 );
 	} );
 
-	it( 'gives up after a few minutes so a stalled queue is not polled forever', async () => {
-		// Once values only (see the top of the file): a 20th call would reject.
-		for ( let i = 0; i < 19; i++ ) {
+	it( 'keeps refreshing for as long as the server says the row waits', async () => {
+		// Past the old three-minute cap: the server's 15-minute window decides.
+		for ( let i = 0; i < 31; i++ ) {
+			apiFetch.mockResolvedValueOnce( { entries: [ waitingRow ] } );
+		}
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ { ...waitingRow, waiting: false } ],
+		} );
+		render( <SendLogList logPath={ LOG_PATH } /> );
+		await screen.findByText( 'Queued' );
+
+		for ( let i = 0; i < 40; i++ ) {
+			await tick();
+		}
+
+		// 31 waiting answers, then the server cleared the flag: no 33rd call.
+		expect( apiFetch ).toHaveBeenCalledTimes( 32 );
+	} );
+
+	it( 'stops at a backstop when the server never clears the flag', async () => {
+		// Once values only (see the top of the file): a 102nd call would reject.
+		for ( let i = 0; i < 101; i++ ) {
 			apiFetch.mockResolvedValueOnce( { entries: [ waitingRow ] } );
 		}
 		render( <SendLogList logPath={ LOG_PATH } /> );
 		await screen.findByText( 'Queued' );
 
-		for ( let i = 0; i < 25; i++ ) {
+		for ( let i = 0; i < 110; i++ ) {
 			await tick();
 		}
 
-		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 18 );
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 100 );
 	} );
 
 	it( 'starts refreshing by itself again after a manual Refresh', async () => {
-		for ( let i = 0; i < 21; i++ ) {
+		for ( let i = 0; i < 103; i++ ) {
 			apiFetch.mockResolvedValueOnce( { entries: [ waitingRow ] } );
 		}
 		render( <SendLogList logPath={ LOG_PATH } /> );
 		await screen.findByText( 'Queued' );
 
-		for ( let i = 0; i < 25; i++ ) {
+		for ( let i = 0; i < 110; i++ ) {
 			await tick();
 		}
-		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 18 );
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 100 );
 
 		await act( async () => {
 			fireEvent.click(
 				screen.getByRole( 'button', { name: 'Refresh' } )
 			);
 		} );
-		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 20 ) );
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 102 ) );
 
 		await tick();
-		expect( apiFetch ).toHaveBeenCalledTimes( 21 );
+		expect( apiFetch ).toHaveBeenCalledTimes( 103 );
 	} );
 
 	it( 'explains a queued job the queue never ran', async () => {
