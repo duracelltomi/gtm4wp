@@ -4,7 +4,7 @@
  *
  * Regenerate with: composer generate:phone-table
  * Source: Google libphonenumber, resources/PhoneNumberMetadata.xml
- * Generated: 2026-08-12
+ * Generated: 2026-10-08
  *
  * Every territory's own example number in TWO spellings, against the E.164 the
  * numbering plan says it is. 972 cases.

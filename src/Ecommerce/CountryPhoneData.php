@@ -4,7 +4,7 @@
  *
  * Regenerate with: composer generate:phone-table
  * Source: Google libphonenumber, resources/PhoneNumberMetadata.xml
- * Generated: 2026-08-12
+ * Generated: 2026-10-08
  *
  * @package GTM4WP
  * @author Thomas Geiger
@@ -124,7 +124,7 @@ final class CountryPhoneData {
 		'GH' => array( '233', '0', '[235]\\d{8}|800\\d{5,6}' ),
 		'GI' => array( '350', null, '(?:[25]\\d|60)\\d{6}' ),
 		'GL' => array( '299', null, '(?:19|[2-689]\\d|70)\\d{4}' ),
-		'GM' => array( '220', null, '[2-9]\\d{6}' ),
+		'GM' => array( '220', null, '[48]\\d{8}|[2-9]\\d{6}' ),
 		'GN' => array( '224', null, '722\\d{6}|(?:3|6\\d)\\d{7}' ),
 		'GP' => array( '590', '0', '7090\\d{5}|(?:[56]9|[89]\\d)\\d{7}' ),
 		'GQ' => array( '240', null, '222\\d{6}|(?:3\\d|55|[89]0)\\d{7}' ),
@@ -285,7 +285,7 @@ final class CountryPhoneData {
 		'YT' => array( '262', '0', '(?:639\\d|7093)\\d{5}|(?:26|80|9\\d)\\d{7}' ),
 		'ZA' => array( '27', '0', '[1-79]\\d{8}|8\\d{4,9}' ),
 		'ZM' => array( '260', '0', '800\\d{6}|(?:21|[579]\\d|63)\\d{7}' ),
-		'ZW' => array( '263', '0', '2(?:[0-57-9]\\d{6,8}|6[0-24-9]\\d{6,7})|[38]\\d{9}|[35-8]\\d{8}|[3-6]\\d{7}|[1-689]\\d{6}|[1-3569]\\d{5}|[1356]\\d{4}' ),
+		'ZW' => array( '263', '0', '(?:13|8\\d{4})\\d{5}|[235-8]\\d{8}|[23568]\\d{6}' ),
 	);
 
 	/**
