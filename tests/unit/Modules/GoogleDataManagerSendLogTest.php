@@ -8,6 +8,8 @@
 namespace GTM4WP\Tests\unit\Modules;
 
 use Brain\Monkey\Functions;
+use GTM4WP\Modules\GoogleDataManager\ConsentPolicy;
+use GTM4WP\Modules\GoogleDataManager\RefundSender;
 use GTM4WP\Modules\GoogleDataManager\SendLog;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
@@ -69,6 +71,51 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 	}
 
 	// ---- Recording ---------------------------------------------------------
+
+	/**
+	 * The skip reasons the ring classifies are stored in it and matched by
+	 * the settings screen's labels, so their values are a contract: a value
+	 * change would misread every stored row (#398). Each is classified as the
+	 * sender's constant, not as a copy of its string.
+	 */
+	public function test_the_classified_skip_reasons_keep_their_stored_values(): void {
+		$replayable    = array(
+			'no_destination'    => RefundSender::REASON_NO_DESTINATION,
+			'consent_unknown'   => ConsentPolicy::REASON_UNKNOWN,
+			'consent_denied'    => ConsentPolicy::REASON_DENIED,
+			'vetoed'            => RefundSender::REASON_VETOED,
+			'platform_inactive' => RefundSender::REASON_PLATFORM_INACTIVE,
+			'refund_unreadable' => RefundSender::REASON_REFUND_UNREADABLE,
+		);
+		$informational = array(
+			'already_sent'        => RefundSender::REASON_ALREADY_SENT,
+			'destination_removed' => RefundSender::REASON_DESTINATION_REMOVED,
+		);
+
+		foreach ( $replayable as $stored => $reason ) {
+			$this->assertSame( $stored, $reason );
+			$row = self::entry(
+				array(
+					'outcome' => SendLog::OUTCOME_SKIPPED,
+					'reason'  => $reason,
+				)
+			);
+			$this->assertTrue( SendLog::is_replayable( $row ), $stored . ' is offered again.' );
+			$this->assertSame( SendLog::TONE_WARN, SendLog::tone( $row ), $stored );
+		}
+
+		foreach ( $informational as $stored => $reason ) {
+			$this->assertSame( $stored, $reason );
+			$row = self::entry(
+				array(
+					'outcome' => SendLog::OUTCOME_SKIPPED,
+					'reason'  => $reason,
+				)
+			);
+			$this->assertFalse( SendLog::is_replayable( $row ), $stored . ' is never offered again.' );
+			$this->assertSame( SendLog::TONE_OK, SendLog::tone( $row ), $stored );
+		}
+	}
 
 	public function test_a_new_site_has_an_empty_ring(): void {
 		$this->assertSame( array(), $this->log()->all() );

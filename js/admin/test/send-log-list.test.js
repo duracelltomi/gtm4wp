@@ -846,7 +846,9 @@ describe( 'SendLogList while a queued job waits', () => {
 			/This job has not been processed/
 		);
 		expect( note ).toBeInTheDocument();
-		expect( note.textContent ).toContain( '"Send refunds" is on' );
+		expect( note.textContent ).toContain(
+			'"Send refunds to Google Analytics" is on'
+		);
 		expect( note.textContent ).not.toMatch( /send it again/ );
 		await tick();
 		expect( apiFetch ).toHaveBeenCalledTimes( 1 );

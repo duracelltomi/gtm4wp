@@ -1149,6 +1149,50 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 	}
 
 	/**
+	 * A refund accepted before the per-refund marker existed is known only
+	 * from the ring. The targeted job's own skip row supersedes that accepted
+	 * row, so the marker must take the answer over at once, or a later whole
+	 * replay sends the refund to that destination a second time (#396).
+	 */
+	public function test_a_ring_only_acceptance_moves_to_the_marker_before_its_own_skip_row_hides_it(): void {
+		$rows   = $this->two_account_rows();
+		$denied = self::refund( array( 'consent_state' => array( 'signals' => array( 'analytics_storage' => 'denied' ) ) ) );
+		$source = $this->source( $denied );
+		$this->ring_row( 'G-AAA', SendLog::OUTCOME_ACCEPTED );
+		$this->ring_row( 'G-BBB', SendLog::OUTCOME_FAILED, 'UNAVAILABLE' );
+
+		// Two replays queued for both destinations; consent refuses the refund.
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run(
+			self::job(
+				array(
+					'only'   => array( 'G-AAA', 'G-BBB' ),
+					'replay' => true,
+				)
+			)
+		);
+
+		$this->assertSame( array( 34 => array( 'G-AAA' ) ), $source->accepted, 'The ring-only answer is written to the marker.' );
+		$this->assertFalse( $this->log->latest_is_accepted( 'woocommerce:12:34', 'G-AAA' ), 'Precondition: the skip row now hides the ring answer.' );
+		$this->assertSame( array(), $this->log->replay_plan()['woocommerce:12:34']['only'], 'Precondition: the refund-level skip makes the next replay a whole job.' );
+
+		// The owner allows sending and replays the whole refund.
+		$this->queue_send( 200, array( 'requestId' => 'req-b2' ) );
+		$this->sender(
+			$source,
+			array(
+				GTM4WP_OPTION_GDM_DESTINATIONS   => $rows,
+				GTM4WP_OPTION_GDM_CONSENT_POLICY => ConsentPolicy::POLICY_NEVER,
+			)
+		)->run( self::job( array( 'replay' => true ) ) );
+
+		$this->assertCount( 2, $this->transport->requests, 'One token exchange and one send, for G-BBB only.' );
+		$accepted_rows = array_values(
+			array_filter( $this->log->all(), fn ( array $row ): bool => SendLog::OUTCOME_ACCEPTED === $row['outcome'] )
+		);
+		$this->assertSame( array( 'G-AAA', 'G-BBB' ), array_column( $accepted_rows, 'destination' ), 'G-AAA is not sent the refund a second time.' );
+	}
+
+	/**
 	 * Every configured destination took it, the per-refund marker was never
 	 * written: a whole replay sends nothing and says so in one row.
 	 */

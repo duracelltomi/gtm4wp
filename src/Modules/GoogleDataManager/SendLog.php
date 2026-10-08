@@ -67,8 +67,9 @@ final class SendLog {
 	 * yet. The job's own rows supersede it: the sender writes one for every
 	 * destination it sends, skips or finds already sent. One older than
 	 * QUEUED_STALE_AFTER with nothing newer was not processed - a stalled
-	 * queue, or "Send refunds" switched off before the job ran (deliberately
-	 * rowless, so it stays replayable) - and may be queued again (#388).
+	 * queue, or "Send refunds to Google Analytics" switched off before the job
+	 * ran (deliberately rowless, so it stays replayable) - and may be queued
+	 * again (#388).
 	 */
 	public const OUTCOME_QUEUED = 'queued';
 
@@ -104,16 +105,19 @@ final class SendLog {
 	 * Skip reasons a configuration change can put right, so the refund is
 	 * worth queueing again. The missing-id reasons and the empty refund are
 	 * deliberately absent: no setting can produce an id that was never captured.
+	 * Both lists name the senders' constants; the values themselves are stored
+	 * in the ring and matched by the settings screen, so they are not free to
+	 * change (#398).
 	 *
 	 * @var string[]
 	 */
 	private const REPLAYABLE_SKIPS = array(
-		'no_destination',
-		'consent_unknown',
-		'consent_denied',
-		'vetoed',
-		'platform_inactive',
-		'refund_unreadable',
+		RefundSender::REASON_NO_DESTINATION,
+		ConsentPolicy::REASON_UNKNOWN,
+		ConsentPolicy::REASON_DENIED,
+		RefundSender::REASON_VETOED,
+		RefundSender::REASON_PLATFORM_INACTIVE,
+		RefundSender::REASON_REFUND_UNREADABLE,
 	);
 
 	/**
@@ -124,8 +128,8 @@ final class SendLog {
 	 * @var string[]
 	 */
 	private const INFORMATIONAL_SKIPS = array(
-		'already_sent',
-		'destination_removed',
+		RefundSender::REASON_ALREADY_SENT,
+		RefundSender::REASON_DESTINATION_REMOVED,
 	);
 
 	/**

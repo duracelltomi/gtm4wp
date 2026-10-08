@@ -492,7 +492,10 @@ final class RefundSender {
 
 	/**
 	 * Which of the given destinations already accepted a refund: its stored
-	 * marker, or the ring's newest row for that destination.
+	 * marker, or the ring's newest row for that destination. A ring-only answer
+	 * (a refund accepted before the marker existed) is written to the marker at
+	 * once: the skip row the caller writes next, and the ring's trim, would
+	 * both erase it (#396).
 	 *
 	 * @param RefundSource $source     The platform adapter.
 	 * @param string       $reference  The refund reference.
@@ -505,13 +508,22 @@ final class RefundSender {
 			return array();
 		}
 
-		$marker = $source->accepted_destinations( $refund_id );
+		$marker    = $source->accepted_destinations( $refund_id );
+		$ring_only = array_values(
+			array_filter(
+				array_diff( $candidates, $marker ),
+				fn ( string $measurement ): bool => $this->log->latest_is_accepted( $reference, $measurement )
+			)
+		);
+
+		if ( array() !== $ring_only ) {
+			$source->mark_accepted( $refund_id, $ring_only, null );
+		}
 
 		return array_values(
 			array_filter(
 				$candidates,
-				fn ( string $measurement ): bool => in_array( $measurement, $marker, true )
-					|| $this->log->latest_is_accepted( $reference, $measurement )
+				fn ( string $measurement ): bool => in_array( $measurement, $marker, true ) || in_array( $measurement, $ring_only, true )
 			)
 		);
 	}
