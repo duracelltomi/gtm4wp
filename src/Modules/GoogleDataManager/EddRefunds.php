@@ -157,16 +157,41 @@ final class EddRefunds implements RefundSource {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * @param int    $refund_id  The refund order.
-	 * @param string $request_id The API request id.
+	 * @param int $refund_id The refund order.
+	 * @return string[]
+	 */
+	public function accepted_destinations( int $refund_id ): array {
+		if ( ! function_exists( 'edd_get_order_meta' ) ) {
+			return array();
+		}
+
+		return DestinationRows::measurement_ids( edd_get_order_meta( $refund_id, self::META_ACCEPTED, true ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param int         $refund_id       The refund order.
+	 * @param string[]    $measurements    Measurement ids that accepted it now.
+	 * @param string|null $sent_request_id The request id that completes it, or null.
 	 * @return void
 	 */
-	public function mark_sent( int $refund_id, string $request_id ): void {
+	public function mark_accepted( int $refund_id, array $measurements, ?string $sent_request_id = null ): void {
 		if ( ! function_exists( 'edd_update_order_meta' ) ) {
 			return;
 		}
 
-		edd_update_order_meta( $refund_id, self::META_SENT, ( '' !== $request_id ) ? $request_id : '1' );
+		$stored   = $this->accepted_destinations( $refund_id );
+		$accepted = DestinationRows::measurement_ids( array_merge( $stored, $measurements ) );
+
+		if ( $accepted !== $stored ) {
+			edd_update_order_meta( $refund_id, self::META_ACCEPTED, $accepted );
+		}
+
+		if ( null !== $sent_request_id ) {
+			// The request id, or a plain marker: '' would read as "not sent" to is_sent().
+			edd_update_order_meta( $refund_id, self::META_SENT, ( '' !== $sent_request_id ) ? $sent_request_id : '1' );
+		}
 	}
 
 	/**

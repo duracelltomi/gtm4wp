@@ -500,6 +500,7 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 				'order_id'  => 12,
 				'refund_id' => 13,
 				'attempt'   => 1,
+				'replay'    => true,
 				'only'      => array( self::MEASUREMENT ),
 			),
 			$this->scheduled[0]['payload'],

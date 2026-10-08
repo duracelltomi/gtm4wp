@@ -174,6 +174,13 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 			public array $sent = array();
 
 			/**
+			 * Measurement ids recorded as having accepted each refund.
+			 *
+			 * @var array<int, string[]>
+			 */
+			public array $accepted = array();
+
+			/**
 			 * How many times load() was called.
 			 */
 			public int $loads = 0;
@@ -212,8 +219,27 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 				return isset( $this->sent[ $refund_id ] );
 			}
 
+			public function accepted_destinations( int $refund_id ): array {
+				return $this->accepted[ $refund_id ] ?? array();
+			}
+
+			public function mark_accepted( int $refund_id, array $measurements, ?string $sent_request_id = null ): void {
+				$this->accepted[ $refund_id ] = array_values( array_unique( array_merge( $this->accepted[ $refund_id ] ?? array(), $measurements ) ) );
+
+				if ( null !== $sent_request_id ) {
+					$this->sent[ $refund_id ] = $sent_request_id;
+				}
+			}
+
+			/**
+			 * Test seeding: a refund already marked sent.
+			 *
+			 * @param int    $refund_id  The refund.
+			 * @param string $request_id The request id to record.
+			 * @return void
+			 */
 			public function mark_sent( int $refund_id, string $request_id ): void {
-				$this->sent[ $refund_id ] = $request_id;
+				$this->mark_accepted( $refund_id, array(), $request_id );
 			}
 		};
 	}
@@ -738,7 +764,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( SendLog::OUTCOME_RETRYING, $outcomes['G-BBB'] );
 	}
 
-	public function test_a_partly_accepted_send_that_exhausts_its_retries_is_still_never_marked_sent(): void {
+	public function test_a_partly_accepted_send_that_exhausts_its_retries_is_marked_sent_with_its_accepted_half(): void {
 		$second = $this->vault->add( KeyFileFixture::parse(), 'Second' );
 		$this->assertIsString( $second );
 
@@ -985,7 +1011,11 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 				return false;
 			}
 
-			public function mark_sent( int $refund_id, string $request_id ): void {
+			public function accepted_destinations( int $refund_id ): array {
+				return array();
+			}
+
+			public function mark_accepted( int $refund_id, array $measurements, ?string $sent_request_id = null ): void {
 			}
 		};
 	}
@@ -1010,6 +1040,197 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$this->assertCount( 1, $this->scheduled );
 		$this->assertSame( 'edd', $this->scheduled[0]['payload']['platform'], 'The closure carries the platform of the source it was handed to, so run() loads the refund from the right adapter.' );
+	}
+
+	// ---- Replays after a partial accept (R48 #394, #388) ---------------------
+
+	/**
+	 * Two destinations on two service accounts, so each gets its own request
+	 * and one can accept while the other refuses.
+	 *
+	 * @return array<int, array<string, string>>
+	 */
+	private function two_account_rows(): array {
+		$second = $this->vault->add( KeyFileFixture::parse(), 'Second' );
+		$this->assertIsString( $second );
+
+		$row_b                                    = $this->destination( 'G-BBB', '987654321' );
+		$row_b[ DestinationRows::COLUMN_ACCOUNT ] = $second;
+
+		return array( $this->destination( 'G-AAA' ), $row_b );
+	}
+
+	/**
+	 * Writes one ring row about the refund under test.
+	 *
+	 * @param string $destination Measurement id, '' for the whole refund.
+	 * @param string $outcome     Outcome.
+	 * @param string $reason      Reason code.
+	 * @return void
+	 */
+	private function ring_row( string $destination, string $outcome, string $reason = '' ): void {
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:34',
+				'destination' => $destination,
+				'outcome'     => $outcome,
+				'reason'      => $reason,
+			)
+		);
+	}
+
+	/**
+	 * The newest ring row.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function newest_row(): array {
+		$all = $this->log->all();
+
+		return end( $all );
+	}
+
+	/**
+	 * A partial accept leaves no per-refund marker, and the ring forgets
+	 * accepted rows first. The refund's own accepted marker is what keeps a
+	 * later whole-refund replay away from the destination that took it.
+	 */
+	public function test_a_partial_accept_survives_the_ring_and_a_whole_replay_sends_only_the_missing_destination(): void {
+		$rows   = $this->two_account_rows();
+		$source = $this->source( self::refund() );
+
+		$this->queue_send( 200, array( 'requestId' => 'req-a' ) );
+		$this->queue_send( 503, array( 'error' => array( 'status' => 'UNAVAILABLE' ) ) );
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run( self::job() );
+
+		$this->assertSame( array( 34 => array( 'G-AAA' ) ), $source->accepted, 'Who took it is remembered while the other is still retrying.' );
+		$this->assertSame( array(), $source->sent );
+
+		// The worst case of trimming: the ring remembers nothing.
+		$this->log->clear();
+		$this->queue_send( 200, array( 'requestId' => 'req-b' ) );
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run( self::job( array( 'replay' => true ) ) );
+
+		$this->assertSame(
+			array( 'G-BBB' => SendLog::OUTCOME_ACCEPTED ),
+			array_column( $this->log->all(), 'outcome', 'destination' ),
+			'G-AAA is not sent the refund a second time.'
+		);
+		$this->assertSame( array( 'G-AAA', 'G-BBB' ), $source->accepted[34] );
+		$this->assertSame( array( 34 => 'req-b' ), $source->sent, 'Done once nothing is missing any more.' );
+	}
+
+	/**
+	 * A retry or replay naming a destination the marker already records sends
+	 * nothing, although the ring's newest row for it still says failed.
+	 */
+	public function test_a_targeted_replay_consults_the_marker_not_only_the_ring(): void {
+		$rows                 = $this->two_account_rows();
+		$source               = $this->source( self::refund() );
+		$source->accepted[34] = array( 'G-BBB' );
+		$this->ring_row( 'G-BBB', SendLog::OUTCOME_FAILED, 'UNAVAILABLE' );
+
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run(
+			self::job(
+				array(
+					'only'   => array( 'G-BBB' ),
+					'replay' => true,
+				)
+			)
+		);
+
+		$this->assertSame( array(), $this->transport->requests );
+		$newest = $this->newest_row();
+		$this->assertSame( 'G-BBB', $newest['destination'], 'A row of its own supersedes the failed one.' );
+		$this->assertSame( RefundSender::REASON_ALREADY_SENT, $newest['reason'] );
+		$this->assertSame( SendLog::TONE_OK, SendLog::tone( $newest ) );
+		$this->assertSame( array(), $this->log->replay_plan(), 'Nothing is offered again.' );
+	}
+
+	/**
+	 * Every configured destination took it, the per-refund marker was never
+	 * written: a whole replay sends nothing and says so in one row.
+	 */
+	public function test_a_whole_replay_of_a_refund_every_destination_took_sends_nothing_and_leaves_a_row(): void {
+		$rows                 = $this->two_account_rows();
+		$source               = $this->source( self::refund() );
+		$source->accepted[34] = array( 'G-AAA', 'G-BBB' );
+		$this->ring_row( '', SendLog::OUTCOME_SKIPPED, 'consent_unknown' );
+		$this->log->record_queued( 'woocommerce:12:34', array() );
+
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run( self::job( array( 'replay' => true ) ) );
+
+		$this->assertSame( array(), $this->transport->requests );
+		$this->assertSame( 0, $source->loads );
+		$newest = $this->newest_row();
+		$this->assertSame( '', $newest['destination'] );
+		$this->assertSame( RefundSender::REASON_ALREADY_SENT, $newest['reason'] );
+		$this->assertSame( array(), $this->log->replay_plan(), 'The queued row is superseded, not left looking unprocessed.' );
+	}
+
+	/**
+	 * A replay of a refund already marked sent leaves a row (its queued row
+	 * must not outlive it); a duplicate platform job still leaves none (see
+	 * test_a_refund_already_sent_is_never_sent_again).
+	 */
+	public function test_a_replay_of_a_refund_already_marked_sent_leaves_a_row(): void {
+		$source = $this->source( self::refund() );
+		$source->mark_sent( 34, 'req-earlier' );
+		$this->ring_row( '', SendLog::OUTCOME_SKIPPED, 'consent_unknown' );
+		$this->log->record_queued( 'woocommerce:12:34', array() );
+
+		$this->sender( $source )->run( self::job( array( 'replay' => true ) ) );
+
+		$this->assertSame( array(), $this->transport->requests );
+		$this->assertSame( RefundSender::REASON_ALREADY_SENT, $this->newest_row()['reason'] );
+		$this->assertSame( array(), $this->log->replay_plan() );
+	}
+
+	/**
+	 * A replay naming a destination that is no longer configured: a row for
+	 * that destination, not a refund-level "no destination" that would turn
+	 * the next replay into a whole-refund job.
+	 */
+	public function test_a_replay_naming_a_destination_no_longer_configured_ends_with_its_own_row(): void {
+		$source = $this->source( self::refund() );
+		$this->ring_row( 'G-AAA', SendLog::OUTCOME_ACCEPTED );
+		$this->ring_row( 'G-BBB', SendLog::OUTCOME_FAILED, 'UNAVAILABLE' );
+		$this->log->record_queued( 'woocommerce:12:34', array( 'G-BBB' ) );
+
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => array( $this->destination( 'G-AAA' ) ) ) )->run(
+			self::job(
+				array(
+					'only'   => array( 'G-BBB' ),
+					'replay' => true,
+				)
+			)
+		);
+
+		$this->assertSame( array(), $this->transport->requests );
+		$newest = $this->newest_row();
+		$this->assertSame( 'G-BBB', $newest['destination'] );
+		$this->assertSame( RefundSender::REASON_DESTINATION_REMOVED, $newest['reason'] );
+		$this->assertNotContains( RefundSender::REASON_NO_DESTINATION, array_column( $this->log->all(), 'reason' ) );
+		$this->assertSame( array(), $this->log->replay_plan(), 'The stale queued row no longer offers a replay.' );
+	}
+
+	/**
+	 * Nothing configured at all is still the site-wide refund-level reason.
+	 */
+	public function test_a_replay_with_no_destination_configured_at_all_keeps_the_refund_level_reason(): void {
+		$this->sender( $this->source( self::refund() ), array( GTM4WP_OPTION_GDM_DESTINATIONS => array() ) )->run(
+			self::job(
+				array(
+					'only'   => array( 'G-BBB' ),
+					'replay' => true,
+				)
+			)
+		);
+
+		$reasons = array_column( $this->log->all(), 'reason', 'destination' );
+		$this->assertSame( RefundSender::REASON_NO_DESTINATION, $reasons[''] );
+		$this->assertSame( RefundSender::REASON_DESTINATION_REMOVED, $reasons['G-BBB'] );
 	}
 
 	/**

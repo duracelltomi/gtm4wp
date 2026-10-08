@@ -86,6 +86,16 @@ function reasonLabel( reason ) {
 				'The refund could not be read back from the store.',
 				'duracelltomi-google-tag-manager'
 			);
+		case 'already_sent':
+			return __(
+				'Google already received this refund here, so it was not sent again.',
+				'duracelltomi-google-tag-manager'
+			);
+		case 'destination_removed':
+			return __(
+				'This destination was not among the configured destinations when the send ran.',
+				'duracelltomi-google-tag-manager'
+			);
 		case 'platform_inactive':
 			return __(
 				'The shop plugin that issued the refund was not active when the send ran.',
@@ -151,7 +161,7 @@ function queuedLabel( entry ) {
 
 	return entry.replayable
 		? __(
-				'The background queue has not run this job. Check that WP-Cron or Action Scheduler runs on this site, then send it again.',
+				'This job has not been processed. If it stays like this, check that WP-Cron or Action Scheduler runs on this site and that "Send refunds" is on.',
 				'duracelltomi-google-tag-manager'
 		  )
 		: '';

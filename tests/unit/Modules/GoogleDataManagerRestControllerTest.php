@@ -736,6 +736,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 				'order_id'  => 12,
 				'refund_id' => 34,
 				'attempt'   => 1,
+				'replay'    => true,
 				'only'      => array( 'G-ABC123', 'G-XYZ789' ),
 			),
 			$this->scheduled[0]['payload']

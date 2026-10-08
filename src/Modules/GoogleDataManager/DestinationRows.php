@@ -171,4 +171,24 @@ final class DestinationRows {
 
 		return false;
 	}
+
+	/**
+	 * A list of measurement ids - a job's `only`, a stored accepted set - as
+	 * unique non-empty strings in their original order; anything else is
+	 * dropped. One reader for every place such a list arrives untyped.
+	 *
+	 * @param mixed $value The list.
+	 * @return string[]
+	 */
+	public static function measurement_ids( $value ): array {
+		$list = array();
+
+		foreach ( is_array( $value ) ? $value : array() as $measurement ) {
+			if ( is_string( $measurement ) && '' !== $measurement && ! in_array( $measurement, $list, true ) ) {
+				$list[] = $measurement;
+			}
+		}
+
+		return $list;
+	}
 }

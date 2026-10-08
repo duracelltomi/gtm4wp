@@ -39,6 +39,14 @@ interface RefundSource {
 	public const META_SENT = '_gtm4wp_gdm_refund_sent';
 
 	/**
+	 * Meta key holding the measurement ids that accepted a refund, written on
+	 * the refund like META_SENT. META_SENT only says the refund is done; this
+	 * survives a partial accept whose other destinations are still retrying
+	 * or failed for good, which the diagnostics ring forgets first (#394).
+	 */
+	public const META_ACCEPTED = '_gtm4wp_gdm_refund_accepted';
+
+	/**
 	 * The platform id this adapter serves.
 	 *
 	 * @return string
@@ -87,11 +95,21 @@ interface RefundSource {
 	public function is_sent( int $refund_id ): bool;
 
 	/**
-	 * Remembers that this refund was sent.
+	 * The destinations that already accepted this refund.
 	 *
-	 * @param int    $refund_id  The refund.
-	 * @param string $request_id The API request id of the send that succeeded.
+	 * @param int $refund_id The refund.
+	 * @return string[] Measurement ids.
+	 */
+	public function accepted_destinations( int $refund_id ): array;
+
+	/**
+	 * Remembers, in one write, the destinations that accepted this refund and,
+	 * when the sending is over, that the refund was sent.
+	 *
+	 * @param int         $refund_id       The refund.
+	 * @param string[]    $measurements    Measurement ids that accepted it now; merged with the stored ones.
+	 * @param string|null $sent_request_id The request id that completes the refund, or null while destinations are still missing it.
 	 * @return void
 	 */
-	public function mark_sent( int $refund_id, string $request_id ): void;
+	public function mark_accepted( int $refund_id, array $measurements, ?string $sent_request_id = null ): void;
 }

@@ -123,6 +123,33 @@ describe( 'SendLogList entries', () => {
 		expect( screen.getByText( /woocommerce:12:34/ ) ).toBeInTheDocument();
 	} );
 
+	it.each( [
+		[
+			'already_sent',
+			'Google already received this refund here, so it was not sent again.',
+		],
+		[
+			'destination_removed',
+			'This destination was not among the configured destinations when the send ran.',
+		],
+	] )( 'explains the %s skip in words', async ( reason, text ) => {
+		apiFetch.mockResolvedValueOnce( {
+			entries: [
+				entry( {
+					outcome: 'skipped',
+					reason,
+					status: 0,
+					request_id: '',
+					tone: 'ok',
+				} ),
+			],
+		} );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		expect( await screen.findByText( text ) ).toBeInTheDocument();
+	} );
+
 	it( 'explains in words why a send was skipped', async () => {
 		apiFetch.mockResolvedValueOnce( {
 			entries: [
@@ -802,7 +829,7 @@ describe( 'SendLogList while a queued job waits', () => {
 		expect( apiFetch ).toHaveBeenCalledTimes( 103 );
 	} );
 
-	it( 'explains a queued job the queue never ran', async () => {
+	it( 'says a queued job was not processed, without blaming the queue or offering a blind resend', async () => {
 		apiFetch.mockResolvedValueOnce( {
 			entries: [
 				entry( {
@@ -815,11 +842,12 @@ describe( 'SendLogList while a queued job waits', () => {
 		} );
 		render( <SendLogList logPath={ LOG_PATH } /> );
 
-		expect(
-			await screen.findByText(
-				/The background queue has not run this job/
-			)
-		).toBeInTheDocument();
+		const note = await screen.findByText(
+			/This job has not been processed/
+		);
+		expect( note ).toBeInTheDocument();
+		expect( note.textContent ).toContain( '"Send refunds" is on' );
+		expect( note.textContent ).not.toMatch( /send it again/ );
 		await tick();
 		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
 	} );

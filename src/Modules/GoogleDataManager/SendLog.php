@@ -64,8 +64,11 @@ final class SendLog {
 
 	/**
 	 * Outcome: a replay queued the send and the background job has not run
-	 * yet. The job's own row supersedes it; one older than QUEUED_STALE_AFTER
-	 * is presumed lost (a stalled queue) and may be queued again.
+	 * yet. The job's own rows supersede it: the sender writes one for every
+	 * destination it sends, skips or finds already sent. One older than
+	 * QUEUED_STALE_AFTER with nothing newer was not processed - a stalled
+	 * queue, or "Send refunds" switched off before the job ran (deliberately
+	 * rowless, so it stays replayable) - and may be queued again (#388).
 	 */
 	public const OUTCOME_QUEUED = 'queued';
 
@@ -111,6 +114,18 @@ final class SendLog {
 		'vetoed',
 		'platform_inactive',
 		'refund_unreadable',
+	);
+
+	/**
+	 * Skip reasons that are information, not problems: the refund reached the
+	 * destination before, or the destination is no longer configured. Drawn as
+	 * a success and kept out of problems_only; never replayable.
+	 *
+	 * @var string[]
+	 */
+	private const INFORMATIONAL_SKIPS = array(
+		'already_sent',
+		'destination_removed',
 	);
 
 	/**
@@ -296,6 +311,10 @@ final class SendLog {
 
 		if ( self::OUTCOME_FAILED === $outcome ) {
 			return self::TONE_ERROR;
+		}
+
+		if ( self::OUTCOME_SKIPPED === $outcome && in_array( (string) ( $entry['reason'] ?? '' ), self::INFORMATIONAL_SKIPS, true ) ) {
+			return self::TONE_OK;
 		}
 
 		if ( self::OUTCOME_SKIPPED === $outcome || self::OUTCOME_RETRYING === $outcome ) {

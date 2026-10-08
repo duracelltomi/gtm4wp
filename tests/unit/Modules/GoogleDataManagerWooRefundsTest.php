@@ -525,18 +525,43 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 
 		$this->assertFalse( $adapter->is_sent( 34 ) );
 
-		$adapter->mark_sent( 34, 'req-42' );
+		$adapter->mark_accepted( 34, array( 'G-AAA' ), 'req-42' );
 
 		$this->assertTrue( $adapter->is_sent( 34 ) );
 		$this->assertSame( 'req-42', $refund_object->saved_meta[ RefundSource::META_SENT ] );
-		$this->assertSame( 1, $refund_object->saves, 'The meta is persisted, not only held in memory.' );
+		$this->assertSame( 1, $refund_object->saves, 'Both keys are persisted in one save, not two (#394).' );
+		$this->assertSame( array( 'G-AAA' ), $adapter->accepted_destinations( 34 ) );
+	}
+
+	public function test_a_partial_accept_is_remembered_without_marking_the_refund_sent(): void {
+		$refund_object = self::refund( 40.0 );
+		$this->stub_orders( self::order(), $refund_object );
+		$adapter = $this->adapter();
+
+		$adapter->mark_accepted( 34, array( 'G-AAA' ) );
+		$adapter->mark_accepted( 34, array( 'G-BBB', 'G-AAA', '', 7 ) );
+
+		$this->assertFalse( $adapter->is_sent( 34 ), 'A destination still missing the refund keeps it open.' );
+		$this->assertSame( array( 'G-AAA', 'G-BBB' ), $adapter->accepted_destinations( 34 ), 'Merged, de-duplicated, non-strings dropped.' );
+		$this->assertSame( 2, $refund_object->saves );
+	}
+
+	public function test_nothing_new_to_remember_is_not_saved(): void {
+		$refund_object = self::refund( 40.0 );
+		$this->stub_orders( self::order(), $refund_object );
+		$adapter = $this->adapter();
+
+		$adapter->mark_accepted( 34, array( 'G-AAA' ) );
+		$adapter->mark_accepted( 34, array( 'G-AAA' ) );
+
+		$this->assertSame( 1, $refund_object->saves );
 	}
 
 	public function test_a_send_with_no_request_id_still_marks_the_refund_sent(): void {
 		$refund_object = self::refund( 40.0 );
 		$this->stub_orders( self::order(), $refund_object );
 
-		$this->adapter()->mark_sent( 34, '' );
+		$this->adapter()->mark_accepted( 34, array( 'G-AAA' ), '' );
 
 		$this->assertTrue(
 			$this->adapter()->is_sent( 34 ),

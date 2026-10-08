@@ -458,10 +458,11 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 
 		$this->assertFalse( $adapter->is_sent( 34 ) );
 
-		$adapter->mark_sent( 34, 'req-42' );
+		$adapter->mark_accepted( 34, array( 'G-AAA' ), 'req-42' );
 
 		$this->assertTrue( $adapter->is_sent( 34 ) );
 		$this->assertSame( 'req-42', $this->order_meta[34][ RefundSource::META_SENT ] );
+		$this->assertSame( array( 'G-AAA' ), $this->order_meta[34][ RefundSource::META_ACCEPTED ] );
 		$this->assertArrayNotHasKey(
 			12,
 			$this->order_meta,
@@ -471,9 +472,19 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 
 	public function test_a_send_with_no_request_id_still_marks_the_refund_sent(): void {
 		$adapter = $this->adapter();
-		$adapter->mark_sent( 34, '' );
+		$adapter->mark_accepted( 34, array( 'G-AAA' ), '' );
 
 		$this->assertTrue( $adapter->is_sent( 34 ) );
+	}
+
+	public function test_a_partial_accept_is_remembered_without_marking_the_refund_sent(): void {
+		$adapter = $this->adapter();
+
+		$adapter->mark_accepted( 34, array( 'G-AAA' ) );
+		$adapter->mark_accepted( 34, array( 'G-BBB', 'G-AAA' ) );
+
+		$this->assertFalse( $adapter->is_sent( 34 ) );
+		$this->assertSame( array( 'G-AAA', 'G-BBB' ), $adapter->accepted_destinations( 34 ) );
 	}
 
 	public function test_the_adapter_names_its_platform(): void {

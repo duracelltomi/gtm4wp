@@ -80,6 +80,9 @@ final class RefundReplay {
 				'order_id'  => $job['order_id'],
 				'refund_id' => $job['refund_id'],
 				'attempt'   => 1,
+				// Survives the retries (array_merge): the sender then leaves a row
+				// even where a duplicate platform job would leave none (#388).
+				'replay'    => true,
 			);
 
 			if ( array() !== $job['only'] ) {

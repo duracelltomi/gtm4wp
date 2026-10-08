@@ -64,6 +64,18 @@ final class RefundSender {
 	public const REASON_VETOED = 'vetoed';
 
 	/**
+	 * Skip reason: a destination (or, refund-level, every destination) already
+	 * accepted this refund, so a replay or retry naming it sends nothing.
+	 */
+	public const REASON_ALREADY_SENT = 'already_sent';
+
+	/**
+	 * Skip reason: a destination a retry or replay names was not among the
+	 * configured Google Analytics destinations when the job ran.
+	 */
+	public const REASON_DESTINATION_REMOVED = 'destination_removed';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options                  $options The plugin options service.
@@ -146,7 +158,9 @@ final class RefundSender {
 		$order_id  = (int) ( $payload['order_id'] ?? 0 );
 		$refund_id = (int) ( $payload['refund_id'] ?? 0 );
 		$attempt   = max( 1, (int) ( $payload['attempt'] ?? 1 ) );
-		$only      = $this->only_list( $payload['only'] ?? null );
+		$only      = DestinationRows::measurement_ids( $payload['only'] ?? null );
+		$is_replay = ! empty( $payload['replay'] );
+		$reference = $platform . ':' . $order_id . ':' . $refund_id;
 
 		if ( ( $order_id <= 0 ) || ( $refund_id <= 0 ) ) {
 			return;
@@ -159,23 +173,49 @@ final class RefundSender {
 			return;
 		}
 
-		// An already-sent refund is never sent again (the per-refund marker).
-		// A job naming destinations in `only` is a retry/replay for the ones
-		// still missing the event, so the guard moves down a level: a named
-		// destination whose newest ring row says accepted is dropped, and two
-		// replays queued before the first ran send once.
+		// No destination is ever sent a refund it already accepted (#394). What
+		// "accepted" means is the refund's own marker, which survives the ring,
+		// plus the ring's newest row (refunds accepted before the marker existed).
 		if ( array() === $only ) {
+			// An already-sent refund is never sent again (the per-refund marker).
+			// A duplicate platform job is not an event and leaves no row; a
+			// replay does, so its queued row does not outlive it (#388).
 			if ( $source->is_sent( $refund_id ) ) {
+				if ( $is_replay ) {
+					$this->skip( $reference, $attempt, self::REASON_ALREADY_SENT );
+				}
+
 				return;
 			}
+
+			// A partial accept leaves no per-refund marker: the whole job goes
+			// only to the destinations still missing the event.
+			$configured = array_column( $this->destinations( array() ), DestinationRows::COLUMN_MEASUREMENT );
+			$accepted   = $this->accepted( $source, $reference, $refund_id, $configured );
+
+			if ( array() !== $accepted ) {
+				$only = array_values( array_diff( $configured, $accepted ) );
+
+				if ( array() === $only ) {
+					if ( $is_replay ) {
+						$this->skip( $reference, $attempt, self::REASON_ALREADY_SENT );
+					}
+
+					return;
+				}
+			}
 		} else {
-			$reference = $platform . ':' . $order_id . ':' . $refund_id;
-			$only      = array_values(
-				array_filter(
-					$only,
-					fn ( string $measurement ): bool => ! $this->log->latest_is_accepted( $reference, $measurement )
-				)
-			);
+			// A retry or replay names the destinations still missing the event.
+			// One that took it meanwhile is dropped with a row of its own, which
+			// supersedes its failed or queued one, so two replays queued before
+			// the first ran send once and neither stays offered (#388).
+			$accepted = $this->accepted( $source, $reference, $refund_id, $only );
+
+			foreach ( $accepted as $measurement ) {
+				$this->skip( $reference, $attempt, self::REASON_ALREADY_SENT, $measurement );
+			}
+
+			$only = array_values( array_diff( $only, $accepted ) );
 
 			if ( array() === $only ) {
 				return;
@@ -185,7 +225,7 @@ final class RefundSender {
 		$refund = $source->load( $order_id, $refund_id );
 
 		if ( null === $refund ) {
-			$this->skip( $platform . ':' . $order_id . ':' . $refund_id, $attempt, self::REASON_REFUND_UNREADABLE );
+			$this->skip( $reference, $attempt, self::REASON_REFUND_UNREADABLE );
 			return;
 		}
 
@@ -194,8 +234,25 @@ final class RefundSender {
 		// lane points at nowhere.
 		$rows = $this->destinations( $only );
 
+		// A named destination that is not configured any more (deleted, or
+		// filtered out by gtm4wp_gdm_destinations) gets a row of its own, so
+		// the replay that named it is not left looking unprocessed (#388).
+		if ( array() !== $only ) {
+			$kept = array_column( $rows, DestinationRows::COLUMN_MEASUREMENT );
+
+			foreach ( array_diff( $only, $kept ) as $measurement ) {
+				$this->skip( $refund->reference(), $attempt, self::REASON_DESTINATION_REMOVED, $measurement );
+			}
+		}
+
 		if ( array() === $rows ) {
-			$this->skip( $refund->reference(), $attempt, self::REASON_NO_DESTINATION );
+			// Refund-level only when nothing at all is configured: a refund-level
+			// row for named destinations would turn the next replay into a whole
+			// job for destinations that may already have it.
+			if ( array() === $only || array() === $this->destinations( array() ) ) {
+				$this->skip( $refund->reference(), $attempt, self::REASON_NO_DESTINATION );
+			}
+
 			return;
 		}
 
@@ -235,6 +292,7 @@ final class RefundSender {
 
 		$retry      = array();
 		$request_id = '';
+		$accepted   = array();
 
 		foreach ( $results as $result ) {
 			$this->record_result( $refund, $attempt, $result );
@@ -243,6 +301,8 @@ final class RefundSender {
 				if ( '' === $request_id ) {
 					$request_id = $result['request_id'];
 				}
+
+				$accepted = array_merge( $accepted, $result['measurements'] );
 
 				StatusPoller::start( $result['account'], $result['request_id'] );
 
@@ -256,9 +316,10 @@ final class RefundSender {
 			}
 		}
 
-		$delay = SendQueue::retry_delay( $attempt );
+		$delay    = SendQueue::retry_delay( $attempt );
+		$retrying = ( array() !== $retry && null !== $delay );
 
-		if ( array() !== $retry && null !== $delay ) {
+		if ( $retrying ) {
 			SendQueue::schedule(
 				SendQueue::HOOK_SEND,
 				array_merge(
@@ -270,12 +331,12 @@ final class RefundSender {
 				),
 				$delay
 			);
-
-			return;
 		}
 
-		if ( '' !== $request_id ) {
-			$source->mark_sent( $refund->refund_id, $request_id );
+		// Who took it, always (a retry may never reach the others, #394); and,
+		// once no retry is coming, that the refund is done - in one write.
+		if ( array() !== $accepted ) {
+			$source->mark_accepted( $refund->refund_id, $accepted, $retrying ? null : $request_id );
 		}
 	}
 
@@ -391,28 +452,6 @@ final class RefundSender {
 	}
 
 	/**
-	 * The measurement ids of a retry payload, as strings.
-	 *
-	 * @param mixed $only The payload member.
-	 * @return string[]
-	 */
-	private function only_list( $only ): array {
-		if ( ! is_array( $only ) ) {
-			return array();
-		}
-
-		$list = array();
-
-		foreach ( $only as $measurement ) {
-			if ( is_string( $measurement ) && ( '' !== $measurement ) ) {
-				$list[] = $measurement;
-			}
-		}
-
-		return $list;
-	}
-
-	/**
 	 * The adapter of a platform, when that platform is active.
 	 *
 	 * @param string $platform Platform id.
@@ -429,21 +468,50 @@ final class RefundSender {
 	}
 
 	/**
-	 * Records a refund that will not be sent, with the rule that stopped it.
+	 * Records a refund (or one destination of it) that will not be sent, with
+	 * the rule that stopped it.
 	 *
-	 * @param string $reference The refund reference.
-	 * @param int    $attempt   This attempt's number.
-	 * @param string $reason    A reason code.
+	 * @param string $reference   The refund reference.
+	 * @param int    $attempt     This attempt's number.
+	 * @param string $reason      A reason code.
+	 * @param string $destination The destination it is about; '' for the whole refund.
 	 * @return void
 	 */
-	private function skip( string $reference, int $attempt, string $reason ): void {
+	private function skip( string $reference, int $attempt, string $reason, string $destination = '' ): void {
 		$this->log->record(
 			array(
-				'feature'   => SendLog::FEATURE_REFUND,
-				'reference' => $reference,
-				'attempt'   => $attempt,
-				'outcome'   => SendLog::OUTCOME_SKIPPED,
-				'reason'    => $reason,
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => $reference,
+				'destination' => $destination,
+				'attempt'     => $attempt,
+				'outcome'     => SendLog::OUTCOME_SKIPPED,
+				'reason'      => $reason,
+			)
+		);
+	}
+
+	/**
+	 * Which of the given destinations already accepted a refund: its stored
+	 * marker, or the ring's newest row for that destination.
+	 *
+	 * @param RefundSource $source     The platform adapter.
+	 * @param string       $reference  The refund reference.
+	 * @param int          $refund_id  The refund.
+	 * @param string[]     $candidates Measurement ids to check.
+	 * @return string[] The accepted ones, in the candidates' order.
+	 */
+	private function accepted( RefundSource $source, string $reference, int $refund_id, array $candidates ): array {
+		if ( array() === $candidates ) {
+			return array();
+		}
+
+		$marker = $source->accepted_destinations( $refund_id );
+
+		return array_values(
+			array_filter(
+				$candidates,
+				fn ( string $measurement ): bool => in_array( $measurement, $marker, true )
+					|| $this->log->latest_is_accepted( $reference, $measurement )
 			)
 		);
 	}
