@@ -377,4 +377,20 @@ final class ScriptTagTest extends FrontendTestCase {
 		$this->assertStringNotContainsString( '&', $literal );
 		$this->assertStringNotContainsString( '"&', $literal );
 	}
+
+	/**
+	 * #339: non-finite floats become `null`; every finite one prints exactly as
+	 * the plain cast did, so ordinary totals keep their short form (json_encode
+	 * under serialize_precision=-1 would print 0.15000000000000002 for 3 x 0.05).
+	 */
+	public function test_number_literal_nulls_non_finite_and_keeps_the_cast_form_otherwise(): void {
+		$this->assertSame( 'null', ScriptTag::number_literal( INF ) );
+		$this->assertSame( 'null', ScriptTag::number_literal( -INF ) );
+		$this->assertSame( 'null', ScriptTag::number_literal( NAN ) );
+
+		foreach ( array( 3 * 0.05, 299.97, 10.0, 0.0, 12.5, 1.0E+20 ) as $value ) {
+			$this->assertSame( (string) $value, ScriptTag::number_literal( $value ) );
+		}
+		$this->assertSame( '0.15', ScriptTag::number_literal( 3 * 0.05 ) );
+	}
 }

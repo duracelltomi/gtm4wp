@@ -417,6 +417,56 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * #339 keeps the finite output byte-identical to the old `(float)` print: an
+	 * imprecise sum stays `0.15`, never `null` nor `0.15000000000000002`.
+	 */
+	public function test_checkout_value_prints_a_finite_total_as_before(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 3 ) ) ); // phpcs:ignore
+
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->andReturnUsing(
+				static function ( $product_array ) {
+					$product_array['price'] = 0.05;
+					return $product_array;
+				}
+			);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value    = 0.15;', $this->inline_for( 'gtm4wp-woocommerce' )['code'] );
+	}
+
+	/**
+	 * #339: a non-finite total printed as a PHP float is `INF`/`NAN`, an undeclared
+	 * identifier in JS (ReferenceError). It must print `null`.
+	 */
+	public function test_checkout_value_is_null_when_the_total_is_not_finite(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_PRODUCT_ARRAY )
+			->andReturnUsing(
+				static function ( $product_array ) {
+					$product_array['price'] = INF;
+					return $product_array;
+				}
+			);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' )['code'];
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value    = null;', $checkout );
+		$this->assertStringNotContainsString( 'INF', $checkout );
+	}
+
+	/**
 	 * The tracker can be filtered into the <head>
 	 * (gtm4wp_integrate-woocommerce-track-enhanced-ecommerce => false), and this
 	 * code runs on wp_head priority 10 - after wp_print_head_scripts() at 9. The

@@ -9,7 +9,7 @@
 
 if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
-		public function __construct( private string $code = '', private string $message = '' ) {}
+		public function __construct( private string $code = '', private string $message = '', private $data = '' ) {}
 
 		public function get_error_code(): string {
 			return $this->code;
@@ -17,6 +17,10 @@ if ( ! class_exists( 'WP_Error' ) ) {
 
 		public function get_error_message(): string {
 			return $this->message;
+		}
+
+		public function get_error_data() {
+			return $this->data;
 		}
 	}
 }
@@ -93,6 +97,21 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
 		public function get_route(): string {
 			return $this->route;
+		}
+
+		/**
+		 * The GET parameters, which core's JSONP handling reads `_jsonp` from.
+		 *
+		 * @var array
+		 */
+		private array $query_params = array();
+
+		public function set_query_params( array $params ): void {
+			$this->query_params = $params;
+		}
+
+		public function get_query_params(): array {
+			return $this->query_params;
 		}
 	}
 }

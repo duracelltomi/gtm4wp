@@ -109,6 +109,12 @@ final class ConsentDefaults {
 				 * @return boolean The updated value of the flag (boolean true or false).
 				 */
 				$flag_value = apply_filters( GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG, $flag_value, $flag );
+
+				// The output vocabulary is accepted too: a callback returning the
+				// string "denied" must not be read as truthy (#308).
+				if ( 'granted' === $flag_value || 'denied' === $flag_value ) {
+					return $flag_value;
+				}
 			}
 		}
 

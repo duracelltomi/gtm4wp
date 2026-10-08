@@ -362,11 +362,10 @@ final class ContainerCodeTest extends FrontendTestCase {
 	}
 
 	public function test_header_begin_does_not_decode_html_entities_in_datalayer_values(): void {
-		// get_search_query() returns esc_attr'd output, so a double quote in the
-		// ?s= parameter reaches the data layer already encoded as &quot;. Because
-		// ScriptTag::print_script_block() runs htmlspecialchars_decode() on the whole
-		// block, the JSON must hex-encode the ampersand; otherwise &quot; is decoded
-		// back into a raw " that breaks out of the JS string (reflected XSS via ?s=).
+		// A value that is already entity-encoded (&quot;) must survive
+		// print_script_block()'s htmlspecialchars_decode(): the JSON hex-encodes the
+		// ampersand, otherwise &quot; is decoded back into a raw " that breaks out
+		// of the JS string. Raw characters are the next test.
 		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
 			->andReturn( array( 'siteSearchTerm' => '&quot;-alert(document.domain)-&quot;' ) );
 
@@ -389,6 +388,36 @@ final class ContainerCodeTest extends FrontendTestCase {
 			'"'
 		);
 		$this->assertStringContainsString( $safe_fragment, $output );
+	}
+
+	/**
+	 * T116: since #274 (raw search term) and #273 (decoded title) raw <, >, " and '
+	 * reach this sink, so every hex flag is the guard, not only JSON_HEX_AMP.
+	 */
+	public function test_header_begin_hex_encodes_raw_breakout_characters_in_datalayer_values(): void {
+		$hostile = 'q"1\'2</script><x-marker>';
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )
+			->andReturn(
+				array(
+					'siteSearchTerm' => $hostile,
+					'pageTitle'      => $hostile,
+				)
+			);
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_CODE => 'GTM-AAA111' ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$safe_fragment = (string) wp_json_encode( $hostile, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+		$this->assertSame( 2, substr_count( $output, $safe_fragment ), 'Both values are printed in their hex-encoded form.' );
+
+		// TS-2: no raw break-out character from the value survives.
+		$this->assertStringNotContainsString( '<x-marker', $output );
+		$this->assertStringNotContainsString( 'q"1', $output );
+		$this->assertStringNotContainsString( "1'2", $output );
+		$this->assertSame( 1, substr_count( $output, 'var dataLayer_content' ), 'The data layer block is printed once.' );
 	}
 
 	public function test_header_begin_preserves_numeric_looking_strings_in_datalayer(): void {

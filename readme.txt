@@ -264,6 +264,13 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Fixed: the plugin conflict notice now calls Google Analytics for WooCommerce by its current name.
 * Fixed: WooCommerce Mini-Cart tracking (`remove_from_cart` from the Mini-Cart drawer) now loads only on pages that show the Mini-Cart block. Stores using the Cart or Checkout block no longer load the WordPress data scripts on every page, and stores with a classic cart now track removals from a Mini-Cart block too.
 * Fixed: a WooCommerce Product Bundles bundle reported `stockstatus` as `instock` in the e-commerce items even when one of its bundled products was out of stock and the bundle could not be bought; it now reports `outofstock`. Thanks to @KingWehsops for the report (#474).
+* Fixed: a `gtm4wp_overwrite_consent_mode_flag` filter callback returning the string `denied` set that consent signal to `granted`; the filter now also accepts `granted` and `denied`.
+* Fixed: a WooCommerce checkout total that is not a finite number no longer breaks the inline checkout script; `gtm4wp_checkout_value` is `null` then.
+* Fixed: hardened how the plugin's REST endpoints answer requests made from other pages.
+* Changed: `siteSearchTerm` carries the search term as typed; the classic data layer used to HTML-encode it while the cache-safe one did not. A GTM trigger matching the encoded form needs the plain text now.
+* Changed: `pageTitle` carries the title as the visitor reads it: WordPress's encoding of ampersands, quotes and dashes is decoded. A GTM trigger matching the encoded form needs the plain text now.
+* Changed: the Contact Form 7 tracker script is no longer loaded while Contact Form 7 is not installed.
+* Changed: for developers, `gtm4wp_datalayer_push()` returns `false` for a non-string `$js_before`/`$js_after` argument instead of printing `Array` into the page.
 
 = 2.0.5 =
 

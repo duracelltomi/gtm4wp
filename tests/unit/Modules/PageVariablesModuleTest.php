@@ -158,14 +158,19 @@ final class PageVariablesModuleTest extends TestCase {
 		return $module;
 	}
 
-	public function test_search_page_data_with_escaped_search_term(): void {
+	public function test_search_page_data_with_raw_search_term(): void {
 		Functions\when( 'is_search' )->justReturn( true );
 
-		// Mirrors WordPress get_search_query() default behavior: the search
-		// term arrives esc_attr() escaped. Absorbed from the 1.x XSS test.
+		// #274: the RAW query is read (get_search_query( false )) so the classic
+		// and the cache-safe tier report one string; the hex-flag JSON sink is
+		// what neutralises it (ContainerCodeTest::
+		// test_header_begin_hex_encodes_raw_breakout_characters_in_datalayer_values).
+		// The stub honours $escaped, so reading the escaped form fails this test.
 		$malicious_term = '<script>alert("xss")</script>';
-		Functions\when( 'get_search_query' )->justReturn(
-			htmlspecialchars( $malicious_term, ENT_QUOTES, 'UTF-8' )
+		Functions\when( 'get_search_query' )->alias(
+			static function ( $escaped = true ) use ( $malicious_term ) {
+				return $escaped ? htmlspecialchars( $malicious_term, ENT_QUOTES, 'UTF-8' ) : $malicious_term;
+			}
 		);
 
 		$_SERVER['HTTP_REFERER'] = 'https://example.com/page/?param=value';
@@ -180,14 +185,29 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertSame( 'search-results', $data_layer['pagePostType'] );
 		$this->assertSame( 5, $data_layer['siteSearchResults'] );
 
-		// The raw script tag must never appear in the data layer value.
-		$this->assertStringNotContainsString( '<script>', $data_layer['siteSearchTerm'] );
-		$this->assertSame( htmlspecialchars( $malicious_term, ENT_QUOTES, 'UTF-8' ), $data_layer['siteSearchTerm'] );
+		// Raw in the ARRAY: the value must not arrive pre-encoded (RI-4), the
+		// script sink encodes it once.
+		$this->assertSame( $malicious_term, $data_layer['siteSearchTerm'] );
 
 		// Referrer query strings are rawurlencoded as in 1.x.
 		$this->assertSame( 'https://example.com/page/?param%3Dvalue', $data_layer['siteSearchFrom'] );
 
 		unset( $_SERVER['HTTP_REFERER'] );
+	}
+
+	/**
+	 * #273 (RI-4 residue): wp_title() arrives texturized and entity-encoded;
+	 * pageTitle carries the text the visitor reads and the JSON sink escapes
+	 * it once.
+	 */
+	public function test_page_title_decodes_the_entities_the_title_filters_add(): void {
+		Functions\when( 'wp_title' )->justReturn( 'Marks &#038; Spencer &#8211; Tom&#8217;s &lt;b&gt;shop&lt;/b&gt;' );
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+
+		$data_layer = $this->make_module( array( GTM4WP_OPTION_INCLUDE_POSTTITLE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertSame( "Marks & Spencer \u{2013} Tom\u{2019}s <b>shop</b>", $data_layer['pageTitle'] );
 	}
 
 	public function test_site_id_typed_as_number(): void {

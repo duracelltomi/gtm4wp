@@ -586,7 +586,7 @@ final class PageDataLayer {
 
 		$checkout_js = '
 			window.gtm4wp_checkout_products = ' . ScriptTag::json_literal( $gtm4wp_checkout_products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';
-			window.gtm4wp_checkout_value    = ' . (float) $gtm4wp_checkout_total . ';';
+			window.gtm4wp_checkout_value    = ' . ScriptTag::number_literal( (float) $gtm4wp_checkout_total ) . ';';
 
 		/*
 		 * Nothing on the page reads these globals unless the classic tracker is on

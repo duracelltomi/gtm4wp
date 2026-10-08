@@ -62,6 +62,51 @@ final class RestCors {
 		// the default 10, so this runs after it and undoes what it did for this
 		// namespace.
 		add_filter( 'rest_pre_serve_request', array( self::class, 'restrict_cors' ), 11, 3 );
+
+		// Core's JSONP wrapper is a channel CORS does not govern (#337).
+		add_filter( 'rest_pre_dispatch', array( self::class, 'refuse_jsonp' ), 10, 3 );
+	}
+
+	/**
+	 * Refuses a JSONP request to this namespace before its callback runs, so the
+	 * wrapped response carries an error and no data. No client of ours uses JSONP.
+	 * rest_jsonp_enabled cannot do this: it runs before the route is known.
+	 *
+	 * @param mixed            $result  The pre-dispatch result; null when nothing short-circuited.
+	 * @param mixed            $server  The REST server (unused).
+	 * @param \WP_REST_Request $request The request being dispatched.
+	 * @return mixed The unchanged $result, or a WP_Error for a JSONP request to this namespace.
+	 */
+	public static function refuse_jsonp( $result, $server, $request ) {
+		if ( null !== $result || ! ( $request instanceof \WP_REST_Request ) ) {
+			return $result;
+		}
+
+		$query = $request->get_query_params();
+
+		if ( ! is_array( $query ) || ! array_key_exists( '_jsonp', $query ) || ! self::in_namespace( (string) $request->get_route() ) ) {
+			return $result;
+		}
+
+		return new \WP_Error(
+			'rest_jsonp_refused',
+			__( 'JSONP is not supported by this API.', 'duracelltomi-google-tag-manager' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	/**
+	 * Whether a route is the namespace index (/gtm4wp/v2) or under it; the slash
+	 * keeps gtm4wp/v22 out. Lowercased: WordPress matches routes case-insensitively
+	 * (see should_restrict_cors()).
+	 *
+	 * @param string $route The REST route, e.g. /gtm4wp/v2/visitor-data.
+	 * @return bool
+	 */
+	private static function in_namespace( string $route ): bool {
+		$path = strtolower( ltrim( $route, '/' ) );
+
+		return self::REST_NAMESPACE === $path || 0 === strpos( $path, self::REST_NAMESPACE . '/' );
 	}
 
 	/**
@@ -131,11 +176,7 @@ final class RestCors {
 		// comparison here would leave those requests outside the policy while
 		// still serving them. The namespace is lowercase ASCII, so strtolower()
 		// normalizes it exactly the way that match does.
-		$path = strtolower( ltrim( $route, '/' ) );
-
-		if ( self::REST_NAMESPACE !== $path
-			&& 0 !== strpos( $path, self::REST_NAMESPACE . '/' )
-		) {
+		if ( ! self::in_namespace( $route ) ) {
 			return false;
 		}
 

@@ -174,6 +174,36 @@ final class DataLayerTest extends FrontendTestCase {
 		$this->assertFalse( $datalayer->queue_push( 'event', 'not-an-array' ) );
 	}
 
+	/**
+	 * #288: the two raw JS legs are concatenated at flush time, so an array would
+	 * print "Array" into the inline script; the public wrapper promises false for
+	 * an invalid type. null, scalars and Stringable (the forms that always worked) pass.
+	 */
+	public function test_queue_push_rejects_a_non_stringable_inline_js_leg(): void {
+		$datalayer = new DataLayer( $this->make_options() );
+
+		$this->assertFalse( $datalayer->queue_push( 'event', array(), array( 'a' ) ) );
+		$this->assertFalse( $datalayer->queue_push( 'event', array(), '', new \stdClass() ) );
+		$this->assertArrayNotHasKey( 'gtm4wp_additional_datalayer_pushes', $GLOBALS, 'Nothing is queued for an invalid leg.' );
+
+		$this->assertTrue( $datalayer->queue_push( 'event', array(), null, 42 ) );
+		$this->assertSame( '', $GLOBALS['gtm4wp_additional_datalayer_pushes'][0]['js_before'] );
+		$this->assertSame( '42', $GLOBALS['gtm4wp_additional_datalayer_pushes'][0]['js_after'] );
+
+		$stringable = new class() {
+			/**
+			 * The JS leg.
+			 *
+			 * @return string
+			 */
+			public function __toString(): string {
+				return 'before();';
+			}
+		};
+		$this->assertTrue( $datalayer->queue_push( 'event', array(), $stringable ) );
+		$this->assertSame( 'before();', $GLOBALS['gtm4wp_additional_datalayer_pushes'][1]['js_before'] );
+	}
+
 	public function test_queue_push_appends_to_compat_global(): void {
 		$datalayer = new DataLayer( $this->make_options() );
 

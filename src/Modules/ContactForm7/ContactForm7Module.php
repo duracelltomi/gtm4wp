@@ -49,7 +49,10 @@ final class ContactForm7Module extends AbstractModule {
 	 * @return void
 	 */
 	protected function register_frontend_hooks(): void {
-		if ( ! $this->opt( GTM4WP_OPTION_INTEGRATE_WPCF7 ) ) {
+		// Without Contact Form 7 the tracker has nothing to listen to, so it is
+		// not enqueued (#281). Checked here, not in is_available(): the admin
+		// panel reads that as "module unavailable".
+		if ( ! $this->opt( GTM4WP_OPTION_INTEGRATE_WPCF7 ) || ! defined( 'WPCF7_VERSION' ) ) {
 			return;
 		}
 

@@ -109,6 +109,49 @@ final class ConsentDefaultsTest extends FrontendTestCase {
 		$this->assertSame( 'granted', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
 	}
 
+	/**
+	 * #308: a filter callback that answers in the output vocabulary ("denied")
+	 * must not be read as a truthy boolean.
+	 */
+	public function test_flag_accepts_the_denied_string_from_the_filter(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG )
+			->once()
+			->with( true, GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS )
+			->andReturn( 'denied' );
+
+		$consent = new ConsentDefaults(
+			$this->make_options(
+				array(
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS => true,
+				)
+			)
+		);
+
+		$this->assertSame( 'denied', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
+	}
+
+	/**
+	 * #308: the "granted" string is accepted the same way.
+	 */
+	public function test_flag_accepts_the_granted_string_from_the_filter(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_OVERWRITE_COMO_FLAG )
+			->once()
+			->with( false, GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS )
+			->andReturn( 'granted' );
+
+		$consent = new ConsentDefaults(
+			$this->make_options(
+				array(
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE => true,
+					GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS => false,
+				)
+			)
+		);
+
+		$this->assertSame( 'granted', $consent->flag( GTM4WP_OPTION_INTEGRATE_CONSENTMODE_ADS ) );
+	}
+
 	public function test_script_block_contains_all_seven_signals(): void {
 		$options = $this->make_options(
 			array(
