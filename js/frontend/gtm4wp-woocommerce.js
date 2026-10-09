@@ -1258,6 +1258,8 @@ function gtm4wp_woocommerce_process_pages() {
 	// jQuery AJAX calls that can not be caught using vanilla JS
 	jQuery( document ).ajaxSuccess( function ( event, xhr, settings ) {
 		// The classic cart's Undo: re-add the line this page saw removed.
+		// Isolated (RI-35): this runs synchronously inside the Undo request's
+		// callbacks, so a throw here would skip WooCommerce's unblock of the cart.
 		const undo_key =
 			settings && 'string' === typeof settings.url
 				? gtm4wp_cart_item_key_from_url( settings.url, 'undo_item' )
@@ -1266,9 +1268,11 @@ function gtm4wp_woocommerce_process_pages() {
 			const restored = gtm4wp_removed_cart_lines[ undo_key ];
 			delete gtm4wp_removed_cart_lines[ undo_key ];
 
-			gtm4wp_push_ecommerce( 'add_to_cart', [ restored ], {
-				currency: gtm4wp_currency,
-				value: restored.price * restored.quantity,
+			gtm4wp_run_isolated( function () {
+				gtm4wp_push_ecommerce( 'add_to_cart', [ restored ], {
+					currency: gtm4wp_currency,
+					value: restored.price * restored.quantity,
+				} );
 			} );
 			return;
 		}

@@ -63,6 +63,11 @@ final class PurchaseTracking {
 
 		if ( $order_id > 0 ) {
 			$order = wc_get_order( $order_id );
+
+			// false, or a refund, for an id that is not an order (#420).
+			if ( ! $order instanceof \WC_Order ) {
+				unset( $order );
+			}
 		}
 
 		$data_layer = array();

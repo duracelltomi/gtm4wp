@@ -150,6 +150,31 @@ final class WooCommerceModuleTest extends TestCase {
 		);
 	}
 
+	/**
+	 * #399: the custom order-received page renders the buyer's order data and
+	 * purchase, so it is kept out of page caches like WooCommerce's own page.
+	 * Separate process: DONOTCACHEPAGE is a constant.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_custom_order_received_page_is_kept_out_of_page_caches(): void {
+		Functions\when( 'is_page' )->alias( static fn ( $id ) => 42 === $id );
+		Functions\expect( 'nocache_headers' )->once();
+
+		$this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) )
+			->prevent_caching_custom_received_page();
+
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
+	public function test_other_pages_stay_cacheable(): void {
+		Functions\when( 'is_page' )->alias( static fn ( $id ) => 99 === $id );
+		Functions\expect( 'nocache_headers' )->never();
+
+		$this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) )
+			->prevent_caching_custom_received_page();
+	}
+
 	public function test_keeps_true_when_woocommerce_already_says_order_received(): void {
 		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42' ) );
 

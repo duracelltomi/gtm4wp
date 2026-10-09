@@ -123,6 +123,20 @@ final class PurchaseTrackingTest extends TestCase {
 		return (string) ob_get_clean();
 	}
 
+	/**
+	 * #420: wc_get_order() returns false (or a refund) for an id that is not an
+	 * order; the fallback must skip it, not raise a TypeError.
+	 */
+	public function test_ignores_an_id_that_is_not_an_order(): void {
+		Functions\when( 'wc_get_order' )->justReturn( false );
+
+		ob_start();
+		$this->make_tracking()->on_thankyou( 999 );
+		$output = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'purchase', $output );
+	}
+
 	public function test_skips_when_on_order_received_page(): void {
 		Functions\when( 'is_order_received_page' )->justReturn( true );
 

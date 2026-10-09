@@ -1687,6 +1687,31 @@ describe( 'gtm4wp-woocommerce classic cart Undo', () => {
 			removeThenUndo( '/cart/?undo_item=other-key&_wpnonce=n' )
 		).toHaveLength( 0 );
 	} );
+
+	it( 'does not throw into the Undo request when the push throws (RI-35)', () => {
+		bootWithCapture();
+		document
+			.querySelector( 'a.remove' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+		jest.runOnlyPendingTimers();
+		global.gtm4wp_push_ecommerce.mockImplementation( () => {
+			throw new Error( 'push failed' );
+		} );
+
+		// A throw here would skip WooCommerce's complete callback, which
+		// unblocks the cart form.
+		expect( () =>
+			ajaxSuccessCb(
+				{},
+				{},
+				{ url: '/cart/?undo_item=key-1&_wpnonce=n' }
+			)
+		).not.toThrow();
+		// The error still reaches the console, from a timer.
+		expect( () => jest.runOnlyPendingTimers() ).toThrow( 'push failed' );
+	} );
 } );
 
 describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {

@@ -604,6 +604,23 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
 	}
 
+	/**
+	 * #421: is_product() does not guarantee wc_get_product() loads a product;
+	 * the product variables are omitted instead of a fatal error.
+	 */
+	public function test_product_page_without_a_loadable_product_adds_no_product_data(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+		Functions\when( 'wc_get_product' )->justReturn( false );
+		$this->stub_wc();
+
+		$data_layer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'productType', $data_layer );
+		$this->assertArrayNotHasKey( 'productRatingCounts', $data_layer );
+	}
+
 	public function test_view_item_carries_quantity_one(): void {
 		// #348: the simple-product view_item item must carry an explicit quantity of 1.
 		Functions\when( 'is_product' )->justReturn( true );

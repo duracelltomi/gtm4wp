@@ -46,6 +46,9 @@ final class PageVariablesModuleTest extends TestCase {
 
 		Functions\stubEscapeFunctions();
 
+		// #400: posts are not password-protected unless a test says so (TS-16).
+		Functions\when( 'post_password_required' )->justReturn( false );
+
 		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
 		// than the real function - wp_specialchars_decode() with ENT_QUOTES
 		// reverses exactly the five entities _wp_specialchars() writes.
@@ -1314,6 +1317,59 @@ final class PageVariablesModuleTest extends TestCase {
 	 * The meta option alone still fills pagePostTerms.meta, so a site that had the
 	 * combined option on keeps the exact data layer shape after the migration.
 	 */
+	/**
+	 * #400: a visitor without the password gets no custom fields and no
+	 * content-derived count of a password-protected post; taxonomy terms stay,
+	 * as themes print them on such a post.
+	 */
+	public function test_password_protected_post_withholds_meta_and_content_metrics(): void {
+		$this->arrange_singular_terms_and_meta();
+		Functions\when( 'post_password_required' )->justReturn( true );
+		Functions\when( 'strip_shortcodes' )->returnArg();
+		Functions\when( 'wp_strip_all_tags' )->returnArg();
+		Functions\when( 'get_post_field' )->justReturn( 'one two three' );
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE         => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES       => false,
+				GTM4WP_OPTION_INCLUDE_TAGS             => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR           => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST     => true,
+				GTM4WP_OPTION_INCLUDE_POSTMETA         => true,
+				GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT => true,
+				GTM4WP_OPTION_INCLUDE_READINGTIME      => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'genre', $data_layer['pagePostTerms'] );
+		$this->assertArrayNotHasKey( 'meta', $data_layer['pagePostTerms'] );
+		$this->assertArrayNotHasKey( 'pageContentWordCount', $data_layer );
+		$this->assertArrayNotHasKey( 'pageReadingTime', $data_layer );
+		$this->assertStringNotContainsString( 'secret-internal-note', (string) wp_json_encode( $data_layer ) );
+	}
+
+	/**
+	 * #400 with only the meta option on: no empty pagePostTerms container either.
+	 */
+	public function test_password_protected_post_with_only_meta_on_omits_the_container(): void {
+		$this->arrange_singular_terms_and_meta();
+		Functions\when( 'post_password_required' )->justReturn( true );
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE     => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES   => false,
+				GTM4WP_OPTION_INCLUDE_TAGS         => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR       => false,
+				GTM4WP_OPTION_INCLUDE_POSTTERMLIST => false,
+				GTM4WP_OPTION_INCLUDE_POSTMETA     => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'pagePostTerms', $data_layer );
+	}
+
 	public function test_post_meta_option_alone_publishes_meta_without_taxonomies(): void {
 		$this->arrange_singular_terms_and_meta();
 

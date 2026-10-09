@@ -604,7 +604,8 @@ final class PageVariablesModule extends AbstractModule {
 	 */
 	private function add_post_terms_and_meta( array $data_layer, object $post ): array {
 		$include_post_terms = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTTERMLIST );
-		$include_post_meta  = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA );
+		// Custom fields of a password-protected post stay behind the password (#400).
+		$include_post_meta = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_POSTMETA ) && ! post_password_required( $post );
 
 		if ( ! $include_post_terms && ! $include_post_meta ) {
 			return $data_layer;
@@ -734,7 +735,8 @@ final class PageVariablesModule extends AbstractModule {
 	 * @return array<string, mixed>
 	 */
 	private function add_post_content_variables( array $data_layer, object $post ): array {
-		if ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) || $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) {
+		// Not measured from the content of a password-protected post (#400).
+		if ( ( $this->opt( GTM4WP_OPTION_INCLUDE_CONTENTWORDCOUNT ) || $this->opt( GTM4WP_OPTION_INCLUDE_READINGTIME ) ) && ! post_password_required( $post ) ) {
 			$post_content = (string) get_post_field( 'post_content', get_the_ID() );
 			$word_count   = self::count_words( wp_strip_all_tags( strip_shortcodes( $post_content ) ) );
 
