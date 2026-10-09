@@ -81,9 +81,13 @@
 * Fixed: the data layer initialisation block no longer contains the word `gtag`. Since 2.0.3, a JavaScript delay plugin with `gtag` on its keyword list, such as Flying Scripts, delayed the whole block and the browser console showed `dataLayer is not defined`. The Google tag developer ID is still set.
 * Fixed: a page with no data layer variables to report no longer pushes an empty array into the data layer; `dataLayer_content` is then an empty object and is not pushed. Content that is pushed is always an object, never an array, which GTM would read as a command.
 
+Release post: [GTM4WP 2.0.5 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-5-is-out.html)
+
 ## 2.0.4 (2026-09-29)
 
 * Fixed: on the classic WooCommerce checkout, an error in the plugin's checkout step tracking could stop the order from being submitted the normal way, so a gateway that adds card details in the browser, such as Stripe, rejected it. Tracking errors can no longer interrupt the checkout or a variation selection, and still show in the browser console. (#472)
+
+Release post: [GTM4WP 2.0.4 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-4-is-out.html)
 
 ## 2.0.3 (2026-09-24)
 
@@ -101,6 +105,8 @@
 * Updated: tested with WooCommerce 11.1.2.
 * Added: the data layer initialisation block carries the plugin's Google tag developer ID, `gtag('set', 'developer_id.dNGJiYT', true)`, so Google can tell which platform installed the tag. It identifies GTM4WP only and adds nothing about the site or its visitors.
 
+Release post: [GTM4WP 2.0.3 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-3-is-out.html)
+
 ## 2.0.2 (2026-09-15)
 
 * Updated: tested with WooCommerce 11.1.
@@ -112,10 +118,14 @@
 * Fixed: a `GTM4WP_HARDCODED_*` value in wp-config.php that ends in a newline character - typically an untrimmed file read feeding the `define()` - is now rejected and named in the existing admin notice, like any other malformed value. Previously a `gtm_auth`/`gtm_preview` value with a trailing newline passed validation, the newline reached the container loader script and broke the whole block, so the container silently did not load with nothing pointing at wp-config. A container ID with a trailing newline used to be silently repaired and kept working; it is now reported the same way instead - remove the stray newline from the `define()` and the override applies again.
 * Fixed: a page whose author cannot be resolved no longer takes the whole page down with a critical error when PublishPress Authors is active. PublishPress reports such an author as no author at all, which happens when the author's user account has been deleted, and the plugin passed that straight into the code reading the author name and ID, where it ended in a fatal error. The WooCommerce My Account page is the one most likely to hit it, since it is often the page nobody keeps an author on. An author that cannot be resolved is now skipped, so the page renders and the author variables are simply left out of the data layer, and a post that has one real author next to an unresolvable one is treated as having a single author.
 
+Release post: [GTM4WP 2.0.2 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-2-is-out.html)
+
 ## 2.0.1 (2026-09-03)
 
 * Fixed: on a block-based store, opening the Cart page pushed `add_shipping_info` and `add_payment_info` into the data layer with no interaction, and both events then fired again on the Checkout page. The block tracker told the two pages apart by the presence of the WooCommerce payment data store, which WooCommerce registers on the Cart page as well; the Cart and Checkout pages now each receive their own context and the checkout-step events fire only on the Checkout page. (#463)
 * Fixed: a blank settings screen no longer stays silent about why it is blank. The screen is built in the browser by a JavaScript file loaded from the plugin folder (`build/admin.js`), and the EasyPrivacy filter list blocks everything under that folder, so an administrator running an ad or privacy blocker with that list opened the settings page and found it empty, with nothing anywhere saying why. The page now carries a static, server-rendered notice that no blocker can remove: it stays invisible while the settings app starts normally and appears after a few seconds only when the app never started, naming the most likely cause and the way out (pause the blocker for the admin area of the site, or add an exception for it). The notice also covers every other reason the script fails to run, an incomplete upload or disabled JavaScript included.
+
+Release post: [GTM4WP 2.0.1 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-1-is-out.html)
 
 ## 2.0 (2026-09-01)
 
@@ -296,6 +306,8 @@ Major rewrite of the plugin - please read the announcement post on gtm4wp.com be
 * Removed: weather and geo data features (ipstack.com / OpenWeatherMap integrations).
 * Removed: scroll tracking feature - use Google Tag Manager's built-in Scroll Depth trigger instead. The `GTM4WP_OPTION_SCROLLER_*` constants remain in place for backward compatibility.
 
+Release post: [GTM4WP 2.0.0 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-0-is-out.html)
+
 ## 1.22.5 (2026-08-04)
 
 A maintenance release for the 1.x line. 1.22.4 was intended to be the last one before GTM4WP 2.0; this release exists because the fixes below are worth shipping to 1.x users rather than holding for 2.0.
@@ -317,6 +329,8 @@ A maintenance release for the 1.x line. 1.22.4 was intended to be the last one b
 * Deprecated: scroll tracking. It still works in this version but will be removed in GTM4WP 2.0. Use the Scroll Depth trigger built into Google Tag Manager instead.
 * Deprecated: the "Custom tag/variable templates" blacklist option, plus the Universal Analytics and Mouseflow entries of the tag blacklist. These will be removed in GTM4WP 2.0.
 * Added: a dismissable admin notice announcing the upcoming GTM4WP 2.0 release. If your site uses one of the deprecated features above, the notice names it.
+
+Release post: [GTM4WP 1.22.4 is out, and 2.0 is on the way](https://gtm4wp.com/announcements/gtm4wp-1-22-4-is-out-and-2-0-is-on-the-way.html)
 
 ## 1.22.3 (2025-12-15)
 
@@ -408,6 +422,8 @@ please update the plugin on a test version of your website before updating your 
 * Added: integration with WebToffee GDPR Cookie Consent plugin. GTM4WP can not fire a GTM event when user consent changes or when a previously stored consent has been loaded.
 * Fixed: add_payment_info and add_shipping_info events were not fired during checkout submit when not fired before on the page.
 * Fixed: GTM4WP will only look for the user's IP address in the REMOTE_ADDR server variable. You may enter a custom HTTP header instead in plugin settings.
+
+Release post: [Be prepared to big changes in GTM4WP v1.20](https://gtm4wp.com/announcements/be-prepared-to-big-changes-in-gtm4wp-v1-20.html)
 
 ## 1.19.1 (2023-12-14)
 
@@ -566,6 +582,8 @@ the next version will be fully dedicacted to go through every peace of code and 
 * Fixed: HTML5 detection. - by [Sjoerd](https://github.com/sjoerdkoelewijn)
 * Fixed: Username not included in datalayer if no other user attribute is included - by [StaymanHou](https://github.com/StaymanHou)
 
+Release post: [GTM4WP v1.14: good-bye jQuery, welcome WooCommerce Blocks](https://gtm4wp.com/announcements/gtm4wp-v1-14-good-bye-jquery-welcome-woocommerce-blocks.html)
+
 ## 1.13.1 (2021-05-20)
 
 * Fix: better PHP8 compatibility
@@ -592,6 +610,8 @@ The goal is to keep this setup in the upcoming versions.
 * Updated: WhichBrowser v2.1.1 (requires PHP 7.0 or newer)
 * Updated: descriptions of WooCommerce tracking methods to emphasize the importance to migrate from standard to enhanced ecommerce
 * Updated: added links to enhanced ecommerce setup guides (GA3 and GA4)
+
+Release post: [GTM4WP v1.13 – Updated Google Dynamic Remarketing and support for server-side containers](https://gtm4wp.com/announcements/gtm4wp-v1-13-updated-google-dynamic-remarketing-and-support-for-server-side-containers.html)
 
 ## 1.12.3 (2021-04-19)
 
@@ -628,6 +648,8 @@ If you are using the blacklist/whitelist feature of the plugin, review these opt
 * Deprecated: classic ecommerce tracking will be removed later this year, please upgrade to enhanced ecommerce tracking
 * Deprecated: standard Google Ads remarketing variable will be removed soon as the Google Ads remarketing tag template can easily use any of your Google Tag Manager variables
 * Deprecated: the old fashioned way of using Google Ads remarketing with the ecomm_ prefixed data layer variables will be removed soon. Instructions for upgrade will be published on gtm4wp.com once this feature gets updated in an upcoming plugin version
+
+Release post: [GTM4WP v1.12 - Google Analytics 4 tracking is here](https://gtm4wp.com/announcements/gtm4wp-v1-12-google-analytics-4-tracking-is-here.html)
 
 ## 1.11.6 (2020-11-19)
 
@@ -726,6 +748,8 @@ Please read the changelog very carefully as there are many important changes and
 * Fixed: missing product quantity while adding a variable product into the cart
 * Fixed: prevent multiple tracking of WooCommerce orders on mobile devices where the mobile browser reloads the order received page from local cache executing GTM tracking again
 
+Release post: [Google Tag Manager for WordPress v1.10 - Even better WooCommerce integration](https://gtm4wp.com/announcements/google-tag-manager-for-wordpress-v1-10-even-better-woocommerce-integration.html)
+
 ## 1.9.2 (2019-02-02)
 
 * Fixed: possible PHP warning if geo data or weather data feature is turned on
@@ -769,6 +793,8 @@ Please read the changelog very carefully as there are many important changes and
   * Download click events
   * Email click events
 * Warning: PHP 5.6 is now the minimum recommended version to use this plugin. I advise to move to PHP 7.x
+
+Release post: [GTM4WP v1.9: AMP, WooCommerce, Google Optimize and more](https://gtm4wp.com/announcements/gtm4wp-v1-9-amp-woocommerce-google-optimize.html)
 
 ## 1.8.1 (2018-06-05)
 
