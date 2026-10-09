@@ -272,7 +272,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Changed: `pageTitle` carries the title as the visitor reads it: WordPress's encoding of ampersands, quotes and dashes is decoded. A GTM trigger matching the encoded form needs the plain text now.
 * Changed: the Contact Form 7 tracker script is no longer loaded while Contact Form 7 is not installed.
 * Changed: for developers, `gtm4wp_datalayer_push()` returns `false` for a non-string `$js_before`/`$js_after` argument instead of printing `Array` into the page.
-* Fixed: thank-you pages that show the purchase are now kept out of page caches, the same way WooCommerce treats its own order received page: the page set as "Custom order received page", and a thank-you page built by a theme or page builder.
+* Fixed: thank-you pages that show the purchase are now kept out of page caches. The page set as "Custom order received page" is treated the same way WooCommerce treats its own order received page; a thank-you page built by a theme or page builder is excluded from page-cache plugins.
 * Fixed: on a password-protected post, the post meta, word count and reading time variables are left out of the data layer for visitors who have not entered the password.
 * Fixed: when the Contact Form 7 tracker's settings do not reach the page (for example an optimisation plugin drops inline scripts), it no longer falls back to sending the submitted form values.
 * Fixed: a PHP error when `woocommerce_thankyou` fired with an id that is not an order, or on a product page whose product could not be loaded.

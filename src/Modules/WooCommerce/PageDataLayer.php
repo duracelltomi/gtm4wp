@@ -1118,9 +1118,9 @@ final class PageDataLayer {
 		// is the recorded case of emitting both keys with one meaningless).
 		//
 		// The two sibling call sites are deliberately NOT gated. resolve_pending_purchase()
-		// resolves the order from the caller's own WC session, and
-		// PurchaseTracking::on_thankyou() only runs once WooCommerce has already
-		// rendered the order - in both, the visitor is the buyer by construction.
+		// resolves the order from the caller's own WC session, so the visitor is the
+		// buyer; PurchaseTracking::on_thankyou() leaves the gate to the hook's caller
+		// (WooCommerce's own callers gate first).
 		if ( ! $withhold_customer_data ) {
 			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
 		}

@@ -51,10 +51,9 @@ final class PurchaseTracking {
 	 * checkout/thankyou.php with a real order ONLY after its known-shopper and
 	 * guest-email gates pass - each declining branch renders
 	 * checkout/order-received.php and returns - and that template fires
-	 * woocommerce_thankyou inside its own `if ( $order )`. Reaching this hook is
-	 * therefore the evidence the page rendered. That holds for the stock template;
-	 * a theme overriding thankyou.php owns its own decision, as it does for every
-	 * other hook it chooses to fire.
+	 * woocommerce_thankyou inside its own `if ( $order )`. That is WooCommerce's
+	 * gate; a theme, page builder or funnel that fires this hook owns its own. A
+	 * printed purchase keeps the page out of page caches (#460).
 	 *
 	 * @param int $order_id The ID of the order placed by the user just recently.
 	 * @return void
@@ -147,9 +146,9 @@ final class PurchaseTracking {
 </script>';
 
 			// The buyer's order is now in this page: keep it out of page caches (#460).
-			// Headers are already sent mid-body; output-buffer caches read the constant.
+			// Constant only: headers are usually sent by now; output-buffer caches read it.
 			if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U141), not ours to prefix.
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U70, U141), not ours to prefix.
 				define( 'DONOTCACHEPAGE', true );
 			}
 
