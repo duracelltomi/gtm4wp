@@ -186,6 +186,12 @@ This is why every finding carries a **stage** (`announced` / `beta` / `rc` /
 coupling caught at `rc` is a scheduled task; caught at `shipped` it is a live
 data-quality bug.
 
+**The RC → GA step is not a formality.** WooCommerce 11.2.0 added eight fixes
+between rc.1 and GA, in 50 files including the Store API checkout route, and was
+tagged a day after its calendar date. A pre-release verdict therefore carries to GA
+only after the RC → GA package diff, and the `tested up to` bump waits for the tag,
+not the calendar (S8).
+
 ### UD-8: Dev notes are the only channel for silent behavior changes
 
 Not every core change gets a deprecation notice. Behavior changes — how `wp_kses`
@@ -807,6 +813,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-10-09 (S8) | Amended **UD-7** (the RC → GA step is not a formality: WC 11.2.0 added eight fixes over rc.1 and shipped a day late; diff the packages before carrying a pre-release verdict, bump at the tag). Sweep 8 itself: WC-scoped, 11.2.0 GA, section B clean at GA, one declaration finding (D56). |
 | 2026-10-06 (S7) | Amended **UD-20** (second example: a site-level cart/checkout setting read as the presence of the Mini-Cart block; probe co-occurrence, not existence — D50). Added **UD-25** (a rationale naming upstream's implementation technology is a coupling). Sweep 7 itself: WC 11.2 GA not tagged on its calendar day; the 11.1.2 → 11.2.0-rc.1 diff of the coupled files is clean, so the claim stays 11.1.2 until the tag. CF7 6.2.0 and WP 7.1.3 shipped the same day, both clean. Four unrowed couplings registered (U182–U185); `npm audit` back to 80 dev-only (D51). |
 | 2026-09-28 (S6) | Added **UD-24** (⭐ a drift sensor that diffs a moved path is green forever; audit a sensor by running its generator, not by reading its last run) after finding `upstream-drift.yml` diffing the pre-`36a0c83` phone-table path (D44) and, by regenerating in a scratch copy, the table two territories behind libphonenumber while the corpus it could still see was unchanged (D45). UD-9 corollary: try the other shell's transport before `fetch-failed`. Sweep 6 itself: WC 11.2.0-beta.2 package grepped whole — no anchor moved; `is_returning_customer()` changes two edge cases in the corrective direction (D46); the #472/#328 fixes' dependence on `triggerHandler` recorded on U25 (D47); Gutenberg 24.1.0-rc.1 deprecates the `@wordpress/scripts` Jest tooling (D48); `npm audit` run for the first time (0). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UD-24, UC-1, UC-3, UC-8. |
 | 2026-09-23 (S5) | Added **UD-23** (a behaviour whose spec page sunset is a coupling with no source: record the documented cousin + a measurement recipe, rate as drifted until measured) after registering the GTM `eventCallback`/`eventTimeout` contract from R35 #261 (U163, D33) and finding no current Google page for it. Sweep 5 itself: WooCommerce 11.1.2 shipped a day after S4 (D32, claim one patch behind); the full-tree coupling inventory — not the diff-scoped hunt — surfaced four unrowed couplings older than the base (OpenSSL → U164, the WC session-cookie prefix → U147, core `_get_cron_array()` → U139, page-conditional wording → U12/U115); U161 gained the R35 #266 selector sentence and lost three unescaped pipes (D39 — the cell-count check must ignore `\|`). |
