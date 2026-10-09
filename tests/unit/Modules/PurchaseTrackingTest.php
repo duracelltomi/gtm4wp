@@ -169,6 +169,33 @@ final class PurchaseTrackingTest extends TestCase {
 	}
 
 	/**
+	 * #460: a third-party thank-you page that fires woocommerce_thankyou now
+	 * carries the buyer's order, so it is kept out of output-buffer page caches.
+	 * Separate process: DONOTCACHEPAGE is a constant.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_rendered_purchase_keeps_the_page_out_of_page_caches(): void {
+		$output = $this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $this->make_order() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $output );
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
+	/**
+	 * #460 guard: nothing rendered (the order is not trackable) leaves the page
+	 * cacheable. Separate process for the same reason.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_nothing_rendered_leaves_the_page_cacheable(): void {
+		$output = $this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $this->make_order( array( 'status' => 'failed' ) ) );
+
+		$this->assertSame( '', $output );
+		$this->assertFalse( defined( 'DONOTCACHEPAGE' ) );
+	}
+
+	/**
 	 * Google publishes two names for the same idea on two surfaces: Google Ads
 	 * customer acquisition reads the boolean `new_customer`, while the GA4
 	 * e-commerce reference documents a `customer_type` string of `new` or

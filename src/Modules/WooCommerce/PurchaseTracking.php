@@ -128,6 +128,13 @@ final class PurchaseTracking {
 	window.' . esc_js( $datalayer_name ) . '.push(' . $encoded_data_layer . ');
 </script>';
 
+			// The buyer's order is now in this page: keep it out of page caches (#460).
+			// Headers are already sent mid-body; output-buffer caches read the constant.
+			if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U141), not ours to prefix.
+				define( 'DONOTCACHEPAGE', true );
+			}
+
 			$this->script_tag->print_script_block( $script_tag );
 
 			$this->product_data->flag_order_tracked( $order );

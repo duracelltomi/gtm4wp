@@ -2343,22 +2343,43 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringNotContainsString( 'a@b.com', $serialized );
 	}
 
-	public function test_cache_safe_omits_the_pending_purchase_one_shot_event(): void {
+	/**
+	 * An already-tracked order emits no purchase but would still emit raw
+	 * orderData, so only the orderData assertion guards that case (#461).
+	 *
+	 * @return array<string, array{0: array<string, mixed>}>
+	 */
+	public static function pending_purchase_orders(): array {
+		return array(
+			'fresh order'           => array( array() ),
+			'already-tracked order' => array( array( 'meta' => array( '_ga_tracked' => 1 ) ) ),
+		);
+	}
+
+	/**
+	 * The reliable-purchase fallback stays out of cacheable HTML (#398, #461).
+	 *
+	 * @param array<string, mixed> $order_data Order fixture overrides.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'pending_purchase_orders' )]
+	public function test_cache_safe_omits_the_pending_purchase_one_shot_event( array $order_data ): void {
 		// Issue #398 (1b): the reliable-tracking fallback is a session one-shot that
 		// fires on arbitrary (cacheable) pages, so it is withheld in cache-safe mode.
-		$order = $this->make_recent_order();
+		$order = $this->make_recent_order( $order_data );
 		Functions\when( 'wc_get_order' )->justReturn( $order );
 		$this->stub_wc_pending( 1001 );
 
-		$this->make_page_datalayer(
+		$result = $this->make_page_datalayer(
 			array(
 				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
 				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
 				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
 			)
 		)->add_datalayer_data( array() );
 
 		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js, 'The pending-purchase one-shot must not fire on a cacheable page in cache-safe mode.' );
+		$this->assertArrayNotHasKey( 'orderData', $result, 'The buyer\'s raw order data must not be baked into a cacheable page either (#461).' );
 	}
 
 	public function test_cache_safe_off_keeps_customer_data_and_cart(): void {
