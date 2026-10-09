@@ -24,8 +24,9 @@ const path = require( 'path' );
 const { spawnSync } = require( 'child_process' );
 
 const SITE = 'https://gtm4wp.com';
-const CURRENT_URL = `${ SITE }/changelog/`;
-const ARCHIVE_URL = `${ SITE }/changelog/1-x/`;
+// gtm4wp.com page permalinks carry no trailing slash.
+const CURRENT_URL = `${ SITE }/changelog`;
+const ARCHIVE_URL = `${ SITE }/changelog/1-x`;
 const REPO_URL = 'https://github.com/duracelltomi/gtm4wp';
 const CHANGELOG_URL = `${ REPO_URL }/blob/master/CHANGELOG.md`;
 
