@@ -934,9 +934,9 @@ final class PageDataLayer {
 		}
 
 		// new_customer / customer_type describe the BUYER, so they are withheld with
-		// 'customer' and user_data - omitted, not emitted falsy (RI-13, #121). The
-		// sibling call sites (resolve_pending_purchase(), PurchaseTracking::on_thankyou())
-		// are deliberately not gated: there the visitor is the buyer by construction.
+		// 'customer' and user_data - omitted, not emitted falsy (RI-13, #121). Not
+		// gated in resolve_pending_purchase() (the order comes from the visitor's own
+		// session) or PurchaseTracking::on_thankyou() (the hook's caller owns the gate).
 		if ( ! $withhold_customer_data ) {
 			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
 		}

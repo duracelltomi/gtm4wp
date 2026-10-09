@@ -43,10 +43,11 @@ final class PurchaseTracking {
 	/**
 	 * Executed during woocommerce_thankyou: fallback purchase data layer for
 	 * customized order received pages where is_order_received_page() is false.
-	 * No visitor check is needed here, unlike
-	 * PageDataLayer::woocommerce_hides_order_from_visitor(): the stock
-	 * thankyou.php fires this hook only after order_received()'s gates passed, so
-	 * reaching it is the evidence the page rendered.
+	 * No visitor check here, unlike
+	 * PageDataLayer::woocommerce_hides_order_from_visitor(): WooCommerce's own
+	 * callers fire this hook only after their visitor gates; a theme, page builder
+	 * or funnel that fires it owns that gate. A printed purchase keeps the page out
+	 * of page caches (#460).
 	 *
 	 * @param int $order_id The ID of the order placed by the user just recently.
 	 * @return void
@@ -129,9 +130,9 @@ final class PurchaseTracking {
 </script>';
 
 			// The buyer's order is now in this page: keep it out of page caches (#460).
-			// Headers are already sent mid-body; output-buffer caches read the constant.
+			// Constant only: headers are usually sent by now; output-buffer caches read it.
 			if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U141), not ours to prefix.
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U70, U141), not ours to prefix.
 				define( 'DONOTCACHEPAGE', true );
 			}
 
