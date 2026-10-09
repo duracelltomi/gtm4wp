@@ -979,7 +979,12 @@ Adding `: string` over a value that has passed through somebody's filter (`get_*
 ### RI-41: A request-shape proxy for "the case our JS handles" is wider than that case
 `array_key_exists( 'HTTP_X_REQUESTED_WITH', $_SERVER )` was used to mean "this restore is the classic cart's Undo, which the browser tracker reports". It also matches every other jQuery AJAX restore, including a third-party side cart's own undo action, which the tracker never sees, so the server-side fallback was switched off for it (#387). The header says "some script made this request", never which script.
 - **The check:** when PHP stands down because "the JS reports this", state the JS's exact match condition and make the PHP skip no wider (here: header **and** `undo_item`, the parameter the JS keys on). Then name the residual cases neither side reports.
-- Ledger at R48: **1** such stand-down (`ListTracking::cart_item_restored()`). Re-derive with `grep -rn "HTTP_X_REQUESTED_WITH\|wp_doing_ajax()" src`.
+- Ledger at R51 (the header read moved into `Ecommerce\Helpers::is_xhr_request()` in `36b0ea6`, #459): **1** such
+  stand-down (`ListTracking::cart_item_restored()`). Re-derive with
+  `grep -rn "is_xhr_request\|HTTP_X_REQUESTED_WITH\|wp_doing_ajax()" src`. Count call sites that skip work because a
+  JS tracker reports the case. Do not count the helper or its WooCommerce forwarder, the WC/EDD
+  `PageDataLayer::add_datalayer_data()` AJAX early returns (nothing is rendered and no JS stands in), or
+  `WooCommerceModule`'s `is_admin() && ! wp_doing_ajax()` context gate.
 
 ### RI-42: A send guard that falls back to a diagnostics ring loses the evidence to its own writes
 Data Manager's `RefundSender::accepted()` treats a destination as already served if the per-refund marker has it **or** the
@@ -1877,3 +1882,4 @@ Running both store integrations on one site is an **unsupported setup** (maintai
 | 2026-10-08 (Review 49, fix session) | #396/#397/#398 fixed `15c10bc`; RI-42 ledger re-derived after the fix (1 guard read, now backfilling; 1 planning read). |
 | 2026-10-08 (Review 50) | Deep review of the released line (`2.0` @ `42d38af`, empty range). **1 Medium (#399), 59 Low (#400-#458).** Four recorded premises failed: **PA-12(d)** (marked; #245 rests on it), **RI-35**'s "ajaxSuccess safe by construction" ledger (marked stale, #413), **PA-2**'s one-predicate rule for sinks of different grammar (note added, #411), and #272's "proxy list stays editable" on `2.0`. FP-2 re-derived on `2.0` (holds). Backport-gap audit: nine master-only fixes live on `2.0`. |
 | 2026-10-09 (Review 50, second fix session) | #399, #400, #402, #413, #420, #421 fixed on both branches; RI-35 ledger re-derived (Undo branch contained); PA-12(d) premise restored by the #399 fix. |
+| 2026-10-09 (Review 51) | Reviewed `d94a257..11b3ea2` (`master`) and `42d38af..51e2910` (`2.0`). **3 Low (#459–#461), 1 security (#460, open).** RI-41 ledger corrected: its grep missed the site after the helper extraction, and the counting rule is now written down (#459). RI-42 reproduces. FP-5 re-derived (holds). A pattern for #460 waits for its fix (disclosure rule). |
