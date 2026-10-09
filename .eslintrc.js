@@ -24,8 +24,8 @@ module.exports = {
 	extends: [ 'plugin:@wordpress/eslint-plugin/recommended' ],
 	overrides: [
 		{
-			// Jest unit tests of the admin app.
-			files: [ 'js/**/test/**/*.js' ],
+			// Jest unit tests of the admin app and of tools/.
+			files: [ 'js/**/test/**/*.js', 'tools/test/**/*.js' ],
 			extends: [ 'plugin:@wordpress/eslint-plugin/test-unit' ],
 		},
 		{
