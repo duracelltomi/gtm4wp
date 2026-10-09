@@ -121,7 +121,7 @@ shared read-write state by design (1.x code appends to them), owned by
 <!-- release-coupled: canonical values in .claude/RELEASE-STATE.md, pinned by ReleaseStateConsistencyTest -->
 - PHP >= 8.0
 - WordPress >= 6.3 (tested up to 7.1)
-- WooCommerce >= 5.0 (tested up to 11.1.2)
+- WooCommerce >= 5.0 (tested up to 11.2.0)
 
 ## Coding Standards
 
