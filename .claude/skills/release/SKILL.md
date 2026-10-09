@@ -16,7 +16,8 @@ true.
 Read `.claude/RELEASE-STATE.md`. Then classify:
 
 - **Pre-release** (beta/rc): GitHub only, `--prerelease`, `Stable tag` does NOT
-  move, RELEASE-STATE.md gains only a History row.
+  move, RELEASE-STATE.md gains only a History row; the changelog page's
+  "In testing" block is refreshed (§7a).
 - **Stable** (new minor/major, or the first stable of a line): `Stable tag`
   moves, `--latest`, wordpress.org follows, a maintenance branch is created, the
   full propagation sweep runs.
@@ -39,11 +40,12 @@ Read `.claude/RELEASE-STATE.md`. Then classify:
    on its "no release blockers" verdict; advisories go on the follow-up list.
 5. Changelog: the top heading must be this release's section, complete, with the
    `readme.txt` mirror block in sync (invoke the `changelog` skill for the
-   rules). The heading itself does not change at release time. **Count the words of
+   rules). The heading gets its date only after the wordpress.org SVN push (§7a); a
+   pre-release never gets one. **Count the words of
    `readme.txt`'s `== Changelog ==` section** (to `== Upgrade Notice ==`,
    `len(text.split())`): wordpress.org truncates it at 5,000 and only emails the
    committers afterwards (U124, hit on 2.0.2). Keep it under ~4,000 by summarizing
-   the oldest big section and pointing at `CHANGELOG.md` on GitHub.
+   the oldest big section and pointing at `https://gtm4wp.com/changelog/1-x`.
 
 ## 2. Version bump
 
@@ -130,12 +132,46 @@ f. Re-run `vendor/bin/phpunit` — the consistency test is the final agreement
   version, `svn ls` of `tags/X.Y.Z` and `trunk` (the shipped items incl. `build/`),
   `Stable tag` in BOTH readmes, and a per-file hash compare of the wp.org-built
   ZIP against the local one.
-- **Announcement post** on gtm4wp.com (drafted beforehand; published after the
-  wp.org push).
+- **Changelog page and post** - see §7a; it runs after the SVN verification.
 - **Screenshots/banners** if the UI changed — images to SVN `/assets`, caption
   edits to `tags/X.Y.Z/readme.txt` + `trunk` + git `readme.txt`.
 - Pending `Tested up to` bumps and upstream-ledger follow-ups surfaced by the
   step-1 drift check (e.g. retiring an exception that converged at release).
+
+## 7a. Changelog page, post, social
+
+Order: GitHub release -> wordpress.org SVN (verified) -> changelog page -> post -> social.
+The gtm4wp.com pages "GTM4WP changelog" (2.x) and "GTM4WP 1.x changelog" are generated
+from `CHANGELOG.md` on `master`; the site's software schema reads the version from the
+wordpress.org API by itself, so it needs no step.
+
+1. **Date** (stable and patch only): read the creation date of the SVN tag, the first
+   log entry, in UTC:
+   `svn log --xml --stop-on-copy -r 1:HEAD -l 1 https://plugins.svn.wordpress.org/duracelltomi-google-tag-manager/tags/X.Y.Z`.
+   Not `svn ls`: it shows the last change, which moves when a tag is edited later. Write
+   `## X.Y.Z (YYYY-MM-DD)` on the released branch and on `master`, commit
+   `[skip changelog]`.
+2. **Generate** on `master`:
+   `node tools/build-changelog-page.js --out <scratch> [--testing-tag <tag>]`. Pass the
+   newest beta/rc tag while its version is unreleased; omit it from the final on (the
+   "In testing" block disappears). The script refuses a tag whose version is released.
+3. **Push**: `python -I .roadmap/site-tools/push_changelog.py <scratch>` (git-ignored,
+   uses the wordpress-mcp credentials). Exit 0 = both pages identical to the generated
+   files and every anchor live. Missing anchors usually mean the page cache: purge WP
+   Rocket for both pages and re-run.
+4. **Post**, by tier:
+
+   | Release | Post | Social links to |
+   |---|---|---|
+   | minor/major | "What's new in GTM4WP X.Y" (benefit-led title, top features, ends with the full list -> `/changelog#vX-Y-Z`), then feature deep dives in Development Log over the following weeks | the post, then one deep dive at a time |
+   | patch the user must act on or should understand | short: symptom, cause, what to do; links the anchor, never repeats the bullets | the post |
+   | patch with fixes only | none | `https://gtm4wp.com/changelog#vX-Y-Z` (UTM before the `#`) |
+   | beta/rc | one per pre-release, only what changed since the previous one, in Announcements | the post |
+
+   At a minor/major final, add a one-line notice to the top of every pre-release post of
+   that cycle, linking the "What's new" post.
+5. When a post was published, add its `Release post:` line to the version's section
+   (both branches), then repeat 2-3.
 
 ## Hard rules
 
