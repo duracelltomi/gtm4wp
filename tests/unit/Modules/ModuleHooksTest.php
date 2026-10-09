@@ -262,6 +262,23 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY ) );
 	}
 
+	public function test_woocommerce_keeps_the_custom_order_received_page_out_of_caches(): void {
+		$module = $this->register_woocommerce_hooks(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE => '42',
+			)
+		);
+
+		$this->assertNotFalse( has_action( 'template_redirect', array( $module, 'prevent_caching_custom_received_page' ) ), '#399: the custom page must not be page-cached.' );
+	}
+
+	public function test_woocommerce_adds_no_cache_hook_without_a_custom_order_received_page(): void {
+		$module = $this->register_woocommerce_hooks( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		$this->assertFalse( has_action( 'template_redirect', array( $module, 'prevent_caching_custom_received_page' ) ) );
+	}
+
 	public function test_woocommerce_does_not_seed_purchase_hooks_by_default(): void {
 		// With tracking on but neither reliability option, the order-remember seed
 		// hooks (payment_complete / status_changed) stay off.

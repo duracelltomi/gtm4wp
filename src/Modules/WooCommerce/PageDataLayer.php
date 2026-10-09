@@ -105,7 +105,9 @@ final class PageDataLayer {
 		// rather than leaving for someone to trust.
 		//
 		// The content-driven events below (view_item / view_cart / begin_checkout /
-		// purchase) are URL-scoped or fire only on cache-excluded pages, so they stay
+		// purchase) are URL-scoped or fire only on cache-excluded pages (the custom
+		// order-received page too, see
+		// WooCommerceModule::prevent_caching_custom_received_page()), so they stay
 		// server-side.
 		$cache_safe = (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER );
 
@@ -331,6 +333,10 @@ final class PageDataLayer {
 
 		$postid  = get_the_ID();
 		$product = wc_get_product( $postid );
+
+		if ( ! $product instanceof \WC_Product ) {
+			return $data_layer;
+		}
 
 		// GA4 expects a quantity on the view_item item; it defaults to 1 for a single
 		// product view (#348). Making it explicit keeps the payload spec-complete.

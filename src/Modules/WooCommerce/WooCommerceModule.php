@@ -180,6 +180,7 @@ final class WooCommerceModule extends AbstractModule {
 
 		if ( $custom_received_page > 0 ) {
 			add_filter( 'woocommerce_is_order_received_page', array( $this, 'filter_is_order_received_page' ) );
+			add_action( 'template_redirect', array( $this, 'prevent_caching_custom_received_page' ) );
 		}
 
 		add_action( 'woocommerce_before_template_part', array( $list_tracking, 'before_template_part' ) );
@@ -254,6 +255,28 @@ final class WooCommerceModule extends AbstractModule {
 		$return_vars['gtm4wp_checkoutwc'] = (int) ( true === $this->opt( GTM4WP_OPTION_INTEGRATE_WC_CHECKOUTWC ) );
 
 		return $return_vars;
+	}
+
+	/**
+	 * Keeps the "Custom order received page" out of page caches, as WooCommerce
+	 * does for its own order-received page: the order data and the purchase
+	 * event rendered there belong to the buyer of this request.
+	 *
+	 * @return void
+	 */
+	public function prevent_caching_custom_received_page(): void {
+		$page_id = (int) $this->opt( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE );
+
+		if ( $page_id <= 0 || ! is_page( $page_id ) ) {
+			return;
+		}
+
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U141), not ours to prefix.
+			define( 'DONOTCACHEPAGE', true );
+		}
+
+		nocache_headers();
 	}
 
 	/**

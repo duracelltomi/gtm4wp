@@ -22,14 +22,15 @@
  */
 
 /**
- * Tracker configuration, injected by the module as an inline script. Falls back
- * to the defaults (full inputs, no GA4 events) when that inline script did not run.
+ * Tracker configuration injected by the module as an inline script. Without it
+ * (an optimiser dropped or reordered that script) the tracker fails closed like
+ * its siblings: events fire, submitted names and values do not (#402).
  *
  * @constant
  * @type {Object}
  */
 const gtm4wp_cf7_config = window.gtm4wp_cf7_config || {
-	inputs: 'full',
+	inputs: 'none',
 	ga4events: false,
 };
 
