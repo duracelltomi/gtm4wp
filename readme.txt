@@ -276,6 +276,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 * Fixed: on a password-protected post, the post meta, word count and reading time variables are left out of the data layer for visitors who have not entered the password.
 * Fixed: when the Contact Form 7 tracker's settings do not reach the page (for example an optimisation plugin drops inline scripts), it no longer falls back to sending the submitted form values.
 * Fixed: a PHP error when `woocommerce_thankyou` fired with an id that is not an order, or on a product page whose product could not be loaded.
+* Updated: tested with WooCommerce 11.2.0.
 
 = 2.0.5 =
 
