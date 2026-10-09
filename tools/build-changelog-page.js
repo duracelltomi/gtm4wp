@@ -30,7 +30,7 @@ const ARCHIVE_URL = `${ SITE }/changelog/1-x`;
 const REPO_URL = 'https://github.com/duracelltomi/gtm4wp';
 const CHANGELOG_URL = `${ REPO_URL }/blob/master/CHANGELOG.md`;
 
-// Versions that never reached wordpress.org, so they have no release date.
+// Headings without a wordpress.org SVN tag; shown without a date.
 const NO_WPORG_RELEASE = [ '1.17' ];
 
 const MONTHS = [

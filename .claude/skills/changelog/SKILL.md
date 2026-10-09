@@ -18,6 +18,23 @@ change that needs a bullet **opens the new heading above it** in the same edit.
 the main plugin file and `uninstall.php`. Tests, docs and `.security/`/`.testing/`
 housekeeping are exempt.
 
+## Release dates, anchors and the website
+
+- A released heading carries the date its wordpress.org SVN tag was created:
+  `## 2.0.5 (2026-10-01)`. The `release` skill adds it after the SVN push; never type
+  it from memory and never use the GitHub date (wordpress.org has followed days later).
+  The unreleased headings at the top carry no date.
+- `CHANGELOG.md` is the source of the gtm4wp.com changelog pages
+  (`tools/build-changelog-page.js`); never edit those pages on the site. The generator
+  stops on a released heading without a date, a malformed heading, or markdown it does
+  not support: `###`/`####`, `* ` bullets with one tab-indented level, paragraphs, and
+  inline bold, italic, code and links.
+- Never rename a released heading: its anchor (`#v2-0-5`) is linked from posts, social
+  posts and forum replies.
+- When a release has a post, the section's last line is
+  `Release post: [Title](https://gtm4wp.com/…)`. It renders as "Read more" and is not a
+  bullet, so it is outside the word budget.
+
 ## The baseline is always the last released stable version
 
 Every bullet in the unreleased block describes a delta against the **last
@@ -91,7 +108,8 @@ it instead of restating it.
 
 `readme.txt` is the tighter of the two: it mirrors the entry, flattened, and the
 whole `== Changelog ==` section stays under 5,000 words (target ~4,000), so older
-sections get summarised and linked to `CHANGELOG.md` rather than left in full.
+sections get summarised and linked to the gtm4wp.com changelog
+(`https://gtm4wp.com/changelog`, 1.x: `/changelog/1-x`) rather than left in full.
 
 The `prose-budget` Stop hook reports any bullet over 60 words that the working
 tree added; `bash .claude/hooks/prose-budget.sh check` runs the same check by hand.
