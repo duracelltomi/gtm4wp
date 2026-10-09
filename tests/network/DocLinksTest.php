@@ -17,7 +17,7 @@ use GTM4WP\Tests\unit\TestCase;
  * exists on gtm4wp.com, and that each option's `<a name="<option key>">` anchor
  * is on the page it points at.
  *
- * This is the probe behind upstream registry row U107. It is NOT part of the
+ * This is the probe behind upstream registry row U112. It is NOT part of the
  * `unit` suite and never runs in CI: the phpunit.xml testsuite covers
  * ./tests/unit/ only, and every test here also skips unless
  * GTM4WP_CHECK_DOC_LINKS=1 is set, so a checkout with no network is unaffected.
@@ -126,6 +126,17 @@ final class DocLinksTest extends TestCase {
 					'what'   => "option '{$field->key}'",
 				);
 			}
+		}
+
+		// wordpress.org shows readme.txt, including its changelog links to gtm4wp.com.
+		$readme = (string) file_get_contents( dirname( __DIR__, 2 ) . '/readme.txt' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file.
+		preg_match_all( '#https://gtm4wp\.com/([^\s)\]"\#]*?)[.,;:]?(?=[\s)\]"\#]|$)(?:\#([\w-]+))?#m', $readme, $links, PREG_SET_ORDER );
+		foreach ( $links as $i => $match ) {
+			$targets[ 'readme:' . $i ] = array(
+				'path'   => $match[1],
+				'anchor' => $match[2] ?? '',
+				'what'   => 'readme.txt link https://gtm4wp.com/' . $match[1],
+			);
 		}
 
 		return $targets;
