@@ -21,6 +21,8 @@
 * Fixed: a PHP error when `woocommerce_thankyou` fired with an id that is not an order, or on a product page whose product could not be loaded.
 * Updated: tested with WooCommerce 11.2.0.
 
+Release post: [GTM4WP 2.0.6 is out](https://gtm4wp.com/announcements/gtm4wp-2-0-6-is-out.html)
+
 ## 2.0.5 (2026-10-01)
 
 * Fixed: the data layer initialisation block no longer contains the word `gtag`. Since 2.0.3, a JavaScript delay plugin with `gtag` on its keyword list, such as Flying Scripts, delayed the whole block and the browser console showed `dataLayer is not defined`. The Google tag developer ID is still set.
