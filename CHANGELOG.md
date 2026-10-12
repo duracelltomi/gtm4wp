@@ -1,6 +1,6 @@
 # Full changelog for GTM4WP
 
-## 2.0.6
+## 2.0.6 (2026-10-12)
 
 * Fixed: visitors browsing in the in-app browser of an Android app such as Facebook or Instagram got no WooCommerce data layer, so their `purchase` and other e-commerce events were missing. Thanks to @sw33tr for the report (#477).
 * Fixed: on the classic cart page, re-adding a removed product with "Undo" now sends `add_to_cart`. WooCommerce restores it in the background and discarded the page part that carried the event.
