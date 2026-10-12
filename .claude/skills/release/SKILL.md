@@ -45,7 +45,9 @@ Read `.claude/RELEASE-STATE.md`. Then classify:
    `readme.txt`'s `== Changelog ==` section** (to `== Upgrade Notice ==`,
    `len(text.split())`): wordpress.org truncates it at 5,000 and only emails the
    committers afterwards (U150, hit on 2.0.2). Keep it under ~4,000 by summarizing
-   the oldest big section and pointing at `https://gtm4wp.com/changelog/1-x`.
+   the oldest big sections into one line linking their anchor on
+   `https://gtm4wp.com/changelog` (1.x: `/changelog/1-x`). The section keeps opening
+   with the full-changelog link (`ReadmeChangelogTest`).
 
 ## 2. Version bump
 

@@ -110,6 +110,8 @@ it instead of restating it.
 whole `== Changelog ==` section stays under 5,000 words (target ~4,000), so older
 sections get summarised and linked to the gtm4wp.com changelog
 (`https://gtm4wp.com/changelog`, 1.x: `/changelog/1-x`) rather than left in full.
+The section always opens with the link to the full changelog, before the first
+version heading; `ReadmeChangelogTest` pins that and the 5,000-word cap.
 
 The `prose-budget` Stop hook reports any bullet over 60 words that the working
 tree added; `bash .claude/hooks/prose-budget.sh check` runs the same check by hand.
