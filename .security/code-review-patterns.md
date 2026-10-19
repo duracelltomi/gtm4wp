@@ -63,6 +63,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-38** — a `has_filter()` availability check run while wp-admin renders sees only admin-registered callbacks; for a hook integrators may register on frontend requests only, the screen disables an option the frontend applies (#361). Host-plugin APIs load unconditionally; our documented hooks do not.
 - **RI-40** — a "never ran"/"lost" verdict read from the absence of a row is only true if every consumer exit after dequeue writes one; enumerate the `return`s, and follow the screen's own remedy through them once (#388).
 - **RI-41** — when PHP stands down because "the JS reports this", the PHP skip must be no wider than the JS match condition; a request header says some script asked, never which one (#387).
+- **RI-43** — a value promised to mirror another builder's number (refund amount ↔ purchase value) needs one shared rule, a test asserting the two agree for every option combination, and an input that carries the subtracted fields for every way the source record is created (a no-line refund carries none).
 - **RI-42** — a send-or-not guard must read a durable per-record marker, never a diagnostics ring: the ring is trimmed (routine rows first) and the guard's own skip rows supersede the evidence. If a ring fallback must stay, backfill the marker the first time it answers (#396).
 - **RI-39** — never "fix" a filtered getter under a new `: string` with a `(string)` cast: it is still fatal on an object and emits `"Array"`; guard with `is_string()` (#362).
 - **RI-34** — a pattern/exclusion list we hand to a third party that names a literal we used to hardcode is a second reader of it: when the literal becomes an option (RI-14), the list is silently narrowed on every non-default site (#325). Grep the literal as a string in every list we emit; prefer a fixed plugin-owned token over the user value.
@@ -72,6 +73,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **PA-4** — `esc_js()` is for HTML-attribute JS, not raw `<script>` bodies; use `wp_json_encode` (hex flags) for inline-script values.
 - **PA-5** — options read via `Options::get()` with `GTM4WP_OPTION_*` constants and sanitized on save in the module's admin schema; the stored value is not assumed safe at output.
 - **PA-6** — a new module registers through the `src/Module/` framework (AbstractModule + Registry + AdminSchema), not ad-hoc `add_action` scattered in the bootstrap.
+- **PA-22** — ⭐ a server-side platform event (order built, payment, refund) is hooked from `Plugin::boot()`, not only from `register_frontend_hooks()`: `is_admin()` is true on admin-ajax, where many gateways build orders. Move it, don't add it twice.
 - **PA-21** — a plugin-wide collector (the ability `Registrar`, the status/settings/site-health abilities, Site Health Info, the settings REST controller) keeps NO per-module map: a module's fact — its ability provider, master switch, host plugin, status or Site Health rows — comes through an opt-in interface on its `AdminSchema` walked with `instanceof` (`AbilitiesInterface`, `StatusInfoInterface`, `SiteHealthInfoInterface`, `SiteHealthTestsInterface`), or from a class inside the module; a feature-scoped ability lives in `src/Modules/<Name>/Abilities.php`. The corollary: a collector that turns a module id into an EXTERNAL identifier (an HTML id, a selector, a test id core reads back) owns the character-set rule and a collision rule, because the id is third-party input the registry never validates (#266).
 - **PA-14** — the repo's own toolchain is attack surface: a pre-approved tool permission, **a committed agent/subagent definition carrying its own tool patterns** (`.claude/agents/` had no Coverage Matrix row and no place in the inventory grep for the two reviews after a finding was found inside it — #135) — **and check the frontmatter KEY, not just its contents: an agent's restriction key is `tools:`, and `allowed-tools:` is the slash-command key, which an agent file accepts silently and ignores, so all three reviewer agents ran with every tool while their files declared read-only (#140)**, a hook that executes a repo-relative path, **a tool CONFIG resolved from the working tree that can name code to load** (watch every filename the tool accepts, not the one in the tree — the dotfile variant usually wins), a CI trigger, or **what the history already published** (removing it from HEAD does not retract it; no diff-scoped review will ever see it; and a finding of that shape belongs in the local report, never in a committed file), reached by third-party text an agent run ingests — **and a hook that merely READS a worktree file into the session context is an entry point too**, which the "does it execute?" question cannot select (#118). Enforced allowlist must match the write surface its skill documents.
 - **RI-26** — a core predicate that ends in `return apply_filters( … )` is not "core's rule", it is *this site's* rule; borrowed as a privacy gate it can be moved in **both** directions, so keep your own test as the floor and OR the helper in (#M1: `is_protected_meta()` can be filtered to UNprotect an underscore key, publishing it to an A0 dataLayer).
@@ -853,6 +855,16 @@ stage as collateral while verifying an unrelated documentation claim about the s
   approximation?" — every approximation needs its caveat stated at the call site.
 - Related: **UC-2** (`Internal` namespaces carry no compatibility promise) covers the *symbol*;
   this covers the *signature*. **RI-19** is the guard around the call; this is the call itself.
+- **The same holds for an action you LISTEN to: the arity is in the signature, the argument's
+  SHAPE is not (R53, #470).** EDD fires `edd_checkout_cart_item_title_after( $item, $key )` with an
+  `edd_get_cart_contents()` row (`id`, `options`, `quantity`); the callback read it as a
+  `edd_get_cart_content_details()` row (`price`, `item_number`), so every read fell to its default
+  and nothing warned. U115 recorded the signature, the docblock named the wrong source, and the
+  tests built their fixture from the assumed shape — three agreeing statements, none read off
+  the fire site. **Litmus:** for a hook argument that is an array or object, name the function
+  that BUILT it at each fire site (vendor source at a tag) and build the test fixture from that
+  function's output, never from a sibling array that looks alike. Register the shape, not just
+  the arity, in the hook's `.upstream` row.
 
 ---
 
@@ -1002,6 +1014,23 @@ behind it, and a later whole-refund job sends the event again (probe-verified, #
 - **After the R49 fix session (`15c10bc`):** the guard's ring leg backfills the marker on its first positive answer; same
   counts (1 guard read, 1 planning read), re-derived on the committed tree.
 
+### RI-43: A value that must mirror another builder's number needs ONE rule, and the rule must cover every source shape
+**Found:** R53, #466 (Medium). The Data Manager refund `conversionValue` is meant to net a purchase to zero, and its
+docblock says so — but the purchase `value` subtracts tax and shipping under the exclude options while the refund
+sent the platform's gross refund total. Two builders, one intended invariant, no shared definition, and no test that
+puts their outputs side by side (every amount test ran with the options off). The drafted fix then failed the same
+way one level down: subtracting the *refund's* tax and shipping is right for a line-itemised refund and wrong for a
+status-change full refund, which WooCommerce creates with **no lines** (`wc_order_fully_refunded()`), so its tax and
+shipping read 0.
+- **The check:** when a docblock, CHANGELOG or option promises that value A "mirrors"/"reverses"/"matches" value B,
+  find B's builder and ask (1) is the rule written once and called from both? (2) is there a test asserting
+  A == B (or A == −B) for **every option combination** B reads? (3) for each way the platform can create A's source
+  record (line items, amount-only, status change, API), does A's input carry the fields the rule subtracts?
+- Same family as **RI-14** (one definition across PHP and JS) and **RI-28** (a predicate must match the states the
+  UI really creates); this is the numeric version.
+- Ledger at R53: **1** mirrored value (refund amount ↔ purchase value, WC + EDD adapters), no shared helper.
+  Re-derive with `grep -rn "EXCLUDETAX\|EXCLUDESHIPPING" src`.
+
 ## Project-Specific Anti-Patterns
 
 ### RI-26: A filterable predicate borrowed as a privacy gate can be moved by the site — in BOTH directions ⭐
@@ -1118,6 +1147,31 @@ New features register through the `src/Module/` framework (implement the module 
 A feature-scoped ability lives in its module (`src/Modules/<Name>/Abilities.php`). The collector itself stays plugin-wide when its answer genuinely spans every module (`get-settings` is every module's options, `get-status` is "call this first"); that is a reason to keep the *ability* central, never a reason to hold module facts in it.
 
 **Litmus:** in a class under `src/Abilities/`, `src/Admin/` or in `src/Plugin.php`, is there an array literal, `switch`/`match` or constant name keyed by a module id, or naming one module's option constant, version constant or class? Then either the module owns it (interface or module class) or the review records why the framework cannot express it. Regression: the third-party-module cases in `RegistrarTest` and `StatusAbilitiesTest` (`Admin\UndocumentedThirdPartyModule` plus the `*ThirdParty*` fixtures under `tests/unit/Abilities/`).
+
+### PA-22: A server-side platform event hooked only from the frontend boot misses the requests the platform really uses ⭐
+
+**Found:** R53, #467 (Medium). `Plugin::boot()` routes a request to the admin or the frontend branch and returns early on
+`is_admin()` — which is **true on `admin-ajax.php`**. `CaptureHooks` (listening to `edd_built_order`) was registered
+from a module's `register_frontend_hooks()`, so it never ran for EDD's Stripe, PayPal Commerce and Square checkouts,
+which build the order on admin-ajax. The sibling `ReliablePurchase::register_flag_hooks()` had been moved into `boot()`
+for exactly this reason (`6234fc5`), and U132 lists `CaptureHooks.php` among the files that rely on the premise —
+the fix reached one of the two consumers.
+
+**The rule:** a hook that records a **server-side business event** (an order built, a payment completed, a status
+change, a refund) is registered from `Plugin::boot()` before the admin/frontend split, or the review records which
+request types the platform fires it in and why the branch covers them. Frontend-only registration is right for
+rendering hooks (`wp_enqueue_scripts`, `template_redirect`, template actions), never by default for platform events.
+When moving one, **move** it: registering from both places doubles the callback (two instances do not dedupe).
+
+**Litmus:** in any `register_frontend_hooks()`, is there an `add_action` on an order/payment/checkout/refund event?
+Name each request type the platform fires it in (frontend POST, admin-ajax, REST, WC-API webhook, cron, CLI) from
+vendor source, and check `Plugin::boot()` reaches the registration in each.
+- Ledger at R53 (`master` @ `a742bf4`), counting rule: `add_action` on a server event inside a
+  `register_frontend_hooks()` body: **4** — `edd_built_order` (`CaptureHooks`, via GDM module — **#467**);
+  WC `woocommerce_payment_complete` and `woocommerce_order_status_changed` → `remember_order` (webhooks are frontend
+  requests and the handler seeds the buyer's session, so a non-buyer request has nothing to seed; a checkout posted to
+  WC's back-compat admin-ajax endpoint would be missed — PLAUSIBLE, theme-only); `woocommerce_thankyou` (a render hook).
+  Registered from `boot()`: `ReliablePurchase::register_flag_hooks()`, the refund lane, the privacy hooks.
 
 ### PA-7: Data-bearing string as a `preg_replace` *replacement* argument ⭐
 The WooCommerce product-list markup injects `data-…` attributes into template HTML by using a built (data-bearing) string as the **replacement** argument of `preg_replace`. That replacement interprets `$0`/`$1`/`${1}`/`\1`, so a product field containing a `$`+digit or `\`+digit sequence is substituted with **the matched text**. Fix by using `preg_replace_callback`, `addcslashes( $replacement, '\\$' )`, or — where the needle is a literal — no regex at all (`strpos()` + `substr_replace()`). Findings #16, #74.
@@ -1887,3 +1941,4 @@ Running both store integrations on one site is an **unsupported setup** (maintai
 | 2026-10-09 (Review 51) | Reviewed `d94a257..11b3ea2` (`master`) and `42d38af..51e2910` (`2.0`). **3 Low (#459–#461), 1 security (#460, open).** RI-41 ledger corrected: its grep missed the site after the helper extraction, and the counting rule is now written down (#459). RI-42 reproduces. FP-5 re-derived (holds). A pattern for #460 waits for its fix (disclosure rule). |
 | 2026-10-09 (Review 51, fix session) | #460/#461 fixed on `master` + `2.0`. #460's pattern stays deferred: `1.x` carries the same code (disclosure rule). |
 | 2026-10-09 (Review 52) | Reviewed `11b3ea2..d376348` (`master`) + `51e2910..ebb8e19` (`2.0`), R51's fix session. 4 Low (#462–#465), 0 security. FP-1 re-derived (13 callers, holds); RI-2 re-verified at every script sink. RI-18 gained the "a fix that disproves a premise retires its prose" bullet with a 2-site ledger. |
+| 2026-10-19 (Review 53) | Targeted whole-surface read of the four surfaces new in 2.1 (Data Manager, Google client + GoogleAuth, Abilities + Site Health, EDD) at `a742bf4`, as the 2.1.0 final gate. **6 Medium (#466–#471), 54 Low, 0 Critical/High; nothing reachable by an attacker above Low.** Added **PA-22** (a server-side platform event hooked only from the frontend boot misses admin-ajax/REST, where gateways build orders; the sibling had been moved and this one not, #467; ledger 4 sites) and **RI-43** (a value promised to mirror another builder's number needs one rule, a side-by-side test for every option combination, and inputs that carry the subtracted fields for every way the record is created, #466). Extended **RI-25** with the argument-SHAPE half for actions we listen to (#470: signature right, item shape assumed from a lookalike array, and the tests built from the assumption). **FP-6 re-derived** (rotation): holds. Adjudication: 9 verifiers, 15 recommendations refuted or revised (four of the six Mediums), six recorded premises failed, including R51's "EDD sibling of #460 not reachable" and the threat model's "salts change when the admin changes them" (Defender rotates them every 60 days by default, #469). |

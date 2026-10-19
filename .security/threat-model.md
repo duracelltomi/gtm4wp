@@ -50,6 +50,14 @@ expresses. Rate findings against it like this:
   "DB+files defeats it" is not a finding. **Caveat:** on sites where `wp_salt()`
   falls back to DB-*stored* salts, the DB-only protection is void; guidance leaning
   on the boundary must carry that caveat.
+- **Salts change without the admin (R53, #469):** security plugins rotate them on a
+  schedule (one popular plugin by default), so "the key goes unreadable" is an
+  availability event to plan for, not only the result of a deliberate edit. It does
+  not move the confidentiality boundary above.
+- **The cached access token is an asset too (R53, #491):** a live bearer token for the
+  granted scope sits in a transient for under an hour. A database-only leak gives that
+  token for its remaining lifetime, not just ciphertext; rate a path exposing it like
+  the key's custody invariant, scaled to the shorter lifetime.
 - **A4 uploading/deleting/testing their own key is A4 → A4** — not a vulnerability,
   same as the container-ID rule.
 
@@ -278,3 +286,4 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | 2026-09-03 | Added **The stored credential** (R30, #230): the google-auth module made the old out-of-scope line "the plugin stores no credentials" false, and the off-site pivot a compromised service-account key enables had no rating vocabulary. Custody invariant, the encryption's honest boundary (with the DB-stored-salts caveat), and the A4→A4 rule for the key's own management routes. |
 | 2026-07-29 | Added the **development-time actors D0/D1** and brought the repository's own toolchain into scope (PA-14). A0–A4 rate risk to a *site*; they have no way to express third-party text or branch content causing code to run on the *maintainer's machine*, so findings #76/#77 had no severity vocabulary and, before that, no lens that would prompt for them. Same lowest-actor rule: D0 → D1 is the finding, rated on what the execution reaches, with enforced boundaries distinguished from described ones. |
 | 2026-09-22 | **The ability surface** wording corrected (R34, #252): the example list of withheld values was fused into the general rule and contradicted the shipped edit surface (`get-settings`/`export-settings` return the GA4 property id and the environment tokens by design, and must - a table option is written whole). Split into the status/inventory rule (question 2) and the edit-surface rule. Verifier-measured: every mask is refused by the row sanitizers, and a masked export imports as an empty container table; the tokens are in every page's public loader URL, so withholding them from an A4 delegate protects nothing. |
+| 2026-10-19 | **The stored credential** gained two bullets (R53): salts rotate without the admin (#469, an availability event, boundary unchanged) and the cached access token is an asset (#491). The send-log text contradiction (#509) is left open for its fix. |
