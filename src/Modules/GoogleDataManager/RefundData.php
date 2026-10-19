@@ -37,6 +37,7 @@ final class RefundData {
 	 * @param string                           $billing_country Two-letter billing country, empty when the order has none.
 	 * @param float                            $shipping        Refunded shipping, positive; 0.0 when none was returned or the platform has no shipping.
 	 * @param float                            $tax             Refunded tax, positive; 0.0 when none was returned.
+	 * @param float|null                       $value           The refund's value on the purchase event's basis (what conversionValue carries); null means $amount.
 	 */
 	public function __construct(
 		public string $platform,
@@ -54,8 +55,19 @@ final class RefundData {
 		// Defaulted so an adapter that has no such amount to report - EDD
 		// carries no shipping on an order at all - simply leaves it out.
 		public float $shipping = 0.0,
-		public float $tax = 0.0
+		public float $tax = 0.0,
+		public ?float $value = null
 	) {
+	}
+
+	/**
+	 * The amount the refund event reverses: $value when the adapter computed
+	 * one, else the gross $amount.
+	 *
+	 * @return float
+	 */
+	public function conversion_value(): float {
+		return null === $this->value ? $this->amount : $this->value;
 	}
 
 	/**

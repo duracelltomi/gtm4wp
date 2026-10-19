@@ -1177,7 +1177,7 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
-| 466 | Medium | open (fix needs design for WC) | — | Data Manager WC/EDD refund adapters, `RefundEvent` | Refund amount does not follow the purchase value's exclude-tax / exclude-shipping options |
+| 466 | Medium | fixed (R53 fix session: purchase basis frozen on the order when tracked; refund value on that basis, remaining-basis ratio for line-less refunds; zero-value refunds skipped; design verified first, drafted fix refuted twice; 17 test cases probed, 15 red before the fix, 2 green by design) | — | Data Manager WC/EDD refund adapters, `RefundEvent` | Refund amount does not follow the purchase value's exclude-tax / exclude-shipping options |
 | 467 | Medium | open | — | Data Manager `CaptureHooks` wiring | EDD orders built on admin-ajax are not captured for the refund lane |
 | 468 | Medium | open | — | `KeyVault`, GoogleAuth routes + remedy texts | The advised recovery after a salt change does not restore sending |
 | 469 | Medium | open (needs design) | — | `KeyVault` storage key | Salts rotate without admin action on common security plugins, so the stored key goes unreadable on a schedule |

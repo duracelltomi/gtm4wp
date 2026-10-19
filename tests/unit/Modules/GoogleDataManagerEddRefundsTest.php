@@ -283,6 +283,54 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 		$this->assertSame( 'EUR', $event['currency'] );
 	}
 
+	// ---- Value on the purchase basis (#466) -----------------------------------
+
+	public function test_a_full_refund_reverses_the_purchase_value_with_or_without_exclude_tax(): void {
+		foreach ( array( array(), array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => true ) ) as $options ) {
+			$order          = self::order(
+				array(
+					'total' => 119.0,
+					'tax'   => 19.0,
+				)
+			);
+			$purchase_value = $this->download_data( $options )->get_purchase_datalayer( $order )['ecommerce']['value'];
+			$this->stub_orders( $order, self::refund( 119.0, array(), array( 'tax' => -19.0 ) ) );
+
+			$this->assertSame( $purchase_value, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'] );
+		}
+	}
+
+	public function test_the_basis_frozen_at_purchase_wins_over_the_current_option(): void {
+		$order = self::order(
+			array(
+				'total' => 119.0,
+				'tax'   => 19.0,
+			)
+		);
+		$this->stub_orders( $order, self::refund( 119.0, array( self::refund_item( 1, 119.0, 19.0 ) ), array( 'tax' => -19.0 ) ) );
+
+		$this->assertSame( 119.0, $this->adapter()->load( 12, 34 )->conversion_value(), 'No frozen basis: the current option (off).' );
+
+		$this->order_meta[12][ \GTM4WP\Ecommerce\Helpers::PURCHASE_BASIS_META ] = array(
+			'value'       => 100.0,
+			'total'       => 119.0,
+			'exclude_tax' => true,
+		);
+		$refund = $this->adapter()->load( 12, 34 );
+
+		$this->assertSame( 100.0, $refund->conversion_value(), 'Tax was excluded when the purchase was tracked.' );
+		$this->assertSame( 100.0, $refund->items[0]['unitPrice'], 'The item price follows the frozen basis too.' );
+	}
+
+	public function test_a_tax_only_refund_under_exclude_tax_is_worth_nothing(): void {
+		$this->stub_orders( self::order(), self::refund( 19.0, array(), array( 'tax' => -19.0 ) ) );
+
+		$refund = $this->adapter( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => true ) )->load( 12, 34 );
+
+		$this->assertSame( 19.0, $refund->amount );
+		$this->assertSame( 0.0, $refund->conversion_value() );
+	}
+
 	// ---- The refund order model (U132) -------------------------------------
 
 	public function test_the_negated_totals_become_positive_amounts(): void {

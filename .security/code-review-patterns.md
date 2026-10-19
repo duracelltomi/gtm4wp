@@ -1030,6 +1030,9 @@ shipping read 0.
   UI really creates); this is the numeric version.
 - Ledger at R53: **1** mirrored value (refund amount ↔ purchase value, WC + EDD adapters), no shared helper.
   Re-derive with `grep -rn "EXCLUDETAX\|EXCLUDESHIPPING" src`.
+- **After the R53 fix:** one rule per store (`ProductData::purchase_rule_value()` + `current_purchase_basis()`,
+  `DownloadData::current_purchase_basis()`), shared by the purchase builder, the basis frozen on the order and the
+  refund value; a side-by-side test per option combination in both refund adapter suites.
 
 ## Project-Specific Anti-Patterns
 

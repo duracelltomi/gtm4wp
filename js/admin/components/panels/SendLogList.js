@@ -81,6 +81,11 @@ function reasonLabel( reason ) {
 				'The refund returned no money.',
 				'duracelltomi-google-tag-manager'
 			);
+		case 'zero_value':
+			return __(
+				'The refund returned only tax or shipping that the purchase value leaves out, so it changes no revenue.',
+				'duracelltomi-google-tag-manager'
+			);
 		case 'refund_unreadable':
 			return __(
 				'The refund could not be read back from the store.',

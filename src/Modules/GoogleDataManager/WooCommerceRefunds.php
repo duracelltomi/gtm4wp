@@ -93,6 +93,7 @@ final class WooCommerceRefunds implements RefundSource {
 			: time();
 
 		$consent = $order->get_meta( AttributionCapture::META_CONSENT_STATE, true );
+		$basis   = ( new ProductData( $this->options ) )->purchase_basis( $order );
 
 		return new RefundData(
 			$this->platform(),
@@ -105,15 +106,115 @@ final class WooCommerceRefunds implements RefundSource {
 			abs( (float) $refund->get_total() ),
 			(float) $order->get_total(),
 			$timestamp,
-			$this->items( $refund ),
+			$this->items( $refund, $basis['item_inc_tax'] ),
 			(string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ),
 			is_array( $consent ) ? $consent : null,
 			(string) $order->get_billing_country(),
 			// The purchase event's two totals, read off the refund and made
 			// positive; get_total_tax() covers the shipping tax too.
 			abs( (float) $refund->get_shipping_total() ),
-			abs( (float) $refund->get_total_tax() )
+			abs( (float) $refund->get_total_tax() ),
+			self::refund_value( self::figures( $refund ), $basis, self::prior_figures( $order, $refund_id ) )
 		);
+	}
+
+	/**
+	 * The refund's value on the purchase basis (#466). WooCommerce sets a
+	 * refund's total to the amount typed in, independently of its lines, and a
+	 * status-change refund has no lines at all (U188). So: the purchase rule on
+	 * the money the lines account for, plus the rest of the amount at the
+	 * ratio of the purchase value still unrefunded, clamped so the refunds of
+	 * one order never reverse more than the purchase value.
+	 *
+	 * @param array{amount: float, line_money: float, tax: float, shipping: float}             $figures This refund.
+	 * @param array{value: float, total: float, exclude_tax: bool, exclude_shipping: bool}     $basis   The purchase basis.
+	 * @param array<int, array{amount: float, line_money: float, tax: float, shipping: float}> $priors The order's earlier refunds, oldest first.
+	 * @return float
+	 */
+	public static function refund_value( array $figures, array $basis, array $priors = array() ): float {
+		$prior_value  = 0.0;
+		$prior_amount = 0.0;
+
+		foreach ( $priors as $prior ) {
+			$prior_value  += self::one_refund_value( $prior, $basis, $prior_value, $prior_amount );
+			$prior_amount += $prior['amount'];
+		}
+
+		return self::one_refund_value( $figures, $basis, $prior_value, $prior_amount );
+	}
+
+	/**
+	 * One refund's value, given what the earlier refunds already reversed.
+	 *
+	 * @param array{amount: float, line_money: float, tax: float, shipping: float}         $figures      The refund.
+	 * @param array{value: float, total: float, exclude_tax: bool, exclude_shipping: bool} $basis        The purchase basis.
+	 * @param float                                                                        $prior_value  Value reversed so far.
+	 * @param float                                                                        $prior_amount Amount refunded so far.
+	 * @return float
+	 */
+	private static function one_refund_value( array $figures, array $basis, float $prior_value, float $prior_amount ): float {
+		$remaining_value = max( 0.0, $basis['value'] - $prior_value );
+		$remaining_total = $basis['total'] - $prior_amount;
+		$ratio           = $remaining_total > 0 ? $remaining_value / $remaining_total : 0.0;
+
+		$value = ProductData::purchase_rule_value(
+			$figures['line_money'],
+			$figures['tax'],
+			$figures['shipping'],
+			$basis['exclude_tax'],
+			$basis['exclude_shipping']
+		) + ( $figures['amount'] - $figures['line_money'] ) * $ratio;
+
+		return max( 0.0, min( $value, $figures['amount'], $remaining_value ) );
+	}
+
+	/**
+	 * The figures refund_value() reads off one refund, all positive.
+	 *
+	 * @param \WC_Order_Refund $refund The refund.
+	 * @return array{amount: float, line_money: float, tax: float, shipping: float}
+	 */
+	private static function figures( \WC_Order_Refund $refund ): array {
+		$line_money = 0.0;
+
+		foreach ( $refund->get_items( array( 'line_item', 'shipping', 'fee' ) ) as $item ) {
+			if ( is_object( $item ) && method_exists( $item, 'get_total' ) ) {
+				$line_money += abs( (float) $item->get_total() );
+			}
+
+			if ( is_object( $item ) && method_exists( $item, 'get_total_tax' ) ) {
+				$line_money += abs( (float) $item->get_total_tax() );
+			}
+		}
+
+		return array(
+			'amount'     => abs( (float) $refund->get_total() ),
+			'line_money' => $line_money,
+			'tax'        => abs( (float) $refund->get_total_tax() ),
+			'shipping'   => abs( (float) $refund->get_shipping_total() ),
+		);
+	}
+
+	/**
+	 * The figures of the order's refunds created before this one, oldest first
+	 * (by id, which follows creation).
+	 *
+	 * @param \WC_Order $order     The parent order.
+	 * @param int       $refund_id The refund being sent.
+	 * @return array<int, array{amount: float, line_money: float, tax: float, shipping: float}>
+	 */
+	private static function prior_figures( \WC_Order $order, int $refund_id ): array {
+		$earlier = array();
+
+		foreach ( (array) $order->get_refunds() as $prior ) {
+			if ( $prior instanceof \WC_Order_Refund && (int) $prior->get_id() < $refund_id ) {
+				$earlier[ (int) $prior->get_id() ] = self::figures( $prior );
+			}
+		}
+
+		ksort( $earlier );
+
+		return array_values( $earlier );
 	}
 
 	/**
@@ -207,20 +308,14 @@ final class WooCommerceRefunds implements RefundSource {
 	 * lines (a by-amount refund) are left out: the API's item shape cannot
 	 * express them, and the value still travels in conversionValue.
 	 *
-	 * @param \WC_Order_Refund $refund The refund.
+	 * @param \WC_Order_Refund $refund  The refund.
+	 * @param bool             $inc_tax The purchase items' tax basis, frozen with the purchase basis, so a
+	 *                                  refunded line and the line it refunds are expressed the same way.
 	 * @return array<int, array<string, mixed>> Items in the API shape, see RefundEvent::item().
 	 */
-	private function items( \WC_Order_Refund $refund ): array {
+	private function items( \WC_Order_Refund $refund, bool $inc_tax ): array {
 		$product_data = new ProductData( $this->options );
 		$items        = array();
-
-		// The same tax basis the purchase event's items use, so a refunded
-		// line and the line it refunds are expressed the same way.
-		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ) ) {
-			$inc_tax = false;
-		} else {
-			$inc_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
-		}
 
 		foreach ( $refund->get_items() as $item ) {
 			if ( ! is_object( $item ) || ! method_exists( $item, 'get_quantity' ) ) {

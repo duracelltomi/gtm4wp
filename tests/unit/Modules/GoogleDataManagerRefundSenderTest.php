@@ -262,6 +262,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 				),
 				'billing_country' => 'DE',
 				'items'           => array(),
+				'value'           => null,
 			),
 			$overrides
 		);
@@ -278,7 +279,10 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 			$values['items'],
 			$values['client_id'],
 			$values['consent_state'],
-			$values['billing_country']
+			$values['billing_country'],
+			0.0,
+			0.0,
+			$values['value']
 		);
 	}
 
@@ -578,6 +582,38 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->sender( $this->source( self::refund( array( 'amount' => 0.0 ) ) ) )->run( self::job() );
 
 		$this->assertSame( RefundSender::REASON_EMPTY_REFUND, $this->entry()['reason'] );
+	}
+
+	/**
+	 * Money came back but none of it counts on the purchase basis (#466): not
+	 * sent, since Analytics takes only the first refund of an order and a zero
+	 * would block a later real one. Half a cent rounds to zero too.
+	 */
+	public function test_a_refund_worth_nothing_on_the_purchase_basis_is_skipped(): void {
+		foreach ( array( 0.0, 0.004 ) as $value ) {
+			$this->transport->requests = array();
+			$this->sender(
+				$this->source(
+					self::refund(
+						array(
+							'amount' => 19.0,
+							'value'  => $value,
+						)
+					)
+				)
+			)->run( self::job() );
+
+			$entries = $this->log->all();
+			$this->assertSame( array(), $this->transport->requests, (string) $value );
+			$this->assertSame( RefundSender::REASON_ZERO_VALUE, end( $entries )['reason'], (string) $value );
+		}
+
+		// Control: a cent is worth sending, so the skip is the value's doing.
+		$this->queue_send( 200, array( 'requestId' => 'req-1' ) );
+		$this->sender( $this->source( self::refund( array( 'value' => 0.01 ) ) ) )->run( self::job() );
+		$entries = $this->log->all();
+		$this->assertNotSame( RefundSender::REASON_ZERO_VALUE, end( $entries )['reason'] );
+		$this->assertNotSame( array(), $this->transport->requests );
 	}
 
 	public function test_a_refund_that_cannot_be_read_back_is_skipped_with_its_reference(): void {

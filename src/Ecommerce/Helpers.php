@@ -73,6 +73,14 @@ final class Helpers {
 	public const ORDER_TRACKED_META = '_ga_tracked';
 
 	/**
+	 * Order meta freezing how the purchase value was computed when the purchase
+	 * was tracked (value, total, exclude flags), so a later refund reverses it on
+	 * the same basis even if the options changed since (#466). Amounts and flags
+	 * only; a value changed by the purchase data layer filter is not stored.
+	 */
+	public const PURCHASE_BASIS_META = '_gtm4wp_purchase_basis';
+
+	/**
 	 * First-party cookie carrying GA4 list attribution across the funnel (#405),
 	 * written client-side on select_item; must match the literal in
 	 * js/frontend/gtm4wp-ecommerce-generic.js.

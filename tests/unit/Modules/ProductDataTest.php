@@ -2267,4 +2267,54 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( 'Master Product', $item['item_name'] );
 		$this->assertSame( 'Master Cat', $item['item_category'] );
 	}
+
+	// ---- The purchase basis frozen with the tracked flag (#466) -------------
+
+	public function test_flag_order_tracked_freezes_the_purchase_basis_once(): void {
+		$order = new \WC_Order(
+			array(
+				'total'          => 129.0,
+				'total_tax'      => 19.0,
+				'shipping_total' => 10.0,
+			)
+		);
+
+		$this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => true ) )->flag_order_tracked( $order );
+
+		$this->assertSame(
+			array(
+				'value'            => 110.0,
+				'total'            => 129.0,
+				'exclude_tax'      => true,
+				'exclude_shipping' => false,
+				'item_inc_tax'     => false,
+			),
+			$order->saved_meta['_gtm4wp_purchase_basis']
+		);
+		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] );
+
+		// A later render under other options leaves the frozen basis alone.
+		$this->make_product_data()->flag_order_tracked( $order );
+		$this->assertSame( 110.0, $order->saved_meta['_gtm4wp_purchase_basis']['value'] );
+	}
+
+	public function test_the_basis_is_frozen_even_when_orders_are_not_flagged(): void {
+		$order = new \WC_Order( array( 'total' => 50.0 ) );
+
+		$this->make_product_data( array( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true ) )->flag_order_tracked( $order );
+
+		$this->assertArrayHasKey( '_gtm4wp_purchase_basis', $order->saved_meta );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta );
+	}
+
+	public function test_a_malformed_frozen_basis_falls_back_to_the_current_options(): void {
+		$order = new \WC_Order(
+			array(
+				'total' => 50.0,
+				'meta'  => array( '_gtm4wp_purchase_basis' => array( 'value' => 'garbage' ) ),
+			)
+		);
+
+		$this->assertSame( 50.0, $this->make_product_data()->purchase_basis( $order )['value'] );
+	}
 }

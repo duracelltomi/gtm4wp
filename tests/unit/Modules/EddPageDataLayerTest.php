@@ -1065,11 +1065,20 @@ final class EddPageDataLayerTest extends TestCase {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		$_GET['payment_key'] = 'pk_super_secret_key';
 		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
-		Functions\expect( 'edd_update_order_meta' )->never();
+
+		// Only the purchase basis is written (#466), never the tracked flag.
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$writes ) {
+				$writes[] = $key;
+			}
+		);
 
 		$this->make_page_datalayer(
 			array( GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG => true )
 		)->add_datalayer_data( array() );
+
+		$this->assertNotContains( \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, $writes );
 
 		$pushed = $this->inline_script_output();
 		$this->assertStringContainsString( '"event":"purchase"', $pushed );

@@ -581,11 +581,7 @@ final class DownloadData {
 		$data_layer = array();
 
 		if ( $order instanceof \EDD\Orders\Order ) {
-			$order_revenue = (float) self::row_prop( $order, 'total', 0 );
-
-			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX ) ) {
-				$order_revenue -= (float) self::row_prop( $order, 'tax', 0 );
-			}
+			$order_revenue = $this->current_purchase_basis( $order )['value'];
 
 			// Optional transaction id prefix; only this event is affected.
 			$transaction_id_prefix = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX );
@@ -883,18 +879,65 @@ final class DownloadData {
 
 	/**
 	 * Flags the order as tracked (via the _ga_tracked order meta) so the
-	 * purchase is not counted twice. No-op when the "do not use the order
-	 * tracked flag" option is on.
+	 * purchase is not counted twice, and freezes the purchase basis the first
+	 * time (#466). The flag is skipped when the "do not use the order tracked
+	 * flag" option is on; the basis is not.
 	 *
 	 * @param \EDD\Orders\Order $order The order to flag.
 	 * @return void
 	 */
 	public function flag_order_tracked( \EDD\Orders\Order $order ): void {
+		$order_id = (int) self::row_prop( $order, 'id', 0 );
+
+		if ( ! is_array( edd_get_order_meta( $order_id, Helpers::PURCHASE_BASIS_META, true ) ) ) {
+			edd_update_order_meta( $order_id, Helpers::PURCHASE_BASIS_META, $this->current_purchase_basis( $order ) );
+		}
+
 		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDNOORDERTRACKEDFLAG ) ) {
 			return;
 		}
 
-		edd_update_order_meta( (int) self::row_prop( $order, 'id', 0 ), Helpers::ORDER_TRACKED_META, 1 );
+		edd_update_order_meta( $order_id, Helpers::ORDER_TRACKED_META, 1 );
+	}
+
+	/**
+	 * The purchase basis under the current options: the order total, less tax
+	 * with "exclude tax" (EDD orders carry no shipping). The one definition the
+	 * purchase event and the refund value share (RI-43).
+	 *
+	 * @param \EDD\Orders\Order $order The order.
+	 * @return array{value: float, total: float, exclude_tax: bool}
+	 */
+	public function current_purchase_basis( \EDD\Orders\Order $order ): array {
+		$exclude_tax = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX );
+		$total       = (float) self::row_prop( $order, 'total', 0 );
+
+		return array(
+			'value'       => $exclude_tax ? $total - (float) self::row_prop( $order, 'tax', 0 ) : $total,
+			'total'       => $total,
+			'exclude_tax' => $exclude_tax,
+		);
+	}
+
+	/**
+	 * The basis the purchase was tracked on: the frozen meta when well-formed,
+	 * else the current options (orders tracked before 2.1, or never tracked).
+	 *
+	 * @param \EDD\Orders\Order $order The order.
+	 * @return array{value: float, total: float, exclude_tax: bool}
+	 */
+	public function purchase_basis( \EDD\Orders\Order $order ): array {
+		$stored = edd_get_order_meta( (int) self::row_prop( $order, 'id', 0 ), Helpers::PURCHASE_BASIS_META, true );
+
+		if ( is_array( $stored ) && is_numeric( $stored['value'] ?? null ) && is_numeric( $stored['total'] ?? null ) ) {
+			return array(
+				'value'       => (float) $stored['value'],
+				'total'       => (float) $stored['total'],
+				'exclude_tax' => ! empty( $stored['exclude_tax'] ),
+			);
+		}
+
+		return $this->current_purchase_basis( $order );
 	}
 
 	/**

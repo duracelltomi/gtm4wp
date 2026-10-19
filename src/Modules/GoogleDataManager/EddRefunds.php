@@ -98,6 +98,9 @@ final class EddRefunds implements RefundSource {
 
 		$prefix  = (string) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX );
 		$consent = edd_get_order_meta( $order_id, AttributionCapture::META_CONSENT_STATE, true );
+		$basis   = ( new DownloadData( $this->options ) )->purchase_basis( $order );
+		$amount  = abs( (float) DownloadData::row_prop( $refund, 'total', 0 ) );
+		$tax     = abs( (float) DownloadData::row_prop( $refund, 'tax', 0 ) );
 
 		return new RefundData(
 			$this->platform(),
@@ -106,16 +109,19 @@ final class EddRefunds implements RefundSource {
 			// The parent order's number, as the purchase event reported it.
 			$prefix . $order->get_number(),
 			(string) DownloadData::row_prop( $order, 'currency' ),
-			abs( (float) DownloadData::row_prop( $refund, 'total', 0 ) ),
+			$amount,
 			(float) DownloadData::row_prop( $order, 'total', 0 ),
 			self::timestamp( $refund ),
-			$this->items( $refund ),
+			$this->items( $refund, $basis['exclude_tax'] ),
 			(string) edd_get_order_meta( $order_id, AttributionCapture::META_CLIENT_ID, true ),
 			is_array( $consent ) ? $consent : null,
 			self::billing_country( $order ),
 			// EDD has no shipping; the tax is negated on the refund order.
 			0.0,
-			abs( (float) DownloadData::row_prop( $refund, 'tax', 0 ) )
+			$tax,
+			// On the purchase basis (#466). EDD builds a refund's total from the
+			// refunded items' own totals and tax, so no proration is needed.
+			max( 0.0, $basis['exclude_tax'] ? $amount - $tax : $amount )
 		);
 	}
 
@@ -199,13 +205,13 @@ final class EddRefunds implements RefundSource {
 	 * from DownloadData::process_download(), the purchase event's builder (see
 	 * the WooCommerce sibling for why).
 	 *
-	 * @param \EDD\Orders\Order $refund The refund order.
+	 * @param \EDD\Orders\Order $refund      The refund order.
+	 * @param bool              $exclude_tax The purchase items' tax basis, frozen with the purchase basis.
 	 * @return array<int, array<string, mixed>> Items in the API shape, see RefundEvent::item().
 	 */
-	private function items( \EDD\Orders\Order $refund ): array {
+	private function items( \EDD\Orders\Order $refund, bool $exclude_tax ): array {
 		$download_data = new DownloadData( $this->options );
 		$items         = array();
-		$exclude_tax   = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX );
 
 		foreach ( (array) $refund->get_items() as $item ) {
 			$quantity = (int) abs( (int) DownloadData::row_prop( $item, 'quantity', 0 ) );

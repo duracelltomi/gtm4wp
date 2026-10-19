@@ -406,7 +406,22 @@ final class EddReliablePurchaseTest extends TestCase {
 		$response = $this->make()->confirm_purchase_tracked();
 
 		$this->assertSame( 204, $response->get_status() );
-		$this->assertSame( array( array( 77, \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, 1 ) ), $this->meta_writes );
+		// The purchase basis is frozen first (#466), then the order flagged.
+		$this->assertSame(
+			array(
+				array(
+					77,
+					\GTM4WP\Ecommerce\Helpers::PURCHASE_BASIS_META,
+					array(
+						'value'       => 38.0,
+						'total'       => 38.0,
+						'exclude_tax' => false,
+					),
+				),
+				array( 77, \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, 1 ),
+			),
+			$this->meta_writes
+		);
 		$this->assertSame( array( array( 'payment_key', self::SESSION_KEY ) ), $this->order_lookups );
 	}
 
@@ -430,7 +445,7 @@ final class EddReliablePurchaseTest extends TestCase {
 		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => self::SESSION_KEY ) );
 		$this->set_order( $this->make_order() );
 		$this->make()->confirm_purchase_tracked();
-		$this->assertCount( 1, $this->meta_writes );
+		$this->assertCount( 2, $this->meta_writes, 'The basis and the tracked flag.' );
 		$this->meta_writes = array();
 
 		$this->set_order( $this->make_order( array( 'status' => 'pending' ) ) );

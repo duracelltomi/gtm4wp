@@ -423,12 +423,7 @@ final class ProductData {
 
 				// Item price on the same tax basis as the transaction value, so GA4
 				// item revenue reconciles with the total (#176).
-				if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ) ) {
-					$inc_tax = false;
-				} else {
-					$inc_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
-				}
-				$product_price = round( (float) $order->get_item_total( $order_item, $inc_tax ), 2 );
+				$product_price = round( (float) $order->get_item_total( $order_item, $this->item_prices_include_tax() ), 2 );
 
 				$item_attributes = array(
 					'quantity' => $order_item->get_quantity(),
@@ -582,17 +577,7 @@ final class ProductData {
 		$data_layer = array();
 
 		if ( $order instanceof \WC_Order ) {
-			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ) ) {
-				$order_revenue = (float) ( $order->get_total() - $order->get_total_tax() );
-			} else {
-				$order_revenue = (float) $order->get_total();
-			}
-
-			$order_shipping_cost = (float) $order->get_shipping_total();
-
-			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING ) ) {
-				$order_revenue -= $order_shipping_cost;
-			}
+			$order_revenue = $this->current_purchase_basis( $order )['value'];
 
 			$order_currency = $order->get_currency();
 
@@ -927,19 +912,113 @@ final class ProductData {
 
 	/**
 	 * Flags the order as tracked (via the _ga_tracked meta) so the purchase is
-	 * not counted twice. No-op when the "do not use the order tracked flag"
-	 * option is on.
+	 * not counted twice, and freezes the purchase basis the first time (#466).
+	 * The flag is skipped when the "do not use the order tracked flag" option is
+	 * on; the basis is not.
 	 *
 	 * @param \WC_Order $order The order to flag.
 	 * @return void
 	 */
 	public function flag_order_tracked( \WC_Order $order ): void {
-		if ( (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ) ) {
-			return;
+		$changed = false;
+
+		if ( ! is_array( $order->get_meta( \GTM4WP\Ecommerce\Helpers::PURCHASE_BASIS_META, true ) ) ) {
+			$order->update_meta_data( \GTM4WP\Ecommerce\Helpers::PURCHASE_BASIS_META, $this->current_purchase_basis( $order ) );
+			$changed = true;
 		}
 
-		$order->update_meta_data( \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, 1 );
-		$order->save();
+		if ( ! (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG ) ) {
+			$order->update_meta_data( \GTM4WP\Ecommerce\Helpers::ORDER_TRACKED_META, 1 );
+			$changed = true;
+		}
+
+		if ( $changed ) {
+			$order->save();
+		}
+	}
+
+	/**
+	 * The purchase value rule: the order total, less tax and shipping when the
+	 * exclude options say so. The one definition the purchase event and the
+	 * refund value share (RI-43).
+	 *
+	 * @param float $total            Order (or refunded) total, positive.
+	 * @param float $tax              Tax within it, shipping tax included.
+	 * @param float $shipping         Shipping within it, without tax.
+	 * @param bool  $exclude_tax      Whether tax is left out.
+	 * @param bool  $exclude_shipping Whether shipping is left out.
+	 * @return float
+	 */
+	public static function purchase_rule_value( float $total, float $tax, float $shipping, bool $exclude_tax, bool $exclude_shipping ): float {
+		$value = $total;
+
+		if ( $exclude_tax ) {
+			$value -= $tax;
+		}
+
+		if ( $exclude_shipping ) {
+			$value -= $shipping;
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Whether purchase item prices include tax: never with "exclude tax", else
+	 * the store's shop display setting (#176).
+	 *
+	 * @return bool
+	 */
+	public function item_prices_include_tax(): bool {
+		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX ) ) {
+			return false;
+		}
+
+		return 'incl' === get_option( 'woocommerce_tax_display_shop' );
+	}
+
+	/**
+	 * The purchase basis under the current options.
+	 *
+	 * @param \WC_Order $order The order.
+	 * @return array{value: float, total: float, exclude_tax: bool, exclude_shipping: bool, item_inc_tax: bool}
+	 */
+	public function current_purchase_basis( \WC_Order $order ): array {
+		$exclude_tax      = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX );
+		$exclude_shipping = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING );
+		$total            = (float) $order->get_total();
+
+		return array(
+			'value'            => self::purchase_rule_value( $total, (float) $order->get_total_tax(), (float) $order->get_shipping_total(), $exclude_tax, $exclude_shipping ),
+			'total'            => $total,
+			'exclude_tax'      => $exclude_tax,
+			'exclude_shipping' => $exclude_shipping,
+			'item_inc_tax'     => $this->item_prices_include_tax(),
+		);
+	}
+
+	/**
+	 * The basis the purchase was tracked on: the frozen meta when well-formed,
+	 * else the current options (orders tracked before 2.1, or never tracked by
+	 * GTM4WP, e.g. cache-safe purchases under "do not flag").
+	 *
+	 * @param \WC_Order $order The order.
+	 * @return array{value: float, total: float, exclude_tax: bool, exclude_shipping: bool, item_inc_tax: bool}
+	 */
+	public function purchase_basis( \WC_Order $order ): array {
+		$stored = $order->get_meta( \GTM4WP\Ecommerce\Helpers::PURCHASE_BASIS_META, true );
+
+		if ( is_array( $stored ) && is_numeric( $stored['value'] ?? null ) && is_numeric( $stored['total'] ?? null ) ) {
+			return array(
+				'value'            => (float) $stored['value'],
+				'total'            => (float) $stored['total'],
+				'exclude_tax'      => ! empty( $stored['exclude_tax'] ),
+				'exclude_shipping' => ! empty( $stored['exclude_shipping'] ),
+				'item_inc_tax'     => ! empty( $stored['item_inc_tax'] ),
+			);
+		}
+
+		return $this->current_purchase_basis( $order );
 	}
 
 	/**

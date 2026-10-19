@@ -41,6 +41,14 @@ final class RefundSender {
 	public const REASON_EMPTY_REFUND = 'empty_refund';
 
 	/**
+	 * Skip reason: the refund returned money, but none of it counts on the
+	 * purchase event's basis (only tax or shipping the value leaves out). Not
+	 * sent: Analytics processes only the first refund of an order, so a zero
+	 * would block a later real one (#466).
+	 */
+	public const REASON_ZERO_VALUE = 'zero_value';
+
+	/**
 	 * Skip reason: no Google Analytics client id was captured for the order,
 	 * so nothing could match the event to its purchase.
 	 */
@@ -400,6 +408,10 @@ final class RefundSender {
 	private function refusal( RefundData $refund ): ?string {
 		if ( $refund->amount <= 0 ) {
 			return self::REASON_EMPTY_REFUND;
+		}
+
+		if ( round( $refund->conversion_value(), 2 ) <= 0 ) {
+			return self::REASON_ZERO_VALUE;
 		}
 
 		if ( '' === $refund->client_id ) {

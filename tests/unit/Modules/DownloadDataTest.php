@@ -839,8 +839,16 @@ final class DownloadDataTest extends TestCase {
 
 		$this->assertFalse( $download_data->is_purchase_already_tracked( $this->make_order() ) );
 
-		Functions\expect( 'edd_update_order_meta' )->never();
+		// The purchase basis is still frozen (#466); only the tracked flag is skipped.
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$writes ) {
+				$writes[] = $key;
+			}
+		);
 		$download_data->flag_order_tracked( $this->make_order() );
+
+		$this->assertSame( array( EcommerceHelpers::PURCHASE_BASIS_META ), $writes );
 	}
 
 	public function test_list_attribution_merged_from_cookie_in_cart_context(): void {
@@ -879,12 +887,48 @@ final class DownloadDataTest extends TestCase {
 	}
 
 	public function test_flag_order_tracked_writes_the_meta(): void {
-		// The literal, not the constant: store owners see this key, shared with WC (#364).
-		Functions\expect( 'edd_update_order_meta' )
-			->once()
-			->with( 77, '_ga_tracked', 1 );
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key, $value ) use ( &$writes ) {
+				$writes[] = array( $order_id, $key, $value );
+			}
+		);
+
+		$this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => true ) )->flag_order_tracked( $this->make_order() );
+
+		// The literals, not the constants: store owners see the tracked key,
+		// shared with WC (#364). The basis is frozen first (#466): 38 less 2 tax.
+		$this->assertSame(
+			array(
+				array(
+					77,
+					'_gtm4wp_purchase_basis',
+					array(
+						'value'       => 36.0,
+						'total'       => 38.0,
+						'exclude_tax' => true,
+					),
+				),
+				array( 77, '_ga_tracked', 1 ),
+			),
+			$writes
+		);
+	}
+
+	public function test_a_frozen_purchase_basis_is_never_overwritten(): void {
+		Functions\when( 'edd_get_order_meta' )->alias(
+			static fn ( $order_id, $key ) => EcommerceHelpers::PURCHASE_BASIS_META === $key ? array( 'value' => 1.0 ) : ''
+		);
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$writes ) {
+				$writes[] = $key;
+			}
+		);
 
 		$this->make_download_data()->flag_order_tracked( $this->make_order() );
+
+		$this->assertSame( array( '_ga_tracked' ), $writes );
 	}
 
 	public function test_order_age_gate(): void {

@@ -128,6 +128,10 @@ if ( ! class_exists( 'WC_Order' ) ) {
 		public function get_items() {
 			return $this->value( 'items', array() );
 		}
+		// The order's refunds, as WC_Abstract_Order returns them.
+		public function get_refunds() {
+			return $this->value( 'refunds', array() );
+		}
 		public function get_item_total( $order_item, $inc_tax ) {
 			// Reflect the requested tax basis when fixtures provide both, so tests
 			// can assert whether tax was included; otherwise fall back to item_total.

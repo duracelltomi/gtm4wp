@@ -282,6 +282,277 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		$this->assertSame( 40.0, RefundEvent::build( $this->adapter()->load( 12, 34 ) )['conversionValue'] );
 	}
 
+	// ---- Value on the purchase basis (#466) -----------------------------------
+
+	/**
+	 * A refund line carrying money but no product (a shipping or fee line, or
+	 * a line refunded by amount): negated like every refund amount.
+	 *
+	 * @param float $total Positive line total.
+	 * @param float $tax   Positive line tax.
+	 * @return object
+	 */
+	private static function money_line( float $total, float $tax ): object {
+		return new class( $total, $tax ) {
+			/**
+			 * Builds the line.
+			 *
+			 * @param float $total Positive total.
+			 * @param float $tax   Positive tax.
+			 */
+			public function __construct( private float $total, private float $tax ) {
+			}
+
+			public function get_total() {
+				return -$this->total;
+			}
+
+			public function get_total_tax() {
+				return -$this->tax;
+			}
+		};
+	}
+
+	/**
+	 * The order every purchase-basis case shares: 129 with 19 tax and 10 shipping.
+	 *
+	 * @param array<string, mixed> $data Overrides.
+	 * @return \WC_Order
+	 */
+	private static function taxed_order( array $data = array() ): \WC_Order {
+		return self::order(
+			array_merge(
+				array(
+					'total'          => 129.0,
+					'total_tax'      => 19.0,
+					'shipping_total' => 10.0,
+				),
+				$data
+			)
+		);
+	}
+
+	/**
+	 * Every combination of the two exclude options.
+	 *
+	 * @return array<string, array{0: array<string, bool>}>
+	 */
+	public static function exclude_options(): array {
+		return array(
+			'gross'            => array( array() ),
+			'exclude tax'      => array( array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => true ) ),
+			'exclude shipping' => array( array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING => true ) ),
+			'exclude both'     => array(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => true,
+					GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * A full refund reverses exactly what the purchase event reported, whether
+	 * it was entered line by line or made by switching the order to Refunded
+	 * (wc_order_fully_refunded(): no lines, so its tax and shipping read 0, U188).
+	 *
+	 * @param array<string, bool> $options The exclude options.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'exclude_options' )]
+	public function test_a_full_refund_reverses_the_purchase_value_under_every_exclude_option( array $options ): void {
+		$purchase_value = $this->product_data( $options )->get_purchase_datalayer( self::taxed_order() )['ecommerce']['value'];
+
+		$itemised = self::refund(
+			129.0,
+			array( self::money_line( 100.0, 19.0 ), self::money_line( 10.0, 0.0 ) ),
+			array(
+				'total_tax'      => -19.0,
+				'shipping_total' => -10.0,
+			)
+		);
+		$this->stub_orders( self::taxed_order(), $itemised );
+		$this->assertSame( $purchase_value, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'], 'Itemised.' );
+
+		$this->stub_orders( self::taxed_order(), self::refund( 129.0 ) );
+		$this->assertSame( $purchase_value, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'], 'Status change, no lines.' );
+	}
+
+	/**
+	 * A line refund followed by the status change to Refunded: the remainder
+	 * (no lines) is valued at what is left of the purchase value, so the two
+	 * net the purchase to zero. 132 = 100 + 22 tax + 10 shipping.
+	 */
+	public function test_a_line_refund_then_a_status_change_net_the_purchase_to_zero(): void {
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX      => true,
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING => true,
+		);
+		$first   = self::refund(
+			60.0,
+			array( self::money_line( 50.0, 10.0 ) ),
+			array(
+				'id'        => 30,
+				'total_tax' => -10.0,
+			)
+		);
+		$order   = self::order(
+			array(
+				'total'          => 132.0,
+				'total_tax'      => 22.0,
+				'shipping_total' => 10.0,
+				'refunds'        => array( self::refund( 72.0 ), $first ),
+			)
+		);
+		$this->stub_orders( $order, self::refund( 72.0 ) );
+
+		$this->assertSame( 50.0, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'] );
+	}
+
+	/**
+	 * The amount WooCommerce stores is the one typed in, independent of the
+	 * lines (U188). Each sequence must still net to the purchase value.
+	 */
+	public function test_mixed_refund_sequences_never_reverse_more_or_less_than_the_purchase(): void {
+		$both = array(
+			'value'            => 100.0,
+			'total'            => 132.0,
+			'exclude_tax'      => true,
+			'exclude_shipping' => true,
+		);
+		$rest = static fn ( float $amount ): array => array(
+			'amount'     => $amount,
+			'line_money' => 0.0,
+			'tax'        => 0.0,
+			'shipping'   => 0.0,
+		);
+
+		$sequences = array(
+			'restock-only line, amount typed'   => array(
+				array(
+					'amount'     => 60.0,
+					'line_money' => 0.0,
+					'tax'        => 0.0,
+					'shipping'   => 0.0,
+				),
+				$rest( 72.0 ),
+			),
+			'amount typed below the line money' => array(
+				array(
+					'amount'     => 5.0,
+					'line_money' => 60.0,
+					'tax'        => 10.0,
+					'shipping'   => 0.0,
+				),
+				$rest( 127.0 ),
+			),
+		);
+
+		foreach ( $sequences as $label => $refunds ) {
+			$sum = 0.0;
+
+			foreach ( $refunds as $index => $figures ) {
+				$sum += round( WooCommerceRefunds::refund_value( $figures, $both, array_slice( $refunds, 0, $index ) ), 2 );
+			}
+
+			$this->assertEqualsWithDelta( 100.0, $sum, 0.011, $label );
+		}
+
+		// Zero-rated shipping, tax excluded only: 130 = 100 + 20 tax + 10 shipping.
+		$tax_only = array(
+			'value'            => 110.0,
+			'total'            => 130.0,
+			'exclude_tax'      => true,
+			'exclude_shipping' => false,
+		);
+		$lines    = array(
+			'amount'     => 120.0,
+			'line_money' => 120.0,
+			'tax'        => 20.0,
+			'shipping'   => 0.0,
+		);
+		$this->assertSame( 100.0, WooCommerceRefunds::refund_value( $lines, $tax_only ) );
+		$this->assertSame( 10.0, WooCommerceRefunds::refund_value( $rest( 10.0 ), $tax_only, array( $lines ) ) );
+	}
+
+	public function test_a_refund_of_only_excluded_tax_is_worth_nothing(): void {
+		$value = WooCommerceRefunds::refund_value(
+			array(
+				'amount'     => 19.0,
+				'line_money' => 19.0,
+				'tax'        => 19.0,
+				'shipping'   => 0.0,
+			),
+			array(
+				'value'            => 100.0,
+				'total'            => 129.0,
+				'exclude_tax'      => true,
+				'exclude_shipping' => true,
+			)
+		);
+
+		$this->assertSame( 0.0, $value );
+	}
+
+	/**
+	 * Options changed between the purchase and the refund: the refund follows
+	 * the basis frozen on the order (value and item price basis), not the
+	 * current settings; with no frozen basis it falls back to them.
+	 */
+	public function test_the_basis_frozen_at_purchase_wins_over_the_current_options(): void {
+		$frozen = self::taxed_order(
+			array(
+				'meta' => array(
+					AttributionCapture::META_CLIENT_ID => '313930999.1788522497',
+					\GTM4WP\Ecommerce\Helpers::PURCHASE_BASIS_META => array(
+						'value'            => 100.0,
+						'total'            => 129.0,
+						'exclude_tax'      => true,
+						'exclude_shipping' => true,
+						'item_inc_tax'     => true,
+					),
+				),
+			)
+		);
+		$line   = new class( new \WC_Product( array( 'id' => 7 ) ) ) {
+			/**
+			 * Builds the line.
+			 *
+			 * @param \WC_Product $product Product.
+			 */
+			public function __construct( private \WC_Product $product ) {
+			}
+
+			public function get_product() {
+				return $this->product;
+			}
+
+			public function get_quantity() {
+				return -1;
+			}
+
+			public function get_total() {
+				return -100;
+			}
+
+			public function get_subtotal() {
+				return -100;
+			}
+
+			public function get_total_tax() {
+				return -19;
+			}
+		};
+		$this->stub_orders( $frozen, self::refund( 129.0, array( $line ), array( 'total_tax' => -19.0 ) ) );
+
+		$refund = $this->adapter()->load( 12, 34 );
+
+		$this->assertSame( 100.0, round( $refund->conversion_value(), 2 ), 'Frozen exclusions, current options all off.' );
+		$this->assertSame( 119.0, $refund->items[0]['unitPrice'], 'Frozen item basis: tax included.' );
+
+		$this->stub_orders( self::taxed_order(), self::refund( 129.0 ) );
+		$this->assertSame( 129.0, $this->adapter()->load( 12, 34 )->conversion_value(), 'No frozen basis: the current options.' );
+	}
+
 	public function test_the_currency_comes_from_the_parent_order(): void {
 		$this->stub_orders( self::order( array( 'currency' => 'HUF' ) ), self::refund( 40.0 ) );
 

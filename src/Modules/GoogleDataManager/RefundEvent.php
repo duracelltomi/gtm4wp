@@ -23,10 +23,11 @@ defined( 'ABSPATH' ) || exit;
  * where the slice completing a sequence of partials (EDD even flags it "all
  * refunded") would have reversed the purchase twice.
  *
- * The amount mirrors the purchase event's value (the platform's refund total,
- * shipping and tax included unless the exclude options say otherwise) so a
- * full refund nets to zero; refunded shipping and tax also travel as event
- * parameters, where Analytics decrements its own metrics from.
+ * conversionValue is the refund on the purchase event's basis, computed by the
+ * adapter from the basis frozen when the purchase was tracked (#466), so the
+ * refunds of an order net its purchase to zero. A value a site filter put on
+ * the purchase event is not mirrored. Refunded shipping and tax also travel
+ * as event parameters, where Analytics decrements its own metrics from.
  */
 final class RefundEvent {
 
@@ -123,7 +124,7 @@ final class RefundEvent {
 		}
 
 		$event['currency']        = $refund->currency;
-		$event['conversionValue'] = round( $refund->amount, 2 );
+		$event['conversionValue'] = round( $refund->conversion_value(), 2 );
 
 		// Lines only when the platform recorded them. A by-amount refund
 		// names none, and an empty list would claim "no items were refunded"

@@ -103,8 +103,9 @@ final class SendLog {
 
 	/**
 	 * Skip reasons a configuration change can put right, so the refund is
-	 * worth queueing again. The missing-id reasons and the empty refund are
-	 * deliberately absent: no setting can produce an id that was never captured.
+	 * worth queueing again. The missing-id reasons, the empty refund and the
+	 * zero-value refund are deliberately absent: no setting can produce an id
+	 * that was never captured, nor change a basis frozen at purchase time.
 	 * Both lists name the senders' constants; the values themselves are stored
 	 * in the ring and matched by the settings screen, so they are not free to
 	 * change (#398).
