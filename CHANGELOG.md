@@ -9,6 +9,8 @@
 * Fixed: a settings import file with a checkbox written as the text "false" switched that option on; it now means off, as it does when saving the settings screen.
 * Changed: a settings export carries only the plugin's own options. Keys another plugin wrote into GTM4WP's option row, and 1.x options not yet cleaned up, are left out; importing the file gives the same settings as before.
 * Fixed: a password-protected WooCommerce product no longer reports `view_item` or its product data before the password is entered.
+* Fixed: with **"Exclude tax"** on and the shop showing prices with tax, WooCommerce product, list, `add_to_cart` and cart prices included tax while the purchase did not. They now use the purchase's basis, so on such stores an Ads or Meta tag reading `add_to_cart` values sees prices without tax.
+* Fixed: WooCommerce items the `gtm4wp_eec_cart_item` or `gtm4wp_eec_order_item` filter excludes are left out of every event, including `remove_from_cart`, the block cart and checkout, and Undo. Classic cart and checkout views and the purchase also follow WooCommerce's own item visibility filters, and server-side refunds leave out the same items.
 * Fixed: a WooCommerce order is flagged as tracked only when its purchase event is really printed, so a site filter that breaks the event no longer suppresses the purchase for good.
 * Fixed: a non-numeric product price returned by a site filter no longer stops the WooCommerce cart and checkout pages with a PHP error; such a line counts as zero.
 * Fixed: the WooCommerce **"Order statuses that trigger the purchase event"** description now says that an empty list counts every order except failed ones.
@@ -34,7 +36,7 @@
 
 * Added: **Easy Digital Downloads integration** (EDD 3.0+, beta) as its own settings section, covering the classic shortcodes and the EDD blocks with the full GA4 event set from `view_item` to `purchase`, deduplicated three ways. The purchase-status default includes Pending for buyers returning from offsite gateways; reliable purchase tracking waits until a pending order is paid.
 * Added: Easy Digital Downloads settings mirroring the WooCommerce ones: `orderData` in the same key names, persistent list attribution, Enhanced Conversions `user_data` (phone via EDD's field or the new `gtm4wp_edd_order_phone` filter) and reliable purchase tracking; the cache-safe data layer also delivers the customer, the cart and missed purchases. Customer identity reaches only a visitor EDD would show the receipt to.
-* Added: for developers, the Easy Digital Downloads filters `gtm4wp_eec_edd_cart_item`, `gtm4wp_eec_edd_order_item`, `gtm4wp_eec_edd_order_data`, `gtm4wp_edd_purchase_datalayer`, `gtm4wp_edd_datalayer_on_pageload` and `gtm4wp_edd_purchase_trackable_statuses`.
+* Added: for developers, the Easy Digital Downloads filters `gtm4wp_eec_edd_cart_item` (cart and checkout rows), `gtm4wp_eec_edd_order_item` (purchase and refunds), `gtm4wp_eec_edd_order_data`, `gtm4wp_edd_purchase_datalayer`, `gtm4wp_edd_datalayer_on_pageload` and `gtm4wp_edd_purchase_trackable_statuses`.
 * Added: an admin notice when WooCommerce and Easy Digital Downloads both track e-commerce on one site. Running both stores together is not supported: they share settings the browser trackers read, such as the currency and clearing the ecommerce object, so some events may not be tracked as intended.
 
 ### Google service accounts

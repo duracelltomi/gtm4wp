@@ -31,6 +31,10 @@ abstract class TestCase extends PHPUnitTestCase {
 		// Defined for every test, so a first mock elsewhere cannot change which
 		// branch production code takes (TS-16); a test may re-stub it.
 		Monkey\Functions\when( 'wp_cache_delete' )->justReturn( true );
+		// Same reason: EDD's tax switch decides whether a price is converted (#519).
+		Monkey\Functions\when( 'edd_use_taxes' )->justReturn( false );
+		// And whether a refund line's original order item is found (#417).
+		Monkey\Functions\when( 'edd_get_order_item' )->justReturn( false );
 	}
 
 	/**

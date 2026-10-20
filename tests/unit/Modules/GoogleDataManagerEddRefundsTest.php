@@ -422,6 +422,22 @@ final class GoogleDataManagerEddRefundsTest extends TestCase {
 
 	// ---- Items -------------------------------------------------------------
 
+	/**
+	 * A refund names only items its purchase named (#417): the purchase's
+	 * filter is asked about the original order item the line refunds.
+	 */
+	public function test_a_refunded_line_whose_order_item_the_purchase_left_out_is_left_out(): void {
+		$original = new \EDD\Orders\Order_Item( array( 'id' => 700 ) );
+		Functions\when( 'edd_get_order_item' )->alias( static fn ( $id ) => 700 === $id ? $original : false );
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_EDD_ORDER_ITEM )
+			->once()
+			->with( true, $original )
+			->andReturn( false );
+		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( 2, 40.0 ) ) ) );
+
+		$this->assertSame( array(), $this->adapter()->load( 12, 34 )->items );
+	}
+
 	public function test_refunded_lines_come_back_positive_with_the_purchase_builders_item_id(): void {
 		$stored = array();
 		$this->stub_orders( self::order(), self::refund( 40.0, array( self::refund_item( 2, 40.0 ) ) ) );

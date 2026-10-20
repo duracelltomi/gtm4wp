@@ -153,6 +153,11 @@ final class ListTracking {
 
 		$line = $this->checkout_cart_line( $item, $key );
 
+		// The cart surface's filter, on the same content-details row shape (#516).
+		if ( ! apply_filters( GTM4WP_WPFILTER_EEC_EDD_CART_ITEM, true, $line ) ) {
+			return;
+		}
+
 		$eec_product_array = $this->download_data->process_download(
 			(int) $item['id'],
 			$this->download_data->cart_line_attributes( $line ),
@@ -202,6 +207,8 @@ final class ListTracking {
 		$quantity = max( 1, (int) ( $item['quantity'] ?? 1 ) );
 		$options  = is_array( $item['options'] ?? null ) ? $item['options'] : array();
 		$unit     = function_exists( 'edd_get_cart_item_price' ) ? (float) edd_get_cart_item_price( (int) $item['id'], $options ) : 0.0;
+		// No tax key, so cart_line_attributes() keeps this already-based price (#519).
+		$unit = $this->download_data->basis_price( $unit, (int) $item['id'] );
 
 		return array(
 			'id'          => (int) $item['id'],
@@ -237,7 +244,7 @@ final class ListTracking {
 
 			$map[ $price_id ] = array(
 				'name'  => (string) ( $price_option['name'] ?? '' ),
-				'price' => round( (float) ( $price_option['amount'] ?? 0 ), 2 ),
+				'price' => round( $this->download_data->basis_price( (float) ( $price_option['amount'] ?? 0 ), $download_id ), 2 ),
 			);
 		}
 

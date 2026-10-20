@@ -328,9 +328,17 @@ final class WooCommerceRefunds implements RefundSource {
 	private function items( \WC_Order_Refund $refund, bool $inc_tax ): array {
 		$product_data = new ProductData( $this->options );
 		$items        = array();
+		$order        = function_exists( 'wc_get_order' ) ? wc_get_order( $refund->get_parent_id() ) : null;
 
 		foreach ( $refund->get_items() as $item ) {
 			if ( ! is_object( $item ) || ! method_exists( $item, 'get_quantity' ) ) {
+				continue;
+			}
+
+			// A refund names only what its purchase named (#417): the purchase's
+			// gates, asked about the original order item when it can be found.
+			$original = ( $order instanceof \WC_Order && method_exists( $item, 'get_meta' ) ) ? $order->get_item( (int) $item->get_meta( '_refunded_item_id' ) ) : false;
+			if ( ! ProductData::reports_order_item( $original ? $original : $item ) ) {
 				continue;
 			}
 

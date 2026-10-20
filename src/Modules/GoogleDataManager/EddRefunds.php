@@ -214,6 +214,14 @@ final class EddRefunds implements RefundSource {
 		$items         = array();
 
 		foreach ( (array) $refund->get_items() as $item ) {
+			// A refund names only what its purchase named (#417): the purchase's
+			// filter, asked about the original order item when it can be found.
+			$parent   = (int) DownloadData::row_prop( $item, 'parent', 0 );
+			$original = ( $parent > 0 && function_exists( 'edd_get_order_item' ) ) ? edd_get_order_item( $parent ) : false;
+			if ( ! apply_filters( GTM4WP_WPFILTER_EEC_EDD_ORDER_ITEM, true, $original ? $original : $item ) ) {
+				continue;
+			}
+
 			$quantity = (int) abs( (int) DownloadData::row_prop( $item, 'quantity', 0 ) );
 
 			if ( $quantity <= 0 ) {

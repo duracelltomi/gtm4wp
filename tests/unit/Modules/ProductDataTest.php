@@ -30,7 +30,8 @@ final class ProductDataTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		Functions\when( 'wc_get_price_to_display' )->justReturn( 19.999 );
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 19.999 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 19.999 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
@@ -1422,16 +1423,18 @@ final class ProductDataTest extends TestCase {
 	}
 
 	public function test_display_price_not_recomputed_when_a_price_is_supplied(): void {
-		// #436: wc_get_price_to_display() is expensive in the cart/checkout context.
+		// #436: the tax price functions are expensive in the cart/checkout context.
 		// When the caller already supplies a price (cart line price / order line total)
-		// it must be skipped, so it is not called once per cart item.
+		// they must be skipped, so they are not called once per cart item.
 		$called = false;
-		Functions\when( 'wc_get_price_to_display' )->alias(
-			static function () use ( &$called ) {
-				$called = true;
-				return 99.0;
-			}
-		);
+		foreach ( array( 'wc_get_price_including_tax', 'wc_get_price_excluding_tax' ) as $fn ) {
+			Functions\when( $fn )->alias(
+				static function () use ( &$called ) {
+					$called = true;
+					return 99.0;
+				}
+			);
+		}
 
 		$item = $this->make_product_data()->process_product(
 			$this->make_product(),
@@ -1439,23 +1442,44 @@ final class ProductDataTest extends TestCase {
 			'cart'
 		);
 
-		$this->assertFalse( $called, 'wc_get_price_to_display() must not run when a price is supplied.' );
+		$this->assertFalse( $called, 'No tax price function may run when a price is supplied.' );
 		$this->assertSame( 5.5, $item['price'] );
 	}
 
-	public function test_display_price_computed_when_no_price_supplied(): void {
-		$called = false;
-		Functions\when( 'wc_get_price_to_display' )->alias(
-			static function () use ( &$called ) {
-				$called = true;
-				return 12.0;
-			}
+	/**
+	 * The product-surface price follows the purchase basis (#519): net with
+	 * "exclude tax", else the shop display setting - the four cells.
+	 *
+	 * @return array<string, array{0: bool, 1: string, 2: float}>
+	 */
+	public static function product_price_bases(): array {
+		return array(
+			'exclude off, display incl' => array( false, 'incl', 12.0 ),
+			'exclude off, display excl' => array( false, 'excl', 10.0 ),
+			'exclude on, display incl'  => array( true, 'incl', 10.0 ),
+			'exclude on, display excl'  => array( true, 'excl', 10.0 ),
+		);
+	}
+
+	/**
+	 * Without a supplied price, the price is computed on the purchase basis.
+	 *
+	 * @param bool   $exclude_tax The plugin's exclude-tax option.
+	 * @param string $display     The shop's tax display setting.
+	 * @param float  $expected    The expected price (gross 12.0, net 10.0).
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'product_price_bases' )]
+	public function test_display_price_follows_the_purchase_tax_basis( bool $exclude_tax, string $display, float $expected ): void {
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 12.0 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 10.0 );
+		Functions\when( 'get_option' )->alias(
+			static fn ( $key ) => 'woocommerce_tax_display_shop' === $key ? $display : array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => $exclude_tax )
 		);
 
-		$item = $this->make_product_data()->process_product( $this->make_product(), array(), 'productdetail' );
+		$product_data = new ProductData( new Options( ( new WooCommerceModule() )->defaults() ) );
+		$item         = $product_data->process_product( $this->make_product(), array(), 'productdetail' );
 
-		$this->assertTrue( $called, 'Without a supplied price the display price is computed as before.' );
-		$this->assertSame( 12.0, $item['price'] );
+		$this->assertSame( $expected, $item['price'] );
 	}
 
 	public function test_purchase_datalayer_revenue_math(): void {
@@ -1577,6 +1601,15 @@ final class ProductDataTest extends TestCase {
 				'item_total_excl' => $excl,
 			)
 		);
+	}
+
+	public function test_an_order_item_wc_hides_from_the_order_views_is_not_purchased(): void {
+		// #417: both WooCommerce order views apply woocommerce_order_item_visible.
+		Filters\expectApplied( 'woocommerce_order_item_visible' )->once()->andReturn( false );
+
+		$items = $this->make_product_data()->process_order_items( $this->make_order_with_item( 24.0, 20.0 ) );
+
+		$this->assertSame( array(), $items );
 	}
 
 	public function test_order_item_price_excludes_tax_when_exclude_tax_option_on(): void {

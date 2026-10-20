@@ -147,12 +147,20 @@ final class ListTracking {
 	 * @return \WC_Product The unchanged product.
 	 */
 	public function cart_item_product_filter( $product, $cart_item = array() ) {
+		// Cleared, not skipped: the next remove link must not carry the
+		// previous row's data (#417).
+		if ( is_array( $cart_item ) && array() !== $cart_item && ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item ) ) {
+			$GLOBALS['gtm4wp_cart_item_proddata'] = '';
+
+			return $product;
+		}
+
 		$attributes = array(
 			'productlink' => apply_filters( 'the_permalink', get_permalink(), 0 ),
 		);
 
 		if ( is_array( $cart_item ) ) {
-			$include_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+			$include_tax = $this->product_data->item_prices_include_tax();
 
 			$price = Helpers::cart_line_display_price( $cart_item, $include_tax );
 			if ( null !== $price ) {
@@ -228,6 +236,12 @@ final class ListTracking {
 		}
 
 		$woo = WC();
+
+		// Restored into the cart already, so the line can be asked (#417).
+		$line = ( $woo && isset( $woo->cart ) && is_object( $woo->cart ) ) ? $woo->cart->get_cart_item( $cart_item_key ) : array();
+		if ( is_array( $line ) && array() !== $line && ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $line ) ) {
+			return;
+		}
 
 		if ( $woo && $woo->session ) {
 			$woo->session->set( 'gtm4wp_product_readded_to_cart', $cart_item_key );

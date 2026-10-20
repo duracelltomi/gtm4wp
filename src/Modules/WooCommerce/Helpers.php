@@ -173,7 +173,7 @@ final class Helpers {
 	 * fall back.
 	 *
 	 * @param array<string, mixed> $cart_item_data A WooCommerce cart item.
-	 * @param bool                 $include_tax    Whether to include tax (the shop's price-display setting).
+	 * @param bool                 $include_tax    Whether to include tax (ProductData::item_prices_include_tax()).
 	 * @return float|null The per-unit display price rounded to 2 decimals, or null when it cannot be derived.
 	 */
 	public static function cart_line_display_price( array $cart_item_data, bool $include_tax ): ?float {
@@ -203,7 +203,7 @@ final class Helpers {
 	 * caller omits the field rather than emitting 0.
 	 *
 	 * @param array<string, mixed> $cart_item_data A WooCommerce cart item.
-	 * @param bool                 $include_tax    Whether to include tax (the shop's price-display setting).
+	 * @param bool                 $include_tax    Whether to include tax (ProductData::item_prices_include_tax()).
 	 * @return float|null The per-unit discount rounded to 2 decimals, or null when there is none.
 	 */
 	public static function cart_line_discount( array $cart_item_data, bool $include_tax ): ?float {
@@ -337,5 +337,51 @@ final class Helpers {
 	 */
 	public static function normalize_and_hash_phone_number( string $hash_algorithm, string $phone_number, string $country_code = '' ): string {
 		return EcommerceHelpers::normalize_and_hash_phone_number( $hash_algorithm, $phone_number, $country_code );
+	}
+
+	/**
+	 * Which block surface the current page is: 'checkout', 'cart' or '' (neither);
+	 * see WooCommerceModule::block_cart_or_checkout_context().
+	 *
+	 * @return string
+	 */
+	public static function block_cart_or_checkout_context(): string {
+		if ( function_exists( 'is_order_received_page' ) && is_order_received_page() ) {
+			return '';
+		}
+
+		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+			return self::page_uses_block( 'woocommerce/checkout' ) ? 'checkout' : '';
+		}
+
+		if ( function_exists( 'is_cart' ) && is_cart() ) {
+			return self::page_uses_block( 'woocommerce/cart' ) ? 'cart' : '';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Whether the given WooCommerce block backs the current cart/checkout page.
+	 * Prefers WooCommerce's canonical CartCheckoutUtils check and falls back to
+	 * scanning the current page content for the block.
+	 *
+	 * @param string $block_name The block name (woocommerce/cart or woocommerce/checkout).
+	 * @return bool
+	 */
+	private static function page_uses_block( string $block_name ): bool {
+		$utils = '\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils';
+
+		if ( 'woocommerce/checkout' === $block_name && method_exists( $utils, 'is_checkout_block_default' ) ) {
+			return (bool) $utils::is_checkout_block_default();
+		}
+
+		if ( 'woocommerce/cart' === $block_name && method_exists( $utils, 'is_cart_block_default' ) ) {
+			return (bool) $utils::is_cart_block_default();
+		}
+
+		$post = function_exists( 'get_post' ) ? get_post() : null;
+
+		return ( $post instanceof \WP_Post ) && function_exists( 'has_block' ) && has_block( $block_name, $post );
 	}
 }

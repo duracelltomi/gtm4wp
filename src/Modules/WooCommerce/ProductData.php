@@ -216,12 +216,15 @@ final class ProductData {
 			$remarketing_id = $data_product_sku;
 		}
 
-		// wc_get_price_to_display() is expensive; skip it when the caller supplies a
-		// price, which array_merge() applies below anyway (#436, memory exhaustion).
+		// The tax price functions are expensive; skip them when the caller supplies
+		// a price, which array_merge() applies below anyway (#436, memory exhaustion).
+		// Same tax basis as the purchase event, not the shop display setting (#519).
 		if ( array_key_exists( 'price', $additional_product_attributes ) ) {
 			$display_price = (float) $additional_product_attributes['price'];
+		} elseif ( $this->item_prices_include_tax() ) {
+			$display_price = (float) wc_get_price_including_tax( $product );
 		} else {
-			$display_price = (float) wc_get_price_to_display( $product );
+			$display_price = (float) wc_get_price_excluding_tax( $product );
 		}
 
 		$_temp_productdata = array(
@@ -418,7 +421,7 @@ final class ProductData {
 				 *
 				 * return bool If the filter returns false, the order item will be omitted from processing.
 				 */
-				if ( ! apply_filters( GTM4WP_WPFILTER_EEC_ORDER_ITEM, true, $order_item ) ) {
+				if ( ! self::reports_order_item( $order_item ) ) {
 					continue;
 				}
 
@@ -967,8 +970,22 @@ final class ProductData {
 	}
 
 	/**
-	 * Whether purchase item prices include tax: never with "exclude tax", else
-	 * the store's shop display setting (#176).
+	 * Whether an order item is reported: the GTM4WP item filter and the
+	 * visibility filter WooCommerce's order views apply (#417). Shared with
+	 * the refund lane, so a refund names only items its purchase named.
+	 *
+	 * @param mixed $order_item The order item.
+	 * @return bool
+	 */
+	public static function reports_order_item( $order_item ): bool {
+		return apply_filters( GTM4WP_WPFILTER_EEC_ORDER_ITEM, true, $order_item )
+			&& apply_filters( 'woocommerce_order_item_visible', true, $order_item );
+	}
+
+	/**
+	 * Whether item prices include tax, on every surface from product page to
+	 * purchase: never with "exclude tax", else the store's shop display setting
+	 * (#176, #519).
 	 *
 	 * @return bool
 	 */

@@ -84,6 +84,87 @@ final class DownloadDataTest extends TestCase {
 	}
 
 	/**
+	 * Stubs EDD's tax API at a 20% store-base rate, the way EDD 3.x computes it
+	 * (unrounded; the inclusive share is amount - amount / 1.2). U189.
+	 *
+	 * @param bool $prices_include_tax Whether catalogue prices include tax.
+	 * @param int  $decimals           The currency's decimals.
+	 * @return void
+	 */
+	private function stub_taxes( bool $prices_include_tax, int $decimals = 2 ): void {
+		Functions\when( 'edd_use_taxes' )->justReturn( true );
+		Functions\when( 'edd_download_is_tax_exclusive' )->justReturn( false );
+		Functions\when( 'edd_get_shop_country' )->justReturn( 'DE' );
+		Functions\when( 'edd_get_shop_state' )->justReturn( '' );
+		Functions\when( 'edd_get_tax_rate' )->alias(
+			static function ( $country, $region, $fallback ) {
+				// The store base, never the visitor: no fallback to their address.
+				return ( 'DE' === $country && false === $fallback ) ? 0.2 : 0.99;
+			}
+		);
+		Functions\when( 'edd_prices_include_tax' )->justReturn( $prices_include_tax );
+		Functions\when( 'edd_currency_decimal_filter' )->justReturn( $decimals );
+		Functions\when( 'edd_calculate_tax' )->alias(
+			static fn ( $amount, $country, $region, $fallback, $rate ) => $prices_include_tax ? $amount - $amount / ( 1 + $rate ) : $amount * $rate
+		);
+	}
+
+	/**
+	 * Product-surface prices on the purchase basis (#519): the cells, with the
+	 * cart's rounding (0.09 inclusive is 0.07 net in EDD's cart too).
+	 *
+	 * @return array<string, array{0: bool, 1: bool, 2: float, 3: float, 4?: int}>
+	 */
+	public static function basis_cells(): array {
+		return array(
+			'exclusive prices, gross basis' => array( false, false, 10.0, 12.0 ),
+			'exclusive prices, net basis'   => array( false, true, 10.0, 10.0 ),
+			'inclusive prices, gross basis' => array( true, false, 12.0, 12.0 ),
+			'inclusive prices, net basis'   => array( true, true, 12.0, 10.0 ),
+			'inclusive, tax rounded first'  => array( true, true, 0.09, 0.07 ),
+			'no decimals, exclusive gross'  => array( false, false, 1.0, 1.0, 0 ),
+		);
+	}
+
+	/**
+	 * The basis price per cell.
+	 *
+	 * @param bool  $inclusive   Whether catalogue prices include tax.
+	 * @param bool  $exclude_tax The plugin's exclude-tax option.
+	 * @param float $amount      Catalogue amount.
+	 * @param float $expected    Expected product-surface price.
+	 * @param int   $decimals    Currency decimals.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'basis_cells' )]
+	public function test_basis_price_matches_the_purchase_basis( bool $inclusive, bool $exclude_tax, float $amount, float $expected, int $decimals = 2 ): void {
+		$this->stub_taxes( $inclusive, $decimals );
+
+		$data = $this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => $exclude_tax ) );
+
+		$this->assertEqualsWithDelta( $expected, $data->basis_price( $amount, 7 ), 0.0001 );
+	}
+
+	public function test_basis_price_leaves_the_amount_without_taxes_or_for_a_tax_exempt_download(): void {
+		$this->stub_taxes( false );
+		$data = $this->make_download_data();
+
+		Functions\when( 'edd_download_is_tax_exclusive' )->justReturn( true );
+		$this->assertSame( 10.0, $data->basis_price( 10.0, 7 ) );
+
+		Functions\when( 'edd_download_is_tax_exclusive' )->justReturn( false );
+		Functions\when( 'edd_use_taxes' )->justReturn( false );
+		$this->assertSame( 10.0, $data->basis_price( 10.0, 7 ) );
+	}
+
+	public function test_the_product_page_price_is_on_the_purchase_basis(): void {
+		$this->stub_taxes( false );
+
+		$item = $this->make_download_data()->process_download( $this->make_download( array( 'price' => 10.0 ) ), array(), 'productdetail' );
+
+		$this->assertEqualsWithDelta( 12.0, $item['price'], 0.0001, 'Exclusive catalogue price, gross basis: the cart and purchase report 12.00 too.' );
+	}
+
+	/**
 	 * Builds a stubbed download.
 	 *
 	 * @param array<string, mixed> $data Download data overrides.

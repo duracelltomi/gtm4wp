@@ -103,6 +103,11 @@ final class StoreApiData {
 	 * @return array<string, string>
 	 */
 	public function extend_cart_item_data( $cart_item ): array {
+		// An excluded line carries no item, and the block tracker drops it (#417).
+		if ( is_array( $cart_item ) && ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item ) ) {
+			return array( 'item' => '' );
+		}
+
 		$product  = is_array( $cart_item ) && isset( $cart_item['data'] ) ? $cart_item['data'] : null;
 		$quantity = is_array( $cart_item ) && isset( $cart_item['quantity'] ) ? $cart_item['quantity'] : 1;
 

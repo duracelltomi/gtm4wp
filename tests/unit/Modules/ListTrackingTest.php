@@ -58,7 +58,8 @@ final class ListTrackingTest extends TestCase {
 		);
 
 		// ProductData dependencies (mirrors ProductDataTest::setUp()).
-		Functions\when( 'wc_get_price_to_display' )->justReturn( 9.99 );
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 9.99 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 9.99 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
@@ -143,6 +144,25 @@ final class ListTrackingTest extends TestCase {
 	 * WooCommerce discards; the classic tracker pushes that add_to_cart, so a
 	 * marker or one-shot cookie left here would repeat it on the next page.
 	 */
+	public function test_cart_item_restored_seeds_no_marker_for_an_excluded_line(): void {
+		// #417: the restored line is in the cart already; an excluded one is not re-added.
+		$session     = $this->stub_wc_session();
+		$store       = WC();
+		$store->cart = new class() {
+			public function get_cart_item( $key ) {
+				return array(
+					'key'      => $key,
+					'quantity' => 1,
+				);
+			}
+		};
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_CART_ITEM )->once()->andReturn( false );
+
+		$this->make_list_tracking()->cart_item_restored( 'hash-1' );
+
+		$this->assertArrayNotHasKey( 'gtm4wp_product_readded_to_cart', $session->sets );
+	}
+
 	public function test_cart_item_restored_seeds_nothing_for_a_background_request(): void {
 		$session = $this->stub_wc_session();
 
@@ -669,6 +689,58 @@ final class ListTrackingTest extends TestCase {
 		$this->assertSame( $product, $result, 'The filter must return the product unchanged.' );
 		$this->assertIsArray( $GLOBALS['gtm4wp_cart_item_proddata'] );
 		$this->assertSame( 'Test Product', $GLOBALS['gtm4wp_cart_item_proddata']['item_name'] );
+	}
+
+	/**
+	 * A cart line is priced on the purchase basis (#519): with "exclude tax" on,
+	 * net even when the shop displays prices with tax.
+	 */
+	public function test_cart_item_price_is_net_with_exclude_tax_even_when_the_shop_displays_gross(): void {
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p/' );
+		Functions\when( 'get_option' )->alias(
+			static fn ( $key ) => 'woocommerce_tax_display_shop' === $key ? 'incl' : array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX     => true,
+			)
+		);
+		$options = new Options( ( new WooCommerceModule() )->defaults() );
+
+		( new ListTracking( $options, new ProductData( $options ) ) )->cart_item_product_filter(
+			$this->make_product(),
+			array(
+				'line_subtotal'     => 20.0,
+				'line_subtotal_tax' => 4.0,
+				'line_total'        => 20.0,
+				'quantity'          => 2,
+			)
+		);
+
+		$this->assertSame( 10.0, $GLOBALS['gtm4wp_cart_item_proddata']['price'] );
+	}
+
+	/**
+	 * An excluded line clears the per-row global, so its remove link cannot carry
+	 * the previous row's data (#417).
+	 */
+	public function test_an_excluded_cart_line_clears_the_remove_link_data(): void {
+		$list_tracking                        = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$GLOBALS['gtm4wp_cart_item_proddata'] = array( 'item_name' => 'Previous row' );
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_CART_ITEM )->once()->andReturn( false );
+
+		$product = $this->make_product();
+		$this->assertSame(
+			$product,
+			$list_tracking->cart_item_product_filter(
+				$product,
+				array(
+					'line_subtotal' => 10.0,
+					'quantity'      => 1,
+				)
+			)
+		);
+
+		$this->assertSame( '', $GLOBALS['gtm4wp_cart_item_proddata'] );
+		$this->assertSame( '<a href="?remove_item=k">x</a>', $list_tracking->cart_item_remove_link_filter( '<a href="?remove_item=k">x</a>' ) );
 	}
 
 	public function test_cart_item_product_filter_passes_null_source_when_called_without_a_cart_item(): void {

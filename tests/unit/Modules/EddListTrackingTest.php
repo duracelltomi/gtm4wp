@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Modules\EasyDigitalDownloads\EasyDigitalDownloadsModule;
@@ -172,6 +173,35 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertStringContainsString( 'Professional', $markup );
 	}
 
+	public function test_variable_price_options_are_on_the_purchase_basis(): void {
+		// #519: the client prices a variable add_to_cart from this map, so it is converted here.
+		Functions\when( 'edd_has_variable_prices' )->justReturn( true );
+		Functions\when( 'edd_get_lowest_price_option' )->justReturn( 5.0 );
+		Functions\when( 'edd_get_variable_prices' )->justReturn(
+			array(
+				2 => array(
+					'name'   => 'Professional',
+					'amount' => 15.0,
+				),
+			)
+		);
+		Functions\when( 'edd_use_taxes' )->justReturn( true );
+		Functions\when( 'edd_download_is_tax_exclusive' )->justReturn( false );
+		Functions\when( 'edd_get_shop_country' )->justReturn( 'DE' );
+		Functions\when( 'edd_get_shop_state' )->justReturn( '' );
+		Functions\when( 'edd_get_tax_rate' )->justReturn( 0.2 );
+		Functions\when( 'edd_prices_include_tax' )->justReturn( false );
+		Functions\when( 'edd_currency_decimal_filter' )->justReturn( 2 );
+		Functions\when( 'edd_calculate_tax' )->alias( static fn ( $amount, $c, $r, $f, $rate ) => $amount * $rate );
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->purchase_link_data( 55, array() )
+		);
+
+		$this->assertStringContainsString( '&quot;price&quot;:18', $markup );
+		$this->assertStringNotContainsString( '&quot;price&quot;:15', $markup );
+	}
+
 	/**
 	 * The hook's item is an edd_get_cart_contents() row (U115); the money is
 	 * on the matching edd_get_cart_content_details() line.
@@ -223,6 +253,18 @@ final class EddListTrackingTest extends TestCase {
 				),
 			)
 		);
+	}
+
+	public function test_a_checkout_row_the_cart_item_filter_excludes_prints_nothing(): void {
+		// #516: the cart surface's filter, asked with the details line it documents.
+		list( $row, $details ) = self::cart_row( 3, 2, 19.98 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_EDD_CART_ITEM )
+			->once()
+			->with( true, $details[3] )
+			->andReturn( false );
+
+		$this->assertSame( '', $this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 3 ) ) );
 	}
 
 	public function test_checkout_cart_row_span_uses_its_own_class_and_carries_the_cart_key(): void {

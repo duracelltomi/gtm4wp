@@ -113,7 +113,8 @@ final class PageDataLayerTest extends TestCase {
 		Functions\when( 'get_woocommerce_currency' )->justReturn( 'USD' );
 
 		// ProductData dependencies.
-		Functions\when( 'wc_get_price_to_display' )->justReturn( 9.99 );
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 9.99 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 9.99 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
@@ -708,9 +709,10 @@ final class PageDataLayerTest extends TestCase {
 	public function test_checkout_prices_items_from_cart_line_totals_not_price_display(): void {
 		// #436: the begin_checkout products must be priced from the cart's
 		// already-calculated line totals (line_subtotal / quantity), not by calling
-		// wc_get_price_to_display() once per cart item.
+		// the tax price functions once per cart item.
 		Functions\when( 'is_checkout' )->justReturn( true );
-		Functions\when( 'wc_get_price_to_display' )->justReturn( 9.99 );
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 9.99 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 9.99 );
 
 		$product = new \WC_Product(
 			array(
@@ -734,7 +736,71 @@ final class PageDataLayerTest extends TestCase {
 
 		$checkout = $this->inline_for( 'gtm4wp-woocommerce' );
 		$this->assertStringContainsString( '"price":20', $checkout['code'], 'The item price must be line_subtotal / quantity (40 / 2 = 20).' );
-		$this->assertStringNotContainsString( '9.99', $checkout['code'], 'wc_get_price_to_display() must not price a cart line whose totals are known.' );
+		$this->assertStringNotContainsString( '9.99', $checkout['code'], 'The tax price functions must not price a cart line whose totals are known.' );
+	}
+
+	/**
+	 * The classic checkout hides what woocommerce_checkout_cart_item_visible
+	 * hides, so begin_checkout does too; the block checkout renders every line,
+	 * so there the filter is not asked (#417).
+	 *
+	 * @return array<string, array{0: bool, 1: bool}>
+	 */
+	public static function checkout_page_kinds(): array {
+		return array(
+			'classic checkout' => array( false, false ),
+			'block checkout'   => array( true, true ),
+		);
+	}
+
+	/**
+	 * A core-hidden line on each kind of checkout page.
+	 *
+	 * @param bool $is_block Whether the checkout page uses the checkout block.
+	 * @param bool $reported Whether the hidden line is reported.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'checkout_page_kinds' )]
+	public function test_begin_checkout_follows_wc_visibility_only_on_the_classic_checkout( bool $is_block, bool $reported ): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+		require_once __DIR__ . '/wc-blocks-stub.php';
+		\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils::$checkout_block = $is_block;
+		Filters\expectApplied( 'woocommerce_checkout_cart_item_visible' )
+			->times( $is_block ? 0 : 2 )
+			->andReturnUsing( static fn ( $visible, $item, $key ) => 'hidden' !== $key );
+
+		$this->stub_wc(
+			array(
+				'shown'  => array(
+					'data'          => new \WC_Product(
+						array(
+							'id'    => 7,
+							'title' => 'Mug',
+						)
+					),
+					'quantity'      => 1,
+					'line_subtotal' => 10.0,
+				),
+				'hidden' => array(
+					'data'          => new \WC_Product(
+						array(
+							'id'    => 8,
+							'title' => 'Bundled child',
+						)
+					),
+					'quantity'      => 1,
+					'line_subtotal' => 0.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils::$checkout_block = false;
+
+		$checkout = $this->inline_for( 'gtm4wp-woocommerce' );
+		$this->assertStringContainsString( 'Mug', $checkout['code'] );
+		$this->assertSame( $reported, str_contains( $checkout['code'], 'Bundled child' ) );
 	}
 
 	public function test_order_received_requires_matching_order_key(): void {

@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Modules;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\WooCommerce\ProductData;
 use GTM4WP\Modules\WooCommerce\StoreApiData;
@@ -39,7 +40,8 @@ final class StoreApiDataTest extends TestCase {
 		);
 
 		Functions\stubTranslationFunctions();
-		Functions\when( 'wc_get_price_to_display' )->justReturn( 12.5 );
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 12.5 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 12.5 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
@@ -103,6 +105,20 @@ final class StoreApiDataTest extends TestCase {
 		$decoded = json_decode( $data['item'], true );
 		$this->assertSame( '42', $decoded['item_id'], 'Identifiers cross the Store API as strings, product ids included.' );
 		$this->assertSame( 3, $decoded['quantity'] );
+	}
+
+	public function test_extend_cart_item_data_drops_a_line_the_cart_item_filter_excludes(): void {
+		// #417: the block tier drops an empty item, as the classic cart skips the line.
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_CART_ITEM )->once()->andReturn( false );
+
+		$data = $this->make_store_api_data()->extend_cart_item_data(
+			array(
+				'data'     => $this->make_product(),
+				'quantity' => 3,
+			)
+		);
+
+		$this->assertSame( array( 'item' => '' ), $data );
 	}
 
 	public function test_extend_cart_item_data_returns_empty_string_for_a_bad_line(): void {

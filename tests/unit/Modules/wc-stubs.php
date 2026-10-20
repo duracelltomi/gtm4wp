@@ -128,6 +128,10 @@ if ( ! class_exists( 'WC_Order' ) ) {
 		public function get_items() {
 			return $this->value( 'items', array() );
 		}
+		// One item by id, false when the order has none: WC_Abstract_Order::get_item().
+		public function get_item( $item_id ) {
+			return $this->value( 'items', array() )[ $item_id ] ?? false;
+		}
 		// The order's refunds, as WC_Abstract_Order returns them.
 		public function get_refunds() {
 			return $this->value( 'refunds', array() );

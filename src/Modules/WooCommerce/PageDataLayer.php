@@ -202,7 +202,7 @@ final class PageDataLayer {
 			'quantity' => $cart_item_data['quantity'],
 		);
 
-		$include_tax = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) );
+		$include_tax = $this->product_data->item_prices_include_tax();
 
 		$price = Helpers::cart_line_display_price( $cart_item_data, $include_tax );
 		if ( null !== $price ) {
@@ -412,6 +412,8 @@ final class PageDataLayer {
 
 		$gtm4wp_currency = get_woocommerce_currency();
 
+		$is_block_page = '' !== Helpers::block_cart_or_checkout_context();
+
 		foreach ( $woo->cart->get_cart() as $cart_item_id => $cart_item_data ) {
 			/**
 			 * Applying WooCommerce's own woocommerce_cart_item_product filter here is essential in order to hide everything
@@ -420,6 +422,12 @@ final class PageDataLayer {
 			$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data['data'], $cart_item_data, $cart_item_id );
 
 			if ( ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item_data ) ) {
+				continue;
+			}
+
+			// The classic template hides what this WooCommerce filter hides; the
+			// block page renders every line, so it is not asked there (#417).
+			if ( ! $is_block_page && ! apply_filters( 'woocommerce_cart_item_visible', true, $cart_item_data, $cart_item_id ) ) {
 				continue;
 			}
 
@@ -520,6 +528,8 @@ final class PageDataLayer {
 
 		$gtm4wp_currency = get_woocommerce_currency();
 
+		$is_block_page = '' !== Helpers::block_cart_or_checkout_context();
+
 		foreach ( $woo->cart->get_cart() as $cart_item_id => $cart_item_data ) {
 			/**
 			 * Applying WooCommerce's own woocommerce_cart_item_product filter here is essential in order to hide everything
@@ -528,6 +538,12 @@ final class PageDataLayer {
 			$product = apply_filters( 'woocommerce_cart_item_product', $cart_item_data['data'], $cart_item_data, $cart_item_id );
 
 			if ( ! apply_filters( GTM4WP_WPFILTER_EEC_CART_ITEM, true, $cart_item_data ) ) {
+				continue;
+			}
+
+			// The classic template hides what this WooCommerce filter hides; the
+			// block page renders every line, so it is not asked there (#417).
+			if ( ! $is_block_page && ! apply_filters( 'woocommerce_checkout_cart_item_visible', true, $cart_item_data, $cart_item_id ) ) {
 				continue;
 			}
 

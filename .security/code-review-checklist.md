@@ -1227,16 +1227,17 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 513 | Low | fixed (R53 fix session: other net-status sale orders, this one excluded) | — | EDD `DownloadData` | New-customer flag vs EDD's counted statuses |
 | 514 | Low | fixed (R53 fix session, with #412: flagged only when the push encodes and queues) | site code | EDD purchase render | #412 sibling |
 | 515 | Low | fixed (R53 fix session, with #415: `Helpers::line_value()`) | site code | EDD cart value | #415 sibling |
-| 516 | Low | open (needs design) | — | EDD checkout rows | #417 sibling |
+| 516 | Low | fixed (R53 fix session, with #417: the cart filter on checkout rows, same row shape and arguments as the cart surface) | — | EDD checkout rows | #417 sibling |
 | 517 | Low | fixed (R53 fix session: description) | — | EDD `AdminSchema` | Description promises a value not emitted |
 | 518 | Low | open (unverified) | A0 | EDD cart page | Possible cache-related exposure; detail in the local report |
-| 519 | Low | open | — | EDD `DownloadData` | Price basis differs between surfaces |
+| 519 | Low | fixed (R53 fix session, maintainer decision: product surfaces on the purchase basis at the store-base rate, tax rounded like the cart; design verified, U189) | — | EDD `DownloadData` | Price basis differs between surfaces |
 | 520 | Low | fixed in part (R53 fix session: unread property, forward-only wrapper, duplicated session lookup; the two public-but-internal methods and `process_download()` length left) | — | EDD module | Dead code / duplication |
 | 521 | Low | open | — | EDD page fallback / `VisitorCart` | Per-page work |
 | 522 | Low | fixed (R53 fix session, with #407) | A0 | EDD product page | #407 sibling |
 | 523 | Low | fixed (R53 fix session: both descriptions) | — | EDD + WC status lists | Empty-list behaviour undocumented on screen |
 | 524 | Low | open (unverified) | A3/A4 | Purchase renders under an excluded role | Tracked flag written while the loader is suppressed |
 | 525 | Low | resolved by #503 (import over REST is documented as unsupported before WP 7.1; the strict confirm stays, pinned by its tests) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Confirmation flag may never pass |
+| 526 | Low | fixed (R53 fix session, found by the #519 design verifier, maintainer decision: product and cart surfaces use the purchase basis; 2.1 only, no 2.0 backport) | — | WC `ProductData`, `PageDataLayer`, `ListTracking` | Price basis differs between surfaces under one option combination |
 
 Note on #395 (open): new evidence (probe). The appended row itself is dropped once the ring holds only problem rows, so
 "harmless since `f6f8a91`" holds for sequential execution only; linked to #474. The fix design is in the local report.
@@ -1325,7 +1326,7 @@ ledger commit on `master`.
 | 414 | Low | open | — | WC dedupe guard, visitor-data storage helpers (both) | `localStorage` access outside try/catch |
 | 415 | Low | fixed (R53 fix session, with #515) | site code | WC cart loops (both) | Arithmetic on filter output without type checks |
 | 416 | Low | open | site code | WC address getters (both) | Filtered getters reach string-typed helpers (#377 sibling) |
-| 417 | Low | open (needs design) | — | WC cart/checkout/purchase item loops (both) | WooCommerce item-visibility filters are applied on one surface only |
+| 417 | Low | fixed (R53 fix session, maintainer decision: the existing item filters on every surface, WooCommerce visibility filters on classic surfaces and purchase only, refunds gated like purchase; design verified) | — | WC cart/checkout/purchase item loops (both) | WooCommerce item-visibility filters are applied on one surface only |
 | 418 | Low | open | — | Quick View `view_item` (both) | Singular `item` key, internal id kept, no missing-product guard |
 | 419 | Low | open | — | WC purchase-confirm beacon (both) | Reads a narrower order source than the resolver (RI-36) |
 | 420 | Low | fixed (R50 second fix session, both branches) | site code | `PurchaseTracking::on_thankyou()` (both) | A non-order id reaches a typed parameter |

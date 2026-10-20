@@ -46,7 +46,8 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		parent::setUp();
 
 		Functions\stubTranslationFunctions();
-		Functions\when( 'wc_get_price_to_display' )->justReturn( 19.99 );
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 19.99 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 19.99 );
 		Functions\when( 'wp_get_post_terms' )->justReturn( array() );
 		Functions\when( 'yoast_get_primary_term_id' )->justReturn( false );
 		Functions\when( 'get_term' )->justReturn( null );
@@ -616,6 +617,46 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 			$items[0]['additionalItemParameters'],
 			'The refunded line carries the same name the purchase sent for it; without it Analytics files the refund under "(not set)".'
 		);
+	}
+
+	/**
+	 * A refund names only items its purchase named (#417): the purchase's
+	 * gates are asked about the original order item the line refunds.
+	 */
+	public function test_a_refunded_line_whose_order_item_the_purchase_left_out_is_left_out(): void {
+		$product  = new \WC_Product(
+			array(
+				'id'    => 123,
+				'title' => 'Bundled child',
+			)
+		);
+		$original = new \stdClass();
+		$line     = new class( $product ) {
+			public function __construct( private \WC_Product $product ) {}
+			public function get_product() {
+				return $this->product;
+			}
+			public function get_quantity() {
+				return -1;
+			}
+			public function get_total() {
+				return -10.0;
+			}
+			public function get_subtotal() {
+				return -10.0;
+			}
+			public function get_meta( $key ) {
+				return '_refunded_item_id' === $key ? 77 : '';
+			}
+		};
+
+		$this->stub_orders( self::order( array( 'items' => array( 77 => $original ) ) ), self::refund( 10.0, array( $line ) ) );
+		Filters\expectApplied( 'woocommerce_order_item_visible' )
+			->once()
+			->with( true, $original )
+			->andReturn( false );
+
+		$this->assertSame( array(), $this->adapter()->load( 12, 34 )->items );
 	}
 
 	public function test_a_refunded_line_carries_every_item_parameter_the_purchase_builder_produced(): void {

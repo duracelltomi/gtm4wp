@@ -481,42 +481,6 @@ final class WooCommerceModule extends AbstractModule {
 	 * @return string
 	 */
 	private function block_cart_or_checkout_context(): string {
-		if ( function_exists( 'is_order_received_page' ) && is_order_received_page() ) {
-			return '';
-		}
-
-		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
-			return $this->page_uses_block( 'woocommerce/checkout' ) ? 'checkout' : '';
-		}
-
-		if ( function_exists( 'is_cart' ) && is_cart() ) {
-			return $this->page_uses_block( 'woocommerce/cart' ) ? 'cart' : '';
-		}
-
-		return '';
-	}
-
-	/**
-	 * Whether the given WooCommerce block backs the current cart/checkout page.
-	 * Prefers WooCommerce's canonical CartCheckoutUtils check and falls back to
-	 * scanning the current page content for the block.
-	 *
-	 * @param string $block_name The block name (woocommerce/cart or woocommerce/checkout).
-	 * @return bool
-	 */
-	private function page_uses_block( string $block_name ): bool {
-		$utils = '\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils';
-
-		if ( 'woocommerce/checkout' === $block_name && method_exists( $utils, 'is_checkout_block_default' ) ) {
-			return (bool) $utils::is_checkout_block_default();
-		}
-
-		if ( 'woocommerce/cart' === $block_name && method_exists( $utils, 'is_cart_block_default' ) ) {
-			return (bool) $utils::is_cart_block_default();
-		}
-
-		$post = function_exists( 'get_post' ) ? get_post() : null;
-
-		return ( $post instanceof \WP_Post ) && function_exists( 'has_block' ) && has_block( $block_name, $post );
+		return Helpers::block_cart_or_checkout_context();
 	}
 }

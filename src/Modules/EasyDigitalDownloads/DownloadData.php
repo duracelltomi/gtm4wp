@@ -291,7 +291,8 @@ final class DownloadData {
 	/**
 	 * Resolves the display price of a download: the given price option when a
 	 * price id is supplied, the lowest price option for a variable-priced
-	 * download without a selection, and the plain price otherwise.
+	 * download without a selection, and the plain price otherwise - on the
+	 * purchase's tax basis (basis_price()).
 	 *
 	 * @param \EDD_Download $download The download.
 	 * @param int|null      $price_id The selected variable price id, or null.
@@ -301,14 +302,51 @@ final class DownloadData {
 		$download_id = (int) $download->get_ID();
 
 		if ( $download->has_variable_prices() ) {
-			if ( null !== $price_id ) {
-				return (float) edd_get_price_option_amount( $download_id, $price_id );
-			}
-
-			return (float) edd_get_lowest_price_option( $download_id );
+			$amount = ( null !== $price_id )
+				? (float) edd_get_price_option_amount( $download_id, $price_id )
+				: (float) edd_get_lowest_price_option( $download_id );
+		} else {
+			$amount = (float) $download->get_price();
 		}
 
-		return (float) $download->get_price();
+		return $this->basis_price( $amount, $download_id );
+	}
+
+	/**
+	 * Whether item prices include tax, on every surface: EDD order and cart
+	 * line totals are gross, so only "exclude tax" makes them net (#519).
+	 *
+	 * @return bool
+	 */
+	public function item_prices_include_tax(): bool {
+		return ! $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX );
+	}
+
+	/**
+	 * A catalogue amount on the purchase's tax basis (#519), taxed at the store
+	 * base rate so a cached download page is the same for every visitor. The tax
+	 * is rounded to the currency's decimals first, as EDD's cart rounds it, so
+	 * a one-item cart line reports the same price (U189). A visitor taxed at
+	 * another rate, and qty > 1 lines, can differ by that rate or a minor unit.
+	 *
+	 * @param float $amount      The catalogue amount as entered in EDD.
+	 * @param int   $download_id The download id.
+	 * @return float
+	 */
+	public function basis_price( float $amount, int $download_id ): float {
+		if ( ! function_exists( 'edd_use_taxes' ) || ! edd_use_taxes() || edd_download_is_tax_exclusive( $download_id ) ) {
+			return $amount;
+		}
+
+		$rate     = edd_get_tax_rate( edd_get_shop_country(), edd_get_shop_state(), false );
+		$decimals = function_exists( 'edd_currency_decimal_filter' ) ? (int) edd_currency_decimal_filter() : 2;
+		$tax      = round( (float) edd_calculate_tax( $amount, '', '', false, $rate ), $decimals );
+
+		if ( edd_prices_include_tax() ) {
+			return $this->item_prices_include_tax() ? $amount : $amount - $tax;
+		}
+
+		return $this->item_prices_include_tax() ? $amount + $tax : $amount;
 	}
 
 	/**
