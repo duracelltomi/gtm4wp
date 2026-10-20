@@ -47,6 +47,10 @@ final class GoogleAuthCustodyTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// Production code builds its own vault, which now tries each key (#506):
+		// the salts it derives from equal the fixtures' secret (TS-16).
+		Functions\when( 'wp_salt' )->alias( static fn ( $scheme ) => 'auth' === $scheme ? self::SECRET : '' );
+
 		// The full default registry is built for the bootstrap payload, which
 		// needs the same stub set the settings page test uses (TS-16).
 		Functions\stubTranslationFunctions();

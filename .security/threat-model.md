@@ -32,7 +32,8 @@ Every judgment below exists to rate those two.
 
 The google-auth module added a third asset unlike the first two: a **Google
 service-account private key**, stored encrypted (AES-256-GCM, key HKDF-derived from
-the wp-config salts, account id as AAD) in its own non-autoloaded option row
+the optional `GTM4WP_ENCRYPTION_KEY` constant, else the wp-config salts, account id as
+AAD) in its own non-autoloaded option row
 (`GTM4WP\Google\KeyVault`). Its compromise pivots **off-site** — whatever Google
 products the account was granted — which no A-ladder rung and neither D-actor
 expresses. Rate findings against it like this:
@@ -46,20 +47,26 @@ expresses. Rate findings against it like this:
   ciphertext to most of them.
 - **The encryption's honest boundary:** a database-only leak (SQLi, a stray backup)
   yields ciphertext; an attacker with the database **and** the files (wp-config
-  salts) gets the key — that boundary is by design and documented to the admin, so
+  salts or `GTM4WP_ENCRYPTION_KEY`) gets the key — that boundary is by design and documented to the admin, so
   "DB+files defeats it" is not a finding. **Caveat:** on sites where `wp_salt()`
   falls back to DB-*stored* salts, the DB-only protection is void; guidance leaning
   on the boundary must carry that caveat.
 - **Salts change without the admin (R53, #469):** security plugins rotate them on a
   schedule (one popular plugin by default), so "the key goes unreadable" is an
   availability event to plan for, not only the result of a deliberate edit. It does
-  not move the confidentiality boundary above.
+  not move the confidentiality boundary above. Since the R53 fixes the constant is
+  the mitigation (keys move to it on the first admin look), readability is found by
+  trying each key, never persisted from a read path, and **Replace key** recovers an
+  account under its id. Removing the constant after the move is the new way to lock
+  the keys; the notice names it.
 - **The cached access token is an asset too (R53, #491):** a live bearer token for the
   granted scope sits in a transient for under an hour. A database-only leak gives that
   token for its remaining lifetime, not just ciphertext; rate a path exposing it like
   the key's custody invariant, scaled to the shorter lifetime.
-- **A4 uploading/deleting/testing their own key is A4 → A4** — not a vulnerability,
-  same as the container-ID rule.
+- **A4 uploading/replacing/deleting/testing their own key is A4 → A4** — not a
+  vulnerability, same as the container-ID rule. Replace key is refused for a key of
+  another service account, so a destination keeps sending as the identity it was set
+  up with.
 
 ### The stored attribution and the send lane (since 2026-09-20)
 
@@ -288,4 +295,5 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | 2026-09-03 | Added **The stored credential** (R30, #230): the google-auth module made the old out-of-scope line "the plugin stores no credentials" false, and the off-site pivot a compromised service-account key enables had no rating vocabulary. Custody invariant, the encryption's honest boundary (with the DB-stored-salts caveat), and the A4→A4 rule for the key's own management routes. |
 | 2026-07-29 | Added the **development-time actors D0/D1** and brought the repository's own toolchain into scope (PA-14). A0–A4 rate risk to a *site*; they have no way to express third-party text or branch content causing code to run on the *maintainer's machine*, so findings #76/#77 had no severity vocabulary and, before that, no lens that would prompt for them. Same lowest-actor rule: D0 → D1 is the finding, rated on what the execution reaches, with enforced boundaries distinguished from described ones. |
 | 2026-09-22 | **The ability surface** wording corrected (R34, #252): the example list of withheld values was fused into the general rule and contradicted the shipped edit surface (`get-settings`/`export-settings` return the GA4 property id and the environment tokens by design, and must - a table option is written whole). Split into the status/inventory rule (question 2) and the edit-surface rule. Verifier-measured: every mask is refused by the row sanitizers, and a masked export imports as an empty container table; the tokens are in every page's public loader URL, so withholding them from an A4 delegate protects nothing. |
+| 2026-10-20 | **The stored credential** follows the R53 fixes (#468/#469/#506): the optional constant in the derivation and the boundary, the read-time readability check, Replace key in the A4 → A4 rule. |
 | 2026-10-19 | **The stored credential** gained two bullets (R53): salts rotate without the admin (#469, an availability event, boundary unchanged) and the cached access token is an asset (#491). The send-log text contradiction (#509) is left open for its fix. |

@@ -111,8 +111,39 @@ final class GoogleAuthSiteHealthTest extends TestCase {
 	public function test_no_stored_account_is_one_none_row(): void {
 		$fields = ( new SiteHealth( $this->vault ) )->debug_fields();
 
-		$this->assertSame( array( 'accounts' ), array_keys( $fields ) );
+		$this->assertSame( array( 'accounts', 'key_encryption' ), array_keys( $fields ) );
 		$this->assertSame( 'none', $fields['accounts']['debug'] );
+	}
+
+	/**
+	 * The row names the secret in use, never its value (#469).
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function key_encryption_states(): array {
+		$constant = 'a-gtm4wp-encryption-key-of-at-least-32-chars';
+
+		return array(
+			'no constant'      => array( '', 'WordPress security keys' ),
+			'constant in use'  => array( $constant, 'GTM4WP_ENCRYPTION_KEY' ),
+			'constant refused' => array( 'too-short', 'WordPress security keys (GTM4WP_ENCRYPTION_KEY is ignored: not a text of 32 or more characters)' ),
+		);
+	}
+
+	/**
+	 * Key encryption row per state.
+	 *
+	 * @param string $encryption_key Stands in for the constant; '' is none.
+	 * @param string $debug          The expected English value.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'key_encryption_states' )]
+	public function test_the_key_encryption_row_names_the_secret_never_its_value( string $encryption_key, string $debug ): void {
+		$row = ( new SiteHealth( new KeyVault( self::SECRET, null, $encryption_key ) ) )->debug_fields()['key_encryption'];
+
+		$this->assertSame( $debug, $row['debug'] );
+		if ( '' !== $encryption_key ) {
+			$this->assertStringNotContainsString( $encryption_key, (string) json_encode( $row ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for a substring assertion.
+		}
 	}
 
 	public function test_an_account_is_named_by_its_label_and_status(): void {

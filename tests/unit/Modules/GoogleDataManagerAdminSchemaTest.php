@@ -19,6 +19,7 @@ use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
 use GTM4WP\Options\Field;
 use GTM4WP\Options\Options;
+use GTM4WP\Tests\unit\Google\KeyFileFixture;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -239,10 +240,23 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 	}
 
 	public function test_panel_data_carries_the_account_choices_for_the_select_column(): void {
+		// The panel's own vault reads with the salts; these equal the fixtures' secret.
+		$secret = 'unit-test-site-secret-do-not-reuse';
+		Functions\when( 'wp_salt' )->alias( static fn ( $scheme ) => 'auth' === $scheme ? $secret : '' );
+		$working = ( new KeyVault( $secret ) )->add( KeyFileFixture::parse(), 'Working SA' );
+		$failing = ( new KeyVault( $secret ) )->add( KeyFileFixture::parse(), 'Failing SA' );
+		$this->options[ KeyVault::OPTION_NAME ][ $failing ]['status'] = KeyVault::STATUS_ERROR;
+
 		$data = ( new AdminSchema() )->panel_data();
 
+		// An account that cannot send says so in its choice label (#468); the
+		// seeded row holds no key at all, so trying it finds it unreadable.
 		$this->assertSame(
-			array( self::ACCOUNT_ID => 'Production SA' ),
+			array(
+				self::ACCOUNT_ID => 'Production SA (key unreadable, use Replace key)',
+				$working         => 'Working SA',
+				$failing         => 'Failing SA (failed its last test)',
+			),
 			$data['columnChoices'][ GTM4WP_OPTION_GDM_DESTINATIONS ][ DestinationRows::COLUMN_ACCOUNT ]
 		);
 		$this->assertSame( 'gtm4wp/v2/google/destinations/test', $data['testPath'] );

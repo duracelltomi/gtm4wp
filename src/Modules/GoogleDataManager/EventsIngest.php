@@ -537,7 +537,7 @@ final class EventsIngest {
 			case 'PERMISSION_DENIED':
 				return __( 'The service account is not allowed to send to this destination. Add it to the GA4 property with the Editor role, and make sure the Data Manager API is enabled in the Google Cloud project the account belongs to.', 'duracelltomi-google-tag-manager' );
 			case 'UNAUTHENTICATED':
-				return __( 'Google did not accept the sign-in of the service account. Use the Test button in the Google service accounts section to check it; if it fails there too, upload its key file again.', 'duracelltomi-google-tag-manager' );
+				return __( 'Google did not accept the sign-in of the service account. Use the Test button in the Google service accounts section to check it; if it fails there too, use Replace key on the account with its key file.', 'duracelltomi-google-tag-manager' );
 			case 'INVALID_ARGUMENT':
 				return __( 'Google refused the request as invalid. Please double-check the GA4 property ID and the measurement ID.', 'duracelltomi-google-tag-manager' );
 			default:

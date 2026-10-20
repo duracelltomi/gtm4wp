@@ -26,6 +26,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   service-accounts/<id>      change the label (PUT/PATCH accepted too)
  * - DELETE service-accounts/<id>      remove (refused while a consumer references it)
  * - POST   service-accounts/<id>/test mint a token now and report the outcome
+ * - POST   service-accounts/<id>/key  replace the key of the same service account (#468)
  *
  * Every route requires the settings capability and the REST nonce. No
  * response carries key material: the listing is built by KeyVault from an
@@ -124,6 +125,22 @@ final class RestController {
 				'permission_callback' => array( $this, 'can_manage' ),
 			)
 		);
+
+		register_rest_route(
+			RestCors::REST_NAMESPACE,
+			self::REST_ROUTE_ONE . '/key',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'replace_key' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+				'args'                => array(
+					'key_file' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -145,14 +162,71 @@ final class RestController {
 	}
 
 	/**
-	 * POST handler: parses and stores an uploaded key file. The contents arrive
-	 * as the `key_file` string of the JSON body (not slashed, unlike $_POST);
-	 * the raw upload is parsed once and discarded.
+	 * POST handler: parses and stores an uploaded key file (parse_key_file()).
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function upload_account( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$key = $this->parse_key_file( $request );
+		if ( $key instanceof \WP_Error ) {
+			return $key;
+		}
+
+		$label = $request->get_param( 'label' );
+		$id    = $this->vault->add( $key, is_string( $label ) ? $label : '' );
+
+		if ( $id instanceof \WP_Error ) {
+			return new \WP_Error( $id->get_error_code(), $id->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'account'  => $this->vault->get( $id ),
+				'accounts' => $this->vault->all(),
+			),
+			201
+		);
+	}
+
+	/**
+	 * POST handler of Replace key: the same parser as an upload, then the vault
+	 * keeps the id and refuses a key of another service account.
+	 *
+	 * @param \WP_REST_Request $request The request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function replace_key( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$key = $this->parse_key_file( $request );
+		if ( $key instanceof \WP_Error ) {
+			return $key;
+		}
+
+		$account = $this->vault->replace_key( (string) $request->get_param( 'id' ), $key );
+
+		if ( $account instanceof \WP_Error ) {
+			$data = $account->get_error_data();
+
+			return new \WP_Error( $account->get_error_code(), $account->get_error_message(), array( 'status' => (int) ( $data['status'] ?? 500 ) ) );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'account'  => $account,
+				'accounts' => $this->vault->all(),
+			)
+		);
+	}
+
+	/**
+	 * The one parser of an uploaded key file, for both upload and replace: the
+	 * `key_file` string of the JSON body (not slashed, unlike $_POST), size
+	 * checked before parsing, then discarded.
+	 *
+	 * @param \WP_REST_Request $request The request.
+	 * @return ServiceAccountKey|\WP_Error
+	 */
+	private function parse_key_file( \WP_REST_Request $request ): ServiceAccountKey|\WP_Error {
 		$key_file = $request->get_param( 'key_file' );
 
 		if ( ! is_string( $key_file ) || ( '' === trim( $key_file ) ) ) {
@@ -176,20 +250,7 @@ final class RestController {
 			return new \WP_Error( $key->get_error_code(), $key->get_error_message(), array( 'status' => 400 ) );
 		}
 
-		$label = $request->get_param( 'label' );
-		$id    = $this->vault->add( $key, is_string( $label ) ? $label : '' );
-
-		if ( $id instanceof \WP_Error ) {
-			return new \WP_Error( $id->get_error_code(), $id->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		return new \WP_REST_Response(
-			array(
-				'account'  => $this->vault->get( $id ),
-				'accounts' => $this->vault->all(),
-			),
-			201
-		);
+		return $key;
 	}
 
 	/**

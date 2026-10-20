@@ -509,8 +509,9 @@ final class SettingsPageTest extends TestCase {
 		$this->assertArrayHasKey( 'google-data-manager', $by_id );
 
 		$columns = array_column( $by_id['google-data-manager']['fields'][0]['columns'], null, 'key' );
+		// The row holds no key, so its choice says it cannot send (#468).
 		$this->assertSame(
-			array( 'sa_0123456789ab' => 'Production SA' ),
+			array( 'sa_0123456789ab' => 'Production SA (key unreadable, use Replace key)' ),
 			$columns['service_account']['choices'],
 			'The select cell shows the stored service accounts.'
 		);

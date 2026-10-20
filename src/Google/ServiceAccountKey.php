@@ -61,6 +61,39 @@ final class ServiceAccountKey {
 	}
 
 	/**
+	 * What var_dump()/print_r() show: everything but the key (#496). Only these
+	 * and serialize() are covered; json_encode(), var_export() and an (array)
+	 * cast still read the public property.
+	 *
+	 * @return array<string, string>
+	 */
+	public function __debugInfo(): array {
+		return self::redacted( get_object_vars( $this ) );
+	}
+
+	/**
+	 * What serialize() keeps: everything but the key, so a stray cache or log
+	 * of this object never stores it (#496).
+	 *
+	 * @return array<string, string>
+	 */
+	public function __serialize(): array {
+		return self::redacted( get_object_vars( $this ) );
+	}
+
+	/**
+	 * The object's fields with the private key replaced.
+	 *
+	 * @param array<string, string> $fields Object fields.
+	 * @return array<string, string>
+	 */
+	private static function redacted( array $fields ): array {
+		$fields['private_key'] = '[redacted]';
+
+		return $fields;
+	}
+
+	/**
 	 * Builds the value object from a downloaded key file: `type` must be
 	 * "service_account", `client_email` non-empty, `private_key` an RSA key
 	 * OpenSSL parses, and `token_uri` the endpoint the plugin posts to (the

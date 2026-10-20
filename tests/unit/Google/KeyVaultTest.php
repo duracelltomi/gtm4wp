@@ -11,6 +11,7 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use GTM4WP\Google\KeyVault;
 use GTM4WP\Google\ServiceAccountKey;
+use GTM4WP\Google\TokenService;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
@@ -140,7 +141,7 @@ final class KeyVaultTest extends TestCase {
 
 		$row = $this->stored_row( $id );
 
-		$this->assertSame( array( 'iv', 'tag', 'ciphertext' ), array_keys( $row['key'] ), 'The key is stored as an authenticated-encryption blob.' );
+		$this->assertSame( array( 'iv', 'tag', 'ciphertext', 'secret' ), array_keys( $row['key'] ), 'The key is stored as an authenticated-encryption blob.' );
 
 		// Absent: the PEM and any fragment of it, in the row as a whole.
 		$serialized = serialize( $this->options[ KeyVault::OPTION_NAME ] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- flattening the stored row to search it.
@@ -361,7 +362,8 @@ final class KeyVaultTest extends TestCase {
 		// runs on a later request, can pick it up.
 		$this->assertSame( KeyVault::STATUS_REUPLOAD, $this->stored_row( $id )['status'] );
 		$this->assertSame( array( $id ), $vault->unreadable() );
-		$this->assertSame( array( $id ), $this->make_vault()->unreadable(), 'Visible to a fresh instance: it was written, not cached.' );
+		$this->assertSame( array( $id ), $this->make_vault( $secret )->unreadable(), 'Visible to a fresh instance: it is found by trying the key, not cached.' );
+		$this->assertSame( KeyVault::STATUS_REUPLOAD, $this->make_vault( $secret )->get( $id )['status'] );
 	}
 
 	/**
@@ -394,6 +396,249 @@ final class KeyVaultTest extends TestCase {
 
 		$this->assertSame( array(), $vault->unreadable() );
 		$this->assertInstanceOf( ServiceAccountKey::class, $vault->open( $fresh ) );
+	}
+
+	// ---- Replace key (#468) -------------------------------------------------
+
+	/**
+	 * A key of the same service account parsed from the fixture with a new key id.
+	 *
+	 * @param array<string, mixed> $overrides See KeyFileFixture::key_data().
+	 * @return ServiceAccountKey
+	 */
+	private function other_key( array $overrides = array( 'private_key_id' => 'ffffffffffffffffffffffffffffffffffffffff' ) ): ServiceAccountKey {
+		$key = ServiceAccountKey::from_json( KeyFileFixture::key_file( $overrides ) );
+		$this->assertInstanceOf( ServiceAccountKey::class, $key );
+
+		return $key;
+	}
+
+	public function test_replace_key_recovers_an_unreadable_account_under_the_same_id(): void {
+		$id = $this->add_fixture( $this->make_vault() );
+		$this->make_vault()->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a' );
+		$before = $this->stored_row( $id );
+
+		$rotated = $this->make_vault( 'a-different-secret-after-salt-rotation' );
+		$this->assertSame( array( $id ), $rotated->unreadable() );
+
+		$account = $rotated->replace_key( $id, $this->other_key() );
+
+		$this->assertIsArray( $account );
+		$this->assertSame( $id, $account['id'] );
+		$this->assertSame( KeyVault::STATUS_UNVERIFIED, $account['status'] );
+		$this->assertSame( 'ffffffffffffffffffffffffffffffffffffffff', $account['private_key_id'] );
+		$this->assertSame( 'Production', $account['label'], 'The label is kept.' );
+		$this->assertSame( array(), $rotated->unreadable() );
+		$this->assertInstanceOf( ServiceAccountKey::class, $rotated->open( $id ) );
+		$this->assertNotSame( $before['key'], $this->stored_row( $id )['key'] );
+		$this->assertSame( 0, $this->stored_row( $id )['last_checked'] );
+		$this->assertSame( array( 'gtm4wp_google_token_' . $id . '_' ), array_map( static fn ( $n ) => substr( $n, 0, strlen( 'gtm4wp_google_token_' . $id . '_' ) ), $this->deleted_transients ), 'The token minted with the old key is purged.' );
+	}
+
+	public function test_replace_key_refuses_a_key_of_another_service_account_and_changes_nothing(): void {
+		$vault  = $this->make_vault();
+		$id     = $this->add_fixture( $vault );
+		$before = $this->stored_row( $id );
+
+		$result = $vault->replace_key( $id, $this->other_key( array( 'client_email' => 'someone-else@other-project.iam.gserviceaccount.com' ) ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_key_other_account', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertSame( $before, $this->stored_row( $id ) );
+		$this->assertSame( array(), $this->deleted_transients );
+	}
+
+	public function test_replace_key_of_an_unknown_id_is_a_404(): void {
+		$result = $this->make_vault()->replace_key( 'sa_000000000000', $this->other_key() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_account_unknown', $result->get_error_code() );
+		$this->assertSame( 404, $result->get_error_data()['status'] );
+		$this->assertArrayNotHasKey( KeyVault::OPTION_NAME, $this->options );
+	}
+
+	// ---- GTM4WP_ENCRYPTION_KEY (#469) ----------------------------------------
+
+	private const CONSTANT = 'a-gtm4wp-encryption-key-of-at-least-32-chars';
+
+	/**
+	 * A vault with the encryption key in use, over the given salts.
+	 *
+	 * @param string $salts The salt material.
+	 * @return KeyVault
+	 */
+	private function constant_vault( string $salts = self::SECRET ): KeyVault {
+		return new KeyVault( $salts, static fn () => self::NOW, self::CONSTANT );
+	}
+
+	public function test_a_key_sealed_with_the_constant_survives_a_salt_rotation(): void {
+		$id = $this->add_fixture( $this->constant_vault() );
+
+		$this->assertSame( KeyVault::SECRET_CONSTANT, $this->stored_row( $id )['key']['secret'] );
+
+		$rotated = $this->constant_vault( 'a-different-secret-after-salt-rotation' );
+		$this->assertSame( array(), $rotated->unreadable() );
+		$this->assertInstanceOf( ServiceAccountKey::class, $rotated->open( $id ) );
+		$this->assertInstanceOf( \WP_Error::class, $this->make_vault()->open( $id ), 'The salts alone do not open it.' );
+	}
+
+	public function test_adding_the_constant_reseals_a_salt_key_on_the_first_look(): void {
+		$id = $this->add_fixture( $this->make_vault() );
+		$this->assertSame( KeyVault::SECRET_SALTS, $this->stored_row( $id )['key']['secret'] );
+
+		$this->constant_vault()->all();
+
+		$this->assertSame( KeyVault::SECRET_CONSTANT, $this->stored_row( $id )['key']['secret'] );
+		$this->assertInstanceOf( ServiceAccountKey::class, $this->constant_vault( 'a-different-secret-after-salt-rotation' )->open( $id ) );
+	}
+
+	public function test_the_reseal_never_overwrites_a_key_replaced_meanwhile(): void {
+		$id       = $this->add_fixture( $this->make_vault() );
+		$replaced = array( 'replaced-by-a-concurrent-request' );
+
+		// The reseal's fresh read is the window a concurrent replace lands in.
+		Functions\when( 'wp_cache_delete' )->alias(
+			function () use ( $id, $replaced ) {
+				$this->options[ KeyVault::OPTION_NAME ][ $id ]['key'] = $replaced;
+				return true;
+			}
+		);
+
+		$this->constant_vault()->all();
+
+		$this->assertSame( $replaced, $this->stored_row( $id )['key'] );
+	}
+
+	public function test_removing_the_constant_after_the_reseal_names_it(): void {
+		$id = $this->add_fixture( $this->constant_vault() );
+
+		$salts_only = $this->make_vault();
+
+		$this->assertSame( array( $id ), $salts_only->unreadable() );
+		$this->assertSame( array( KeyVault::CAUSE_CONSTANT_MISSING => array( $id ) ), $salts_only->unreadable_by_cause() );
+		$this->assertSame( array(), $this->constant_vault()->unreadable_by_cause() );
+	}
+
+	public function test_each_unreadable_account_is_reported_under_its_own_cause(): void {
+		$constant = $this->add_fixture( $this->constant_vault(), 'Constant' );
+		$salts    = $this->add_fixture( $this->make_vault(), 'Salts' );
+
+		$this->assertSame(
+			array(
+				KeyVault::CAUSE_CONSTANT_MISSING => array( $constant ),
+				KeyVault::CAUSE_SALTS            => array( $salts ),
+			),
+			$this->make_vault( 'a-different-secret-after-salt-rotation' )->unreadable_by_cause(),
+			'Restoring the constant would not fix the salt-sealed one, so it is not blamed on it.'
+		);
+
+		$changed = new KeyVault( self::SECRET, static fn () => self::NOW, 'another-gtm4wp-encryption-key-of-32-chars' );
+		$this->assertSame( array( KeyVault::CAUSE_CONSTANT_CHANGED => array( $constant ) ), $changed->unreadable_by_cause() );
+	}
+
+	/**
+	 * A mint that opened the key before a replace records nothing on the new
+	 * key and tells its caller not to cache the token (#468).
+	 */
+	public function test_a_mint_with_a_replaced_key_records_nothing(): void {
+		$vault = $this->make_vault();
+		$id    = $this->add_fixture( $vault );
+		$vault->replace_key( $id, $this->other_key() );
+		$before = $this->stored_row( $id );
+
+		$this->assertFalse( $vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a', false, KeyFileFixture::PRIVATE_KEY_ID ) );
+		$this->assertSame( $before, $this->stored_row( $id ) );
+
+		$this->assertTrue( $vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a', false, 'ffffffffffffffffffffffffffffffffffffffff' ) );
+		$this->assertSame( KeyVault::STATUS_OK, $this->stored_row( $id )['status'] );
+	}
+
+	/**
+	 * Status writers re-read the row just before writing, so a key replaced
+	 * by another request before that read survives them (#468, C1).
+	 *
+	 * @return array<string, array{0: callable}>
+	 */
+	public static function status_writers(): array {
+		return array(
+			'token result' => array( static fn ( KeyVault $vault, string $id ) => $vault->record_token_result( $id, false, 'refused' ) ),
+			'relabel'      => array( static fn ( KeyVault $vault, string $id ) => $vault->relabel( $id, 'Renamed' ) ),
+		);
+	}
+
+	/**
+	 * A key replaced before the writer's re-read is kept.
+	 *
+	 * @param callable $write The status write.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'status_writers' )]
+	public function test_a_status_write_keeps_a_key_replaced_by_another_request( callable $write ): void {
+		$vault    = $this->make_vault();
+		$id       = $this->add_fixture( $vault );
+		$replaced = array( 'replaced-by-a-concurrent-request' );
+
+		// The writer's fresh read is where another request's replace shows up.
+		Functions\when( 'wp_cache_delete' )->alias(
+			function () use ( $id, $replaced ) {
+				$this->options[ KeyVault::OPTION_NAME ][ $id ]['key'] = $replaced;
+				return true;
+			}
+		);
+
+		$write( $vault, $id );
+
+		$this->assertSame( $replaced, $this->stored_row( $id )['key'] );
+	}
+
+	/**
+	 * The stored token endpoint is not re-validated on open: a row written
+	 * before an endpoint change keeps working (#498).
+	 */
+	public function test_a_stored_token_endpoint_never_locks_the_row(): void {
+		$id = $this->add_fixture( $this->make_vault() );
+		$this->options[ KeyVault::OPTION_NAME ][ $id ]['token_uri'] = 'https://oauth2.example.com/token';
+
+		$key = $this->make_vault()->open( $id );
+
+		$this->assertInstanceOf( ServiceAccountKey::class, $key );
+		$this->assertSame( TokenService::TOKEN_ENDPOINT, $key->token_uri );
+	}
+
+	// ---- Custody across the R53 additions -------------------------------------
+
+	/**
+	 * The vault's public surface, pinned whole: a new public method is a new
+	 * place key material could leave from, so adding one fails here first.
+	 * Only open() may name ServiceAccountKey in its return type.
+	 */
+	public function test_only_open_hands_out_key_material(): void {
+		$methods = array();
+		$openers = array();
+
+		foreach ( ( new \ReflectionClass( KeyVault::class ) )->getMethods( \ReflectionMethod::IS_PUBLIC ) as $method ) {
+			$methods[] = $method->getName();
+			if ( false !== strpos( (string) $method->getReturnType(), 'ServiceAccountKey' ) ) {
+				$openers[] = $method->getName();
+			}
+		}
+
+		sort( $methods );
+		$this->assertSame(
+			array( '__construct', 'add', 'all', 'clean_label', 'delete', 'encryption_key_state', 'get', 'has', 'open', 'record_token_result', 'relabel', 'replace_key', 'safe_label', 'unreadable', 'unreadable_by_cause' ),
+			$methods
+		);
+		$this->assertSame( array( 'open' ), $openers );
+
+		$vault = new KeyVault( self::SECRET, static fn () => self::NOW, 'a-gtm4wp-encryption-key-of-at-least-32-chars' );
+		$id    = $this->add_fixture( $this->make_vault() );
+		$flat  = serialize( // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- flattening to search.
+			array( $vault->all(), $vault->get( $id ), $vault->replace_key( $id, $this->other_key() ), $vault->unreadable(), $vault->unreadable_by_cause() )
+		);
+
+		$this->assertStringNotContainsString( 'PRIVATE KEY', $flat );
+		$this->assertStringNotContainsString( 'ciphertext', $flat );
+		$this->assertStringNotContainsString( $this->stored_row( $id )['key']['ciphertext'], $flat );
 	}
 
 	// ---- Deletion ----------------------------------------------------------

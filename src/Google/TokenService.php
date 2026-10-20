@@ -70,6 +70,12 @@ final class TokenService {
 	public const EARLY_EXPIRY = 60;
 
 	/**
+	 * Seconds `iat` is backdated, so a server clock running fast is not refused
+	 * as a token "from the future" (#492; Google's own PHP client uses 60).
+	 */
+	public const CLOCK_SKEW = 60;
+
+	/**
 	 * Prefix of the transient holding a cached token.
 	 */
 	private const TRANSIENT_PREFIX = 'gtm4wp_google_token_';
@@ -122,7 +128,7 @@ final class TokenService {
 
 		$assertion = $this->sign_assertion( $key, $scope );
 		if ( $assertion instanceof \WP_Error ) {
-			$this->vault->record_token_result( $account_id, false, $assertion->get_error_message() );
+			$this->vault->record_token_result( $account_id, false, $assertion->get_error_message(), '', false, $key->private_key_id );
 			return $assertion;
 		}
 
@@ -150,16 +156,17 @@ final class TokenService {
 
 		if ( ( 200 !== $response['status'] ) || ! is_string( $token ) || ( '' === $token ) ) {
 			$message = self::error_summary( $response );
-			$this->vault->record_token_result( $account_id, false, $message );
+			$this->vault->record_token_result( $account_id, false, $message, '', false, $key->private_key_id );
 
 			return new \WP_Error( 'gtm4wp_google_token_refused', $message );
 		}
 
 		// $fresh is the Test button, which always writes (see is_unchanged_success()).
-		$this->vault->record_token_result( $account_id, true, '', $scope, $fresh );
+		// A key replaced since open() leaves nothing recorded or cached (#468).
+		$current = $this->vault->record_token_result( $account_id, true, '', $scope, $fresh, $key->private_key_id );
 
 		$ttl = $expires_in - self::EARLY_EXPIRY;
-		if ( $ttl > 0 ) {
+		if ( $current && $ttl > 0 ) {
 			set_transient( $transient, $token, $ttl );
 		}
 
@@ -225,8 +232,8 @@ final class TokenService {
 	 * Builds and signs the JWT-bearer assertion.
 	 *
 	 * Claims per Google's service-account flow: `iss` the account e-mail,
-	 * `scope` the requested scope, `aud` the token endpoint, `iat` now and
-	 * `exp` one hour later. Header `alg` RS256 with the key id as `kid`.
+	 * `scope` the requested scope, `aud` the token endpoint (our constant,
+	 * not the stored field, #498), `iat` now less CLOCK_SKEW and `exp` one hour later. Header `alg` RS256 with the key id as `kid`.
 	 *
 	 * @param ServiceAccountKey $key   The account key.
 	 * @param string            $scope OAuth scope.
@@ -246,9 +253,9 @@ final class TokenService {
 		$claims = array(
 			'iss'   => $key->client_email,
 			'scope' => $scope,
-			'aud'   => $key->token_uri,
-			'iat'   => $now,
-			'exp'   => $now + self::ASSERTION_LIFETIME,
+			'aud'   => self::TOKEN_ENDPOINT,
+			'iat'   => $now - self::CLOCK_SKEW,
+			'exp'   => $now - self::CLOCK_SKEW + self::ASSERTION_LIFETIME,
 		);
 
 		$signing_input = self::base64url( (string) wp_json_encode( $header ) ) . '.' . self::base64url( (string) wp_json_encode( $claims ) );

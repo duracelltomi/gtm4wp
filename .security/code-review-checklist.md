@@ -1179,13 +1179,13 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 |---|---|---|---|---|---|
 | 466 | Medium | fixed (R53 fix session: purchase basis frozen on the order when tracked; refund value on that basis, remaining-basis ratio for line-less refunds; zero-value refunds skipped; design verified first, drafted fix refuted twice; 17 test cases probed, 15 red before the fix, 2 green by design) | — | Data Manager WC/EDD refund adapters, `RefundEvent` | Refund amount does not follow the purchase value's exclude-tax / exclude-shipping options |
 | 467 | Medium | fixed (R53 fix session: the capture hooks are wired from `Plugin::boot()` via `CaptureHooks::register_for()` and no longer from the module, so they are not registered twice; 3 tests, 2 red before the fix, 1 guard green by design) | — | Data Manager `CaptureHooks` wiring | EDD orders built on admin-ajax are not captured for the refund lane |
-| 468 | Medium | open | — | `KeyVault`, GoogleAuth routes + remedy texts | The advised recovery after a salt change does not restore sending |
-| 469 | Medium | open (needs design) | — | `KeyVault` storage key | Salts rotate without admin action on common security plugins, so the stored key goes unreadable on a schedule |
+| 468 | Medium | fixed (R53 fix session, maintainer decision: Replace key per account, refused for another service account; status writers update only their own fields; remedy texts point at it) | — | `KeyVault`, GoogleAuth routes + remedy texts | The advised recovery after a salt change does not restore sending |
+| 469 | Medium | fixed (R53 fix session, maintainer decision: optional `GTM4WP_ENCRYPTION_KEY`, keys move to it on first use, refused or removed constant named in a notice; design and code verified) | — | `KeyVault` storage key | Salts rotate without admin action on common security plugins, so the stored key goes unreadable on a schedule |
 | 470 | Medium | fixed (R53 fix session: the row resolves its content-details line by key, download and price id; catalogue fallback; fixtures moved to the real hook shape, U115 records it) | — | EDD `ListTracking` checkout rows | Checkout-row cart events read fields the hook's item does not carry |
 | 471 | Medium | fixed (R53 fix session: pending counts only on the confirmation page; the fallback waits for payment) | — | EDD reliable-purchase fallback | The fallback lanes treat an unpaid pending order as a purchase |
 | 472 | Low | fixed (R53 fix session: token transport/429/5xx transient and retried, not charged to the key; encode not retried) | — | Data Manager `EventsIngest` / `TokenService` | Retry classification: transient token failures not retried, a deterministic failure retried |
 | 473 | Low | fixed (R53 fix session: overdue retrying rows replayable; an unschedulable job logged failed `not_queued`) | A4 / — | Data Manager `RefundSender` / `SendLog` | A job that never runs leaves no replay target (new evidence on #388's scope) |
-| 474 | Low | open (unverified) | A4 / — | Data Manager `RefundSender` | No claim between the already-sent check and the send |
+| 474 | Low | accepted (R53 maintainer decision: delivery is at least once, documented on `RefundSender`; revisit with the 2.2 purchase lane) | A4 / — | Data Manager `RefundSender` | No claim between the already-sent check and the send |
 | 475 | Low | fixed (R53 fix session: `refund` context documented on both item builders) | site code | Data Manager refund item build | Item filters run in cron under an undocumented context |
 | 476 | Low | fixed (R53 fix session: documented as refund-event filter context; kept) | — | `RefundData::$order_total` | Unread internally; public filter input |
 | 477 | Low | open | — | `RefundSender::run()` | Over 50 lines |
@@ -1203,13 +1203,13 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 489 | Low | fixed (R53 fix session: wording) | — | `AttributionCookies` | Lifetime wording |
 | 490 | Low | open | — | `KeyVault` | Sealed blob carries no version |
 | 491 | Low | open | — | `TokenService` / threat model | The cached access token is not named in the threat model |
-| 492 | Low | open | — | `TokenService` | No clock-skew allowance |
+| 492 | Low | fixed (R53 fix session: `iat` backdated 60 s) | — | `TokenService` | No clock-skew allowance |
 | 493 | Low | fixed (R53 fix session, maintainer decision: the production-only setting holds sending back) | — | Data Manager send lane | No environment guard |
 | 494 | Low | fixed (R53 fix session, maintainer decision: 7 territories added; undecided ones recorded in U127) | A0/A1 data | `ConsentRegions` | Region list omits EU territories with their own codes |
-| 495 | Low | open | — | `KeyVault`, `TokenService` | Comment rationale drift |
-| 496 | Low | open | — | `ServiceAccountKey` | Debug output redaction |
-| 497 | Low | open | — | `KeyVault` | Misdiagnosis without OpenSSL |
-| 498 | Low | open | — | `ServiceAccountKey`, `KeyVault` | Redundant stored field |
+| 495 | Low | fixed (R53 fix session: comment reworded, `$force` kept) | — | `KeyVault`, `TokenService` | Comment rationale drift |
+| 496 | Low | fixed (R53 fix session: `__debugInfo`/`__serialize` redact the key) | — | `ServiceAccountKey` | Debug output redaction |
+| 497 | Low | fixed (R53 fix session: no-OpenSSL error, no status write) | — | `KeyVault` | Misdiagnosis without OpenSSL |
+| 498 | Low | fixed (R53 fix session: `aud` and the opened key use the endpoint constant) | — | `ServiceAccountKey`, `KeyVault` | Redundant stored field |
 | 499 | Low | (a) open, (b) fixed (this ledger update) | — | Notices; #229/#233 ledger rows | (a) a shared notice-markup convention; (b) stale "no production caller" ledger text |
 | 500 | Low | fixed (R53 fix session: selects declare string or integer; get→update type round-trip test) | A4 delegate | `Field::value_schema()` | Two settings round-trip with a type error between the read and the write ability |
 | 501 | Low | fixed (R53 fix session: refused 400 in the shared service; minItems + pattern on both schemas) | A4 delegate | Data Manager replay (ability + route) | An empty or malformed reference list widens the replay |
@@ -1217,7 +1217,7 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 503 | Low | fixed (R53 fix session, maintainer decision: import documented as an MCP / WP-CLI call) | — | `SettingsAbilities` | Write abilities' REST transport puts the payload in the query string |
 | 504 | Low | fixed (R53 fix session: unknown status → recommended; non-array Info rows dropped) | site code | `StatusAbilities`, Site Health collectors | A third-party contribution can fail the whole answer |
 | 505 | Low | accepted (R53 maintainer decision: recorded PA-21 exception) | — | `ConfigurationChecks` | PA-21: module facts in a plugin-wide collector |
-| 506 | Low | open | — | GoogleAuth Site Health + key notice | Readability reported from a lazily set status |
+| 506 | Low | fixed (R53 fix session: readability found by trying each key, never persisted from a read path) | — | GoogleAuth Site Health + key notice | Readability reported from a lazily set status |
 | 507 | Low | fixed (R53 fix session: export restricted to registered fields) | A4 delegate | `SettingsStore` export | The export carries more than the registered options |
 | 508 | Low | fixed in part (R53 fix session: docblock corrected; measuring get_pages() on a large site left) | — | WC `AdminSchema::fields()` | A database read on ability registration and on every REST request |
 | 509 | Low | fixed (R53 fix session, maintainer decision: the ability answers with the error class; threat model reconciled) | A4 delegate | Send-log ability; threat model | Upstream error text in the log; the threat model contradicts itself |

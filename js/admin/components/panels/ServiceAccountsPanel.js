@@ -1,6 +1,6 @@
 /**
  * Google service accounts panel, the custody UI of the google-auth module:
- * list, upload a key file, rename, test, delete. The key file is read only
+ * list, upload a key file, replace a key, rename, test, delete. The key file is read only
  * to be posted; the server answers with the public view, which is all this
  * panel renders. No way to read a key back; the label is the only editable
  * stored field.
@@ -26,7 +26,7 @@ function statusText( status ) {
 			return __( 'Failed', 'duracelltomi-google-tag-manager' );
 		case 'reupload-required':
 			return __(
-				'Key unreadable, upload the key file again',
+				'Key unreadable, use Replace key',
 				'duracelltomi-google-tag-manager'
 			);
 		case 'unverified':
@@ -67,6 +67,8 @@ export default function ServiceAccountsPanel( { data } ) {
 	const { restPath, keyFileMaxBytes, labelMaxLength } = data;
 
 	const fileInputRef = useRef( null );
+	const replaceInputRef = useRef( null );
+	const [ replaceTarget, setReplaceTarget ] = useState( null );
 	const [ accounts, setAccounts ] = useState( null );
 	const [ label, setLabel ] = useState( '' );
 	const [ pendingFile, setPendingFile ] = useState( null );
@@ -172,6 +174,82 @@ export default function ServiceAccountsPanel( { data } ) {
 					error,
 					__(
 						'The key file could not be uploaded.',
+						'duracelltomi-google-tag-manager'
+					)
+				),
+			} );
+		} finally {
+			setIsBusy( false );
+		}
+	};
+
+	// Choosing the file is the confirmation: the server keeps the id and
+	// refuses a key of another service account (#468).
+	const onReplaceStart = ( account ) => {
+		if ( isBusy ) {
+			return;
+		}
+
+		setReplaceTarget( account );
+		setPendingDeleteId( null );
+
+		if ( replaceInputRef.current ) {
+			replaceInputRef.current.click();
+		}
+	};
+
+	const onReplaceFileChange = async ( event ) => {
+		const file = event.target.files && event.target.files[ 0 ];
+		const account = replaceTarget;
+
+		event.target.value = '';
+		setReplaceTarget( null );
+
+		if ( ! file || ! account || isBusy ) {
+			return;
+		}
+
+		if ( file.size > keyFileMaxBytes ) {
+			setNotice( {
+				status: 'error',
+				text: __(
+					'That file is too large to be a service account key file.',
+					'duracelltomi-google-tag-manager'
+				),
+			} );
+			return;
+		}
+
+		setIsBusy( true );
+		setNotice( null );
+
+		try {
+			const keyFile = await file.text();
+			const response = await apiFetch( {
+				path: `${ restPath }/${ account.id }/key`,
+				method: 'POST',
+				data: { key_file: keyFile },
+			} );
+
+			setAccounts( response.accounts || [] );
+			setNotice( {
+				status: 'success',
+				text: sprintf(
+					/* translators: %s: label of the service account. */
+					__(
+						'The key of %s was replaced. Use Test to check that it can reach Google; sends that failed meanwhile can be sent again under Recent sends in the Google Data Manager section.',
+						'duracelltomi-google-tag-manager'
+					),
+					account.label
+				),
+			} );
+		} catch ( error ) {
+			setNotice( {
+				status: 'error',
+				text: errorText(
+					error,
+					__(
+						'The key could not be replaced.',
 						'duracelltomi-google-tag-manager'
 					)
 				),
@@ -357,6 +435,7 @@ export default function ServiceAccountsPanel( { data } ) {
 					onRenameCancel={ () => setEditingId( null ) }
 					onRename={ onRename }
 					onTest={ onTest }
+					onReplace={ onReplaceStart }
 					onDeleteRequest={ setPendingDeleteId }
 					onDelete={ onDelete }
 				/>
@@ -441,6 +520,14 @@ export default function ServiceAccountsPanel( { data } ) {
 					</Button>
 				</div>
 			</div>
+			<input
+				ref={ replaceInputRef }
+				type="file"
+				accept="application/json,.json"
+				className="gtm4wp-app__file-input"
+				data-testid="gtm4wp-replace-key-input"
+				onChange={ onReplaceFileChange }
+			/>
 		</div>
 	);
 }
@@ -456,6 +543,7 @@ function AccountsTable( {
 	onRenameCancel,
 	onRename,
 	onTest,
+	onReplace,
 	onDeleteRequest,
 	onDelete,
 } ) {
@@ -568,6 +656,7 @@ function AccountsTable( {
 									onRenameCancel={ onRenameCancel }
 									onRename={ onRename }
 									onTest={ onTest }
+									onReplace={ onReplace }
 									onDeleteRequest={ onDeleteRequest }
 									onDelete={ onDelete }
 								/>
@@ -591,6 +680,7 @@ function RowActions( {
 	onRenameCancel,
 	onRename,
 	onTest,
+	onReplace,
 	onDeleteRequest,
 	onDelete,
 } ) {
@@ -682,6 +772,21 @@ function RowActions( {
 				onClick={ () => onRenameStart( account ) }
 			>
 				{ __( 'Rename', 'duracelltomi-google-tag-manager' ) }
+			</Button>
+			<Button
+				variant="tertiary"
+				disabled={ isBusy }
+				label={ sprintf(
+					/* translators: %s: label of the service account. */
+					__(
+						'Replace the key of %s',
+						'duracelltomi-google-tag-manager'
+					),
+					account.label
+				) }
+				onClick={ () => onReplace( account ) }
+			>
+				{ __( 'Replace key', 'duracelltomi-google-tag-manager' ) }
 			</Button>
 			{ /* Icon-only, matching the remove-row button every TableControl
 			     table (containers, Data Manager destinations) renders. The

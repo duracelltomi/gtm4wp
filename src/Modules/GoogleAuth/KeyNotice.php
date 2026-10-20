@@ -16,11 +16,11 @@ use GTM4WP\Google\KeyVault;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Names the accounts whose stored key stopped decrypting (a salt rotation,
- * typically). Not dismissible: a live gap that clears itself once the key is
- * re-uploaded or the account removed. Costs one non-autoloaded option read
- * per admin pageview for settings-capable users, the price of a notice that
- * is actually seen.
+ * Names the accounts whose stored key stopped decrypting (rotated salts,
+ * typically, #506), and a GTM4WP_ENCRYPTION_KEY that is defined but refused
+ * (#469). Not dismissible: each is a live gap that clears itself once fixed.
+ * Costs one non-autoloaded option read and one decryption attempt per account
+ * per admin pageview for settings-capable users.
  */
 final class KeyNotice {
 
@@ -42,38 +42,87 @@ final class KeyNotice {
 	}
 
 	/**
-	 * Prints the notice when at least one account needs a fresh upload.
+	 * Prints the notices that apply.
 	 *
 	 * @return void
 	 */
 	public function show_notice(): void {
-		$unreadable = $this->vault->unreadable();
-		if ( array() === $unreadable ) {
+		if ( 'rejected' === $this->vault->encryption_key_state() ) {
+			echo '<div class="gtm4wp-notice notice notice-error" data-href="?google-encryption-key-rejected"><p><strong>';
+			printf(
+				/* translators: 1: the constant name, 2: the minimum length. */
+				esc_html__( '%1$s in wp-config.php is ignored: it must be a text of at least %2$d characters. Google service-account keys are encrypted with the WordPress security keys until it is fixed.', 'duracelltomi-google-tag-manager' ),
+				esc_html( KeyVault::ENCRYPTION_KEY_CONSTANT ),
+				(int) KeyVault::ENCRYPTION_KEY_MIN_LENGTH
+			);
+			echo '</strong></p></div>';
+		}
+
+		$by_cause = $this->vault->unreadable_by_cause();
+		if ( array() === $by_cause ) {
 			return;
 		}
 
 		$labels = array();
-		foreach ( $unreadable as $id ) {
-			$account  = $this->vault->get( $id );
-			$labels[] = (string) ( $account['label'] ?? $id );
+		foreach ( $this->vault->all() as $account ) {
+			$labels[ $account['id'] ] = (string) $account['label'];
 		}
 
 		echo '<div class="gtm4wp-notice notice notice-error" data-href="?google-key-unreadable"><p><strong>';
-		printf(
-			esc_html(
-				/* translators: 1: comma separated list of service-account labels. 2: opening anchor element pointing to the GTM4WP options page. 3: closing anchor element. */
-				_n(
-					'The stored key of the Google service account %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed. Features using it cannot reach Google until you %2$supload its key file again%3$s.',
-					'The stored keys of the Google service accounts %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed. Features using them cannot reach Google until you %2$supload their key files again%3$s.',
-					count( $labels ),
-					'duracelltomi-google-tag-manager'
-				)
-			),
-			esc_html( implode( ', ', $labels ) ),
-			// The fragment is the settings app's module bookmark.
-			'<a href="' . esc_url( SettingsPage::url() . '#' . GoogleAuthModule::ID ) . '">',
-			'</a>'
-		);
+
+		// One sentence per cause: each has its own remedy (#469).
+		$sentences = array();
+		foreach ( $by_cause as $cause => $ids ) {
+			$names = array_map( static fn ( $id ) => $labels[ $id ] ?? $id, $ids );
+
+			$sentences[] = sprintf(
+				esc_html( self::message( $cause, count( $names ) ) ),
+				esc_html( implode( ', ', $names ) ),
+				esc_html( KeyVault::ENCRYPTION_KEY_CONSTANT ),
+				// The fragment is the settings app's module bookmark.
+				'<a href="' . esc_url( SettingsPage::url() . '#' . GoogleAuthModule::ID ) . '">',
+				'</a>'
+			);
+		}
+
+		echo implode( ' ', $sentences ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- each sentence is escaped above.
 		echo '</strong></p></div>';
+	}
+
+	/**
+	 * The sentence for one cause, with placeholders 1: labels, 2: the constant
+	 * name, 3/4: the link to the accounts panel.
+	 *
+	 * @param string $cause A KeyVault::CAUSE_* value.
+	 * @param int    $count How many accounts it names.
+	 * @return string
+	 */
+	private static function message( string $cause, int $count ): string {
+		switch ( $cause ) {
+			case KeyVault::CAUSE_CONSTANT_MISSING:
+				/* translators: 1: comma separated list of service-account labels. 2: the constant name. 3: opening anchor element pointing to the GTM4WP options page. 4: closing anchor element. */
+				return _n(
+					'The stored key of the Google service account %1$s can no longer be decrypted because %2$s is no longer defined in wp-config.php, or is ignored. Restore it, or use %3$sReplace key%4$s on the account with its key file.',
+					'The stored keys of the Google service accounts %1$s can no longer be decrypted because %2$s is no longer defined in wp-config.php, or is ignored. Restore it, or use %3$sReplace key%4$s on each account with its key file.',
+					$count,
+					'duracelltomi-google-tag-manager'
+				);
+			case KeyVault::CAUSE_CONSTANT_CHANGED:
+				/* translators: 1: comma separated list of service-account labels. 2: the constant name. 3: opening anchor element pointing to the GTM4WP options page. 4: closing anchor element. */
+				return _n(
+					'The stored key of the Google service account %1$s can no longer be decrypted because the value of %2$s in wp-config.php changed. Restore the previous value, or use %3$sReplace key%4$s on the account with its key file.',
+					'The stored keys of the Google service accounts %1$s can no longer be decrypted because the value of %2$s in wp-config.php changed. Restore the previous value, or use %3$sReplace key%4$s on each account with its key file.',
+					$count,
+					'duracelltomi-google-tag-manager'
+				);
+			default:
+				/* translators: 1: comma separated list of service-account labels. 2: the constant name. 3: opening anchor element pointing to the GTM4WP options page. 4: closing anchor element. */
+				return _n(
+					'The stored key of the Google service account %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed (some security plugins change them on a schedule; defining %2$s prevents this). Use %3$sReplace key%4$s on the account with its key file.',
+					'The stored keys of the Google service accounts %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed (some security plugins change them on a schedule; defining %2$s prevents this). Use %3$sReplace key%4$s on each account with its key file.',
+					$count,
+					'duracelltomi-google-tag-manager'
+				);
+		}
 	}
 }

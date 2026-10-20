@@ -23,6 +23,10 @@ defined( 'ABSPATH' ) || exit;
  * path that does not send says why in the diagnostics ring, and no case is
  * papered over with an invented value: a refund Analytics cannot join to its
  * purchase is worse than an honest gap.
+ *
+ * Delivery is at least once, not exactly once (#474): no lock spans the
+ * already-sent check and the send, so two runners of one job, or a timeout
+ * after Google accepted the event, can send it twice.
  */
 final class RefundSender {
 

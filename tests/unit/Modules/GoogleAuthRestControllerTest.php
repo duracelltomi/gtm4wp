@@ -19,7 +19,7 @@ use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
 /**
- * The five routes of the service-accounts panel. Three lenses:
+ * The six routes of the service-accounts panel. Three lenses:
  *
  * - Access control (TS-12/TC-13): every route is registered with can_manage()
  *   as its permission_callback, and can_manage() is proven in the grant, deny
@@ -169,7 +169,7 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$controller = $this->make_controller();
 		$controller->register_routes();
 
-		$this->assertCount( 3, $registered );
+		$this->assertCount( 4, $registered );
 
 		$endpoints = array();
 		foreach ( $registered as list( $ns, $route, $args ) ) {
@@ -191,6 +191,7 @@ final class GoogleAuthRestControllerTest extends TestCase {
 				'POST, PUT, PATCH ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')',
 				'DELETE ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')',
 				'POST ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')/test',
+				'POST ' . RestController::REST_ROUTE . '/(?P<id>' . KeyVault::ID_PATTERN . ')/key',
 			),
 			$endpoints,
 			'The id in a route is constrained to the vault\'s own id format.'
@@ -203,6 +204,10 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$relabel = $registered[1][2][0];
 		$this->assertTrue( $relabel['args']['label']['required'] );
 		$this->assertSame( 'string', $relabel['args']['label']['type'] );
+
+		$replace = $registered[3][2];
+		$this->assertTrue( $replace['args']['key_file']['required'] );
+		$this->assertSame( 'string', $replace['args']['key_file']['type'] );
 	}
 
 	// ---- List --------------------------------------------------------------
@@ -324,6 +329,84 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$over = $this->make_controller()->upload_account( new \WP_REST_Request( array( 'key_file' => $one_over ) ) );
 		$this->assertInstanceOf( \WP_Error::class, $over );
 		$this->assertSame( 'gtm4wp_google_key_too_large', $over->get_error_code() );
+	}
+
+	// ---- Replace key (#468) --------------------------------------------------
+
+	/**
+	 * Replaces the key of an account through the controller.
+	 *
+	 * @param string $id       Account id.
+	 * @param mixed  $key_file The key_file parameter.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	private function replace( string $id, $key_file ) {
+		return $this->make_controller()->replace_key(
+			new \WP_REST_Request(
+				array(
+					'id'       => $id,
+					'key_file' => $key_file,
+				)
+			)
+		);
+	}
+
+	public function test_replace_key_keeps_the_id_and_answers_the_listing_without_key_material(): void {
+		$id = $this->upload_fixture();
+		$this->vault->record_token_result( $id, true, '', 'https://www.googleapis.com/auth/scope-a' );
+		$this->deleted_transients = array();
+
+		$response = $this->replace( $id, KeyFileFixture::key_file( array( 'private_key_id' => 'ffffffffffffffffffffffffffffffffffffffff' ) ) );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $response );
+		$this->assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertSame( $id, $data['account']['id'] );
+		$this->assertSame( 'ffffffffffffffffffffffffffffffffffffffff', $data['account']['private_key_id'] );
+		$this->assertSame( KeyVault::STATUS_UNVERIFIED, $data['account']['status'] );
+		$this->assertSame( array( $data['account'] ), $data['accounts'] );
+		$this->assertCount( 1, $this->deleted_transients, 'The token of the old key is dropped.' );
+		$this->assert_no_secret_in( $data );
+	}
+
+	/**
+	 * Replace parses through the upload's parser: every refused upload is a
+	 * refused replace too, and nothing is written.
+	 *
+	 * @param mixed  $key_file The key_file parameter.
+	 * @param string $code     Expected error code.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'refused_uploads' )]
+	public function test_replace_key_refuses_what_an_upload_refuses( $key_file, string $code ): void {
+		$id     = $this->upload_fixture();
+		$before = $this->options[ KeyVault::OPTION_NAME ];
+
+		$response = $this->replace( $id, $key_file );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( $code, $response->get_error_code() );
+		$this->assertSame( 400, $response->get_error_data()['status'] );
+		$this->assertSame( $before, $this->options[ KeyVault::OPTION_NAME ] );
+	}
+
+	public function test_replace_key_with_another_accounts_key_is_400_and_keeps_the_key(): void {
+		$id     = $this->upload_fixture();
+		$before = $this->options[ KeyVault::OPTION_NAME ];
+
+		$response = $this->replace( $id, KeyFileFixture::key_file( array( 'client_email' => 'someone-else@other-project.iam.gserviceaccount.com' ) ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 'gtm4wp_google_key_other_account', $response->get_error_code() );
+		$this->assertSame( 400, $response->get_error_data()['status'] );
+		$this->assertSame( $before, $this->options[ KeyVault::OPTION_NAME ] );
+	}
+
+	public function test_replace_key_of_an_unknown_account_is_404(): void {
+		$response = $this->replace( 'sa_000000000000', KeyFileFixture::key_file() );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 'gtm4wp_google_account_unknown', $response->get_error_code() );
+		$this->assertSame( 404, $response->get_error_data()['status'] );
 	}
 
 	// ---- Relabel -----------------------------------------------------------

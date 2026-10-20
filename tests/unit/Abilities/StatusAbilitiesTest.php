@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Abilities;
 
+use Brain\Monkey\Functions;
 use GTM4WP\Abilities\StatusAbilities;
 use GTM4WP\Admin\ConfigurationChecks;
 use GTM4WP\Admin\SiteHealthTests;
@@ -54,6 +55,10 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+
+		// Production code builds its own vault, which now tries each key (#506):
+		// the salts it derives from equal the fixtures' secret (TS-16).
+		Functions\when( 'wp_salt' )->alias( static fn ( $scheme ) => 'auth' === $scheme ? self::SECRET : '' );
 
 		$this->vault  = new KeyVault( self::SECRET, static fn () => self::NOW );
 		$this->health = new DestinationHealth( static fn () => self::NOW );

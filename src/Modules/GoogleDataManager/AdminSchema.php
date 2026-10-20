@@ -421,9 +421,17 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * @return array<string, mixed>
 	 */
 	public function panel_data(): array {
+		// An account that cannot send says so in its choice label (#468).
+		$suffixes = array(
+			/* translators: appended to a Google service account label in the destination's account choices. */
+			KeyVault::STATUS_REUPLOAD => __( ' (key unreadable, use Replace key)', 'duracelltomi-google-tag-manager' ),
+			/* translators: appended to a Google service account label in the destination's account choices. */
+			KeyVault::STATUS_ERROR    => __( ' (failed its last test)', 'duracelltomi-google-tag-manager' ),
+		);
+
 		$accounts = array();
 		foreach ( ( new KeyVault() )->all() as $account ) {
-			$accounts[ (string) $account['id'] ] = (string) $account['label'];
+			$accounts[ (string) $account['id'] ] = (string) $account['label'] . ( $suffixes[ $account['status'] ] ?? '' );
 		}
 
 		return array(

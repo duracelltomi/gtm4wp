@@ -16,12 +16,13 @@ defined( 'ABSPATH' ) || exit;
  * Stores uploaded service-account keys in their own non-autoloaded option row
  * (never in `gtm4wp-options`, which travels to the settings screen and the
  * export file; the custody tests pin each path), with the private key
- * encrypted at rest: AES-256-GCM, key HKDF-derived from the wp-config.php
- * salts. That makes a database-only leak non-fatal; it does NOT protect
- * against an attacker holding the files too, and the settings screen says
- * so. Rotated salts flip the account to "re-upload required" with a notice,
- * never a fatal. The private key is write-only: only open() returns key
- * material, and only TokenService calls it; the ciphertext is never returned either.
+ * encrypted at rest: AES-256-GCM, key HKDF-derived from the optional
+ * GTM4WP_ENCRYPTION_KEY constant, else the wp-config.php salts (#469). That
+ * makes a database-only leak non-fatal; it does NOT protect against an
+ * attacker holding the files too, and the settings screen says so. A key that
+ * no longer decrypts reads "re-upload required", never a fatal. The private
+ * key is write-only: only open() returns key material, and only TokenService
+ * calls it; the ciphertext is never returned either.
  */
 final class KeyVault {
 
@@ -75,12 +76,43 @@ final class KeyVault {
 	private const HKDF_INFO = 'gtm4wp/google-service-accounts/v1';
 
 	/**
-	 * The secret the storage key is derived from, or null to derive it from
-	 * the WordPress salts on first use.
+	 * The optional wp-config.php constant the storage key is derived from in
+	 * place of the salts, which security plugins rotate on a schedule (#469).
+	 */
+	public const ENCRYPTION_KEY_CONSTANT = 'GTM4WP_ENCRYPTION_KEY';
+
+	/**
+	 * Shortest value of that constant accepted; a shorter one is reported, not used.
+	 */
+	public const ENCRYPTION_KEY_MIN_LENGTH = 32;
+
+	/**
+	 * The secret a stored blob was sealed with, recorded beside it ('secret').
+	 * A hint only: unsealing tries both, GCM refuses the wrong one.
+	 */
+	public const SECRET_CONSTANT = 'constant';
+	public const SECRET_SALTS    = 'salts';
+
+	/**
+	 * Why a key no longer opens, as unreadable_by_cause() reports it.
+	 */
+	public const CAUSE_SALTS            = 'salts';
+	public const CAUSE_CONSTANT_CHANGED = 'constant-changed';
+	public const CAUSE_CONSTANT_MISSING = 'constant-missing';
+
+	/**
+	 * The salt material, or null to read the WordPress salts on first use.
 	 *
 	 * @var string|null
 	 */
 	private ?string $secret;
+
+	/**
+	 * The encryption key: null reads the constant, '' means none (tests).
+	 *
+	 * @var string|null
+	 */
+	private ?string $encryption_key;
 
 	/**
 	 * Returns the current Unix time. Injectable so tests can pin the stored
@@ -97,10 +129,34 @@ final class KeyVault {
 	 *                              wp-config.php salts. Injected by tests only.
 	 * @param callable|null $clock  Returns the current Unix time; null uses time().
 	 *                              Injected by tests.
+	 * @param string|null   $encryption_key Stands in for GTM4WP_ENCRYPTION_KEY; null reads the constant,
+	 *                                      '' means none. Injected by tests.
 	 */
-	public function __construct( ?string $secret = null, $clock = null ) {
-		$this->secret = $secret;
-		$this->clock  = $clock;
+	public function __construct( ?string $secret = null, $clock = null, ?string $encryption_key = null ) {
+		$this->secret         = $secret;
+		$this->clock          = $clock;
+		$this->encryption_key = $encryption_key;
+	}
+
+	/**
+	 * Whether GTM4WP_ENCRYPTION_KEY is absent, in use, or defined but refused
+	 * (not a string, or shorter than the minimum): a refused one is named in a
+	 * notice, never silently ignored (#60).
+	 *
+	 * @return string 'absent', 'active' or 'rejected'.
+	 */
+	public function encryption_key_state(): string {
+		if ( null !== $this->encryption_key ) {
+			$value = ( '' === $this->encryption_key ) ? null : $this->encryption_key;
+		} else {
+			$value = defined( self::ENCRYPTION_KEY_CONSTANT ) ? constant( self::ENCRYPTION_KEY_CONSTANT ) : null;
+		}
+
+		if ( null === $value ) {
+			return 'absent';
+		}
+
+		return ( is_string( $value ) && strlen( $value ) >= self::ENCRYPTION_KEY_MIN_LENGTH ) ? 'active' : 'rejected';
 	}
 
 	/**
@@ -120,7 +176,7 @@ final class KeyVault {
 	 * @return string|\WP_Error The new account id.
 	 */
 	public function add( ServiceAccountKey $key, string $label ): string|\WP_Error {
-		$accounts = $this->read();
+		$accounts = $this->read( true );
 		$id       = $this->new_id( $accounts );
 
 		$sealed = $this->seal( $key->private_key, $id );
@@ -163,7 +219,7 @@ final class KeyVault {
 	 * @return true|\WP_Error
 	 */
 	public function delete( string $id ): bool|\WP_Error {
-		$accounts = $this->read();
+		$accounts = $this->read( true );
 
 		if ( ! isset( $accounts[ $id ] ) ) {
 			return new \WP_Error(
@@ -219,11 +275,73 @@ final class KeyVault {
 		}
 
 		$label = self::clean_label( $label );
+		$label = ( '' === $label ) ? (string) ( $accounts[ $id ]['client_email'] ?? '' ) : $label;
 
-		$accounts[ $id ]['label'] = ( '' === $label ) ? (string) ( $accounts[ $id ]['client_email'] ?? '' ) : $label;
-		$this->write( $accounts );
+		$this->write_fields( $id, array( 'label' => $label ) );
 
-		return self::public_view( $id, $accounts[ $id ] );
+		return $this->get( $id ) ?? self::public_view( $id, array( 'label' => $label ) + $accounts[ $id ] );
+	}
+
+	/**
+	 * Replaces the key of an existing account, under the same id (#468): the
+	 * recovery after the storage secret changed, and an ordinary key rotation.
+	 * Refused for a key of another service account, so consumers keep sending
+	 * as the identity they were set up with. Any new key of the same account is
+	 * accepted (Google shows a private key once).
+	 *
+	 * @param string            $id  Account id.
+	 * @param ServiceAccountKey $key The parsed key file.
+	 * @return array<string, mixed>|\WP_Error The account's refreshed public view.
+	 */
+	public function replace_key( string $id, ServiceAccountKey $key ): array|\WP_Error {
+		$accounts = $this->read( true );
+
+		if ( ! isset( $accounts[ $id ] ) ) {
+			return new \WP_Error(
+				'gtm4wp_google_account_unknown',
+				__( 'This service account no longer exists.', 'duracelltomi-google-tag-manager' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		if ( (string) ( $accounts[ $id ]['client_email'] ?? '' ) !== $key->client_email ) {
+			return new \WP_Error(
+				'gtm4wp_google_key_other_account',
+				__( 'This key file belongs to another service account. Add it as a new account instead.', 'duracelltomi-google-tag-manager' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$sealed = $this->seal( $key->private_key, $id );
+		if ( $sealed instanceof \WP_Error ) {
+			return $sealed;
+		}
+
+		// A cached token must not outlive the key it was minted with.
+		foreach ( self::minted_scopes( $accounts[ $id ] ) as $scope ) {
+			TokenService::forget( $id, $scope );
+		}
+
+		// A fresh IV makes the row differ, so false is a refused write, as in add().
+		$written = $this->write_fields(
+			$id,
+			array(
+				'private_key_id' => $key->private_key_id,
+				'token_uri'      => $key->token_uri,
+				'uploaded_at'    => $this->now(),
+				'status'         => self::STATUS_UNVERIFIED,
+				'last_checked'   => 0,
+				'last_error'     => '',
+				'key'            => $sealed,
+			)
+		);
+
+		$account = $written ? $this->get( $id ) : null;
+
+		return $account ?? new \WP_Error(
+			'gtm4wp_google_key_store_failed',
+			__( 'The service account could not be saved to the database. Please try again.', 'duracelltomi-google-tag-manager' )
+		);
 	}
 
 	/**
@@ -236,7 +354,7 @@ final class KeyVault {
 		$listed = array();
 
 		foreach ( $this->read() as $id => $account ) {
-			$listed[] = self::public_view( $id, $account );
+			$listed[] = self::public_view( $id, $account, $this->trial( (string) $id, $account ) );
 		}
 
 		return $listed;
@@ -251,7 +369,7 @@ final class KeyVault {
 	public function get( string $id ): ?array {
 		$accounts = $this->read();
 
-		return isset( $accounts[ $id ] ) ? self::public_view( $id, $accounts[ $id ] ) : null;
+		return isset( $accounts[ $id ] ) ? self::public_view( $id, $accounts[ $id ], $this->trial( $id, $accounts[ $id ] ) ) : null;
 	}
 
 	/**
@@ -265,7 +383,9 @@ final class KeyVault {
 	}
 
 	/**
-	 * Ids of the accounts whose stored key can no longer be read.
+	 * Ids of the accounts whose stored key can no longer be read, found by
+	 * trying it now, so a changed secret shows at once, not at the next send
+	 * (#506). Nothing about it is stored: it clears when the secret is back.
 	 *
 	 * @return string[]
 	 */
@@ -273,12 +393,87 @@ final class KeyVault {
 		$ids = array();
 
 		foreach ( $this->read() as $id => $account ) {
-			if ( self::STATUS_REUPLOAD === ( $account['status'] ?? '' ) ) {
-				$ids[] = $id;
+			if ( 'unreadable' === $this->trial( (string) $id, $account ) ) {
+				$ids[] = (string) $id;
 			}
 		}
 
 		return $ids;
+	}
+
+	/**
+	 * The unreadable accounts grouped by the likely cause, so the notice names
+	 * the right remedy for each (#469): the salts changed, the constant's value
+	 * changed, or the constant they were sealed with is not in use now.
+	 *
+	 * @return array<string, string[]> Cause (self::CAUSE_*) => account ids; empty causes left out.
+	 */
+	public function unreadable_by_cause(): array {
+		$accounts = $this->read();
+		$active   = null !== $this->constant_secret();
+		$causes   = array();
+
+		foreach ( $this->unreadable() as $id ) {
+			if ( self::SECRET_CONSTANT !== ( $accounts[ $id ]['key']['secret'] ?? '' ) ) {
+				$cause = self::CAUSE_SALTS;
+			} else {
+				$cause = $active ? self::CAUSE_CONSTANT_CHANGED : self::CAUSE_CONSTANT_MISSING;
+			}
+
+			$causes[ $cause ][] = $id;
+		}
+
+		return $causes;
+	}
+
+	/**
+	 * Tries an account's key without handing it out: 'readable', 'unreadable',
+	 * or 'unknown' when this server cannot decrypt at all (no OpenSSL, #497).
+	 * A key still sealed with the salts while the constant is in use is
+	 * resealed under the constant here, on the first admin look (#469).
+	 *
+	 * @param string               $id      Account id.
+	 * @param array<string, mixed> $account Stored account.
+	 * @return string
+	 */
+	private function trial( string $id, array $account ): string {
+		if ( ! function_exists( 'openssl_decrypt' ) ) {
+			return 'unknown';
+		}
+
+		$unsealed = $this->unseal( $account['key'] ?? null, $id );
+
+		if ( null === $unsealed ) {
+			return 'unreadable';
+		}
+
+		$this->migrate( $id, $unsealed, $account['key'] );
+
+		return 'readable';
+	}
+
+	/**
+	 * Reseals a key opened with the salts under the constant, once it is in use.
+	 * Written only while the stored blob is still the one opened, so a key
+	 * replaced before the re-read is not overwritten with the old one.
+	 *
+	 * @param string                             $id       Account id.
+	 * @param array{pem: string, secret: string} $unsealed The key and the secret it opened with.
+	 * @param mixed                              $opened   The stored blob it was opened from.
+	 * @return void
+	 */
+	private function migrate( string $id, array $unsealed, $opened ): void {
+		if ( self::SECRET_SALTS !== $unsealed['secret'] || null === $this->constant_secret() ) {
+			return;
+		}
+
+		$sealed   = $this->seal( $unsealed['pem'], $id );
+		$accounts = $this->read( true );
+
+		if ( is_array( $sealed ) && isset( $accounts[ $id ] ) && ( $accounts[ $id ]['key'] ?? null ) === $opened ) {
+			$accounts[ $id ]['key'] = $sealed;
+			$this->write( $accounts );
+		}
 	}
 
 	/**
@@ -318,19 +513,34 @@ final class KeyVault {
 			);
 		}
 
-		$account = $accounts[ $id ];
-		$pem     = $this->unseal( $account['key'] ?? null, $id );
+		// Without OpenSSL nothing decrypts; that is the server, not the key (#497).
+		if ( ! function_exists( 'openssl_decrypt' ) ) {
+			return new \WP_Error(
+				'gtm4wp_google_key_no_openssl',
+				__( 'The PHP OpenSSL extension is required to use Google service accounts, but it is not available on this server.', 'duracelltomi-google-tag-manager' )
+			);
+		}
 
-		if ( null === $pem ) {
-			$accounts[ $id ]['status']     = self::STATUS_REUPLOAD;
-			$accounts[ $id ]['last_error'] = '';
-			$this->write( $accounts );
+		$account  = $accounts[ $id ];
+		$unsealed = $this->unseal( $account['key'] ?? null, $id );
+
+		if ( null === $unsealed ) {
+			$this->write_fields(
+				$id,
+				array(
+					'status'     => self::STATUS_REUPLOAD,
+					'last_error' => '',
+				)
+			);
 
 			return new \WP_Error(
 				'gtm4wp_google_key_unreadable',
-				__( 'The stored key of this service account can no longer be decrypted (this happens when the security keys in wp-config.php change). Please upload the key file again.', 'duracelltomi-google-tag-manager' )
+				__( 'The stored key of this service account can no longer be decrypted: the security keys in wp-config.php or GTM4WP_ENCRYPTION_KEY changed. Use Replace key on the account with its key file.', 'duracelltomi-google-tag-manager' )
 			);
 		}
+
+		$this->migrate( $id, $unsealed, $account['key'] );
+		$pem = $unsealed['pem'];
 
 		// Rebuilt through the same parser, so the decrypted key is checked
 		// again rather than trusted because it came from our own row.
@@ -341,7 +551,8 @@ final class KeyVault {
 					'client_email'   => (string) ( $account['client_email'] ?? '' ),
 					'private_key'    => $pem,
 					'private_key_id' => (string) ( $account['private_key_id'] ?? '' ),
-					'token_uri'      => (string) ( $account['token_uri'] ?? '' ),
+					// The constant, not the stored field: an endpoint change must not lock every row (#498).
+					'token_uri'      => TokenService::TOKEN_ENDPOINT,
 				)
 			)
 		);
@@ -350,39 +561,48 @@ final class KeyVault {
 	/**
 	 * Records the outcome of a token mint against the account.
 	 *
-	 * @param string $id      Account id.
-	 * @param bool   $ok      Whether Google issued a token.
-	 * @param string $message Error summary from Google when it did not; ignored on success.
-	 * @param string $scope   OAuth scope the mint was for; remembered so delete() can purge its token (#226).
-	 * @param bool   $force   Write even when nothing changed (the Test button: the admin must see the time move).
-	 * @return void
+	 * @param string  $id      Account id.
+	 * @param bool    $ok      Whether Google issued a token.
+	 * @param string  $message Error summary from Google when it did not; ignored on success.
+	 * @param string  $scope   OAuth scope the mint was for; remembered so delete() can purge its token (#226).
+	 * @param bool    $force   Write even when nothing changed (the Test button): the stored time is what the
+	 *                         ability reports as tested_at, and the write restarts the freshness window.
+	 * @param ?string $key_id The private_key_id the mint signed with; null when no key was opened.
+	 * @return bool False when the key was replaced since the mint opened it: nothing is
+	 *              recorded and the caller must not cache the token (#468).
 	 */
-	public function record_token_result( string $id, bool $ok, string $message = '', string $scope = '', bool $force = false ): void {
-		$accounts = $this->read();
+	public function record_token_result( string $id, bool $ok, string $message = '', string $scope = '', bool $force = false, ?string $key_id = null ): bool {
+		$accounts = $this->read( true );
 
 		if ( ! isset( $accounts[ $id ] ) ) {
-			return;
+			return false;
+		}
+
+		if ( null !== $key_id && (string) ( $accounts[ $id ]['private_key_id'] ?? '' ) !== $key_id ) {
+			return false;
 		}
 
 		if ( ! $force && $this->is_unchanged_success( $accounts[ $id ], $ok, $scope ) ) {
-			return;
+			return true;
 		}
 
-		$accounts[ $id ]['status']       = $ok ? self::STATUS_OK : self::STATUS_ERROR;
-		$accounts[ $id ]['last_checked'] = $this->now();
-		$accounts[ $id ]['last_error']   = $ok
-			? ''
-			: mb_substr( sanitize_text_field( $message ), 0, TokenService::ERROR_MAX_LENGTH );
+		$fields = array(
+			'status'       => $ok ? self::STATUS_OK : self::STATUS_ERROR,
+			'last_checked' => $this->now(),
+			'last_error'   => $ok ? '' : mb_substr( sanitize_text_field( $message ), 0, TokenService::ERROR_MAX_LENGTH ),
+		);
 
 		if ( $ok && ( '' !== $scope ) ) {
 			$scopes = self::minted_scopes( $accounts[ $id ] );
 			if ( ! in_array( $scope, $scopes, true ) ) {
 				$scopes[] = $scope;
 			}
-			$accounts[ $id ]['scopes'] = $scopes;
+			$fields['scopes'] = $scopes;
 		}
 
-		$this->write( $accounts );
+		$this->write_fields( $id, $fields );
+
+		return true;
 	}
 
 	/**
@@ -443,16 +663,26 @@ final class KeyVault {
 	 *
 	 * @param string               $id      Account id.
 	 * @param array<string, mixed> $account Stored account.
+	 * @param string               $trial   What trying the key found now (trial()); 'unknown' keeps the stored status.
 	 * @return array<string, mixed>
 	 */
-	private static function public_view( string $id, array $account ): array {
+	private static function public_view( string $id, array $account, string $trial = 'unknown' ): array {
+		$status = (string) ( $account['status'] ?? self::STATUS_UNVERIFIED );
+
+		// What trying the key found now wins over what was stored, both ways (#506).
+		if ( 'unreadable' === $trial ) {
+			$status = self::STATUS_REUPLOAD;
+		} elseif ( 'readable' === $trial && self::STATUS_REUPLOAD === $status ) {
+			$status = self::STATUS_UNVERIFIED;
+		}
+
 		return array(
 			'id'             => $id,
 			'label'          => (string) ( $account['label'] ?? '' ),
 			'client_email'   => (string) ( $account['client_email'] ?? '' ),
 			'private_key_id' => (string) ( $account['private_key_id'] ?? '' ),
 			'uploaded_at'    => (int) ( $account['uploaded_at'] ?? 0 ),
-			'status'         => (string) ( $account['status'] ?? self::STATUS_UNVERIFIED ),
+			'status'         => $status,
 			'last_checked'   => (int) ( $account['last_checked'] ?? 0 ),
 			'last_error'     => (string) ( $account['last_error'] ?? '' ),
 		);
@@ -480,7 +710,7 @@ final class KeyVault {
 	 *
 	 * @param string $pem Private key.
 	 * @param string $id  Account id the blob belongs to.
-	 * @return array{iv: string, tag: string, ciphertext: string}|\WP_Error Base64 fields.
+	 * @return array{iv: string, tag: string, ciphertext: string, secret: string}|\WP_Error Base64 fields, and the secret used.
 	 */
 	private function seal( string $pem, string $id ): array|\WP_Error {
 		if ( ! function_exists( 'openssl_encrypt' ) || ! in_array( self::CIPHER, openssl_get_cipher_methods(), true ) ) {
@@ -493,7 +723,8 @@ final class KeyVault {
 		$iv  = random_bytes( self::IV_BYTES );
 		$tag = '';
 
-		$ciphertext = openssl_encrypt( $pem, self::CIPHER, $this->storage_key(), OPENSSL_RAW_DATA, $iv, $tag, $id, self::TAG_BYTES );
+		$secret     = null !== $this->constant_secret() ? self::SECRET_CONSTANT : self::SECRET_SALTS;
+		$ciphertext = openssl_encrypt( $pem, self::CIPHER, $this->storage_key( $secret ), OPENSSL_RAW_DATA, $iv, $tag, $id, self::TAG_BYTES );
 
 		if ( false === $ciphertext ) {
 			return new \WP_Error(
@@ -507,18 +738,20 @@ final class KeyVault {
 			'iv'         => base64_encode( $iv ),
 			'tag'        => base64_encode( $tag ),
 			'ciphertext' => base64_encode( $ciphertext ),
+			'secret'     => $secret,
 		);
 		// phpcs:enable
 	}
 
 	/**
-	 * Decrypts a stored blob, or null when it does not authenticate.
+	 * Decrypts a stored blob with whichever secret opens it, the one recorded
+	 * beside it first; null when none does.
 	 *
-	 * @param mixed  $sealed The stored {iv, tag, ciphertext} array.
+	 * @param mixed  $sealed The stored {iv, tag, ciphertext, secret} array.
 	 * @param string $id     Account id the blob must belong to.
-	 * @return string|null
+	 * @return array{pem: string, secret: string}|null
 	 */
-	private function unseal( $sealed, string $id ): ?string {
+	private function unseal( $sealed, string $id ): ?array {
 		if ( ! is_array( $sealed ) || ! function_exists( 'openssl_decrypt' ) ) {
 			return null;
 		}
@@ -533,33 +766,99 @@ final class KeyVault {
 			return null;
 		}
 
-		$pem = openssl_decrypt( $ciphertext, self::CIPHER, $this->storage_key(), OPENSSL_RAW_DATA, $iv, $tag, $id );
+		$secrets = array( self::SECRET_SALTS );
 
-		return ( false === $pem ) ? null : $pem;
+		if ( null !== $this->constant_secret() ) {
+			$secrets = self::SECRET_SALTS === ( $sealed['secret'] ?? '' )
+				? array( self::SECRET_SALTS, self::SECRET_CONSTANT )
+				: array( self::SECRET_CONSTANT, self::SECRET_SALTS );
+		}
+
+		foreach ( $secrets as $secret ) {
+			$pem = openssl_decrypt( $ciphertext, self::CIPHER, $this->storage_key( $secret ), OPENSSL_RAW_DATA, $iv, $tag, $id );
+
+			if ( false !== $pem ) {
+				return array(
+					'pem'    => $pem,
+					'secret' => $secret,
+				);
+			}
+		}
+
+		return null;
 	}
 
 	/**
-	 * Derives the AES key from the site secret. wp_salt() falls back to
-	 * database-stored values when wp-config.php defines no keys; on such a
-	 * site the key lives next to the ciphertext, which is why the settings
-	 * screen tells the admin to define them.
+	 * The usable GTM4WP_ENCRYPTION_KEY value, or null.
 	 *
-	 * @return string 32 raw bytes.
+	 * @return string|null
 	 */
-	private function storage_key(): string {
-		if ( null === $this->secret ) {
-			$this->secret = wp_salt( 'auth' ) . wp_salt( 'secure_auth' );
+	private function constant_secret(): ?string {
+		if ( 'active' !== $this->encryption_key_state() ) {
+			return null;
 		}
 
-		return hash_hkdf( 'sha256', $this->secret, self::KEY_BYTES, self::HKDF_INFO );
+		return $this->encryption_key ?? (string) constant( self::ENCRYPTION_KEY_CONSTANT );
+	}
+
+	/**
+	 * Derives the AES key from one secret: the constant, or the salts.
+	 * wp_salt() falls back to database-stored values when wp-config.php defines
+	 * no keys; on such a site the salt-derived key lives next to the ciphertext,
+	 * which is why the settings screen tells the admin to define them.
+	 *
+	 * @param string $secret self::SECRET_CONSTANT or self::SECRET_SALTS.
+	 * @return string 32 raw bytes.
+	 */
+	private function storage_key( string $secret ): string {
+		if ( self::SECRET_CONSTANT === $secret ) {
+			$material = (string) $this->constant_secret();
+		} else {
+			if ( null === $this->secret ) {
+				$this->secret = wp_salt( 'auth' ) . wp_salt( 'secure_auth' );
+			}
+
+			$material = $this->secret;
+		}
+
+		return hash_hkdf( 'sha256', $material, self::KEY_BYTES, self::HKDF_INFO );
+	}
+
+	/**
+	 * Updates only the given fields of one account on a row read just before the
+	 * write, which narrows (does not close: the option row has no
+	 * compare-and-swap) the window in which a concurrent writer's change to
+	 * another field, such as a replaced key, is undone (#468). The key is written
+	 * only by add, replace, delete and migration.
+	 *
+	 * @param string               $id     Account id.
+	 * @param array<string, mixed> $fields Fields to set.
+	 * @return bool Whether the store accepted the write (false for an unknown id).
+	 */
+	private function write_fields( string $id, array $fields ): bool {
+		$accounts = $this->read( true );
+
+		if ( ! isset( $accounts[ $id ] ) ) {
+			return false;
+		}
+
+		$accounts[ $id ] = array_merge( $accounts[ $id ], $fields );
+
+		return $this->write( $accounts );
 	}
 
 	/**
 	 * Reads the option row.
 	 *
+	 * @param bool $fresh Bypass the per-request option cache: a writer reads what
+	 *                    another request may have written meanwhile.
 	 * @return array<string, array<string, mixed>>
 	 */
-	private function read(): array {
+	private function read( bool $fresh = false ): array {
+		if ( $fresh ) {
+			wp_cache_delete( self::OPTION_NAME, 'options' );
+		}
+
 		$stored = get_option( self::OPTION_NAME, array() );
 
 		return is_array( $stored ) ? $stored : array();

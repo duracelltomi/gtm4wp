@@ -27,6 +27,10 @@ abstract class TestCase extends PHPUnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		Monkey\setUp();
+
+		// Defined for every test, so a first mock elsewhere cannot change which
+		// branch production code takes (TS-16); a test may re-stub it.
+		Monkey\Functions\when( 'wp_cache_delete' )->justReturn( true );
 	}
 
 	/**

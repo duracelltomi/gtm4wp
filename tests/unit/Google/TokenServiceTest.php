@@ -172,8 +172,8 @@ final class TokenServiceTest extends TestCase {
 				'iss'   => KeyFileFixture::CLIENT_EMAIL,
 				'scope' => self::SCOPE,
 				'aud'   => TokenService::TOKEN_ENDPOINT,
-				'iat'   => self::NOW,
-				'exp'   => self::NOW + TokenService::ASSERTION_LIFETIME,
+				'iat'   => self::NOW - 60,
+				'exp'   => self::NOW - 60 + TokenService::ASSERTION_LIFETIME,
 			),
 			json_decode( self::b64url_decode( $segments[1] ), true )
 		);
@@ -222,6 +222,28 @@ final class TokenServiceTest extends TestCase {
 		$this->assertStringStartsWith( 'gtm4wp_google_token_' . $this->account_id . '_', $name );
 		$this->assertLessThanOrEqual( 172, strlen( $name ), 'Within the transient name limit.' );
 		$this->assertSame( array( 'ya29.first', 3599 - TokenService::EARLY_EXPIRY ), $this->transients[ $name ] );
+	}
+
+	/**
+	 * A key replaced while the mint was in flight: the token still answers this
+	 * call, but nothing is cached under the account or recorded on the new key (#468).
+	 */
+	public function test_a_token_minted_with_a_replaced_key_is_neither_cached_nor_recorded(): void {
+		$this->transport->will_respond( self::token_response( 'ya29.old-key', 3599 ) );
+		$before = $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ];
+
+		// The recording's fresh read is where the other request's replace shows up.
+		Functions\when( 'wp_cache_delete' )->alias(
+			function () {
+				$this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['private_key_id'] = 'ffffffffffffffffffffffffffffffffffffffff';
+				return true;
+			}
+		);
+
+		$this->assertSame( 'ya29.old-key', $this->make_service()->access_token( $this->account_id, self::SCOPE ) );
+		$this->assertSame( array(), $this->transients );
+		$this->assertSame( $before['status'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['status'] );
+		$this->assertSame( $before['scopes'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['scopes'] );
 	}
 
 	public function test_the_cache_is_per_scope(): void {

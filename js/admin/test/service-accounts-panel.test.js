@@ -3,7 +3,7 @@
  *
  * The server owns the parsing, encryption and every refusal (covered by
  * GoogleAuthRestControllerTest); what this component owns is the wire shape of
- * the five calls, the client-side size pre-check that mirrors the server cap,
+ * the six calls, the client-side size pre-check that mirrors the server cap,
  * the explicit two-step upload (choose, then Add - never submit-on-select),
  * the inline rename, the two-step delete, and the one property the whole
  * custody design rests on: nothing the panel renders can be the key. The
@@ -158,7 +158,7 @@ describe( 'ServiceAccountsPanel listing', () => {
 			screen.getByText( 'invalid_grant: Invalid JWT Signature.' )
 		).toBeInTheDocument();
 		expect(
-			screen.getByText( 'Key unreadable, upload the key file again' )
+			screen.getByText( 'Key unreadable, use Replace key' )
 		).toBeInTheDocument();
 	} );
 
@@ -830,5 +830,122 @@ describe( 'ServiceAccountsPanel delete', () => {
 		expect(
 			screen.getByRole( 'button', { name: 'Delete Production' } )
 		).toBeInTheDocument();
+	} );
+} );
+
+describe( 'ServiceAccountsPanel replace key', () => {
+	/**
+	 * Clicks Replace key on a row, then drives the replace file input.
+	 *
+	 * @param {string} label   Row label.
+	 * @param {string} payload File contents.
+	 * @param {number} [size]  Byte size to report.
+	 */
+	function replaceWith( label, payload, size = payload.length ) {
+		fireEvent.click(
+			screen.getByRole( 'button', {
+				name: `Replace the key of ${ label }`,
+			} )
+		);
+
+		const input = screen.getByTestId( 'gtm4wp-replace-key-input' );
+		const file = new File( [ payload ], 'project-key.json', {
+			type: 'application/json',
+		} );
+		file.text = () => Promise.resolve( payload );
+		Object.defineProperty( file, 'size', { value: size } );
+		Object.defineProperty( input, 'files', {
+			value: [ file ],
+			writable: true,
+		} );
+		fireEvent.change( input );
+	}
+
+	it( 'posts the file to the account key route, adopts the answer and names Recent sends', async () => {
+		await renderLoaded( [
+			{ ...PRODUCTION, status: 'reupload-required' },
+			STAGING,
+		] );
+		apiFetch.mockResolvedValueOnce( {
+			account: PRODUCTION,
+			accounts: [ PRODUCTION, STAGING ],
+		} );
+
+		replaceWith( 'Production', KEY_FILE );
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'The key of Production was replaced.'
+			)
+		);
+		expect( apiFetch ).toHaveBeenLastCalledWith( {
+			path: `${ REST_PATH }/${ PRODUCTION.id }/key`,
+			method: 'POST',
+			data: { key_file: KEY_FILE },
+		} );
+		expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+			'Recent sends'
+		);
+		expect(
+			screen.queryByText( 'Key unreadable, use Replace key' )
+		).not.toBeInTheDocument();
+		expect( document.body.innerHTML ).not.toContain( 'NOT-A-REAL-KEY' );
+	} );
+
+	it( 'refuses a file over the server cap without sending it', async () => {
+		await renderLoaded( [ PRODUCTION ] );
+
+		replaceWith( 'Production', KEY_FILE, KEY_FILE_MAX_BYTES + 1 );
+
+		expect( screen.getByRole( 'alert' ) ).toHaveTextContent( 'too large' );
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
+	} );
+
+	it( 'shows the server refusal and keeps the account as it was', async () => {
+		await renderLoaded( [ PRODUCTION ] );
+		apiFetch.mockRejectedValueOnce( {
+			code: 'gtm4wp_google_key_other_account',
+			message:
+				'This key file belongs to another service account. Add it as a new account instead.',
+		} );
+
+		replaceWith( 'Production', KEY_FILE );
+
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'belongs to another service account'
+			)
+		);
+		expect( screen.getByRole( 'alert' ) ).toHaveAttribute(
+			'data-status',
+			'error'
+		);
+		expect( screen.getByText( 'Production' ) ).toBeInTheDocument();
+	} );
+
+	it( 'sends nothing while another request is in flight', async () => {
+		await renderLoaded( [ PRODUCTION ] );
+
+		let finishTest;
+		apiFetch.mockImplementationOnce(
+			() =>
+				new Promise( ( resolve ) => {
+					finishTest = resolve;
+				} )
+		);
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Test Production' } )
+		);
+
+		replaceWith( 'Production', KEY_FILE );
+
+		expect( apiFetch ).toHaveBeenCalledTimes( 2 );
+
+		finishTest( { ok: true, message: 'Google accepted the key.' } );
+		await waitFor( () =>
+			expect( screen.getByRole( 'alert' ) ).toHaveTextContent(
+				'Google accepted the key.'
+			)
+		);
 	} );
 } );

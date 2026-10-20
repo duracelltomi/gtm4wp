@@ -39,7 +39,7 @@
 
 ### Google service accounts
 
-* Added: a **Google service accounts** section on the settings screen (experimental): upload, label, test and delete the JSON key of a Google Cloud service account, several side by side. The Data Manager destinations below authenticate with one. Keys are stored encrypted, never shown again and removed on uninstall; changing the wp-config.php security keys makes them unreadable, and a notice then names the accounts to upload again.
+* Added: a **Google service accounts** section on the settings screen (experimental): upload, label, test, replace the key of and delete Google Cloud service accounts; the Data Manager destinations authenticate with one. Keys are stored encrypted and never shown again. Define `GTM4WP_ENCRYPTION_KEY` in wp-config.php to keep them readable when a security plugin rotates the WordPress security keys.
 
 ### Google Data Manager
 

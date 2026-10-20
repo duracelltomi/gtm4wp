@@ -84,6 +84,26 @@ final class ServiceAccountKeyTest extends TestCase {
 	}
 
 	/**
+	 * A dump, a print_r or a serialize of the parsed key names every field
+	 * but carries no key (#496); the property itself still holds it for signing.
+	 */
+	public function test_debug_output_and_serialization_redact_the_private_key(): void {
+		$key = KeyFileFixture::parse();
+
+		ob_start();
+		var_dump( $key ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_dump -- the output under test.
+		$dumped = (string) ob_get_clean();
+
+		foreach ( array( $dumped, print_r( $key, true ), serialize( $key ) ) as $output ) { // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_print_r, WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- the output under test.
+			$this->assertStringNotContainsString( 'PRIVATE KEY', $output );
+			$this->assertStringContainsString( '[redacted]', $output );
+			$this->assertStringContainsString( KeyFileFixture::CLIENT_EMAIL, $output );
+		}
+
+		$this->assertStringContainsString( 'PRIVATE KEY', $key->private_key );
+	}
+
+	/**
 	 * Google's IAM page shows two key-file examples with two different
 	 * `token_uri` values (U122); the older host is the same endpoint. The JWT
 	 * audience must be the endpoint the assertion is posted to, so the legacy
