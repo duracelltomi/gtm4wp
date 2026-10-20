@@ -80,10 +80,10 @@ final class GoogleDataManagerModule extends AbstractModule {
 	}
 
 	/**
-	 * Registers the attribution capture when a send lane is on AND it can
-	 * work: a commerce platform and at least one destination. depends_on only
-	 * greys the admin checkbox; a destination deleted after saving leaves a
-	 * lane on with nothing to ask for.
+	 * Loads the attribution script when a send lane is on and a commerce
+	 * platform is active (the script itself needs a destination, see below).
+	 * The order-creation hooks are wired from Plugin::boot() instead, since
+	 * orders are also built on admin-ajax (CaptureHooks::register_for(), #467).
 	 *
 	 * @return void
 	 */
@@ -97,8 +97,6 @@ final class GoogleDataManagerModule extends AbstractModule {
 		}
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_capture_script' ) );
-
-		( new CaptureHooks( new CaptureStats() ) )->register_hooks();
 	}
 
 	/**

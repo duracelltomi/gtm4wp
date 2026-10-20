@@ -91,9 +91,11 @@ final class Plugin {
 		}
 
 		// EDD changes the cart and builds orders on admin-ajax too, so the
-		// cache-safe cookies cannot wait for the frontend branch; self-gated.
+		// cache-safe cookies and the attribution capture cannot wait for the
+		// frontend branch; self-gated.
 		Modules\EasyDigitalDownloads\VisitorCart::register_state_hooks( $this->options );
 		Modules\EasyDigitalDownloads\ReliablePurchase::register_flag_hooks( $this->options );
+		Modules\GoogleDataManager\CaptureHooks::register_for( $this->options );
 
 		// REST routes must exist on REST requests, where is_admin() is false.
 		// RestCors is registered here unconditionally on purpose: it withdraws

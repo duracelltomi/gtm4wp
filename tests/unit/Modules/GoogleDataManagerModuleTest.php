@@ -211,13 +211,13 @@ final class GoogleDataManagerModuleTest extends TestCase {
 	}
 
 	/**
-	 * The script writes cookies for the order-creation hooks to read, so the
-	 * module has to attach those hooks too. Asserted here rather than only in
-	 * the CaptureHooks suite, which builds its own instance: without this,
-	 * deleting the wiring line leaves the feature as a script writing cookies
-	 * that nothing ever reads, with the suite green.
+	 * The order-creation hooks are wired from Plugin::boot() (#467: EDD builds
+	 * orders on admin-ajax, where the frontend branch never runs). The module
+	 * must not attach them as well: two instances do not dedupe, so every
+	 * frontend-built order would be captured and counted twice. The boot-level
+	 * half is PluginRestWiringTest.
 	 */
-	public function test_booting_with_capture_on_also_attaches_the_order_creation_hooks(): void {
+	public function test_the_module_leaves_the_order_creation_hooks_to_plugin_boot(): void {
 		$GLOBALS['gtm4wp_test_forced_functions'] = array(
 			'WC'  => true,
 			'EDD' => true,
@@ -230,9 +230,9 @@ final class GoogleDataManagerModuleTest extends TestCase {
 			)
 		);
 
-		$this->assertNotFalse( has_action( 'woocommerce_checkout_order_created' ) );
-		$this->assertNotFalse( has_action( 'woocommerce_store_api_checkout_order_processed' ) );
-		$this->assertNotFalse( has_action( 'edd_built_order' ) );
+		$this->assertFalse( has_action( 'woocommerce_checkout_order_created' ) );
+		$this->assertFalse( has_action( 'woocommerce_store_api_checkout_order_processed' ) );
+		$this->assertFalse( has_action( 'edd_built_order' ) );
 	}
 
 	public function test_booting_with_capture_off_attaches_no_order_creation_hook(): void {

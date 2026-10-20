@@ -10,6 +10,8 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Options\Options;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -27,6 +29,22 @@ final class CaptureHooks {
 	 * @param CaptureStats $stats Capture-rate counters.
 	 */
 	public function __construct( private CaptureStats $stats ) {
+	}
+
+	/**
+	 * Wires the capture from Plugin::boot(), before the admin/frontend split:
+	 * EDD's Stripe, PayPal Commerce and Square checkouts build the order on
+	 * admin-ajax, where is_admin() is true (#467, U132). Self-gated like
+	 * ReliablePurchase::register_flag_hooks(); no core path of either store
+	 * creates an order through these hooks on a non-AJAX admin screen.
+	 *
+	 * @param Options $options The plugin options service.
+	 * @return void
+	 */
+	public static function register_for( Options $options ): void {
+		if ( GoogleDataManagerModule::capture_enabled( $options ) ) {
+			( new self( new CaptureStats() ) )->register_hooks();
+		}
 	}
 
 	/**

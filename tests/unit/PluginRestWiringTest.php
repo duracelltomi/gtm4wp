@@ -418,6 +418,45 @@ final class PluginRestWiringTest extends TestCase {
 		$this->assertSame( 20, has_action( 'edd_built_order', 'GTM4WP\Modules\EasyDigitalDownloads\ReliablePurchase->flag_event()' ) );
 	}
 
+	/**
+	 * #467: EDD's Stripe, PayPal Commerce and Square checkouts build the order
+	 * on admin-ajax, where is_admin() is true and the frontend branch never
+	 * runs. The harness boots exactly such a request, so the capture hooks
+	 * must come from boot() itself. Both directions of the capture gate.
+	 */
+	public function test_boot_wires_the_attribution_capture_on_an_admin_ajax_request(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'  => true,
+			'EDD' => true,
+		);
+
+		try {
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) );
+
+			$this->assertSame( 10, has_action( 'edd_built_order', 'GTM4WP\Modules\GoogleDataManager\CaptureHooks->capture_edd_order()' ) );
+			$this->assertSame( 10, has_action( 'woocommerce_checkout_order_created', 'GTM4WP\Modules\GoogleDataManager\CaptureHooks->capture_woocommerce_order()' ) );
+			$this->assertSame( 10, has_action( 'woocommerce_store_api_checkout_order_processed', 'GTM4WP\Modules\GoogleDataManager\CaptureHooks->capture_woocommerce_order()' ) );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
+	}
+
+	public function test_boot_wires_no_attribution_capture_while_sending_is_off(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array(
+			'WC'  => true,
+			'EDD' => true,
+		);
+
+		try {
+			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => false ) );
+
+			$this->assertFalse( has_action( 'edd_built_order', 'GTM4WP\Modules\GoogleDataManager\CaptureHooks->capture_edd_order()' ) );
+			$this->assertFalse( has_action( 'woocommerce_checkout_order_created' ) );
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+		}
+	}
+
 	public function test_boot_wires_no_edd_cache_safe_cookie_hooks_while_the_mode_is_off(): void {
 		Functions\when( 'EDD' )->justReturn( new \stdClass() );
 		if ( ! defined( 'EDD_VERSION' ) ) {

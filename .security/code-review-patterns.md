@@ -1175,6 +1175,9 @@ vendor source, and check `Plugin::boot()` reaches the registration in each.
   requests and the handler seeds the buyer's session, so a non-buyer request has nothing to seed; a checkout posted to
   WC's back-compat admin-ajax endpoint would be missed — PLAUSIBLE, theme-only); `woocommerce_thankyou` (a render hook).
   Registered from `boot()`: `ReliablePurchase::register_flag_hooks()`, the refund lane, the privacy hooks.
+- **After the R53 fix:** **3** sites (the WC trio above); `edd_built_order` capture moved to `boot()` via
+  `CaptureHooks::register_for()`, pinned on an `is_admin()` boot by `PluginRestWiringTest` and against a second
+  registration from the module by `GoogleDataManagerModuleTest`.
 
 ### PA-7: Data-bearing string as a `preg_replace` *replacement* argument ⭐
 The WooCommerce product-list markup injects `data-…` attributes into template HTML by using a built (data-bearing) string as the **replacement** argument of `preg_replace`. That replacement interprets `$0`/`$1`/`${1}`/`\1`, so a product field containing a `$`+digit or `\`+digit sequence is substituted with **the matched text**. Fix by using `preg_replace_callback`, `addcslashes( $replacement, '\\$' )`, or — where the needle is a literal — no regex at all (`strpos()` + `substr_replace()`). Findings #16, #74.
