@@ -54,14 +54,25 @@ final class ConsentRegionsTest extends TestCase {
 	);
 
 	public function test_the_set_is_the_eu_27_plus_the_three_eea_states_the_uk_and_switzerland(): void {
-		$expected = array_merge( self::EU_27, array( 'IS', 'LI', 'NO', 'GB', 'CH' ) );
+		// Plus the member-state territories stores list as countries (#494).
+		$expected = array_merge( self::EU_27, array( 'IS', 'LI', 'NO', 'GB', 'CH' ), array( 'AX', 'GF', 'GP', 'MF', 'MQ', 'RE', 'YT' ) );
 
 		sort( $expected );
 		$actual = ConsentRegions::COUNTRIES;
 		sort( $actual );
 
 		$this->assertSame( $expected, $actual );
-		$this->assertCount( 32, ConsentRegions::COUNTRIES );
+		$this->assertCount( 39, ConsentRegions::COUNTRIES );
+	}
+
+	/**
+	 * #494: a buyer with a Réunion or Åland billing address is in the EU, so
+	 * the default eea-only policy gates the refund like a French or Finnish one.
+	 */
+	public function test_member_state_territories_listed_as_countries_are_covered(): void {
+		$this->assertTrue( ConsentRegions::covers( 're' ) );
+		$this->assertTrue( ConsentRegions::covers( 'AX' ) );
+		$this->assertFalse( ConsentRegions::covers( 'GI' ), 'Recorded as undecided in U127.' );
 	}
 
 	/**

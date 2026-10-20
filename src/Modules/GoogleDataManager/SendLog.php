@@ -119,6 +119,7 @@ final class SendLog {
 		RefundSender::REASON_VETOED,
 		RefundSender::REASON_PLATFORM_INACTIVE,
 		RefundSender::REASON_REFUND_UNREADABLE,
+		RefundSender::REASON_NOT_PRODUCTION,
 	);
 
 	/**
@@ -134,6 +135,26 @@ final class SendLog {
 	);
 
 	/**
+	 * Skips that are expected and never replayable: drawn as warnings, but
+	 * trimmed like routine rows, oldest first, or a ring of them would evict
+	 * every success and queued row as it lands (#395).
+	 *
+	 * @var string[]
+	 */
+	private const EXPECTED_SKIPS = array(
+		RefundSender::REASON_NO_CLIENT_ID,
+		RefundSender::REASON_CONSENT_NO_CLIENT_ID,
+		RefundSender::REASON_EMPTY_REFUND,
+		RefundSender::REASON_ZERO_VALUE,
+	);
+
+	/**
+	 * The reference grammar parse_reference() accepts, for input schemas
+	 * (platform:order:refund).
+	 */
+	public const REFERENCE_PATTERN = '^[^:]+:[0-9]+:[0-9]+$';
+
+	/**
 	 * Longest stored reason / error summary, in characters (200 cut the
 	 * plugin's own NOT_FOUND explanation mid-sentence; a cut is now marked).
 	 */
@@ -144,6 +165,12 @@ final class SendLog {
 	 * from stretching the row.
 	 */
 	private const REFERENCE_MAX_LENGTH = 60;
+
+	/**
+	 * Longest stored requestId. It is the status poll's match key, so it is
+	 * capped apart from the display fields and compared after the same cap (#478).
+	 */
+	private const REQUEST_ID_MAX_LENGTH = 200;
 
 	/**
 	 * Clock, injectable so tests can pin stored timestamps.
@@ -171,7 +198,7 @@ final class SendLog {
 		$entries   = $this->read();
 		$entries[] = $this->clean_entry( $entry );
 
-		$this->write( self::trim( $entries ) );
+		$this->write( self::trim( $entries, 1 ) );
 	}
 
 	/**
@@ -185,7 +212,9 @@ final class SendLog {
 	public function record_queued( string $reference, array $destinations ): void {
 		$entries = $this->read();
 
-		foreach ( array() === $destinations ? array( '' ) : $destinations as $destination ) {
+		$targets = array() === $destinations ? array( '' ) : $destinations;
+
+		foreach ( $targets as $destination ) {
 			$entries[] = $this->clean_entry(
 				array(
 					'feature'     => self::FEATURE_REFUND,
@@ -197,34 +226,39 @@ final class SendLog {
 			);
 		}
 
-		$this->write( self::trim( $entries ) );
+		$this->write( self::trim( $entries, count( $targets ) ) );
 	}
 
 	/**
 	 * The ring cut back to MAX_ENTRIES, dropping routine sends before problems:
 	 * a batch of successful refunds must not push this morning's failure out
 	 * before anybody looked at it. A problem is dropped only when the ring holds
-	 * nothing else; order is never changed.
+	 * nothing else; order is never changed. The rows this write appended are
+	 * never the routine ones dropped: with a ring of problems they would vanish
+	 * as they land, success and queued rows included (#395).
 	 *
-	 * @param array<int, array<string, mixed>> $entries Entries, oldest first.
+	 * @param array<int, array<string, mixed>> $entries  Entries, oldest first.
+	 * @param int                              $appended How many trailing entries this write appended.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private static function trim( array $entries ): array {
+	private static function trim( array $entries, int $appended ): array {
 		$excess = count( $entries ) - self::MAX_ENTRIES;
 
 		if ( $excess <= 0 ) {
 			return $entries;
 		}
 
-		// Oldest first, routine ones only.
-		foreach ( array_keys( $entries ) as $index ) {
+		// Oldest first, routine ones only, never the rows just appended.
+		foreach ( array_slice( array_keys( $entries ), 0, max( 0, count( $entries ) - $appended ) ) as $index ) {
 			if ( $excess <= 0 ) {
 				break;
 			}
 
-			$tone = self::tone( $entries[ $index ] );
+			$tone     = self::tone( $entries[ $index ] );
+			$expected = self::OUTCOME_SKIPPED === ( $entries[ $index ]['outcome'] ?? '' )
+				&& in_array( $entries[ $index ]['reason'] ?? '', self::EXPECTED_SKIPS, true );
 
-			if ( self::TONE_WARN === $tone || self::TONE_ERROR === $tone ) {
+			if ( ( self::TONE_WARN === $tone || self::TONE_ERROR === $tone ) && ! $expected ) {
 				continue;
 			}
 
@@ -264,9 +298,10 @@ final class SendLog {
 
 		$entries = $this->read();
 		$changed = false;
+		$key     = $this->text( $request_id, self::REQUEST_ID_MAX_LENGTH );
 
 		foreach ( $entries as $index => $entry ) {
-			if ( ( $entry['request_id'] ?? '' ) !== $request_id ) {
+			if ( ( $entry['request_id'] ?? '' ) !== $key ) {
 				continue;
 			}
 
@@ -415,7 +450,7 @@ final class SendLog {
 			$only = array();
 
 			foreach ( $by_destination as $destination => $entry ) {
-				if ( '' !== $destination && self::is_retry_target( $entry ) ) {
+				if ( '' !== $destination && self::is_retry_target( $entry, $now ) ) {
 					$only[] = $destination;
 				}
 			}
@@ -455,14 +490,22 @@ final class SendLog {
 
 	/**
 	 * Whether a destination's newest row puts it in a replay's `only` list: a
-	 * failure, or a queued row the job never overtook (a waiting one never
-	 * gets here).
+	 * failure, a queued row the job never overtook (a waiting one never gets
+	 * here), or a retry overdue by QUEUED_STALE_AFTER: its job never ran (the
+	 * lane switched off, a lost action), so nothing else will move it (#473).
 	 *
 	 * @param array<string, mixed> $entry One stored entry.
+	 * @param int                  $now   Current Unix time.
 	 * @return bool
 	 */
-	private static function is_retry_target( array $entry ): bool {
+	private static function is_retry_target( array $entry, int $now ): bool {
 		$outcome = (string) ( $entry['outcome'] ?? '' );
+
+		if ( self::OUTCOME_RETRYING === $outcome ) {
+			$due = (int) ( $entry['time'] ?? 0 ) + (int) SendQueue::retry_delay( (int) ( $entry['attempt'] ?? 1 ) );
+
+			return ( $now - $due ) >= self::QUEUED_STALE_AFTER;
+		}
 
 		return self::OUTCOME_FAILED === $outcome || self::OUTCOME_QUEUED === $outcome;
 	}
@@ -534,6 +577,7 @@ final class SendLog {
 	 * @return array{platform: string, order_id: int, refund_id: int}|null
 	 */
 	public static function parse_reference( string $reference ): ?array {
+		// REFERENCE_PATTERN says the same for the input schemas; keep them in step.
 		$parts = explode( ':', $reference );
 
 		if ( 3 !== count( $parts ) || '' === $parts[0] || ! ctype_digit( $parts[1] ) || ! ctype_digit( $parts[2] ) ) {
@@ -625,9 +669,12 @@ final class SendLog {
 			'outcome'     => $this->text( $entry['outcome'] ?? '', self::REFERENCE_MAX_LENGTH ),
 			'attempt'     => max( 0, (int) ( $entry['attempt'] ?? 0 ) ),
 			'status'      => max( 0, (int) ( $entry['status'] ?? 0 ) ),
-			'request_id'  => $this->text( $entry['request_id'] ?? '', self::REFERENCE_MAX_LENGTH ),
+			'request_id'  => $this->text( $entry['request_id'] ?? '', self::REQUEST_ID_MAX_LENGTH ),
 			'reason'      => $this->text( $entry['reason'] ?? '', self::REASON_MAX_LENGTH ),
 			'result'      => $this->text( $entry['result'] ?? '', self::REASON_MAX_LENGTH ),
+			// The code-shaped class of a failed request (PERMISSION_DENIED, http_403);
+			// what the log ability answers with instead of Google's text (#509).
+			'error_class' => 1 === preg_match( '/^[A-Za-z0-9_]{1,40}$/D', (string) ( $entry['error_class'] ?? '' ) ) ? (string) $entry['error_class'] : '',
 			'errors'      => max( 0, (int) ( $entry['errors'] ?? 0 ) ),
 			'warnings'    => max( 0, (int) ( $entry['warnings'] ?? 0 ) ),
 		);

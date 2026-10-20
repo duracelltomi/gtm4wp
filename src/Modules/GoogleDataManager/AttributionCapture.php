@@ -284,7 +284,17 @@ final class AttributionCapture {
 	 * @return array<string, mixed> Meta key to value.
 	 */
 	public static function parse_payload( array $payload ): array {
-		$ids  = self::validate_ids( $payload );
+		return self::ids_to_meta( self::validate_ids( $payload ) );
+	}
+
+	/**
+	 * Validated ids mapped onto the fixed meta keys: one definition for the
+	 * order-creation capture and the backfill, so both store alike (#486).
+	 *
+	 * @param array<string, mixed> $ids Validated ids, keyed as in the cookie.
+	 * @return array<string, mixed> Meta key to value.
+	 */
+	private static function ids_to_meta( array $ids ): array {
 		$meta = array();
 
 		if ( isset( $ids[ AttributionCookies::KEY_CLIENT_ID ] ) ) {
@@ -323,22 +333,7 @@ final class AttributionCapture {
 	 * @return array<string, mixed> Meta key to value; absent captures are absent keys.
 	 */
 	public static function meta_for_order( $order_reference ): array {
-		$ids  = self::parse_ids();
-		$meta = array();
-
-		if ( isset( $ids[ AttributionCookies::KEY_CLIENT_ID ] ) ) {
-			$meta[ self::META_CLIENT_ID ] = $ids[ AttributionCookies::KEY_CLIENT_ID ];
-		}
-
-		if ( isset( $ids[ AttributionCookies::KEY_SESSIONS ] ) ) {
-			$meta[ self::META_SESSION_IDS ] = $ids[ AttributionCookies::KEY_SESSIONS ];
-		}
-
-		foreach ( AttributionCookies::CLICK_ID_PARAMS as $param ) {
-			if ( isset( $ids[ $param ] ) ) {
-				$meta[ self::META_CLICK_ID_PREFIX . $param ] = $ids[ $param ];
-			}
-		}
+		$meta = self::ids_to_meta( self::parse_ids() );
 
 		$consent = self::filter_consent( self::parse_consent(), $order_reference );
 		$meta    = self::apply_consent_gate( $meta, $consent );

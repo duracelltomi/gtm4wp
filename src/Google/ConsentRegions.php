@@ -25,10 +25,14 @@ final class ConsentRegions {
 	 * ISO 3166-1 alpha-2 codes of the covered countries, uppercase.
 	 *
 	 * EU (27): AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL
-	 * PL PT RO SE SI SK. EEA additions (3): IS LI NO. Plus GB and CH.
+	 * PL PT RO SE SI SK. EEA additions (3): IS LI NO. Plus GB and CH. Plus the
+	 * parts of member states that stores list as countries of their own (7):
+	 * AX (Åland), GF GP MQ RE YT MF (French outermost regions); the policy
+	 * scopes by member state, so these are covered (#494, U127).
 	 */
 	public const COUNTRIES = array(
 		'AT',
+		'AX',
 		'BE',
 		'BG',
 		'CH',
@@ -41,6 +45,8 @@ final class ConsentRegions {
 		'FI',
 		'FR',
 		'GB',
+		'GF',
+		'GP',
 		'GR',
 		'HR',
 		'HU',
@@ -51,15 +57,19 @@ final class ConsentRegions {
 		'LT',
 		'LU',
 		'LV',
+		'MF',
+		'MQ',
 		'MT',
 		'NL',
 		'NO',
 		'PL',
 		'PT',
+		'RE',
 		'RO',
 		'SE',
 		'SI',
 		'SK',
+		'YT',
 	);
 
 	/**

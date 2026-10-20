@@ -88,6 +88,26 @@ final class CaptureStats {
 	}
 
 	/**
+	 * Records that the receipt-page backfill stored a client id on an order
+	 * counted uncaptured at creation (#482): captured goes up, seen does not,
+	 * and captured never passes seen.
+	 *
+	 * @return void
+	 */
+	public function record_rescue(): void {
+		$record = $this->get();
+
+		if ( $record['captured'] >= $record['seen'] ) {
+			return;
+		}
+
+		++$record['captured'];
+		$record['last_captured_at'] = $this->now();
+
+		$this->save( $record );
+	}
+
+	/**
 	 * The stored counters, with every member present.
 	 *
 	 * @return array{seen: int, captured: int, last_seen_at: int, last_captured_at: int}

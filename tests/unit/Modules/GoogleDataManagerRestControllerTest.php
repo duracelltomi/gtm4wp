@@ -234,7 +234,11 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 				'references' => array(
 					'type'     => 'array',
 					'required' => false,
-					'items'    => array( 'type' => 'string' ),
+					'minItems' => 1,
+					'items'    => array(
+						'type'    => 'string',
+						'pattern' => SendLog::REFERENCE_PATTERN,
+					),
 				),
 			),
 			$captured[2]['args']['args']
@@ -633,7 +637,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$entries = $this->make_controller()->send_log()->get_data()['entries'];
 
 		$this->assertSame(
-			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'errors', 'warnings', 'tone', 'replayable', 'waiting' ),
+			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'error_class', 'errors', 'warnings', 'tone', 'replayable', 'waiting' ),
 			array_keys( $entries[0] ),
 			'The route adds exactly three derived fields to what the ring stores, and nothing else joins it.'
 		);
@@ -845,6 +849,27 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 
 		$this->assertSame( array( 'woocommerce:3:4' ), $response->get_data()['references'] );
 		$this->assertCount( 1, $this->scheduled );
+	}
+
+	/**
+	 * #501: a list that names nothing valid is refused, not read as "every
+	 * refund"; only an omitted list means all.
+	 */
+	public function test_replay_refuses_a_list_that_names_no_refund(): void {
+		$log = new SendLog( static fn () => self::NOW );
+		$log->record( self::row( array( 'reference' => 'woocommerce:1:2' ) ) );
+		$log->record( self::row( array( 'reference' => 'woocommerce:3:4' ) ) );
+
+		$controller = $this->replay_controller( $log );
+
+		foreach ( array( array(), array( 'woocomerce:1:2x' ) ) as $references ) {
+			$response = $controller->replay( new \WP_REST_Request( array( 'references' => $references ) ) );
+
+			$this->assertInstanceOf( \WP_Error::class, $response );
+			$this->assertSame( 'gtm4wp_gdm_no_references', $response->get_error_code() );
+		}
+
+		$this->assertSame( array(), $this->scheduled );
 	}
 
 	public function test_replay_queues_nothing_when_nothing_needs_it(): void {

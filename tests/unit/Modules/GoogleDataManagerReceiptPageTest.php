@@ -47,6 +47,9 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		// Neither confirmation page by default; each test opts in.
 		Functions\when( 'is_order_received_page' )->justReturn( false );
 		Functions\when( 'edd_is_success_page' )->justReturn( false );
+
+		// EDD would show this visitor the receipt unless a test says otherwise (#480).
+		Functions\when( 'edd_can_view_receipt' )->justReturn( true );
 	}
 
 	protected function tearDown(): void {
@@ -64,7 +67,7 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 	 * @param array<string, mixed> $meta Meta the order carries.
 	 * @return void
 	 */
-	private function given_wc_receipt_page( array $meta = array() ): void {
+	private function given_wc_receipt_page( array $meta = array(), string $created = 'now' ): void {
 		Functions\when( 'is_order_received_page' )->justReturn( true );
 
 		$_GET = array(
@@ -74,9 +77,10 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 
 		$order = new \WC_Order(
 			array(
-				'id'        => self::ORDER_ID,
-				'order_key' => self::ORDER_KEY,
-				'meta'      => $meta,
+				'id'           => self::ORDER_ID,
+				'order_key'    => self::ORDER_KEY,
+				'meta'         => $meta,
+				'date_created' => $created,
 			)
 		);
 
@@ -178,13 +182,44 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 
 	// ---- Easy Digital Downloads --------------------------------------------
 
+	/**
+	 * #480: past the backfill window the receipt page offers nothing.
+	 */
+	public function test_no_flag_for_an_order_past_the_backfill_window(): void {
+		$this->given_wc_receipt_page( array(), gmdate( 'Y-m-d H:i:s', time() - ( BackfillEndpoint::WINDOW_DAYS + 1 ) * DAY_IN_SECONDS ) );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	/**
+	 * #480: only a visitor EDD itself would show the receipt to is offered the
+	 * backfill (a leaked or shared success link is not).
+	 */
+	public function test_no_edd_flag_for_a_visitor_edd_would_not_show_the_receipt(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		Functions\when( 'edd_can_view_receipt' )->justReturn( false );
+		$_GET = array( 'payment_key' => 'edd-payment-key-abc' );
+		Functions\when( 'edd_get_order_by' )->justReturn(
+			(object) array(
+				'id'           => self::ORDER_ID,
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+			)
+		);
+		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
 	public function test_flags_an_edd_order_that_has_no_attribution_yet(): void {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		$_GET = array( 'payment_key' => 'edd-payment-key-abc' );
 
 		Functions\when( 'edd_get_order_by' )->alias(
 			static fn ( $field, $value ) => ( 'payment_key' === $field && 'edd-payment-key-abc' === $value )
-				? (object) array( 'id' => self::ORDER_ID )
+				? (object) array(
+					'id'           => self::ORDER_ID,
+					'date_created' => gmdate( 'Y-m-d H:i:s' ),
+				)
 				: false
 		);
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
@@ -205,7 +240,12 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		$_GET = array( 'payment_key' => 'edd-payment-key-abc' );
 
-		Functions\when( 'edd_get_order_by' )->justReturn( (object) array( 'id' => self::ORDER_ID ) );
+		Functions\when( 'edd_get_order_by' )->justReturn(
+			(object) array(
+				'id'           => self::ORDER_ID,
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+			)
+		);
 		Functions\when( 'edd_get_order_meta' )->justReturn( '111.222' );
 
 		$this->assertNull( ReceiptPage::backfill_config() );
@@ -241,7 +281,12 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		$_GET = array();
 
 		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'edd-payment-key-abc' ) );
-		Functions\when( 'edd_get_order_by' )->justReturn( (object) array( 'id' => self::ORDER_ID ) );
+		Functions\when( 'edd_get_order_by' )->justReturn(
+			(object) array(
+				'id'           => self::ORDER_ID,
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+			)
+		);
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
 
 		$this->assertNull( ReceiptPage::backfill_config() );
@@ -264,13 +309,19 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		Functions\when( 'edd_get_order' )->justReturn(
 			new \EDD\Orders\Order(
 				array(
-					'id'          => self::ORDER_ID,
-					'payment_key' => 'edd-payment-key-abc',
-					'email'       => 'buyer@example.com',
+					'id'           => self::ORDER_ID,
+					'payment_key'  => 'edd-payment-key-abc',
+					'email'        => 'buyer@example.com',
+					'date_created' => gmdate( 'Y-m-d H:i:s' ),
 				)
 			)
 		);
-		Functions\when( 'edd_get_order_by' )->justReturn( (object) array( 'id' => self::ORDER_ID ) );
+		Functions\when( 'edd_get_order_by' )->justReturn(
+			(object) array(
+				'id'           => self::ORDER_ID,
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+			)
+		);
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
 
 		// resolve_payment_key() releases the key only when the hash matches.

@@ -10,6 +10,8 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\GoogleDataManager\AttributionCapture;
 use GTM4WP\Modules\GoogleDataManager\BackfillEndpoint;
+use GTM4WP\Modules\GoogleDataManager\CaptureStats;
+use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
@@ -38,6 +40,8 @@ require_once __DIR__ . '/edd-stubs.php';
  */
 final class GoogleDataManagerBackfillTest extends TestCase {
 
+	use OptionStoreTrait;
+
 	private const ORDER_ID  = 42;
 	private const ORDER_KEY = 'wc_order_aBcDeF123456';
 
@@ -57,6 +61,9 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+
+		// A rescued client id is counted (#482); the counters live in an option.
+		$this->stub_option_store();
 
 		$_SERVER = array_diff_key( $_SERVER, array( 'HTTP_REFERER' => true ) );
 
@@ -117,11 +124,12 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * @param array<string, mixed> $meta Meta the order already carries.
 	 * @return \WC_Order
 	 */
-	private function given_woocommerce_order( array $meta = array() ): \WC_Order {
+	private function given_woocommerce_order( array $meta = array(), string $created = 'now' ): \WC_Order {
 		$order = new class(array(
-			'id'        => self::ORDER_ID,
-			'order_key' => self::ORDER_KEY,
-			'meta'      => $meta,
+			'id'           => self::ORDER_ID,
+			'order_key'    => self::ORDER_KEY,
+			'meta'         => $meta,
+			'date_created' => $created,
 		)) extends \WC_Order {
 			/**
 			 * Times save() was called.
@@ -161,7 +169,10 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 					return false;
 				}
 
-				return (object) array( 'id' => self::ORDER_ID );
+				return (object) array(
+					'id'           => self::ORDER_ID,
+					'date_created' => gmdate( 'Y-m-d H:i:s' ),
+				);
 			}
 		);
 
@@ -175,9 +186,10 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 				}
 
 				$data = array(
-					'id'          => self::ORDER_ID,
-					'payment_key' => $payment_key,
-					'email'       => 'buyer@example.com',
+					'id'           => self::ORDER_ID,
+					'payment_key'  => $payment_key,
+					'email'        => 'buyer@example.com',
+					'date_created' => gmdate( 'Y-m-d H:i:s' ),
 				);
 
 				if ( null !== $signed_receipt_hash ) {
@@ -323,6 +335,37 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 			),
 			$order->get_meta( AttributionCapture::META_CONSENT_STATE, true )
 		);
+	}
+
+	/**
+	 * #482: a client id the backfill rescues raises the captured count of an
+	 * order counted uncaptured at creation; never the seen count, never past it.
+	 */
+	public function test_a_rescued_client_id_is_counted_as_captured(): void {
+		$this->options[ CaptureStats::OPTION_NAME ] = array(
+			'seen'     => 3,
+			'captured' => 0,
+		);
+		$this->given_woocommerce_order();
+
+		( new BackfillEndpoint() )->backfill( self::request() );
+
+		$this->assertSame( 3, $this->options[ CaptureStats::OPTION_NAME ]['seen'] );
+		$this->assertSame( 1, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+	}
+
+	/**
+	 * #480: the receipt URL is a durable secret, so a leaked link or a late
+	 * revisit fills nothing once the order is past the backfill window.
+	 */
+	public function test_an_order_past_the_backfill_window_is_refused(): void {
+		$order = $this->given_woocommerce_order( array(), gmdate( 'Y-m-d H:i:s', time() - ( BackfillEndpoint::WINDOW_DAYS + 1 ) * DAY_IN_SECONDS ) );
+
+		$result = ( new BackfillEndpoint() )->backfill( self::request() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_gdm_backfill_denied', $result->get_error_code(), 'The same answer as every other refusal.' );
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
 	}
 
 	/**

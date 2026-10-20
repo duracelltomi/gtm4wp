@@ -693,7 +693,7 @@ final class PageDataLayer {
 		// event fires on the key alone (the buyer arriving from checkout must not
 		// lose the conversion); only the customer identity blocks are withheld, in
 		// exactly the cases WooCommerce itself would not render the order.
-		$withhold_customer_data = $from_request && $this->woocommerce_hides_order_from_visitor( $order );
+		$withhold_customer_data = $from_request && self::woocommerce_hides_order_from_visitor( $order );
 
 		return $this->add_purchase_for_order( $data_layer, $order, (int) $order_id, $withhold_customer_data );
 	}
@@ -730,7 +730,7 @@ final class PageDataLayer {
 	 * @param \WC_Order $order The order resolved from the request.
 	 * @return bool True when the order data must not be attributed to this visitor.
 	 */
-	private function woocommerce_hides_order_from_visitor( \WC_Order $order ): bool {
+	public static function woocommerce_hides_order_from_visitor( \WC_Order $order ): bool {
 		// Absent means 5.0-7.8.x, which renders the order to any valid key holder.
 		// method_exists() triggers WC_Autoloader and sees private members, so the
 		// probe works before the class is loaded. Residual 1: an unloadable class

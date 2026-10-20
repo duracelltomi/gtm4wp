@@ -60,10 +60,13 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 		// process-wide, so without this the "platform absent" cases would
 		// depend on which test file ran first (TS-16).
 		$GLOBALS['gtm4wp_test_forced_functions'] = array(
-			'wc_get_orders'         => false,
-			'edd_get_orders'        => false,
-			'edd_get_order_meta'    => false,
-			'edd_delete_order_meta' => false,
+			'wc_get_orders'                     => false,
+			'edd_get_orders'                    => false,
+			'edd_get_order_meta'                => false,
+			'edd_delete_order_meta'             => false,
+			'get_user_by'                       => false,
+			'edd_get_customer_by'               => false,
+			'edd_get_customer_email_address_by' => false,
 		);
 	}
 
@@ -117,7 +120,7 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 		$GLOBALS['gtm4wp_test_forced_functions']['wc_get_orders'] = true;
 
 		Functions\when( 'wc_get_orders' )->alias(
-			static fn ( $args ) => ( self::EMAIL === ( $args['billing_email'] ?? '' ) && 1 === (int) ( $args['paged'] ?? 1 ) )
+			static fn ( $args ) => ( in_array( self::EMAIL, (array) ( $args['customer'] ?? array() ), true ) && 1 === (int) ( $args['paged'] ?? 1 ) )
 				? array( $order )
 				: array()
 		);
@@ -176,16 +179,61 @@ final class GoogleDataManagerPrivacyTest extends TestCase {
 		$privacy = new PrivacyData();
 		$privacy->register_hooks();
 
-		// The named callbacks at the default priority, not merely something on
-		// the hooks (TC-4).
+		// The named callbacks, not merely something on the hooks (TC-4), ahead
+		// of the stores' own erasers at 10, which anonymise what we look up (#479).
 		$this->assertSame(
-			10,
+			5,
 			has_filter( 'wp_privacy_personal_data_exporters', array( $privacy, 'register_exporter' ) )
 		);
 		$this->assertSame(
-			10,
+			5,
 			has_filter( 'wp_privacy_personal_data_erasers', array( $privacy, 'register_eraser' ) )
 		);
+	}
+
+	/**
+	 * #479: as WooCommerce's own exporter, a registered customer's orders are
+	 * found by the account too, whatever billing e-mail they carry.
+	 */
+	public function test_a_registered_customers_orders_are_found_by_the_account_too(): void {
+		$GLOBALS['gtm4wp_test_forced_functions']['wc_get_orders'] = true;
+		$GLOBALS['gtm4wp_test_forced_functions']['get_user_by']   = true;
+		Functions\when( 'get_user_by' )->justReturn( (object) array( 'ID' => 42 ) );
+		$query = null;
+		Functions\when( 'wc_get_orders' )->alias(
+			static function ( $args ) use ( &$query ) {
+				$query = $args;
+				return array();
+			}
+		);
+
+		( new PrivacyData() )->export( self::EMAIL );
+
+		$this->assertSame( array( self::EMAIL, 42 ), $query['customer'] );
+	}
+
+	/**
+	 * #479: as EDD's own exporter, the orders of the customer an address
+	 * belongs to (any of their addresses) are found by customer id.
+	 */
+	public function test_an_edd_customers_orders_are_found_by_customer_id(): void {
+		$GLOBALS['gtm4wp_test_forced_functions']['edd_get_orders']                    = true;
+		$GLOBALS['gtm4wp_test_forced_functions']['edd_get_customer_by']               = true;
+		$GLOBALS['gtm4wp_test_forced_functions']['edd_get_customer_email_address_by'] = true;
+		Functions\when( 'edd_get_customer_by' )->justReturn( false );
+		Functions\when( 'edd_get_customer_email_address_by' )->justReturn( (object) array( 'customer_id' => 9 ) );
+		$query = null;
+		Functions\when( 'edd_get_orders' )->alias(
+			static function ( $args ) use ( &$query ) {
+				$query = $args;
+				return array();
+			}
+		);
+
+		( new PrivacyData() )->export( 'secondary@example.com' );
+
+		$this->assertSame( 9, $query['customer_id'] );
+		$this->assertArrayNotHasKey( 'email', $query );
 	}
 
 	public function test_the_callbacks_are_added_under_this_plugins_own_group(): void {

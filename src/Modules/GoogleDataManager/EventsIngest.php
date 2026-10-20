@@ -272,9 +272,15 @@ final class EventsIngest {
 		$token = $this->tokens->access_token( $account, TokenService::SCOPE_DATA_MANAGER );
 
 		if ( $token instanceof \WP_Error ) {
-			// Needs the admin, not a retry; status stays 0, no request was made.
-			$result['error']  = $token->get_error_message();
-			$result['reason'] = self::REASON_ACCOUNT;
+			// A key Google refused needs the admin; an unreachable or busy token
+			// endpoint is retried like any transport failure (#472). Status stays
+			// 0: no Data Manager request was made.
+			$data      = $token->get_error_data();
+			$transient = is_array( $data ) && ! empty( $data[ TokenService::ERROR_DATA_TRANSIENT ] );
+
+			$result['error']     = $token->get_error_message();
+			$result['reason']    = $transient ? self::REASON_TRANSPORT : self::REASON_ACCOUNT;
+			$result['retryable'] = $transient;
 
 			return $result;
 		}
@@ -296,9 +302,10 @@ final class EventsIngest {
 
 		if ( $response instanceof \WP_Error ) {
 			// DNS, TLS or a timeout: the request may never have reached Google.
+			// A body that does not encode fails the same way every time.
 			$result['error']     = $response->get_error_message();
 			$result['reason']    = self::REASON_TRANSPORT;
-			$result['retryable'] = true;
+			$result['retryable'] = 'gtm4wp_google_transport_encode' !== $response->get_error_code();
 
 			return $result;
 		}

@@ -58,12 +58,38 @@ final class RefundReplay {
 	}
 
 	/**
+	 * The references a caller named, or null when it named none (every
+	 * replayable refund). A list naming nothing valid is refused: read as
+	 * "all", one mistyped reference would queue every refund (#501).
+	 *
+	 * @param mixed $raw The submitted list, or null when none was submitted.
+	 * @return string[]|\WP_Error|null
+	 */
+	public static function named( $raw ): array|\WP_Error|null {
+		if ( null === $raw ) {
+			return null;
+		}
+
+		$references = self::references( $raw );
+
+		if ( array() === $references ) {
+			return new \WP_Error(
+				'gtm4wp_gdm_no_references',
+				__( 'None of the given references names a refund in the log, so nothing was queued.', 'duracelltomi-google-tag-manager' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return $references;
+	}
+
+	/**
 	 * Queues every replayable refund again, or only the named ones.
 	 *
-	 * @param string[] $references Limit to these references; empty means every replayable refund.
+	 * @param string[]|null $references Limit to these references; null means every replayable refund.
 	 * @return array{queued: int, references: string[]}|\WP_Error The count and the references queued; 409 while sending is off.
 	 */
-	public function replay( array $references = array() ): array|\WP_Error {
+	public function replay( ?array $references = null ): array|\WP_Error {
 		if ( null !== $this->options && ! $this->options->get( GTM4WP_OPTION_GDM_SEND_REFUNDS ) ) {
 			return new \WP_Error(
 				'gtm4wp_gdm_sending_off',
@@ -74,7 +100,7 @@ final class RefundReplay {
 
 		$queued = array();
 
-		foreach ( $this->log->replay_plan( $references ) as $reference => $job ) {
+		foreach ( $this->log->replay_plan( $references ?? array() ) as $reference => $job ) {
 			$payload = array(
 				'platform'  => $job['platform'],
 				'order_id'  => $job['order_id'],

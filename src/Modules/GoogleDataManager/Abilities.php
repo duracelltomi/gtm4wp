@@ -238,7 +238,11 @@ final class Abilities implements ProviderInterface {
 						'references' => array(
 							'type'        => 'array',
 							'description' => __( 'Send only these refunds again, by their reference from the log. Omit for every refund the log marks replayable.', 'duracelltomi-google-tag-manager' ),
-							'items'       => array( 'type' => 'string' ),
+							'minItems'    => 1,
+							'items'       => array(
+								'type'    => 'string',
+								'pattern' => SendLog::REFERENCE_PATTERN,
+							),
 						),
 						'confirm'    => array(
 							'type'        => 'boolean',
@@ -279,7 +283,21 @@ final class Abilities implements ProviderInterface {
 		$problems_only = ! empty( $input['problems_only'] );
 		$limit         = isset( $input['limit'] ) ? max( 1, min( self::MAX_LIMIT, (int) $input['limit'] ) ) : self::MAX_LIMIT;
 
-		$entries = $this->log->entries_for_display();
+		// Google's error text stays on the settings screen: it can name the Cloud
+		// project, the identifier the abilities never return. The answer carries
+		// the error class instead, empty for a row written before the class was (#509).
+		$entries = array_map(
+			static function ( array $entry ): array {
+				if ( in_array( $entry['outcome'] ?? '', array( SendLog::OUTCOME_FAILED, SendLog::OUTCOME_RETRYING ), true ) ) {
+					$entry['reason'] = (string) ( $entry['error_class'] ?? '' );
+				}
+
+				unset( $entry['error_class'] );
+
+				return $entry;
+			},
+			$this->log->entries_for_display()
+		);
 
 		if ( $problems_only ) {
 			$entries = array_values(
@@ -350,7 +368,13 @@ final class Abilities implements ProviderInterface {
 			return Registrar::confirmation_required_error();
 		}
 
-		return ( new RefundReplay( $this->log, $this->options() ) )->replay( RefundReplay::references( $input['references'] ?? array() ) );
+		$named = RefundReplay::named( array_key_exists( 'references', $input ) ? $input['references'] : null );
+
+		if ( $named instanceof \WP_Error ) {
+			return $named;
+		}
+
+		return ( new RefundReplay( $this->log, $this->options() ) )->replay( $named );
 	}
 
 	/**

@@ -29,6 +29,11 @@ defined( 'ABSPATH' ) || exit;
 final class TokenService {
 
 	/**
+	 * Key in a WP_Error's data marking a failure worth retrying as is.
+	 */
+	public const ERROR_DATA_TRANSIENT = 'transient';
+
+	/**
 	 * Longest error text from Google the plugin keeps or hands on: the vault's
 	 * stored last_error, the message the Test buttons and the two test
 	 * abilities return, and EventsIngest's summaries all use this one cap, so
@@ -129,13 +134,19 @@ final class TokenService {
 			)
 		);
 
+		// Not reaching Google, or Google busy (429/5xx), says nothing about the
+		// key: no account error recorded, and the error is marked transient so a
+		// send retries it (#472). Only a refusal is the key's problem.
 		if ( $response instanceof \WP_Error ) {
-			$this->vault->record_token_result( $account_id, false, $response->get_error_message() );
-			return $response;
+			return new \WP_Error( $response->get_error_code(), $response->get_error_message(), array( self::ERROR_DATA_TRANSIENT => true ) );
 		}
 
 		$token      = $response['body']['access_token'] ?? null;
 		$expires_in = (int) ( $response['body']['expires_in'] ?? 0 );
+
+		if ( 429 === $response['status'] || $response['status'] >= 500 ) {
+			return new \WP_Error( 'gtm4wp_google_token_unavailable', self::error_summary( $response ), array( self::ERROR_DATA_TRANSIENT => true ) );
+		}
 
 		if ( ( 200 !== $response['status'] ) || ! is_string( $token ) || ( '' === $token ) ) {
 			$message = self::error_summary( $response );

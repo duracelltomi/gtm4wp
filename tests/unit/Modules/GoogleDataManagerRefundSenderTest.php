@@ -578,6 +578,42 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( RefundSender::REASON_CONSENT_NO_CLIENT_ID, $this->entry()['reason'] );
 	}
 
+	/**
+	 * #473: a refund whose job could not be scheduled is logged as failed,
+	 * so it is not lost silently and a replay can queue it.
+	 */
+	public function test_a_job_that_cannot_be_scheduled_is_logged_as_failed(): void {
+		Functions\when( 'as_schedule_single_action' )->justReturn( 0 );
+
+		$this->sender( $this->source( self::refund() ) )->enqueue( 'woocommerce', 12, 34 );
+
+		$entry = $this->entry();
+		$this->assertSame( SendLog::OUTCOME_FAILED, $entry['outcome'] );
+		$this->assertSame( RefundSender::REASON_NOT_QUEUED, $entry['reason'] );
+		$this->assertArrayHasKey( 'woocommerce:12:34', $this->log->replay_plan() );
+	}
+
+	/**
+	 * #493: "Only output on production environments" holds sending back on a
+	 * staging copy that kept its salts, so real orders' refunds stay off the
+	 * live property; on production the refund is sent as ever.
+	 */
+	public function test_a_non_production_install_holds_sending_back_when_asked(): void {
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'staging' );
+
+		$this->sender( $this->source( self::refund() ), array( GTM4WP_OPTION_PRODUCTIONONLY => true ) )->run( self::job() );
+
+		$this->assertSame( array(), $this->transport->requests );
+		$this->assertSame( RefundSender::REASON_NOT_PRODUCTION, $this->entry()['reason'] );
+
+		Functions\when( 'wp_get_environment_type' )->justReturn( 'production' );
+		$this->queue_send( 200, array( 'requestId' => 'req-1' ) );
+
+		$this->sender( $this->source( self::refund() ), array( GTM4WP_OPTION_PRODUCTIONONLY => true ) )->run( self::job() );
+
+		$this->assertNotSame( array(), $this->transport->requests );
+	}
+
 	public function test_a_refund_of_nothing_is_skipped(): void {
 		$this->sender( $this->source( self::refund( array( 'amount' => 0.0 ) ) ) )->run( self::job() );
 

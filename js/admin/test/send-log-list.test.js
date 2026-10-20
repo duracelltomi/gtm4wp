@@ -59,6 +59,16 @@ describe( 'SendLogList loading', () => {
 		expect( apiFetch ).toHaveBeenCalledWith( { path: LOG_PATH } );
 	} );
 
+	it( 'names what was sent in words, not the stored code (#487)', async () => {
+		apiFetch.mockResolvedValueOnce( { entries: [ entry() ] } );
+
+		render( <SendLogList logPath={ LOG_PATH } /> );
+
+		const cell = await screen.findByText( /woocommerce:12:34/ );
+
+		expect( cell.textContent ).toBe( 'Refund woocommerce:12:34' );
+	} );
+
 	it( 'renders nothing at all without a path', () => {
 		const { container } = render( <SendLogList logPath={ undefined } /> );
 

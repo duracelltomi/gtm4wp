@@ -34,6 +34,11 @@ defined( 'ABSPATH' ) || exit;
 final class BackfillEndpoint {
 
 	/**
+	 * Days after order creation during which the receipt page may backfill.
+	 */
+	public const WINDOW_DAYS = 7;
+
+	/**
 	 * Route path under the plugin's REST namespace.
 	 */
 	public const REST_ROUTE = '/google/attribution-backfill';
@@ -184,8 +189,13 @@ final class BackfillEndpoint {
 			return null;
 		}
 
+		if ( ! self::within_window( method_exists( $order, 'get_date_created' ) ? $order->get_date_created() : null ) ) {
+			return null;
+		}
+
 		$writer = static function ( array $values ) use ( $order ): void {
 			$written = false;
+			$rescued = false;
 			$values  = self::honour_stored_consent( $values, $order->get_meta( AttributionCapture::META_CONSENT_STATE, true ) );
 
 			foreach ( $values as $key => $value ) {
@@ -195,10 +205,15 @@ final class BackfillEndpoint {
 
 				$order->update_meta_data( $key, $value );
 				$written = true;
+				$rescued = $rescued || AttributionCapture::META_CLIENT_ID === $key;
 			}
 
 			if ( $written ) {
 				$order->save();
+			}
+
+			if ( $rescued ) {
+				( new CaptureStats() )->record_rescue();
 			}
 		};
 
@@ -242,10 +257,15 @@ final class BackfillEndpoint {
 
 			if ( $by_id instanceof \EDD\Orders\Order && EddPageDataLayer::receipt_hash_matches( $by_id, $token ) ) {
 				$resolved_id = $requested_id;
+				$order       = $by_id;
 			}
 		}
 
 		if ( 0 >= $resolved_id || $requested_id !== $resolved_id ) {
+			return null;
+		}
+
+		if ( ! self::within_window( (string) ( $order->date_created ?? '' ) ) ) {
 			return null;
 		}
 
@@ -258,10 +278,33 @@ final class BackfillEndpoint {
 				}
 
 				edd_update_order_meta( $resolved_id, $key, $value );
+
+				if ( AttributionCapture::META_CLIENT_ID === $key ) {
+					( new CaptureStats() )->record_rescue();
+				}
 			}
 		};
 
 		return array( $writer, $resolved_id );
+	}
+
+	/**
+	 * Whether an order is recent enough to backfill: the receipt URL is a
+	 * durable secret, so after the window a shared or leaked link, or a buyer
+	 * revisiting it, fills nothing, and an erased order is not re-filled (#480).
+	 * An unreadable date refuses.
+	 *
+	 * @param mixed $created The order's creation date: a DateTimeInterface, or EDD's UTC string.
+	 * @return bool
+	 */
+	public static function within_window( $created ): bool {
+		if ( $created instanceof \DateTimeInterface ) {
+			$timestamp = $created->getTimestamp();
+		} else {
+			$timestamp = is_string( $created ) && '' !== $created ? strtotime( $created . ' UTC' ) : false;
+		}
+
+		return false !== $timestamp && ( time() - $timestamp ) <= self::WINDOW_DAYS * DAY_IN_SECONDS;
 	}
 
 	/**

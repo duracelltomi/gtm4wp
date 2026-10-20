@@ -38,6 +38,22 @@ function outcomeLabel( outcome ) {
 }
 
 /**
+ * Plain-words name of what was sent; an unknown one falls back to the stored
+ * word (#487).
+ *
+ * @param {string} feature Stored feature.
+ * @return {string} Label to show.
+ */
+function featureLabel( feature ) {
+	switch ( feature ) {
+		case 'refund':
+			return __( 'Refund', 'duracelltomi-google-tag-manager' );
+		default:
+			return feature || '';
+	}
+}
+
+/**
  * Plain-words explanation of a reason code, or the code itself when it is one
  * this bundle does not know.
  *
@@ -79,6 +95,16 @@ function reasonLabel( reason ) {
 		case 'empty_refund':
 			return __(
 				'The refund returned no money.',
+				'duracelltomi-google-tag-manager'
+			);
+		case 'not_production':
+			return __(
+				'"Only output on production environments" holds sending back on this non-production site.',
+				'duracelltomi-google-tag-manager'
+			);
+		case 'not_queued':
+			return __(
+				'The background job could not be scheduled, so it never ran. Send it again.',
 				'duracelltomi-google-tag-manager'
 			);
 		case 'zero_value':
@@ -526,7 +552,8 @@ export default function SendLogList( {
 							>
 								<td>{ formatTime( entry.time ) }</td>
 								<td>
-									{ entry.feature } { entry.reference }
+									{ featureLabel( entry.feature ) }{ ' ' }
+									{ entry.reference }
 								</td>
 								<td>{ entry.destination || '—' }</td>
 								<td className="gtm4wp-send-log__outcome">

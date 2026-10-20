@@ -553,6 +553,27 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		$this->assertSame( 129.0, $this->adapter()->load( 12, 34 )->conversion_value(), 'No frozen basis: the current options.' );
 	}
 
+	/**
+	 * #478: a site filter returning an object from a getter must not be a
+	 * fatal error in the background job.
+	 */
+	public function test_an_object_from_a_filtered_getter_does_not_break_the_job(): void {
+		$this->stub_orders(
+			self::order(
+				array(
+					'currency'        => new \stdClass(),
+					'billing_country' => new \stdClass(),
+				)
+			),
+			self::refund( 40.0 )
+		);
+
+		$refund = $this->adapter()->load( 12, 34 );
+
+		$this->assertSame( '', $refund->currency );
+		$this->assertSame( '', $refund->billing_country );
+	}
+
 	public function test_the_currency_comes_from_the_parent_order(): void {
 		$this->stub_orders( self::order( array( 'currency' => 'HUF' ) ), self::refund( 40.0 ) );
 

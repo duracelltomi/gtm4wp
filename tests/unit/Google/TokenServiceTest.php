@@ -393,7 +393,6 @@ final class TokenServiceTest extends TestCase {
 			'HTTP 200 without a token'         => array( 200, array( 'token_type' => 'Bearer' ), 'Google did not issue a token (HTTP 200).' ),
 			'HTTP 200 with empty token'        => array( 200, array( 'access_token' => '' ), 'Google did not issue a token (HTTP 200).' ),
 			'token that is not a string'       => array( 200, array( 'access_token' => array( 'x' ) ), 'Google did not issue a token (HTTP 200).' ),
-			'HTTP 500, no JSON'                => array( 500, null, 'Google did not issue a token (HTTP 500).' ),
 			'HTTP 403 with a non-string error' => array( 403, array( 'error' => array( 'code' => 403 ) ), 'Google did not issue a token (HTTP 403).' ),
 			// A well-formed token in a non-200 body is still refused: this is
 			// the one row where ONLY the status check discriminates, so it pins
@@ -430,17 +429,39 @@ final class TokenServiceTest extends TestCase {
 		$this->assertSame( array(), $this->transients );
 	}
 
-	public function test_a_transport_error_is_passed_through_and_recorded(): void {
+	/**
+	 * #472: not reaching Google says nothing about the key, so the account is
+	 * not marked broken and the error is flagged transient for a retry.
+	 */
+	public function test_a_transport_error_is_passed_through_as_transient_and_not_charged_to_the_key(): void {
+		$before = $this->vault->get( $this->account_id );
 		$this->transport->will_respond( new \WP_Error( 'http_request_failed', 'cURL error 28: Connection timed out' ) );
 
 		$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'http_request_failed', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()[ TokenService::ERROR_DATA_TRANSIENT ] );
 
 		$account = $this->vault->get( $this->account_id );
-		$this->assertSame( KeyVault::STATUS_ERROR, $account['status'] );
-		$this->assertSame( 'cURL error 28: Connection timed out', $account['last_error'] );
+		$this->assertSame( $before['status'], $account['status'] );
+		$this->assertSame( $before['last_error'], $account['last_error'] );
+	}
+
+	/**
+	 * #472: Google busy (429) or failing (5xx) is not a refusal of the key.
+	 */
+	public function test_a_busy_token_endpoint_is_transient_and_not_charged_to_the_key(): void {
+		foreach ( array( 429, 500, 503 ) as $status ) {
+			$before = $this->vault->get( $this->account_id );
+			$this->transport->will_respond_json( $status, null );
+
+			$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+			$this->assertSame( 'gtm4wp_google_token_unavailable', $result->get_error_code(), (string) $status );
+			$this->assertTrue( $result->get_error_data()[ TokenService::ERROR_DATA_TRANSIENT ], (string) $status );
+			$this->assertSame( $before['status'], $this->vault->get( $this->account_id )['status'], (string) $status );
+		}
 	}
 
 	public function test_a_corrupt_cached_value_is_ignored_and_a_fresh_token_is_minted(): void {

@@ -39,8 +39,10 @@ final class AttributionCookies {
 	public const FORMAT_VERSION = 1;
 
 	/**
-	 * Lifetime of both cookies, in days: covers the click-to-purchase gap,
-	 * refreshed on every page that resolves them.
+	 * Lifetime of both cookies, in days, at most: covers the click-to-purchase
+	 * gap, refreshed on every page that resolves them. Written from script, so
+	 * Safari caps it at 7 days (24 h after a tracked link), as Google's own
+	 * cookies (#489).
 	 */
 	public const LIFETIME_DAYS = 90;
 

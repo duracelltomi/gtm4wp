@@ -26,9 +26,21 @@ final class CaptureHooks {
 	/**
 	 * Builds the hook set.
 	 *
-	 * @param CaptureStats $stats Capture-rate counters.
+	 * @param CaptureStats $stats   Capture-rate counters.
+	 * @param Options|null $options Plugin options, for the destination check; null skips it (tests).
 	 */
-	public function __construct( private CaptureStats $stats ) {
+	public function __construct( private CaptureStats $stats, private ?Options $options = null ) {
+	}
+
+	/**
+	 * Whether there is anything to capture for: a destination deleted after a
+	 * lane was saved leaves the lane on with nothing to send to (#484). Read
+	 * at order time, not at boot, so a destinations filter a theme adds counts.
+	 *
+	 * @return bool
+	 */
+	private function has_destination(): bool {
+		return null === $this->options || array() !== DestinationRows::rows( $this->options );
 	}
 
 	/**
@@ -43,7 +55,7 @@ final class CaptureHooks {
 	 */
 	public static function register_for( Options $options ): void {
 		if ( GoogleDataManagerModule::capture_enabled( $options ) ) {
-			( new self( new CaptureStats() ) )->register_hooks();
+			( new self( new CaptureStats(), $options ) )->register_hooks();
 		}
 	}
 
@@ -72,7 +84,7 @@ final class CaptureHooks {
 	 * @return void
 	 */
 	public function capture_woocommerce_order( $order ): void {
-		if ( ! is_object( $order ) || ! method_exists( $order, 'update_meta_data' ) ) {
+		if ( ! is_object( $order ) || ! method_exists( $order, 'update_meta_data' ) || ! $this->has_destination() ) {
 			return;
 		}
 
@@ -82,7 +94,27 @@ final class CaptureHooks {
 			return;
 		}
 
+		// A resumed order (failed payment, then a retry) runs this again: the
+		// newest pass replaces what the first stored, so a click id cannot sit
+		// beside a newer denial, and the order is counted once (#481).
+		$stored = array();
+
+		if ( method_exists( $order, 'get_meta' ) ) {
+			foreach ( AttributionCapture::meta_keys() as $key ) {
+				if ( ! in_array( $order->get_meta( $key, true ), array( '', null, false ), true ) ) {
+					$stored[] = $key;
+				}
+			}
+		}
+
 		$meta = AttributionCapture::meta_for_order( $order );
+
+		// A pass that resolved nothing replaces nothing.
+		foreach ( array() === $meta ? array() : array_diff( $stored, array_keys( $meta ) ) as $key ) {
+			if ( method_exists( $order, 'delete_meta_data' ) ) {
+				$order->delete_meta_data( $key );
+			}
+		}
 
 		foreach ( $meta as $key => $value ) {
 			$order->update_meta_data( $key, $value );
@@ -92,7 +124,9 @@ final class CaptureHooks {
 			$order->save();
 		}
 
-		$this->stats->record( AttributionCapture::is_usable( $meta ) );
+		if ( array() === $stored ) {
+			$this->stats->record( AttributionCapture::is_usable( $meta ) );
+		}
 	}
 
 	/**
@@ -105,7 +139,7 @@ final class CaptureHooks {
 	public function capture_edd_order( $order_id, $order_data = array() ): void {
 		$order_id = (int) $order_id;
 
-		if ( $order_id <= 0 || ! function_exists( 'edd_update_order_meta' ) ) {
+		if ( $order_id <= 0 || ! function_exists( 'edd_update_order_meta' ) || ! $this->has_destination() ) {
 			return;
 		}
 

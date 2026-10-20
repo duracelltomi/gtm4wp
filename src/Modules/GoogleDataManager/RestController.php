@@ -66,14 +66,14 @@ final class RestController {
 	 * @param KeyVault               $vault   The key store, to name an unknown account before any request.
 	 * @param EventsIngest           $ingest  The validateOnly probe.
 	 * @param SendLog                $log     The diagnostics ring.
-	 * @param Options|null           $options Plugin options; null skips the sending-on check of the replay route (tests).
+	 * @param Options|null           $options Plugin options; null skips the sending-on check of the replay route and treats a probed row as saved (tests).
 	 * @param DestinationHealth|null $health  Per-destination health, cleared by a passing probe; null builds one on demand.
 	 */
 	public function __construct(
 		KeyVault $vault,
 		EventsIngest $ingest,
 		private SendLog $log,
-		?Options $options = null,
+		private ?Options $options = null,
 		?DestinationHealth $health = null
 	) {
 		$this->probe  = new DestinationProbe( $vault, $ingest, $health );
@@ -135,7 +135,11 @@ final class RestController {
 					'references' => array(
 						'type'     => 'array',
 						'required' => false,
-						'items'    => array( 'type' => 'string' ),
+						'minItems' => 1,
+						'items'    => array(
+							'type'    => 'string',
+							'pattern' => SendLog::REFERENCE_PATTERN,
+						),
 					),
 				),
 			)
@@ -152,7 +156,13 @@ final class RestController {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function replay( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$result = $this->replay->replay( RefundReplay::references( $request->get_param( 'references' ) ) );
+		$named = RefundReplay::named( $request->get_param( 'references' ) );
+
+		if ( $named instanceof \WP_Error ) {
+			return $named;
+		}
+
+		$result = $this->replay->replay( $named );
 
 		if ( $result instanceof \WP_Error ) {
 			return $result;
@@ -212,7 +222,7 @@ final class RestController {
 			);
 		}
 
-		$result = $this->probe->probe( $row );
+		$result = $this->probe->probe( $row, null === $this->options || DestinationRows::is_saved_row( $this->options, $row ) );
 
 		if ( $result instanceof \WP_Error ) {
 			return $result;

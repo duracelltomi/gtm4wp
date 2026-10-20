@@ -29,7 +29,7 @@ final class RefundData {
 	 * @param string                           $transaction_id  The GA transaction id of the parent order, prefix included - the join key.
 	 * @param string                           $currency        ISO 4217 currency of the order.
 	 * @param float                            $amount          The refunded amount, positive.
-	 * @param float                            $order_total     The parent order's own total, as it was before any refund.
+	 * @param float                            $order_total     The parent order's own total, as it was before any refund; context for gtm4wp_gdm_refund_event callbacks.
 	 * @param int                              $timestamp       Unix time the refund was created.
 	 * @param array<int, array<string, mixed>> $items           Refunded lines in the API shape (RefundEvent::item()); empty for a refund the platform recorded as an amount only.
 	 * @param string                           $client_id       Stored Google Analytics client id, empty when none was captured.

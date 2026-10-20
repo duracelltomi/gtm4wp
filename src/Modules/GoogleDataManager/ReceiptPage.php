@@ -11,6 +11,7 @@
 namespace GTM4WP\Modules\GoogleDataManager;
 
 use GTM4WP\Modules\EasyDigitalDownloads\PageDataLayer as EddPageDataLayer;
+use GTM4WP\Modules\WooCommerce\PageDataLayer as WooPageDataLayer;
 use GTM4WP\RestCors;
 
 defined( 'ABSPATH' ) || exit;
@@ -82,6 +83,13 @@ final class ReceiptPage {
 			return null;
 		}
 
+		// Only for a visitor WooCommerce itself would show this order to, and
+		// inside the backfill window (#480). The session the gate reads exists
+		// here, not on the REST route.
+		if ( WooPageDataLayer::woocommerce_hides_order_from_visitor( $order ) || ! BackfillEndpoint::within_window( $order->get_date_created() ) ) {
+			return null;
+		}
+
 		if ( '' !== (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) ) {
 			return null;
 		}
@@ -127,7 +135,11 @@ final class ReceiptPage {
 
 		$order_id = (int) ( $order->id ?? 0 );
 
-		if ( $order_id <= 0 ) {
+		// Only for a visitor EDD itself would show the receipt to, and inside the
+		// backfill window (#480).
+		if ( $order_id <= 0
+			|| ! function_exists( 'edd_can_view_receipt' ) || ! edd_can_view_receipt( $payment_key )
+			|| ! BackfillEndpoint::within_window( (string) ( $order->date_created ?? '' ) ) ) {
 			return null;
 		}
 

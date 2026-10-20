@@ -419,6 +419,41 @@ final class GoogleDataManagerIngestSendTest extends TestCase {
 		$this->assertCount( 1, $this->transport->requests, 'No ingest request is made when no token could be minted.' );
 	}
 
+	/**
+	 * #472: the token endpoint unreachable or busy is retried like any
+	 * transport failure; the key is not blamed.
+	 */
+	public function test_a_token_endpoint_that_is_busy_or_unreachable_is_retried(): void {
+		foreach ( array( 503, 'timeout' ) as $answer ) {
+			$ingest = $this->ingest();
+
+			if ( 'timeout' === $answer ) {
+				$this->transport->will_respond( new \WP_Error( 'http_request_failed', 'cURL error 28' ) );
+			} else {
+				$this->transport->will_respond_json( $answer, null );
+			}
+
+			$results = $ingest->send( array( self::row( 'G-ABC123', $this->stored_account() ) ), self::full_event() );
+
+			$this->assertTrue( $results[0]['retryable'], (string) $answer );
+			$this->assertSame( EventsIngest::REASON_TRANSPORT, $results[0]['reason'], (string) $answer );
+		}
+	}
+
+	/**
+	 * #472: a body that does not encode fails identically every time, so it
+	 * is not retried.
+	 */
+	public function test_a_body_that_does_not_encode_is_not_retried(): void {
+		$ingest = $this->ingest();
+		$this->queue_token();
+		$this->transport->will_respond( new \WP_Error( 'gtm4wp_google_transport_encode', 'The request to Google could not be encoded.' ) );
+
+		$results = $ingest->send( array( self::row( 'G-ABC123', $this->stored_account() ) ), self::full_event() );
+
+		$this->assertFalse( $results[0]['retryable'] );
+	}
+
 	public function test_the_reason_class_is_googles_code_name_and_carries_no_message(): void {
 		$ingest = $this->ingest();
 		$this->queue_token();

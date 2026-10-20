@@ -331,6 +331,9 @@ final class ProductData {
 		 * addtocartsingle: product added to cart
 		 * productlist: product shown in a product list (category page or special product list like 'New products')
 		 * groupedproductlist: product shown on a product detail page of a grouped product
+		 * refund: a refunded line sent server-side by Google Data Manager, in a
+		 *         background job (no visitor, no cart or session; the source item is
+		 *         the refund's line, quantities and totals negated)
 		 *
 		 * @deprecated 2.0 Use {@see 'gtm4wp_eec_item_with_source'} instead, which receives the same
 		 *                 arguments plus the raw source object (cart item / order item) the item was built from.

@@ -11,6 +11,7 @@ use Brain\Monkey\Functions;
 use GTM4WP\Modules\GoogleDataManager\ConsentPolicy;
 use GTM4WP\Modules\GoogleDataManager\RefundSender;
 use GTM4WP\Modules\GoogleDataManager\SendLog;
+use GTM4WP\Modules\GoogleDataManager\SendQueue;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -137,6 +138,7 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 					'request_id'  => 'req-42',
 					'reason'      => '',
 					'result'      => '',
+					'error_class' => '',
 					'errors'      => 0,
 					'warnings'    => 0,
 				),
@@ -473,6 +475,34 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->assertSame( 0, $entry['warnings'] );
 	}
 
+	/**
+	 * #478: the requestId is the poll's match key; one longer than the old
+	 * 60-character display cap must still match, and so must one over the
+	 * match key's own cap (both sides are capped alike).
+	 */
+	public function test_a_long_request_id_still_receives_its_status(): void {
+		foreach ( array( 70, 260 ) as $length ) {
+			$this->options = array();
+			$log           = $this->log();
+			$request_id    = str_repeat( 'r', $length );
+			$log->record( self::entry( array( 'request_id' => $request_id ) ) );
+
+			$log->record_status(
+				$request_id,
+				array(
+					array(
+						'measurement' => 'G-ABC123',
+						'status'      => 'SUCCESS',
+						'errors'      => 0,
+						'warnings'    => 0,
+					),
+				)
+			);
+
+			$this->assertSame( 'SUCCESS', $log->all()[0]['result'], (string) $length );
+		}
+	}
+
 	public function test_a_status_without_a_request_id_writes_nothing(): void {
 		$log = $this->log();
 		$log->record( self::entry( array( 'request_id' => '' ) ) );
@@ -782,13 +812,87 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->assertNotContains( 'woocommerce:8:0', $references );
 	}
 
-	public function test_a_skipped_send_counts_as_a_problem_worth_keeping(): void {
+	/**
+	 * #395: in a ring of problems (expected skips after switching the feature
+	 * on, an EEA store), a routine row being written is not the one dropped:
+	 * an accepted send and every queued row of a replay must land.
+	 */
+	public function test_a_routine_row_lands_in_a_ring_of_problems(): void {
+		$log = $this->log();
+
+		for ( $i = 0; $i < SendLog::MAX_ENTRIES; $i++ ) {
+			$log->record(
+				self::entry(
+					array(
+						'reference' => 'woocommerce:6:' . $i,
+						'outcome'   => SendLog::OUTCOME_SKIPPED,
+						'reason'    => 'no_client_id',
+					)
+				)
+			);
+		}
+
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:6:ok',
+					'outcome'   => SendLog::OUTCOME_ACCEPTED,
+					'result'    => 'SUCCESS',
+				)
+			)
+		);
+		$log->record_queued( 'woocommerce:6:q', array( 'G-A', 'G-B' ) );
+
+		$entries = $log->all();
+		$tail    = array_slice( $entries, -3 );
+
+		$this->assertCount( SendLog::MAX_ENTRIES, $entries );
+		$this->assertSame( array( 'woocommerce:6:ok', 'woocommerce:6:q', 'woocommerce:6:q' ), array_column( $tail, 'reference' ) );
+		$this->assertSame( array( 'G-ABC123', 'G-A', 'G-B' ), array_column( $tail, 'destination' ) );
+	}
+
+	/**
+	 * A skip a setting can put right is a problem kept ahead of routine
+	 * sends. An expected, never-replayable skip (no client id, #395) ages out
+	 * in order with them instead, or a ring of them evicts every success.
+	 */
+	/**
+	 * #473: a retry whose job never ran (the lane switched off, a lost action)
+	 * becomes a replay target once it is overdue by QUEUED_STALE_AFTER; until
+	 * then the scheduled retry is left to run.
+	 */
+	public function test_an_overdue_retry_becomes_replayable(): void {
+		$this->log()->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:5:6',
+					'outcome'   => SendLog::OUTCOME_RETRYING,
+					'attempt'   => 2,
+				)
+			)
+		);
+		$due = self::NOW + SendQueue::retry_delay( 2 );
+
+		$this->assertSame( array(), $this->log( $due + SendLog::QUEUED_STALE_AFTER - 1 )->replay_plan(), 'Still due to run.' );
+		$this->assertSame( array( 'G-ABC123' ), $this->log( $due + SendLog::QUEUED_STALE_AFTER )->replay_plan()['woocommerce:5:6']['only'] ?? null );
+	}
+
+	public function test_a_fixable_skip_is_kept_and_an_expected_one_ages_out(): void {
 		$log = $this->log();
 
 		$log->record(
 			self::entry(
 				array(
 					'reference' => 'woocommerce:7:1',
+					'outcome'   => SendLog::OUTCOME_SKIPPED,
+					'reason'    => 'no_destination',
+				)
+			)
+		);
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:7:2',
 					'outcome'   => SendLog::OUTCOME_SKIPPED,
 					'reason'    => 'no_client_id',
 				)
@@ -807,7 +911,10 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 			);
 		}
 
-		$this->assertContains( 'woocommerce:7:1', array_column( $log->all(), 'reference' ) );
+		$references = array_column( $log->all(), 'reference' );
+
+		$this->assertContains( 'woocommerce:7:1', $references );
+		$this->assertNotContains( 'woocommerce:7:2', $references );
 	}
 
 	/**

@@ -103,6 +103,28 @@ final class DestinationRows {
 	}
 
 	/**
+	 * Whether a row is one of the saved ones on every column a send uses
+	 * (the label aside): the health record is keyed by measurement ID alone,
+	 * so only the saved row's outcome may change it (#485).
+	 *
+	 * @param Options               $options The plugin options service.
+	 * @param array<string, string> $row     A normalized row.
+	 * @return bool
+	 */
+	public static function is_saved_row( Options $options, array $row ): bool {
+		$columns = array( self::COLUMN_ACCOUNT, self::COLUMN_TYPE, self::COLUMN_PROPERTY, self::COLUMN_MEASUREMENT );
+		$wanted  = array_intersect_key( $row, array_flip( $columns ) );
+
+		foreach ( self::rows( $options ) as $saved ) {
+			if ( array_intersect_key( $saved, array_flip( $columns ) ) == $wanted ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- key order may differ; values are normalized strings.
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * The runtime destination list: the stored rows through the public filter,
 	 * every surviving row re-validated so an invalid filtered row never
 	 * reaches a request body. Every consumer reads through here except the

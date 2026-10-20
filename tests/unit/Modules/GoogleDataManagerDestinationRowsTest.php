@@ -188,4 +188,16 @@ final class GoogleDataManagerDestinationRowsTest extends TestCase {
 	public function test_references_account_tolerates_a_damaged_stored_value(): void {
 		$this->assertFalse( DestinationRows::references_account( $this->options_with( 'broken' ), self::ACCOUNT_ID ) );
 	}
+
+	/**
+	 * #485: only the saved row, on every column a send uses (the label aside),
+	 * may change the health record its measurement ID keys.
+	 */
+	public function test_a_row_is_saved_only_when_every_send_column_matches(): void {
+		$options = $this->options_with( array( self::row() ) );
+
+		$this->assertTrue( DestinationRows::is_saved_row( $options, self::row( array( DestinationRows::COLUMN_LABEL => 'Edited label' ) ) ), 'The label does not matter.' );
+		$this->assertFalse( DestinationRows::is_saved_row( $options, self::row( array( DestinationRows::COLUMN_PROPERTY => '999999999' ) ) ), 'An edited property ID.' );
+		$this->assertFalse( DestinationRows::is_saved_row( $options, self::row( array( DestinationRows::COLUMN_ACCOUNT => 'sa_ffffffffffff' ) ) ), 'Another service account.' );
+	}
 }

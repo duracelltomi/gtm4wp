@@ -249,6 +249,21 @@ final class DestinationProbeTest extends TestCase {
 		$this->assertFalse( ( new DestinationHealth( static fn () => self::NOW ) )->is_failing( self::MEASUREMENT ), 'Read back fresh from the option table.' );
 	}
 
+	/**
+	 * #485: a passing test of an edited, unsaved row says nothing about the
+	 * saved row with the same measurement ID, which keeps failing.
+	 */
+	public function test_a_passing_probe_of_an_unsaved_row_leaves_the_streak_alone(): void {
+		$health = $this->failing_health();
+		$id     = $this->store_account();
+		$this->queue_token();
+		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-1' ) );
+
+		$this->assertTrue( $this->probe( $health )->probe( self::row( $id ), false )['ok'] );
+
+		$this->assertTrue( $health->is_failing( self::MEASUREMENT ) );
+	}
+
 	public function test_a_failing_probe_leaves_the_streak_alone(): void {
 		$health = $this->failing_health();
 		$id     = $this->store_account();

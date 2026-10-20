@@ -83,6 +83,8 @@ claims in the same change" did not happen when they landed):
 - **The send-log ring and the health/capture counters** (`gtm4wp_gdm_send_log`,
   `gtm4wp_gdm_destination_health`, `gtm4wp_gdm_capture_stats`) — order/refund ids,
   statuses, counts, reason classes, sanitized error summaries and Google request ids.
+  The summaries are Google's own text and can name the Cloud project, so they stay on
+  the settings screen; the send-log ability answers with the reason class (#509).
   Admin-only surfaces (an A4 REST read, the settings panel, Site Health). **Site
   Health's Info section is pasted into public threads**, so the rating question for a
   new row there is "may a stranger read it": no account address, no key material, no

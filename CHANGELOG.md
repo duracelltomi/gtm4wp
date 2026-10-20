@@ -47,8 +47,9 @@
 * Added: **server-side refund events** (experimental): each store refund is sent to every Data Manager destination as a GA4 `refund` event, matched by transaction ID and client ID; its value follows the exclude tax/shipping settings in force at purchase. Google Analytics itself processes only the first of several refunds on one order; reported to Google, no update needed once fixed.
 * Changed: the settings screen shows **Unsaved changes** next to the Save button while anything is waiting, and the browser asks before a tab with unsaved edits is closed or reloaded.
 * Changed: removing a row from a settings table now asks first: the trash icon becomes a Remove/Cancel pair for that row. A row nobody has typed into is still removed straight away.
+* Changed: with **"Only output on production environments"** on, a non-production copy of the site also holds back Google Data Manager refunds, so a staging clone does not send real orders' refunds to the live property.
 * Added: a **Recent sends** list under the destinations table: what was sent to Google from the server and what became of it, skips and their reason included, with a switch that hides everything Google applied. Failed or fixable refunds can be sent again, one row or all, and show as queued until the background job runs.
-* Added: a **"Require consent before sending"** setting (experimental) deciding which orders need analytics storage granted before anything about them is sent: buyers in the EEA, the UK and Switzerland by billing country (the default), every order, or never. Where the gate applies and consent was denied or was never captured, nothing is sent and the reason is recorded.
+* Added: a **"Require consent before sending"** setting (experimental): which orders need analytics storage granted before anything about them is sent. By default, buyers in the EEA (EU territories with their own country code included), the UK and Switzerland, by billing country; or every order, or none. Without consent nothing is sent and the reason is recorded.
 
 ### Site Health
 

@@ -113,7 +113,7 @@ final class DownloadData {
 	 *
 	 * @param mixed    $download   An EDD_Download instance or a download id.
 	 * @param array    $additional_product_attributes Any key-value pair that needs to be added into the ecommerce item object.
-	 * @param string   $attributes_used_for The placement ID of the product passed to the item filters so 3rd party code knows where the data is used (productdetail, productlist, addtocartsingle, cart, checkout, purchase).
+	 * @param string   $attributes_used_for The placement ID of the product passed to the item filters so 3rd party code knows where the data is used (productdetail, productlist, addtocartsingle, cart, checkout, purchase, and refund: a Google Data Manager refund line built in a background job, no visitor or cart).
 	 * @param mixed    $source_item Optional. The raw cart content details array or Order_Item the item is built from, passed only to the GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE filter. Default null.
 	 * @param int|null $price_id   Optional. The selected variable price id, used for the price and the item_variant. Default null.
 	 * @return array|false The ecommerce item object of the download, or false if the download does not exist.

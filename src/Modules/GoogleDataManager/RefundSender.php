@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
 
 defined( 'ABSPATH' ) || exit;
@@ -39,6 +40,19 @@ final class RefundSender {
 	 * Skip reason: the refund returned no money.
 	 */
 	public const REASON_EMPTY_REFUND = 'empty_refund';
+
+	/**
+	 * Skip reason: "Only output on production environments" holds the
+	 * container back on this install, so a staging copy does not send real
+	 * orders' refunds to the live property either (#493).
+	 */
+	public const REASON_NOT_PRODUCTION = 'not_production';
+
+	/**
+	 * Failure reason: the background job could not be scheduled, so nothing
+	 * would ever run it; logged as failed so a replay can queue it (#473).
+	 */
+	public const REASON_NOT_QUEUED = 'not_queued';
 
 	/**
 	 * Skip reason: the refund returned money, but none of it counts on the
@@ -139,7 +153,7 @@ final class RefundSender {
 			return;
 		}
 
-		SendQueue::schedule(
+		$queued = SendQueue::schedule(
 			SendQueue::HOOK_SEND,
 			array(
 				'platform'  => $platform,
@@ -149,6 +163,10 @@ final class RefundSender {
 			),
 			SendQueue::INITIAL_DELAY
 		);
+
+		if ( ! $queued ) {
+			$this->not_queued( $platform . ':' . $order_id . ':' . $refund_id, 1 );
+		}
 	}
 
 	/**
@@ -171,6 +189,11 @@ final class RefundSender {
 		$reference = $platform . ':' . $order_id . ':' . $refund_id;
 
 		if ( ( $order_id <= 0 ) || ( $refund_id <= 0 ) ) {
+			return;
+		}
+
+		if ( '' !== ContainerRows::environment_suppression( $this->options->get( GTM4WP_OPTION_PRODUCTIONONLY ) ) ) {
+			$this->skip( $reference, $attempt, self::REASON_NOT_PRODUCTION );
 			return;
 		}
 
@@ -324,11 +347,12 @@ final class RefundSender {
 			}
 		}
 
-		$delay    = SendQueue::retry_delay( $attempt );
-		$retrying = ( array() !== $retry && null !== $delay );
+		$delay = SendQueue::retry_delay( $attempt );
 
-		if ( $retrying ) {
-			SendQueue::schedule(
+		// A retry that could not be scheduled is no retry: the refund is done
+		// for the marker, and its retrying rows turn replayable once overdue (#473).
+		$retrying = array() !== $retry && null !== $delay
+			&& SendQueue::schedule(
 				SendQueue::HOOK_SEND,
 				array_merge(
 					$payload,
@@ -339,7 +363,6 @@ final class RefundSender {
 				),
 				$delay
 			);
-		}
 
 		// Who took it, always (a retry may never reach the others, #394); and,
 		// once no retry is coming, that the refund is done - in one write.
@@ -376,6 +399,7 @@ final class RefundSender {
 					'request_id'  => $result['request_id'],
 					'outcome'     => $this->outcome( $result, $last_step ),
 					'reason'      => $result['error'],
+					'error_class' => $result['reason'],
 				)
 			);
 		}
@@ -566,10 +590,28 @@ final class RefundSender {
 			return;
 		}
 
-		SendQueue::schedule(
-			SendQueue::HOOK_SEND,
-			array_merge( $payload, array( 'attempt' => $attempt + 1 ) ),
-			$delay
+		if ( ! SendQueue::schedule( SendQueue::HOOK_SEND, array_merge( $payload, array( 'attempt' => $attempt + 1 ) ), $delay ) ) {
+			$this->not_queued( (string) ( $payload['platform'] ?? '' ) . ':' . (int) ( $payload['order_id'] ?? 0 ) . ':' . (int) ( $payload['refund_id'] ?? 0 ), $attempt + 1 );
+		}
+	}
+
+	/**
+	 * Records a job that could not be scheduled as failed, so it is not lost
+	 * silently and a replay can queue it (#473).
+	 *
+	 * @param string $reference The refund reference.
+	 * @param int    $attempt   The attempt that could not be scheduled.
+	 * @return void
+	 */
+	private function not_queued( string $reference, int $attempt ): void {
+		$this->log->record(
+			array(
+				'feature'   => SendLog::FEATURE_REFUND,
+				'reference' => $reference,
+				'attempt'   => $attempt,
+				'outcome'   => SendLog::OUTCOME_FAILED,
+				'reason'    => self::REASON_NOT_QUEUED,
+			)
 		);
 	}
 }

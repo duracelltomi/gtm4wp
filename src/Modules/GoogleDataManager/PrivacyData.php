@@ -38,8 +38,10 @@ final class PrivacyData {
 	 * @return void
 	 */
 	public function register_hooks(): void {
-		add_filter( 'wp_privacy_personal_data_exporters', array( $this, 'register_exporter' ) );
-		add_filter( 'wp_privacy_personal_data_erasers', array( $this, 'register_eraser' ) );
+		// Ahead of the stores' own (priority 10): WooCommerce's eraser anonymises
+		// the billing e-mail and customer id this lookup needs (#479).
+		add_filter( 'wp_privacy_personal_data_exporters', array( $this, 'register_exporter' ), 5 );
+		add_filter( 'wp_privacy_personal_data_erasers', array( $this, 'register_eraser' ), 5 );
 	}
 
 	/**
@@ -165,7 +167,10 @@ final class PrivacyData {
 	}
 
 	/**
-	 * One page of this person's orders, across both platforms.
+	 * One page of this person's orders, across both platforms, found the way
+	 * each store's own exporter finds them (#479): WooCommerce by billing
+	 * e-mail OR the account with that e-mail; EDD by the customer the e-mail
+	 * belongs to (any of their addresses), else by the order e-mail.
 	 *
 	 * @param string $email_address The person the request is about.
 	 * @param int    $page          One-based page number.
@@ -179,12 +184,19 @@ final class PrivacyData {
 		$orders = array();
 
 		if ( function_exists( 'wc_get_orders' ) ) {
+			$customer = array( $email_address );
+			$user     = function_exists( 'get_user_by' ) ? get_user_by( 'email', $email_address ) : false;
+
+			if ( is_object( $user ) && ! empty( $user->ID ) ) {
+				$customer[] = (int) $user->ID;
+			}
+
 			$found = wc_get_orders(
 				array(
-					'billing_email' => $email_address,
-					'limit'         => self::PER_PAGE,
-					'paged'         => $page,
-					'type'          => 'shop_order',
+					'customer' => $customer,
+					'limit'    => self::PER_PAGE,
+					'paged'    => $page,
+					'type'     => 'shop_order',
 				)
 			);
 
@@ -202,9 +214,10 @@ final class PrivacyData {
 		}
 
 		if ( function_exists( 'edd_get_orders' ) ) {
-			$found = edd_get_orders(
-				array(
-					'email'  => $email_address,
+			$customer_id = self::edd_customer_id( $email_address );
+			$found       = edd_get_orders(
+				( $customer_id > 0 ? array( 'customer_id' => $customer_id ) : array( 'email' => $email_address ) )
+				+ array(
 					'number' => self::PER_PAGE,
 					'offset' => ( $page - 1 ) * self::PER_PAGE,
 				)
@@ -224,6 +237,33 @@ final class PrivacyData {
 		}
 
 		return $orders;
+	}
+
+	/**
+	 * The EDD customer an e-mail belongs to, primary or secondary address, as
+	 * EDD's own exporter resolves it; 0 when none.
+	 *
+	 * @param string $email_address The e-mail.
+	 * @return int
+	 */
+	private static function edd_customer_id( string $email_address ): int {
+		if ( function_exists( 'edd_get_customer_by' ) ) {
+			$customer = edd_get_customer_by( 'email', $email_address );
+
+			if ( is_object( $customer ) && ! empty( $customer->id ) ) {
+				return (int) $customer->id;
+			}
+		}
+
+		if ( function_exists( 'edd_get_customer_email_address_by' ) ) {
+			$address = edd_get_customer_email_address_by( 'email', $email_address );
+
+			if ( is_object( $address ) && ! empty( $address->customer_id ) ) {
+				return (int) $address->customer_id;
+			}
+		}
+
+		return 0;
 	}
 
 	/**

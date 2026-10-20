@@ -42,10 +42,12 @@ final class DestinationProbe {
 	/**
 	 * Probes one valid destination row.
 	 *
-	 * @param array<string, string> $row A normalized row that passed DestinationRows::is_valid_row().
+	 * @param array<string, string> $row      A normalized row that passed DestinationRows::is_valid_row().
+	 * @param bool                  $is_saved Whether the row is the saved one: only then does a pass end its
+	 *                                        failure streak, not when an edited, unsaved row passes (#485).
 	 * @return array{ok: bool, message: string}|\WP_Error 404 when the row's service account no longer exists.
 	 */
-	public function probe( array $row ): array|\WP_Error {
+	public function probe( array $row, bool $is_saved = true ): array|\WP_Error {
 		if ( ! $this->vault->has( (string) ( $row[ DestinationRows::COLUMN_ACCOUNT ] ?? '' ) ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_account_unknown',
@@ -59,7 +61,7 @@ final class DestinationProbe {
 
 		// A passing probe ends the failure streak and the notice it raises;
 		// otherwise the notice stayed until the next refund.
-		if ( $ok ) {
+		if ( $ok && $is_saved ) {
 			( $this->health ?? new DestinationHealth() )->clear_failures( (string) $row[ DestinationRows::COLUMN_MEASUREMENT ] );
 		}
 

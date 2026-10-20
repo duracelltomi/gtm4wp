@@ -12,6 +12,8 @@ use GTM4WP\Modules\GoogleDataManager\AttributionCapture;
 use GTM4WP\Modules\GoogleDataManager\AttributionCookies;
 use GTM4WP\Modules\GoogleDataManager\CaptureHooks;
 use GTM4WP\Modules\GoogleDataManager\CaptureStats;
+use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
+use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -240,6 +242,77 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 
 		$this->assertSame( 'the-original-id', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
 		$this->assertSame( '', (string) $order->get_meta( '_gtm4wp_gclid', true ) );
+	}
+
+	/**
+	 * #481: a resumed order runs the capture again. When the first pass stored
+	 * no client id, the newest pass replaces what it stored (a click id must
+	 * not sit beside a newer denial) and the order is counted once.
+	 */
+	public function test_a_resumed_order_is_replaced_by_the_newest_pass_and_counted_once(): void {
+		// phpcs:disable WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
+		$_COOKIE[ AttributionCookies::CONSENT_COOKIE ] = (string) json_encode(
+			array(
+				'v'           => AttributionCookies::FORMAT_VERSION,
+				'signals'     => array(
+					'analytics_storage' => 'denied',
+					'ad_storage'        => 'denied',
+				),
+				'captured_at' => 1_800_000_100,
+			)
+		);
+		// phpcs:enable WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		$order = new class(
+			array(
+				'id'   => 42,
+				'meta' => array(
+					'_gtm4wp_gclid'                        => 'abc123',
+					AttributionCapture::META_CONSENT_STATE => array(
+						'signals'     => array( 'ad_storage' => 'granted' ),
+						'captured_at' => 1_800_000_000,
+					),
+				),
+			)
+		) extends \WC_Order {
+			/**
+			 * Keys deleted.
+			 *
+			 * @var string[]
+			 */
+			public array $deleted = array();
+
+			public function delete_meta_data( $key ) {
+				$this->deleted[]          = $key;
+				$this->saved_meta[ $key ] = '';
+			}
+		};
+		$stats = new CaptureStats( static fn () => 1_800_000_100 );
+
+		( new CaptureHooks( $stats ) )->capture_woocommerce_order( $order );
+
+		$this->assertSame( array( '_gtm4wp_gclid' ), $order->deleted );
+		$this->assertSame( 'denied', $order->get_meta( AttributionCapture::META_CONSENT_STATE, true )['signals']['ad_storage'] );
+		$this->assertSame( 0, $stats->get()['seen'], 'The first pass already counted this order.' );
+	}
+
+	/**
+	 * #484: a lane left on after its last destination was deleted has nothing
+	 * to capture for: no meta is stored and the order is not counted, so
+	 * Site Health does not blame the tag for a missing destination.
+	 */
+	public function test_nothing_is_captured_or_counted_without_a_destination(): void {
+		$this->set_captured_cookies();
+		$this->options[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+			GTM4WP_OPTION_GDM_DESTINATIONS => array(),
+		);
+		$stats                           = new CaptureStats( static fn () => 1_800_000_000 );
+		$order                           = new \WC_Order( array( 'id' => 42 ) );
+
+		( new CaptureHooks( $stats, new Options( ( new GoogleDataManagerModule() )->defaults() ) ) )->capture_woocommerce_order( $order );
+
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( 0, $stats->get()['seen'] );
 	}
 
 	public function test_a_non_order_argument_is_ignored(): void {

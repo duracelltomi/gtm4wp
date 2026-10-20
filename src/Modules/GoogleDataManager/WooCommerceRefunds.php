@@ -102,20 +102,32 @@ final class WooCommerceRefunds implements RefundSource {
 			// The PARENT order's number, prefix included: the transaction the
 			// purchase reported. The refund's own number Analytics has never seen.
 			$prefix . $order->get_order_number(),
-			(string) $order->get_currency(),
+			self::text( $order->get_currency() ),
 			abs( (float) $refund->get_total() ),
 			(float) $order->get_total(),
 			$timestamp,
 			$this->items( $refund, $basis['item_inc_tax'] ),
-			(string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ),
+			self::text( $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) ),
 			is_array( $consent ) ? $consent : null,
-			(string) $order->get_billing_country(),
+			self::text( $order->get_billing_country() ),
 			// The purchase event's two totals, read off the refund and made
 			// positive; get_total_tax() covers the shipping tax too.
 			abs( (float) $refund->get_shipping_total() ),
 			abs( (float) $refund->get_total_tax() ),
 			self::refund_value( self::figures( $refund ), $basis, self::prior_figures( $order, $refund_id ) )
 		);
+	}
+
+	/**
+	 * A filtered getter's value as a string: these getters run through site
+	 * filters, and casting an object that has no __toString() would be a
+	 * fatal error inside the background job (#478, RI-39).
+	 *
+	 * @param mixed $value The getter's value.
+	 * @return string
+	 */
+	private static function text( $value ): string {
+		return is_scalar( $value ) ? (string) $value : '';
 	}
 
 	/**
@@ -251,7 +263,7 @@ final class WooCommerceRefunds implements RefundSource {
 			return false;
 		}
 
-		return '' !== (string) $refund->get_meta( self::META_SENT, true );
+		return '' !== self::text( $refund->get_meta( self::META_SENT, true ) );
 	}
 
 	/**

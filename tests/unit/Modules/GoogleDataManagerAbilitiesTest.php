@@ -222,12 +222,57 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( array( 'confirm' ), $schema['required'], 'References are optional; the confirmation is not.' );
 		$this->assertSame( array( 'references', 'confirm' ), array_keys( $schema['properties'] ) );
 		$this->assertSame( 'array', $schema['properties']['references']['type'] );
-		$this->assertSame( array( 'type' => 'string' ), $schema['properties']['references']['items'], 'The log references are strings (platform:order:refund), as the REST route declares them.' );
+		$this->assertSame(
+			array(
+				'type'    => 'string',
+				'pattern' => SendLog::REFERENCE_PATTERN,
+			),
+			$schema['properties']['references']['items'],
+			'The log references (platform:order:refund), as the REST route declares them.'
+		);
+		$this->assertSame( 1, $schema['properties']['references']['minItems'], '#501: an empty list is not "every refund".' );
 		$this->assertSame( 'boolean', $schema['properties']['confirm']['type'] );
 		$this->assertFalse( $schema['additionalProperties'] );
 	}
 
 	// ---- get-google-data-manager-log ---------------------------------------
+
+	/**
+	 * #509: Google's error text can name the Cloud project, which the abilities
+	 * never return; a failed row answers with its error class, and a row written
+	 * before the class existed with nothing. The screen keeps the text.
+	 */
+	public function test_the_log_answer_carries_the_error_class_not_googles_text(): void {
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:10:11',
+				'destination' => self::MEASUREMENT,
+				'outcome'     => SendLog::OUTCOME_FAILED,
+				'attempt'     => 6,
+				'status'      => 403,
+				'reason'      => 'PERMISSION_DENIED: project 123456789012 has not enabled the API',
+				'error_class' => 'PERMISSION_DENIED',
+			)
+		);
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:12:13',
+				'destination' => self::MEASUREMENT,
+				'outcome'     => SendLog::OUTCOME_FAILED,
+				'attempt'     => 6,
+				'status'      => 403,
+				'reason'      => 'project 123456789012',
+			)
+		);
+
+		$reasons = array_column( $this->execute( Abilities::GET_LOG, array() )['entries'], 'reason', 'reference' );
+
+		$this->assertSame( 'PERMISSION_DENIED', $reasons['woocommerce:10:11'] );
+		$this->assertSame( '', $reasons['woocommerce:12:13'] );
+		$this->assertStringContainsString( '123456789012', $this->log->entries_for_display()[0]['reason'], 'The screen keeps the text.' );
+	}
 
 	/**
 	 * The allow-list is SendLog's (its own test pins the write side); this
@@ -524,6 +569,31 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 
 		$this->assertSame( array( 'woocommerce:3:4' ), $result['references'] );
 		$this->assertCount( 1, $this->scheduled );
+	}
+
+	/**
+	 * #501: references given but naming no refund are refused with nothing
+	 * queued; omitted, every replayable refund is queued.
+	 */
+	public function test_a_replay_naming_no_refund_is_refused_and_an_omitted_list_means_all(): void {
+		$this->store_destination( $this->store_account() );
+		$this->record( 'woocommerce:1:2', SendLog::OUTCOME_FAILED );
+		$this->record( 'woocommerce:3:4', SendLog::OUTCOME_FAILED );
+
+		$refused = $this->execute(
+			Abilities::REPLAY_REFUNDS,
+			array(
+				'confirm'    => true,
+				'references' => array( 'typo:x:y' ),
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $refused );
+		$this->assertSame( array(), $this->scheduled );
+
+		$all = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => true ) );
+
+		$this->assertSame( 2, $all['queued'] );
 	}
 
 	public function test_a_replay_is_refused_while_sending_is_off(): void {
