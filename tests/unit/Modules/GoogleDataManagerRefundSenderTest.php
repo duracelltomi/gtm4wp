@@ -594,7 +594,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 	}
 
 	/**
-	 * #493: "Only output on production environments" holds sending back on a
+	 * #493: "Only output the container on production environments" holds sending back on a
 	 * staging copy that kept its salts, so real orders' refunds stay off the
 	 * live property; on production the refund is sent as ever.
 	 */

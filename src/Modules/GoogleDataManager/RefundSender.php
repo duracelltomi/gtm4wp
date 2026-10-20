@@ -46,7 +46,7 @@ final class RefundSender {
 	public const REASON_EMPTY_REFUND = 'empty_refund';
 
 	/**
-	 * Skip reason: "Only output on production environments" holds the
+	 * Skip reason: "Only output the container on production environments" holds the
 	 * container back on this install, so a staging copy does not send real
 	 * orders' refunds to the live property either (#493).
 	 */

@@ -99,7 +99,7 @@ function reasonLabel( reason ) {
 			);
 		case 'not_production':
 			return __(
-				'"Only output on production environments" holds sending back on this non-production site.',
+				'"Only output the container on production environments" holds sending back on this non-production site.',
 				'duracelltomi-google-tag-manager'
 			);
 		case 'not_queued':
