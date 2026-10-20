@@ -1052,6 +1052,7 @@ final class DownloadDataTest extends TestCase {
 
 		// #513: this order is left out by id, whatever its status, and only the
 		// statuses EDD counts as sales decide.
+		$this->assertSame( 12, $args['customer_id'] ?? null, 'Only this customer\'s orders count; unscoped, every later buyer reads as returning.' );
 		$this->assertSame( array( 77 ), $args['id__not_in'] );
 		$this->assertSame( 'sale', $args['type'] );
 		$this->assertSame( array( 'complete', 'partially_refunded', 'revoked', 'on_hold' ), $args['status__in'] );

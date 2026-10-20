@@ -225,7 +225,7 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame(
 			array(
 				'type'    => 'string',
-				'pattern' => SendLog::REFERENCE_PATTERN,
+				'pattern' => '^[^:]+:[0-9]+:[0-9]+$',
 			),
 			$schema['properties']['references']['items'],
 			'The log references (platform:order:refund), as the REST route declares them.'
@@ -272,6 +272,29 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 'PERMISSION_DENIED', $reasons['woocommerce:10:11'] );
 		$this->assertSame( '', $reasons['woocommerce:12:13'] );
 		$this->assertStringContainsString( '123456789012', $this->log->entries_for_display()[0]['reason'], 'The screen keeps the text.' );
+	}
+
+	/**
+	 * #509, the retrying leg: a transient failure carries the same Google text.
+	 */
+	public function test_a_retrying_row_answers_with_its_error_class_too(): void {
+		$this->log->record(
+			array(
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => 'woocommerce:10:11',
+				'destination' => self::MEASUREMENT,
+				'outcome'     => SendLog::OUTCOME_RETRYING,
+				'attempt'     => 2,
+				'status'      => 503,
+				'reason'      => 'UNAVAILABLE: project 123456789012 is overloaded',
+				'error_class' => 'UNAVAILABLE',
+			)
+		);
+
+		$entry = $this->execute( Abilities::GET_LOG, array() )['entries'][0];
+
+		$this->assertSame( 'UNAVAILABLE', $entry['reason'] );
+		$this->assertStringNotContainsString( '123456789012', (string) json_encode( $entry ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- flattening for a substring assertion.
 	}
 
 	/**
@@ -339,6 +362,18 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 
 		$this->assertSame( array( 'woocommerce:14:15', 'woocommerce:12:13' ), array_column( $entries, 'reference' ) );
 		$this->assertSame( array( SendLog::TONE_ERROR, SendLog::TONE_WARN ), array_column( $entries, 'tone' ) );
+	}
+
+	/**
+	 * #502: a client sending the flag as the string 'false' asked for everything.
+	 */
+	public function test_problems_only_as_the_string_false_lists_every_row(): void {
+		$this->record( 'woocommerce:10:11', SendLog::OUTCOME_ACCEPTED );
+		$this->record( 'woocommerce:14:15', SendLog::OUTCOME_FAILED );
+
+		$entries = $this->execute( Abilities::GET_LOG, array( 'problems_only' => 'false' ) )['entries'];
+
+		$this->assertSame( array( 'woocommerce:14:15', 'woocommerce:10:11' ), array_column( $entries, 'reference' ) );
 	}
 
 	public function test_the_limit_cuts_the_newest_rows(): void {

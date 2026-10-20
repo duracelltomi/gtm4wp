@@ -246,6 +246,37 @@ final class TokenServiceTest extends TestCase {
 		$this->assertSame( $before['scopes'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['scopes'] );
 	}
 
+	/**
+	 * Swaps the stored key id at the recording's fresh read, as a concurrent
+	 * Replace key would (#468).
+	 *
+	 * @return void
+	 */
+	private function replace_key_at_the_recording(): void {
+		Functions\when( 'wp_cache_delete' )->alias(
+			function () {
+				$this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['private_key_id'] = 'ffffffffffffffffffffffffffffffffffffffff';
+				return true;
+			}
+		);
+	}
+
+	/**
+	 * Google refusing the old key says nothing about its replacement (#468).
+	 */
+	public function test_a_refusal_of_a_replaced_key_is_not_recorded_on_the_new_one(): void {
+		$this->transport->will_respond_json( 400, array( 'error' => 'invalid_grant' ) );
+		$before = $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ];
+		$this->replace_key_at_the_recording();
+
+		$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_token_refused', $result->get_error_code() );
+		$this->assertSame( $before['status'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['status'] );
+		$this->assertSame( $before['last_error'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['last_error'] );
+	}
+
 	public function test_the_cache_is_per_scope(): void {
 		$this->transport->will_respond( self::token_response( 'ya29.scope-a' ) );
 		$this->transport->will_respond( self::token_response( 'ya29.scope-b' ) );
@@ -525,6 +556,43 @@ final class TokenServiceTest extends TestCase {
 		$account = $this->vault->get( $this->account_id );
 		$this->assertSame( KeyVault::STATUS_ERROR, $account['status'] );
 		$this->assertSame( 'The request to Google could not be signed with the stored key.', $account['last_error'] );
+	}
+
+	/**
+	 * A signing failure with the old key is not recorded on its replacement (#468).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_signing_failure_of_a_replaced_key_is_not_recorded_on_the_new_one(): void {
+		Functions\when( 'GTM4WP\Google\openssl_sign' )->justReturn( false );
+		$before = $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ];
+		$this->replace_key_at_the_recording();
+
+		$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+		$this->assertSame( 'gtm4wp_google_token_sign_failed', $result->get_error_code() );
+		$this->assertSame( $before['status'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['status'] );
+		$this->assertSame( $before['last_error'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['last_error'] );
+	}
+
+	/**
+	 * Without OpenSSL nothing decrypts: the server's problem, so the account is
+	 * not marked damaged (#497). The shadow is defined after setUp() sealed the
+	 * key and only hides openssl_decrypt.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_server_without_openssl_is_not_recorded_on_the_account(): void {
+		$before = $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ];
+		Functions\when( 'GTM4WP\Google\function_exists' )->alias( static fn ( $name ) => 'openssl_decrypt' !== $name && \function_exists( $name ) );
+
+		$result = $this->make_service()->access_token( $this->account_id, self::SCOPE );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_key_no_openssl', $result->get_error_code() );
+		$this->assertSame( array(), $this->transport->requests, 'No request leaves the site.' );
+		$this->assertSame( $before['status'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['status'] );
+		$this->assertSame( $before['last_error'], $this->options[ KeyVault::OPTION_NAME ][ $this->account_id ]['last_error'] );
 	}
 
 	/**

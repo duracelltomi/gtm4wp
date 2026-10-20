@@ -401,6 +401,21 @@ final class GoogleAuthRestControllerTest extends TestCase {
 		$this->assertSame( $before, $this->options[ KeyVault::OPTION_NAME ] );
 	}
 
+	/**
+	 * The replace twin of the upload's 500: a vault error without a status of
+	 * its own is a server error, not the client's.
+	 */
+	public function test_replace_key_answers_500_when_the_store_refuses_the_write(): void {
+		$id = $this->upload_fixture();
+		Functions\when( 'update_option' )->justReturn( false );
+
+		$response = $this->replace( $id, KeyFileFixture::key_file( array( 'private_key_id' => 'ffffffffffffffffffffffffffffffffffffffff' ) ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 'gtm4wp_google_key_store_failed', $response->get_error_code() );
+		$this->assertSame( 500, $response->get_error_data()['status'] );
+	}
+
 	public function test_replace_key_of_an_unknown_account_is_404(): void {
 		$response = $this->replace( 'sa_000000000000', KeyFileFixture::key_file() );
 

@@ -128,13 +128,18 @@ final class PurchaseTrackingTest extends TestCase {
 	 * order; the fallback must skip it, not raise a TypeError.
 	 */
 	public function test_ignores_an_id_that_is_not_an_order(): void {
-		Functions\when( 'wc_get_order' )->justReturn( false );
+		foreach ( array(
+			'false'  => false,
+			'refund' => new \WC_Order_Refund( array( 'id' => 999 ) ),
+		) as $label => $answer ) {
+			Functions\when( 'wc_get_order' )->justReturn( $answer );
 
-		ob_start();
-		$this->make_tracking()->on_thankyou( 999 );
-		$output = (string) ob_get_clean();
+			ob_start();
+			$this->make_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )->on_thankyou( 999 );
+			$output = (string) ob_get_clean();
 
-		$this->assertStringNotContainsString( 'purchase', $output );
+			$this->assertStringNotContainsString( 'purchase', $output, $label );
+		}
 	}
 
 	public function test_skips_when_on_order_received_page(): void {

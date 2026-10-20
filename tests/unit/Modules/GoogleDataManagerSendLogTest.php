@@ -87,6 +87,7 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 			'vetoed'            => RefundSender::REASON_VETOED,
 			'platform_inactive' => RefundSender::REASON_PLATFORM_INACTIVE,
 			'refund_unreadable' => RefundSender::REASON_REFUND_UNREADABLE,
+			'not_production'    => RefundSender::REASON_NOT_PRODUCTION,
 		);
 		$informational = array(
 			'already_sent'        => RefundSender::REASON_ALREADY_SENT,
@@ -283,6 +284,46 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->log()->record( self::entry( array( 'reason' => array( 'nested' => 'value' ) ) ) );
 
 		$this->assertSame( '', $this->log()->all()[0]['reason'] );
+	}
+
+	/**
+	 * #509: error_class is what the log ability answers with in place of
+	 * Google's text, so only a code-shaped value is ever stored.
+	 *
+	 * @param string $stored   The class a caller passed.
+	 * @param string $expected What the ring keeps.
+	 */
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'PERMISSION_DENIED', 'PERMISSION_DENIED' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'http_403', 'http_403' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'Project 123456789012 denied', '' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( '"><img src=x>', '' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( "PERMISSION_DENIED\n", '' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'A_CLASS_NAME_THAT_IS_LONGER_THAN_FORTY_CHARS', '' ) )]
+	public function test_only_a_code_shaped_error_class_is_stored( string $stored, string $expected ): void {
+		$log = $this->log();
+		$log->record( self::entry( array( 'error_class' => $stored ) ) );
+
+		$this->assertSame( $expected, $log->all()[0]['error_class'] );
+	}
+
+	/**
+	 * The input-schema pattern accepts exactly what parse_reference() accepts.
+	 * The schema is published to REST and ability clients, so it is pinned by
+	 * the strings it sorts, not by its own value (TS-21).
+	 */
+	public function test_the_reference_pattern_accepts_what_parse_reference_accepts(): void {
+		$accept = array( 'woocommerce:12:34', 'edd:1:0' );
+		$refuse = array( 'woocommerce:12', ':12:34', 'woocommerce:a:34', 'woocommerce:12:34x', 'a:1:2:3', 'woocommerce:12:' );
+
+		foreach ( $accept as $reference ) {
+			$this->assertSame( 1, preg_match( '/' . SendLog::REFERENCE_PATTERN . '/D', $reference ), $reference );
+			$this->assertNotNull( SendLog::parse_reference( $reference ), $reference );
+		}
+
+		foreach ( $refuse as $reference ) {
+			$this->assertSame( 0, preg_match( '/' . SendLog::REFERENCE_PATTERN . '/D', $reference ), $reference );
+			$this->assertNull( SendLog::parse_reference( $reference ), $reference );
+		}
 	}
 
 	public function test_negative_counts_are_never_stored(): void {
@@ -852,11 +893,6 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 	}
 
 	/**
-	 * A skip a setting can put right is a problem kept ahead of routine
-	 * sends. An expected, never-replayable skip (no client id, #395) ages out
-	 * in order with them instead, or a ring of them evicts every success.
-	 */
-	/**
 	 * #473: a retry whose job never ran (the lane switched off, a lost action)
 	 * becomes a replay target once it is overdue by QUEUED_STALE_AFTER; until
 	 * then the scheduled retry is left to run.
@@ -877,6 +913,52 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 		$this->assertSame( array( 'G-ABC123' ), $this->log( $due + SendLog::QUEUED_STALE_AFTER )->replay_plan()['woocommerce:5:6']['only'] ?? null );
 	}
 
+	/**
+	 * #395 with problems no trim may drop (failures, a fixable skip): the rows a
+	 * write appends still land instead of being the routine rows trimmed.
+	 */
+	public function test_appended_rows_survive_a_ring_of_problems_that_are_never_trimmed(): void {
+		$log = $this->log();
+
+		for ( $i = 0; $i < SendLog::MAX_ENTRIES; $i++ ) {
+			$log->record(
+				self::entry(
+					array(
+						'reference' => 'woocommerce:4:' . $i,
+						'outcome'   => 0 === $i % 2 ? SendLog::OUTCOME_FAILED : SendLog::OUTCOME_SKIPPED,
+						'reason'    => 0 === $i % 2 ? 'refused' : 'consent_unknown',
+					)
+				)
+			);
+		}
+
+		$log->record(
+			self::entry(
+				array(
+					'reference' => 'woocommerce:4:ok',
+					'outcome'   => SendLog::OUTCOME_ACCEPTED,
+					'result'    => 'SUCCESS',
+				)
+			)
+		);
+
+		$after_accepted = $log->all();
+		$this->assertSame( 'woocommerce:4:ok', end( $after_accepted )['reference'] );
+
+		// The next write may trim that routine row, never its own two.
+		$log->record_queued( 'woocommerce:4:q', array( 'G-A', 'G-B' ) );
+		$entries = $log->all();
+
+		$this->assertCount( SendLog::MAX_ENTRIES, $entries );
+		$this->assertSame( array( 'G-A', 'G-B' ), array_column( array_slice( $entries, -2 ), 'destination' ) );
+		$this->assertSame( array( 'woocommerce:4:q', 'woocommerce:4:q' ), array_column( array_slice( $entries, -2 ), 'reference' ) );
+	}
+
+	/**
+	 * A skip a setting can put right is a problem kept ahead of routine
+	 * sends. An expected, never-replayable skip (no client id, #395) ages out
+	 * in order with them instead, or a ring of them evicts every success.
+	 */
 	public function test_a_fixable_skip_is_kept_and_an_expected_one_ages_out(): void {
 		$log = $this->log();
 

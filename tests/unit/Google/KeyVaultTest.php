@@ -34,12 +34,11 @@ use GTM4WP\Tests\unit\TestCase;
  * the derivation from the WordPress salts is a one-line property of
  * storage_key() covered by reading the source, not by a test (BE-3).
  *
- * NOTE (untestable branches): the no-OpenSSL bail in seal()/unseal() and the
- * openssl_encrypt()-returns-false leg cannot be exercised in-process -
- * patchwork.json redefines no openssl internals, and function_exists() on a
- * loaded extension cannot be made false (the TS-16 documented-limitation
- * class; same note in ServiceAccountKeyTest for its no-OpenSSL bail). Both
- * legs fail closed to a WP_Error by reading the source.
+ * No OpenSSL is simulated in a separate process by a namespaced
+ * function_exists() shadow (it outlives the test, TS-16); open()'s guard is
+ * pinned that way. The seal() bail and the openssl_encrypt()-returns-false
+ * leg are not exercised; both fail closed to a WP_Error by reading the source.
+ * GTM4WP_ENCRYPTION_KEY is define()d in separate processes too (TS-24).
  */
 final class KeyVaultTest extends TestCase {
 
@@ -386,6 +385,41 @@ final class KeyVaultTest extends TestCase {
 		$this->assertSame( array( $b ), $vault->unreadable() );
 	}
 
+	/**
+	 * A stored "re-upload required" clears from the listings once the secret
+	 * is back and the key opens again (#506).
+	 */
+	public function test_a_stored_reupload_status_reads_unverified_once_the_key_opens_again(): void {
+		$id = $this->add_fixture( $this->make_vault() );
+		$this->assertInstanceOf( \WP_Error::class, $this->make_vault( 'a-different-secret-after-salt-rotation' )->open( $id ) );
+		$this->assertSame( KeyVault::STATUS_REUPLOAD, $this->stored_row( $id )['status'] );
+
+		$vault = $this->make_vault();
+
+		$this->assertSame( KeyVault::STATUS_UNVERIFIED, $vault->get( $id )['status'] );
+		$this->assertSame( KeyVault::STATUS_UNVERIFIED, $vault->all()[0]['status'] );
+		$this->assertSame( array(), $vault->unreadable() );
+	}
+
+	/**
+	 * Without OpenSSL nothing decrypts: open() says so and does not flag the
+	 * key for a re-upload (#497).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_open_without_openssl_is_a_server_error_that_leaves_the_account_alone(): void {
+		$vault  = $this->make_vault();
+		$id     = $this->add_fixture( $vault );
+		$before = $this->stored_row( $id );
+		Functions\when( 'GTM4WP\Google\function_exists' )->alias( static fn ( $name ) => 'openssl_decrypt' !== $name && \function_exists( $name ) );
+
+		$result = $vault->open( $id );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_google_key_no_openssl', $result->get_error_code() );
+		$this->assertSame( $before, $this->stored_row( $id ) );
+	}
+
 	public function test_re_uploading_replaces_the_unreadable_status_with_a_fresh_account(): void {
 		$vault = $this->make_vault();
 		$old   = $this->add_fixture( $vault );
@@ -470,6 +504,51 @@ final class KeyVaultTest extends TestCase {
 	 */
 	private function constant_vault( string $salts = self::SECRET ): KeyVault {
 		return new KeyVault( $salts, static fn () => self::NOW, self::CONSTANT );
+	}
+
+	/**
+	 * The real constant, with no key injected: a key is sealed under its value,
+	 * not merely labelled with it (TS-24).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_defined_constant_is_the_secret_a_key_is_sealed_with(): void {
+		define( KeyVault::ENCRYPTION_KEY_CONSTANT, self::CONSTANT );
+		$vault = $this->make_vault();
+
+		$this->assertSame( 'active', $vault->encryption_key_state() );
+		$id = $this->add_fixture( $vault );
+
+		$this->assertSame( KeyVault::SECRET_CONSTANT, $this->stored_row( $id )['key']['secret'] );
+		$this->assertInstanceOf( ServiceAccountKey::class, $this->constant_vault( 'a-different-secret-after-salt-rotation' )->open( $id ) );
+		$this->assertInstanceOf( \WP_Error::class, ( new KeyVault( self::SECRET, static fn () => self::NOW, '' ) )->open( $id ), 'The same salts without the constant do not open it.' );
+	}
+
+	/**
+	 * Lengths around the 32-character minimum, read from the real constant.
+	 *
+	 * @return array<string, array{0: int, 1: string}>
+	 */
+	public static function constant_lengths(): array {
+		return array(
+			'31 characters' => array( 31, 'rejected' ),
+			'32 characters' => array( 32, 'active' ),
+		);
+	}
+
+	/**
+	 * A constant shorter than the minimum is refused, the minimum itself is used.
+	 *
+	 * @param int    $length Length of the defined value.
+	 * @param string $state  Expected encryption_key_state().
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'constant_lengths' )]
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_defined_constant_is_refused_below_the_minimum_length( int $length, string $state ): void {
+		define( KeyVault::ENCRYPTION_KEY_CONSTANT, str_repeat( 'k', $length ) );
+
+		$this->assertSame( $state, $this->make_vault()->encryption_key_state() );
 	}
 
 	public function test_a_key_sealed_with_the_constant_survives_a_salt_rotation(): void {

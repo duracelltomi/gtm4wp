@@ -12,6 +12,7 @@ use GTM4WP\Modules\GoogleDataManager\AttributionCapture;
 use GTM4WP\Modules\GoogleDataManager\AttributionCookies;
 use GTM4WP\Modules\GoogleDataManager\CaptureHooks;
 use GTM4WP\Modules\GoogleDataManager\CaptureStats;
+use GTM4WP\Modules\GoogleDataManager\DestinationRows;
 use GTM4WP\Modules\GoogleDataManager\GoogleDataManagerModule;
 use GTM4WP\Options\Options;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
@@ -313,6 +314,72 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 
 		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
 		$this->assertSame( 0, $stats->get()['seen'] );
+	}
+
+	/**
+	 * #481: a later pass that resolved nothing (cookies gone) is no newer
+	 * answer, so it deletes nothing the first pass stored.
+	 */
+	public function test_a_pass_that_resolved_nothing_keeps_what_the_first_pass_stored(): void {
+		$order = new class(
+			array(
+				'id'   => 42,
+				'meta' => array( '_gtm4wp_gclid' => 'abc123' ),
+			)
+		) extends \WC_Order {
+			/**
+			 * Keys deleted.
+			 *
+			 * @var string[]
+			 */
+			public array $deleted = array();
+
+			public function delete_meta_data( $key ) {
+				$this->deleted[]          = $key;
+				$this->saved_meta[ $key ] = '';
+			}
+		};
+
+		$this->hooks()->capture_woocommerce_order( $order );
+
+		$this->assertSame( array(), $order->deleted );
+		$this->assertSame( 'abc123', $order->get_meta( '_gtm4wp_gclid', true ) );
+	}
+
+	/**
+	 * #484, the EDD half, through a real Options (TS-24): no destination means
+	 * nothing stored and nothing counted; with one, the order is captured.
+	 *
+	 * @param bool $with_destination Whether a destination row is stored.
+	 */
+	#[\PHPUnit\Framework\Attributes\TestWith( array( false ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( true ) )]
+	public function test_an_edd_order_is_captured_only_while_a_destination_exists( bool $with_destination ): void {
+		$this->set_captured_cookies();
+		$this->options[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+			GTM4WP_OPTION_GDM_DESTINATIONS => $with_destination ? array(
+				array(
+					DestinationRows::COLUMN_ACCOUNT     => 'sa_0123456789ab',
+					DestinationRows::COLUMN_TYPE        => DestinationRows::TYPE_GA4,
+					DestinationRows::COLUMN_PROPERTY    => '123456789',
+					DestinationRows::COLUMN_MEASUREMENT => 'G-ABC123',
+				),
+			) : array(),
+		);
+
+		$written = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$written ): void {
+				$written[] = $key;
+			}
+		);
+		$stats = new CaptureStats( static fn () => 1_800_000_000 );
+
+		( new CaptureHooks( $stats, new Options( ( new GoogleDataManagerModule() )->defaults() ) ) )->capture_edd_order( 42, array() );
+
+		$this->assertSame( $with_destination, in_array( AttributionCapture::META_CLIENT_ID, $written, true ) );
+		$this->assertSame( $with_destination ? 1 : 0, $stats->get()['seen'] );
 	}
 
 	public function test_a_non_order_argument_is_ignored(): void {

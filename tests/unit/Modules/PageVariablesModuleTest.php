@@ -1314,10 +1314,6 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
-	 * The meta option alone still fills pagePostTerms.meta, so a site that had the
-	 * combined option on keeps the exact data layer shape after the migration.
-	 */
-	/**
 	 * #400: a visitor without the password gets no custom fields and no
 	 * content-derived count of a password-protected post; taxonomy terms stay,
 	 * as themes print them on such a post.
@@ -1370,6 +1366,10 @@ final class PageVariablesModuleTest extends TestCase {
 		$this->assertArrayNotHasKey( 'pagePostTerms', $data_layer );
 	}
 
+	/**
+	 * The meta option alone still fills pagePostTerms.meta, so a site that had the
+	 * combined option on keeps the exact data layer shape after the migration.
+	 */
 	public function test_post_meta_option_alone_publishes_meta_without_taxonomies(): void {
 		$this->arrange_singular_terms_and_meta();
 

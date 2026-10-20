@@ -739,6 +739,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$this->assertSame( array(), $this->scheduled, 'Repeating a request Google called wrong would only spend quota on the same rejection.' );
 		$this->assertSame( SendLog::OUTCOME_FAILED, $this->entry()['outcome'] );
+		$this->assertSame( 'INVALID_ARGUMENT', $this->entry()['error_class'], '#509: the class the log ability answers with.' );
 		$this->assertSame( 1, $this->health->get( 'G-ABC123' )['consecutive_failures'] );
 	}
 
@@ -834,6 +835,51 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$outcomes = array_column( $this->log->all(), 'outcome', 'destination' );
 		$this->assertSame( SendLog::OUTCOME_ACCEPTED, $outcomes['G-AAA'] );
 		$this->assertSame( SendLog::OUTCOME_RETRYING, $outcomes['G-BBB'] );
+	}
+
+	/**
+	 * #473: a retry that cannot be scheduled is no retry, so the accepted half
+	 * is marked sent with its request id, as if the retries were used up.
+	 */
+	public function test_a_partly_accepted_send_whose_retry_cannot_be_scheduled_is_marked_sent(): void {
+		Functions\when( 'as_schedule_single_action' )->alias(
+			static fn ( $timestamp, $hook ) => SendQueue::HOOK_SEND === $hook ? 0 : 1
+		);
+
+		$second = $this->vault->add( KeyFileFixture::parse(), 'Second' );
+		$this->assertIsString( $second );
+
+		$row_b                                    = $this->destination( 'G-BBB', '987654321' );
+		$row_b[ DestinationRows::COLUMN_ACCOUNT ] = $second;
+
+		$source = $this->source( self::refund() );
+
+		$this->queue_send( 200, array( 'requestId' => 'req-ok' ) );
+		$this->queue_send( 503, array( 'error' => array( 'status' => 'UNAVAILABLE' ) ) );
+
+		$this->sender(
+			$source,
+			array( GTM4WP_OPTION_GDM_DESTINATIONS => array( $this->destination( 'G-AAA' ), $row_b ) )
+		)->run( self::job() );
+
+		$this->assertSame( array( 34 => 'req-ok' ), $source->sent );
+		$this->assertSame( array( 34 => array( 'G-AAA' ) ), $source->accepted );
+	}
+
+	/**
+	 * #473: a job that could not start and whose retry cannot be scheduled is
+	 * logged as failed for the attempt that was lost, so a replay can queue it.
+	 */
+	public function test_a_retry_of_a_job_that_could_not_start_that_cannot_be_scheduled_is_logged(): void {
+		Functions\when( 'as_schedule_single_action' )->justReturn( 0 );
+
+		$this->sender( $this->source( self::refund(), false ) )->run( self::job() );
+
+		$entry = $this->entry();
+		$this->assertSame( 'woocommerce:12:34', $entry['reference'] );
+		$this->assertSame( SendLog::OUTCOME_FAILED, $entry['outcome'] );
+		$this->assertSame( 'not_queued', $entry['reason'] );
+		$this->assertSame( 2, $entry['attempt'] );
 	}
 
 	public function test_a_partly_accepted_send_that_exhausts_its_retries_is_marked_sent_with_its_accepted_half(): void {

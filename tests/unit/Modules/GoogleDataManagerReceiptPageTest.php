@@ -15,6 +15,10 @@ use GTM4WP\Tests\unit\TestCase;
 
 require_once __DIR__ . '/wc-stubs.php';
 require_once __DIR__ . '/edd-stubs.php';
+// The WC visitor gate (#480) can only deny once these exist; loaded here, not
+// borrowed from another file (TS-16).
+require_once __DIR__ . '/wc-shortcode-checkout-stub.php';
+require_once __DIR__ . '/wc-users-stub.php';
 
 /**
  * The flag exists because the client cannot read order meta: only the server
@@ -50,6 +54,9 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 
 		// EDD would show this visitor the receipt unless a test says otherwise (#480).
 		Functions\when( 'edd_can_view_receipt' )->justReturn( true );
+
+		// A logged-out visitor unless a test says otherwise.
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
 	}
 
 	protected function tearDown(): void {
@@ -64,10 +71,12 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 	 * Puts the request on a WooCommerce order-received page for an order with
 	 * the given meta.
 	 *
-	 * @param array<string, mixed> $meta Meta the order carries.
+	 * @param array<string, mixed> $meta        Meta the order carries.
+	 * @param string               $created     The order's creation date.
+	 * @param int                  $customer_id The order's customer, 0 for a guest.
 	 * @return void
 	 */
-	private function given_wc_receipt_page( array $meta = array(), string $created = 'now' ): void {
+	private function given_wc_receipt_page( array $meta = array(), string $created = 'now', int $customer_id = 0 ): void {
 		Functions\when( 'is_order_received_page' )->justReturn( true );
 
 		$_GET = array(
@@ -81,6 +90,7 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 				'order_key'    => self::ORDER_KEY,
 				'meta'         => $meta,
 				'date_created' => $created,
+				'customer_id'  => $customer_id,
 			)
 		);
 
@@ -180,13 +190,76 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		);
 	}
 
-	// ---- Easy Digital Downloads --------------------------------------------
-
 	/**
 	 * #480: past the backfill window the receipt page offers nothing.
 	 */
 	public function test_no_flag_for_an_order_past_the_backfill_window(): void {
 		$this->given_wc_receipt_page( array(), gmdate( 'Y-m-d H:i:s', time() - ( BackfillEndpoint::WINDOW_DAYS + 1 ) * DAY_IN_SECONDS ) );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	/**
+	 * #480: a near-inside grant, so a shortened window goes red (TS-23).
+	 */
+	public function test_flags_a_six_day_old_woocommerce_order(): void {
+		$this->given_wc_receipt_page( array(), gmdate( 'Y-m-d H:i:s', time() - 6 * DAY_IN_SECONDS ) );
+
+		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null );
+	}
+
+	/**
+	 * #480: a registered shopper's order, opened logged out with the key, is
+	 * one WooCommerce itself hides, so no flag (T138).
+	 */
+	public function test_no_flag_for_a_known_shoppers_order_viewed_logged_out(): void {
+		$this->given_wc_receipt_page( array(), 'now', 7 );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	public function test_flags_a_known_shoppers_order_for_that_shopper(): void {
+		$this->given_wc_receipt_page( array(), 'now', 7 );
+		Functions\when( 'get_current_user_id' )->justReturn( 7 );
+
+		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null );
+	}
+
+	// ---- Easy Digital Downloads --------------------------------------------
+
+	/**
+	 * Puts the request on an EDD success page whose URL carries the payment key.
+	 *
+	 * @param array<string, mixed> $order The order's fields, beside its id.
+	 * @return void
+	 */
+	private function given_edd_receipt_page( array $order ): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET = array( 'payment_key' => 'edd-payment-key-abc' );
+		Functions\when( 'edd_get_order_by' )->justReturn( (object) ( array( 'id' => self::ORDER_ID ) + $order ) );
+		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
+	}
+
+	/**
+	 * #480: the EDD receipt window, refused past it and granted near its end.
+	 */
+	public function test_no_edd_flag_for_an_order_past_the_backfill_window(): void {
+		$this->given_edd_receipt_page( array( 'date_created' => gmdate( 'Y-m-d H:i:s', time() - 8 * DAY_IN_SECONDS ) ) );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	public function test_flags_a_six_day_old_edd_order(): void {
+		$this->given_edd_receipt_page( array( 'date_created' => gmdate( 'Y-m-d H:i:s', time() - 6 * DAY_IN_SECONDS ) ) );
+
+		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null );
+	}
+
+	/**
+	 * An order whose date cannot be read is refused, not taken as "now".
+	 */
+	public function test_no_edd_flag_for_an_order_without_a_creation_date(): void {
+		$this->given_edd_receipt_page( array() );
 
 		$this->assertNull( ReceiptPage::backfill_config() );
 	}

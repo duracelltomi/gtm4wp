@@ -437,6 +437,26 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertNotSame( array(), $keys );
 	}
 
+	/**
+	 * A filtered row whose value is an object is copied as '', not a fatal
+	 * string cast that loses every other row.
+	 */
+	public function test_site_health_copies_an_object_info_value_as_an_empty_string(): void {
+		\Brain\Monkey\Filters\expectApplied( 'gtm4wp_site_health_info' )->andReturnUsing(
+			static fn ( $fields ) => array(
+				'acme_object' => array(
+					'label' => 'Acme',
+					'value' => new \stdClass(),
+				),
+			) + $fields
+		);
+
+		$rows = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['info'], 'value', 'key' );
+
+		$this->assertSame( '', $rows['acme_object'] );
+		$this->assertArrayHasKey( 'problems', $rows );
+	}
+
 	public function test_site_health_reports_a_missing_container_id_as_a_critical_configuration(): void {
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array() ) );
 

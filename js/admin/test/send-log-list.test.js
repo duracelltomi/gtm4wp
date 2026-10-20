@@ -142,6 +142,18 @@ describe( 'SendLogList entries', () => {
 			'destination_removed',
 			'This destination was not among the configured destinations when the send ran.',
 		],
+		[
+			'not_production',
+			'"Only output the container on production environments" holds sending back on this non-production site.',
+		],
+		[
+			'not_queued',
+			'The background job could not be scheduled, so it never ran. Send it again.',
+		],
+		[
+			'zero_value',
+			'The refund returned only tax or shipping that the purchase value leaves out, so it changes no revenue.',
+		],
 	] )( 'explains the %s skip in words', async ( reason, text ) => {
 		apiFetch.mockResolvedValueOnce( {
 			entries: [
@@ -837,6 +849,49 @@ describe( 'SendLogList while a queued job waits', () => {
 
 		await tick();
 		expect( apiFetch ).toHaveBeenCalledTimes( 103 );
+	} );
+
+	it( 'starts refreshing by itself again after a replay queued something', async () => {
+		const failedRow = entry( {
+			reference: 'edd:3:4',
+			outcome: 'failed',
+			tone: 'error',
+			replayable: true,
+		} );
+		for ( let i = 0; i < 101; i++ ) {
+			apiFetch.mockResolvedValueOnce( {
+				entries: [ waitingRow, failedRow ],
+			} );
+		}
+		render(
+			<SendLogList
+				logPath={ LOG_PATH }
+				replayPath="gtm4wp/v2/google/send-log/replay"
+			/>
+		);
+		await screen.findByText( 'Queued' );
+
+		for ( let i = 0; i < 110; i++ ) {
+			await tick();
+		}
+		expect( apiFetch ).toHaveBeenCalledTimes( 1 + 100 );
+
+		apiFetch.mockResolvedValueOnce( { queued: 1, references: [] } );
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ waitingRow, failedRow ],
+		} );
+		apiFetch.mockResolvedValueOnce( {
+			entries: [ waitingRow, failedRow ],
+		} );
+		await act( async () => {
+			fireEvent.click(
+				screen.getByRole( 'button', { name: 'Send edd:3:4 again' } )
+			);
+		} );
+		await waitFor( () => expect( apiFetch ).toHaveBeenCalledTimes( 103 ) );
+
+		await tick();
+		expect( apiFetch ).toHaveBeenCalledTimes( 104 );
 	} );
 
 	it( 'says a queued job was not processed, without blaming the queue or offering a blind resend', async () => {

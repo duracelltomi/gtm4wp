@@ -801,18 +801,84 @@ final class EddPageDataLayerTest extends TestCase {
 		Functions\when( 'edd_is_success_page' )->justReturn( true );
 		$_GET['payment_key'] = 'pk_super_secret_key';
 		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
-		$writes = array();
-		Functions\when( 'edd_update_order_meta' )->alias(
-			static function ( $order_id, $key ) use ( &$writes ) {
-				$writes[] = $key;
+
+		// One expectation reading the current case: a second expectApplied() on the
+		// same filter would never be reached, Mockery answers with the first.
+		$filter = null;
+		$calls  = 0;
+		Filters\expectApplied( GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER )->andReturnUsing(
+			static function ( $dl ) use ( &$filter, &$calls ) {
+				++$calls;
+				return $filter( $dl );
 			}
 		);
-		Filters\expectApplied( GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER )->andReturnUsing( static fn ( $dl ) => array( 'value' => NAN ) + $dl );
+
+		foreach ( array(
+			'unencodable' => static fn ( $dl ) => array( 'value' => NAN ) + $dl,
+			'no event'    => static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ),
+		) as $label => $filter ) {
+			$writes = array();
+			Functions\when( 'edd_update_order_meta' )->alias(
+				static function ( $order_id, $key ) use ( &$writes ) {
+					$writes[] = $key;
+				}
+			);
+			$this->inline_scripts = array();
+			$before               = $calls;
+
+			$this->make_page_datalayer()->add_datalayer_data( array() );
+
+			$this->assertSame( $before + 1, $calls, $label . ': precondition, the purchase was built.' );
+			$this->assertNotContains( EcommerceHelpers::ORDER_TRACKED_META, $writes, $label );
+			$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), $label . ': no browser guard either.' );
+		}
+	}
+
+	/**
+	 * #471: the confirmation page counts a pending order (the default status list
+	 * includes pending for an offline or redirect gateway), unlike the page fallback.
+	 */
+	public function test_success_page_reports_a_pending_order_under_the_default_statuses(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order( array( 'status' => 'pending' ) ) );
+		Functions\expect( 'edd_update_order_meta' )
+			->once()
+			->with( 77, EcommerceHelpers::ORDER_TRACKED_META, 1 );
 
 		$this->make_page_datalayer()->add_datalayer_data( array() );
 
-		$this->assertNotContains( EcommerceHelpers::ORDER_TRACKED_META, $writes );
-		$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), 'No browser guard either.' );
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+	}
+
+	/**
+	 * Parity with WooCommerce: the purchase is cleared first, inside the dedupe
+	 * guard, so a skipped repeat clears nothing.
+	 */
+	public function test_purchase_is_cleared_inside_the_dedupe_guard_only_when_enabled(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL => true ) )->add_datalayer_data( array() );
+		$on = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+
+		$guard = strpos( $on, 'gtm4wp_orderid_tracked' );
+		$clear = strpos( $on, '{"ecommerce":null}' );
+		$event = strpos( $on, '"event":"purchase"' );
+		$this->assertNotFalse( $guard, 'Precondition: the guard is emitted by default.' );
+		$this->assertNotFalse( $event, 'Precondition: the purchase was rendered.' );
+		$this->assertNotFalse( $clear, 'The clearing push must be printed.' );
+		$this->assertGreaterThan( $guard, $clear, 'The clearing push must be inside the guard.' );
+		$this->assertLessThan( $event, $clear, 'The clearing push must come first.' );
+
+		$this->inline_scripts = array();
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+		$off = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+
+		$this->assertStringContainsString( '"event":"purchase"', $off, 'Precondition.' );
+		$this->assertStringNotContainsString( '"ecommerce":null', $off );
 	}
 
 	public function test_reliable_purchase_tracking_delivers_a_missed_purchase_from_the_session(): void {

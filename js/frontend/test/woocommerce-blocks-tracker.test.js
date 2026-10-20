@@ -907,6 +907,36 @@ describe( 'gtm4wp-woocommerce-blocks Store API fallback', () => {
 		expect( pushedEvents( 'remove_from_cart' ) ).toHaveLength( 1 );
 	} );
 
+	// A classic change whose silent read fails stays owed: the next read
+	// re-baselines instead of reporting the classic tracker's removal.
+	it( 'keeps a failed re-baseline pending, so the next read stays silent', async () => {
+		respondWith( [
+			cartOf( [
+				cartLine( 'A', 1, { item_id: 7, price: 10 } ),
+				cartLine( 'B', 1, { item_id: 8, price: 5 } ),
+			] ),
+		] );
+		loadTracker();
+
+		syncCart(); // baseline A + B
+		await settle();
+
+		window.fetch = jest.fn( () =>
+			Promise.reject( new Error( 'offline' ) )
+		);
+		classicEvent( 'removed_from_cart' ); // A removed by a classic link
+		await settle();
+
+		respondWith( [
+			cartOf( [ cartLine( 'B', 1, { item_id: 8, price: 5 } ) ] ),
+		] );
+		syncCart();
+		await settle();
+
+		expect( window.fetch ).toHaveBeenCalledTimes( 1 );
+		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+	} );
+
 	it( 'treats a refused or malformed cart response as no reading', async () => {
 		respondWith( [
 			cartOf( [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ] ),

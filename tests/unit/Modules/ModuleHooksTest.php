@@ -275,6 +275,18 @@ final class ModuleHooksTest extends TestCase {
 		$this->assertFalse( has_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY ) );
 	}
 
+	public function test_woocommerce_attaches_the_mini_cart_tracker_to_the_block_render(): void {
+		$module = $this->register_woocommerce_hooks( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		$this->assertNotFalse( has_filter( 'render_block_woocommerce/mini-cart', array( $module, 'enqueue_minicart_tracker' ) ), 'The Mini-Cart tracker is only ever loaded from this filter.' );
+	}
+
+	public function test_woocommerce_does_not_attach_the_mini_cart_tracker_when_tracking_disabled(): void {
+		$module = $this->register_woocommerce_hooks( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => false ) );
+
+		$this->assertFalse( has_filter( 'render_block_woocommerce/mini-cart', array( $module, 'enqueue_minicart_tracker' ) ) );
+	}
+
 	public function test_woocommerce_keeps_the_custom_order_received_page_out_of_caches(): void {
 		$module = $this->register_woocommerce_hooks(
 			array(

@@ -51,6 +51,8 @@ on every review before anything else.
 - **TS-4** — tautological test: it asserts the value a stub/mock was told to return, exercising nothing real.
 - **TS-21** — the expected value is computed by the source's own expression (`assertSame( defined('X'), $info['active'] )`): a tautology without a stub. It cannot go red in either direction, and it usually comes with a docblock explaining why the literal was not written. Write the literal, and make the environment produce it (a separate process that `define()`s the constant).
 - **TS-22** — a stub that collapses two outputs the code must keep distinct: an identity translator (`__` returning its input) makes a translated `value` and its English `debug` twin identical, so a module handing the translated string as `debug` stays green; a mock that returns the same thing on both legs of a branch hides which leg ran. Make the double *mark* what it touches (`'[' . $text . ']'`) and assert the mark is absent where the raw form is required.
+- **TS-23** ⭐ — a multi-leg fix is pinned on the leg the finding was written about: the regression test reproduces the reported path (WC route, FAILED row, view_cart call site) while the same fix's sibling legs (EDD route, RETRYING row, checkout call site) ship revertible green. Enumerate the fix's legs from its diff, not from the finding text, and probe each.
+- **TS-24** ⭐ — only the seam's test branch runs: an optional constructor dependency (`$encryption_key`, `$options = null`) whose test default takes a bypass branch means the production branch is executed by no test, however many tests the class has. Find each `?? <production read>` / `null === $this->x ||` and require one test that leaves the seam unset.
 - **TS-5** — happy-path only: no error / empty / boundary / invalid-input branch (a valid custom value tested, the fallback path not).
 - **TS-7** — state leakage: a test reads/writes `$_SERVER`, `$GLOBALS`, statics or singletons without snapshotting and resetting them in `setUp`/`tearDown`.
 - **TS-8** — non-determinism: reliance on real time, randomness, or test-execution order.
@@ -193,6 +195,8 @@ Confirmed twice in Run 5 (2026-08-05), both found only by reverting:
   child shell — find and kill it, then check `git status`. And say before the first
   probe that `src/` files will change for a moment: the maintainer sees the edits,
   and the changelog Stop hook fires on an in-flight mutant (not a real change).
+
+- **A loop that re-registers a Brain Monkey expectation tests the first case N times** (Run 17, T157): `Filters\expectApplied()` / `Functions\expect()` inside a `foreach` keeps answering with the first registration, and a global the first pass raises can make the next pass bail early. Register once with a by-reference value the loop changes, reset per-pass state, and count that each case reached the code under test.
 
 ### TS-16: A green suite is not evidence of isolation — check the order ⭐
 TS-7 asks whether a test *resets* the state it writes. This asks the question one
@@ -748,6 +752,44 @@ EDD integration ported from WooCommerce:
   detach), a new suite in the same directory that lacks it will re-accumulate the
   exact assertion weaknesses the improvement fixed.
 
+### TS-23: A multi-leg fix is pinned on the leg the finding was written about ⭐
+A finding describes one reproduction; its fix often touches several legs: both
+stores, both surfaces, two outcomes, three call sites of a promoted helper. The
+regression test is written from the finding, so it pins the reproduced leg and the
+others land looking finished (the guard is visibly there) and revert green.
+
+Confirmed 2026-10-20 (Run 17) at six findings of one fix session: #480 (window +
+visitor gate on four surfaces, two pinned — T138/T139), #417 and #526 (checkout /
+sibling surfaces pinned, view_cart not — T142), #509 (FAILED pinned, RETRYING not —
+T148), #502 and #415 (one call site of two / three — T155/T154). All survived the
+full suite together.
+
+**Rules:**
+- **List the legs from the fix diff**, not from the finding row: every hunk that adds
+  the guard is a leg, and each leg needs a probe that goes red.
+- A guard promoted into a shared helper is pinned at the helper AND at one call site
+  per caller shape; the helper test alone proves nothing about the callers.
+- Grants that are all "now" and denials that are all far past do not measure a window:
+  pin a near-inside grant beside the refusal (TS-5 boundary, without the exact edge).
+
+### TS-24: Only the seam's test branch runs ⭐
+A constructor seam (an injected key, a clock, `$options = null`) exists so tests can
+replace a production read. If every test sets it, or every test leaves it at a
+default that short-circuits the check, the production branch is executed by no test.
+Coverage marks the line covered when the expression is on one line, so nothing flags it.
+
+Confirmed 2026-10-20 (Run 17) at three sites: #469 (every test injects the key; the
+`GTM4WP_ENCRYPTION_KEY` read replaced by `''` is green — T140), #485 (every controller
+built with `options = null`, so `is_saved_row()` never runs on the route — T146), #484
+EDD half (the same `null` default in `CaptureHooks` — T155).
+
+**Rules:**
+- For each `$this->seam ?? <production read>` or `null === $this->seam || <check>`,
+  require one test with the seam unset (a constant `define()`d in a separate process,
+  a real `Options` instance) that discriminates the production value.
+- A shared test factory with the bypass default is the root cause: give it no default,
+  so each test chooses the branch on purpose.
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -1065,6 +1107,8 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-10-20 (Run 17 — gaps closed) | Closed T138–T157 with three parallel agents split by test-file ownership (no shared file, each probe restoring its own source). **One production change:** T141, the #497 token-path fix, red before the fix. **PHP 3577/20211 → 3629/20825; JS 1063 → 1068**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean; `build/` byte-identical. **All 43 original survivors re-probed red.** TS-15 caught a pin the review itself had called solid (T157: an `expectApplied()` loop re-ran its first case), so a new TS-15 bullet was added. TS-24's recipe in practice: real `Options` instances and a `define()` in a separate process reach the production branches. |
+| 2026-10-20 (Run 17 — reviews 46–53 pass, report only) | Reviewed `ff09e37..7c1bc34` (64 commits; findings #365–#526, the R53 fix session, 2.1.0-rc1) with 3 parallel read-only deep-reads, PCOV (97.98% lines) and **46 serial probes (43 survived → T138–T156, 3 controls red)**; no tests written. **All 40 PHP survivors applied together leave the full suite green at the unchanged 3577/20211** — the combined run is the cheap way to confirm survivors suite-wide. Added **TS-23** (a multi-leg fix pinned on the leg the finding describes — six findings) and **TS-24** (only the seam's test branch runs — #469 / #485 / #484). One latent bug from a scratch test outside the repo: #497 half-fixed, the token path still records no-OpenSSL as a damaged key (T141 → `/code-review`); the test-file comment claiming the leg cannot run in-process was false — the Run 10 namespaced-shadow + `RunInSeparateProcess` recipe reaches `function_exists` too. |
 | 2026-10-05 (Run 16 — gaps closed) | Closed T124–T137 (one fork: T132 pinned as-is, stub made faithful to `WC_DateTime::date()`). **PHP 3360/18478 → 3393/18945; JS 1008 → 1009**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean. **31/31 survivors re-probed red.** Two reusable shapes: a cross-store contract lives in ONE test-support list both suites assert against (`OrderDataKeys`), and a public-constant table pins values with a completeness guard over the `define()`s, so a new constant cannot land unpinned. |
 | 2026-10-05 (Run 16 — reviews 40–45 pass, report only) | Reviewed `94d9251..ff09e37` (42 commits; findings #330–#364, EDD cache-safe delivery, WebToffee/YouTube removals, the object-only initial push) with 3 parallel read-only deep-reads, PCOV (97.78% lines) and **35 valid serial probes (30 survived → T124–T137)**; no tests written. No new number: **TS-21 bullet** (a shared constant on both sides of the assertion — T126/T133), **TS-1 corollary** (a presence check satisfied by a sibling block — T128), **TS-15 probe-mechanics bullet** (literal-string driver; kill the child shell; announce the temporary `src/` edits). The attachment lesson (T66/T75/T82) recurred a fifth time on the EDD wiring (T124/T125). |
 | 2026-09-28 (Run 15 — gaps closed) | Closed T116–T123 on the maintainer's "close straightforward, ask with options otherwise" go-ahead (two forks: UTC pinned in the bootstrap; the Services intro omits its link when the doc URL is removed — one production change, unreleased bullet edited). **PHP 3263/18049 → 3286/18118; JS 995 → 1001**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean; `build/` byte-identical. **Every survivor re-probed red.** TS-15 earned its keep once more: the first T123g draft asserted `null` from the resolvers and stayed green with the id check deleted, because the pluggable `is_user_logged_in()` gate in front of it answered first — a guard behind another guard needs the first one held open. |

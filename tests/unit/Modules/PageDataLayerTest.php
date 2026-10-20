@@ -803,6 +803,133 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( $reported, str_contains( $checkout['code'], 'Bundled child' ) );
 	}
 
+	/**
+	 * The cart and checkout pages carry a view event each.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function cart_line_pages(): array {
+		return array(
+			'view_cart'      => array( 'is_cart', 'view_cart' ),
+			'begin_checkout' => array( 'is_checkout', 'begin_checkout' ),
+		);
+	}
+
+	/**
+	 * #526: a cart line is priced on the purchase basis, so "exclude tax" wins over
+	 * a shop that displays prices with tax. The basis is the only reader of
+	 * woocommerce_tax_display_shop here, hence the per-key get_option.
+	 *
+	 * @param string $predicate The page conditional to turn on.
+	 * @param string $event     The event the page fires.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'cart_line_pages' )]
+	public function test_cart_line_price_follows_the_purchase_basis_not_the_shop_display( string $predicate, string $event ): void {
+		Functions\when( $predicate )->justReturn( true );
+
+		$this->stub_wc(
+			array(
+				'item-1' => array(
+					'data'              => new \WC_Product(
+						array(
+							'id'    => 7,
+							'title' => 'Mug',
+						)
+					),
+					'quantity'          => 2,
+					'line_subtotal'     => 20.0,
+					'line_subtotal_tax' => 4.0,
+				),
+			)
+		);
+
+		$stored = array(
+			GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX     => true,
+		);
+		$page   = $this->make_page_datalayer( $stored );
+		Functions\when( 'get_option' )->alias(
+			static function ( $key, $fallback = false ) use ( $stored ) {
+				if ( GTM4WP_OPTIONS === $key ) {
+					return $stored;
+				}
+
+				return 'woocommerce_tax_display_shop' === $key ? 'incl' : $fallback;
+			}
+		);
+
+		$page->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"' . $event . '"', $this->inline_js );
+		$this->assertMatchesRegularExpression( '/"price":10(\.0)?[,}]/', $this->inline_js, 'Net unit price: 20 / 2.' );
+		$this->assertStringNotContainsString( '"price":12', $this->inline_js, 'The shop display setting must not add the line tax back.' );
+	}
+
+	/**
+	 * #417 on the cart page: the classic cart template hides what
+	 * woocommerce_cart_item_visible hides; the cart block renders every line.
+	 *
+	 * @return array<string, array{0: bool, 1: bool}>
+	 */
+	public static function cart_page_kinds(): array {
+		return array(
+			'classic cart' => array( false, false ),
+			'block cart'   => array( true, true ),
+		);
+	}
+
+	/**
+	 * A core-hidden line on each kind of cart page.
+	 *
+	 * @param bool $is_block Whether the cart page uses the cart block.
+	 * @param bool $reported Whether the hidden line is reported.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'cart_page_kinds' )]
+	public function test_view_cart_follows_wc_visibility_only_on_the_classic_cart( bool $is_block, bool $reported ): void {
+		Functions\when( 'is_cart' )->justReturn( true );
+		require_once __DIR__ . '/wc-blocks-stub.php';
+		\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils::$cart_block = $is_block;
+		Filters\expectApplied( 'woocommerce_cart_item_visible' )
+			->times( $is_block ? 0 : 2 )
+			->andReturnUsing( static fn ( $visible, $item, $key ) => 'hidden' !== $key );
+
+		$this->stub_wc(
+			array(
+				'shown'  => array(
+					'data'          => new \WC_Product(
+						array(
+							'id'    => 7,
+							'title' => 'Mug',
+						)
+					),
+					'quantity'      => 1,
+					'line_subtotal' => 10.0,
+				),
+				'hidden' => array(
+					'data'          => new \WC_Product(
+						array(
+							'id'    => 8,
+							'title' => 'Bundled child',
+						)
+					),
+					'quantity'      => 1,
+					'line_subtotal' => 0.0,
+				),
+			)
+		);
+
+		try {
+			$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+				->add_datalayer_data( array() );
+		} finally {
+			\Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils::$cart_block = false;
+		}
+
+		$this->assertStringContainsString( '"event":"view_cart"', $this->inline_js );
+		$this->assertStringContainsString( 'Mug', $this->inline_js );
+		$this->assertSame( $reported, str_contains( $this->inline_js, 'Bundled child' ) );
+	}
+
 	public function test_order_received_requires_matching_order_key(): void {
 		Functions\when( 'is_order_received_page' )->justReturn( true );
 
@@ -1128,6 +1255,17 @@ final class PageDataLayerTest extends TestCase {
 	 * on every other path too.
 	 */
 	public function test_an_unprintable_purchase_does_not_flag_the_order(): void {
+		// One expectation reading the current case: a second expectApplied() on the
+		// same filter would never be reached, Mockery answers with the first.
+		$filter = null;
+		$calls  = 0;
+		Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )->andReturnUsing(
+			static function ( $dl ) use ( &$filter, &$calls ) {
+				++$calls;
+				return $filter( $dl );
+			}
+		);
+
 		foreach ( array(
 			'unencodable' => static fn ( $dl ) => array( 'value' => NAN ) + $dl,
 			'no event'    => static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ),
@@ -1135,8 +1273,10 @@ final class PageDataLayerTest extends TestCase {
 			$order = $this->make_recent_order();
 			Functions\when( 'wc_get_order' )->justReturn( $order );
 			$this->stub_wc_pending( 1001 );
-			Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )->andReturnUsing( $filter );
 			$this->inline_js = '';
+			// The previous case raised the request flag, which would end this one early.
+			unset( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+			$before = $calls;
 
 			$this->make_page_datalayer(
 				array(
@@ -1145,6 +1285,7 @@ final class PageDataLayerTest extends TestCase {
 				)
 			)->add_datalayer_data( array() );
 
+			$this->assertSame( $before + 1, $calls, $label . ': precondition, the purchase was built.' );
 			$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, $label );
 		}
 	}
@@ -2854,6 +2995,23 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"event":"view_cart"', $this->inline_js );
 	}
 
+	/**
+	 * #415 at the begin_checkout call site of line_value(): the line counts as 0.
+	 */
+	public function test_a_non_numeric_filtered_price_does_not_break_the_checkout_page(): void {
+		Functions\when( 'is_checkout' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing( static fn ( $item ) => array( 'price' => 'call for price' ) + $item );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"begin_checkout"', $this->inline_js );
+		$this->assertStringContainsString( 'window.gtm4wp_checkout_value    = 0;', $this->inline_js );
+	}
+
 	public function test_cart_page_fires_view_cart_event(): void {
 		// TS-5: the is_cart() branch (add_cart_view) fires the GA4 view_cart event for a
 		// non-empty cart when e-commerce tracking is on.
@@ -4229,6 +4387,28 @@ final class PageDataLayerTest extends TestCase {
 		$clear = strpos( $this->inline_js, '{"ecommerce":null}' );
 
 		$this->assertNotFalse( $event, 'Precondition: the Undo add_to_cart was rendered.' );
+		$this->assertNotFalse( $clear );
+		$this->assertLessThan( $event, $clear );
+	}
+
+	public function test_variable_parent_view_item_push_is_cleared_when_enabled(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+		Functions\when( 'wc_get_product' )->justReturn( new \WC_Product( array( 'id' => 7, 'type' => 'variable', 'title' => 'Tee', 'sku' => 'SKU-7' ) ) ); // phpcs:ignore
+		$this->stub_wc();
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+				GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT => true,
+				GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$event = strpos( $this->inline_js, '"event":"view_item"' );
+		$clear = strpos( $this->inline_js, '{"ecommerce":null}' );
+
+		$this->assertNotFalse( $event, 'Precondition: the parent view_item was rendered.' );
 		$this->assertNotFalse( $clear );
 		$this->assertLessThan( $event, $clear );
 	}

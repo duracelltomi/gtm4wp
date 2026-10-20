@@ -410,6 +410,39 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 	}
 
 	/**
+	 * Earlier refunds are replayed oldest first by id, whatever order
+	 * get_refunds() returns them in (newest first in WooCommerce): the value
+	 * left to reverse depends on it. 20 (line, 50 + 10 tax) then 25 (30, no
+	 * lines) leaves 29.17 of 100 over 42, so this 10 is worth 6.94; the
+	 * reverse order would give 6.49.
+	 */
+	public function test_earlier_refunds_are_valued_oldest_first_whatever_order_they_are_listed_in(): void {
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX      => true,
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING => true,
+		);
+		$line    = self::refund(
+			60.0,
+			array( self::money_line( 50.0, 10.0 ) ),
+			array(
+				'id'        => 20,
+				'total_tax' => -10.0,
+			)
+		);
+		$order   = self::order(
+			array(
+				'total'          => 132.0,
+				'total_tax'      => 22.0,
+				'shipping_total' => 10.0,
+				'refunds'        => array( self::refund( 10.0 ), self::refund( 30.0, array(), array( 'id' => 25 ) ), $line ),
+			)
+		);
+		$this->stub_orders( $order, self::refund( 10.0 ) );
+
+		$this->assertSame( 6.94, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'] );
+	}
+
+	/**
 	 * The amount WooCommerce stores is the one typed in, independent of the
 	 * lines (U188). Each sequence must still net to the purchase value.
 	 */
@@ -772,6 +805,18 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 		$this->assertSame( '313930999.1788522497', $refund->client_id );
 		$this->assertSame( array( 'analytics_storage' => 'granted' ), $refund->consent_signals() );
 		$this->assertSame( 'DE', $refund->billing_country );
+	}
+
+	/**
+	 * #478: the client id is read through the same scalar guard as the other
+	 * filtered getters; a non-scalar meta value is no client id, not a fatal.
+	 */
+	public function test_a_non_scalar_client_id_meta_value_reads_as_none(): void {
+		foreach ( array( new \stdClass(), array( '313930999.1788522497' ) ) as $stored ) {
+			$this->stub_orders( self::order( array( 'meta' => array( AttributionCapture::META_CLIENT_ID => $stored ) ) ), self::refund( 40.0 ) );
+
+			$this->assertSame( '', $this->adapter()->load( 12, 34 )->client_id );
+		}
 	}
 
 	public function test_an_order_with_no_captured_consent_reports_unknown(): void {

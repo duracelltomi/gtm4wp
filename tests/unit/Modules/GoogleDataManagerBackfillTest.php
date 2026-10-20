@@ -161,17 +161,21 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 *                                         own receipt hash: only this value
 	 *                                         passes. Null models 3.0 - 3.7.0,
 	 *                                         where the hash is a plain digest.
+	 * @param string|null $created             The order's creation date (EDD's
+	 *                                         UTC string); null means now.
 	 */
-	private function given_edd_order( string $payment_key, ?string $signed_receipt_hash = null ): void {
+	private function given_edd_order( string $payment_key, ?string $signed_receipt_hash = null, ?string $created = null ): void {
+		$created ??= gmdate( 'Y-m-d H:i:s' );
+
 		Functions\when( 'edd_get_order_by' )->alias(
-			static function ( $field, $value ) use ( $payment_key ) {
+			static function ( $field, $value ) use ( $payment_key, $created ) {
 				if ( 'payment_key' !== $field || $value !== $payment_key ) {
 					return false;
 				}
 
 				return (object) array(
 					'id'           => self::ORDER_ID,
-					'date_created' => gmdate( 'Y-m-d H:i:s' ),
+					'date_created' => $created,
 				);
 			}
 		);
@@ -180,7 +184,7 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 		// digest of the order's own key and e-mail, so the writer has to load
 		// the order the request names to check it.
 		Functions\when( 'edd_get_order' )->alias(
-			static function ( $id ) use ( $payment_key, $signed_receipt_hash ) {
+			static function ( $id ) use ( $payment_key, $signed_receipt_hash, $created ) {
 				if ( self::ORDER_ID !== (int) $id ) {
 					return false;
 				}
@@ -189,7 +193,7 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 					'id'           => self::ORDER_ID,
 					'payment_key'  => $payment_key,
 					'email'        => 'buyer@example.com',
-					'date_created' => gmdate( 'Y-m-d H:i:s' ),
+					'date_created' => $created,
 				);
 
 				if ( null !== $signed_receipt_hash ) {
@@ -352,6 +356,108 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 
 		$this->assertSame( 3, $this->options[ CaptureStats::OPTION_NAME ]['seen'] );
 		$this->assertSame( 1, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+	}
+
+	/**
+	 * #482: captured never passes seen, so a rescue on a full record is not counted.
+	 */
+	public function test_a_rescue_never_raises_captured_past_seen(): void {
+		$this->options[ CaptureStats::OPTION_NAME ] = array(
+			'seen'     => 2,
+			'captured' => 2,
+		);
+		$this->given_woocommerce_order();
+
+		( new BackfillEndpoint() )->backfill( self::request() );
+
+		$this->assertSame( 2, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+	}
+
+	/**
+	 * #482: only a client id makes an order sendable, so a backfill that writes
+	 * only a gclid rescues nothing.
+	 */
+	public function test_a_backfill_without_a_client_id_is_not_counted_as_a_rescue(): void {
+		$order = $this->given_woocommerce_order();
+
+		$this->options[ CaptureStats::OPTION_NAME ] = array(
+			'seen'     => 3,
+			'captured' => 0,
+		);
+
+		( new BackfillEndpoint() )->backfill( self::request( array( 'values' => array( 'gclid' => 'abc123' ) ) ) );
+
+		$this->assertSame( 'abc123', $order->get_meta( '_gtm4wp_gclid', true ), 'The gclid itself is still written.' );
+		$this->assertSame( 0, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+	}
+
+	/**
+	 * #482: the EDD writer counts its rescue too.
+	 */
+	public function test_a_rescued_edd_client_id_is_counted_as_captured(): void {
+		$this->options[ CaptureStats::OPTION_NAME ] = array(
+			'seen'     => 3,
+			'captured' => 0,
+		);
+		$this->given_edd_order( 'edd-payment-key-abc' );
+
+		( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => 'edd-payment-key-abc',
+				)
+			)
+		);
+
+		$this->assertSame( 1, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+	}
+
+	/**
+	 * #480: a near-inside grant beside the refusal below, so a shortened window
+	 * goes red (TS-23); both stores.
+	 */
+	public function test_a_six_day_old_order_is_still_inside_the_window(): void {
+		$order = $this->given_woocommerce_order( array(), gmdate( 'Y-m-d H:i:s', time() - 6 * DAY_IN_SECONDS ) );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, ( new BackfillEndpoint() )->backfill( self::request() ) );
+		$this->assertSame( '111.222', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+
+		$this->given_edd_order( 'edd-payment-key-abc', null, gmdate( 'Y-m-d H:i:s', time() - 6 * DAY_IN_SECONDS ) );
+		$edd = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => 'edd-payment-key-abc',
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $edd );
+		$this->assertContains( AttributionCapture::META_CLIENT_ID, array_column( $this->edd_written, 1 ) );
+	}
+
+	/**
+	 * #480: the EDD route window, past it and with an unreadable date.
+	 *
+	 * @param string $created The order's stored creation date.
+	 */
+	#[\PHPUnit\Framework\Attributes\TestWith( array( 'eight days' ) )]
+	#[\PHPUnit\Framework\Attributes\TestWith( array( '' ) )]
+	public function test_an_edd_order_past_the_window_or_without_a_date_is_refused( string $created ): void {
+		$this->given_edd_order( 'edd-payment-key-abc', null, 'eight days' === $created ? gmdate( 'Y-m-d H:i:s', time() - 8 * DAY_IN_SECONDS ) : $created );
+
+		$result = ( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => 'edd-payment-key-abc',
+				)
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( array(), $this->edd_written );
 	}
 
 	/**

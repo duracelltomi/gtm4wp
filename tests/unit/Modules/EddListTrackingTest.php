@@ -315,6 +315,22 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertStringContainsString( '&quot;price&quot;:12.5', $markup );
 	}
 
+	/**
+	 * #470: a details line under the same key and price id but for another
+	 * download is not this row's line.
+	 */
+	public function test_a_details_line_of_another_download_is_not_used(): void {
+		list( $row, $details ) = self::cart_row( 0, 2, 30.0 );
+		$details[0]['id']      = 56;
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+		Functions\when( 'edd_get_cart_item_price' )->justReturn( 12.5 );
+
+		$markup = $this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 0 ) );
+
+		$this->assertStringContainsString( '&quot;price&quot;:12.5', $markup );
+		$this->assertStringNotContainsString( '&quot;price&quot;:15', $markup );
+	}
+
 	public function test_invalid_inputs_emit_no_markup(): void {
 		Functions\when( 'get_the_ID' )->justReturn( 0 );
 		$list_tracking = $this->make_list_tracking();

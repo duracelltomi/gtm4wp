@@ -347,7 +347,7 @@ The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changel
 
 **Google service accounts**
 
-* Added: a **Google service accounts** section on the settings screen (experimental): upload, label, test, replace the key of and delete Google Cloud service accounts; the Data Manager destinations authenticate with one. Keys are stored encrypted and never shown again. Define `GTM4WP_ENCRYPTION_KEY` in wp-config.php to keep them readable when a security plugin rotates the WordPress security keys.
+* Added: a **Google service accounts** section on the settings screen (experimental): upload, label, test, replace the key of and delete Google Cloud service accounts; the Data Manager destinations authenticate with one. Keys are stored encrypted (needs PHP OpenSSL) and never shown again. Define `GTM4WP_ENCRYPTION_KEY` in wp-config.php to keep them readable when a security plugin rotates WordPress security keys.
 
 **Google Data Manager**
 

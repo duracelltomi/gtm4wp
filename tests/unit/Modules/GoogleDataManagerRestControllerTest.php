@@ -237,7 +237,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 					'minItems' => 1,
 					'items'    => array(
 						'type'    => 'string',
-						'pattern' => SendLog::REFERENCE_PATTERN,
+						'pattern' => '^[^:]+:[0-9]+:[0-9]+$',
 					),
 				),
 			),
@@ -1228,5 +1228,52 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$controller->test_destination( self::request( $id ) );
 
 		$this->assertTrue( $health->is_failing( 'G-ABC123' ) );
+	}
+
+	/**
+	 * #485 through the route, with a real Options (TS-24): a passing probe of an
+	 * edited, unsaved row proves nothing about the stored row with the same
+	 * measurement id, so its streak stays; the saved row's pass still clears it.
+	 */
+	public function test_a_passing_probe_of_an_unsaved_edit_leaves_the_saved_rows_streak(): void {
+		$health = new DestinationHealth( static fn () => self::NOW );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+		$health->record_failure( 'G-ABC123', 'NOT_FOUND', 'NOT_FOUND' );
+
+		$id = $this->store_account();
+
+		$this->options['gtm4wp-options'] = array(
+			GTM4WP_OPTION_GDM_DESTINATIONS => array(
+				array(
+					DestinationRows::COLUMN_ACCOUNT     => $id,
+					DestinationRows::COLUMN_TYPE        => DestinationRows::TYPE_GA4,
+					DestinationRows::COLUMN_PROPERTY    => '123456789',
+					DestinationRows::COLUMN_MEASUREMENT => 'G-ABC123',
+				),
+			),
+		);
+
+		$clock      = static fn () => self::NOW;
+		$controller = new RestController(
+			$this->vault,
+			new EventsIngest( new TokenService( $this->vault, $this->transport, $clock ), $this->transport, $clock ),
+			new SendLog(),
+			new Options( ( new GoogleDataManagerModule() )->defaults() ),
+			$health
+		);
+
+		$this->queue_token();
+		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-1' ) );
+		$edited = $controller->test_destination( self::request( $id, array( DestinationRows::COLUMN_PROPERTY => '987654321' ) ) );
+
+		$this->assertTrue( $edited->get_data()['ok'] );
+		$this->assertTrue( $health->is_failing( 'G-ABC123' ), 'The edit is not what is stored and sending.' );
+
+		$this->queue_token();
+		$this->transport->will_respond_json( 200, array( 'requestId' => 'req-2' ) );
+		$controller->test_destination( self::request( $id ) );
+
+		$this->assertFalse( $health->is_failing( 'G-ABC123' ) );
 	}
 }

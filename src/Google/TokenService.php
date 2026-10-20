@@ -112,10 +112,10 @@ final class TokenService {
 		$key = $this->vault->open( $account_id );
 		if ( $key instanceof \WP_Error ) {
 			// open() records "re-upload required" itself; recording a token
-			// failure on top would overwrite it with the weaker "error". Other
-			// open() failures (damaged metadata) are recorded here; an unknown
-			// id records nothing.
-			if ( 'gtm4wp_google_key_unreadable' !== $key->get_error_code() ) {
+			// failure on top would overwrite it with the weaker "error". No
+			// OpenSSL is the server, not the key (#497). Other open() failures
+			// (damaged metadata) are recorded here; an unknown id records nothing.
+			if ( ! in_array( $key->get_error_code(), array( 'gtm4wp_google_key_unreadable', 'gtm4wp_google_key_no_openssl' ), true ) ) {
 				$this->vault->record_token_result(
 					$account_id,
 					false,

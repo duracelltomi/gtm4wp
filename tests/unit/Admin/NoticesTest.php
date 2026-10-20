@@ -9,6 +9,7 @@ namespace GTM4WP\Tests\unit\Admin;
 
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
+use GTM4WP\Admin\ConfigurationChecks;
 use GTM4WP\Admin\Notices;
 use GTM4WP\Modules\Container\ContainerRows;
 use GTM4WP\Options\Options;
@@ -267,6 +268,38 @@ final class NoticesTest extends TestCase {
 		}
 
 		$this->assertCount( 0, $this->saved_meta );
+	}
+
+	/**
+	 * Every problem ConfigurationChecks builds as dismissible must be accepted
+	 * by the dismiss handler, or its X never sticks (T153). Read from the source
+	 * so a code added later is checked without editing this test.
+	 */
+	public function test_every_dismissible_problem_code_can_be_dismissed(): void {
+		Functions\when( 'check_ajax_referer' )->justReturn( true );
+		Functions\when( 'current_user_can' )->justReturn( true );
+
+		$source = (string) file_get_contents( ( new \ReflectionClass( ConfigurationChecks::class ) )->getFileName() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- reading a local source file.
+		preg_match_all( "/'code'\s*=>\s*self::(CODE_\w+),.*?'dismissible'\s*=>\s*(true|false)/s", $source, $matches, PREG_SET_ORDER );
+		$this->assertCount( substr_count( $source, "'dismissible' =>" ), $matches, 'Every problem array was read; a reshaped one needs this scan updated.' );
+
+		$codes = array();
+		foreach ( $matches as $match ) {
+			if ( 'true' === $match[2] ) {
+				$codes[] = constant( ConfigurationChecks::class . '::' . $match[1] );
+			}
+		}
+		$this->assertContains( ConfigurationChecks::CODE_DUAL_STORE, $codes );
+
+		foreach ( $codes as $code ) {
+			$this->saved_meta  = array();
+			$_POST['noticeid'] = $code;
+
+			$this->make_notices()->dismiss_notice();
+
+			$this->assertCount( 1, $this->saved_meta, "Dismissing {$code} must persist." );
+			$this->assertTrue( json_decode( $this->saved_meta[0][1], true )[ $code ] );
+		}
 	}
 
 	/**
