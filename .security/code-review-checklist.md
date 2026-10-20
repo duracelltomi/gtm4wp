@@ -1188,21 +1188,21 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 474 | Low | accepted (R53 maintainer decision: delivery is at least once, documented on `RefundSender`; revisit with the 2.2 purchase lane) | A4 / — | Data Manager `RefundSender` | No claim between the already-sent check and the send |
 | 475 | Low | fixed (R53 fix session: `refund` context documented on both item builders) | site code | Data Manager refund item build | Item filters run in cron under an undocumented context |
 | 476 | Low | fixed (R53 fix session: documented as refund-event filter context; kept) | — | `RefundData::$order_total` | Unread internally; public filter input |
-| 477 | Low | open | — | `RefundSender::run()` | Over 50 lines |
+| 477 | Low | wontfix (R53 maintainer decision: refactor after 2.1 final) | — | `RefundSender::run()` | Over 50 lines |
 | 478 | Low | fixed (R53 fix session: (a) request id capped apart and compared after the same cap, (b) getters through a scalar guard; (c) routed to /upstream-review) | — / site code | `SendLog`, WC refund adapter, `RefundEvent` | Three small robustness items (one routed to `/upstream-review`) |
 | 479 | Low | fixed (R53 fix session: WC customer query, EDD customer id incl. secondary addresses, registered ahead of the stores' erasers) | — | Data Manager `PrivacyData` | Exporter/eraser order lookup narrower than either platform's own |
 | 480 | Low | fixed (R53 fix session: 7-day window after order creation on the route; receipt page gated on the platform's own receipt decision) | A0 | Data Manager backfill route + receipt page | Backfill route authorization; detail in the local report |
 | 481 | Low | fixed (R53 fix session: the newest pass replaces, counted once) | — | Data Manager `CaptureHooks` | A resumed order re-runs capture |
 | 482 | Low | fixed (R53 fix session: `CaptureStats::record_rescue()`) | — | `CaptureStats` / Site Health | Backfill rescues are not counted |
-| 483 | Low | open (maintainer decision) | — | `AttributionCapture` | Identifiers stored with no 2.1 consumer |
+| 483 | Low | accepted (R53 maintainer decision: identifiers kept for 2.2; the GDPR page lists them, site work) | — | `AttributionCapture` | Identifiers stored with no 2.1 consumer |
 | 484 | Low | fixed (R53 fix session: destination checked at order time, not at boot) | — | `GoogleDataManagerModule` | Docblock vs registration (destination check) |
 | 485 | Low | fixed (R53 fix session: only a saved row's pass ends its streak) | A4 | `DestinationProbe` | Testing an unsaved row clears the stored row's failure streak |
 | 486 | Low | fixed (R53 fix session: `ids_to_meta()`) | — | `AttributionCapture`, `BackfillEndpoint` | Duplication |
 | 487 | Low | fixed (R53 fix session) | — | `SendLogList.js` | Untranslated code in one column |
-| 488 | Low | open (unverified live) | — | Data Manager receipt page | A nonce incompatibility on the oldest supported WooCommerce versions |
+| 488 | Low | accepted (R53 maintainer decision: documented as U190) | — | Data Manager receipt page | A nonce incompatibility on the oldest supported WooCommerce versions |
 | 489 | Low | fixed (R53 fix session: wording) | — | `AttributionCookies` | Lifetime wording |
-| 490 | Low | open | — | `KeyVault` | Sealed blob carries no version |
-| 491 | Low | open | — | `TokenService` / threat model | The cached access token is not named in the threat model |
+| 490 | Low | wontfix (R53 maintainer decision: GCM tells schemes apart) | — | `KeyVault` | Sealed blob carries no version |
+| 491 | Low | fixed (R53 ledger update: threat model names the cached token) | — | `TokenService` / threat model | The cached access token is not named in the threat model |
 | 492 | Low | fixed (R53 fix session: `iat` backdated 60 s) | — | `TokenService` | No clock-skew allowance |
 | 493 | Low | fixed (R53 fix session, maintainer decision: the production-only setting holds sending back) | — | Data Manager send lane | No environment guard |
 | 494 | Low | fixed (R53 fix session, maintainer decision: 7 territories added; undecided ones recorded in U127) | A0/A1 data | `ConsentRegions` | Region list omits EU territories with their own codes |
@@ -1210,7 +1210,7 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 496 | Low | fixed (R53 fix session: `__debugInfo`/`__serialize` redact the key) | — | `ServiceAccountKey` | Debug output redaction |
 | 497 | Low | fixed (R53 fix session: no-OpenSSL error, no status write) | — | `KeyVault` | Misdiagnosis without OpenSSL |
 | 498 | Low | fixed (R53 fix session: `aud` and the opened key use the endpoint constant) | — | `ServiceAccountKey`, `KeyVault` | Redundant stored field |
-| 499 | Low | (a) open, (b) fixed (this ledger update) | — | Notices; #229/#233 ledger rows | (a) a shared notice-markup convention; (b) stale "no production caller" ledger text |
+| 499 | Low | (a) wontfix (R53 maintainer decision), (b) fixed (this ledger update) | — | Notices; #229/#233 ledger rows | (a) a shared notice-markup convention; (b) stale "no production caller" ledger text |
 | 500 | Low | fixed (R53 fix session: selects declare string or integer; get→update type round-trip test) | A4 delegate | `Field::value_schema()` | Two settings round-trip with a type error between the read and the write ability |
 | 501 | Low | fixed (R53 fix session: refused 400 in the shared service; minItems + pattern on both schemas) | A4 delegate | Data Manager replay (ability + route) | An empty or malformed reference list widens the replay |
 | 502 | Low | fixed (R53 fix session: `Abilities\Input` reads flags and lists as WP 7.1 coerces them) | A4 delegate | Abilities on WP 6.9–7.0 GET transport | Input validated but not sanitised |
