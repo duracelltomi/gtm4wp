@@ -304,7 +304,8 @@ final class PageDataLayer {
 		$postid  = get_the_ID();
 		$product = wc_get_product( $postid );
 
-		if ( ! $product instanceof \WC_Product ) {
+		// A password-protected product stays behind its password (#407, as #400).
+		if ( ! $product instanceof \WC_Product || post_password_required( $postid ) ) {
 			return $data_layer;
 		}
 
@@ -432,7 +433,7 @@ final class PageDataLayer {
 			unset( $eec_product_array['internal_id'] );
 
 			$gtm4wp_cart_products[] = $eec_product_array;
-			$gtm4wp_cart_total     += $eec_product_array['price'] * $eec_product_array['quantity'];
+			$gtm4wp_cart_total     += \GTM4WP\Ecommerce\Helpers::line_value( $eec_product_array );
 		}
 
 		// Do not fire GTM event if no products are in the cart.
@@ -490,7 +491,7 @@ final class PageDataLayer {
 				array(
 					'ecommerce' => array(
 						'currency' => $gtm4wp_currency,
-						'value'    => $eec_product_array['price'] * $eec_product_array['quantity'],
+						'value'    => \GTM4WP\Ecommerce\Helpers::line_value( $eec_product_array ),
 						'items'    => array( $eec_product_array ),
 					),
 				),
@@ -540,7 +541,7 @@ final class PageDataLayer {
 			unset( $eec_product_array['internal_id'] );
 
 			$gtm4wp_checkout_products[] = $eec_product_array;
-			$gtm4wp_checkout_total     += $eec_product_array['quantity'] * $eec_product_array['price'];
+			$gtm4wp_checkout_total     += \GTM4WP\Ecommerce\Helpers::line_value( $eec_product_array );
 		} // end foreach cart item
 
 		// Do not fire GTM event if no products are in the cart.
@@ -958,12 +959,21 @@ final class PageDataLayer {
 			list( $before_purchase_dl_push, $after_purchase_dl_push ) = $this->purchase_dedupe_guard( $order );
 		}
 
-		$this->datalayer->queue_push(
-			$purchase_data_layer['event'],
-			$purchase_data_layer,
-			$before_purchase_dl_push . $this->clear_ecommerce_js(),
-			$after_purchase_dl_push
-		);
+		// Flag only a purchase that will really be printed: a filter can drop
+		// `event` or inject an unencodable value, and a flagged order is
+		// suppressed for good (#412).
+		$queued = '' !== (string) ( $purchase_data_layer['event'] ?? '' )
+			&& DataLayer::encodes( $purchase_data_layer )
+			&& $this->datalayer->queue_push(
+				(string) $purchase_data_layer['event'],
+				$purchase_data_layer,
+				$before_purchase_dl_push . $this->clear_ecommerce_js(),
+				$after_purchase_dl_push
+			);
+
+		if ( ! $queued ) {
+			return $data_layer;
+		}
 
 		$this->product_data->flag_order_tracked( $order );
 		$this->clear_pending_session_order();
@@ -1258,7 +1268,7 @@ final class PageDataLayer {
 				'event'     => 'add_to_cart',
 				'ecommerce' => array(
 					'currency' => $gtm4wp_currency,
-					'value'    => $eec_product_array['price'] * $eec_product_array['quantity'],
+					'value'    => \GTM4WP\Ecommerce\Helpers::line_value( $eec_product_array ),
 					'items'    => array( $eec_product_array ),
 				),
 			),

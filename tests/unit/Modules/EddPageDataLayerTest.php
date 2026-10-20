@@ -81,6 +81,9 @@ final class EddPageDataLayerTest extends TestCase {
 		Functions\when( 'edd_is_success_page' )->justReturn( false );
 		Functions\when( 'edd_is_checkout' )->justReturn( false );
 		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+		Functions\when( 'current_user_can' )->justReturn( false );
+		Functions\when( 'edd_get_purchase_session' )->justReturn( false );
+		Functions\when( 'post_password_required' )->justReturn( false );
 
 		// The buyer viewing their own confirmation page is the default: EDD would
 		// show them the receipt, so nothing is withheld. Individual tests override
@@ -415,6 +418,21 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'internal_id', $data_layer['cartContent']['items'][0] );
 	}
 
+	/**
+	 * #522: a password-protected download reports no view_item and no product
+	 * data until the password is entered (as #400 for posts, #407 for WC).
+	 */
+	public function test_a_password_protected_download_reports_nothing_before_the_password(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+		Functions\when( 'post_password_required' )->alias( static fn ( $post ) => 55 === $post );
+
+		$data_layer = $this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'productType', $data_layer );
+		$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+	}
+
 	public function test_view_item_fires_on_the_download_page(): void {
 		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
 		Functions\when( 'get_the_ID' )->justReturn( 55 );
@@ -548,6 +566,34 @@ final class EddPageDataLayerTest extends TestCase {
 		$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
 		$this->assertStringContainsString( '"event":"view_cart"', $pushed );
 		$this->assertStringContainsString( '"value":19.98', $pushed );
+	}
+
+	/**
+	 * #515: a site filter returning a non-numeric price must not fatal the cart
+	 * page; the line counts as 0.
+	 */
+	public function test_a_non_numeric_filtered_price_does_not_break_the_cart_page(): void {
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '[download_cart]' ) );
+		Functions\when( 'has_shortcode' )->alias(
+			static fn ( $content, $shortcode ) => str_contains( (string) $content, '[' . $shortcode . ']' )
+		);
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 2,
+					'price'    => 19.98,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing( static fn ( $item ) => array( 'price' => 'call for price' ) + $item );
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"value":0', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
 	}
 
 	public function test_view_cart_fires_on_the_full_cart_block_page(): void {
@@ -709,6 +755,66 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"77" == gtm4wp_orderid_tracked', $pushed );
 	}
 
+	/**
+	 * #512: shop staff opening another buyer's receipt (EDD's "View Receipt")
+	 * get the order data but no purchase and no tracked flag, or the buyer's
+	 * own purchase would be lost. The buyer (order user, or the order in their
+	 * purchase session) still gets it, admin rights or not.
+	 */
+	public function test_staff_viewing_another_buyers_receipt_fire_no_purchase(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order( array( 'user_id' => 5 ) ) );
+		Functions\when( 'current_user_can' )->alias( static fn ( $cap ) => 'edit_shop_payments' === $cap );
+		Functions\when( 'get_current_user_id' )->justReturn( 9 );
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$writes ) {
+				$writes[] = $key;
+			}
+		);
+
+		$data_layer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true ) )->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'orderData', $data_layer );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+		$this->assertSame( array(), $writes );
+
+		foreach ( array(
+			'the order user'     => 5,
+			'the session holder' => 9,
+		) as $label => $current_user ) {
+			$this->inline_scripts = array();
+			Functions\when( 'get_current_user_id' )->justReturn( $current_user );
+			Functions\when( 'edd_get_purchase_session' )->justReturn( 9 === $current_user ? array( 'purchase_key' => 'pk_super_secret_key' ) : false );
+
+			$this->make_page_datalayer()->add_datalayer_data( array() );
+
+			$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), $label );
+		}
+	}
+
+	/**
+	 * #514 (the #412 sibling): an unprintable purchase does not flag the order.
+	 */
+	public function test_an_unprintable_purchase_does_not_flag_the_order(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$writes ) {
+				$writes[] = $key;
+			}
+		);
+		Filters\expectApplied( GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER )->andReturnUsing( static fn ( $dl ) => array( 'value' => NAN ) + $dl );
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+
+		$this->assertNotContains( EcommerceHelpers::ORDER_TRACKED_META, $writes );
+		$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), 'No browser guard either.' );
+	}
+
 	public function test_reliable_purchase_tracking_delivers_a_missed_purchase_from_the_session(): void {
 		// Any regular page: no success-page, checkout or download conditions.
 		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
@@ -735,6 +841,33 @@ final class EddPageDataLayerTest extends TestCase {
 			$data_layer,
 			'The raw order data block stays exclusive to the confirmation page even with the order-data option on.'
 		);
+	}
+
+	/**
+	 * #471: the page lane runs when the buyer did NOT reach the confirmation
+	 * page, so a pending order (an abandoned PayPal redirect) is not a
+	 * purchase there, even though the default status list includes pending.
+	 * It is reported on a later page view once the gateway completes it.
+	 */
+	public function test_the_page_fallback_does_not_report_a_pending_order(): void {
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order( array( 'status' => 'pending' ) ) );
+		$writes = array();
+		Functions\when( 'edd_update_order_meta' )->alias(
+			static function ( $order_id, $key ) use ( &$writes ) {
+				$writes[] = $key;
+			}
+		);
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true ) )->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+		$this->assertSame( array(), $writes );
+
+		// Control: completed by the gateway, the same session order is reported.
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order( array( 'status' => 'complete' ) ) );
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true ) )->add_datalayer_data( array() );
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
 	}
 
 	public function test_reliable_purchase_tracking_stays_inert_when_disabled_or_unsafe(): void {

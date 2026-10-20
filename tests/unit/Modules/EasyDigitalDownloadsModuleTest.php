@@ -136,6 +136,30 @@ final class EasyDigitalDownloadsModuleTest extends TestCase {
 		$this->assertNotFalse( has_filter( GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS, ReliablePurchase::class . '->declare_visitor_scoped_fields()' ), 'The reliable-purchase one-shot must be declared (it self-gates on the mode).' );
 		// The A0 confirm beacon's route: rung 3 of TS-12, the WooCommerce sibling is ModuleHooksTest (T39).
 		$this->assertNotFalse( has_action( 'rest_api_init', ReliablePurchase::class . '->register_confirm_route()' ) );
+		$this->assertNotFalse( has_action( 'template_redirect', array( $module, 'prevent_caching_success_page' ) ), '#511: the success page must not be page-cached.' );
+	}
+
+	/**
+	 * #511: the success / confirmation page renders the buyer's purchase, and
+	 * EDD before 3.6.7 does not exclude a separate Confirmation page itself.
+	 * Separate process: DONOTCACHEPAGE is a constant.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_the_success_page_is_kept_out_of_page_caches(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		Functions\expect( 'nocache_headers' )->once();
+
+		( new EasyDigitalDownloadsModule() )->prevent_caching_success_page();
+
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
+	public function test_other_pages_stay_cacheable(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( false );
+		Functions\expect( 'nocache_headers' )->never();
+
+		( new EasyDigitalDownloadsModule() )->prevent_caching_success_page();
 	}
 
 	public function test_global_vars_carry_the_edd_settings(): void {

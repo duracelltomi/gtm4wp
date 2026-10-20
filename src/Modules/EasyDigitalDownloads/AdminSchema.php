@@ -275,7 +275,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds the logged-in customer\'s name, email, hashed email and phone, order count and total value to the data layer, and the Enhanced Conversions user_data block to the purchase event. With the cache-safe data layer on, they arrive in gtm4wp.customerData.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the logged-in customer\'s name, email and its hash, order count and total value to the data layer, and the Enhanced Conversions user_data block (hashed email and phone) to the purchase event. With the cache-safe data layer on, they arrive in gtm4wp.customerData.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -335,7 +335,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_MULTISELECT,
 				default_value: array( 'pending', 'processing', 'complete' ),
 				label: __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'The purchase event is sent when the buyer reaches the confirmation page with an order in one of these statuses. Pending is included for offsite gateways like PayPal; remove Pending and Processing to count only completed orders.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The purchase event is sent when the buyer reaches the confirmation page with an order in one of these statuses. Pending covers offsite gateways like PayPal; remove it and Processing to count completed orders only. An empty list counts all but failed orders.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
 				choices: $order_status_choices,

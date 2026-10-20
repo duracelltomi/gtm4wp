@@ -81,6 +81,21 @@ final class Helpers {
 	public const PURCHASE_BASIS_META = '_gtm4wp_purchase_basis';
 
 	/**
+	 * Price times quantity of an item array that came out of a site filter
+	 * (gtm4wp_eec_item_with_source and friends): a non-numeric value counts
+	 * as 0 instead of a TypeError on the cart or checkout page (#415, #515).
+	 *
+	 * @param array<string, mixed> $item An item with price and quantity.
+	 * @return float
+	 */
+	public static function line_value( array $item ): float {
+		$price    = $item['price'] ?? 0;
+		$quantity = $item['quantity'] ?? 0;
+
+		return ( is_numeric( $price ) ? (float) $price : 0.0 ) * ( is_numeric( $quantity ) ? (float) $quantity : 0.0 );
+	}
+
+	/**
 	 * First-party cookie carrying GA4 list attribution across the funnel (#405),
 	 * written client-side on select_item; must match the literal in
 	 * js/frontend/gtm4wp-ecommerce-generic.js.

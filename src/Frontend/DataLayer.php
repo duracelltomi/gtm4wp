@@ -140,6 +140,24 @@ final class DataLayer {
 	}
 
 	/**
+	 * Encode flags of a queued push, shared with encodes() so a check made
+	 * before queueing agrees with flush_pushes().
+	 */
+	private const PUSH_JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS;
+
+	/**
+	 * Whether flush_pushes() will print this push: it skips one that does not
+	 * encode (INF/NAN or a resource from a filter, #141). A caller that marks
+	 * an order tracked checks this first (#412, #514).
+	 *
+	 * @param array $event_data The push object.
+	 * @return bool
+	 */
+	public static function encodes( array $event_data ): bool {
+		return false !== wp_json_encode( $event_data, self::PUSH_JSON_FLAGS );
+	}
+
+	/**
 	 * Queues a data layer event to be fired after the main GTM container code.
 	 * Port of gtm4wp_datalayer_push() from 1.x.
 	 *
@@ -275,7 +293,7 @@ final class DataLayer {
 			if ( array_key_exists( 'datalayer_object', $one_event ) ) {
 				// Skip the statement on an encode failure (#141, RI-21): false would
 				// emit `.push()`, present-and-meaningless rather than absent (RI-13).
-				$encoded_object = wp_json_encode( $one_event['datalayer_object'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+				$encoded_object = wp_json_encode( $one_event['datalayer_object'], self::PUSH_JSON_FLAGS );
 
 				if ( false !== $encoded_object ) {
 					list( $wrapper_open, $wrapper_close ) = $this->wrapper_fragments( $one_event );

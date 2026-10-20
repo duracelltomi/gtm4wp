@@ -89,6 +89,7 @@ final class PageDataLayerTest extends TestCase {
 
 		Functions\stubEscapeFunctions();
 		Functions\stubTranslationFunctions();
+		Functions\when( 'post_password_required' )->justReturn( false );
 		Functions\when( 'wp_json_encode' )->alias(
 			static function ( $data, $options = 0, $depth = 512 ) {
 				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
@@ -637,6 +638,24 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"quantity":1', $this->inline_js, 'view_item must report quantity 1 on the item.' );
 	}
 
+	/**
+	 * #407: a password-protected product reports no view_item and no product
+	 * data until the password is entered (as #400 for posts).
+	 */
+	public function test_a_password_protected_product_reports_nothing_before_the_password(): void {
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+		Functions\when( 'post_password_required' )->alias( static fn ( $post ) => 7 === $post );
+		Functions\when( 'wc_get_product' )->justReturn( new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ) ); // phpcs:ignore
+		$this->stub_wc();
+
+		$data_layer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_js );
+		$this->assertArrayNotHasKey( 'productRatingCounts', $data_layer );
+	}
+
 	public function test_checkout_hex_encodes_hostile_list_attribution_cookie(): void {
 		// #405 / TC-5: the list-attribution cookie is untrusted input reaching the
 		// begin_checkout inline <script>. Even if the sanitizer let a </script> through,
@@ -1035,6 +1054,33 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertArrayHasKey( ProductData::PENDING_PURCHASE_SESSION_KEY, $session->sets, 'The pending marker must be consumed.' );
 		$this->assertNull( $session->sets[ ProductData::PENDING_PURCHASE_SESSION_KEY ], 'The pending marker must be cleared to null after emitting.' );
 		$this->assertNotEmpty( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+	}
+
+	/**
+	 * #412: a purchase that will not be printed (a filter injecting NAN, or
+	 * dropping `event`) must not flag the order, or it is suppressed for good
+	 * on every other path too.
+	 */
+	public function test_an_unprintable_purchase_does_not_flag_the_order(): void {
+		foreach ( array(
+			'unencodable' => static fn ( $dl ) => array( 'value' => NAN ) + $dl,
+			'no event'    => static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ),
+		) as $label => $filter ) {
+			$order = $this->make_recent_order();
+			Functions\when( 'wc_get_order' )->justReturn( $order );
+			$this->stub_wc_pending( 1001 );
+			Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )->andReturnUsing( $filter );
+			$this->inline_js = '';
+
+			$this->make_page_datalayer(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+					GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				)
+			)->add_datalayer_data( array() );
+
+			$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta, $label );
+		}
 	}
 
 	public function test_pending_purchase_fallback_ignored_when_option_disabled(): void {
@@ -2723,6 +2769,23 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( (string) $expected, $this->inline_js, 'The decoded category must reach the script hex-encoded.' );
 		$this->assertStringNotContainsString( 'Shirts & Ties', $this->inline_js, 'A raw ampersand must never reach the script body.' );
 		$this->assertStringNotContainsString( 'Shirts &amp; Ties', $this->inline_js, 'And the stored entity must not survive to the data layer either.' );
+	}
+
+	/**
+	 * #415: a site filter returning a non-numeric price must not fatal the
+	 * cart page; the line counts as 0 in the cart total.
+	 */
+	public function test_a_non_numeric_filtered_price_does_not_break_the_cart_page(): void {
+		Functions\when( 'is_cart' )->justReturn( true );
+
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 2 ) ) ); // phpcs:ignore
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing( static fn ( $item ) => array( 'price' => 'call for price' ) + $item );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"view_cart"', $this->inline_js );
 	}
 
 	public function test_cart_page_fires_view_cart_event(): void {

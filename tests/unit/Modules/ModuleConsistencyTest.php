@@ -455,7 +455,6 @@ final class ModuleConsistencyTest extends TestCase {
 		'integrate-woocommerce-transaction-id-prefix',
 		'integrate-woocommerce-product-per-impression',
 		'event-dailymotion-playerid',
-		'integrate-woocommerce-purchase-track-statuses',
 		'integrate-woocommerce-checkoutwc',
 		'integrate-woocommerce-clear-ecommerce-datalayer',
 		'include-visitor-ip',

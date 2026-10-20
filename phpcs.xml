@@ -12,6 +12,15 @@
 	<rule ref="WordPress" />
 	<rule ref="WordPress-Core" />
 	<rule ref="WordPress-Extra" />
+
+	<!-- Capabilities registered by the store plugins this one integrates with. -->
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="edit_shop_payments"/>
+			</property>
+		</properties>
+	</rule>
 	<rule ref="PHPCompatibility" />
 
 	<!--

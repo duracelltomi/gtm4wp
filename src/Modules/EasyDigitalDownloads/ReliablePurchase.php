@@ -148,7 +148,7 @@ final class ReliablePurchase {
 			return null;
 		}
 
-		$order = $this->session_order();
+		$order = $this->download_data->session_order();
 		if ( null === $order ) {
 			return null;
 		}
@@ -211,36 +211,16 @@ final class ReliablePurchase {
 	 * @return \WP_REST_Response A 204 No Content response.
 	 */
 	public function confirm_purchase_tracked(): \WP_REST_Response {
-		$order = $this->session_order();
+		$order = $this->download_data->session_order();
 
 		if (
 			null !== $order
 			&& ! $this->download_data->is_order_older_than_max_age( $order )
-			&& $this->download_data->is_order_status_trackable( $order )
+			&& $this->download_data->is_order_status_trackable( $order, false )
 		) {
 			$this->download_data->flag_order_tracked( $order );
 		}
 
 		return new \WP_REST_Response( null, 204 );
-	}
-
-	/**
-	 * The order of the buyer's own EDD purchase session (U116), or null.
-	 *
-	 * @return \EDD\Orders\Order|null
-	 */
-	private function session_order(): ?\EDD\Orders\Order {
-		if ( ! function_exists( 'edd_get_purchase_session' ) || ! function_exists( 'edd_get_order_by' ) ) {
-			return null;
-		}
-
-		$session = edd_get_purchase_session();
-		if ( ! is_array( $session ) || empty( $session['purchase_key'] ) ) {
-			return null;
-		}
-
-		$order = edd_get_order_by( 'payment_key', (string) $session['purchase_key'] );
-
-		return $order instanceof \EDD\Orders\Order ? $order : null;
 	}
 }

@@ -78,7 +78,7 @@ final class EddListTrackingTest extends TestCase {
 
 		$options = new Options( ( new EasyDigitalDownloadsModule() )->defaults() );
 
-		return new ListTracking( $options, new DownloadData( $options ) );
+		return new ListTracking( new DownloadData( $options ) );
 	}
 
 	/**
@@ -115,7 +115,7 @@ final class EddListTrackingTest extends TestCase {
 		$list_tracking = $this->make_list_tracking();
 
 		// The block hook shares the running list position with the shortcode.
-		$first  = $this->capture_output( array( $list_tracking, 'after_downloads_block_item' ) );
+		$first  = $this->capture_output( array( $list_tracking, 'after_download_shortcode_item' ) );
 		$second = $this->capture_output( array( $list_tracking, 'after_download_shortcode_item' ) );
 
 		$this->assertStringContainsString( 'class="gtm4wp_edd_productdata"', $first );
@@ -172,18 +172,65 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertStringContainsString( 'Professional', $markup );
 	}
 
-	public function test_checkout_cart_row_span_uses_its_own_class_and_carries_the_cart_key(): void {
-		$markup = $this->capture_output(
-			fn () => $this->make_list_tracking()->checkout_cart_item_data(
-				array(
-					'id'       => 55,
-					'quantity' => 2,
-					'price'    => 19.98,
-					'tax'      => 0.0,
-					'discount' => 0.0,
+	/**
+	 * The hook's item is an edd_get_cart_contents() row (U115); the money is
+	 * on the matching edd_get_cart_content_details() line.
+	 *
+	 * @param int   $key      Cart key.
+	 * @param int   $quantity Quantity.
+	 * @param float $price    Line total.
+	 * @param array $options  Item options.
+	 * @return array{0: array, 1: array} The contents row and the details list.
+	 */
+	private static function cart_row( int $key, int $quantity, float $price, array $options = array() ): array {
+		$contents = array(
+			'id'       => 55,
+			'options'  => $options,
+			'quantity' => $quantity,
+		);
+
+		return array(
+			$contents,
+			array(
+				$key => array(
+					'id'          => 55,
+					'item_number' => $contents,
+					'quantity'    => $quantity,
+					'price'       => $price,
+					'tax'         => 0.0,
+					'discount'    => 0.0,
 				),
-				3
+			),
+		);
+	}
+
+	/**
+	 * A download with two price options.
+	 *
+	 * @return void
+	 */
+	private function stub_variable_prices(): void {
+		Functions\when( 'edd_has_variable_prices' )->justReturn( true );
+		Functions\when( 'edd_get_variable_prices' )->justReturn(
+			array(
+				1 => array(
+					'name'   => 'Basic',
+					'amount' => 12.5,
+				),
+				2 => array(
+					'name'   => 'Professional',
+					'amount' => 15.0,
+				),
 			)
+		);
+	}
+
+	public function test_checkout_cart_row_span_uses_its_own_class_and_carries_the_cart_key(): void {
+		list( $row, $details ) = self::cart_row( 3, 2, 19.98 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+
+		$markup = $this->capture_output(
+			fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 3 )
 		);
 
 		// A dedicated class keeps cart rows out of the view_item_list impressions.
@@ -191,6 +238,39 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertStringNotContainsString( 'gtm4wp_edd_productdata', $markup );
 		$this->assertStringContainsString( '&quot;cart_key&quot;:3', $markup );
 		$this->assertStringNotContainsString( 'internal_id', $markup );
+		$this->assertStringContainsString( '&quot;price&quot;:9.99', $markup, 'The unit price comes from the details line (#470).' );
+	}
+
+	/**
+	 * #470: a variable-price row is priced and named from its own option, and
+	 * a details line for the same download under another price id is not used.
+	 */
+	public function test_a_variable_price_checkout_row_carries_its_price_and_variant(): void {
+		$this->stub_variable_prices();
+		list( $row, $details ) = self::cart_row( 0, 2, 30.0, array( 'price_id' => 2 ) );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+
+		$item = json_decode( html_entity_decode( (string) preg_replace( '/.*data-gtm4wp_product_data="([^"]*)".*/s', '$1', $this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 0 ) ) ) ), true );
+
+		$this->assertSame( 15.0, (float) $item['price'] );
+		$this->assertSame( 'Professional', $item['item_variant'] );
+		$this->assertSame( 2, $item['quantity'] );
+	}
+
+	/**
+	 * A row with no matching details line (the block editor's preview cart)
+	 * is priced from the catalogue rather than reported at zero.
+	 */
+	public function test_a_checkout_row_without_a_details_line_is_priced_from_the_catalogue(): void {
+		$this->stub_variable_prices();
+		list( $row, $details )                = self::cart_row( 0, 1, 9.99, array( 'price_id' => 2 ) );
+		$details[0]['item_number']['options'] = array( 'price_id' => 1 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+		Functions\when( 'edd_get_cart_item_price' )->justReturn( 12.5 );
+
+		$markup = $this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 0 ) );
+
+		$this->assertStringContainsString( '&quot;price&quot;:12.5', $markup );
 	}
 
 	public function test_invalid_inputs_emit_no_markup(): void {
@@ -250,17 +330,11 @@ final class EddListTrackingTest extends TestCase {
 			)
 		);
 
+		list( $row, $details ) = self::cart_row( 0, 1, 9.99 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+
 		$markup = $this->capture_output(
-			fn () => $this->make_list_tracking()->checkout_cart_item_data(
-				array(
-					'id'       => 55,
-					'quantity' => 1,
-					'price'    => 9.99,
-					'tax'      => 0.0,
-					'discount' => 0.0,
-				),
-				0
-			)
+			fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 0 )
 		);
 
 		// Both directions (TS-2), completing the sibling symmetry: the grid

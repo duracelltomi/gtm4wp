@@ -346,7 +346,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_MULTISELECT,
 				default_value: array( 'processing', 'on-hold', 'completed' ),
 				label: __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'The purchase event is sent when an order first reaches one of these statuses, i.e. at order placement - not when payment physically clears. This is why Cash on Delivery (Processing) and bank transfer (On hold) orders are tracked at checkout even though the money arrives later. Leave Failed, Cancelled and Pending payment unchecked so unpaid orders are not counted as sales.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'The purchase event is sent when an order first reaches one of these statuses, at placement, not when payment clears: Cash on Delivery (Processing) and bank transfer (On hold) count at checkout. Leave unpaid statuses unchecked. An empty list counts all but failed orders.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
 				choices: $order_status_choices,

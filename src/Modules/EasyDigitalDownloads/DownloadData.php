@@ -789,7 +789,7 @@ final class DownloadData {
 	public function is_order_trackable( \EDD\Orders\Order $order ): bool {
 		return ! $this->is_order_older_than_max_age( $order )
 			&& ! $this->is_purchase_already_tracked( $order )
-			&& $this->is_order_status_trackable( $order );
+			&& $this->is_order_status_trackable( $order, false );
 	}
 
 	/**
@@ -804,7 +804,7 @@ final class DownloadData {
 			return false;
 		}
 
-		if ( $this->is_order_status_trackable( $order ) ) {
+		if ( $this->is_order_status_trackable( $order, false ) ) {
 			return false;
 		}
 
@@ -819,12 +819,19 @@ final class DownloadData {
 	 * Whether the order's status makes it eligible for the purchase event: the
 	 * filterable EDDPURCHASESTATUSES option (pending is in the default because
 	 * an offsite gateway can land the buyer on the confirmation page early);
-	 * an empty list tracks any order that did not fail.
+	 * an empty list tracks any order that did not fail. Pending counts only
+	 * when the buyer reached the confirmation page: the fallback lanes run when
+	 * they did not, e.g. an abandoned PayPal redirect (#471).
 	 *
-	 * @param \EDD\Orders\Order $order The order to check.
+	 * @param \EDD\Orders\Order $order     The order to check.
+	 * @param bool              $confirmed Whether the buyer reached the confirmation page.
 	 * @return bool
 	 */
-	public function is_order_status_trackable( \EDD\Orders\Order $order ): bool {
+	public function is_order_status_trackable( \EDD\Orders\Order $order, bool $confirmed = true ): bool {
+		if ( ! $confirmed && 'pending' === (string) self::row_prop( $order, 'status' ) ) {
+			return false;
+		}
+
 		$statuses = (array) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES );
 
 		/**
@@ -941,9 +948,32 @@ final class DownloadData {
 	}
 
 	/**
+	 * The order of the buyer's own EDD purchase session (U116), or null. One
+	 * definition for the page fallback and the session endpoint (#520).
+	 *
+	 * @return \EDD\Orders\Order|null
+	 */
+	public function session_order(): ?\EDD\Orders\Order {
+		if ( ! function_exists( 'edd_get_purchase_session' ) || ! function_exists( 'edd_get_order_by' ) ) {
+			return null;
+		}
+
+		$session = edd_get_purchase_session();
+		if ( ! is_array( $session ) || empty( $session['purchase_key'] ) ) {
+			return null;
+		}
+
+		$order = edd_get_order_by( 'payment_key', (string) $session['purchase_key'] );
+
+		return $order instanceof \EDD\Orders\Order ? $order : null;
+	}
+
+	/**
 	 * Whether the order belongs to a new (first time) customer, used for the
-	 * Google new-customer reporting variable. Unknown customers (guest orders
-	 * without a customer record) report as new.
+	 * Google new-customer reporting variable: the customer has no OTHER sale
+	 * order in a status EDD counts. Not the customer's purchase_count, which
+	 * leaves out this order while it is pending or processing (#513). Guest
+	 * orders without a customer record report as new.
 	 *
 	 * @param \EDD\Orders\Order $order The order to check.
 	 * @return bool
@@ -954,12 +984,16 @@ final class DownloadData {
 			return true;
 		}
 
-		$customer = edd_get_customer( $customer_id );
-		if ( ! is_object( $customer ) ) {
-			return true;
-		}
+		$others = edd_count_orders(
+			array(
+				'customer_id' => $customer_id,
+				'type'        => 'sale',
+				'status__in'  => edd_get_net_order_statuses(),
+				'id__not_in'  => array( (int) self::row_prop( $order, 'id', 0 ) ),
+			)
+		);
 
-		return (int) self::row_prop( $customer, 'purchase_count', 0 ) <= 1;
+		return 0 === (int) $others;
 	}
 
 	/**

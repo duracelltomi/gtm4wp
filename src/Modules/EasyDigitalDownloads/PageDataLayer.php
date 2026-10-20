@@ -288,7 +288,7 @@ final class PageDataLayer {
 			unset( $eec_product_array['internal_id'] );
 
 			$items[] = $eec_product_array;
-			$value  += $eec_product_array['price'] * $eec_product_array['quantity'];
+			$value  += EcommerceHelpers::line_value( $eec_product_array );
 		}
 
 		return array(
@@ -334,7 +334,9 @@ final class PageDataLayer {
 	 */
 	private function add_download_view( array $data_layer ): array {
 		$download = edd_get_download( (int) get_the_ID() );
-		if ( ! ( $download instanceof \EDD_Download ) ) {
+
+		// A password-protected download stays behind its password (#522, as #400).
+		if ( ! ( $download instanceof \EDD_Download ) || post_password_required( (int) get_the_ID() ) ) {
 			return $data_layer;
 		}
 
@@ -515,7 +517,33 @@ final class PageDataLayer {
 		$withhold_customer_data = ! function_exists( 'edd_can_view_receipt' )
 			|| ! edd_can_view_receipt( $payment_key );
 
-		return $this->add_purchase_for_order( $data_layer, $order, true, $withhold_customer_data );
+		return $this->add_purchase_for_order( $data_layer, $order, true, $withhold_customer_data, self::is_staff_viewing_receipt( $order, $payment_key ) );
+	}
+
+	/**
+	 * Whether shop staff opened somebody else's receipt (EDD's "View Receipt"
+	 * row action links the success page with ?id=&order=): the purchase must
+	 * neither fire from their browser nor be flagged, or the buyer's own is
+	 * lost for good (#512). The buyer is the order's user or holds it in their
+	 * purchase session.
+	 *
+	 * @param \EDD\Orders\Order $order       The resolved order.
+	 * @param string            $payment_key Its payment key.
+	 * @return bool
+	 */
+	private static function is_staff_viewing_receipt( \EDD\Orders\Order $order, string $payment_key ): bool {
+		if ( ! function_exists( 'current_user_can' ) || ! current_user_can( 'edit_shop_payments' ) ) {
+			return false;
+		}
+
+		$user_id = (int) DownloadData::row_prop( $order, 'user_id', 0 );
+		if ( $user_id > 0 && get_current_user_id() === $user_id ) {
+			return false;
+		}
+
+		$session = function_exists( 'edd_get_purchase_session' ) ? edd_get_purchase_session() : null;
+
+		return ! ( is_array( $session ) && (string) ( $session['purchase_key'] ?? '' ) === $payment_key );
 	}
 
 	/**
@@ -611,21 +639,9 @@ final class PageDataLayer {
 	 * @return array<string, mixed>
 	 */
 	private function add_missed_purchase( array $data_layer ): array {
-		if ( ! function_exists( 'edd_get_purchase_session' ) || ! function_exists( 'edd_get_order_by' ) ) {
-			return $data_layer;
-		}
+		$order = $this->download_data->session_order();
 
-		$session = edd_get_purchase_session();
-		if ( ! is_array( $session ) || empty( $session['purchase_key'] ) ) {
-			return $data_layer;
-		}
-
-		$order = edd_get_order_by( 'payment_key', (string) $session['purchase_key'] );
-		if ( ! ( $order instanceof \EDD\Orders\Order ) ) {
-			return $data_layer;
-		}
-
-		return $this->add_purchase_for_order( $data_layer, $order, false );
+		return null === $order ? $data_layer : $this->add_purchase_for_order( $data_layer, $order, false );
 	}
 
 	/**
@@ -635,11 +651,12 @@ final class PageDataLayer {
 	 *
 	 * @param array<string, mixed> $data_layer             The data layer collected so far.
 	 * @param \EDD\Orders\Order    $order                  The resolved order.
-	 * @param bool                 $with_raw_order_data    Whether the raw orderData block may be added (confirmation page only).
+	 * @param bool                 $with_raw_order_data    Whether this is the confirmation page: the raw orderData block, and a pending order counted (#471).
 	 * @param bool                 $withhold_customer_data Whether to leave out the customer identity blocks (EDD would not show this visitor the receipt).
+	 * @param bool                 $staff_view             Whether staff are viewing another buyer's receipt: orderData only, no purchase, no flag (#512).
 	 * @return array<string, mixed>
 	 */
-	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $with_raw_order_data = true, bool $withhold_customer_data = false ): array {
+	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $with_raw_order_data = true, bool $withhold_customer_data = false, bool $staff_view = false ): array {
 		if ( $this->download_data->is_order_older_than_max_age( $order ) ) {
 			return $data_layer;
 		}
@@ -659,11 +676,11 @@ final class PageDataLayer {
 			}
 		}
 
-		if ( $this->download_data->is_purchase_already_tracked( $order ) ) {
+		if ( $staff_view || $this->download_data->is_purchase_already_tracked( $order ) ) {
 			return $data_layer;
 		}
 
-		if ( ! $this->download_data->is_order_status_trackable( $order ) ) {
+		if ( ! $this->download_data->is_order_status_trackable( $order, $with_raw_order_data ) ) {
 			return $data_layer;
 		}
 
@@ -688,12 +705,19 @@ final class PageDataLayer {
 			list( $before_purchase_dl_push, $after_purchase_dl_push ) = EcommerceHelpers::purchase_dedupe_guard( (string) $order->get_number() );
 		}
 
-		$this->datalayer->queue_push(
-			$purchase_data_layer['event'],
-			$purchase_data_layer,
-			$before_purchase_dl_push . $this->clear_ecommerce_js(),
-			$after_purchase_dl_push
-		);
+		// Flag only a purchase that will really be printed (#514, the #412 sibling).
+		$queued = '' !== (string) ( $purchase_data_layer['event'] ?? '' )
+			&& DataLayer::encodes( $purchase_data_layer )
+			&& $this->datalayer->queue_push(
+				(string) $purchase_data_layer['event'],
+				$purchase_data_layer,
+				$before_purchase_dl_push . $this->clear_ecommerce_js(),
+				$after_purchase_dl_push
+			);
+
+		if ( ! $queued ) {
+			return $data_layer;
+		}
 
 		$this->download_data->flag_order_tracked( $order );
 

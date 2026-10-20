@@ -944,16 +944,39 @@ final class DownloadDataTest extends TestCase {
 		$this->assertFalse( $disabled->is_order_older_than_max_age( $old ), 'A 0 max age disables the gate.' );
 	}
 
+	/**
+	 * Stubs the order count is_new_customer() asks EDD for.
+	 *
+	 * @param int        $others The count of the customer's other orders.
+	 * @param array|null $args   Receives the query arguments.
+	 * @return void
+	 */
+	private function stub_other_orders( int $others, ?array &$args = null ): void {
+		Functions\when( 'edd_get_net_order_statuses' )->justReturn( array( 'complete', 'partially_refunded', 'revoked', 'on_hold' ) );
+		Functions\when( 'edd_count_orders' )->alias(
+			static function ( $query ) use ( $others, &$args ) {
+				$args = $query;
+				return $others;
+			}
+		);
+	}
+
 	public function test_new_customer_flag(): void {
 		$download_data = $this->make_download_data();
 
 		$this->assertTrue( $download_data->is_new_customer( $this->make_order( array( 'customer_id' => 0 ) ) ), 'Guest orders without a customer record report as new.' );
 
-		Functions\when( 'edd_get_customer' )->justReturn( new \EDD_Customer( array( 'purchase_count' => 1 ) ) );
+		$this->stub_other_orders( 0, $args );
 		$this->assertTrue( $download_data->is_new_customer( $this->make_order() ) );
 
-		Functions\when( 'edd_get_customer' )->justReturn( new \EDD_Customer( array( 'purchase_count' => 3 ) ) );
-		$this->assertFalse( $download_data->is_new_customer( $this->make_order() ) );
+		// #513: this order is left out by id, whatever its status, and only the
+		// statuses EDD counts as sales decide.
+		$this->assertSame( array( 77 ), $args['id__not_in'] );
+		$this->assertSame( 'sale', $args['type'] );
+		$this->assertSame( array( 'complete', 'partially_refunded', 'revoked', 'on_hold' ), $args['status__in'] );
+
+		$this->stub_other_orders( 1 );
+		$this->assertFalse( $download_data->is_new_customer( $this->make_order( array( 'status' => 'pending' ) ) ), 'A pending repeat order of a returning customer is returning.' );
 	}
 
 	public function test_customer_signals_carry_both_key_names(): void {
@@ -970,7 +993,7 @@ final class DownloadDataTest extends TestCase {
 			$download_data->customer_signals( $this->make_order( array( 'customer_id' => 0 ) ) )
 		);
 
-		Functions\when( 'edd_get_customer' )->justReturn( new \EDD_Customer( array( 'purchase_count' => 3 ) ) );
+		$this->stub_other_orders( 2 );
 		$this->assertSame(
 			array(
 				'new_customer'  => false,

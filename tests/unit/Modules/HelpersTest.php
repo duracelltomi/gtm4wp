@@ -899,4 +899,48 @@ final class HelpersTest extends TestCase {
 		$this->assertNotNull( $canonical );
 		$this->assertSame( $canonical, CountryPhoneData::lookup( ' hu ' ) );
 	}
+
+	/**
+	 * #415/#515: price times quantity of a filtered item; a non-numeric value
+	 * counts as 0 rather than a TypeError on the cart or checkout page.
+	 */
+	public function test_line_value_survives_non_numeric_filter_output(): void {
+		$this->assertSame(
+			19.98,
+			\GTM4WP\Ecommerce\Helpers::line_value(
+				array(
+					'price'    => '9.99',
+					'quantity' => 2,
+				)
+			)
+		);
+		$this->assertSame(
+			0.0,
+			\GTM4WP\Ecommerce\Helpers::line_value(
+				array(
+					'price'    => 'abc',
+					'quantity' => 2,
+				)
+			)
+		);
+		$this->assertSame(
+			0.0,
+			\GTM4WP\Ecommerce\Helpers::line_value(
+				array(
+					'price'    => '',
+					'quantity' => 1,
+				)
+			)
+		);
+		$this->assertSame( 0.0, \GTM4WP\Ecommerce\Helpers::line_value( array( 'price' => 5.0 ) ), 'A dropped quantity.' );
+		$this->assertSame(
+			0.0,
+			\GTM4WP\Ecommerce\Helpers::line_value(
+				array(
+					'price'    => array( 1 ),
+					'quantity' => 1,
+				)
+			)
+		);
+	}
 }

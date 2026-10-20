@@ -1181,8 +1181,8 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 467 | Medium | fixed (R53 fix session: the capture hooks are wired from `Plugin::boot()` via `CaptureHooks::register_for()` and no longer from the module, so they are not registered twice; 3 tests, 2 red before the fix, 1 guard green by design) | — | Data Manager `CaptureHooks` wiring | EDD orders built on admin-ajax are not captured for the refund lane |
 | 468 | Medium | open | — | `KeyVault`, GoogleAuth routes + remedy texts | The advised recovery after a salt change does not restore sending |
 | 469 | Medium | open (needs design) | — | `KeyVault` storage key | Salts rotate without admin action on common security plugins, so the stored key goes unreadable on a schedule |
-| 470 | Medium | open | — | EDD `ListTracking` checkout rows | Checkout-row cart events read fields the hook's item does not carry |
-| 471 | Medium | open | — | EDD reliable-purchase fallback | The fallback lanes treat an unpaid pending order as a purchase |
+| 470 | Medium | fixed (R53 fix session: the row resolves its content-details line by key, download and price id; catalogue fallback; fixtures moved to the real hook shape, U115 records it) | — | EDD `ListTracking` checkout rows | Checkout-row cart events read fields the hook's item does not carry |
+| 471 | Medium | fixed (R53 fix session: pending counts only on the confirmation page; the fallback waits for payment) | — | EDD reliable-purchase fallback | The fallback lanes treat an unpaid pending order as a purchase |
 | 472 | Low | open | — | Data Manager `EventsIngest` / `TokenService` | Retry classification: transient token failures not retried, a deterministic failure retried |
 | 473 | Low | open | A4 / — | Data Manager `RefundSender` / `SendLog` | A job that never runs leaves no replay target (new evidence on #388's scope) |
 | 474 | Low | open (unverified) | A4 / — | Data Manager `RefundSender` | No claim between the already-sent check and the send |
@@ -1222,19 +1222,19 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 508 | Low | open | — | WC `AdminSchema::fields()` | A database read on ability registration and on every REST request |
 | 509 | Low | open | A4 delegate | Send-log ability; threat model | Upstream error text in the log; the threat model contradicts itself |
 | 510 | Low | fixed (this ledger update) | — | Coverage Matrix | Site Health files named in no row label |
-| 511 | Low | open | A0 | EDD confirmation page | Cache-related exposure on some EDD versions; detail in the local report (re-opens R51's #460 sibling note) |
-| 512 | Low | open | A3 | EDD success page | Staff receipt views can fire and flag a purchase |
-| 513 | Low | open | — | EDD `DownloadData` | New-customer flag vs EDD's counted statuses |
-| 514 | Low | open | site code | EDD purchase render | #412 sibling |
-| 515 | Low | open | site code | EDD cart value | #415 sibling |
+| 511 | Low | fixed (R53 fix session: no-cache guard on the success page; U141 corrected) | A0 | EDD confirmation page | Cache-related exposure on some EDD versions; detail in the local report (re-opens R51's #460 sibling note) |
+| 512 | Low | fixed (R53 fix session) | A3 | EDD success page | Staff receipt views can fire and flag a purchase |
+| 513 | Low | fixed (R53 fix session: other net-status sale orders, this one excluded) | — | EDD `DownloadData` | New-customer flag vs EDD's counted statuses |
+| 514 | Low | fixed (R53 fix session, with #412: flagged only when the push encodes and queues) | site code | EDD purchase render | #412 sibling |
+| 515 | Low | fixed (R53 fix session, with #415: `Helpers::line_value()`) | site code | EDD cart value | #415 sibling |
 | 516 | Low | open (needs design) | — | EDD checkout rows | #417 sibling |
-| 517 | Low | open | — | EDD `AdminSchema` | Description promises a value not emitted |
+| 517 | Low | fixed (R53 fix session: description) | — | EDD `AdminSchema` | Description promises a value not emitted |
 | 518 | Low | open (unverified) | A0 | EDD cart page | Possible cache-related exposure; detail in the local report |
 | 519 | Low | open | — | EDD `DownloadData` | Price basis differs between surfaces |
-| 520 | Low | open | — | EDD module | Dead code / duplication |
+| 520 | Low | fixed in part (R53 fix session: unread property, forward-only wrapper, duplicated session lookup; the two public-but-internal methods and `process_download()` length left) | — | EDD module | Dead code / duplication |
 | 521 | Low | open | — | EDD page fallback / `VisitorCart` | Per-page work |
-| 522 | Low | open (unverified) | A0 | EDD product page | #407 sibling |
-| 523 | Low | open | — | EDD + WC status lists | Empty-list behaviour undocumented on screen |
+| 522 | Low | fixed (R53 fix session, with #407) | A0 | EDD product page | #407 sibling |
+| 523 | Low | fixed (R53 fix session: both descriptions) | — | EDD + WC status lists | Empty-list behaviour undocumented on screen |
 | 524 | Low | open (unverified) | A3/A4 | Purchase renders under an excluded role | Tracked flag written while the loader is suppressed |
 | 525 | Low | open (unverified) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Confirmation flag may never pass |
 
@@ -1315,15 +1315,15 @@ ledger commit on `master`.
 | 404 | Low | open | A1 | VisitorData login gate (both) | The login gate cookie can outlive a logout that lands on a cached page |
 | 405 | Low | open (reach unverified) | — | `UserEventsModule` (both) | The registration event response carries no no-cache signal (#44 sibling) |
 | 406 | Low | open (product decision) | A0 | `ProductData` stock level (both, 1.x) | Exact stock quantity is emitted regardless of the store's stock display setting |
-| 407 | Low | open (unverified) | A0 | WC product page (both) | Protected products: product view data is not checked against the password |
+| 407 | Low | fixed (R53 fix session, with #522: no view_item before the password) | A0 | WC product page (both) | Protected products: product view data is not checked against the password |
 | 408 | Low | open | — | `VisitorIp::get()` (both) | Falls back to the trusted proxy's own address when no client address could be read |
 | 409 | Low | open | A0 own data | WC `Helpers` list-attribution cookie (both) | Non-scalar cookie members are cast to string (warnings) |
 | 410 | Low | open | A4 | Settings import (both) | A rejected key is stored as its default, so a bad row can clear the containers; the errors are not shown |
 | 411 | Low | open (needs design) | A4 | `ContainerRows` identifier rule (both, 1.x) | Reserved words and colliding names pass the data-layer-name / global-var grammar and break the script blocks |
-| 412 | Low | open | site code | WC `add_purchase_for_order()` (both) | The order is marked tracked before it is known that the push encodes (#141 residual) |
+| 412 | Low | fixed (R53 fix session, with #514) | site code | WC `add_purchase_for_order()` (both) | The order is marked tracked before it is known that the push encodes (#141 residual) |
 | 413 | Low | fixed (R50 second fix session, both branches: push isolated; RI-35 ledger re-derived) | — | `gtm4wp-woocommerce.js` Undo branch (both) | A synchronous push inside `ajaxSuccess` is not contained; the RI-35 ledger is stale |
 | 414 | Low | open | — | WC dedupe guard, visitor-data storage helpers (both) | `localStorage` access outside try/catch |
-| 415 | Low | open | site code | WC cart loops (both) | Arithmetic on filter output without type checks |
+| 415 | Low | fixed (R53 fix session, with #515) | site code | WC cart loops (both) | Arithmetic on filter output without type checks |
 | 416 | Low | open | site code | WC address getters (both) | Filtered getters reach string-typed helpers (#377 sibling) |
 | 417 | Low | open (needs design) | — | WC cart/checkout/purchase item loops (both) | WooCommerce item-visibility filters are applied on one surface only |
 | 418 | Low | open | — | Quick View `view_item` (both) | Singular `item` key, internal id kept, no missing-product guard |

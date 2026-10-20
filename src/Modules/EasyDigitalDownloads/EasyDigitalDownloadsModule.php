@@ -102,7 +102,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 
 		$download_data  = new DownloadData( $this->options );
 		$page_datalayer = new PageDataLayer( $this->options, $download_data, $frontend->datalayer(), $frontend->script_tag() );
-		$list_tracking  = new ListTracking( $this->options, $download_data );
+		$list_tracking  = new ListTracking( $download_data );
 
 		add_filter( GTM4WP_WPFILTER_COMPILE_DATALAYER, array( $page_datalayer, 'add_datalayer_data' ) );
 
@@ -122,12 +122,36 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 		// form (add_to_cart) and a span in every checkout cart row
 		// (remove_from_cart). All read client-side by gtm4wp-edd.js.
 		add_action( 'edd_download_after', array( $list_tracking, 'after_download_shortcode_item' ) );
-		add_action( 'edd_blocks_downloads_after_entry_title', array( $list_tracking, 'after_downloads_block_item' ), 10, 0 );
+		// The downloads block renders its own grid but runs a regular loop, so the
+		// shortcode item's span applies as is.
+		add_action( 'edd_blocks_downloads_after_entry_title', array( $list_tracking, 'after_download_shortcode_item' ), 10, 0 );
 		add_action( 'edd_purchase_link_end', array( $list_tracking, 'purchase_link_data' ), 10, 2 );
 		add_action( 'edd_checkout_cart_item_title_after', array( $list_tracking, 'checkout_cart_item_data' ), 10, 2 );
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 		add_filter( GTM4WP_WPFILTER_ADDGLOBALVARS_ARRAY, array( $this, 'add_global_vars' ) );
+		add_action( 'template_redirect', array( $this, 'prevent_caching_success_page' ) );
+	}
+
+	/**
+	 * Keeps EDD's success / confirmation page out of page caches: it renders
+	 * the buyer's purchase and identity, and EDD below 3.6.7 does not exclude
+	 * a separate Confirmation page itself (#511, U141). Mirrors WooCommerce's
+	 * custom order-received page guard; before output, so headers still go.
+	 *
+	 * @return void
+	 */
+	public function prevent_caching_success_page(): void {
+		if ( ! function_exists( 'edd_is_success_page' ) || ! edd_is_success_page() ) {
+			return;
+		}
+
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U141), not ours to prefix.
+			define( 'DONOTCACHEPAGE', true );
+		}
+
+		nocache_headers();
 	}
 
 	/**

@@ -386,6 +386,25 @@ final class EddReliablePurchaseTest extends TestCase {
 	}
 
 	/**
+	 * #471: with the DEFAULT statuses (pending included, for the confirmation
+	 * page), a pending order in the fallback is waited for, not reported, and a
+	 * stray confirm POST cannot end the wait. Once the gateway completes it,
+	 * the next resolve delivers it.
+	 */
+	public function test_a_pending_order_is_waited_for_under_the_default_statuses(): void {
+		$_COOKIE[ ReliablePurchase::EVENT_COOKIE ] = '1';
+
+		$this->set_order( $this->make_order( array( 'status' => 'pending' ) ) );
+		$this->assertSame( array( 'pending' => true ), $this->make()->resolve_pending_purchase() );
+
+		$this->make()->confirm_purchase_tracked();
+		$this->assertSame( array(), $this->meta_writes, 'A stray POST does not flag a pending order.' );
+
+		$this->set_order( $this->make_order( array( 'status' => 'complete' ) ) );
+		$this->assertIsArray( $this->make()->resolve_pending_purchase()['push'] ?? null );
+	}
+
+	/**
 	 * U132: the terminal list is edd_get_payment_statuses() of EDD 3.7.0 minus
 	 * the placement and waiting statuses. A new EDD status fails this test
 	 * until it is classified.

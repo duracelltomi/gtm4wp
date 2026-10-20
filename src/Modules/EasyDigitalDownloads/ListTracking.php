@@ -10,8 +10,6 @@
 
 namespace GTM4WP\Modules\EasyDigitalDownloads;
 
-use GTM4WP\Options\Options;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -35,13 +33,19 @@ final class ListTracking {
 	private int $list_item_index = 0;
 
 	/**
+	 * The cart's content details (edd_get_cart_content_details()), read once per
+	 * request for the checkout rows; EDD's own cart cache is off by default.
+	 *
+	 * @var array<int|string, mixed>|null
+	 */
+	private ?array $cart_details = null;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param Options      $options       The plugin options service.
 	 * @param DownloadData $download_data The download data builder.
 	 */
 	public function __construct(
-		private Options $options,
 		private DownloadData $download_data
 	) {
 	}
@@ -88,19 +92,6 @@ final class ListTracking {
 			'<span class="gtm4wp_edd_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_data="%s"></span>',
 			esc_attr( (string) wp_json_encode( $eec_product_array ) )
 		);
-	}
-
-	/**
-	 * Executed during edd_blocks_downloads_after_entry_title, the per-item
-	 * hook of the EDD downloads block - the block renders its own grid markup
-	 * (article.edd-blocks__download) instead of the [downloads] shortcode's
-	 * .edd_download items, but runs inside a regular WP loop, so the same
-	 * span emission applies.
-	 *
-	 * @return void
-	 */
-	public function after_downloads_block_item(): void {
-		$this->after_download_shortcode_item();
 	}
 
 	/**
@@ -151,7 +142,7 @@ final class ListTracking {
 	 * remove link is clicked. Uses its own CSS class (not the list one) so
 	 * cart rows are never counted as list impressions.
 	 *
-	 * @param array $item The cart item as passed to the checkout cart template.
+	 * @param array $item An edd_get_cart_contents() row (id, options, quantity) at both fire sites (U115).
 	 * @param mixed $key  The cart position key of the row.
 	 * @return void
 	 */
@@ -160,12 +151,14 @@ final class ListTracking {
 			return;
 		}
 
+		$line = $this->checkout_cart_line( $item, $key );
+
 		$eec_product_array = $this->download_data->process_download(
 			(int) $item['id'],
-			$this->download_data->cart_line_attributes( $item ),
+			$this->download_data->cart_line_attributes( $line ),
 			'cart',
-			$item,
-			DownloadData::cart_item_price_id( $item )
+			$line,
+			DownloadData::cart_item_price_id( $line )
 		);
 
 		if ( false === $eec_product_array ) {
@@ -179,6 +172,42 @@ final class ListTracking {
 		printf(
 			'<span class="gtm4wp_edd_cartitemdata" style="display:none; visibility:hidden;" data-gtm4wp_product_data="%s"></span>',
 			esc_attr( (string) wp_json_encode( $eec_product_array ) )
+		);
+	}
+
+	/**
+	 * The edd_get_cart_content_details() line of a checkout row (#470): the hook
+	 * passes the contents row, which carries no price. Details keep the contents
+	 * keys, so the line is found by key and checked by download and price id
+	 * (one download can sit on two rows). A row with no matching line (the
+	 * block editor's preview cart) is priced from the catalogue, tax not split.
+	 *
+	 * @param array $item The contents row.
+	 * @param mixed $key  Its cart key.
+	 * @return array<string, mixed> A content-details line.
+	 */
+	private function checkout_cart_line( array $item, $key ): array {
+		if ( null === $this->cart_details ) {
+			$details            = function_exists( 'edd_get_cart_content_details' ) ? edd_get_cart_content_details() : array();
+			$this->cart_details = is_array( $details ) ? $details : array();
+		}
+
+		$line     = $this->cart_details[ $key ] ?? null;
+		$price_id = DownloadData::cart_item_price_id( array( 'item_number' => $item ) );
+
+		if ( is_array( $line ) && (int) ( $line['id'] ?? 0 ) === (int) $item['id'] && DownloadData::cart_item_price_id( $line ) === $price_id ) {
+			return $line;
+		}
+
+		$quantity = max( 1, (int) ( $item['quantity'] ?? 1 ) );
+		$options  = is_array( $item['options'] ?? null ) ? $item['options'] : array();
+		$unit     = function_exists( 'edd_get_cart_item_price' ) ? (float) edd_get_cart_item_price( (int) $item['id'], $options ) : 0.0;
+
+		return array(
+			'id'          => (int) $item['id'],
+			'item_number' => $item,
+			'quantity'    => $quantity,
+			'price'       => $unit * $quantity,
 		);
 	}
 
