@@ -240,9 +240,13 @@ final class StatusAbilities implements ProviderInterface {
 		$tests   = array();
 
 		foreach ( ( new SiteHealthTests( $this->registry, $options ) )->run_all() as $id => $result ) {
+			// A third-party test reporting a status outside core's three would fail
+			// the output schema and with it the whole answer (#504).
+			$status = (string) ( $result['status'] ?? 'good' );
+
 			$tests[] = array(
 				'id'          => (string) $id,
-				'status'      => (string) ( $result['status'] ?? 'good' ),
+				'status'      => in_array( $status, array( 'good', 'recommended', 'critical' ), true ) ? $status : 'recommended',
 				'label'       => (string) ( $result['label'] ?? '' ),
 				'description' => self::plain_text( (string) ( $result['description'] ?? '' ) ),
 			);
@@ -296,7 +300,7 @@ final class StatusAbilities implements ProviderInterface {
 		$value = $row['debug'] ?? ( $row['value'] ?? '' );
 
 		if ( ! is_array( $value ) ) {
-			return (string) $value;
+			return is_scalar( $value ) ? (string) $value : '';
 		}
 
 		$lines = array();

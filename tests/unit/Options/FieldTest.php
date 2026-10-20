@@ -297,7 +297,7 @@ final class FieldTest extends TestCase {
 		$this->assertSame( 'array', $this->make_field( Field::TYPE_TABLE, array() )->rest_type() );
 		$this->assertSame( 'array', $this->make_field( Field::TYPE_MULTISELECT, array() )->rest_type() );
 		$this->assertSame( 'string', $this->make_field( Field::TYPE_TEXT, '' )->rest_type() );
-		$this->assertSame( 'string', $this->make_field( Field::TYPE_SELECT, '' )->rest_type() );
+		$this->assertSame( array( 'string', 'integer' ), $this->make_field( Field::TYPE_SELECT, '' )->rest_type(), '#500: two selects store an int.' );
 	}
 
 	public function test_to_ui_array_carries_schema_and_current_value(): void {

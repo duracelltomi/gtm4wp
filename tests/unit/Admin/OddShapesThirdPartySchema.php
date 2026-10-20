@@ -41,12 +41,17 @@ final class OddShapesThirdPartySchema implements AdminSchemaInterface, SiteHealt
 
 	public function site_health_tests( Options $options ): array {
 		return array(
-			'scalar'     => static fn () => 'nope',
-			'label-only' => static fn (): array => array( 'label' => 'Only a label' ),
-			'Odd.Key v2' => static fn (): array => array(
+			'scalar'      => static fn () => 'nope',
+			'label-only'  => static fn (): array => array( 'label' => 'Only a label' ),
+			'Odd.Key v2'  => static fn (): array => array(
 				'status'      => 'recommended',
 				'label'       => 'Odd key',
 				'description' => '<p>a</p>b<br>c<br><ul><li>d</li><li>e</li></ul><div>f</div>',
+			),
+			// Not one of core's three statuses (#504).
+			'junk-status' => static fn (): array => array(
+				'status' => 'warning',
+				'label'  => 'Junk status',
 			),
 		);
 	}

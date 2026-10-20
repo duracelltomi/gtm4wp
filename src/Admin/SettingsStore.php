@@ -162,7 +162,9 @@ final class SettingsStore {
 	/**
 	 * Builds the settings export envelope: a header plus the current option
 	 * values. Schema driven, so every registered option is included and
-	 * nothing else; on import every value passes its Field sanitizer again.
+	 * nothing else - not a key another plugin wrote into the row, nor a 1.x
+	 * key Migration has not removed yet (#507); on import every value passes
+	 * its Field sanitizer again.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -171,7 +173,7 @@ final class SettingsStore {
 			'plugin'  => 'gtm4wp',
 			'type'    => self::EXPORT_TYPE,
 			'version' => defined( 'GTM4WP_VERSION' ) ? GTM4WP_VERSION : '',
-			'options' => $this->current_values(),
+			'options' => array_intersect_key( $this->current_values(), $this->fields_by_key() ),
 		);
 	}
 

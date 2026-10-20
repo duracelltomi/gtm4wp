@@ -291,7 +291,29 @@ final class RestControllerTest extends TestCase {
 		$this->assertSame( 'gtm4wp', $data['plugin'] );
 		$this->assertSame( SettingsStore::EXPORT_TYPE, $data['type'] );
 		$this->assertSame( GTM4WP_VERSION, $data['version'] );
-		$this->assertSame( 'GTM-EXPORTED', $data['options'][ GTM4WP_OPTION_GTM_CODE ] );
+		// The stored 1.x container id travels in the container list; the flat
+		// mirror itself is not a setting and is not exported (#507).
+		$this->assertSame( 'GTM-EXPORTED', $data['options'][ GTM4WP_OPTION_GTM_CONTAINERS ][0]['id'] );
+		$this->assertArrayNotHasKey( GTM4WP_OPTION_GTM_CODE, $data['options'] );
+	}
+
+	/**
+	 * #507: a key another plugin wrote into the option row, or a 1.x key
+	 * Migration has not removed yet (it runs on admin boot only), is not
+	 * exported - the export ability returns no more than the screen.
+	 */
+	public function test_export_carries_no_unregistered_key(): void {
+		$controller = $this->make_controller(
+			array(
+				'geo-apikey'      => 'a-third-party-api-key',
+				'third-party-key' => 'not ours',
+			)
+		);
+
+		$options = $controller->export_settings()->get_data()['options'];
+
+		$this->assertArrayNotHasKey( 'geo-apikey', $options );
+		$this->assertArrayNotHasKey( 'third-party-key', $options );
 	}
 
 	/**

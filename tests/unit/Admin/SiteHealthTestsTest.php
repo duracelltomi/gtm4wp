@@ -204,7 +204,7 @@ final class SiteHealthTestsTest extends TestCase {
 		$results = $this->collector( array( $this->module_with_id( 'acme-odd', OddShapesThirdPartySchema::class ) ) )->run_all();
 
 		$this->assertSame(
-			array( SiteHealthTests::TEST_CONFIGURATION, 'gtm4wp_acme_odd_scalar', 'gtm4wp_acme_odd_label_only', 'gtm4wp_acme_odd_odd_key_v2' ),
+			array( SiteHealthTests::TEST_CONFIGURATION, 'gtm4wp_acme_odd_scalar', 'gtm4wp_acme_odd_label_only', 'gtm4wp_acme_odd_odd_key_v2', 'gtm4wp_acme_odd_junk_status' ),
 			array_keys( $results )
 		);
 		$this->assertSame( 'good', $results['gtm4wp_acme_odd_scalar']['status'] );

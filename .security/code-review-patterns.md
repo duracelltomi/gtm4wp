@@ -1149,6 +1149,8 @@ New features register through the `src/Module/` framework (implement the module 
 
 A feature-scoped ability lives in its module (`src/Modules/<Name>/Abilities.php`). The collector itself stays plugin-wide when its answer genuinely spans every module (`get-settings` is every module's options, `get-status` is "call this first"); that is a reason to keep the *ability* central, never a reason to hold module facts in it.
 
+**Recorded exception (R53, #505, maintainer decision 2026-10-20):** `Admin\ConfigurationChecks` names module options and, for the dual-store warning, module classes. It is the plugin's own list of built-in configuration problems, several of them cross-module by nature (dual store, the MonsterInsights conflict), and a third-party module reports its own problems through `SiteHealthTestsInterface`. Accepted as is; not a model for new collectors.
+
 **Litmus:** in a class under `src/Abilities/`, `src/Admin/` or in `src/Plugin.php`, is there an array literal, `switch`/`match` or constant name keyed by a module id, or naming one module's option constant, version constant or class? Then either the module owns it (interface or module class) or the review records why the framework cannot express it. Regression: the third-party-module cases in `RegistrarTest` and `StatusAbilitiesTest` (`Admin\UndocumentedThirdPartyModule` plus the `*ThirdParty*` fixtures under `tests/unit/Abilities/`).
 
 ### PA-22: A server-side platform event hooked only from the frontend boot misses the requests the platform really uses ⭐

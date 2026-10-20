@@ -222,7 +222,7 @@ final class SettingsAbilities implements ProviderInterface {
 			self::IMPORT_SETTINGS,
 			array(
 				'label'               => __( 'Import the Google Tag Manager settings', 'duracelltomi-google-tag-manager' ),
-				'description'         => __( 'Replaces EVERY option of Google Tag Manager for WordPress with the values of a settings export - site-wide: an option missing from the envelope falls back to its default, so this is a full restore, not a patch (use update-settings to change a few options). payload is the export envelope as a JSON string, exactly as export-settings returned it or as the Export button of the settings screen downloaded it; anything else is refused with 400 (a size cap, a check of the type marker) and nothing is stored. Every value passes the same sanitizer as the settings screen: a value the sanitizer refuses is reported under errors and its option keeps the default, while the rest is stored. Protocol, in this order: 1) call export-settings first and keep its answer, so the previous configuration can be restored with this ability; 2) tell the user which site and plugin version the envelope came from and that every option of this site will be replaced, the container IDs included, and ask "Replace all settings on this site?" - wait for an explicit yes in the same turn; a general instruction such as "restore my settings" is not a confirmation; 3) call this ability with confirm true. Without confirm true the call is refused with 400 and nothing is stored. Destructive: a wrong envelope switches tracking off for every visitor or points the site at somebody else\'s container. Options that wp-config.php constants control keep the constant\'s value whatever is stored. The answer carries the new values_hash for update-settings.', 'duracelltomi-google-tag-manager' ),
+				'description'         => __( 'Replaces EVERY option of Google Tag Manager for WordPress with the values of a settings export - site-wide: an option missing from the envelope falls back to its default, so this is a full restore, not a patch (use update-settings to change a few options). Call it through an MCP client or WP-CLI: the WordPress REST route of this ability carries the whole envelope in the URL, which web servers can refuse. payload is the export envelope as a JSON string, exactly as export-settings returned it or as the Export button of the settings screen downloaded it; anything else is refused with 400 (a size cap, a check of the type marker) and nothing is stored. Every value passes the same sanitizer as the settings screen: a value the sanitizer refuses is reported under errors and its option keeps the default, while the rest is stored. Protocol, in this order: 1) call export-settings first and keep its answer, so the previous configuration can be restored with this ability; 2) tell the user which site and plugin version the envelope came from and that every option of this site will be replaced, the container IDs included, and ask "Replace all settings on this site?" - wait for an explicit yes in the same turn; a general instruction such as "restore my settings" is not a confirmation; 3) call this ability with confirm true. Without confirm true the call is refused with 400 and nothing is stored. Destructive: a wrong envelope switches tracking off for every visitor or points the site at somebody else\'s container. Options that wp-config.php constants control keep the constant\'s value whatever is stored. The answer carries the new values_hash for update-settings.', 'duracelltomi-google-tag-manager' ),
 				'category'            => Registrar::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -338,9 +338,9 @@ final class SettingsAbilities implements ProviderInterface {
 		$input = is_array( $input ) ? $input : array();
 
 		$by_module      = $this->store->fields_by_module();
-		$modules        = self::string_list( $input['modules'] ?? array() );
-		$keys           = self::string_list( $input['keys'] ?? array() );
-		$include_schema = ! empty( $input['include_schema'] );
+		$modules        = Input::strings( $input['modules'] ?? array() );
+		$keys           = Input::strings( $input['keys'] ?? array() );
+		$include_schema = Input::flag( $input['include_schema'] ?? false );
 
 		$unknown_modules = array_diff( $modules, array_keys( $by_module ) );
 		if ( array() !== $unknown_modules ) {
@@ -542,27 +542,5 @@ final class SettingsAbilities implements ProviderInterface {
 			'unavailable' => $field->unavailable,
 			'doc_url'     => Docs::url( $field->doc, $field->key ),
 		);
-	}
-
-	/**
-	 * A list input as unique strings; anything else is dropped.
-	 *
-	 * @param mixed $value The raw list.
-	 * @return string[]
-	 */
-	private static function string_list( $value ): array {
-		if ( ! is_array( $value ) ) {
-			return array();
-		}
-
-		$strings = array();
-
-		foreach ( $value as $item ) {
-			if ( is_string( $item ) && '' !== $item ) {
-				$strings[] = $item;
-			}
-		}
-
-		return array_values( array_unique( $strings ) );
 	}
 }

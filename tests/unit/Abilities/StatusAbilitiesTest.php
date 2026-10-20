@@ -414,6 +414,22 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$tests = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['tests'], null, 'id' );
 
 		$this->assertSame( "a\nb\nc\nd\ne\nf", $tests['gtm4wp_acme_odd_odd_key_v2']['description'] );
+		$this->assertSame( 'recommended', $tests['gtm4wp_acme_odd_junk_status']['status'], '#504: an unknown status cannot fail the whole answer.' );
+	}
+
+	/**
+	 * #504: a row a gtm4wp_site_health_info filter left as a non-array is
+	 * dropped, not a TypeError that loses every other row.
+	 */
+	public function test_site_health_drops_an_info_row_a_filter_broke(): void {
+		\Brain\Monkey\Filters\expectApplied( 'gtm4wp_site_health_info' )->andReturnUsing(
+			static fn ( $fields ) => array( 'acme_broken' => 'not a row' ) + $fields
+		);
+
+		$keys = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['info'], 'key' );
+
+		$this->assertNotContains( 'acme_broken', $keys );
+		$this->assertNotSame( array(), $keys );
 	}
 
 	public function test_site_health_reports_a_missing_container_id_as_a_critical_configuration(): void {

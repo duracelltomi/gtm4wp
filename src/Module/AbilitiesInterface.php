@@ -33,8 +33,9 @@ interface AbilitiesInterface {
 	 * The provider whose register() the Registrar calls. Called only inside
 	 * wp_abilities_api_init, which core fires lazily on the first ability
 	 * lookup of a request, so building the provider may afford a database
-	 * read (the same cost class as PanelSchemaInterface::panel_data());
-	 * fields() stays database-free.
+	 * read (the same cost class as PanelSchemaInterface::panel_data()).
+	 * fields() should stay database-free; WooCommerce's reads the page list
+	 * for its page choices, so building the settings schema costs one query (#508).
 	 *
 	 * @return ProviderInterface
 	 */

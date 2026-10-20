@@ -7,6 +7,7 @@
 * Fixed: the plugin no longer buffers every WooCommerce template part on every page. That buffering only fed the classic "Products" widget, whose tracking had been dead since 2017. If a GTM trigger filters on an `item_list_name` ending in "(widget)", remove that condition.
 * Fixed: the description of the WooCommerce **"Order data in data layer"** setting no longer says it works independently of ecommerce tracking. It needs "Track e-commerce", and still writes `orderData` when the purchase event is not sent again.
 * Fixed: a settings import file with a checkbox written as the text "false" switched that option on; it now means off, as it does when saving the settings screen.
+* Changed: a settings export carries only the plugin's own options. Keys another plugin wrote into GTM4WP's option row, and 1.x options not yet cleaned up, are left out; importing the file gives the same settings as before.
 * Fixed: a password-protected WooCommerce product no longer reports `view_item` or its product data before the password is entered.
 * Fixed: a WooCommerce order is flagged as tracked only when its purchase event is really printed, so a site filter that breaks the event no longer suppresses the purchase for good.
 * Fixed: a non-numeric product price returned by a site filter no longer stops the WooCommerce cart and checkout pages with a PHP error; such a line counts as zero.

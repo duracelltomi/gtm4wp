@@ -1211,15 +1211,15 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 497 | Low | open | — | `KeyVault` | Misdiagnosis without OpenSSL |
 | 498 | Low | open | — | `ServiceAccountKey`, `KeyVault` | Redundant stored field |
 | 499 | Low | (a) open, (b) fixed (this ledger update) | — | Notices; #229/#233 ledger rows | (a) a shared notice-markup convention; (b) stale "no production caller" ledger text |
-| 500 | Low | open | A4 delegate | `Field::value_schema()` | Two settings round-trip with a type error between the read and the write ability |
+| 500 | Low | fixed (R53 fix session: selects declare string or integer; get→update type round-trip test) | A4 delegate | `Field::value_schema()` | Two settings round-trip with a type error between the read and the write ability |
 | 501 | Low | fixed (R53 fix session: refused 400 in the shared service; minItems + pattern on both schemas) | A4 delegate | Data Manager replay (ability + route) | An empty or malformed reference list widens the replay |
-| 502 | Low | open | A4 delegate | Abilities on WP 6.9–7.0 GET transport | Input validated but not sanitised |
-| 503 | Low | open (needs design) | — | `SettingsAbilities` | Write abilities' REST transport puts the payload in the query string |
-| 504 | Low | open | site code | `StatusAbilities`, Site Health collectors | A third-party contribution can fail the whole answer |
-| 505 | Low | open | — | `ConfigurationChecks` | PA-21: module facts in a plugin-wide collector |
+| 502 | Low | fixed (R53 fix session: `Abilities\Input` reads flags and lists as WP 7.1 coerces them) | A4 delegate | Abilities on WP 6.9–7.0 GET transport | Input validated but not sanitised |
+| 503 | Low | fixed (R53 fix session, maintainer decision: import documented as an MCP / WP-CLI call) | — | `SettingsAbilities` | Write abilities' REST transport puts the payload in the query string |
+| 504 | Low | fixed (R53 fix session: unknown status → recommended; non-array Info rows dropped) | site code | `StatusAbilities`, Site Health collectors | A third-party contribution can fail the whole answer |
+| 505 | Low | accepted (R53 maintainer decision: recorded PA-21 exception) | — | `ConfigurationChecks` | PA-21: module facts in a plugin-wide collector |
 | 506 | Low | open | — | GoogleAuth Site Health + key notice | Readability reported from a lazily set status |
-| 507 | Low | open | A4 delegate | `SettingsStore` export | The export carries more than the registered options |
-| 508 | Low | open | — | WC `AdminSchema::fields()` | A database read on ability registration and on every REST request |
+| 507 | Low | fixed (R53 fix session: export restricted to registered fields) | A4 delegate | `SettingsStore` export | The export carries more than the registered options |
+| 508 | Low | fixed in part (R53 fix session: docblock corrected; measuring get_pages() on a large site left) | — | WC `AdminSchema::fields()` | A database read on ability registration and on every REST request |
 | 509 | Low | fixed (R53 fix session, maintainer decision: the ability answers with the error class; threat model reconciled) | A4 delegate | Send-log ability; threat model | Upstream error text in the log; the threat model contradicts itself |
 | 510 | Low | fixed (this ledger update) | — | Coverage Matrix | Site Health files named in no row label |
 | 511 | Low | fixed (R53 fix session: no-cache guard on the success page; U141 corrected) | A0 | EDD confirmation page | Cache-related exposure on some EDD versions; detail in the local report (re-opens R51's #460 sibling note) |
@@ -1236,7 +1236,7 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 522 | Low | fixed (R53 fix session, with #407) | A0 | EDD product page | #407 sibling |
 | 523 | Low | fixed (R53 fix session: both descriptions) | — | EDD + WC status lists | Empty-list behaviour undocumented on screen |
 | 524 | Low | open (unverified) | A3/A4 | Purchase renders under an excluded role | Tracked flag written while the loader is suppressed |
-| 525 | Low | open (unverified) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Confirmation flag may never pass |
+| 525 | Low | resolved by #503 (import over REST is documented as unsupported before WP 7.1; the strict confirm stays, pinned by its tests) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Confirmation flag may never pass |
 
 Note on #395 (open): new evidence (probe). The appended row itself is dropped once the ring holds only problem rows, so
 "harmless since `f6f8a91`" holds for sequential execution only; linked to #474. The fix design is in the local report.

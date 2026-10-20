@@ -223,9 +223,9 @@ final class Field {
 	/**
 	 * Returns the JSON schema type of the field for the REST endpoint.
 	 *
-	 * @return string
+	 * @return string|string[]
 	 */
-	public function rest_type(): string {
+	public function rest_type(): string|array {
 		switch ( $this->type ) {
 			case self::TYPE_CHECKBOX:
 				return 'boolean';
@@ -236,6 +236,11 @@ final class Field {
 			case self::TYPE_TABLE:
 			case self::TYPE_MULTISELECT:
 				return 'array';
+
+			// Two selects store an int (container placement, blacklist mode), so
+			// a value read back must validate on the way in (#500).
+			case self::TYPE_SELECT:
+				return array( 'string', 'integer' );
 
 			default:
 				return 'string';

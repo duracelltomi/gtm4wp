@@ -140,6 +140,8 @@ final class SiteHealthInfo {
 		 */
 		$filtered = apply_filters( 'gtm4wp_site_health_info', $fields, $this->options );
 
-		return is_array( $filtered ) ? $filtered : $fields;
+		// A row a filter left as a non-array breaks the Info tab and the ability
+		// alike, so it is dropped (#504).
+		return is_array( $filtered ) ? array_filter( $filtered, 'is_array' ) : $fields;
 	}
 }

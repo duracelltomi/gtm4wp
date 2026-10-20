@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Abilities\Input;
 use GTM4WP\Abilities\Meta;
 use GTM4WP\Abilities\ProviderInterface;
 use GTM4WP\Abilities\Registrar;
@@ -280,7 +281,7 @@ final class Abilities implements ProviderInterface {
 	 */
 	public function get_log( $input = null ): array {
 		$input         = is_array( $input ) ? $input : array();
-		$problems_only = ! empty( $input['problems_only'] );
+		$problems_only = Input::flag( $input['problems_only'] ?? false );
 		$limit         = isset( $input['limit'] ) ? max( 1, min( self::MAX_LIMIT, (int) $input['limit'] ) ) : self::MAX_LIMIT;
 
 		// Google's error text stays on the settings screen: it can name the Cloud

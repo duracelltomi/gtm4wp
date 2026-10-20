@@ -767,4 +767,59 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
 		$this->assertSame( 0, $this->settings_writes() );
 	}
+
+	/**
+	 * #500: every value get-settings hands out validates against the type
+	 * update-settings declares for it, so a client echoing a value back is not
+	 * refused (container placement and blacklist mode are stored as ints).
+	 */
+	public function test_every_value_get_settings_returns_has_a_type_update_settings_accepts(): void {
+		$values     = (array) $this->execute( SettingsAbilities::GET_SETTINGS )['values'];
+		$properties = $this->registered[ SettingsAbilities::UPDATE_SETTINGS ]['input_schema']['properties']['values']['properties'];
+		$json_type  = array(
+			'string'  => 'string',
+			'integer' => 'integer',
+			'boolean' => 'boolean',
+			'array'   => 'array',
+			'double'  => 'number',
+		);
+		$mismatches = array();
+
+		foreach ( $values as $key => $value ) {
+			$types = (array) $properties[ $key ]['type'];
+
+			// Core's rest_is_array() runs a scalar through wp_parse_list() first, so
+			// a comma-separated multiselect string validates as an array.
+			if ( is_string( $value ) && in_array( 'array', $types, true ) ) {
+				continue;
+			}
+
+			if ( ! in_array( $json_type[ gettype( $value ) ] ?? gettype( $value ), $types, true ) ) {
+				$mismatches[ $key ] = gettype( $value );
+			}
+		}
+
+		$this->assertSame( array(), $mismatches );
+	}
+
+	/**
+	 * #502: on the GET transport before WordPress 7.1 the input arrives as
+	 * query strings; "false" must not switch the schema on, and a single
+	 * module name must narrow the answer like a one-item list.
+	 */
+	public function test_query_string_input_is_read_like_its_json_form(): void {
+		$result = $this->execute(
+			SettingsAbilities::GET_SETTINGS,
+			array(
+				'include_schema' => 'false',
+				'modules'        => 'container',
+			)
+		);
+
+		$this->assertSame( array(), $result['fields'] );
+		$this->assertSame(
+			array_keys( (array) $this->execute( SettingsAbilities::GET_SETTINGS, array( 'modules' => array( 'container' ) ) )['values'] ),
+			array_keys( (array) $result['values'] )
+		);
+	}
 }
