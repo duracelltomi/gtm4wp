@@ -590,6 +590,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$entry = $this->entry();
 		$this->assertSame( SendLog::OUTCOME_FAILED, $entry['outcome'] );
 		$this->assertSame( RefundSender::REASON_NOT_QUEUED, $entry['reason'] );
+		$this->assertSame( 'not_queued', $entry['error_class'], 'The log ability answers with the class (#509).' );
 		$this->assertArrayHasKey( 'woocommerce:12:34', $this->log->replay_plan() );
 	}
 
@@ -879,6 +880,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 		$this->assertSame( 'woocommerce:12:34', $entry['reference'] );
 		$this->assertSame( SendLog::OUTCOME_FAILED, $entry['outcome'] );
 		$this->assertSame( 'not_queued', $entry['reason'] );
+		$this->assertSame( 'not_queued', $entry['error_class'] );
 		$this->assertSame( 2, $entry['attempt'] );
 	}
 
@@ -1023,6 +1025,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$this->assertSame( array(), $this->scheduled );
 		$this->assertSame( RefundSender::REASON_PLATFORM_INACTIVE, $this->entry()['reason'] );
+		$this->assertSame( 'platform_inactive', $this->entry()['error_class'], 'The log ability answers with the class (#509).' );
 		$this->assertSame( SendLog::OUTCOME_FAILED, $this->entry()['outcome'] );
 	}
 

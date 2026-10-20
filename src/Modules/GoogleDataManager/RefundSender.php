@@ -581,13 +581,15 @@ final class RefundSender {
 		$delay = SendQueue::retry_delay( $attempt );
 
 		if ( null === $delay ) {
+			// A plugin code is its own class; the log ability answers with the class (#509).
 			$this->log->record(
 				array(
-					'feature'   => SendLog::FEATURE_REFUND,
-					'reference' => (string) ( $payload['platform'] ?? '' ) . ':' . (int) ( $payload['order_id'] ?? 0 ) . ':' . (int) ( $payload['refund_id'] ?? 0 ),
-					'attempt'   => $attempt,
-					'outcome'   => SendLog::OUTCOME_FAILED,
-					'reason'    => $reason,
+					'feature'     => SendLog::FEATURE_REFUND,
+					'reference'   => (string) ( $payload['platform'] ?? '' ) . ':' . (int) ( $payload['order_id'] ?? 0 ) . ':' . (int) ( $payload['refund_id'] ?? 0 ),
+					'attempt'     => $attempt,
+					'outcome'     => SendLog::OUTCOME_FAILED,
+					'reason'      => $reason,
+					'error_class' => $reason,
 				)
 			);
 
@@ -610,11 +612,12 @@ final class RefundSender {
 	private function not_queued( string $reference, int $attempt ): void {
 		$this->log->record(
 			array(
-				'feature'   => SendLog::FEATURE_REFUND,
-				'reference' => $reference,
-				'attempt'   => $attempt,
-				'outcome'   => SendLog::OUTCOME_FAILED,
-				'reason'    => self::REASON_NOT_QUEUED,
+				'feature'     => SendLog::FEATURE_REFUND,
+				'reference'   => $reference,
+				'attempt'     => $attempt,
+				'outcome'     => SendLog::OUTCOME_FAILED,
+				'reason'      => self::REASON_NOT_QUEUED,
+				'error_class' => self::REASON_NOT_QUEUED,
 			)
 		);
 	}

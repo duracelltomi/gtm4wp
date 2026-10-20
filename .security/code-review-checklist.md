@@ -1238,6 +1238,7 @@ production change):** PHP 3464 / 19177, `phpcs` 0. Detail for every open item st
 | 524 | Low | open (unverified) | A3/A4 | Purchase renders under an excluded role | Tracked flag written while the loader is suppressed |
 | 525 | Low | resolved by #503 (import over REST is documented as unsupported before WP 7.1; the strict confirm stays, pinned by its tests) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Confirmation flag may never pass |
 | 526 | Low | fixed (R53 fix session, found by the #519 design verifier, maintainer decision: product and cart surfaces use the purchase basis; 2.1 only, no 2.0 backport) | — | WC `ProductData`, `PageDataLayer`, `ListTracking` | Price basis differs between surfaces under one option combination |
+| 527 | Low | fixed (found by test-review Run 17: plugin-code failure rows carry their code as `error_class`; sender tests red before the fix) | A4 delegate | Send-log ability, `RefundSender` | The #509 redaction blanks the reason of failures the plugin records itself (not scheduled, platform inactive), so the answer cannot say what to do |
 
 Note on #395 (open): new evidence (probe). The appended row itself is dropped once the ring holds only problem rows, so
 "harmless since `f6f8a91`" holds for sequential execution only; linked to #474. The fix design is in the local report.

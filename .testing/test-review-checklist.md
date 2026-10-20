@@ -1013,8 +1013,8 @@ Report-only pass; full detail in the git-ignored
 read-only deep-reads and **46 serial main-thread probes — 43 survived (T138–T156), 3
 controls red**; all 40 PHP survivors applied together leave the full suite green at the
 unchanged count, the 3 JS survivors likewise. **One latent bug** (T141 → `/code-review`);
-one code lead (the log ability's empty reason on plugin-code failed rows) and one
-upstream lead (`wc_get_orders` customer-array shape, unregistered) routed.
+one code lead (the log ability's empty reason on plugin-code failed rows → `.security` #527, fixed) and one
+upstream lead (`wc_get_orders` customer-array shape → U191, registered) routed.
 
 **Closed the same session (T138–T157)** on the maintainer's go-ahead, with three parallel agents split by test-file ownership. **One production change:** T141 (the token path no longer records the no-OpenSSL error; red before the fix; the unreleased service-accounts bullet edited in both files). PHP 3577/20211 → **3629/20825**, declaration + 4 seeds identical (1792501768 / 836 / 900 / 966); JS 1063 → **1068**; `phpcs` exit 0; `lint:js` clean; `build/` byte-identical. **All 43 original survivors re-probed red**, plus 17 extra mutations the agents added. T157 was found and fixed while closing T154: a pin the report had called verified-solid was vacuous.
 
