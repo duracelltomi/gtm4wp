@@ -569,7 +569,10 @@ final class ProductData {
 		 * @param array  $order_data An associative array containing all data (head data and products) about the currently placed order.
 		 * @param WC_Order $order       The WooCommerce order object.
 		 */
-		return apply_filters( GTM4WP_WPFILTER_EEC_ORDER_DATA, $order_data, $order );
+		$order_data = apply_filters( GTM4WP_WPFILTER_EEC_ORDER_DATA, $order_data, $order );
+
+		// A filter returning a non-array leaves orderData out rather than stopping the page (#529).
+		return is_array( $order_data ) ? $order_data : array();
 	}
 
 	/**
@@ -630,7 +633,10 @@ final class ProductData {
 		 * @param array $data_layer An associative array containing the full data layer including purchase header attributes.
 		 * @param WC_Order $order The WooCommerce order that needs to be transformed into an ecommerce data layer.
 		 */
-		return apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer, $order );
+		$data_layer = apply_filters( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER, $data_layer, $order );
+
+		// A filter returning a non-array drops the purchase rather than stopping the page (#529).
+		return is_array( $data_layer ) ? $data_layer : array();
 	}
 
 	/**

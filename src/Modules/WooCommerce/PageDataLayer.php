@@ -280,6 +280,11 @@ final class PageDataLayer {
 				$cart_item_data
 			);
 
+			// An item filter can drop the line (false) or return nothing (#529).
+			if ( ! is_array( $eec_product_array ) ) {
+				continue;
+			}
+
 			unset( $eec_product_array['internal_id'] );
 
 			$data_layer['cartContent']['items'][] = $eec_product_array;
@@ -317,6 +322,9 @@ final class PageDataLayer {
 			'productdetail'
 		);
 
+		// An item filter that drops the product skips only the view_item push (#529).
+		$has_item = is_array( $eec_product_array );
+
 		$data_layer['productRatingCounts']  = $product->get_rating_counts();
 		$data_layer['productAverageRating'] = (float) $product->get_average_rating();
 		$data_layer['productReviewCount']   = (int) $product->get_review_count();
@@ -326,7 +334,7 @@ final class PageDataLayer {
 		// visitor came from is never baked into the HTML; the push is wrapped in a JS
 		// call that merges it from the first-party cookie, keyed by the product id
 		// internal_id carries (the same value the client-side variation path uses).
-		$list_product_id   = $eec_product_array['internal_id'] ?? $postid;
+		$list_product_id   = $has_item ? ( $eec_product_array['internal_id'] ?? $postid ) : $postid;
 		$list_wrapper      = '';
 		$list_wrapper_args = array();
 
@@ -339,7 +347,7 @@ final class PageDataLayer {
 			case 'variable':
 				$data_layer['productIsVariable'] = 1;
 
-				if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT ) ) {
+				if ( $has_item && true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT ) ) {
 					$gtm4wp_currency = get_woocommerce_currency();
 					unset( $eec_product_array['internal_id'] );
 
@@ -370,6 +378,10 @@ final class PageDataLayer {
 
 			default:
 				$data_layer['productIsVariable'] = 0;
+
+				if ( ! $has_item ) {
+					break;
+				}
 
 				$gtm4wp_currency = get_woocommerce_currency();
 				unset( $eec_product_array['internal_id'] );
@@ -438,6 +450,10 @@ final class PageDataLayer {
 				$cart_item_data
 			);
 
+			if ( ! is_array( $eec_product_array ) ) {
+				continue;
+			}
+
 			unset( $eec_product_array['internal_id'] );
 
 			$gtm4wp_cart_products[] = $eec_product_array;
@@ -481,16 +497,15 @@ final class PageDataLayer {
 
 		$cart_item = $woo->cart->get_cart_item( $cart_readded_hash );
 
-		if ( ! empty( $cart_item ) ) {
-			$product = $cart_item['data'];
+		$eec_product_array = empty( $cart_item ) ? null : $this->product_data->process_product(
+			$cart_item['data'],
+			$this->cart_line_attributes( $cart_item ),
+			'readdedtocart',
+			$cart_item
+		);
 
-			$eec_product_array = $this->product_data->process_product(
-				$product,
-				$this->cart_line_attributes( $cart_item ),
-				'readdedtocart',
-				$cart_item
-			);
-
+		// The marker is cleared below either way, so a dropped item is not retried.
+		if ( is_array( $eec_product_array ) ) {
 			$gtm4wp_currency = get_woocommerce_currency();
 			unset( $eec_product_array['internal_id'] );
 
@@ -553,6 +568,10 @@ final class PageDataLayer {
 				'checkout',
 				$cart_item_data
 			);
+
+			if ( ! is_array( $eec_product_array ) ) {
+				continue;
+			}
 
 			unset( $eec_product_array['internal_id'] );
 
@@ -913,8 +932,12 @@ final class PageDataLayer {
 
 		// Raw order data will be output regardless of whether the purchase has been already tracked previously, since this data is not meant to track using GA.
 		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERDATA ) ) {
-			$order_items             = $this->product_data->process_order_items( $order );
-			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
+			$order_items = $this->product_data->process_order_items( $order );
+			$order_data  = $this->product_data->get_raw_order_datalayer( $order, $order_items );
+
+			if ( array() !== $order_data ) {
+				$data_layer['orderData'] = $order_data;
+			}
 
 			// Dropped after the GTM4WP_WPFILTER_EEC_ORDER_DATA filter so the filter
 			// keeps seeing its usual shape; a filter that copied billing details onto
@@ -978,10 +1001,12 @@ final class PageDataLayer {
 		// Flag only a purchase that will really be printed: a filter can drop
 		// `event` or inject an unencodable value, and a flagged order is
 		// suppressed for good (#412).
-		$queued = '' !== (string) ( $purchase_data_layer['event'] ?? '' )
+		// `event` is tested, never cast: an object would be fatal (RI-39, #530).
+		$event  = $purchase_data_layer['event'] ?? null;
+		$queued = is_string( $event ) && '' !== $event
 			&& DataLayer::encodes( $purchase_data_layer )
 			&& $this->datalayer->queue_push(
-				(string) $purchase_data_layer['event'],
+				$event,
 				$purchase_data_layer,
 				$before_purchase_dl_push . $this->clear_ecommerce_js(),
 				$after_purchase_dl_push
@@ -1274,6 +1299,10 @@ final class PageDataLayer {
 			'readdedtocart',
 			$cart_item
 		);
+
+		if ( ! is_array( $eec_product_array ) ) {
+			return null;
+		}
 
 		unset( $eec_product_array['internal_id'] );
 

@@ -227,6 +227,25 @@ final class PurchaseTrackingTest extends TestCase {
 	 * that no raw break-out or upstream entity-encoding survives. Break-out chars are
 	 * written with \xNN so no literal char appears in this file (TC-2).
 	 */
+	/**
+	 * #529 on a third-party thank-you page: a non-array order-data filter return
+	 * leaves orderData out instead of stopping the page.
+	 */
+	public function test_a_non_array_order_data_filter_return_leaves_order_data_out(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ORDER_DATA )->andReturn( false );
+
+		$output = $this->run_thankyou(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+			),
+			$this->make_order()
+		);
+
+		$this->assertStringNotContainsString( '"orderData"', $output );
+		$this->assertStringContainsString( '"event":"purchase"', $output );
+	}
+
 	public function test_order_data_branch_hex_encodes_hostile_billing_and_coupon(): void {
 		// \x3C < , \x3E > , \x22 " , \x26 &
 		$order = $this->make_order(

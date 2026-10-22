@@ -82,8 +82,11 @@ final class PurchaseTracking {
 		// Raw order data will be output regardless of whether the purchase has been already tracked previously, since this data is not meant to track using GA.
 		if ( isset( $order ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERDATA ) ) {
 			$order_items = $this->product_data->process_order_items( $order );
+			$order_data  = $this->product_data->get_raw_order_datalayer( $order, $order_items );
 
-			$data_layer['orderData'] = $this->product_data->get_raw_order_datalayer( $order, $order_items );
+			if ( array() !== $order_data ) {
+				$data_layer['orderData'] = $order_data;
+			}
 		}
 
 		// The canonical eligibility gauntlet; the separate age check above only

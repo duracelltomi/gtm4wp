@@ -281,7 +281,8 @@ final class PageDataLayer {
 				DownloadData::cart_item_price_id( $cart_item_details )
 			);
 
-			if ( ! $eec_product_array ) {
+			// An item filter can drop the line (false) or return nothing (#529).
+			if ( ! $eec_product_array || ! is_array( $eec_product_array ) ) {
 				continue;
 			}
 
@@ -348,7 +349,7 @@ final class PageDataLayer {
 			'productdetail'
 		);
 
-		if ( ! $eec_product_array ) {
+		if ( ! $eec_product_array || ! is_array( $eec_product_array ) ) {
 			return $data_layer;
 		}
 
@@ -666,8 +667,12 @@ final class PageDataLayer {
 		// Raw order data will be output regardless of whether the purchase has been
 		// already tracked previously, since this data is not meant to track using GA.
 		if ( $on_confirmation_page && $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA ) ) {
-			$order_items             = $this->download_data->process_order_items( $order );
-			$data_layer['orderData'] = $this->download_data->get_raw_order_datalayer( $order, $order_items );
+			$order_items = $this->download_data->process_order_items( $order );
+			$order_data  = $this->download_data->get_raw_order_datalayer( $order, $order_items );
+
+			if ( array() !== $order_data ) {
+				$data_layer['orderData'] = $order_data;
+			}
 
 			// Identity line, as in the WooCommerce module: dropped after the filter
 			// so third-party code sees the usual shape; only 'customer' is withheld.
@@ -706,10 +711,12 @@ final class PageDataLayer {
 		}
 
 		// Flag only a purchase that will really be printed (#514, the #412 sibling).
-		$queued = '' !== (string) ( $purchase_data_layer['event'] ?? '' )
+		// `event` is tested, never cast: an object would be fatal (RI-39, #530).
+		$event  = $purchase_data_layer['event'] ?? null;
+		$queued = is_string( $event ) && '' !== $event
 			&& DataLayer::encodes( $purchase_data_layer )
 			&& $this->datalayer->queue_push(
-				(string) $purchase_data_layer['event'],
+				$event,
 				$purchase_data_layer,
 				$before_purchase_dl_push . $this->clear_ecommerce_js(),
 				$after_purchase_dl_push

@@ -1176,8 +1176,8 @@ report.
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
 | 528 | Medium | open | A3 (unintended) | Data Manager `ReceiptPage` | Receipt-page attribution backfill is not limited to the buyer; detail in the local report |
-| 529 | Low | open | site code | `Ecommerce\Helpers::line_value()`, WC cart loops | A non-array item now stops the cart and checkout render (regression of the #415 fix) |
-| 530 | Low | open | site code | WC + EDD purchase render | `(string)` cast on a filtered event (RI-39 recurrence, #412/#514 fix) |
+| 529 | Low | fixed (R54 fix session: every item site in both stores checks for an array, both purchase and both order-data builders return an array; a `Fixed:` bullet for the shipped WooCommerce half; 9 tests red before the fix) | site code | `Ecommerce\Helpers::line_value()`, WC cart loops | A non-array item now stops the cart and checkout render (regression of the #415 fix) |
+| 530 | Low | fixed (R54 fix session: `event` tested with `is_string()` in both stores) | site code | WC + EDD purchase render | `(string)` cast on a filtered event (RI-39 recurrence, #412/#514 fix) |
 | 531 | Low | open | — | WC variation tracker JS; 2.1 changelog bullet | #526 incomplete for variable products; the bullet overclaims |
 | 532 | Low | open | — | Data Manager `WooCommerceRefunds::figures()` | A refunded negative fee raises the line-based refund value |
 | 533 | Low | open | — | EDD `DownloadData::basis_price()` | Tax rounding differs from the cart on EDD 3.3.6+ for some currencies; U189 (4) wrong |
@@ -1239,6 +1239,7 @@ report.
 | 589 | Low | open | D1 → third party | Plugin diagnostics skill | Can publish transcript-derived text |
 | 590 | Low | fixed (ledger corrected; `code-review.md` wording) | — | `code-review.md` PA-19 text, toolchain ledger | Pin wording contradicts itself; two ledger figures wrong |
 | 591 | Low | fixed (this ledger update) | A4 | Public Surface Inventory, matrix labels | Replace-key route unlisted; backfill row text stale |
+| 592 | Low | open | site code | WC `PurchaseTracking`, WC + EDD one-shot purchase resolvers | Purchase payload printed or flagged without checking `event` (#412 sibling; found by the #529 fix) |
 
 ### Report 53: `.security/code-review-report-2026-10-19-1004.md`
 

@@ -988,6 +988,11 @@ Adding `: string` over a value that has passed through somebody's filter (`get_*
   (`line_value( array $item )`) to a helper fed by filter output. A parameter type is a cast that throws: a null that
   used to warn now stops the checkout page. Check both directions: a new `: type` return and a new typed parameter on
   anything a filter's output reaches. Ledger at R54: **2** sites (both open).
+- **After the R54 fix session (#529, #530):** the family was wider than the report: 8 item sites across both stores
+  read the item builder's filtered output unchecked, and 4 typed builders (`get_purchase_datalayer()`,
+  `get_raw_order_datalayer()`, both stores) returned a filter's output raw. All guarded with `is_array()` /
+  `is_string()`. Re-derive the builder half with a scan for `return apply_filters(` inside a function declaring
+  a scalar or array return type with no cast: **0** at R54.
 
 ### RI-40: A diagnostic that reads the ABSENCE of a row as a cause must enumerate every consumer exit that writes no row
 "Nothing newer than the queued row after N seconds, so the queue never ran" holds only if every path the job takes after it runs leaves a newer row. Data Manager's `RefundSender::run()` had at least three silent exits (sending switched off, a destination in `only` removed from settings, a whole-refund job for an already-sent refund), so the label blamed the queue for jobs that had run, and the replay it offered fed the `is_sent` exit and looped (#388).

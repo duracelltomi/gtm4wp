@@ -596,6 +596,41 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->assertStringContainsString( '"value":0', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
 	}
 
+	/**
+	 * #529: an item filter returning a truthy non-array drops the line on the
+	 * cart page and the view_item on the download page instead of stopping them.
+	 */
+	public function test_an_item_filter_returning_a_non_array_drops_the_item(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturn( 'dropped' );
+
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
+		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '[download_cart]' ) );
+		Functions\when( 'has_shortcode' )->alias(
+			static fn ( $content, $shortcode ) => str_contains( (string) $content, '[' . $shortcode . ']' )
+		);
+		Functions\when( 'edd_get_cart_content_details' )->justReturn(
+			array(
+				array(
+					'id'       => 55,
+					'quantity' => 1,
+					'price'    => 9.99,
+					'tax'      => 0.0,
+					'discount' => 0.0,
+				),
+			)
+		);
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+		$this->assertStringNotContainsString( '"event":"view_cart"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+		$this->inline_scripts = array();
+
+		$this->make_page_datalayer()->add_datalayer_data( array() );
+		$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+	}
+
 	public function test_view_cart_fires_on_the_full_cart_block_page(): void {
 		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => '' === $type );
 		Functions\when( 'get_post' )->justReturn( $this->make_post_with_content( '<!-- wp:edd/cart {"mini":false} /-->' ) );
@@ -814,8 +849,13 @@ final class EddPageDataLayerTest extends TestCase {
 		);
 
 		foreach ( array(
-			'unencodable' => static fn ( $dl ) => array( 'value' => NAN ) + $dl,
-			'no event'    => static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ),
+			'unencodable'       => static fn ( $dl ) => array( 'value' => NAN ) + $dl,
+			'no event'          => static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ),
+			// #530: the event is tested, never cast; #529: a non-array payload.
+			'object event'      => static fn ( $dl ) => array( 'event' => new \stdClass() ) + $dl,
+			'array event'       => static fn ( $dl ) => array( 'event' => array( 'purchase' ) ) + $dl,
+			'int event'         => static fn ( $dl ) => array( 'event' => 7 ) + $dl,
+			'non-array payload' => static fn ( $dl ) => false,
 		) as $label => $filter ) {
 			$writes = array();
 			Functions\when( 'edd_update_order_meta' )->alias(
@@ -831,6 +871,7 @@ final class EddPageDataLayerTest extends TestCase {
 			$this->assertSame( $before + 1, $calls, $label . ': precondition, the purchase was built.' );
 			$this->assertNotContains( EcommerceHelpers::ORDER_TRACKED_META, $writes, $label );
 			$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), $label . ': no browser guard either.' );
+			$this->assertStringNotContainsString( '"transaction_id"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), $label . ': nothing printed.' );
 		}
 	}
 
@@ -1228,6 +1269,24 @@ final class EddPageDataLayerTest extends TestCase {
 		$this->make_page_datalayer()->add_datalayer_data( array() );
 
 		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output() );
+	}
+
+	/**
+	 * #529: an order-data filter returning a non-array leaves orderData out.
+	 */
+	public function test_a_non_array_order_data_filter_return_leaves_order_data_out(): void {
+		Functions\when( 'edd_is_success_page' )->justReturn( true );
+		$_GET['payment_key'] = 'pk_super_secret_key';
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_EDD_ORDER_DATA )->andReturn( false );
+
+		$data_layer = $this->make_page_datalayer(
+			array( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA => true )
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayNotHasKey( 'orderData', $data_layer );
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output() );
 	}
 
 	public function test_untrackable_status_skips_the_purchase_but_keeps_order_data(): void {
