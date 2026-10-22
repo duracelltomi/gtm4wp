@@ -55,8 +55,22 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		// EDD would show this visitor the receipt unless a test says otherwise (#480).
 		Functions\when( 'edd_can_view_receipt' )->justReturn( true );
 
-		// A logged-out visitor unless a test says otherwise.
+		// A logged-out visitor without capabilities unless a test says otherwise.
 		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+		Functions\when( 'current_user_can' )->justReturn( false );
+		Functions\when( 'edd_get_purchase_session' )->justReturn( null );
+	}
+
+	/**
+	 * Makes the current user hold exactly one capability.
+	 *
+	 * @param string $cap     The capability.
+	 * @param int    $user_id The user id.
+	 * @return void
+	 */
+	private function as_user_with( string $cap, int $user_id ): void {
+		Functions\when( 'get_current_user_id' )->justReturn( $user_id );
+		Functions\when( 'current_user_can' )->alias( static fn ( $asked ) => $cap === $asked );
 	}
 
 	protected function tearDown(): void {
@@ -225,6 +239,31 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null );
 	}
 
+	/**
+	 * #528: staff pass WooCommerce's order gate, but their browser is not the
+	 * buyer's, so a guest order opened by a shop manager is not offered.
+	 */
+	public function test_no_flag_for_staff_viewing_a_guest_order(): void {
+		$this->given_wc_receipt_page();
+		$this->as_user_with( 'read_private_shop_orders', 3 );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	/**
+	 * #528, the other direction: staff viewing their own order, and a logged-in
+	 * buyer without the capability viewing a guest order, are still offered.
+	 */
+	public function test_flags_staff_viewing_their_own_order_and_a_logged_in_buyer(): void {
+		$this->given_wc_receipt_page( array(), 'now', 3 );
+		$this->as_user_with( 'read_private_shop_orders', 3 );
+		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null, 'Staff buying for themselves.' );
+
+		$this->given_wc_receipt_page();
+		$this->as_user_with( 'read', 9 );
+		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null, 'A logged-in buyer of a guest order.' );
+	}
+
 	// ---- Easy Digital Downloads --------------------------------------------
 
 	/**
@@ -251,6 +290,34 @@ final class GoogleDataManagerReceiptPageTest extends TestCase {
 
 	public function test_flags_a_six_day_old_edd_order(): void {
 		$this->given_edd_receipt_page( array( 'date_created' => gmdate( 'Y-m-d H:i:s', time() - 6 * DAY_IN_SECONDS ) ) );
+
+		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null );
+	}
+
+	/**
+	 * #528: EDD shows staff every receipt (its View Receipt row action), but the
+	 * staff browser is not the buyer's, so it is not offered the backfill.
+	 */
+	public function test_no_edd_flag_for_staff_viewing_a_buyers_receipt(): void {
+		$this->given_edd_receipt_page(
+			array(
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+				'user_id'      => 7,
+			)
+		);
+		$this->as_user_with( 'edit_shop_payments', 3 );
+
+		$this->assertNull( ReceiptPage::backfill_config() );
+	}
+
+	public function test_flags_edd_staff_viewing_their_own_receipt(): void {
+		$this->given_edd_receipt_page(
+			array(
+				'date_created' => gmdate( 'Y-m-d H:i:s' ),
+				'user_id'      => 3,
+			)
+		);
+		$this->as_user_with( 'edit_shop_payments', 3 );
 
 		$this->assertSame( '42', ReceiptPage::backfill_config()['order'] ?? null );
 	}

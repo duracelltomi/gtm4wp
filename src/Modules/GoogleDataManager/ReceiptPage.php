@@ -85,8 +85,11 @@ final class ReceiptPage {
 
 		// Only for a visitor WooCommerce itself would show this order to, and
 		// inside the backfill window (#480). The session the gate reads exists
-		// here, not on the REST route.
-		if ( WooPageDataLayer::woocommerce_hides_order_from_visitor( $order ) || ! BackfillEndpoint::within_window( $order->get_date_created() ) ) {
+		// here, not on the REST route. Staff pass that gate, so they are refused
+		// apart: their browser is not the buyer's (#528).
+		if ( WooPageDataLayer::woocommerce_hides_order_from_visitor( $order )
+			|| WooPageDataLayer::is_staff_viewing_order( $order )
+			|| ! BackfillEndpoint::within_window( $order->get_date_created() ) ) {
 			return null;
 		}
 
@@ -135,10 +138,11 @@ final class ReceiptPage {
 
 		$order_id = (int) ( $order->id ?? 0 );
 
-		// Only for a visitor EDD itself would show the receipt to, and inside the
-		// backfill window (#480).
+		// Only for a visitor EDD itself would show the receipt to, never staff
+		// viewing a buyer's receipt (#528), and inside the backfill window (#480).
 		if ( $order_id <= 0
 			|| ! function_exists( 'edd_can_view_receipt' ) || ! edd_can_view_receipt( $payment_key )
+			|| EddPageDataLayer::is_staff_viewing_receipt( $order, $payment_key )
 			|| ! BackfillEndpoint::within_window( (string) ( $order->date_created ?? '' ) ) ) {
 			return null;
 		}

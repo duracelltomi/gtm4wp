@@ -525,14 +525,16 @@ final class PageDataLayer {
 	 * Whether shop staff opened somebody else's receipt (EDD's "View Receipt"
 	 * row action links the success page with ?id=&order=): the purchase must
 	 * neither fire from their browser nor be flagged, or the buyer's own is
-	 * lost for good (#512). The buyer is the order's user or holds it in their
-	 * purchase session.
+	 * lost for good (#512), and the attribution backfill must not stamp their
+	 * browser's identifiers on the order (#528). The buyer is the order's user
+	 * or holds it in their purchase session. The WooCommerce twin is
+	 * WooCommerce\PageDataLayer::is_staff_viewing_order().
 	 *
-	 * @param \EDD\Orders\Order $order       The resolved order.
-	 * @param string            $payment_key Its payment key.
+	 * @param object $order       The resolved order.
+	 * @param string $payment_key Its payment key.
 	 * @return bool
 	 */
-	private static function is_staff_viewing_receipt( \EDD\Orders\Order $order, string $payment_key ): bool {
+	public static function is_staff_viewing_receipt( object $order, string $payment_key ): bool {
 		if ( ! function_exists( 'current_user_can' ) || ! current_user_can( 'edit_shop_payments' ) ) {
 			return false;
 		}

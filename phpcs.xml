@@ -18,6 +18,7 @@
 		<properties>
 			<property name="custom_capabilities" type="array">
 				<element value="edit_shop_payments"/>
+				<element value="read_private_shop_orders"/>
 			</property>
 		</properties>
 	</rule>

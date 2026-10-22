@@ -1207,9 +1207,11 @@ by design, so "this visitor may see the receipt" is a wider set than "this visit
   the buyer's), ask who passes the borrowed predicate besides the owner: staff capabilities, grace windows, filters.
   Add the ownership half yourself, scoped to the staff path, so a logged-in owner of a guest record still passes.
 - Same family as **RI-26** (a borrowed predicate moves with the site) and **PA-10** (record ownership).
-- Ledger at R54: **4** consumers of a receipt-visibility gate: `ReceiptPage` WC and EDD (#528, open); EDD
-  `PageDataLayer` purchase render (staff rule since #512); WC `PageDataLayer` purchase render (staff rule
-  unexamined).
+- Ledger at R54: **4** consumers of a receipt-visibility gate: `ReceiptPage` WC and EDD (staff rule since the R54
+  fix, #528); EDD `PageDataLayer` purchase render (staff rule since #512); WC `PageDataLayer` purchase render
+  (staff rule unexamined). One staff rule per store: `WooCommerce\PageDataLayer::is_staff_viewing_order()`,
+  `EasyDigitalDownloads\PageDataLayer::is_staff_viewing_receipt()`. Not covered by the receipt gate: an order
+  staff create or pay themselves, whose browser is captured at order time (#528, open).
   Re-derive with `grep -rn "edd_can_view_receipt\|woocommerce_hides_order_from_visitor(\|is_staff_viewing_receipt" src`.
 
 ### PA-7: Data-bearing string as a `preg_replace` *replacement* argument ⭐

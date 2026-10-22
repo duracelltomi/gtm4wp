@@ -856,6 +856,26 @@ final class PageDataLayer {
 	}
 
 	/**
+	 * Whether shop staff opened somebody else's order-received page. WooCommerce
+	 * lets `read_private_shop_orders` past its order gate, so "may see it" is not
+	 * "is the buyer" (PA-23): the attribution backfill must not stamp the staff
+	 * browser's identifiers on the order (#528). The EDD twin is
+	 * EasyDigitalDownloads\PageDataLayer::is_staff_viewing_receipt().
+	 *
+	 * @param \WC_Order $order The order being shown.
+	 * @return bool
+	 */
+	public static function is_staff_viewing_order( \WC_Order $order ): bool {
+		if ( ! function_exists( 'current_user_can' ) || ! current_user_can( 'read_private_shop_orders' ) ) {
+			return false;
+		}
+
+		$customer_id = (int) $order->get_customer_id();
+
+		return ! ( $customer_id > 0 && get_current_user_id() === $customer_id );
+	}
+
+	/**
 	 * Reliable purchase tracking fallback: when "purchase on any page" is on and the
 	 * order-received page did not fire the purchase this request, emit it for the
 	 * order remembered in the session (PurchaseTracking::remember_order()) on the

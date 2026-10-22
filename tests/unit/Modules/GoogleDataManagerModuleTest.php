@@ -50,6 +50,10 @@ final class GoogleDataManagerModuleTest extends TestCase {
 		$this->enqueued = array();
 		$this->inline   = array();
 
+		// The receipt page asks whether the viewer is staff (#528): a visitor
+		// without capabilities here, stubbed in this file (TS-16).
+		Functions\when( 'current_user_can' )->justReturn( false );
+
 		// Brain Monkey defines a stubbed WC()/EDD() process-wide and
 		// permanently, so whether this process "has WooCommerce" depends on
 		// which other test files ran. The namespaced shim makes that explicit
