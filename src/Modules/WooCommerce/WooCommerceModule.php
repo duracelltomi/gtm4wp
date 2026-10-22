@@ -303,7 +303,7 @@ final class WooCommerceModule extends AbstractModule {
 			$this->wraps_product_view_item() ? '' : 'defer'
 		);
 
-		$block_context = $this->block_cart_or_checkout_context();
+		$block_context = Helpers::block_cart_or_checkout_context();
 		if ( '' !== $block_context ) {
 			// The Cart & Checkout blocks never fire the classic jQuery events: load
 			// the block tracker instead of the classic one, so nothing is tracked twice.
@@ -467,20 +467,6 @@ final class WooCommerceModule extends AbstractModule {
 	 * @return bool
 	 */
 	public function is_block_cart_or_checkout(): bool {
-		return '' !== $this->block_cart_or_checkout_context();
-	}
-
-	/**
-	 * Which block surface the current page is: 'checkout', 'cart' or '' (neither).
-	 * Content-driven, never visitor-driven, so safe under full-page caching. The
-	 * two pages must stay distinct (the tracker cannot tell them apart by the
-	 * wc/store/payment store, which exists on the Cart page too, #463), and the
-	 * order-received page is excluded ahead of both arms because is_checkout() and
-	 * on some stores is_cart() are true there (see PageDataLayer::add_datalayer_data()).
-	 *
-	 * @return string
-	 */
-	private function block_cart_or_checkout_context(): string {
-		return Helpers::block_cart_or_checkout_context();
+		return '' !== Helpers::block_cart_or_checkout_context();
 	}
 }

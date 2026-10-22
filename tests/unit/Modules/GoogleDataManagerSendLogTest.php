@@ -80,15 +80,29 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 	 * sender's constant, not as a copy of its string.
 	 */
 	public function test_the_classified_skip_reasons_keep_their_stored_values(): void {
-		$replayable    = array(
+		$replayable = array(
 			'no_destination'    => RefundSender::REASON_NO_DESTINATION,
 			'consent_unknown'   => ConsentPolicy::REASON_UNKNOWN,
 			'consent_denied'    => ConsentPolicy::REASON_DENIED,
 			'vetoed'            => RefundSender::REASON_VETOED,
-			'platform_inactive' => RefundSender::REASON_PLATFORM_INACTIVE,
 			'refund_unreadable' => RefundSender::REASON_REFUND_UNREADABLE,
 			'not_production'    => RefundSender::REASON_NOT_PRODUCTION,
 		);
+
+		// An inactive platform is only ever written as failed, which stays
+		// replayable through the failed branch, not as a skip (#553).
+		$this->assertSame( 'platform_inactive', RefundSender::REASON_PLATFORM_INACTIVE );
+		$this->assertTrue(
+			SendLog::is_replayable(
+				self::entry(
+					array(
+						'outcome' => SendLog::OUTCOME_FAILED,
+						'reason'  => RefundSender::REASON_PLATFORM_INACTIVE,
+					)
+				)
+			)
+		);
+
 		$informational = array(
 			'already_sent'        => RefundSender::REASON_ALREADY_SENT,
 			'destination_removed' => RefundSender::REASON_DESTINATION_REMOVED,

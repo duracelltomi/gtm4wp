@@ -55,7 +55,8 @@ expresses. Rate findings against it like this:
   schedule (one popular plugin by default), so "the key goes unreadable" is an
   availability event to plan for, not only the result of a deliberate edit. It does
   not move the confidentiality boundary above. Since the R53 fixes the constant is
-  the mitigation (keys move to it on the first admin look), readability is found by
+  the mitigation (keys move to it on the first admin look or the first send, R54
+  #561), readability is found by
   trying each key, never persisted from a read path, and **Replace key** recovers an
   account under its id. Removing the constant after the move is the new way to lock
   the keys; the notice names it.
@@ -297,3 +298,4 @@ gap *is* the vulnerability class, whether it manifests as injection or exposure.
 | 2026-09-22 | **The ability surface** wording corrected (R34, #252): the example list of withheld values was fused into the general rule and contradicted the shipped edit surface (`get-settings`/`export-settings` return the GA4 property id and the environment tokens by design, and must - a table option is written whole). Split into the status/inventory rule (question 2) and the edit-surface rule. Verifier-measured: every mask is refused by the row sanitizers, and a masked export imports as an empty container table; the tokens are in every page's public loader URL, so withholding them from an A4 delegate protects nothing. |
 | 2026-10-20 | **The stored credential** follows the R53 fixes (#468/#469/#506): the optional constant in the derivation and the boundary, the read-time readability check, Replace key in the A4 → A4 rule. |
 | 2026-10-19 | **The stored credential** gained two bullets (R53): salts rotate without the admin (#469, an availability event, boundary unchanged) and the cached access token is an asset (#491). The send-log text contradiction (#509) is left open for its fix. |
+| 2026-10-22 | **The stored credential**: the migration also runs at the first send, not only on an admin look (R54, #561). |

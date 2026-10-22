@@ -78,12 +78,13 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			'The private key inside the file is stored encrypted, using the security keys defined in your wp-config.php file, and is never shown again or included in a settings export. The encryption only helps while your wp-config.php stays private: define the AUTH_KEY, SECURE_AUTH_KEY, AUTH_SALT and SECURE_AUTH_SALT constants there rather than letting WordPress keep generated values in the database. Changing those constants makes every stored key unreadable until you use Replace key on the account.',
 			'duracelltomi-google-tag-manager'
 		) . '</p><p>' . sprintf(
-			/* translators: %s: the constant name. */
+			/* translators: 1: the constant name, 2: the minimum number of characters. */
 			esc_html__(
-				'Some security plugins change those keys on a schedule. To avoid that, define %s in wp-config.php as a random text of at least 32 characters: stored keys move to it automatically. Keep it once defined, because removing it makes the keys unreadable again.',
+				'Some security plugins change those keys on a schedule. To avoid that, define %1$s in wp-config.php as a random text of at least %2$d characters: stored keys move to it automatically. Keep it once defined, because removing it makes the keys unreadable again.',
 				'duracelltomi-google-tag-manager'
 			),
-			'<code>GTM4WP_ENCRYPTION_KEY</code>'
+			'<code>' . esc_html( KeyVault::ENCRYPTION_KEY_CONSTANT ) . '</code>',
+			KeyVault::ENCRYPTION_KEY_MIN_LENGTH
 		) . '</p><p>' . esc_html__(
 			'This section is experimental. Stored accounts are used by the Google Data Manager section, where each destination picks the account it sends with; nothing is sent anywhere until a feature there is turned on.',
 			'duracelltomi-google-tag-manager'

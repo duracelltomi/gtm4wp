@@ -291,8 +291,9 @@ final class BackfillEndpoint {
 	/**
 	 * Whether an order is recent enough to backfill: the receipt URL is a
 	 * durable secret, so after the window a shared or leaked link, or a buyer
-	 * revisiting it, fills nothing, and an erased order is not re-filled (#480).
-	 * An unreadable date refuses.
+	 * revisiting it, fills nothing (#480). Inside it an erased order can be
+	 * re-filled. EDD resets the creation date on a resumed payment, so its
+	 * window restarts; a future date keeps it open. An unreadable date refuses.
 	 *
 	 * @param mixed $created The order's creation date: a DateTimeInterface, or EDD's UTC string.
 	 * @return bool

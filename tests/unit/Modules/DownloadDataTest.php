@@ -864,8 +864,10 @@ final class DownloadDataTest extends TestCase {
 		$download_data = $this->make_download_data();
 
 		// Offsite gateways can land the buyer on the confirmation page while the
-		// order is still pending, so the lenient default counts it once, there.
-		$this->assertTrue( $download_data->is_order_status_trackable( $this->make_order( array( 'status' => 'pending' ) ) ) );
+		// order is still pending, so the lenient default counts it once, there;
+		// a caller that does not say it is on that page gets no pending (#546).
+		$this->assertTrue( $download_data->is_order_status_trackable( $this->make_order( array( 'status' => 'pending' ) ), true ) );
+		$this->assertFalse( $download_data->is_order_status_trackable( $this->make_order( array( 'status' => 'pending' ) ) ) );
 		$this->assertTrue( $download_data->is_order_status_trackable( $this->make_order( array( 'status' => 'processing' ) ) ) );
 		$this->assertTrue( $download_data->is_order_status_trackable( $this->make_order( array( 'status' => 'complete' ) ) ) );
 

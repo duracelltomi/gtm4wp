@@ -190,7 +190,6 @@ final class KeyVault {
 			'label'          => ( '' === $label ) ? $key->client_email : $label,
 			'client_email'   => $key->client_email,
 			'private_key_id' => $key->private_key_id,
-			'token_uri'      => $key->token_uri,
 			'uploaded_at'    => $this->now(),
 			'status'         => self::STATUS_UNVERIFIED,
 			'last_checked'   => 0,
@@ -327,7 +326,6 @@ final class KeyVault {
 			$id,
 			array(
 				'private_key_id' => $key->private_key_id,
-				'token_uri'      => $key->token_uri,
 				'uploaded_at'    => $this->now(),
 				'status'         => self::STATUS_UNVERIFIED,
 				'last_checked'   => 0,
@@ -430,7 +428,7 @@ final class KeyVault {
 	 * Tries an account's key without handing it out: 'readable', 'unreadable',
 	 * or 'unknown' when this server cannot decrypt at all (no OpenSSL, #497).
 	 * A key still sealed with the salts while the constant is in use is
-	 * resealed under the constant here, on the first admin look (#469).
+	 * resealed under the constant here, on an admin look (#469); see migrate().
 	 *
 	 * @param string               $id      Account id.
 	 * @param array<string, mixed> $account Stored account.
@@ -453,9 +451,12 @@ final class KeyVault {
 	}
 
 	/**
-	 * Reseals a key opened with the salts under the constant, once it is in use.
-	 * Written only while the stored blob is still the one opened, so a key
-	 * replaced before the re-read is not overwritten with the old one.
+	 * Reseals a key opened with the salts under the constant, once it is in use:
+	 * on the first admin look (trial()) or the first send (open()), whichever
+	 * comes first. Written only while the stored blob is still the one opened, so
+	 * a key replaced before the re-read is not overwritten with the old one; a
+	 * replace landing between the re-read and the write is the residual the
+	 * write_fields() note accepts (#558).
 	 *
 	 * @param string                             $id       Account id.
 	 * @param array{pem: string, secret: string} $unsealed The key and the secret it opened with.

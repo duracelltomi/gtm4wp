@@ -1003,7 +1003,7 @@ final class ProductData {
 	 * @param \WC_Order $order The order.
 	 * @return array{value: float, total: float, exclude_tax: bool, exclude_shipping: bool, item_inc_tax: bool}
 	 */
-	public function current_purchase_basis( \WC_Order $order ): array {
+	private function current_purchase_basis( \WC_Order $order ): array {
 		$exclude_tax      = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX );
 		$exclude_shipping = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING );
 		$total            = (float) $order->get_total();

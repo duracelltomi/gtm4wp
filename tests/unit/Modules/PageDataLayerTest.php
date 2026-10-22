@@ -3034,7 +3034,7 @@ final class PageDataLayerTest extends TestCase {
 	 * content. Reported on the wordpress.org forum, where the checkout page emitted
 	 * view_cart and begin_checkout was never emitted anywhere, while the block
 	 * tracker fired the checkout steps on the same page because
-	 * WooCommerceModule::block_cart_or_checkout_context() resolves is_checkout()
+	 * Helpers::block_cart_or_checkout_context() resolves is_checkout()
 	 * first. The two halves have to answer the same way, and the checkout is the
 	 * more specific of the two states, so it wins.
 	 */

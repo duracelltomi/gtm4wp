@@ -651,12 +651,12 @@ final class PageDataLayer {
 	 *
 	 * @param array<string, mixed> $data_layer             The data layer collected so far.
 	 * @param \EDD\Orders\Order    $order                  The resolved order.
-	 * @param bool                 $with_raw_order_data    Whether this is the confirmation page: the raw orderData block, and a pending order counted (#471).
+	 * @param bool                 $on_confirmation_page   Whether this is the confirmation page: the raw orderData block, and a pending order counted (#471).
 	 * @param bool                 $withhold_customer_data Whether to leave out the customer identity blocks (EDD would not show this visitor the receipt).
 	 * @param bool                 $staff_view             Whether staff are viewing another buyer's receipt: orderData only, no purchase, no flag (#512).
 	 * @return array<string, mixed>
 	 */
-	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $with_raw_order_data = true, bool $withhold_customer_data = false, bool $staff_view = false ): array {
+	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $on_confirmation_page = true, bool $withhold_customer_data = false, bool $staff_view = false ): array {
 		if ( $this->download_data->is_order_older_than_max_age( $order ) ) {
 			return $data_layer;
 		}
@@ -665,7 +665,7 @@ final class PageDataLayer {
 
 		// Raw order data will be output regardless of whether the purchase has been
 		// already tracked previously, since this data is not meant to track using GA.
-		if ( $with_raw_order_data && $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA ) ) {
+		if ( $on_confirmation_page && $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDORDERDATA ) ) {
 			$order_items             = $this->download_data->process_order_items( $order );
 			$data_layer['orderData'] = $this->download_data->get_raw_order_datalayer( $order, $order_items );
 
@@ -680,7 +680,7 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		if ( ! $this->download_data->is_order_status_trackable( $order, $with_raw_order_data ) ) {
+		if ( ! $this->download_data->is_order_status_trackable( $order, $on_confirmation_page ) ) {
 			return $data_layer;
 		}
 

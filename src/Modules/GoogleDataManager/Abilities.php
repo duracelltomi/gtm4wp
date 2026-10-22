@@ -285,7 +285,8 @@ final class Abilities implements ProviderInterface {
 		$limit         = isset( $input['limit'] ) ? max( 1, min( self::MAX_LIMIT, (int) $input['limit'] ) ) : self::MAX_LIMIT;
 
 		// Google's error text stays on the settings screen: it can name the Cloud
-		// project, the identifier the abilities never return. The answer carries
+		// project, which the status answers never return (the two test abilities
+		// relay it capped, like the buttons they stand for, #259). The answer carries
 		// the error class instead, empty for a row written before the class was (#509).
 		$entries = array_map(
 			static function ( array $entry ): array {

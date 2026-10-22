@@ -20,7 +20,8 @@ defined( 'ABSPATH' ) || exit;
  * typically, #506), and a GTM4WP_ENCRYPTION_KEY that is defined but refused
  * (#469). Not dismissible: each is a live gap that clears itself once fixed.
  * Costs one non-autoloaded option read and one decryption attempt per account
- * per admin pageview for settings-capable users.
+ * per admin pageview for settings-capable users while every key opens; more
+ * while one does not (each secret is tried, and the labels take a second pass).
  */
 final class KeyNotice {
 

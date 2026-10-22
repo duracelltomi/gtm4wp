@@ -114,9 +114,9 @@ final class SiteHealth {
 			case 'rejected':
 				return SiteHealthRows::text(
 					$label,
-					/* translators: %s: the constant name. */
-					sprintf( __( 'WordPress security keys (%s is ignored: not a text of 32 or more characters)', 'duracelltomi-google-tag-manager' ), KeyVault::ENCRYPTION_KEY_CONSTANT ),
-					'WordPress security keys (' . KeyVault::ENCRYPTION_KEY_CONSTANT . ' is ignored: not a text of 32 or more characters)'
+					/* translators: 1: the constant name, 2: the minimum number of characters. */
+					sprintf( __( 'WordPress security keys (%1$s is ignored: not a text of %2$d or more characters)', 'duracelltomi-google-tag-manager' ), KeyVault::ENCRYPTION_KEY_CONSTANT, KeyVault::ENCRYPTION_KEY_MIN_LENGTH ),
+					'WordPress security keys (' . KeyVault::ENCRYPTION_KEY_CONSTANT . ' is ignored: not a text of ' . KeyVault::ENCRYPTION_KEY_MIN_LENGTH . ' or more characters)'
 				);
 			default:
 				return SiteHealthRows::text( $label, __( 'WordPress security keys', 'duracelltomi-google-tag-manager' ), 'WordPress security keys' );

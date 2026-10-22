@@ -225,7 +225,7 @@ final class SettingsStore {
 	 * registered fields: each option key maps to its REST value type, so a
 	 * caller can validate each value's type before it reaches the sanitizer.
 	 *
-	 * @return array<string, array<string, string>>
+	 * @return array<string, array<string, string|string[]>>
 	 */
 	public function value_schema(): array {
 		$properties = array();

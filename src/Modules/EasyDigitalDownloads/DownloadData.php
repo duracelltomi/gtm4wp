@@ -318,7 +318,7 @@ final class DownloadData {
 	 *
 	 * @return bool
 	 */
-	public function item_prices_include_tax(): bool {
+	private function item_prices_include_tax(): bool {
 		return ! $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX );
 	}
 
@@ -357,7 +357,7 @@ final class DownloadData {
 	 * @param int|null $price_id    The price option id, or null.
 	 * @return string
 	 */
-	public function price_option_name( int $download_id, ?int $price_id ): string {
+	private function price_option_name( int $download_id, ?int $price_id ): string {
 		if ( null === $price_id ) {
 			return '';
 		}
@@ -862,10 +862,10 @@ final class DownloadData {
 	 * they did not, e.g. an abandoned PayPal redirect (#471).
 	 *
 	 * @param \EDD\Orders\Order $order     The order to check.
-	 * @param bool              $confirmed Whether the buyer reached the confirmation page.
+	 * @param bool              $confirmed Whether the buyer reached the confirmation page; false counts no pending order.
 	 * @return bool
 	 */
-	public function is_order_status_trackable( \EDD\Orders\Order $order, bool $confirmed = true ): bool {
+	public function is_order_status_trackable( \EDD\Orders\Order $order, bool $confirmed = false ): bool {
 		if ( ! $confirmed && 'pending' === (string) self::row_prop( $order, 'status' ) ) {
 			return false;
 		}
@@ -953,7 +953,7 @@ final class DownloadData {
 	 * @param \EDD\Orders\Order $order The order.
 	 * @return array{value: float, total: float, exclude_tax: bool}
 	 */
-	public function current_purchase_basis( \EDD\Orders\Order $order ): array {
+	private function current_purchase_basis( \EDD\Orders\Order $order ): array {
 		$exclude_tax = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX );
 		$total       = (float) self::row_prop( $order, 'total', 0 );
 

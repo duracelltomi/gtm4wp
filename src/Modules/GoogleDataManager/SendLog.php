@@ -117,7 +117,6 @@ final class SendLog {
 		ConsentPolicy::REASON_UNKNOWN,
 		ConsentPolicy::REASON_DENIED,
 		RefundSender::REASON_VETOED,
-		RefundSender::REASON_PLATFORM_INACTIVE,
 		RefundSender::REASON_REFUND_UNREADABLE,
 		RefundSender::REASON_NOT_PRODUCTION,
 	);

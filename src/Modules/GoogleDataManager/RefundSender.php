@@ -31,7 +31,8 @@ defined( 'ABSPATH' ) || exit;
 final class RefundSender {
 
 	/**
-	 * Skip reason: the commerce platform that issued the refund is not active.
+	 * Failure reason: the commerce platform that issued the refund is not
+	 * active. Written only as `failed` by retry_or_fail(), never as a skip.
 	 */
 	public const REASON_PLATFORM_INACTIVE = 'platform_inactive';
 

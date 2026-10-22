@@ -21,9 +21,9 @@ defined( 'ABSPATH' ) || exit;
  * fresh first attempt at the destinations still missing it, and the sender
  * applies every gate again when the job runs. Each queued refund gets a
  * "queued" log row at once, so the list shows the click took effect and a
- * second click cannot queue it twice. The only check made here is
- * the lane's master switch, since a job queued while sending is off would be
- * dropped with no row to say so.
+ * second click cannot queue it twice. The checks made here are the lane's
+ * master switch, since a job queued while sending is off would be dropped
+ * with no row to say so, and named() refusing a list with no valid reference.
  */
 final class RefundReplay {
 
@@ -75,7 +75,7 @@ final class RefundReplay {
 		if ( array() === $references ) {
 			return new \WP_Error(
 				'gtm4wp_gdm_no_references',
-				__( 'None of the given references names a refund in the log, so nothing was queued.', 'duracelltomi-google-tag-manager' ),
+				__( 'None of the given references is a refund reference (platform:order:refund), so nothing was queued.', 'duracelltomi-google-tag-manager' ),
 				array( 'status' => 400 )
 			);
 		}

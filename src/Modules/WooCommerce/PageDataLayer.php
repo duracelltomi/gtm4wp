@@ -104,7 +104,7 @@ final class PageDataLayer {
 		// Arm order matters: is_cart() and is_checkout() can both be true (a theme
 		// defining WOOCOMMERCE_CART or a cart shortcode on the checkout page), so
 		// checkout is tested before cart, matching
-		// WooCommerceModule::block_cart_or_checkout_context(); order-received stays
+		// Helpers::block_cart_or_checkout_context(); order-received stays
 		// ahead of both because is_checkout() is true there too.
 		if ( is_product() ) {
 			$data_layer = $this->add_product_view( $data_layer );

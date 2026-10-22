@@ -340,8 +340,12 @@ final class Helpers {
 	}
 
 	/**
-	 * Which block surface the current page is: 'checkout', 'cart' or '' (neither);
-	 * see WooCommerceModule::block_cart_or_checkout_context().
+	 * Which block surface the current page is: 'checkout', 'cart' or '' (neither).
+	 * Content-driven, never visitor-driven, so safe under full-page caching. The
+	 * two pages must stay distinct (the tracker cannot tell them apart by the
+	 * wc/store/payment store, which exists on the Cart page too, #463), and the
+	 * order-received page is excluded ahead of both arms because is_checkout() and
+	 * on some stores is_cart() are true there (see PageDataLayer::add_datalayer_data()).
 	 *
 	 * @return string
 	 */
