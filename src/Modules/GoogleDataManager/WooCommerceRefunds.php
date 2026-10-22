@@ -189,19 +189,21 @@ final class WooCommerceRefunds implements RefundSource {
 	private static function figures( \WC_Order_Refund $refund ): array {
 		$line_money = 0.0;
 
+		// Summed signed, made positive once: a refunded discount fee is stored
+		// with the opposite sign of the other lines, so it lowers the sum (#532).
 		foreach ( $refund->get_items( array( 'line_item', 'shipping', 'fee' ) ) as $item ) {
 			if ( is_object( $item ) && method_exists( $item, 'get_total' ) ) {
-				$line_money += abs( (float) $item->get_total() );
+				$line_money += (float) $item->get_total();
 			}
 
 			if ( is_object( $item ) && method_exists( $item, 'get_total_tax' ) ) {
-				$line_money += abs( (float) $item->get_total_tax() );
+				$line_money += (float) $item->get_total_tax();
 			}
 		}
 
 		return array(
 			'amount'     => abs( (float) $refund->get_total() ),
-			'line_money' => $line_money,
+			'line_money' => abs( $line_money ),
 			'tax'        => abs( (float) $refund->get_total_tax() ),
 			'shipping'   => abs( (float) $refund->get_shipping_total() ),
 		);

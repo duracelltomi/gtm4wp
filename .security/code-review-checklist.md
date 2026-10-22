@@ -1179,7 +1179,7 @@ report.
 | 529 | Low | fixed (R54 fix session: every item site in both stores checks for an array, both purchase and both order-data builders return an array; a `Fixed:` bullet for the shipped WooCommerce half; 9 tests red before the fix) | site code | `Ecommerce\Helpers::line_value()`, WC cart loops | A non-array item now stops the cart and checkout render (regression of the #415 fix) |
 | 530 | Low | fixed (R54 fix session: `event` tested with `is_string()` in both stores) | site code | WC + EDD purchase render | `(string)` cast on a filtered event (RI-39 recurrence, #412/#514 fix) |
 | 531 | Low | open | — | WC variation tracker JS; 2.1 changelog bullet | #526 incomplete for variable products; the bullet overclaims |
-| 532 | Low | open | — | Data Manager `WooCommerceRefunds::figures()` | A refunded negative fee raises the line-based refund value |
+| 532 | Low | fixed (R54 fix session: lines summed signed and made positive once; U152 (3) corrected; 1 test red before the fix, 1 guard green by design) | — | Data Manager `WooCommerceRefunds::figures()` | A refunded negative fee raises the line-based refund value |
 | 533 | Low | open | — | EDD `DownloadData::basis_price()` | Tax rounding differs from the cart on EDD 3.3.6+ for some currencies; U189 (4) wrong |
 | 534 | Low | open | — | Data Manager `CaptureHooks` | A resumed order whose first pass stored nothing is counted twice |
 | 535 | Low | open | — | Data Manager `CaptureHooks` (EDD) | EDD resumed orders have none of the #481 handling |

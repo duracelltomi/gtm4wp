@@ -379,6 +379,48 @@ final class GoogleDataManagerWooRefundsTest extends TestCase {
 	}
 
 	/**
+	 * #532: a discount fee is negative on the order, so its refund line is
+	 * stored positive while the others are negative. It lowers the returned
+	 * money: 100 line - 10 fee + 20 shipping = 110, less 20 shipping = 90.
+	 */
+	public function test_a_refunded_discount_fee_lowers_the_line_based_value(): void {
+		$options = array( GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING => true );
+		$order   = self::order(
+			array(
+				'total'          => 200.0,
+				'shipping_total' => 20.0,
+			)
+		);
+		$refund  = self::refund(
+			110.0,
+			array( self::money_line( 100.0, 0.0 ), self::money_line( -10.0, 0.0 ), self::money_line( 20.0, 0.0 ) ),
+			array( 'shipping_total' => -20.0 )
+		);
+		$this->stub_orders( $order, $refund );
+
+		$this->assertSame( 90.0, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'] );
+	}
+
+	/**
+	 * Guard, green before and after #532 by design: a store keeping refund
+	 * lines positive reads the same value as one keeping them negated.
+	 */
+	public function test_refund_lines_stored_positive_read_the_same_value(): void {
+		$options = array(
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX      => true,
+			GTM4WP_OPTION_INTEGRATE_WCEXCLUDESHIPPING => true,
+		);
+		$refund  = self::refund(
+			60.0,
+			array( self::money_line( -50.0, 0.0 ), self::money_line( -10.0, 0.0 ) ),
+			array( 'shipping_total' => 10.0 )
+		);
+		$this->stub_orders( self::taxed_order(), $refund );
+
+		$this->assertSame( 50.0, RefundEvent::build( $this->adapter( $options )->load( 12, 34 ) )['conversionValue'] );
+	}
+
+	/**
 	 * A line refund followed by the status change to Refunded: the remainder
 	 * (no lines) is valued at what is left of the purchase value, so the two
 	 * net the purchase to zero. 132 = 100 + 22 tax + 10 shipping.
