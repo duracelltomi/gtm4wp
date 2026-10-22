@@ -354,7 +354,7 @@ Pair every **entry point** (a command or skill that ingests third-party text) wi
 - **Permissions.** Is each `permissions.allow` entry pinned to a verb *and* a path? A wildcard admitting state-changing verbs converts any successful injection into an unattended authenticated write. The enforced allowlist must be no wider than the write surface the skill *documents* — where prose and allowlist disagree, only the allowlist is real.
   - **Read every scope, not every file in one scope (PA-19, #162).** For 21 reviews this playbook named only the two project-scope files, and a pre-approved dispatcher sat unread in **user** scope the whole time. User scope is outside the repository, so no `git` command reaches it and no `.gitignore` entry advertises it the way the project-scope files at least do.
   - **A pinned command is not a safe command.** Pinning the *name* narrows nothing when the command is a **dispatcher**: `phpcs --standard=phpcs.xml .` names one binary and one ruleset and still executes whatever PHP a branch's ruleset `<autoload>`s. The question is never "is this entry specific?" but **"whose file does this ultimately execute?"** Pinning helps only when it pins the *resolved target* out of the worktree (an absolute path outside any checkout), and removing the pre-approval is the only form that closes it outright.
-- **Definitions — agents, skills, commands, hooks (PA-19, #186).** The scope rule above is not about permissions; it is about **anything assembled from more than one scope**, and for 23 reviews it was applied to permissions only. Count **per scope**, and record not just the file count but **how many declare a tool the repo-local set does not** — that is the figure that would have caught this (measured 2026-08-12: project **4** agents declaring **0** `Write`/`Edit`; **user scope 17** declaring **15**; one enabled plugin **7** declaring **2** — a ledger reading "4" against a reality of **28**). An agent's `tools:` **restricts and does not grant**, so this adds no reach by itself; the inventory is the point, because the next finding here will be in something nobody counted. Three counting traps: a **relative** path silently means project scope only; compiled artifacts (`__pycache__/*.pyc`) match these greps and inflate any file count; and a plugin's *content* moves under a *stable* name, so pin `version` + `gitCommitSha` from `installed_plugins.json` rather than the name. Anything under `~/.claude/` is the maintainer's machine, not the project — record **counts and method**, never listings, and never quote what you find there (that tree also holds credential material).
+- **Definitions — agents, skills, commands, hooks (PA-19, #186).** The scope rule above is not about permissions; it is about **anything assembled from more than one scope**, and for 23 reviews it was applied to permissions only. Count **per scope**, and record not just the file count but **how many declare a tool the repo-local set does not** — that is the figure that would have caught this (measured 2026-08-12: project **4** agents declaring **0** `Write`/`Edit`; **user scope 17** declaring **15**; one enabled plugin **7** declaring **2** — a ledger reading "4" against a reality of **28**). An agent's `tools:` **restricts and does not grant**, so this adds no reach by itself; the inventory is the point, because the next finding here will be in something nobody counted. Three counting traps: a **relative** path silently means project scope only; compiled artifacts (`__pycache__/*.pyc`) match these greps and inflate any file count; and a plugin's *content* moves under a *stable* name, so record `version` from `installed_plugins.json` plus the computed content digest (the CONTENT PIN block above; `gitCommitSha` is install-time provenance only), never the name, and record one for **every** enabled plugin (#586, #590). Anything under `~/.claude/` is the maintainer's machine, not the project — record **counts and method**, never listings, and never quote what you find there (that tree also holds credential material).
 - **Hooks.** Does anything reached via `core.hooksPath` or a `.claude` Stop/SessionStart hook execute a script resolved from the **working tree**? Then a checked-out PR branch supplies that code. It must come from a fixed, maintainer-controlled location.
 - **CI.** Does any workflow run with secrets on a trigger a fork can influence?
 - **Prose is not a control.** Injection guards written in a command file share a context window with the attacker's text. Note them as mitigation; never close a finding on them.
@@ -430,18 +430,34 @@ reading an external source). The `Conf.` column carries the honesty; there is no
 separate below-the-bar section. The maintainer triages — a small item they dismiss in
 a second beats one they never see.
 
-### Critical (fix immediately)
+**Two kinds, reported apart (maintainer request, R54).** Sort every finding into one:
+- **Defect** — something behaves differently from intended: security (incl. hardening and
+  the D-axis), wrong output or number, crash, lost or exposed data, measurable cost, a wrong
+  diagnostic verdict, or **user-facing text** (field description, notice, error message,
+  changelog bullet) that misstates what the code does.
+- **Upkeep** — fixing it changes no runtime behaviour: internal comments and docblocks,
+  ledger/registry counts, dead code, duplication, method length, visibility, naming.
+
+When unsure, it is a Defect. Numbering stays one sequence across both kinds.
+
+### Behaviour defects
+
+#### Critical (fix immediately)
 | # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
 |---|----------|-------|-------|---------|------|---------|---------|----------------|
 
-### High (fix soon)
+#### High (fix soon)
 | # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
 
-### Medium (plan to fix)
+#### Medium (plan to fix)
 | # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
 
-### Low (nice to have)
+#### Low (nice to have)
 | # | Category | Actor | Conf. | Verdict | File | Line(s) | Finding | Recommendation |
+
+### Upkeep (one table, most useful first; a severity above Low is rare and must say why)
+| # | Category | Sev | Verdict | File | Line(s) | Finding | Recommendation |
+|---|----------|-----|---------|------|---------|---------|----------------|
 
 {Actor/Conf. are `—` for non-security findings: complexity, dead code, and
 improvement findings are rated on their own merits and are NOT subject to the
@@ -451,7 +467,7 @@ Low-confidence / unverified items are **(open)**-marked rows in the tables above
 
 ## Statistics
 - Files reviewed: X
-- Total findings: X (Critical: X, High: X, Medium: X, Low: X)
+- Total findings: X — **defects X** (Critical: X, High: X, Medium: X, Low: X) · **upkeep X**
 - Security: X | Complexity: X | Improvement: X
 - Patterns confirmed clean: {RI/PA ids}
 - **Adjudication: X drafts verified · X mechanisms refuted · X recommendations refuted · X dispositions refuted · X left PLAUSIBLE/UNVERIFIED**
@@ -473,4 +489,4 @@ Low-confidence / unverified items are **(open)**-marked rows in the tables above
 - Verify exploitability where feasible (a tiny PHP repro, or a failing PHPUnit test) before rating a finding Critical/High. Use a **throwaway** probe (scratchpad dir), not a committed test — adding regression tests is the post-fix step. **This rule is necessary and was never sufficient**: it gates on severity and covers only the mechanism, so a Low finding's mechanism and *every* recommendation and disposition sat outside it. That gap is what the **Adjudication** stage above closes — do not read this bullet as the whole of the verification duty.
 - **Never ship an unverified recommendation.** A finding says what is wrong; a recommendation says what somebody should do, and it is the half that reaches production. If the adjudication stage refuted it, or you could not check it, write "needs design" and say what would settle it. A wrong recommendation in a committed ledger is worse than the finding it accompanies, because the next reader inherits it with a review's authority.
 - **A `wontfix` is a cost estimate, so measure it.** Any disposition resting on "that would be too expensive / would need X" states the measured number and how it was measured, or it is not a disposition, it is a guess with a status field.
-- After saving the report, present a summary to the user and ask which findings they want to address.
+- After saving the report, present a summary to the user and ask which findings they want to address. Lead with the defects; give the upkeep items as a count plus anything notable. The Known Findings Log entry's headline states the same split.
