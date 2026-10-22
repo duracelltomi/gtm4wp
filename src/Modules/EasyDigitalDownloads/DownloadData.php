@@ -325,9 +325,9 @@ final class DownloadData {
 	/**
 	 * A catalogue amount on the purchase's tax basis (#519), taxed at the store
 	 * base rate so a cached download page is the same for every visitor. The tax
-	 * is rounded to the currency's decimals first, as EDD's cart rounds it, so
-	 * a one-item cart line reports the same price (U189). A visitor taxed at
-	 * another rate, and qty > 1 lines, can differ by that rate or a minor unit.
+	 * is rounded as EDD's cart rounds it (round_like_the_cart()), so a one-item
+	 * cart line reports the same price (U189). A visitor taxed at another rate,
+	 * and qty > 1 lines, can differ by that rate or a minor unit.
 	 *
 	 * @param float $amount      The catalogue amount as entered in EDD.
 	 * @param int   $download_id The download id.
@@ -338,15 +338,31 @@ final class DownloadData {
 			return $amount;
 		}
 
-		$rate     = edd_get_tax_rate( edd_get_shop_country(), edd_get_shop_state(), false );
-		$decimals = function_exists( 'edd_currency_decimal_filter' ) ? (int) edd_currency_decimal_filter() : 2;
-		$tax      = round( (float) edd_calculate_tax( $amount, '', '', false, $rate ), $decimals );
+		$rate = edd_get_tax_rate( edd_get_shop_country(), edd_get_shop_state(), false );
+		$tax  = self::round_like_the_cart( (float) edd_calculate_tax( $amount, '', '', false, $rate ) );
 
 		if ( edd_prices_include_tax() ) {
 			return $this->item_prices_include_tax() ? $amount : $amount - $tax;
 		}
 
 		return $this->item_prices_include_tax() ? $amount + $tax : $amount;
+	}
+
+	/**
+	 * Rounds a line tax the way EDD's cart does (#533, U189): from 3.3.6 through
+	 * edd_format_amount( …, 'data' ), which uses the currency's own decimals (0
+	 * for KRW, CLP, VND and the other zero-decimal codes); before that with
+	 * round() to edd_currency_decimal_filter(). 3.3.5 knows no 'data' context.
+	 *
+	 * @param float $tax The unrounded tax.
+	 * @return float
+	 */
+	private static function round_like_the_cart( float $tax ): float {
+		if ( defined( 'EDD_VERSION' ) && version_compare( (string) EDD_VERSION, '3.3.6', '>=' ) && function_exists( 'edd_format_amount' ) ) {
+			return (float) edd_format_amount( $tax, true, '', 'data' );
+		}
+
+		return round( $tax, function_exists( 'edd_currency_decimal_filter' ) ? (int) edd_currency_decimal_filter() : 2 );
 	}
 
 	/**
@@ -407,13 +423,15 @@ final class DownloadData {
 			'quantity' => (int) $quantity,
 		);
 
-		// The line total ("price") includes tax; subtract it when the admin
-		// excludes tax from revenue so item-level and transaction-level revenue
-		// reconcile in GA4.
-		$line_total = (float) ( $cart_item_details['price'] ?? 0 );
-		if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX ) ) {
-			$line_total -= (float) ( $cart_item_details['tax'] ?? 0 );
-		}
+		// The line total ("price") includes tax; the purchase rule takes it out
+		// when the admin excludes tax, so item and transaction revenue reconcile.
+		$line_total = Helpers::purchase_rule_value(
+			(float) ( $cart_item_details['price'] ?? 0 ),
+			(float) ( $cart_item_details['tax'] ?? 0 ),
+			0.0,
+			! $this->item_prices_include_tax(),
+			false
+		);
 
 		$attributes['price'] = round( $line_total / $quantity, 2 );
 
@@ -459,10 +477,13 @@ final class DownloadData {
 			// Report the per-item price on the same tax basis as the transaction
 			// value so GA4 item-level revenue reconciles with the transaction
 			// total. The order item total includes tax (subtotal - discount + tax).
-			$line_total = (float) self::row_prop( $order_item, 'total', 0 );
-			if ( $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX ) ) {
-				$line_total -= (float) self::row_prop( $order_item, 'tax', 0 );
-			}
+			$line_total = Helpers::purchase_rule_value(
+				(float) self::row_prop( $order_item, 'total', 0 ),
+				(float) self::row_prop( $order_item, 'tax', 0 ),
+				0.0,
+				! $this->item_prices_include_tax(),
+				false
+			);
 
 			$item_attributes = array(
 				'quantity' => (int) $quantity,
@@ -952,19 +973,19 @@ final class DownloadData {
 	}
 
 	/**
-	 * The purchase basis under the current options: the order total, less tax
-	 * with "exclude tax" (EDD orders carry no shipping). The one definition the
-	 * purchase event and the refund value share (RI-43).
+	 * The purchase basis under the current options: the order total through the
+	 * shared purchase rule (EDD orders carry no shipping), which the refund value
+	 * applies too (RI-43, #548).
 	 *
 	 * @param \EDD\Orders\Order $order The order.
 	 * @return array{value: float, total: float, exclude_tax: bool}
 	 */
 	private function current_purchase_basis( \EDD\Orders\Order $order ): array {
-		$exclude_tax = (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX );
+		$exclude_tax = ! $this->item_prices_include_tax();
 		$total       = (float) self::row_prop( $order, 'total', 0 );
 
 		return array(
-			'value'       => $exclude_tax ? $total - (float) self::row_prop( $order, 'tax', 0 ) : $total,
+			'value'       => Helpers::purchase_rule_value( $total, (float) self::row_prop( $order, 'tax', 0 ), 0.0, $exclude_tax, false ),
 			'total'       => $total,
 			'exclude_tax' => $exclude_tax,
 		);

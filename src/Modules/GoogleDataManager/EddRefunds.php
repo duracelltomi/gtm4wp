@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Modules\EasyDigitalDownloads\DownloadData;
 use GTM4WP\Options\Options;
 
@@ -121,7 +122,7 @@ final class EddRefunds implements RefundSource {
 			$tax,
 			// On the purchase basis (#466). EDD builds a refund's total from the
 			// refunded items' own totals and tax, so no proration is needed.
-			max( 0.0, $basis['exclude_tax'] ? $amount - $tax : $amount )
+			max( 0.0, EcommerceHelpers::purchase_rule_value( $amount, $tax, 0.0, $basis['exclude_tax'], false ) )
 		);
 	}
 
@@ -230,11 +231,13 @@ final class EddRefunds implements RefundSource {
 
 			// Both negated, so subtract the tax BEFORE abs(), as the purchase
 			// builder does on the positive originals.
-			$line_total = (float) DownloadData::row_prop( $item, 'total', 0 );
-
-			if ( $exclude_tax ) {
-				$line_total -= (float) DownloadData::row_prop( $item, 'tax', 0 );
-			}
+			$line_total = EcommerceHelpers::purchase_rule_value(
+				(float) DownloadData::row_prop( $item, 'total', 0 ),
+				(float) DownloadData::row_prop( $item, 'tax', 0 ),
+				0.0,
+				$exclude_tax,
+				false
+			);
 
 			$unit_price = round( abs( $line_total ) / $quantity, 2 );
 			$price_id   = DownloadData::row_prop( $item, 'price_id', null );

@@ -96,6 +96,32 @@ final class Helpers {
 	}
 
 	/**
+	 * The purchase value rule: a total, less tax and shipping when the exclude
+	 * options say so. The one definition the purchase event, its items and the
+	 * refund value share in both stores (RI-43, #548); EDD passes no shipping.
+	 *
+	 * @param float $total            Order, line or refunded total.
+	 * @param float $tax              Tax within it, shipping tax included.
+	 * @param float $shipping         Shipping within it, without tax.
+	 * @param bool  $exclude_tax      Whether tax is left out.
+	 * @param bool  $exclude_shipping Whether shipping is left out.
+	 * @return float
+	 */
+	public static function purchase_rule_value( float $total, float $tax, float $shipping, bool $exclude_tax, bool $exclude_shipping ): float {
+		$value = $total;
+
+		if ( $exclude_tax ) {
+			$value -= $tax;
+		}
+
+		if ( $exclude_shipping ) {
+			$value -= $shipping;
+		}
+
+		return $value;
+	}
+
+	/**
 	 * First-party cookie carrying GA4 list attribution across the funnel (#405),
 	 * written client-side on select_item; must match the literal in
 	 * js/frontend/gtm4wp-ecommerce-generic.js.

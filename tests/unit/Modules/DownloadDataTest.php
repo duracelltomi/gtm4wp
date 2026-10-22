@@ -87,11 +87,28 @@ final class DownloadDataTest extends TestCase {
 	 * Stubs EDD's tax API at a 20% store-base rate, the way EDD 3.x computes it
 	 * (unrounded; the inclusive share is amount - amount / 1.2). U189.
 	 *
-	 * @param bool $prices_include_tax Whether catalogue prices include tax.
-	 * @param int  $decimals           The currency's decimals.
+	 * Both of EDD's cart roundings are modelled (#533): edd_currency_decimal_filter()
+	 * before 3.3.6, edd_format_amount( …, 'data' ) from 3.3.6, which uses the
+	 * currency's own decimals. EDD_VERSION is defined order-stickily by other
+	 * files, so either path may run here; both give $decimals unless a test
+	 * sets $data_decimals apart (TS-16).
+	 *
+	 * @param bool     $prices_include_tax Whether catalogue prices include tax.
+	 * @param int      $decimals           The currency's decimals.
+	 * @param int|null $data_decimals      Decimals of the 3.3.6+ 'data' rounding, default $decimals.
 	 * @return void
 	 */
-	private function stub_taxes( bool $prices_include_tax, int $decimals = 2 ): void {
+	private function stub_taxes( bool $prices_include_tax, int $decimals = 2, ?int $data_decimals = null ): void {
+		$data_decimals ??= $decimals;
+		Functions\when( 'edd_format_amount' )->alias(
+			static function ( $amount, $with_decimals, $currency, $context ) use ( $data_decimals ) {
+				if ( 'data' === $context ) {
+					return number_format( round( (float) $amount, $data_decimals ), $data_decimals, '.', '' );
+				}
+
+				return number_format( (float) $amount, 2, ',', '.' );
+			}
+		);
 		Functions\when( 'edd_use_taxes' )->justReturn( true );
 		Functions\when( 'edd_download_is_tax_exclusive' )->justReturn( false );
 		Functions\when( 'edd_get_shop_country' )->justReturn( 'DE' );
@@ -142,6 +159,44 @@ final class DownloadDataTest extends TestCase {
 		$data = $this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => $exclude_tax ) );
 
 		$this->assertEqualsWithDelta( $expected, $data->basis_price( $amount, 7 ), 0.0001 );
+	}
+
+	/**
+	 * #533: from EDD 3.3.6 the cart rounds through edd_format_amount( …, 'data' ),
+	 * so a zero-decimal currency (KRW: the filter still says 2) is rounded to 0
+	 * decimals like the cart: 10000 incl. 10% is 9091 net, not 9090.91.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_basis_price_rounds_like_the_cart_from_edd_3_3_6(): void {
+		define( 'EDD_VERSION', '3.7.1.1' );
+		$this->stub_taxes( true, 2, 0 );
+		Functions\when( 'edd_calculate_tax' )->alias(
+			static fn ( $amount, $country, $region, $fallback, $rate ) => $amount - $amount / 1.1
+		);
+
+		$data = $this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => true ) );
+
+		$this->assertEqualsWithDelta( 9091.0, $data->basis_price( 10000.0, 7 ), 0.0001 );
+	}
+
+	/**
+	 * #533, the other side of the gate: before 3.3.6 the cart rounds with
+	 * edd_currency_decimal_filter(), and 3.3.5's edd_format_amount() knows no
+	 * 'data' context (it would format for display, "1,667" read as 1).
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_basis_price_rounds_with_the_decimal_filter_before_edd_3_3_6(): void {
+		define( 'EDD_VERSION', '3.3.5' );
+		$this->stub_taxes( true, 2, 0 );
+		Functions\when( 'edd_calculate_tax' )->alias(
+			static fn ( $amount, $country, $region, $fallback, $rate ) => $amount - $amount / 1.1
+		);
+
+		$data = $this->make_download_data( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => true ) );
+
+		$this->assertEqualsWithDelta( 9090.91, $data->basis_price( 10000.0, 7 ), 0.0001 );
 	}
 
 	public function test_basis_price_leaves_the_amount_without_taxes_or_for_a_tax_exempt_download(): void {

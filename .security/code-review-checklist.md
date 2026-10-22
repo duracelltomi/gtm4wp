@@ -1180,7 +1180,7 @@ report.
 | 530 | Low | fixed (R54 fix session: `event` tested with `is_string()` in both stores) | site code | WC + EDD purchase render | `(string)` cast on a filtered event (RI-39 recurrence, #412/#514 fix) |
 | 531 | Low | fixed (R54 fix session: variations carry a purchase-basis price where it differs from display_price, the tracker reads it first; U194; PHP + JS tests; the bullet names variations) | — | WC variation tracker JS; 2.1 changelog bullet | #526 incomplete for variable products; the bullet overclaims |
 | 532 | Low | fixed (R54 fix session: lines summed signed and made positive once; U152 (3) corrected; 1 test red before the fix, 1 guard green by design) | — | Data Manager `WooCommerceRefunds::figures()` | A refunded negative fee raises the line-based refund value |
-| 533 | Low | open | — | EDD `DownloadData::basis_price()` | Tax rounding differs from the cart on EDD 3.3.6+ for some currencies; U189 (4) wrong |
+| 533 | Low | fixed (R54 fix session: the line tax is rounded as the cart does per EDD version, edd_format_amount data from 3.3.6, the decimal filter before; U189 (4) corrected; 1 test red before the fix, 1 guard green by design) | — | EDD `DownloadData::basis_price()` | Tax rounding differs from the cart on EDD 3.3.6+ for some currencies; U189 (4) wrong |
 | 534 | Low | open | — | Data Manager `CaptureHooks` | A resumed order whose first pass stored nothing is counted twice |
 | 535 | Low | open | — | Data Manager `CaptureHooks` (EDD) | EDD resumed orders have none of the #481 handling |
 | 536 | Low | open (maintainer decision) | A0/A1 data | Data Manager `CaptureHooks` (WC) | Consent recorded on a resumed order; WC and EDD answer differently |
@@ -1195,7 +1195,7 @@ report.
 | 545 | Low | open | A1 | EDD `DownloadData` | Tax rate resolved per price call |
 | 546 | Low | fixed (R54 upkeep: default false, parameter renamed; the default test asserts both) | — | EDD `is_order_status_trackable()` | Permissive default argument |
 | 547 | Low | open | site code | EDD checkout rows | Synthesized line lacks content-details keys |
-| 548 | Low | open | — | EDD `DownloadData`, `EddRefunds` | Exclude-tax rule written five times; RI-43 claim half true |
+| 548 | Low | fixed (R54 fix session: Ecommerce\Helpers::purchase_rule_value() is the one rule for both stores, moved out of WooCommerce ProductData; 7 call sites; equivalent, suites unchanged) | — | EDD `DownloadData`, `EddRefunds` | Exclude-tax rule written five times; RI-43 claim half true |
 | 549 | Low | open | — | Data Manager `RefundSender`, send-log panel | A replayed refund on an inactive platform leaves no row (RI-40 ledger is 2) |
 | 550 | Low | open | — | Data Manager `RefundSender::deliver()` | A failed retry schedule keeps reading "retrying" |
 | 551 | Low | fixed (R54 upkeep: wording) | — | Data Manager `RefundReplay` | Class doc and 400 message overstate the check |

@@ -191,7 +191,10 @@ final class EddListTrackingTest extends TestCase {
 		Functions\when( 'edd_get_shop_state' )->justReturn( '' );
 		Functions\when( 'edd_get_tax_rate' )->justReturn( 0.2 );
 		Functions\when( 'edd_prices_include_tax' )->justReturn( false );
+		// Both cart roundings (#533): which one runs depends on EDD_VERSION,
+		// defined order-stickily elsewhere (TS-16); both give 2 decimals here.
 		Functions\when( 'edd_currency_decimal_filter' )->justReturn( 2 );
+		Functions\when( 'edd_format_amount' )->alias( static fn ( $amount ) => number_format( round( (float) $amount, 2 ), 2, '.', '' ) );
 		Functions\when( 'edd_calculate_tax' )->alias( static fn ( $amount, $c, $r, $f, $rate ) => $amount * $rate );
 
 		$markup = $this->capture_output(

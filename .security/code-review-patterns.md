@@ -1048,7 +1048,8 @@ shipping read 0.
 - **After the R53 fix:** one rule per store (`ProductData::purchase_rule_value()` + `current_purchase_basis()`,
   `DownloadData::current_purchase_basis()`), shared by the purchase builder, the basis frozen on the order and the
   refund value; a side-by-side test per option combination in both refund adapter suites.
-- **R54 (#548, #532, #533):** "one rule per store" holds for WooCommerce only; EDD shares the basis *flag* and
+- **After the R54 fix session (#548, #533):** one rule for both stores, `Ecommerce\Helpers::purchase_rule_value()`, used by the purchase value, the items and the refund value of WooCommerce and EDD; the EDD tax rounding follows the cart's per version. Ledger: **1** rule, **7** call sites (`grep -rn purchase_rule_value src`).
+- **R54 (#548, #532, #533), as found:** "one rule per store" held for WooCommerce only; EDD shares the basis *flag* and
   writes the subtraction inline at five sites. The rule's inputs also moved under it: a refunded negative fee is
   stored positive (a per-line `abs()` is wrong for that line type), and EDD's cart rounds tax through a different
   function from 3.3.6. Apply check (3) to the rounding function too, per supported platform version.

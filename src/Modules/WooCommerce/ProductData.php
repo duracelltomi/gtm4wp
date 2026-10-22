@@ -950,32 +950,6 @@ final class ProductData {
 	}
 
 	/**
-	 * The purchase value rule: the order total, less tax and shipping when the
-	 * exclude options say so. The one definition the purchase event and the
-	 * refund value share (RI-43).
-	 *
-	 * @param float $total            Order (or refunded) total, positive.
-	 * @param float $tax              Tax within it, shipping tax included.
-	 * @param float $shipping         Shipping within it, without tax.
-	 * @param bool  $exclude_tax      Whether tax is left out.
-	 * @param bool  $exclude_shipping Whether shipping is left out.
-	 * @return float
-	 */
-	public static function purchase_rule_value( float $total, float $tax, float $shipping, bool $exclude_tax, bool $exclude_shipping ): float {
-		$value = $total;
-
-		if ( $exclude_tax ) {
-			$value -= $tax;
-		}
-
-		if ( $exclude_shipping ) {
-			$value -= $shipping;
-		}
-
-		return $value;
-	}
-
-	/**
 	 * Whether an order item is reported: the GTM4WP item filter and the
 	 * visibility filter WooCommerce's order views apply (#417). Shared with
 	 * the refund lane, so a refund names only items its purchase named.
@@ -1015,7 +989,7 @@ final class ProductData {
 		$total            = (float) $order->get_total();
 
 		return array(
-			'value'            => self::purchase_rule_value( $total, (float) $order->get_total_tax(), (float) $order->get_shipping_total(), $exclude_tax, $exclude_shipping ),
+			'value'            => \GTM4WP\Ecommerce\Helpers::purchase_rule_value( $total, (float) $order->get_total_tax(), (float) $order->get_shipping_total(), $exclude_tax, $exclude_shipping ),
 			'total'            => $total,
 			'exclude_tax'      => $exclude_tax,
 			'exclude_shipping' => $exclude_shipping,

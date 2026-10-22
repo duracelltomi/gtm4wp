@@ -10,6 +10,7 @@
 
 namespace GTM4WP\Modules\GoogleDataManager;
 
+use GTM4WP\Ecommerce\Helpers as EcommerceHelpers;
 use GTM4WP\Modules\WooCommerce\ProductData;
 use GTM4WP\Options\Options;
 
@@ -169,7 +170,7 @@ final class WooCommerceRefunds implements RefundSource {
 		$remaining_total = $basis['total'] - $prior_amount;
 		$ratio           = $remaining_total > 0 ? $remaining_value / $remaining_total : 0.0;
 
-		$value = ProductData::purchase_rule_value(
+		$value = EcommerceHelpers::purchase_rule_value(
 			$figures['line_money'],
 			$figures['tax'],
 			$figures['shipping'],
