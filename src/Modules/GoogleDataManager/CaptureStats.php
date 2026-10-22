@@ -88,9 +88,10 @@ final class CaptureStats {
 	}
 
 	/**
-	 * Records that the receipt-page backfill stored a client id on an order
-	 * counted uncaptured at creation (#482): captured goes up, seen does not,
-	 * and captured never passes seen.
+	 * Records that an order counted uncaptured at creation got its client id
+	 * later, from the receipt-page backfill (#482) or a resumed checkout: captured
+	 * goes up, seen does not, and captured never passes seen. Callers check the
+	 * order's CaptureHooks::META_COUNTED marker first (#537).
 	 *
 	 * @return void
 	 */

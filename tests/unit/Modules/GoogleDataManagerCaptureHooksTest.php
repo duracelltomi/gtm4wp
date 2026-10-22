@@ -50,6 +50,95 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 			'WC'  => true,
 			'EDD' => true,
 		);
+
+		// EDD order meta in memory, stubbed here (TS-16): the pass reads the
+		// stored values and the counting marker back (#534-#536).
+		$this->edd_meta = array();
+		Functions\when( 'edd_get_order_meta' )->alias( fn ( $order_id, $key ) => $this->edd_meta[ $order_id ][ $key ] ?? '' );
+		Functions\when( 'edd_update_order_meta' )->alias(
+			function ( $order_id, $key, $value ): void {
+				$this->edd_meta[ $order_id ][ $key ] = $value;
+			}
+		);
+		Functions\when( 'edd_delete_order_meta' )->alias(
+			function ( $order_id, $key ): void {
+				unset( $this->edd_meta[ $order_id ][ $key ] );
+			}
+		);
+	}
+
+	/**
+	 * EDD order meta written by the stubs, by order id.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private array $edd_meta = array();
+
+	/**
+	 * A WooCommerce order that records deletions (the base stub has no
+	 * delete_meta_data(), so a deletion would be skipped silently).
+	 *
+	 * @param array<string, mixed> $meta Stored meta.
+	 * @return \WC_Order
+	 */
+	private static function deletable_order( array $meta = array() ): \WC_Order {
+		return new class(
+			array(
+				'id'   => 42,
+				'meta' => $meta,
+			)
+		) extends \WC_Order {
+			/**
+			 * Keys deleted.
+			 *
+			 * @var string[]
+			 */
+			public array $deleted = array();
+
+			/**
+			 * Times save() was called.
+			 *
+			 * @var int
+			 */
+			public int $save_count = 0;
+
+			public function delete_meta_data( $key ) {
+				$this->deleted[]          = $key;
+				$this->saved_meta[ $key ] = '';
+			}
+
+			public function save() {
+				++$this->save_count;
+
+				return parent::save();
+			}
+		};
+	}
+
+	/**
+	 * Sets the two capture cookies.
+	 *
+	 * @param array<string, mixed>|null $ids     The ids cookie payload (without the version), null for none.
+	 * @param array<string, mixed>|null $signals The consent signals, null for no consent cookie.
+	 * @return void
+	 */
+	private static function set_cookies( ?array $ids, ?array $signals ): void {
+		$_COOKIE = array();
+		// phpcs:disable WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Building a cookie fixture, not plugin output.
+		if ( null !== $ids ) {
+			$_COOKIE[ AttributionCookies::IDS_COOKIE ] = (string) json_encode( array( 'v' => AttributionCookies::FORMAT_VERSION ) + $ids );
+		}
+
+		if ( null !== $signals ) {
+			$_COOKIE[ AttributionCookies::CONSENT_COOKIE ] = (string) json_encode(
+				array(
+					'v'           => AttributionCookies::FORMAT_VERSION,
+					'signals'     => $signals,
+					'captured_at' => 1_800_000_100,
+				)
+			);
+		}
+		// phpcs:enable WordPress.WP.AlternativeFunctions.json_encode_json_encode
 	}
 
 	protected function tearDown(): void {
@@ -221,28 +310,155 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 		$this->hooks()->capture_woocommerce_order( $order );
 
 		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
-		$this->assertSame( 0, $order->save_count, 'An order with nothing to store is not written to at all.' );
+		$this->assertSame( '0', $order->get_meta( CaptureHooks::META_COUNTED, true ), 'Only the counting marker is written (#534, maintainer decision 2026-10-22).' );
+		$this->assertSame( 1, $order->save_count );
 	}
 
 	/**
-	 * Capture runs once, at creation. An order that already carries it is left
-	 * alone, so a second pass can never replace resolved attribution with
-	 * whatever the current request happens to hold.
+	 * #536: a later pass is the later observation, so its client id replaces the
+	 * stored one (the maintainer's decision: the later observation wins). An
+	 * order stored before the counting marker is not counted again.
 	 */
-	public function test_an_order_that_already_carries_capture_is_left_alone(): void {
+	public function test_a_later_pass_replaces_the_stored_client_id(): void {
 		$this->set_captured_cookies();
+		$order = self::deletable_order( array( AttributionCapture::META_CLIENT_ID => 'the-original-id' ) );
+		$stats = new CaptureStats( static fn () => 1_800_000_000 );
 
-		$order = new \WC_Order(
+		( new CaptureHooks( $stats ) )->capture_woocommerce_order( $order );
+
+		$this->assertSame( '111.222', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( 'abc123', $order->get_meta( '_gtm4wp_gclid', true ) );
+		$this->assertSame( 0, $stats->get()['seen'], 'Captured before the marker existed: already counted.' );
+		$this->assertSame( '1', $order->get_meta( CaptureHooks::META_COUNTED, true ) );
+	}
+
+	/**
+	 * #534: a first pass that stored nothing is counted once; the resumed pass
+	 * that finds a client id counts as a rescue, not a second order.
+	 */
+	public function test_an_empty_first_pass_then_a_capturing_resume_counts_one_order(): void {
+		$order = self::deletable_order();
+		$stats = new CaptureStats( static fn () => 1_800_000_000 );
+		$hooks = new CaptureHooks( $stats );
+
+		$hooks->capture_woocommerce_order( $order );
+		$hooks->capture_woocommerce_order( $order );
+		$this->assertSame( array( 1, 0 ), array( $stats->get()['seen'], $stats->get()['captured'] ), 'Two empty passes, one order.' );
+
+		$this->set_captured_cookies();
+		$hooks->capture_woocommerce_order( $order );
+
+		$this->assertSame( array( 1, 1 ), array( $stats->get()['seen'], $stats->get()['captured'] ) );
+		$this->assertSame( '1', $order->get_meta( CaptureHooks::META_COUNTED, true ) );
+	}
+
+	/**
+	 * #536, per signal: a later consent map that did not observe a signal (the
+	 * tracker writes an empty map when it saw no consent regime, or a partial
+	 * one) keeps the stored value of that signal, so a stored denial stands.
+	 */
+	public function test_a_later_map_without_a_signal_keeps_the_stored_denial(): void {
+		$denied = array(
+			'signals'     => array(
+				'analytics_storage' => 'denied',
+				'ad_storage'        => 'denied',
+			),
+			'captured_at' => 1_800_000_000,
+		);
+
+		foreach ( array(
+			'empty map'   => array(),
+			'partial map' => array( 'analytics_storage' => 'denied' ),
+		) as $label => $signals ) {
+			self::set_cookies(
+				array(
+					'client_id' => '111.222',
+					'gclid'     => 'abc123',
+				),
+				$signals
+			);
+			$order = self::deletable_order( array( AttributionCapture::META_CONSENT_STATE => $denied ) );
+
+			$this->hooks()->capture_woocommerce_order( $order );
+
+			$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ), $label );
+			$this->assertSame( '', (string) $order->get_meta( '_gtm4wp_gclid', true ), $label );
+			$this->assertSame( 'denied', $order->get_meta( AttributionCapture::META_CONSENT_STATE, true )['signals']['ad_storage'], $label );
+		}
+	}
+
+	/**
+	 * #536: a pass with ids but no consent cookie is gated by the stored state,
+	 * so the ids never sit beside a stored denial.
+	 */
+	public function test_ids_without_a_consent_cookie_obey_the_stored_denial(): void {
+		self::set_cookies( array( 'client_id' => '111.222' ), null );
+		$order = self::deletable_order(
 			array(
-				'id'   => 42,
-				'meta' => array( AttributionCapture::META_CLIENT_ID => 'the-original-id' ),
+				AttributionCapture::META_CONSENT_STATE => array(
+					'signals'     => array( 'analytics_storage' => 'denied' ),
+					'captured_at' => 1_800_000_000,
+				),
 			)
 		);
 
 		$this->hooks()->capture_woocommerce_order( $order );
 
-		$this->assertSame( 'the-original-id', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
-		$this->assertSame( '', (string) $order->get_meta( '_gtm4wp_gclid', true ) );
+		$this->assertSame( '', (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+	}
+
+	/**
+	 * #536: an id group the pass resolved replaces the stored group whole, so a
+	 * new client id never sits beside the previous client's session ids.
+	 */
+	public function test_a_new_client_id_does_not_keep_the_old_clients_sessions(): void {
+		self::set_cookies( array( 'client_id' => '333.444' ), array( 'analytics_storage' => 'granted' ) );
+		$order = self::deletable_order(
+			array(
+				AttributionCapture::META_CLIENT_ID   => '111.222',
+				AttributionCapture::META_SESSION_IDS => array( 'G-ABC123' => '1788522496' ),
+			)
+		);
+
+		$this->hooks()->capture_woocommerce_order( $order );
+
+		$this->assertSame( '333.444', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertContains( AttributionCapture::META_SESSION_IDS, $order->deleted );
+	}
+
+	/**
+	 * #535: the EDD resume mirrors the WooCommerce one: counted once, and a
+	 * newer ad denial removes the stored click id.
+	 */
+	public function test_a_resumed_edd_order_is_counted_once_and_obeys_the_newer_denial(): void {
+		$stats = new CaptureStats( static fn () => 1_800_000_000 );
+		$hooks = new CaptureHooks( $stats );
+
+		self::set_cookies(
+			array(
+				'client_id' => '111.222',
+				'gclid'     => 'abc123',
+			),
+			array(
+				'analytics_storage' => 'granted',
+				'ad_storage'        => 'granted',
+			)
+		);
+		$hooks->capture_edd_order( 42, array() );
+
+		self::set_cookies( null, array( 'ad_storage' => 'denied' ) );
+		$hooks->capture_edd_order( 42, array() );
+
+		$this->assertArrayNotHasKey( '_gtm4wp_gclid', $this->edd_meta[42] );
+		$this->assertSame( '111.222', $this->edd_meta[42][ AttributionCapture::META_CLIENT_ID ] );
+		$this->assertSame(
+			array(
+				'analytics_storage' => 'granted',
+				'ad_storage'        => 'denied',
+			),
+			$this->edd_meta[42][ AttributionCapture::META_CONSENT_STATE ]['signals']
+		);
+		$this->assertSame( 1, $stats->get()['seen'] );
 	}
 
 	/**
@@ -419,15 +635,20 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 						'captured_at' => 1_800_000_000,
 					),
 				),
+				array( 42, CaptureHooks::META_COUNTED, '1' ),
 			),
 			$written
 		);
 	}
 
-	public function test_no_edd_meta_is_written_when_nothing_was_captured(): void {
-		Functions\expect( 'edd_update_order_meta' )->never();
-
+	/**
+	 * Only the counting marker is written for an order with nothing to store
+	 * (#534, maintainer decision 2026-10-22).
+	 */
+	public function test_only_the_counting_marker_is_written_when_nothing_was_captured(): void {
 		$this->hooks()->capture_edd_order( 42, array() );
+
+		$this->assertSame( array( CaptureHooks::META_COUNTED => '0' ), $this->edd_meta[42] );
 	}
 
 	public function test_an_invalid_edd_order_id_is_ignored(): void {
@@ -467,11 +688,8 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 	 * be a refund that cannot be sent, weeks later.
 	 */
 	public function test_orders_flowing_with_nothing_captured_is_a_reportable_state(): void {
-		// The EDD branch bails on function_exists() before it counts the order;
-		// an earlier test in this file used to define the function for it, so the
-		// case passed in declaration order and failed alone (TS-16 corollary).
-		Functions\expect( 'edd_update_order_meta' )->never();
-
+		// The EDD meta functions come from setUp() (TS-16): the branch bails on
+		// function_exists() before it counts the order.
 		$stats = new CaptureStats( static fn () => 1_800_000_000 );
 		$hooks = new CaptureHooks( $stats );
 

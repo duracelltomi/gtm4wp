@@ -93,9 +93,10 @@ final class AttributionCapture {
 	public const MAX_SESSIONS = 20;
 
 	/**
-	 * All meta keys this feature writes, which is also what the privacy
-	 * exporter and eraser work from - one definition, or an erasure request
-	 * would leave personal data behind.
+	 * The personal-data meta keys this feature writes, which is also what the
+	 * privacy exporter and eraser work from - one definition, or an erasure
+	 * request would leave personal data behind. CaptureHooks::META_COUNTED, a
+	 * constant counting marker, is deliberately not one of them.
 	 *
 	 * @return string[]
 	 */
@@ -391,17 +392,58 @@ final class AttributionCapture {
 
 		$signals = $consent[ AttributionCookies::KEY_SIGNALS ];
 
-		if ( isset( $signals[ self::SIGNAL_ANALYTICS ] ) && self::CONSENT_GRANTED !== $signals[ self::SIGNAL_ANALYTICS ] ) {
-			unset( $meta[ self::META_CLIENT_ID ], $meta[ self::META_SESSION_IDS ] );
-		}
-
-		if ( isset( $signals[ self::SIGNAL_ADS ] ) && self::CONSENT_GRANTED !== $signals[ self::SIGNAL_ADS ] ) {
-			foreach ( AttributionCookies::CLICK_ID_PARAMS as $param ) {
-				unset( $meta[ self::META_CLICK_ID_PREFIX . $param ] );
+		foreach ( self::signal_groups() as $signal => $keys ) {
+			if ( isset( $signals[ $signal ] ) && self::CONSENT_GRANTED !== $signals[ $signal ] ) {
+				foreach ( $keys as $key ) {
+					unset( $meta[ $key ] );
+				}
 			}
 		}
 
 		return $meta;
+	}
+
+	/**
+	 * The stored identifiers grouped by the consent signal that gates them: the
+	 * one map the consent gate and a capture pass's group replacement read.
+	 *
+	 * @return array<string, string[]> Signal name => meta keys.
+	 */
+	public static function signal_groups(): array {
+		$ads = array();
+
+		foreach ( AttributionCookies::CLICK_ID_PARAMS as $param ) {
+			$ads[] = self::META_CLICK_ID_PREFIX . $param;
+		}
+
+		return array(
+			self::SIGNAL_ANALYTICS => array( self::META_CLIENT_ID, self::META_SESSION_IDS ),
+			self::SIGNAL_ADS       => $ads,
+		);
+	}
+
+	/**
+	 * A newer consent observation merged onto the stored one, per signal: a
+	 * signal the newer pass observed replaces the stored value, one it did not
+	 * observe keeps it, so an empty or partial map cannot erase a stored denial
+	 * (#536, maintainer decision 2026-10-22).
+	 *
+	 * @param array<string, mixed>|null $stored   The consent state stored with the order.
+	 * @param array<string, mixed>|null $observed The state this pass observed.
+	 * @return array<string, mixed>|null
+	 */
+	public static function merge_consent( ?array $stored, ?array $observed ): ?array {
+		if ( null === $observed || null === $stored ) {
+			return $observed ?? $stored;
+		}
+
+		$stored_signals   = $stored[ AttributionCookies::KEY_SIGNALS ] ?? array();
+		$observed_signals = $observed[ AttributionCookies::KEY_SIGNALS ] ?? array();
+
+		return array(
+			AttributionCookies::KEY_SIGNALS     => array_replace( is_array( $stored_signals ) ? $stored_signals : array(), is_array( $observed_signals ) ? $observed_signals : array() ),
+			AttributionCookies::KEY_CAPTURED_AT => $observed[ AttributionCookies::KEY_CAPTURED_AT ] ?? ( $stored[ AttributionCookies::KEY_CAPTURED_AT ] ?? 0 ),
+		);
 	}
 
 	/**

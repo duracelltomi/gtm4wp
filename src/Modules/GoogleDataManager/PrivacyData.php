@@ -13,7 +13,7 @@ namespace GTM4WP\Modules\GoogleDataManager;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Wires the `_gtm4wp_*` attribution meta into WordPress' personal-data export
+ * Wires the personal-data attribution meta into WordPress' personal-data export
  * and erasure requests, for both platforms. Uninstall leaves the meta behind,
  * so the eraser is the per-person removal path. Registered unconditionally: a
  * request must find data captured while the feature was on. The key list is

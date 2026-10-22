@@ -1181,10 +1181,10 @@ report.
 | 531 | Low | fixed (R54 fix session: variations carry a purchase-basis price where it differs from display_price, the tracker reads it first; U194; PHP + JS tests; the bullet names variations) | — | WC variation tracker JS; 2.1 changelog bullet | #526 incomplete for variable products; the bullet overclaims |
 | 532 | Low | fixed (R54 fix session: lines summed signed and made positive once; U152 (3) corrected; 1 test red before the fix, 1 guard green by design) | — | Data Manager `WooCommerceRefunds::figures()` | A refunded negative fee raises the line-based refund value |
 | 533 | Low | fixed (R54 fix session: the line tax is rounded as the cart does per EDD version, edd_format_amount data from 3.3.6, the decimal filter before; U189 (4) corrected; 1 test red before the fix, 1 guard green by design) | — | EDD `DownloadData::basis_price()` | Tax rounding differs from the cart on EDD 3.3.6+ for some currencies; U189 (4) wrong |
-| 534 | Low | open | — | Data Manager `CaptureHooks` | A resumed order whose first pass stored nothing is counted twice |
-| 535 | Low | open | — | Data Manager `CaptureHooks` (EDD) | EDD resumed orders have none of the #481 handling |
-| 536 | Low | open (maintainer decision) | A0/A1 data | Data Manager `CaptureHooks` (WC) | Consent recorded on a resumed order; WC and EDD answer differently |
-| 537 | Low | open | — | `CaptureStats::record_rescue()` | Rescue also counts orders that were never counted |
+| 534 | Low | fixed (R54 fix session: a per-order counting marker, `_gtm4wp_capture_counted`; a later first client id counts as a rescue; maintainer accepted the one write per order) | — | Data Manager `CaptureHooks` | A resumed order whose first pass stored nothing is counted twice |
+| 535 | Low | fixed (R54 fix session: one capture pass shared by both stores) | — | Data Manager `CaptureHooks` (EDD) | EDD resumed orders have none of the #481 handling |
+| 536 | Low | fixed (R54 fix session, maintainer decision 2026-10-22: the later observed consent wins per signal; an id group the pass resolved replaces the stored group; threat model updated) | A0/A1 data | Data Manager `CaptureHooks` (WC) | Consent recorded on a resumed order; WC and EDD answer differently |
+| 537 | Low | fixed (R54 fix session: a rescue only of an order whose marker reads uncaptured) | — | `CaptureStats::record_rescue()` | Rescue also counts orders that were never counted |
 | 538 | Low | open | A0 key holder | Data Manager backfill route | Writes while no destination exists (#484 sibling) |
 | 539 | Low | open | A0 | Data Manager backfill route | Route arguments carry no length bound |
 | 540 | Low | open (unverified) | A0 | `ReceiptPage`, EDD receipt gate | A second EDD receipt filter is not mirrored |

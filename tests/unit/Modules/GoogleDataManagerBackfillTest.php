@@ -10,6 +10,7 @@ namespace GTM4WP\Tests\unit\Modules;
 use Brain\Monkey\Functions;
 use GTM4WP\Modules\GoogleDataManager\AttributionCapture;
 use GTM4WP\Modules\GoogleDataManager\BackfillEndpoint;
+use GTM4WP\Modules\GoogleDataManager\CaptureHooks;
 use GTM4WP\Modules\GoogleDataManager\CaptureStats;
 use GTM4WP\Tests\unit\Google\OptionStoreTrait;
 use GTM4WP\Tests\unit\TestCase;
@@ -344,18 +345,58 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	/**
 	 * #482: a client id the backfill rescues raises the captured count of an
 	 * order counted uncaptured at creation; never the seen count, never past it.
+	 * #537: "counted uncaptured" is the order's marker, flipped in the same save.
 	 */
 	public function test_a_rescued_client_id_is_counted_as_captured(): void {
 		$this->options[ CaptureStats::OPTION_NAME ] = array(
 			'seen'     => 3,
 			'captured' => 0,
 		);
-		$this->given_woocommerce_order();
+		$order                                      = $this->given_woocommerce_order( array( CaptureHooks::META_COUNTED => '0' ) );
 
 		( new BackfillEndpoint() )->backfill( self::request() );
 
 		$this->assertSame( 3, $this->options[ CaptureStats::OPTION_NAME ]['seen'] );
 		$this->assertSame( 1, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+		$this->assertSame( '1', $order->get_meta( CaptureHooks::META_COUNTED, true ) );
+		$this->assertSame( 1, $order->save_count );
+	}
+
+	/**
+	 * #537: an order never counted (no marker: placed before the lane, or with
+	 * no destination) or already counted captured is not a rescue; the client
+	 * id is still written.
+	 */
+	public function test_an_order_not_counted_uncaptured_is_not_a_rescue(): void {
+		foreach ( array(
+			'no marker'        => array(),
+			'counted captured' => array( CaptureHooks::META_COUNTED => '1' ),
+		) as $label => $meta ) {
+			$this->options[ CaptureStats::OPTION_NAME ] = array(
+				'seen'     => 3,
+				'captured' => 0,
+			);
+			$order                                      = $this->given_woocommerce_order( $meta );
+
+			( new BackfillEndpoint() )->backfill( self::request() );
+
+			$this->assertSame( '111.222', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ), $label );
+			$this->assertSame( 0, $this->options[ CaptureStats::OPTION_NAME ]['captured'], $label );
+		}
+
+		$this->edd_existing = array();
+		$this->given_edd_order( 'edd-payment-key-abc' );
+
+		( new BackfillEndpoint() )->backfill(
+			self::request(
+				array(
+					'platform' => BackfillEndpoint::PLATFORM_EDD,
+					'token'    => 'edd-payment-key-abc',
+				)
+			)
+		);
+
+		$this->assertSame( 0, $this->options[ CaptureStats::OPTION_NAME ]['captured'], 'EDD, no marker.' );
 	}
 
 	/**
@@ -366,7 +407,7 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 			'seen'     => 2,
 			'captured' => 2,
 		);
-		$this->given_woocommerce_order();
+		$this->given_woocommerce_order( array( CaptureHooks::META_COUNTED => '0' ) );
 
 		( new BackfillEndpoint() )->backfill( self::request() );
 
@@ -378,7 +419,7 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 	 * only a gclid rescues nothing.
 	 */
 	public function test_a_backfill_without_a_client_id_is_not_counted_as_a_rescue(): void {
-		$order = $this->given_woocommerce_order();
+		$order = $this->given_woocommerce_order( array( CaptureHooks::META_COUNTED => '0' ) );
 
 		$this->options[ CaptureStats::OPTION_NAME ] = array(
 			'seen'     => 3,
@@ -399,6 +440,7 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 			'seen'     => 3,
 			'captured' => 0,
 		);
+		$this->edd_existing                         = array( CaptureHooks::META_COUNTED => '0' );
 		$this->given_edd_order( 'edd-payment-key-abc' );
 
 		( new BackfillEndpoint() )->backfill(
@@ -411,6 +453,7 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 		);
 
 		$this->assertSame( 1, $this->options[ CaptureStats::OPTION_NAME ]['captured'] );
+		$this->assertContains( array( 42, CaptureHooks::META_COUNTED, '1' ), $this->edd_written );
 	}
 
 	/**

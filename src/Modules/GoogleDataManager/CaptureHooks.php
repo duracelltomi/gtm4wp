@@ -16,12 +16,18 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Writes the captured attribution into order meta at order creation, on both
- * platforms: the one moment inside the buyer's own request (cookies readable)
- * that happens exactly once; a payment hook can fire from a gateway callback.
- * What to store is decided in AttributionCapture; this is the wiring plus the
- * two platform-specific writers.
+ * platforms: a moment inside the buyer's own request (cookies readable); a
+ * payment hook can fire from a gateway callback. A resumed order (a failed
+ * payment retried) runs the pass again, so each pass merges onto the last
+ * (pass()). What to store is decided in AttributionCapture.
  */
 final class CaptureHooks {
+
+	/**
+	 * Order meta marking the order as counted in CaptureStats: '0' uncaptured,
+	 * '1' captured. Not personal data, so not in AttributionCapture::meta_keys().
+	 */
+	public const META_COUNTED = '_gtm4wp_capture_counted';
 
 	/**
 	 * Builds the hook set.
@@ -84,48 +90,25 @@ final class CaptureHooks {
 	 * @return void
 	 */
 	public function capture_woocommerce_order( $order ): void {
-		if ( ! is_object( $order ) || ! method_exists( $order, 'update_meta_data' ) || ! $this->has_destination() ) {
+		if ( ! is_object( $order ) || ! method_exists( $order, 'update_meta_data' ) || ! method_exists( $order, 'get_meta' ) || ! $this->has_destination() ) {
 			return;
 		}
 
-		// An order that already carries capture is left alone: a second pass
-		// could only overwrite good data.
-		if ( method_exists( $order, 'get_meta' ) && '' !== (string) $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) ) {
-			return;
-		}
-
-		// A resumed order (failed payment, then a retry) runs this again: the
-		// newest pass replaces what the first stored, so a click id cannot sit
-		// beside a newer denial, and the order is counted once (#481).
-		$stored = array();
-
-		if ( method_exists( $order, 'get_meta' ) ) {
-			foreach ( AttributionCapture::meta_keys() as $key ) {
-				if ( ! in_array( $order->get_meta( $key, true ), array( '', null, false ), true ) ) {
-					$stored[] = $key;
+		$changed = $this->pass(
+			static fn ( string $key ) => $order->get_meta( $key, true ),
+			static function ( string $key, $value ) use ( $order ): void {
+				$order->update_meta_data( $key, $value );
+			},
+			static function ( string $key ) use ( $order ): void {
+				if ( method_exists( $order, 'delete_meta_data' ) ) {
+					$order->delete_meta_data( $key );
 				}
-			}
-		}
+			},
+			$order
+		);
 
-		$meta = AttributionCapture::meta_for_order( $order );
-
-		// A pass that resolved nothing replaces nothing.
-		foreach ( array() === $meta ? array() : array_diff( $stored, array_keys( $meta ) ) as $key ) {
-			if ( method_exists( $order, 'delete_meta_data' ) ) {
-				$order->delete_meta_data( $key );
-			}
-		}
-
-		foreach ( $meta as $key => $value ) {
-			$order->update_meta_data( $key, $value );
-		}
-
-		if ( array() !== $meta && method_exists( $order, 'save' ) ) {
+		if ( $changed && method_exists( $order, 'save' ) ) {
 			$order->save();
-		}
-
-		if ( array() === $stored ) {
-			$this->stats->record( AttributionCapture::is_usable( $meta ) );
 		}
 	}
 
@@ -139,18 +122,107 @@ final class CaptureHooks {
 	public function capture_edd_order( $order_id, $order_data = array() ): void {
 		$order_id = (int) $order_id;
 
-		if ( $order_id <= 0 || ! function_exists( 'edd_update_order_meta' ) || ! $this->has_destination() ) {
+		if ( $order_id <= 0 || ! function_exists( 'edd_update_order_meta' ) || ! function_exists( 'edd_get_order_meta' ) || ! $this->has_destination() ) {
 			return;
 		}
 
 		unset( $order_data );
 
-		$meta = AttributionCapture::meta_for_order( $order_id );
+		$this->pass(
+			static fn ( string $key ) => edd_get_order_meta( $order_id, $key, true ),
+			static function ( string $key, $value ) use ( $order_id ): void {
+				edd_update_order_meta( $order_id, $key, $value );
+			},
+			static function ( string $key ) use ( $order_id ): void {
+				if ( function_exists( 'edd_delete_order_meta' ) ) {
+					edd_delete_order_meta( $order_id, $key );
+				}
+			},
+			$order_id
+		);
+	}
 
-		foreach ( $meta as $key => $value ) {
-			edd_update_order_meta( $order_id, $key, $value );
+	/**
+	 * One capture pass, either store (#534-#536). Consent merges per signal
+	 * (AttributionCapture::merge_consent()), and the merged state gates this
+	 * pass's ids and the stored ones. An id group this pass resolved replaces
+	 * the stored group whole, so a new client id never sits beside the old
+	 * client's sessions; a group it did not resolve is kept, so an empty pass
+	 * changes nothing. The order is counted once, a later first client id as a
+	 * rescue (META_COUNTED); orders stored before the marker count as counted.
+	 *
+	 * @param callable $get             Reads a meta value: fn( string $key ): mixed.
+	 * @param callable $set             Writes one: fn( string $key, mixed $value ): void.
+	 * @param callable $delete          Deletes one: fn( string $key ): void.
+	 * @param mixed    $order_reference The WC_Order, or the EDD order id.
+	 * @return bool Whether anything was written or deleted.
+	 */
+	private function pass( callable $get, callable $set, callable $delete, $order_reference ): bool {
+		$stored = array();
+
+		foreach ( AttributionCapture::meta_keys() as $key ) {
+			$value = $get( $key );
+
+			if ( ! in_array( $value, array( '', null, false ), true ) ) {
+				$stored[ $key ] = $value;
+			}
 		}
 
-		$this->stats->record( AttributionCapture::is_usable( $meta ) );
+		$meta    = AttributionCapture::meta_for_order( $order_reference );
+		$consent = AttributionCapture::merge_consent(
+			is_array( $stored[ AttributionCapture::META_CONSENT_STATE ] ?? null ) ? $stored[ AttributionCapture::META_CONSENT_STATE ] : null,
+			is_array( $meta[ AttributionCapture::META_CONSENT_STATE ] ?? null ) ? $meta[ AttributionCapture::META_CONSENT_STATE ] : null
+		);
+
+		unset( $meta[ AttributionCapture::META_CONSENT_STATE ] );
+		$meta = AttributionCapture::apply_consent_gate( $meta, $consent );
+
+		$kept = $stored;
+		unset( $kept[ AttributionCapture::META_CONSENT_STATE ] );
+
+		foreach ( AttributionCapture::signal_groups() as $keys ) {
+			if ( array() !== array_intersect_key( $meta, array_flip( $keys ) ) ) {
+				$kept = array_diff_key( $kept, array_flip( $keys ) );
+			}
+		}
+
+		$final = $meta + AttributionCapture::apply_consent_gate( $kept, $consent );
+
+		if ( null !== $consent ) {
+			$final[ AttributionCapture::META_CONSENT_STATE ] = $consent;
+		}
+
+		$changed = false;
+
+		foreach ( array_keys( array_diff_key( $stored, $final ) ) as $key ) {
+			$delete( $key );
+			$changed = true;
+		}
+
+		foreach ( $final as $key => $value ) {
+			if ( ! array_key_exists( $key, $stored ) || $stored[ $key ] !== $value ) {
+				$set( $key, $value );
+				$changed = true;
+			}
+		}
+
+		$counted = $get( self::META_COUNTED );
+		$counted = is_scalar( $counted ) ? (string) $counted : '';
+		$usable  = AttributionCapture::is_usable( $final );
+
+		if ( '' === $counted ) {
+			if ( array() === $stored ) {
+				$this->stats->record( $usable );
+			}
+
+			$set( self::META_COUNTED, $usable ? '1' : '0' );
+			$changed = true;
+		} elseif ( '0' === $counted && $usable ) {
+			$this->stats->record_rescue();
+			$set( self::META_COUNTED, '1' );
+			$changed = true;
+		}
+
+		return $changed;
 	}
 }
