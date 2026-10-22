@@ -334,7 +334,7 @@ describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
 	// Fires WooCommerce's found_variation handler with the given prefix and returns
 	// the pushed view_item item. found_variation is bound through jQuery, so a
 	// capturing jQuery stub records the handler and we invoke it directly.
-	const fireFoundVariation = ( prefix ) => {
+	const fireFoundVariation = ( prefix, variationFields = {} ) => {
 		document.body.className = '';
 		document.body.innerHTML =
 			'<form class="cart variations_form">' +
@@ -383,6 +383,7 @@ describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
 				sku: 'VAR-SKU',
 				display_price: 9.99,
 				attributes: { attribute_pa_color: 'blue' },
+				...variationFields,
 			}
 		);
 
@@ -400,6 +401,18 @@ describe( 'gtm4wp-woocommerce variation id prefix (#383)', () => {
 		expect( item.item_group_id ).toBe( 'woocommerce_gpf_10' );
 		// #348: the variation view_item must carry an explicit quantity of 1.
 		expect( item.quantity ).toBe( 1 );
+	} );
+
+	// #531: the purchase-basis price PHP adds wins over WooCommerce's
+	// display_price; without it the display price is kept.
+	it( 'prices the variation on the purchase basis when PHP supplies it', () => {
+		expect( fireFoundVariation( '', { gtm4wp_price: 8.26 } ).price ).toBe(
+			8.26
+		);
+	} );
+
+	it( 'keeps the display price when PHP supplies no basis price', () => {
+		expect( fireFoundVariation( '' ).price ).toBe( 9.99 );
 	} );
 
 	it( 'leaves the id unprefixed and numeric when no prefix is set', () => {

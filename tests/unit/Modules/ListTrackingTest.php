@@ -719,6 +719,42 @@ final class ListTrackingTest extends TestCase {
 	}
 
 	/**
+	 * #531: a variation carries its purchase-basis price only where it differs
+	 * from WooCommerce's display_price, i.e. "Exclude tax" with a gross shop
+	 * display; every other combination leaves the variation data untouched.
+	 */
+	public function test_a_variation_carries_the_purchase_basis_price_only_where_it_differs(): void {
+		Functions\when( 'wc_get_price_including_tax' )->justReturn( 12.1 );
+		Functions\when( 'wc_get_price_excluding_tax' )->justReturn( 10.0 );
+		$variation = $this->make_product();
+		$data      = array( 'display_price' => 12.1 );
+
+		$cases = array(
+			'exclude tax, shop gross' => array( true, 'incl', 10.0 ),
+			'exclude tax, shop net'   => array( true, 'excl', null ),
+			'gross, shop gross'       => array( false, 'incl', null ),
+			'gross, shop net'         => array( false, 'excl', null ),
+		);
+
+		foreach ( $cases as $label => list( $exclude_tax, $display, $expected ) ) {
+			Functions\when( 'get_option' )->alias(
+				static fn ( $key ) => 'woocommerce_tax_display_shop' === $key ? $display : array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_INTEGRATE_WCEXCLUDETAX => $exclude_tax,
+				)
+			);
+			$options = new Options( ( new WooCommerceModule() )->defaults() );
+
+			$result = ( new ListTracking( $options, new ProductData( $options ) ) )->add_basis_price_to_variation( $data, null, $variation );
+
+			$this->assertSame( $expected, $result[ ListTracking::VARIATION_BASIS_PRICE_KEY ] ?? null, $label );
+			$this->assertSame( 12.1, $result['display_price'], $label . ': display_price is never changed.' );
+		}
+
+		$this->assertSame( 'not data', $this->make_list_tracking()->add_basis_price_to_variation( 'not data' ) );
+	}
+
+	/**
 	 * An excluded line clears the per-row global, so its remove link cannot carry
 	 * the previous row's data (#417).
 	 */

@@ -34,6 +34,12 @@ final class ListTracking {
 	 * One key per list, not per rendering path, so a shortcode, a Product
 	 * Collection block and a legacy grid block report the same identity.
 	 */
+	/**
+	 * Variation-data key the tracker reads before display_price (#531); the
+	 * same literal is in js/frontend/gtm4wp-woocommerce.js.
+	 */
+	public const VARIATION_BASIS_PRICE_KEY = 'gtm4wp_price';
+
 	private const LIST_GENERAL      = 'general';
 	private const LIST_SEARCH       = 'search';
 	private const LIST_RELATED      = 'related';
@@ -66,6 +72,34 @@ final class ListTracking {
 		$GLOBALS['gtm4wp_product_counter']    = 0;
 		$GLOBALS['gtm4wp_grouped_product_ix'] = 1;
 		$GLOBALS['gtm4wp_cart_item_proddata'] = '';
+	}
+
+	/**
+	 * Adds the variation's price on the purchase basis to the data the variation
+	 * form passes to found_variation, under VARIATION_BASIS_PRICE_KEY, wherever it
+	 * differs from WooCommerce's display_price (shop display setting): "Exclude
+	 * tax" on with the shop showing prices with tax (#531, U194). Hooked to
+	 * woocommerce_available_variation, which passes three arguments.
+	 *
+	 * @param mixed $data      The variation data.
+	 * @param mixed $product   The variable product.
+	 * @param mixed $variation The variation.
+	 * @return mixed
+	 */
+	public function add_basis_price_to_variation( $data, $product = null, $variation = null ) {
+		if ( ! is_array( $data ) || ! $variation instanceof \WC_Product || ! function_exists( 'wc_get_price_excluding_tax' ) ) {
+			return $data;
+		}
+
+		$include_tax = $this->product_data->item_prices_include_tax();
+
+		if ( ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) ) === $include_tax ) {
+			return $data;
+		}
+
+		$data[ self::VARIATION_BASIS_PRICE_KEY ] = (float) ( $include_tax ? wc_get_price_including_tax( $variation ) : wc_get_price_excluding_tax( $variation ) );
+
+		return $data;
 	}
 
 	/**

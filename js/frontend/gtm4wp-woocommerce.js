@@ -1203,8 +1203,12 @@ function gtm4wp_woocommerce_process_pages() {
 							: product_variation.sku;
 					current_product_detail_data.item_id = product_variation.sku;
 				}
+				// The purchase-basis price PHP adds where it differs from WooCommerce's
+				// display_price (ListTracking::VARIATION_BASIS_PRICE_KEY, #531).
 				current_product_detail_data.price = gtm4wp_make_sure_is_float(
-					product_variation.display_price
+					undefined !== product_variation.gtm4wp_price
+						? product_variation.gtm4wp_price
+						: product_variation.display_price
 				);
 
 				const product_variation_attribute_values = [];
