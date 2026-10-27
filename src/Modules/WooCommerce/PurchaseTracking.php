@@ -132,12 +132,7 @@ final class PurchaseTracking {
 	window.' . esc_js( $datalayer_name ) . '.push(' . $encoded_data_layer . ');
 </script>';
 
-			// The buyer's order is now in this page: keep it out of page caches (#460).
-			// Constant only: headers are usually sent by now; output-buffer caches read it.
-			if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U70, U141), not ours to prefix.
-				define( 'DONOTCACHEPAGE', true );
-			}
+			\GTM4WP\Ecommerce\Helpers::keep_out_of_page_caches();
 
 			$this->script_tag->print_script_block( $script_tag );
 

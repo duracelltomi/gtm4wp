@@ -1269,6 +1269,69 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * #541: the fallback prints the buyer's purchase on an ordinary page, which
+	 * must then stay out of output-buffer page caches. Separate process:
+	 * DONOTCACHEPAGE is a constant.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_pending_purchase_fallback_keeps_the_page_out_of_page_caches(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => false,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
+	/**
+	 * #541 guard: a page the fallback prints nothing on stays cacheable.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_page_without_the_fallback_purchase_stays_cacheable(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_pending( 1001 );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+			->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertFalse( defined( 'DONOTCACHEPAGE' ) );
+	}
+
+	/**
+	 * #541: orderData alone carries the buyer's identity, so it keeps the page
+	 * out of caches too, even for an order already tracked.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_fallback_order_data_alone_keeps_the_page_out_of_page_caches(): void {
+		$order = $this->make_recent_order( array( 'meta' => array( '_ga_tracked' => 1 ) ) );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		$this->stub_wc_pending( 1001 );
+
+		$data_layer = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_WCORDERDATA      => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertArrayHasKey( 'orderData', $data_layer );
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_js );
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
+	/**
 	 * #412: a purchase that will not be printed (a filter injecting NAN, or
 	 * dropping `event`) must not flag the order, or it is suppressed for good
 	 * on every other path too.

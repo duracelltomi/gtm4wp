@@ -111,6 +111,20 @@ final class Helpers {
 	}
 
 	/**
+	 * Keeps the page being rendered out of page caches once the buyer's order
+	 * is in it (#460, #541). Constant only: headers are usually sent by the
+	 * time the data layer is built, and output-buffer caches read it at the end.
+	 *
+	 * @return void
+	 */
+	public static function keep_out_of_page_caches(): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U70, U141), not ours to prefix.
+			define( 'DONOTCACHEPAGE', true );
+		}
+	}
+
+	/**
 	 * The purchase value rule: a total, less tax and shipping when the exclude
 	 * options say so. The one definition the purchase event, its items and the
 	 * refund value share in both stores (RI-43, #548); EDD passes no shipping.

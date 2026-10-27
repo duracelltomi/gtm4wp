@@ -674,6 +674,7 @@ final class PageDataLayer {
 
 			if ( array() !== $order_data ) {
 				$data_layer['orderData'] = $order_data;
+				EcommerceHelpers::keep_out_of_page_caches();
 			}
 
 			// Identity line, as in the WooCommerce module: dropped after the filter
@@ -727,6 +728,8 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
+		// Any page on the fallback lane, not only the confirmation page (#541).
+		EcommerceHelpers::keep_out_of_page_caches();
 		$this->download_data->flag_order_tracked( $order );
 
 		return $data_layer;

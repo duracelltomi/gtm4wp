@@ -957,6 +957,7 @@ final class PageDataLayer {
 
 			if ( array() !== $order_data ) {
 				$data_layer['orderData'] = $order_data;
+				\GTM4WP\Ecommerce\Helpers::keep_out_of_page_caches();
 			}
 
 			// Dropped after the GTM4WP_WPFILTER_EEC_ORDER_DATA filter so the filter
@@ -1035,6 +1036,8 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
+		// Any page on the fallback lane, not only the order-received page (#541).
+		\GTM4WP\Ecommerce\Helpers::keep_out_of_page_caches();
 		$this->product_data->flag_order_tracked( $order );
 		$this->clear_pending_session_order();
 

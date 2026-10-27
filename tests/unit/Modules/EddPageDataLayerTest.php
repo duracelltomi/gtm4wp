@@ -951,6 +951,39 @@ final class EddPageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * #541: a missed purchase printed on an ordinary page keeps that page out
+	 * of output-buffer page caches. Separate process: DONOTCACHEPAGE is a constant.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_missed_purchase_keeps_the_page_out_of_page_caches(): void {
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true ) )->add_datalayer_data( array() );
+
+		$this->assertStringContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+	}
+
+	/**
+	 * #541 guard: nothing printed (a pending order) leaves the page cacheable.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_a_page_without_a_missed_purchase_stays_cacheable(): void {
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order( array( 'status' => 'pending' ) ) );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true ) )->add_datalayer_data( array() );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ) );
+		$this->assertFalse( defined( 'DONOTCACHEPAGE' ) );
+	}
+
+	/**
 	 * #471: the page lane runs when the buyer did NOT reach the confirmation
 	 * page, so a pending order (an abandoned PayPal redirect) is not a
 	 * purchase there, even though the default status list includes pending.
