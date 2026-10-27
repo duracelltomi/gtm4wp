@@ -42,7 +42,7 @@ final class Input {
 	 */
 	public static function strings( $value ): array {
 		if ( is_string( $value ) ) {
-			$value = function_exists( 'wp_parse_list' ) ? wp_parse_list( $value ) : preg_split( '/[\s,]+/', $value, -1, PREG_SPLIT_NO_EMPTY );
+			$value = wp_parse_list( $value );
 		}
 
 		if ( ! is_array( $value ) ) {

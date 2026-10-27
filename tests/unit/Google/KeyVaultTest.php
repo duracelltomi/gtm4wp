@@ -381,6 +381,7 @@ final class KeyVaultTest extends TestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_google_key_unreadable', $result->get_error_code() );
+		$this->assertStringContainsString( 'wp-config.php or ' . KeyVault::ENCRYPTION_KEY_CONSTANT . ' changed.', $result->get_error_message(), 'The placeholder is filled (#618).' );
 
 		// The status is persisted (not just returned) so the admin notice, which
 		// runs on a later request, can pick it up.

@@ -26,10 +26,16 @@ defined( 'ABSPATH' ) || exit;
 final class CaptureHooks {
 
 	/**
-	 * Order meta marking the order as counted in CaptureStats: '0' uncaptured,
-	 * '1' captured. Not personal data, so not in AttributionCapture::meta_keys().
+	 * Order meta marking the order as counted in CaptureStats, holding one of
+	 * the COUNTED_* values. Not personal data, so not in AttributionCapture::meta_keys().
 	 */
 	public const META_COUNTED = '_gtm4wp_capture_counted';
+
+	/** META_COUNTED value: counted uncaptured (a later client id is a rescue). */
+	public const COUNTED_UNCAPTURED = '0';
+
+	/** META_COUNTED value: counted captured. */
+	public const COUNTED_CAPTURED = '1';
 
 	/**
 	 * Builds the hook set.
@@ -49,6 +55,16 @@ final class CaptureHooks {
 	 */
 	private function has_destination(): bool {
 		return null === $this->options || array() !== DestinationRows::rows( $this->options );
+	}
+
+	/**
+	 * Reads a stored META_COUNTED value: '' when never counted, else a COUNTED_* value.
+	 *
+	 * @param mixed $marker The stored meta value.
+	 * @return string
+	 */
+	public static function counted_state( $marker ): string {
+		return is_scalar( $marker ) ? (string) $marker : '';
 	}
 
 	/**
@@ -215,8 +231,7 @@ final class CaptureHooks {
 			}
 		}
 
-		$counted = $get( self::META_COUNTED );
-		$counted = is_scalar( $counted ) ? (string) $counted : '';
+		$counted = self::counted_state( $get( self::META_COUNTED ) );
 		$usable  = AttributionCapture::is_usable( $final );
 
 		if ( '' === $counted ) {
@@ -224,11 +239,11 @@ final class CaptureHooks {
 				$this->stats->record( $usable );
 			}
 
-			$set( self::META_COUNTED, $usable ? '1' : '0' );
+			$set( self::META_COUNTED, $usable ? self::COUNTED_CAPTURED : self::COUNTED_UNCAPTURED );
 			$changed = true;
-		} elseif ( '0' === $counted && $usable ) {
+		} elseif ( self::COUNTED_UNCAPTURED === $counted && $usable ) {
 			$this->stats->record_rescue();
-			$set( self::META_COUNTED, '1' );
+			$set( self::META_COUNTED, self::COUNTED_CAPTURED );
 			$changed = true;
 		}
 

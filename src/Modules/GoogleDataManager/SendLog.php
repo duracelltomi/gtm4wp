@@ -51,8 +51,8 @@ final class SendLog {
 	public const OUTCOME_RETRYING = 'retrying';
 
 	/**
-	 * Outcome: the request failed and will not be retried - either the error
-	 * says the request itself is wrong, or the retries ran out.
+	 * Outcome: nothing more will be tried - the error says the request itself
+	 * is wrong, the retries ran out, or the job could not be queued.
 	 */
 	public const OUTCOME_FAILED = 'failed';
 

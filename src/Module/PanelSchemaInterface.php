@@ -31,8 +31,10 @@ interface PanelSchemaInterface {
 	/**
 	 * Data the panel component needs at boot (REST paths, limits, labels);
 	 * scalars and arrays only, it travels as JSON. Called only when the settings
-	 * page renders (unlike fields(), walked on every REST request), so this is
-	 * the one place a schema may afford a database read.
+	 * page renders, so this is the one place a schema may afford a database read:
+	 * fields() runs whenever a settings schema is built (the settings POST
+	 * dispatch, abilities registration, the settings screen), so it stays
+	 * database-free; costly choices go through a choices_loader.
 	 *
 	 * Reserved keys: `columnChoices` (option key => column key => choices,
 	 * merged into table columns whose choices exist only at render time) and

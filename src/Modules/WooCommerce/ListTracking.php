@@ -29,17 +29,17 @@ defined( 'ABSPATH' ) || exit;
 final class ListTracking {
 
 	/**
-	 * Keys of the product lists the plugin names itself; list_identity() resolves
-	 * each to a translated item_list_name and a locale-independent item_list_id.
-	 * One key per list, not per rendering path, so a shortcode, a Product
-	 * Collection block and a legacy grid block report the same identity.
-	 */
-	/**
 	 * Variation-data key the tracker reads before display_price (#531); the
 	 * same literal is in js/frontend/gtm4wp-woocommerce.js.
 	 */
 	public const VARIATION_BASIS_PRICE_KEY = 'gtm4wp_price';
 
+	/**
+	 * Keys of the product lists the plugin names itself; list_identity() resolves
+	 * each to a translated item_list_name and a locale-independent item_list_id.
+	 * One key per list, not per rendering path, so a shortcode, a Product
+	 * Collection block and a legacy grid block report the same identity.
+	 */
 	private const LIST_GENERAL      = 'general';
 	private const LIST_SEARCH       = 'search';
 	private const LIST_RELATED      = 'related';

@@ -218,7 +218,7 @@ final class BackfillEndpoint {
 			$rescued = $rescued && self::counted_uncaptured( $order->get_meta( CaptureHooks::META_COUNTED, true ) );
 
 			if ( $rescued ) {
-				$order->update_meta_data( CaptureHooks::META_COUNTED, '1' );
+				$order->update_meta_data( CaptureHooks::META_COUNTED, CaptureHooks::COUNTED_CAPTURED );
 			}
 
 			if ( $written ) {
@@ -293,7 +293,7 @@ final class BackfillEndpoint {
 				edd_update_order_meta( $resolved_id, $key, $value );
 
 				if ( AttributionCapture::META_CLIENT_ID === $key && self::counted_uncaptured( edd_get_order_meta( $resolved_id, CaptureHooks::META_COUNTED, true ) ) ) {
-					edd_update_order_meta( $resolved_id, CaptureHooks::META_COUNTED, '1' );
+					edd_update_order_meta( $resolved_id, CaptureHooks::META_COUNTED, CaptureHooks::COUNTED_CAPTURED );
 					( new CaptureStats() )->record_rescue();
 				}
 			}
@@ -324,14 +324,14 @@ final class BackfillEndpoint {
 
 	/**
 	 * Whether the order was counted uncaptured at creation (CaptureHooks::META_COUNTED
-	 * reads '0'): only then is a backfilled client id a rescue. An order never
+	 * reads COUNTED_UNCAPTURED): only then is a backfilled client id a rescue. An order never
 	 * counted (placed before the lane, or with no destination) carries no marker.
 	 *
 	 * @param mixed $marker The stored marker.
 	 * @return bool
 	 */
 	private static function counted_uncaptured( $marker ): bool {
-		return is_scalar( $marker ) && '0' === (string) $marker;
+		return CaptureHooks::COUNTED_UNCAPTURED === CaptureHooks::counted_state( $marker );
 	}
 
 	/**

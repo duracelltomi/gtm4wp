@@ -791,6 +791,24 @@ final class ListTrackingTest extends TestCase {
 	}
 
 	/**
+	 * RI-14: PHP writes the basis price under this key and the tracker reads it
+	 * under a literal; only reading the JS source catches a rename on one side.
+	 *
+	 * @return void
+	 */
+	public function test_variation_basis_price_key_matches_the_javascript_reader(): void {
+		// A local source file in this repository, not a remote URL.
+		$js = file_get_contents( dirname( __DIR__, 3 ) . '/js/frontend/gtm4wp-woocommerce.js' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		$this->assertIsString( $js, 'The tracker source must be readable to verify the key contract.' );
+		$this->assertStringContainsString(
+			'product_variation.' . ListTracking::VARIATION_BASIS_PRICE_KEY,
+			(string) $js,
+			'gtm4wp-woocommerce.js must read the variation key PHP writes (#531).'
+		);
+	}
+
+	/**
 	 * An excluded line clears the per-row global, so its remove link cannot carry
 	 * the previous row's data (#417).
 	 */

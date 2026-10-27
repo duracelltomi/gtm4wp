@@ -218,7 +218,8 @@ final class ProductData {
 
 		// The tax price functions are expensive; skip them when the caller supplies
 		// a price, which array_merge() applies below anyway (#436, memory exhaustion).
-		// Same tax basis as the purchase event, not the shop display setting (#519).
+		// Item basis (item_prices_include_tax()), as on the purchase items: net with
+		// Exclude tax, else the shop display (#519, #575).
 		if ( array_key_exists( 'price', $additional_product_attributes ) ) {
 			$display_price = (float) $additional_product_attributes['price'];
 		} elseif ( $this->item_prices_include_tax() ) {

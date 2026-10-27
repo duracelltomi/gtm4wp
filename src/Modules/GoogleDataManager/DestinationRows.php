@@ -38,7 +38,10 @@ final class DestinationRows {
 	public const TYPE_GA4 = 'ga4';
 
 	/**
-	 * Every known destination type.
+	 * Every known destination type. Four sites answer "is there a destination":
+	 * any row (CaptureHooks::has_destination(), the backfill route gate in Plugin)
+	 * or GA4 rows only (GoogleDataManagerModule::enqueue_capture_script(),
+	 * RefundSender::destinations()). A second type must make them agree (RI-28).
 	 *
 	 * @var string[]
 	 */

@@ -169,9 +169,9 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 	}
 
 	/**
-	 * The fields() method runs on every REST request (the settings route's schema) and on
-	 * every abilities registration; get_pages() loads every page of the site,
-	 * so it runs only when the choices are read.
+	 * The fields() method runs whenever a settings schema is built (the settings POST dispatch,
+	 * abilities registration, the settings screen), so it stays database-free;
+	 * get_pages() goes through a choices_loader and runs only when the choices are read.
 	 */
 	public function test_order_received_pages_load_only_when_the_choices_are_read(): void {
 		$calls = 0;

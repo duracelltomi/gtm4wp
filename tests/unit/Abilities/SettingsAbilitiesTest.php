@@ -28,6 +28,11 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// Core's wp_parse_list() (TS-16): a string splits on commas and whitespace.
+		Functions\when( 'wp_parse_list' )->alias(
+			static fn ( $input_list ) => is_array( $input_list ) ? $input_list : preg_split( '/[\s,]+/', (string) $input_list, -1, PREG_SPLIT_NO_EMPTY )
+		);
+
 		$this->registry = $this->registry();
 
 		( new SettingsAbilities( $this->registry ) )->register();

@@ -659,7 +659,7 @@ final class PageDataLayer {
 	 * @param bool                 $staff_view             Whether staff are viewing another buyer's receipt: orderData only, no purchase, no flag (#512).
 	 * @return array<string, mixed>
 	 */
-	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $on_confirmation_page = true, bool $withhold_customer_data = false, bool $staff_view = false ): array {
+	private function add_purchase_for_order( array $data_layer, \EDD\Orders\Order $order, bool $on_confirmation_page, bool $withhold_customer_data = false, bool $staff_view = false ): array {
 		if ( $this->download_data->is_order_older_than_max_age( $order ) ) {
 			return $data_layer;
 		}
@@ -674,6 +674,7 @@ final class PageDataLayer {
 
 			if ( array() !== $order_data ) {
 				$data_layer['orderData'] = $order_data;
+				// Deliberate second guard behind prevent_caching_success_page(); keep it.
 				EcommerceHelpers::keep_out_of_page_caches();
 			}
 

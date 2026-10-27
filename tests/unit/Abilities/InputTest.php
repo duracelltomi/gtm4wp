@@ -7,6 +7,7 @@
 
 namespace GTM4WP\Tests\unit\Abilities;
 
+use Brain\Monkey\Functions;
 use GTM4WP\Abilities\Input;
 use GTM4WP\Tests\unit\TestCase;
 
@@ -16,6 +17,15 @@ use GTM4WP\Tests\unit\TestCase;
  * single name as a one-item list, as 7.1's own coercion reads them.
  */
 final class InputTest extends TestCase {
+
+	protected function setUp(): void {
+		parent::setUp();
+
+		// Core's wp_parse_list() (TS-16): a string splits on commas and whitespace.
+		Functions\when( 'wp_parse_list' )->alias(
+			static fn ( $input_list ) => is_array( $input_list ) ? $input_list : preg_split( '/[\s,]+/', (string) $input_list, -1, PREG_SPLIT_NO_EMPTY )
+		);
+	}
 
 	public function test_a_query_string_false_is_false(): void {
 		foreach ( array( 'false', 'FALSE', '0', '', false, 0, null ) as $value ) {

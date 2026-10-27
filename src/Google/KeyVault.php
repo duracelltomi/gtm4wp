@@ -537,7 +537,11 @@ final class KeyVault {
 
 			return new \WP_Error(
 				'gtm4wp_google_key_unreadable',
-				__( 'The stored key of this service account can no longer be decrypted: the security keys in wp-config.php or GTM4WP_ENCRYPTION_KEY changed. Use Replace key on the account with its key file.', 'duracelltomi-google-tag-manager' )
+				sprintf(
+					/* translators: %s: the encryption key constant name. */
+					__( 'The stored key of this service account can no longer be decrypted: the security keys in wp-config.php or %s changed. Use Replace key on the account with its key file.', 'duracelltomi-google-tag-manager' ),
+					self::ENCRYPTION_KEY_CONSTANT
+				)
 			);
 		}
 

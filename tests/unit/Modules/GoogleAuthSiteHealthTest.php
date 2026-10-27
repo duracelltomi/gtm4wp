@@ -103,6 +103,7 @@ final class GoogleAuthSiteHealthTest extends TestCase {
 
 		$this->assertSame( 'critical', $result['status'], 'Every feature on that key has stopped reaching Google - not an improvement waiting to be made.' );
 		$this->assertStringContainsString( 'no longer be read', $result['label'] );
+		$this->assertStringContainsString( 'wp-config.php or ' . KeyVault::ENCRYPTION_KEY_CONSTANT . ' change.', $result['description'], 'The placeholder is filled (#618).' );
 		$this->assertStringContainsString( '#google-auth', $result['actions'], 'The settings app opens the panel from its bookmark.' );
 	}
 

@@ -29,8 +29,8 @@ use GTM4WP\Tests\unit\TestCase;
  * the row (never a silently repaired or dropped broken row), every
  * acceptance stores the normalized form, and - the reason this schema is
  * special - fields() itself never touches the database: the vault read
- * lives in panel_data(), because the settings REST controller walks
- * fields() on every REST request site-wide.
+ * lives in panel_data(), because fields() runs whenever a settings schema is
+ * built (the settings POST dispatch, abilities registration, the settings screen).
  */
 final class GoogleDataManagerAdminSchemaTest extends TestCase {
 
@@ -184,7 +184,7 @@ final class GoogleDataManagerAdminSchemaTest extends TestCase {
 	 * The cost rule the class doc block states, pinned: building the schema
 	 * must not read the database. get_option() is deliberately re-stubbed to
 	 * explode here, so a vault read sneaking back into fields() (or the
-	 * column choices) fails this test instead of taxing every REST request.
+	 * column choices) fails this test instead of taxing every schema build.
 	 */
 	public function test_building_the_fields_reads_no_options(): void {
 		Functions\when( 'get_option' )->alias(

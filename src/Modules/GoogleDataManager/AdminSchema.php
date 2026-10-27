@@ -29,9 +29,9 @@ defined( 'ABSPATH' ) || exit;
  * The destinations table plus the custom test panel below it - the first
  * schema mixing Field controls with a PanelSchemaInterface panel.
  *
- * Cost discipline: fields() is walked by the settings REST controller's
- * value schema on EVERY REST request site-wide, so nothing in fields() may
- * read the database. The service-account choices of the select column come
+ * Cost discipline: fields() runs whenever a settings schema is built (the
+ * settings POST dispatch, abilities registration, the settings screen), so it
+ * stays database-free. The service-account choices of the select column come
  * through panel_data() instead (columnChoices), which only runs when the
  * settings page itself is rendered - the same cost class as the key notice.
  */

@@ -34,8 +34,9 @@ interface AbilitiesInterface {
 	 * wp_abilities_api_init, which core fires lazily on the first ability
 	 * lookup of a request, so building the provider may afford a database
 	 * read (the same cost class as PanelSchemaInterface::panel_data()).
-	 * fields() should stay database-free; WooCommerce's reads the page list
-	 * for its page choices, so building the settings schema costs one query (#508).
+	 * fields() runs whenever a settings schema is built (the settings POST
+	 * dispatch, abilities registration, the settings screen), so it stays
+	 * database-free; costly choices go through a choices_loader (#508).
 	 *
 	 * @return ProviderInterface
 	 */

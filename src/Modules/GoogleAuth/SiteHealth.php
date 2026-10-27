@@ -64,7 +64,13 @@ final class SiteHealth {
 		return array(
 			'status'      => 'critical',
 			'label'       => __( 'A Google service account key can no longer be read', 'duracelltomi-google-tag-manager' ),
-			'description' => '<p>' . esc_html__( 'The stored key of at least one Google service account can no longer be decrypted, which happens when the security keys in wp-config.php or GTM4WP_ENCRYPTION_KEY change. Every feature using that account has stopped reaching Google. Use Replace key on the account with its key file to fix it.', 'duracelltomi-google-tag-manager' ) . '</p>',
+			'description' => '<p>' . esc_html(
+				sprintf(
+					/* translators: %s: the encryption key constant name. */
+					__( 'The stored key of at least one Google service account can no longer be decrypted, which happens when the security keys in wp-config.php or %s change. Every feature using that account has stopped reaching Google. Use Replace key on the account with its key file to fix it.', 'duracelltomi-google-tag-manager' ),
+					KeyVault::ENCRYPTION_KEY_CONSTANT
+				)
+			) . '</p>',
 			'actions'     => sprintf(
 				'<p><a href="%1$s">%2$s</a></p>',
 				// The fragment is the settings app's module bookmark.
