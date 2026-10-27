@@ -1207,7 +1207,7 @@ report.
 | 557 | Low | fixed (R54 upkeep: placeholder formats) | — | Data Manager `AdminSchema` | Translatable suffixes with a leading space |
 | 558 | Low | open (proposed: accept as #468 residual) | A4 | `KeyVault::migrate()` | Lost update against Replace key |
 | 559 | Low | open (needs design) | — | `ServiceAccountKey` | Key material reachable through encoders #496 does not cover |
-| 560 | Low | open | — | `KeyVault` | Salt material cached on the object |
+| 560 | Low | fixed (R54 fix session: the salt material is read on each use, never kept on the vault; dump test) | — | `KeyVault` | Salt material cached on the object |
 | 561 | Low | fixed (R54 upkeep: docblocks and threat model) | — | `KeyVault` docblock, threat model | Migration timing wording |
 | 562 | Low | open | — | `KeyVault`, `KeyNotice` | Remedy text while the constant is active or rejected |
 | 563 | Low | fixed (R54 upkeep: both writes dropped) | — | `KeyVault` | Stored field written, never read |

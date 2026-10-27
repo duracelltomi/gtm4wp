@@ -101,7 +101,8 @@ final class KeyVault {
 	public const CAUSE_CONSTANT_MISSING = 'constant-missing';
 
 	/**
-	 * The salt material, or null to read the WordPress salts on first use.
+	 * Injected salt material (tests), or null to read the WordPress salts on
+	 * each use; never filled from them (#560).
 	 *
 	 * @var string|null
 	 */
@@ -812,14 +813,12 @@ final class KeyVault {
 	 * @return string 32 raw bytes.
 	 */
 	private function storage_key( string $secret ): string {
+		// Read each time, never kept on the object: a print_r() / var_export() of
+		// the vault or of a class holding it would print it (#560).
 		if ( self::SECRET_CONSTANT === $secret ) {
 			$material = (string) $this->constant_secret();
 		} else {
-			if ( null === $this->secret ) {
-				$this->secret = wp_salt( 'auth' ) . wp_salt( 'secure_auth' );
-			}
-
-			$material = $this->secret;
+			$material = $this->secret ?? ( wp_salt( 'auth' ) . wp_salt( 'secure_auth' ) );
 		}
 
 		return hash_hkdf( 'sha256', $material, self::KEY_BYTES, self::HKDF_INFO );

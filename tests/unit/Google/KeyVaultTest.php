@@ -95,6 +95,31 @@ final class KeyVaultTest extends TestCase {
 	}
 
 	/**
+	 * #560: a vault reading the real salts never keeps them on the object, so
+	 * no dump of it (or of a class holding it) prints the salt material.
+	 */
+	public function test_the_salt_material_is_never_kept_on_the_vault(): void {
+		Functions\when( 'wp_salt' )->alias( static fn ( $scheme ) => 'salt-material-' . $scheme . '-0123456789' );
+		// The default clock: serialize() cannot take an injected closure.
+		$vault = new KeyVault( null, null, '' );
+
+		$id = $vault->add( KeyFileFixture::parse(), 'Production' );
+		$this->assertIsString( $id );
+		$this->assertInstanceOf( ServiceAccountKey::class, $vault->open( $id ), 'The salts still open the key.' );
+
+		// phpcs:disable WordPress.PHP.DevelopmentFunctions.error_log_print_r, WordPress.PHP.DevelopmentFunctions.error_log_var_export, WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- the dumps under test.
+		foreach ( array(
+			'print_r'    => print_r( $vault, true ),
+			'var_export' => var_export( $vault, true ),
+			'serialize'  => serialize( $vault ),
+			'array cast' => var_export( (array) $vault, true ),
+		) as $label => $dump ) {
+			$this->assertStringNotContainsString( 'salt-material-', $dump, $label );
+		}
+		// phpcs:enable
+	}
+
+	/**
 	 * The parsed fixture key.
 	 *
 	 * @return ServiceAccountKey
