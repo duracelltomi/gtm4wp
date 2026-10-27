@@ -192,7 +192,7 @@ function queuedLabel( entry ) {
 
 	return entry.replayable
 		? __(
-				'This job has not been processed. If it stays like this, check that WP-Cron or Action Scheduler runs on this site and that "Send refunds to Google Analytics" is on.',
+				'This job has not been processed. If it stays like this, check that WP-Cron or Action Scheduler runs on this site, that "Send refunds to Google Analytics" is on, and that the shop plugin is active (a job waits for it).',
 				'duracelltomi-google-tag-manager'
 		  )
 		: '';

@@ -275,7 +275,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds the logged-in customer\'s name, email and its hash, order count and total value to the data layer, and the Enhanced Conversions user_data block (hashed email and phone) to the purchase event. With the cache-safe data layer on, they arrive in gtm4wp.customerData.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the logged-in customer\'s name, email and its hash, order count and total value to the data layer, and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event. With the cache-safe data layer on, they arrive in gtm4wp.customerData.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -346,7 +346,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Reliable purchase tracking', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Measures the purchase on the buyer\'s next page view when the confirmation page was never reached, for example after an abandoned offsite payment redirect. Has no effect while "Do not flag orders as being tracked" is on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Measures the purchase on the buyer\'s next page view when the confirmation page was never reached, for example after paying offsite and returning another way; a pending order counts once paid. Has no effect while "Do not flag orders as being tracked" is on.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE

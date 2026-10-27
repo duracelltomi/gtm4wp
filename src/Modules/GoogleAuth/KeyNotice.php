@@ -71,13 +71,15 @@ final class KeyNotice {
 
 		echo '<div class="gtm4wp-notice notice notice-error" data-href="?google-key-unreadable"><p><strong>';
 
-		// One sentence per cause: each has its own remedy (#469).
+		// One sentence per cause: each has its own remedy (#469). With the
+		// constant defined (in use or refused) it is no advice to define it (#562).
+		$defined   = in_array( $this->vault->encryption_key_state(), array( 'active', 'rejected' ), true );
 		$sentences = array();
 		foreach ( $by_cause as $cause => $ids ) {
 			$names = array_map( static fn ( $id ) => $labels[ $id ] ?? $id, $ids );
 
 			$sentences[] = sprintf(
-				esc_html( self::message( $cause, count( $names ) ) ),
+				esc_html( self::message( $cause, count( $names ), $defined ) ),
 				esc_html( implode( ', ', $names ) ),
 				esc_html( KeyVault::ENCRYPTION_KEY_CONSTANT ),
 				// The fragment is the settings app's module bookmark.
@@ -94,11 +96,12 @@ final class KeyNotice {
 	 * The sentence for one cause, with placeholders 1: labels, 2: the constant
 	 * name, 3/4: the link to the accounts panel.
 	 *
-	 * @param string $cause A KeyVault::CAUSE_* value.
-	 * @param int    $count How many accounts it names.
+	 * @param string $cause   A KeyVault::CAUSE_* value.
+	 * @param int    $count   How many accounts it names.
+	 * @param bool   $defined Whether the constant is defined (in use or refused).
 	 * @return string
 	 */
-	private static function message( string $cause, int $count ): string {
+	private static function message( string $cause, int $count, bool $defined = false ): string {
 		switch ( $cause ) {
 			case KeyVault::CAUSE_CONSTANT_MISSING:
 				/* translators: 1: comma separated list of service-account labels. 2: the constant name. 3: opening anchor element pointing to the GTM4WP options page. 4: closing anchor element. */
@@ -117,6 +120,16 @@ final class KeyNotice {
 					'duracelltomi-google-tag-manager'
 				);
 			default:
+				if ( $defined ) {
+					/* translators: 1: comma separated list of service-account labels. 2: the constant name (not used in this sentence). 3: opening anchor element pointing to the GTM4WP options page. 4: closing anchor element. */
+					return _n(
+						'The stored key of the Google service account %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed before it moved to the encryption key. Use %3$sReplace key%4$s on the account with its key file.',
+						'The stored keys of the Google service accounts %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed before they moved to the encryption key. Use %3$sReplace key%4$s on each account with its key file.',
+						$count,
+						'duracelltomi-google-tag-manager'
+					);
+				}
+
 				/* translators: 1: comma separated list of service-account labels. 2: the constant name. 3: opening anchor element pointing to the GTM4WP options page. 4: closing anchor element. */
 				return _n(
 					'The stored key of the Google service account %1$s can no longer be decrypted, usually because the security keys in wp-config.php changed (some security plugins change them on a schedule; defining %2$s prevents this). Use %3$sReplace key%4$s on the account with its key file.',

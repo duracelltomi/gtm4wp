@@ -186,6 +186,26 @@ final class GoogleAuthKeyNoticeTest extends TestCase {
 		$this->assertStringNotContainsString( 'Salts', $changed, 'The salts are unchanged here, so that key still opens.' );
 	}
 
+	/**
+	 * #562: a salts-sealed key that went unreadable before it moved to the
+	 * constant gets no advice to define the constant once it is defined.
+	 */
+	public function test_the_salts_remedy_does_not_advise_a_constant_already_defined(): void {
+		$this->store_unreadable( 'Production' );
+
+		$this->assertStringContainsString( 'defining GTM4WP_ENCRYPTION_KEY prevents this', $this->render(), 'Undefined: the advice stands.' );
+
+		foreach ( array(
+			'in use'  => self::CONSTANT,
+			'refused' => 'too-short',
+		) as $label => $constant ) {
+			$html = $this->render( self::ROTATED, $constant );
+
+			$this->assertStringContainsString( 'service account Production can no longer be decrypted, usually because the security keys in wp-config.php changed before it moved to the encryption key.', $html, $label );
+			$this->assertStringNotContainsString( 'prevents this', $html, $label );
+		}
+	}
+
 	public function test_a_refused_constant_is_named_even_without_an_account(): void {
 		$html = $this->render( self::SECRET, 'too-short' );
 

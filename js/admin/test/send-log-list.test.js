@@ -914,6 +914,8 @@ describe( 'SendLogList while a queued job waits', () => {
 		expect( note.textContent ).toContain(
 			'"Send refunds to Google Analytics" is on'
 		);
+		// #549: a job whose shop plugin is inactive retries without a row.
+		expect( note.textContent ).toContain( 'the shop plugin is active' );
 		expect( note.textContent ).not.toMatch( /send it again/ );
 		await tick();
 		expect( apiFetch ).toHaveBeenCalledTimes( 1 );
