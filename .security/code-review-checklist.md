@@ -1189,7 +1189,7 @@ report.
 | 539 | Low | fixed (R54 fix session: token maxLength 128 without a pattern, order digits up to 20) | A0 | Data Manager backfill route | Route arguments carry no length bound |
 | 540 | Low | open (unverified) | A0 | `ReceiptPage`, EDD receipt gate | A second EDD receipt filter is not mirrored |
 | 541 | Low | open (unverified) | A0 | WC + EDD reliable-purchase page lane | Cache-related exposure; detail in the local report |
-| 542 | Low | open | — | EDD `DownloadData` status gate | Unpaid statuses pass the unconfirmed lane with an empty list |
+| 542 | Low | fixed | — | EDD `DownloadData` status gate | Unpaid statuses pass the unconfirmed lane with an empty list |
 | 543 | Low | open | — | EDD + WC customer-data descriptions | Descriptions omit fields the code emits (RI-15) |
 | 544 | Low | open | — | EDD reliable-purchase description | Example names the case #471 now refuses |
 | 545 | Low | fixed (R54 fix session: the store base rate memoized per DownloadData instance) | A1 | EDD `DownloadData` | Tax rate resolved per price call |

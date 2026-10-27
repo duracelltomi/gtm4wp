@@ -49,6 +49,8 @@ final class DownloadDataTest extends TestCase {
 		Functions\when( 'sanitize_text_field' )->alias( static fn ( $value ) => trim( (string) $value ) );
 
 		Functions\when( 'edd_get_download_sku' )->justReturn( false );
+		// EDD 3.3.5's unfiltered list (U195).
+		Functions\when( 'edd_get_complete_order_statuses' )->justReturn( array( 'publish', 'complete', 'completed', 'partially_refunded', 'revoked', 'refunded' ) );
 		Functions\when( 'edd_get_order_meta' )->justReturn( '' );
 		Functions\when( 'edd_get_payment_meta' )->justReturn( null );
 		Functions\when( 'edd_get_download' )->alias(
@@ -965,6 +967,26 @@ final class DownloadDataTest extends TestCase {
 		);
 		$this->assertTrue( $empty->is_order_status_trackable( $this->make_order( array( 'status' => 'refunded' ) ) ) );
 		$this->assertFalse( $empty->is_order_status_trackable( $this->make_order( array( 'status' => 'failed' ) ) ) );
+		$this->assertTrue( $empty->is_order_status_trackable( $this->make_order( array( 'status' => 'processing' ) ), true ) );
+	}
+
+	public function test_empty_list_counts_only_complete_statuses_off_the_confirmation_page(): void {
+		$empty = $this->make_download_data(
+			array( GTM4WP_OPTION_INTEGRATE_EDDPURCHASESTATUSES => array() )
+		);
+
+		// #542: an unpaid order the buyer never confirmed is no purchase.
+		foreach ( array( 'abandoned', 'preapproval', 'preapproval_pending', 'cancelled', 'processing', 'on_hold' ) as $status ) {
+			$this->assertFalse( $empty->is_order_status_trackable( $this->make_order( array( 'status' => $status ) ) ), $status );
+		}
+		foreach ( array( 'complete', 'partially_refunded', 'revoked', 'refunded' ) as $status ) {
+			$this->assertTrue( $empty->is_order_status_trackable( $this->make_order( array( 'status' => $status ) ) ), $status );
+		}
+
+		// EDD's own (filtered) list decides, not a copy of it.
+		Functions\when( 'edd_get_complete_order_statuses' )->justReturn( array( 'on_hold' ) );
+		$this->assertTrue( $empty->is_order_status_trackable( $this->make_order( array( 'status' => 'on_hold' ) ) ) );
+		$this->assertFalse( $empty->is_order_status_trackable( $this->make_order( array( 'status' => 'complete' ) ) ) );
 	}
 
 	public function test_already_tracked_via_order_meta(): void {

@@ -335,7 +335,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_MULTISELECT,
 				default_value: array( 'pending', 'processing', 'complete' ),
 				label: __( 'Order statuses that trigger the purchase event', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'The purchase event is sent when the buyer reaches the confirmation page with an order in one of these statuses. Pending covers offsite gateways like PayPal; remove it and Processing to count completed orders only. An empty list counts all but failed orders.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Statuses whose orders send the purchase event when the buyer reaches the confirmation page. Pending covers offsite gateways like PayPal; remove it and Processing to count completed orders only. An empty list counts all but failed orders there, and completed orders elsewhere.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
 				choices: $order_status_choices,
