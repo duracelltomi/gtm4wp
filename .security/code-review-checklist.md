@@ -1190,7 +1190,7 @@ report.
 | 538 | Low | fixed (R54 fix session: the guest route is registered only while a destination row exists, as the capture hooks refuse) | A0 key holder | Data Manager backfill route | Writes while no destination exists (#484 sibling) |
 | 539 | Low | fixed (R54 fix session: token maxLength 128 without a pattern, order digits up to 20) | A0 | Data Manager backfill route | Route arguments carry no length bound |
 | 540 | Low | open (not mirrored by design) | A0 | `ReceiptPage`, EDD receipt gate | A second EDD receipt filter is not mirrored |
-| 541 | Low | fixed | A0 | WC + EDD reliable-purchase page lane | Cache-related exposure; detail in the local report |
+| 541 | Low | fixed on master (2.0 line superseded by 2.1 final, no backport; maintainer decision 2026-10-27) | A0 | WC + EDD reliable-purchase page lane | Cache-related exposure; detail in the local report |
 | 542 | Low | fixed | — | EDD `DownloadData` status gate | Unpaid statuses pass the unconfirmed lane with an empty list |
 | 543 | Low | fixed (fac400c) | — | EDD + WC customer-data descriptions | Descriptions omit fields the code emits (RI-15) |
 | 544 | Low | fixed (fac400c) | — | EDD reliable-purchase description | Example names the case #471 now refuses |
