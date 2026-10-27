@@ -34,14 +34,15 @@ final class Input {
 	}
 
 	/**
-	 * A list of non-empty strings, from an array or a comma-separated string.
+	 * A list of non-empty strings, from an array or a string split on commas
+	 * and whitespace, as WordPress 7.1 coerces a list (wp_parse_list(), #568).
 	 *
 	 * @param mixed $value The raw input value.
 	 * @return string[]
 	 */
 	public static function strings( $value ): array {
 		if ( is_string( $value ) ) {
-			$value = explode( ',', $value );
+			$value = function_exists( 'wp_parse_list' ) ? wp_parse_list( $value ) : preg_split( '/[\s,]+/', $value, -1, PREG_SPLIT_NO_EMPTY );
 		}
 
 		if ( ! is_array( $value ) ) {

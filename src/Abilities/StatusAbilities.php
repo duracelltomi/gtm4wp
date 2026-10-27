@@ -242,13 +242,13 @@ final class StatusAbilities implements ProviderInterface {
 		foreach ( ( new SiteHealthTests( $this->registry, $options ) )->run_all() as $id => $result ) {
 			// A third-party test reporting a status outside core's three would fail
 			// the output schema and with it the whole answer (#504).
-			$status = (string) ( $result['status'] ?? 'good' );
+			$status = self::text( $result['status'] ?? 'good' );
 
 			$tests[] = array(
 				'id'          => (string) $id,
 				'status'      => in_array( $status, array( 'good', 'recommended', 'critical' ), true ) ? $status : 'recommended',
-				'label'       => (string) ( $result['label'] ?? '' ),
-				'description' => self::plain_text( (string) ( $result['description'] ?? '' ) ),
+				'label'       => self::text( $result['label'] ?? '' ),
+				'description' => self::plain_text( self::text( $result['description'] ?? '' ) ),
 			);
 		}
 
@@ -263,7 +263,7 @@ final class StatusAbilities implements ProviderInterface {
 
 			$info[] = array(
 				'key'   => (string) $key,
-				'label' => (string) ( $row['label'] ?? '' ),
+				'label' => self::text( $row['label'] ?? '' ),
 				'value' => self::copy_value( $row ),
 			);
 		}
@@ -300,16 +300,28 @@ final class StatusAbilities implements ProviderInterface {
 		$value = $row['debug'] ?? ( $row['value'] ?? '' );
 
 		if ( ! is_array( $value ) ) {
-			return is_scalar( $value ) ? (string) $value : '';
+			return self::text( $value );
 		}
 
 		$lines = array();
 
 		foreach ( $value as $key => $item ) {
-			$lines[] = is_int( $key ) ? (string) $item : $key . ': ' . (string) $item;
+			$lines[] = is_int( $key ) ? self::text( $item ) : $key . ': ' . self::text( $item );
 		}
 
 		return $lines;
+	}
+
+	/**
+	 * A row value as text: a scalar cast, anything else empty. A third-party
+	 * row can carry an array or object where text belongs, and a cast would
+	 * throw on the object or print "Array" (#571, RI-39).
+	 *
+	 * @param mixed $value The value.
+	 * @return string
+	 */
+	private static function text( $value ): string {
+		return is_scalar( $value ) ? (string) $value : '';
 	}
 
 	/**

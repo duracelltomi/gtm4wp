@@ -163,6 +163,31 @@ final class Registrar {
 	}
 
 	/**
+	 * The refusal for a `confirm` input that is not the JSON boolean true, or
+	 * null when it is. A text "true" or "1" still refuses (the check stays
+	 * strict, #525) but says why: a client repeating the call as told would
+	 * loop, and on WordPress 6.9/7.0 the REST route can only send text (#567).
+	 *
+	 * @param mixed $confirm The confirm input.
+	 * @return \WP_Error|null
+	 */
+	public static function confirmation_error( $confirm ): ?\WP_Error {
+		if ( true === $confirm ) {
+			return null;
+		}
+
+		if ( is_string( $confirm ) || is_int( $confirm ) ) {
+			return new \WP_Error(
+				'gtm4wp_confirm_not_boolean',
+				__( 'confirm arrived as text, not as the JSON boolean true. The WordPress REST route of this ability can only send text before WordPress 7.1: call it through an MCP client or WP-CLI, with confirm set to true.', 'duracelltomi-google-tag-manager' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return self::confirmation_required_error();
+	}
+
+	/**
 	 * The input schema of an ability that takes no input (#253). The
 	 * empty-object default is what core applies when a client sends nothing, so
 	 * a bare call validates instead of failing on null input (U155).

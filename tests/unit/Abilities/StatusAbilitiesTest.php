@@ -457,6 +457,29 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 		$this->assertArrayHasKey( 'problems', $rows );
 	}
 
+	/**
+	 * #571: one level down, an object in a value list, or an object or array
+	 * label, is also copied as '' rather than a fatal cast or "Array".
+	 */
+	public function test_site_health_copies_nested_non_scalar_values_as_empty_strings(): void {
+		\Brain\Monkey\Filters\expectApplied( 'gtm4wp_site_health_info' )->andReturnUsing(
+			static fn ( $fields ) => array(
+				'acme_nested' => array(
+					'label' => array( 'not', 'a', 'label' ),
+					'value' => array(
+						'ok'     => 'yes',
+						'object' => new \stdClass(),
+					),
+				),
+			) + $fields
+		);
+
+		$info = array_column( $this->execute( StatusAbilities::GET_SITE_HEALTH )['info'], null, 'key' );
+
+		$this->assertSame( '', $info['acme_nested']['label'] );
+		$this->assertSame( array( 'ok: yes', 'object: ' ), $info['acme_nested']['value'] );
+	}
+
 	public function test_site_health_reports_a_missing_container_id_as_a_critical_configuration(): void {
 		$this->store_settings( array( GTM4WP_OPTION_GTM_CONTAINERS => array() ) );
 

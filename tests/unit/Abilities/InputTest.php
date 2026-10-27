@@ -33,4 +33,14 @@ final class InputTest extends TestCase {
 		$this->assertSame( array( 'a', 'b' ), Input::strings( array( 'a', 'b', 'a', '', 42 ) ) );
 		$this->assertSame( array(), Input::strings( 42 ) );
 	}
+
+	/**
+	 * #568: WordPress 7.1 splits a list on whitespace too (wp_parse_list()),
+	 * so the 6.9/7.0 GET transport must read "a b" as two names, not one.
+	 */
+	public function test_a_whitespace_separated_string_is_a_list(): void {
+		$this->assertSame( array( 'container', 'woocommerce' ), Input::strings( 'container woocommerce' ) );
+		$this->assertSame( array( 'container', 'woocommerce' ), Input::strings( "container\n\twoocommerce" ) );
+		$this->assertSame( array(), Input::strings( ' ' ) );
+	}
 }

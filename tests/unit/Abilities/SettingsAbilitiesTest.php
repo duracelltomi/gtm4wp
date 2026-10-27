@@ -607,14 +607,15 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	/**
 	 * Calls that do not carry the confirmation.
 	 *
-	 * @return array<string, array{0: array<string, mixed>}>
+	 * @return array<string, array{0: array<string, mixed>, 1: string}>
 	 */
 	public static function unconfirmed_imports(): array {
 		return array(
-			'confirm missing' => array( array() ),
-			'confirm false'   => array( array( 'confirm' => false ) ),
-			'confirm string'  => array( array( 'confirm' => 'true' ) ),
-			'confirm 1'       => array( array( 'confirm' => 1 ) ),
+			'confirm missing' => array( array(), 'gtm4wp_confirmation_required' ),
+			'confirm false'   => array( array( 'confirm' => false ), 'gtm4wp_confirmation_required' ),
+			// #567: text is refused too, with the reason (6.9/7.0 REST sends text).
+			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean' ),
+			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean' ),
 		);
 	}
 
@@ -623,9 +624,10 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 * decoded, and the row stays as it was.
 	 *
 	 * @param array<string, mixed> $confirm The confirm member, or none.
+	 * @param string               $code    The refusal's error code.
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'unconfirmed_imports' )]
-	public function test_an_import_without_confirm_true_is_refused_before_anything_runs( array $confirm ): void {
+	public function test_an_import_without_confirm_true_is_refused_before_anything_runs( array $confirm, string $code ): void {
 		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
 
 		$result = $this->execute(
@@ -634,7 +636,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'gtm4wp_confirmation_required', $result->get_error_code() );
+		$this->assertSame( $code, $result->get_error_code() );
 		$this->assertSame( 400, $result->get_error_data()['status'] );
 		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
 		$this->assertSame( 0, $this->settings_writes() );

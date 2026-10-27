@@ -1214,12 +1214,12 @@ report.
 | 564 | Low | fixed (R54 upkeep: class constants) | — | GoogleAuth `SiteHealth`, `AdminSchema` | Minimum length and constant name hardcoded |
 | 565 | Low | fixed (R54 upkeep: docblock) | — | `KeyNotice` | Cost docblock |
 | 566 | Low | open (needs design) | config | `KeyVault` status view | Readability differs between request contexts |
-| 567 | Low | open | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Misleading refusal; #525's resolution not true as written |
-| 568 | Low | open | A4 delegate | `Abilities\Input::strings()` | Lists parsed differently from core |
+| 567 | Low | fixed (R54 fix session: text or int confirm refused with gtm4wp_confirm_not_boolean naming the transport, both confirm abilities; the import description names 7.1, which makes #525 true; strict check kept) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Misleading refusal; #525's resolution not true as written |
+| 568 | Low | fixed (R54 fix session: wp_parse_list(), same split as a fallback) | A4 delegate | `Abilities\Input::strings()` | Lists parsed differently from core |
 | 569 | Low | fixed (R54 upkeep: docblock) | — | `SettingsStore::value_schema()` | Stale return type |
-| 570 | Low | open | A0 | Settings REST route registration | #508 remainder: page query on every REST request; cost claim unmeasured |
-| 571 | Low | open | site code | `StatusAbilities` | Object-valued Site Health rows still throw |
-| 572 | Low | open | A4 | `SettingsStore` export/import | Inactive third-party module settings dropped |
+| 570 | Low | fixed (ba05e0f: the settings schema is built only when the settings route runs; page choices loaded on first read) | A0 | Settings REST route registration | #508 remainder: page query on every REST request; cost claim unmeasured |
+| 571 | Low | fixed (R54 fix session: one scalar guard for every row value, label and description) | site code | `StatusAbilities` | Object-valued Site Health rows still throw |
+| 572 | Low | fixed (R54 fix session: export and import descriptions name the inactive-module case) | A4 | `SettingsStore` export/import | Inactive third-party module settings dropped |
 | 573 | Low | open | — | `BackfillEndpoint` writers | Duplicated write loop |
 | 574 | Low | open | — | four methods | Crossed 50 lines in range |
 | 575 | Low | open (maintainer decision) | — | WC `ProductData` | Item vs value tax basis in one option cell; comment wrong (pre-existing) |

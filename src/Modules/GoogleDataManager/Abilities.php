@@ -366,8 +366,10 @@ final class Abilities implements ProviderInterface {
 
 		$input = is_array( $input ) ? $input : array();
 
-		if ( true !== ( $input['confirm'] ?? null ) ) {
-			return Registrar::confirmation_required_error();
+		$refused = Registrar::confirmation_error( $input['confirm'] ?? null );
+
+		if ( null !== $refused ) {
+			return $refused;
 		}
 
 		$named = RefundReplay::named( array_key_exists( 'references', $input ) ? $input['references'] : null );

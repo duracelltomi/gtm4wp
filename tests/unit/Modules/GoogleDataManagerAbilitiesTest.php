@@ -532,11 +532,12 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	 */
 	public static function unconfirmed_calls(): array {
 		return array(
-			'confirm missing' => array( array() ),
-			'confirm false'   => array( array( 'confirm' => false ) ),
-			'confirm null'    => array( array( 'confirm' => null ) ),
-			'confirm string'  => array( array( 'confirm' => 'true' ) ),
-			'confirm 1'       => array( array( 'confirm' => 1 ) ),
+			'confirm missing' => array( array(), 'gtm4wp_confirmation_required' ),
+			'confirm false'   => array( array( 'confirm' => false ), 'gtm4wp_confirmation_required' ),
+			'confirm null'    => array( array( 'confirm' => null ), 'gtm4wp_confirmation_required' ),
+			// #567: text is refused too, with the reason.
+			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean' ),
+			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean' ),
 		);
 	}
 
@@ -544,16 +545,17 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	 * Without `confirm: true` nothing runs: no plan, no job, no request.
 	 *
 	 * @param array<string, mixed> $input The input.
+	 * @param string               $code  The refusal's error code.
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'unconfirmed_calls' )]
-	public function test_a_replay_without_confirm_true_is_refused_before_anything_runs( array $input ): void {
+	public function test_a_replay_without_confirm_true_is_refused_before_anything_runs( array $input, string $code ): void {
 		$this->store_destination( $this->store_account() );
 		$this->record( 'woocommerce:12:13', SendLog::OUTCOME_FAILED );
 
 		$result = $this->execute( Abilities::REPLAY_REFUNDS, $input );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'gtm4wp_confirmation_required', $result->get_error_code() );
+		$this->assertSame( $code, $result->get_error_code() );
 		$this->assertSame( 400, $result->get_error_data()['status'] );
 		$this->assertSame( array(), $this->scheduled, 'Nothing was queued.' );
 		$this->assertSame( array(), $this->transport->requests, 'Nothing left the site.' );
