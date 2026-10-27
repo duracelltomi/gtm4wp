@@ -64,6 +64,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-40** — a "never ran"/"lost" verdict read from the absence of a row is only true if every consumer exit after dequeue writes one; enumerate the `return`s, and follow the screen's own remedy through them once (#388).
 - **RI-41** — when PHP stands down because "the JS reports this", the PHP skip must be no wider than the JS match condition; a request header says some script asked, never which one (#387).
 - **RI-43** — a value promised to mirror another builder's number (refund amount ↔ purchase value) needs one shared rule, a test asserting the two agree for every option combination, and an input that carries the subtracted fields for every way the source record is created (a no-line refund carries none).
+- **RI-44** — a callback on a third-party hook is reached by every route that fires it; grep each `do_action` site and its permission check before writing "runs in the buyer's own request" (#598).
 - **RI-42** — a send-or-not guard must read a durable per-record marker, never a diagnostics ring: the ring is trimmed (routine rows first) and the guard's own skip rows supersede the evidence. If a ring fallback must stay, backfill the marker the first time it answers (#396).
 - **RI-39** — never "fix" a filtered getter under a new `: string` with a `(string)` cast: it is still fatal on an object and emits `"Array"`; guard with `is_string()` (#362).
 - **RI-34** — a pattern/exclusion list we hand to a third party that names a literal we used to hardcode is a second reader of it: when the literal becomes an option (RI-14), the list is silently narrowed on every non-default site (#325). Grep the literal as a string in every list we emit; prefer a fixed plugin-owned token over the user value.
@@ -993,6 +994,11 @@ Adding `: string` over a value that has passed through somebody's filter (`get_*
   `get_raw_order_datalayer()`, both stores) returned a filter's output raw. All guarded with `is_array()` /
   `is_string()`. Re-derive the builder half with a scan for `return apply_filters(` inside a function declaring
   a scalar or array return type with no cast: **0** at R54.
+- **R55 (#593): "all guarded" was counted from the fix diff, not from the sink.** The 8 were the sites the fix
+  touched. A grep of every `process_product()` / `process_download()` caller found **11 more** outside the two
+  `PageDataLayer` files. Fixed in the R55 session with one predicate, `Ecommerce\Helpers::is_item()` (a non-empty
+  array: a bare `is_array()` passes `array()`, which prints the same junk item `null` does). Ledger: **21**
+  store-side builder calls, **21** `is_item()` guards in 7 files; the 2 refund adapters keep their own guard.
 
 ### RI-40: A diagnostic that reads the ABSENCE of a row as a cause must enumerate every consumer exit that writes no row
 "Nothing newer than the queued row after N seconds, so the queue never ran" holds only if every path the job takes after it runs leaves a newer row. Data Manager's `RefundSender::run()` had at least three silent exits (sending switched off, a destination in `only` removed from settings, a whole-refund job for an already-sent refund), so the label blamed the queue for jobs that had run, and the replay it offered fed the `is_sent` exit and looped (#388).
@@ -1053,6 +1059,20 @@ shipping read 0.
   writes the subtraction inline at five sites. The rule's inputs also moved under it: a refunded negative fee is
   stored positive (a per-line `abs()` is wrong for that line type), and EDD's cart rounds tax through a different
   function from 3.3.6. Apply check (3) to the rounding function too, per supported platform version.
+
+### RI-44: A third-party hook's actor is every route that fires it, not the route you had in mind
+
+A premise of the form "this callback runs inside the buyer's own request" is a claim about **every**
+`do_action()` site of that hook, and the platform can add one without our code changing. When the callback writes
+onto a record, its actor is the weakest authorization among those routes.
+
+Found R55 (#598, open; detail in the local report): a callback's premise named one route, while our own upstream
+registry already listed a second caller of the same hook when the premise was written.
+
+- Before writing a "who can trigger this" sentence, grep the platform source for every `do_action( '<hook>'` and
+  read each caller's permission check. Where the registry row lists the callers, that list is the input.
+- A replace-or-merge rule is safe only for the weakest of those callers; a fill-only rule is the conservative default.
+- Record the caller list beside the premise (threat model or docblock), so a new caller upstream invalidates it visibly.
 
 ## Project-Specific Anti-Patterns
 
@@ -1989,3 +2009,4 @@ Running both store integrations on one site is an **unsupported setup** (maintai
 | 2026-10-09 (Review 52) | Reviewed `11b3ea2..d376348` (`master`) + `51e2910..ebb8e19` (`2.0`), R51's fix session. 4 Low (#462–#465), 0 security. FP-1 re-derived (13 callers, holds); RI-2 re-verified at every script sink. RI-18 gained the "a fix that disproves a premise retires its prose" bullet with a 2-site ledger. |
 | 2026-10-19 (Review 53) | Targeted whole-surface read of the four surfaces new in 2.1 (Data Manager, Google client + GoogleAuth, Abilities + Site Health, EDD) at `a742bf4`, as the 2.1.0 final gate. **6 Medium (#466–#471), 54 Low, 0 Critical/High; nothing reachable by an attacker above Low.** Added **PA-22** (a server-side platform event hooked only from the frontend boot misses admin-ajax/REST, where gateways build orders; the sibling had been moved and this one not, #467; ledger 4 sites) and **RI-43** (a value promised to mirror another builder's number needs one rule, a side-by-side test for every option combination, and inputs that carry the subtracted fields for every way the record is created, #466). Extended **RI-25** with the argument-SHAPE half for actions we listen to (#470: signature right, item shape assumed from a lookalike array, and the tests built from the assumption). **FP-6 re-derived** (rotation): holds. Adjudication: 9 verifiers, 15 recommendations refuted or revised (four of the six Mediums), six recorded premises failed, including R51's "EDD sibling of #460 not reachable" and the threat model's "salts change when the admin changes them" (Defender rotates them every 60 days by default, #469). |
 | 2026-10-21 (Review 54) | Reviewed `a742bf4..5f36a40` (R53's fix session) as the 2.1.0-rc2 gate: 1 Medium (#528), 63 Low (#529–#591). New **PA-23** (a visibility predicate is not an ownership predicate). RI-39 recurrence as a guard and as a typed parameter (#529, #530). Ledgers re-derived: RI-25 14 → 17, RI-40 1 → 2, RI-43 EDD half. FP-2 re-derived (holds). |
+| 2026-10-27 (Review 55) | Reviewed `5f36a40..75dcb71` (R54's whole fix session) as the 2.1.0 final gate: 0 Critical/High/Medium, 33 Low (#593–#625; 21 defects, 12 upkeep). New **RI-44** (a third-party hook's actor is every route that fires it; #598). RI-39 corrected: R54's "all guarded" counted the fix diff, not the sink; the 11 remaining item sites fixed the same day with one predicate (#593). FP-5 and FP-4 re-derived: hold. Adjudication: 11 recommendations refuted or revised, 7 recorded premises failed. |

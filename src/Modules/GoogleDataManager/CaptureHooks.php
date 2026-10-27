@@ -16,10 +16,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Writes the captured attribution into order meta at order creation, on both
- * platforms: a moment inside the buyer's own request (cookies readable); a
- * payment hook can fire from a gateway callback. A resumed order (a failed
- * payment retried) runs the pass again, so each pass merges onto the last
- * (pass()). What to store is decided in AttributionCapture.
+ * platforms: a moment inside the request that places or pays the order
+ * (cookies readable); a payment hook can fire from a gateway callback. A
+ * resumed order (a failed payment retried, also through WooCommerce's
+ * pay-for-order route) runs the pass again, so each pass merges onto the last
+ * (pass()): whoever pays the order counts as the buyer (#598). What to store
+ * is decided in AttributionCapture.
  */
 final class CaptureHooks {
 

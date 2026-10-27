@@ -79,8 +79,12 @@ claims in the same change" did not happen when they landed):
   `_gtm4wp_ga_session_ids`, `_gtm4wp_gclid` / `_gtm4wp_gbraid` / `_gtm4wp_wbraid`, and
   the consent map `_gtm4wp_consent_state`, written at order creation from the visitor's
   own cookies and by the guest-facing backfill route (write-only-if-absent); a resumed
-  checkout (the buyer's own request again) merges onto them, the later consent per
-  signal winning (#536, maintainer decision 2026-10-22). They are
+  checkout merges onto them, the later consent per signal winning (#536, maintainer
+  decision 2026-10-22). A resumed checkout is any request that places or pays the
+  order, including WooCommerce's pay-for-order route, whose caller proves the order
+  rather than the buyer's session: **whoever pays the order counts as the buyer**, and
+  its replacing of stored ids is accepted, not a finding (#598, maintainer decision
+  2026-10-27; RI-44). They are
   personal data in the GDPR sense (they tie a visit to a person's order), readable by
   **A3/A4 by design** like every other order field, exported and erased through the
   WordPress privacy tools (`PrivacyData`), and deliberately left behind by uninstall.
