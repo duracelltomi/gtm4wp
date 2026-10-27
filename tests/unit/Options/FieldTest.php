@@ -392,7 +392,7 @@ final class FieldTest extends TestCase {
 	}
 
 	/**
-	 * $unavailable is the last parameter (no positional caller shifts) and
+	 * $unavailable is a trailing parameter (no positional caller shifts) and
 	 * reaches the UI array under the key the admin app reads to disable the
 	 * control and show the reason.
 	 */
@@ -451,5 +451,74 @@ final class FieldTest extends TestCase {
 		// And the default: no sections declared, an empty list under the same key
 		// (the admin app tests for length, not presence).
 		$this->assertSame( array(), $this->make_field( Field::TYPE_MULTISELECT, '' )->to_ui_array( '' )['sections'] );
+	}
+
+	/**
+	 * The loader runs on the first choices() read and never at construction:
+	 * fields() runs on every request that builds a schema, and the WooCommerce
+	 * page list it feeds loads every page of the site.
+	 */
+	public function test_choices_loader_runs_once_on_first_read_and_appends(): void {
+		$calls = 0;
+		$field = new Field(
+			key: 'page-key',
+			type: Field::TYPE_SELECT,
+			default_value: '',
+			label: 'Page',
+			choices: array( '' => '(none)' ),
+			choices_loader: static function () use ( &$calls ): array {
+				++$calls;
+				return array(
+					'42' => 'Thank you',
+					'43' => 'Receipt',
+				);
+			}
+		);
+
+		$this->assertSame( 0, $calls, 'Building the field must not load its choices.' );
+		$this->assertSame(
+			array(
+				''   => '(none)',
+				'42' => 'Thank you',
+				'43' => 'Receipt',
+			),
+			$field->choices()
+		);
+		$field->choices();
+		$field->to_ui_array( '' );
+		$this->assertSame( 1, $calls, 'The loaded choices are kept for the rest of the request.' );
+	}
+
+	/**
+	 * Save-time validation and the admin app both see the loaded choices, so
+	 * a lazily loaded list keeps refusing a value it does not offer.
+	 */
+	public function test_loaded_choices_drive_sanitize_and_the_ui_array(): void {
+		$make = static fn ( string $type, $default_value ): Field => new Field(
+			key: 'page-key',
+			type: $type,
+			default_value: $default_value,
+			label: 'Page',
+			choices: array( '' => '(none)' ),
+			choices_loader: static fn (): array => array( '42' => 'Thank you' )
+		);
+
+		$this->assertSame( '42', $make( Field::TYPE_SELECT, '' )->sanitize( '42' ) );
+		$this->assertSame( '', $make( Field::TYPE_SELECT, '' )->sanitize( '99' ), 'A page the loader does not list falls back to the default.' );
+		$this->assertSame( array( '42' ), $make( Field::TYPE_MULTISELECT, array() )->sanitize( array( '42', '99' ) ) );
+		$this->assertSame(
+			array(
+				''   => '(none)',
+				'42' => 'Thank you',
+			),
+			$make( Field::TYPE_SELECT, '' )->to_ui_array( '' )['choices']
+		);
+	}
+
+	public function test_choices_without_a_loader_are_the_static_list(): void {
+		$field = $this->make_field( Field::TYPE_SELECT, 'a', array( 'choices' => array( 'a' => 'A' ) ) );
+
+		$this->assertNull( $field->choices_loader );
+		$this->assertSame( array( 'a' => 'A' ), $field->choices() );
 	}
 }

@@ -71,12 +71,14 @@ final class RestController {
 					'callback'            => array( $this, 'save_settings' ),
 					'permission_callback' => array( $this, 'can_manage' ),
 					'args'                => array(
+						// Per-field types from the module schemas, built only when this
+						// route runs: rest_api_init fires on every REST request of the
+						// site. Unknown keys stay allowed (the store ignores them).
 						'values' => array(
-							'type'       => 'object',
-							'required'   => true,
-							// Per-field types from the module schemas; unknown keys stay
-							// allowed (the store ignores them).
-							'properties' => $this->store->value_schema(),
+							'type'              => 'object',
+							'required'          => true,
+							'validate_callback' => array( $this, 'validate_values' ),
+							'sanitize_callback' => array( $this, 'sanitize_values' ),
 						),
 					),
 				),
@@ -111,6 +113,44 @@ final class RestController {
 					),
 				),
 			)
+		);
+	}
+
+	/**
+	 * Validates the POST 'values' argument against the per-field schema.
+	 *
+	 * @param mixed  $value   The submitted argument.
+	 * @param mixed  $request The REST request (unused).
+	 * @param string $param   The argument name.
+	 * @return true|\WP_Error
+	 */
+	public function validate_values( $value, $request, string $param ) {
+		unset( $request );
+		return rest_validate_value_from_schema( $value, $this->values_schema(), $param );
+	}
+
+	/**
+	 * Sanitizes the POST 'values' argument against the per-field schema.
+	 *
+	 * @param mixed  $value   The submitted argument.
+	 * @param mixed  $request The REST request (unused).
+	 * @param string $param   The argument name.
+	 * @return mixed
+	 */
+	public function sanitize_values( $value, $request, string $param ) {
+		unset( $request );
+		return rest_sanitize_value_from_schema( $value, $this->values_schema(), $param );
+	}
+
+	/**
+	 * The schema of the POST 'values' argument.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function values_schema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => $this->store->value_schema(),
 		);
 	}
 

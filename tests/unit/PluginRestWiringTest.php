@@ -66,8 +66,8 @@ final class PluginRestWiringTest extends TestCase {
 		Functions\when( 'update_option' )->justReturn( true );
 		Functions\when( 'plugin_basename' )->alias( static fn ( $file ) => basename( (string) $file ) );
 
-		// register_routes() on the settings controller walks every AdminSchema
-		// for the value schema, which needs the settings-page stub set (TS-16).
+		// The settings route's value schema walks every AdminSchema when the
+		// route runs; the settings-page stub set stays for that (TS-16).
 		Functions\when( 'wp_kses' )->returnArg();
 		Functions\when( 'sanitize_text_field' )->returnArg();
 		Functions\when( 'sanitize_key' )->alias(
@@ -205,6 +205,55 @@ final class PluginRestWiringTest extends TestCase {
 		foreach ( $gdm_callbacks as $callback ) {
 			$this->assertSame( 'can_manage', $callback[1] );
 		}
+	}
+
+	/**
+	 * The reported trace: rest_api_init fires on every REST request of the
+	 * site, and building the settings schema there loaded every page through
+	 * get_pages(). Registering the routes builds no module schema at all; the
+	 * POST route validates and sanitizes through the controller at dispatch.
+	 */
+	public function test_registering_the_routes_builds_no_settings_schema(): void {
+		$closure = $this->boot_and_capture_rest_api_init();
+		$this->assertNotNull( $closure );
+
+		$schema_reads = array();
+		foreach ( array( 'get_pages', 'get_object_taxonomies', 'wc_get_order_statuses' ) as $function ) {
+			$schema_reads[ $function ] = 0;
+			Functions\when( $function )->alias(
+				static function () use ( &$schema_reads, $function ): array {
+					++$schema_reads[ $function ];
+					return array();
+				}
+			);
+		}
+
+		$this->run_rest_api_init( $closure );
+
+		$this->assertSame(
+			array(
+				'get_pages'             => 0,
+				'get_object_taxonomies' => 0,
+				'wc_get_order_statuses' => 0,
+			),
+			$schema_reads,
+			'A REST request for any route must not walk the module schemas.'
+		);
+
+		$settings = array_values(
+			array_filter(
+				$this->routes,
+				static fn ( array $call ) => \GTM4WP\Admin\RestController::REST_ROUTE === $call['route']
+			)
+		);
+		$this->assertCount( 1, $settings );
+		$post = array_values( array_filter( $settings[0]['args'], static fn ( $endpoint ) => 'POST' === ( $endpoint['methods'] ?? '' ) ) );
+		$this->assertCount( 1, $post );
+		$values = $post[0]['args']['values'];
+		$this->assertArrayNotHasKey( 'properties', $values, 'The per-field schema is built at dispatch, not at registration.' );
+		$this->assertInstanceOf( \GTM4WP\Admin\RestController::class, $values['validate_callback'][0] );
+		$this->assertSame( 'validate_values', $values['validate_callback'][1] );
+		$this->assertSame( 'sanitize_values', $values['sanitize_callback'][1] );
 	}
 
 	/**

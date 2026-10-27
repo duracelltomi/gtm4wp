@@ -137,6 +137,43 @@ final class RestControllerTest extends TestCase {
 		$this->assertSame( 250, $this->saved[ GTM4WP_OPTION_INTEGRATE_WCPRODPERIMPRESSION ], 'Integer values are cast to int.' );
 	}
 
+	/**
+	 * The POST 'values' schema moved from registration to dispatch (it walked
+	 * every module on every REST request of the site). Both callbacks must
+	 * still hand core the full per-field schema and return core's answer.
+	 */
+	public function test_values_are_validated_and_sanitized_against_the_full_field_schema(): void {
+		$controller = $this->make_controller();
+		$expected   = array(
+			'type'       => 'object',
+			'properties' => ( new SettingsStore( Registry::with_default_modules() ) )->value_schema(),
+		);
+		$this->assertSame( 'boolean', $expected['properties'][ GTM4WP_OPTION_INCLUDE_LOGGEDIN ]['type'] );
+
+		$seen  = array();
+		$error = new \WP_Error( 'rest_invalid_type', 'values[x] is not of type boolean.' );
+		Functions\when( 'rest_validate_value_from_schema' )->alias(
+			static function ( $value, $schema, $param ) use ( &$seen, $error ) {
+				$seen['validate'] = array( $value, $schema, $param );
+				return $error;
+			}
+		);
+		Functions\when( 'rest_sanitize_value_from_schema' )->alias(
+			static function ( $value, $schema, $param ) use ( &$seen ) {
+				$seen['sanitize'] = array( $value, $schema, $param );
+				return array( 'sanitized' => true );
+			}
+		);
+
+		$submitted = array( GTM4WP_OPTION_INCLUDE_LOGGEDIN => '1' );
+		$request   = new \WP_REST_Request();
+
+		$this->assertSame( $error, $controller->validate_values( $submitted, $request, 'values' ), 'A type error reaches core unchanged.' );
+		$this->assertSame( array( 'sanitized' => true ), $controller->sanitize_values( $submitted, $request, 'values' ) );
+		$this->assertSame( array( $submitted, $expected, 'values' ), $seen['validate'] );
+		$this->assertSame( array( $submitted, $expected, 'values' ), $seen['sanitize'] );
+	}
+
 	public function test_saving_container_rows_syncs_legacy_mirror_options(): void {
 		$controller = $this->make_controller();
 

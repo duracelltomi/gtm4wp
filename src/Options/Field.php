@@ -96,6 +96,10 @@ final class Field {
 	 * @param string        $unavailable   Translated note that the option may not take effect on this
 	 *                                     site (a host plugin looks missing): the admin UI shows it but
 	 *                                     never disables the control on it (#361). Empty when available.
+	 * @param callable|null $choices_loader Optional fn(): array of further value => label choices,
+	 *                                     appended to $choices on the first read through choices().
+	 *                                     For choices that cost a query: fields() runs on requests
+	 *                                     that never read them (the REST and abilities schemas).
 	 */
 	public function __construct(
 		public string $key,
@@ -113,8 +117,23 @@ final class Field {
 		public bool $rows_locked = false,
 		public array $choice_sections = array(),
 		public string $doc = '',
-		public string $unavailable = ''
+		public string $unavailable = '',
+		public $choices_loader = null
 	) {
+	}
+
+	/**
+	 * The select/multiselect choices: $choices plus the loader's, loaded once.
+	 *
+	 * @return array<int|string, string>
+	 */
+	public function choices(): array {
+		if ( null !== $this->choices_loader && is_callable( $this->choices_loader ) ) {
+			$this->choices        = $this->choices + (array) call_user_func( $this->choices_loader );
+			$this->choices_loader = null;
+		}
+
+		return $this->choices;
 	}
 
 	/**
@@ -155,20 +174,22 @@ final class Field {
 				return (int) $value;
 
 			case self::TYPE_SELECT:
-				$value = (string) sanitize_text_field( self::to_string( $value ) );
-				if ( array() !== $this->choices && ! array_key_exists( $value, $this->choices ) ) {
+				$value   = (string) sanitize_text_field( self::to_string( $value ) );
+				$choices = $this->choices();
+				if ( array() !== $choices && ! array_key_exists( $value, $choices ) ) {
 					return $this->default_value;
 				}
 				return $value;
 
 			case self::TYPE_MULTISELECT:
-				$values = is_array( $value ) ? $value : explode( ',', self::to_string( $value ) );
-				$values = array_map( 'sanitize_text_field', array_map( static fn ( $one ) => self::to_string( $one ), $values ) );
-				if ( array() !== $this->choices ) {
+				$values  = is_array( $value ) ? $value : explode( ',', self::to_string( $value ) );
+				$values  = array_map( 'sanitize_text_field', array_map( static fn ( $one ) => self::to_string( $one ), $values ) );
+				$choices = $this->choices();
+				if ( array() !== $choices ) {
 					$values = array_values(
 						array_filter(
 							$values,
-							fn ( $one_value ) => array_key_exists( $one_value, $this->choices )
+							static fn ( $one_value ) => array_key_exists( $one_value, $choices )
 						)
 					);
 				}
@@ -262,7 +283,7 @@ final class Field {
 			'description' => $this->description,
 			'group'       => $this->group,
 			'phase'       => $this->phase,
-			'choices'     => $this->choices,
+			'choices'     => $this->choices(),
 			'sections'    => $this->choice_sections,
 			'columns'     => $this->columns,
 			'depends_on'  => $this->depends_on,

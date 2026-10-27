@@ -168,6 +168,35 @@ final class WooCommerceAdminSchemaTest extends TestCase {
 		$this->assertArrayHasKey( '', $field->choices, 'The empty choice keeps the standard WooCommerce order received page.' );
 	}
 
+	/**
+	 * fields() runs on every REST request (the settings route's schema) and on
+	 * every abilities registration; get_pages() loads every page of the site,
+	 * so it runs only when the choices are read.
+	 */
+	public function test_order_received_pages_load_only_when_the_choices_are_read(): void {
+		$calls = 0;
+		Functions\when( 'get_pages' )->alias(
+			static function () use ( &$calls ): array {
+				++$calls;
+				return array(
+					(object) array(
+						'ID'         => 42,
+						'post_title' => 'Thank you',
+					),
+				);
+			}
+		);
+
+		$field = $this->field( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE );
+		$this->assertSame( 0, $calls, 'Building the schema must not query the pages.' );
+
+		$choices = $field->choices();
+		$this->assertSame( 1, $calls );
+		$this->assertSame( array( '', '42' ), array_map( 'strval', array_keys( $choices ) ) );
+		$this->assertSame( 'Thank you', $choices[42] );
+		$this->assertSame( '42', $field->sanitize( '42' ), 'A listed page is accepted on save.' );
+	}
+
 	public function test_brand_taxonomy_sanitizer_trims_and_coerces_to_string(): void {
 		// The field is a TYPE_SELECT with a custom sanitizer, which REPLACES the
 		// default SELECT branch entirely (Field::sanitize() returns its result

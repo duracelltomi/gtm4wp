@@ -134,15 +134,21 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 			);
 		}
 
-		// Page choices for the custom order-received page selector.
+		// Page choices for the custom order-received page selector. Loaded only
+		// when read: get_pages() loads every page, and fields() also runs on
+		// requests that never show them.
 		$order_received_page_choices = array(
 			'' => __( '(use the standard WooCommerce order received page)', 'duracelltomi-google-tag-manager' ),
 		);
-		if ( function_exists( 'get_pages' ) ) {
-			foreach ( (array) get_pages() as $page ) {
-				$order_received_page_choices[ (string) $page->ID ] = $page->post_title;
+		$load_order_received_pages   = static function (): array {
+			$pages = array();
+			if ( function_exists( 'get_pages' ) ) {
+				foreach ( (array) get_pages() as $page ) {
+					$pages[ (string) $page->ID ] = $page->post_title;
+				}
 			}
-		}
+			return $pages;
+		};
 
 		// Business vertical labels are Google product terms and are intentionally not translated (1.x parity).
 		$business_verticals = array(
@@ -282,7 +288,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add all customer data (billing and shipping data, total number of orders and order value) into the data layer', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the customer\'s billing and shipping data, order count and total order value to the data layer, and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				doc: self::DOC_REFERENCE
 			),
@@ -371,7 +377,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				group: 'purchase',
 				phase: Field::PHASE_BETA,
 				choices: $order_received_page_choices,
-				doc: self::DOC_REFERENCE
+				doc: self::DOC_REFERENCE,
+				choices_loader: $load_order_received_pages
 			),
 			new Field(
 				key: GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL,

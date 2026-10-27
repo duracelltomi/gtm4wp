@@ -535,7 +535,7 @@ final class SettingsAbilities implements ProviderInterface {
 			'type'        => $field->type,
 			'phase'       => $field->phase,
 			'default'     => $field->default_value,
-			'choices'     => (object) $field->choices,
+			'choices'     => (object) $field->choices(),
 			'columns'     => array_values( $field->columns ),
 			'depends_on'  => $field->depends_on,
 			'rows_locked' => $field->rows_locked,

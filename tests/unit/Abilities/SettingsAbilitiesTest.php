@@ -8,6 +8,7 @@
 namespace GTM4WP\Tests\unit\Abilities;
 
 use Brain\Monkey\Filters;
+use Brain\Monkey\Functions;
 use GTM4WP\Abilities\SettingsAbilities;
 use GTM4WP\Admin\SettingsStore;
 use GTM4WP\Module\Registry;
@@ -119,6 +120,40 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 
 		$this->assertSame( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE, $result['fields'][0]['key'] );
 		$this->assertStringContainsString( 'No WPML or Polylang detected', $result['fields'][0]['unavailable'] );
+	}
+
+	/**
+	 * Abilities register whenever core builds its registry, which an MCP
+	 * server can do on every REST request: registering must not load the page
+	 * list the order received selector offers, and a schema read still lists it.
+	 */
+	public function test_registering_loads_no_pages_and_include_schema_lists_them(): void {
+		$calls = 0;
+		Functions\when( 'get_pages' )->alias(
+			static function () use ( &$calls ): array {
+				++$calls;
+				return array(
+					(object) array(
+						'ID'         => 42,
+						'post_title' => 'Thank you',
+					),
+				);
+			}
+		);
+
+		$this->registered = array();
+		( new SettingsAbilities( $this->registry ) )->register();
+		$this->assertSame( 0, $calls, 'Registering the abilities must not query the pages.' );
+
+		$result = $this->execute(
+			SettingsAbilities::GET_SETTINGS,
+			array(
+				'keys'           => array( GTM4WP_OPTION_INTEGRATE_WCCUSTOMORDERRECEIVEDPAGE ),
+				'include_schema' => true,
+			)
+		);
+
+		$this->assertSame( 'Thank you', ( (array) $result['fields'][0]['choices'] )[42] ?? null );
 	}
 
 	public function test_include_schema_describes_each_returned_option_in_plain_text(): void {
