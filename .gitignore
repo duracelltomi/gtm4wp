@@ -55,6 +55,8 @@ __pycache__/
 # report - so without this line the isolation mechanism trips its own integrity
 # check every time a verifier is live.
 .claude/worktrees/
+# A worktree skill's in-tree fallback location (#588); worktrees belong in .claude/worktrees/.
+.worktrees/
 
 # Output of the claude-security plugin
 CLAUDE-SECURITY-*/

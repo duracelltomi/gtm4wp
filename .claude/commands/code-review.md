@@ -347,6 +347,10 @@ cat ~/.claude/plugins/installed_plugins.json                   # version + insta
 grep -rn "hooksPath\|rev-parse --show-toplevel" .githooks/ .claude/
 grep -rn "on:\|pull_request_target\|secrets\." .github/workflows/
 grep -rln "gh issue\|gh api\|wporg\|forum" .claude/commands/ .claude/skills/
+# SKILL GRANTS (#587): "always allow" on a skill persists Skill(<name>) here. Baseline 0.
+grep -h 'Skill(' ~/.claude/settings.json .claude/settings.json .claude/settings.local.json 2>/dev/null
+# MARKETPLACE PINS (#586): every non-official marketplace carries a tag `ref`.
+grep -o '"ref": *"[^"]*"' ~/.claude/settings.json
 ```
 
 Pair every **entry point** (a command or skill that ingests third-party text) with every **sink** it can reach, and rate the pair:

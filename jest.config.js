@@ -19,6 +19,7 @@ module.exports = {
 	testPathIgnorePatterns: [
 		...( preset.testPathIgnorePatterns || [] ),
 		'<rootDir>/.claude/worktrees/',
+		'<rootDir>/.worktrees/', // a worktree skill's in-tree fallback (#588)
 	],
 	setupFilesAfterEnv: [
 		...( preset.setupFilesAfterEnv || [] ),

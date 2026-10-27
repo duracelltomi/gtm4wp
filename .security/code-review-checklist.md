@@ -9,6 +9,8 @@
 >
 > Committed files may contain ONLY: a one-line summary, severity, status, and file path — plus, for `fixed` issues, the general vulnerability class. **All exploit detail lives solely in the git-ignored reports.** When in doubt, write less in the committed file and keep the detail in the local report.
 >
+> **The same limits bind any text posted outside this repository** (#589): a GitHub issue or comment on any repo, a forum reply, a bug report a tool files for you. Session transcripts quote the local reports, so a tool that reads transcripts and posts (a plugin's diagnosing or feedback skill) needs the same review as a commit. `gh issue create` is denied in this project's settings for that reason.
+>
 > ### "Fixed" means fixed in what users RUN, not on this branch
 >
 > `master` is 2.0 (unreleased); the line in actual use is `1.x`. A defect ported from
@@ -1187,56 +1189,56 @@ report.
 | 537 | Low | fixed (R54 fix session: a rescue only of an order whose marker reads uncaptured) | — | `CaptureStats::record_rescue()` | Rescue also counts orders that were never counted |
 | 538 | Low | fixed (R54 fix session: the guest route is registered only while a destination row exists, as the capture hooks refuse) | A0 key holder | Data Manager backfill route | Writes while no destination exists (#484 sibling) |
 | 539 | Low | fixed (R54 fix session: token maxLength 128 without a pattern, order digits up to 20) | A0 | Data Manager backfill route | Route arguments carry no length bound |
-| 540 | Low | open (unverified) | A0 | `ReceiptPage`, EDD receipt gate | A second EDD receipt filter is not mirrored |
+| 540 | Low | open (not mirrored by design) | A0 | `ReceiptPage`, EDD receipt gate | A second EDD receipt filter is not mirrored |
 | 541 | Low | fixed | A0 | WC + EDD reliable-purchase page lane | Cache-related exposure; detail in the local report |
 | 542 | Low | fixed | — | EDD `DownloadData` status gate | Unpaid statuses pass the unconfirmed lane with an empty list |
-| 543 | Low | open | — | EDD + WC customer-data descriptions | Descriptions omit fields the code emits (RI-15) |
-| 544 | Low | open | — | EDD reliable-purchase description | Example names the case #471 now refuses |
+| 543 | Low | fixed (fac400c) | — | EDD + WC customer-data descriptions | Descriptions omit fields the code emits (RI-15) |
+| 544 | Low | fixed (fac400c) | — | EDD reliable-purchase description | Example names the case #471 now refuses |
 | 545 | Low | fixed (R54 fix session: the store base rate memoized per DownloadData instance) | A1 | EDD `DownloadData` | Tax rate resolved per price call |
 | 546 | Low | fixed (R54 upkeep: default false, parameter renamed; the default test asserts both) | — | EDD `is_order_status_trackable()` | Permissive default argument |
 | 547 | Low | fixed (R54 fix session: name, item_price, subtotal and discount added; tax left absent on purpose) | site code | EDD checkout rows | Synthesized line lacks content-details keys |
 | 548 | Low | fixed (R54 fix session: Ecommerce\Helpers::purchase_rule_value() is the one rule for both stores, moved out of WooCommerce ProductData; 7 call sites; equivalent, suites unchanged) | — | EDD `DownloadData`, `EddRefunds` | Exclude-tax rule written five times; RI-43 claim half true |
-| 549 | Low | open | — | Data Manager `RefundSender`, send-log panel | A replayed refund on an inactive platform leaves no row (RI-40 ledger is 2) |
+| 549 | Low | fixed (fac400c) | — | Data Manager `RefundSender`, send-log panel | A replayed refund on an inactive platform leaves no row (RI-40 ledger is 2) |
 | 550 | Low | fixed (R54 fix session: a failed retry schedule writes one failed not_queued row per destination, replayable at once) | — | Data Manager `RefundSender::deliver()` | A failed retry schedule keeps reading "retrying" |
 | 551 | Low | fixed (R54 upkeep: wording) | — | Data Manager `RefundReplay` | Class doc and 400 message overstate the check |
-| 552 | Low | open (needs design) | A4 | Data Manager `SendLog` replay plan | An overdue retry is replayable while still scheduled (inside #474) |
+| 552 | Low | open (design, 2.2) | A4 | Data Manager `SendLog` replay plan | An overdue retry is replayable while still scheduled (inside #474) |
 | 553 | Low | fixed (R54 upkeep: entry dropped, a failed row stays replayable, guard test; merge note for the 2.2 branch) | — | `SendLog::REPLAYABLE_SKIPS` | Lists a reason never written as a skip |
 | 554 | Low | fixed (R54 upkeep: comment) | A4 delegate | Data Manager `Abilities` | Comment overclaims what the abilities never return |
-| 555 | Low | open | site code | Data Manager `WooCommerceRefunds` | Refund-line fallback hands the item filters a refund-owned item |
-| 556 | Low | open (unverified) | — | `EventsIngest`, `TokenService` | 408/409 classed as deterministic |
+| 555 | Low | open (both paths named) | site code | Data Manager `WooCommerceRefunds` | Refund-line fallback hands the item filters a refund-owned item |
+| 556 | Low | open (U197) | — | `EventsIngest`, `TokenService` | 408/409 classed as deterministic |
 | 557 | Low | fixed (R54 upkeep: placeholder formats) | — | Data Manager `AdminSchema` | Translatable suffixes with a leading space |
-| 558 | Low | open (proposed: accept as #468 residual) | A4 | `KeyVault::migrate()` | Lost update against Replace key |
-| 559 | Low | open (needs design) | — | `ServiceAccountKey` | Key material reachable through encoders #496 does not cover |
+| 558 | Low | accepted (#468 residual, no compare-and-swap in the Options API) | A4 | `KeyVault::migrate()` | Lost update against Replace key |
+| 559 | Low | open (design, 2.2) | — | `ServiceAccountKey` | Key material reachable through encoders #496 does not cover |
 | 560 | Low | fixed (R54 fix session: the salt material is read on each use, never kept on the vault; dump test) | — | `KeyVault` | Salt material cached on the object |
 | 561 | Low | fixed (R54 upkeep: docblocks and threat model) | — | `KeyVault` docblock, threat model | Migration timing wording |
-| 562 | Low | open | — | `KeyVault`, `KeyNotice` | Remedy text while the constant is active or rejected |
+| 562 | Low | fixed (fac400c) | — | `KeyVault`, `KeyNotice` | Remedy text while the constant is active or rejected |
 | 563 | Low | fixed (R54 upkeep: both writes dropped) | — | `KeyVault` | Stored field written, never read |
 | 564 | Low | fixed (R54 upkeep: class constants) | — | GoogleAuth `SiteHealth`, `AdminSchema` | Minimum length and constant name hardcoded |
 | 565 | Low | fixed (R54 upkeep: docblock) | — | `KeyNotice` | Cost docblock |
-| 566 | Low | open (needs design) | config | `KeyVault` status view | Readability differs between request contexts |
+| 566 | Low | open (design, 2.2) | config | `KeyVault` status view | Readability differs between request contexts |
 | 567 | Low | fixed (R54 fix session: text or int confirm refused with gtm4wp_confirm_not_boolean naming the transport, both confirm abilities; the import description names 7.1, which makes #525 true; strict check kept) | A4 delegate | `import-settings` on WP 6.9–7.0 REST | Misleading refusal; #525's resolution not true as written |
 | 568 | Low | fixed (R54 fix session: wp_parse_list(), same split as a fallback) | A4 delegate | `Abilities\Input::strings()` | Lists parsed differently from core |
 | 569 | Low | fixed (R54 upkeep: docblock) | — | `SettingsStore::value_schema()` | Stale return type |
 | 570 | Low | fixed (ba05e0f: the settings schema is built only when the settings route runs; page choices loaded on first read) | A0 | Settings REST route registration | #508 remainder: page query on every REST request; cost claim unmeasured |
 | 571 | Low | fixed (R54 fix session: one scalar guard for every row value, label and description) | site code | `StatusAbilities` | Object-valued Site Health rows still throw |
 | 572 | Low | fixed (R54 fix session: export and import descriptions name the inactive-module case) | A4 | `SettingsStore` export/import | Inactive third-party module settings dropped |
-| 573 | Low | open | — | `BackfillEndpoint` writers | Duplicated write loop |
-| 574 | Low | open | — | four methods | Crossed 50 lines in range |
-| 575 | Low | open (maintainer decision on the basis; the comment is narrowed to what the code does) | — | WC `ProductData` | Item vs value tax basis in one option cell; comment wrong (pre-existing) |
-| 576 | Low | open | — | WC cart vs purchase | Pre- vs post-discount unit price (pre-existing) |
+| 573 | Low | deferred (after 2.1 final) | — | `BackfillEndpoint` writers | Duplicated write loop |
+| 574 | Low | deferred (after 2.1 final, with #477) | — | four methods | Crossed 50 lines in range |
+| 575 | Low | open (U196, decide in 2.2) | — | WC `ProductData` | Item vs value tax basis in one option cell; comment wrong (pre-existing) |
+| 576 | Low | open (U196, decide in 2.2) | — | WC cart vs purchase | Pre- vs post-discount unit price (pre-existing) |
 | 577 | Low | fixed (RI-25 count in this ledger update; U192 registered) | — | RI-25 ledger, `.upstream` | Ledger read 14, tree has 17; three hook couplings unregistered |
 | 578 | Low | fixed (R54 upkeep: wrapper removed, docblock moved, three pointers) | — | `WooCommerceModule` | Forward-only wrapper |
-| 579 | Low | open | — | WC `PageDataLayer` | Cloned cart/checkout loops |
+| 579 | Low | deferred (after 2.1 final) | — | WC `PageDataLayer` | Cloned cart/checkout loops |
 | 580 | Low | fixed (R54 upkeep: four methods private; `order_discount_codes()` kept public for the 2.2 branch) | — | WC `ProductData`, EDD `DownloadData` | Public methods with own-class callers only |
-| 581 | Low | open | — | WC + EDD `purchase_basis()` | Duplicated parse |
+| 581 | Low | deferred (after 2.1 final) | — | WC + EDD `purchase_basis()` | Duplicated parse |
 | 582 | Low | fixed (GA4 effect unverified) | — | WC tracker JS | String `value` on three pushes |
 | 583 | Low | fixed | site code | WC tracker JS, blocks cart diff | Unguarded price on one Store API path |
 | 584 | Low | fixed (R54 upkeep: docblock) | — | `BackfillEndpoint::within_window()` | Docblock wording |
-| 585 | Low | open (unverified) | D0 → D1 | Plugin hook (maintainer machine) | Interpreter resolved by bare name; detail in the local report |
-| 586 | Low | open | publisher → D1 | Plugin marketplaces | No content pin for three plugins; official marketplace auto-updates |
-| 587 | Low | open | D0 → D1 | Plugin SessionStart injection | Steers skill choice in triage sessions; add a `Skill(` grep |
-| 588 | Low | open | D0 → D1 | Plugin worktree skill | Fallback location not ignored, unasked commit |
-| 589 | Low | open | D1 → third party | Plugin diagnostics skill | Can publish transcript-derived text |
+| 585 | Low | fixed (user env) | D0 → D1 | Plugin hook (maintainer machine) | Interpreter resolved by bare name; detail in the local report |
+| 586 | Low | fixed (digests pinned, marketplace ref; official auto-update accepted) | publisher → D1 | Plugin marketplaces | No content pin for three plugins; official marketplace auto-updates |
+| 587 | Low | fixed (Skill( grep, baseline 0) | D0 → D1 | Plugin SessionStart injection | Steers skill choice in triage sessions; add a `Skill(` grep |
+| 588 | Low | fixed | D0 → D1 | Plugin worktree skill | Fallback location not ignored, unasked commit |
+| 589 | Low | fixed (rule extended, gh issue create denied) | D1 → third party | Plugin diagnostics skill | Can publish transcript-derived text |
 | 590 | Low | fixed (ledger corrected; `code-review.md` wording) | — | `code-review.md` PA-19 text, toolchain ledger | Pin wording contradicts itself; two ledger figures wrong |
 | 591 | Low | fixed (this ledger update) | A4 | Public Surface Inventory, matrix labels | Replace-key route unlisted; backfill row text stale |
 | 592 | Low | fixed (R54 fix session: Ecommerce\Helpers::purchase_event() on every purchase path; the thank-you page prints but does not flag, the one-shot resolvers answer nothing; the #412 bullet names the paths) | site code | WC `PurchaseTracking`, WC + EDD one-shot purchase resolvers | Purchase payload printed or flagged without checking `event` (#412 sibling; found by the #529 fix) |
