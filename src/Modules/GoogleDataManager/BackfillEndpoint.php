@@ -72,13 +72,19 @@ final class BackfillEndpoint {
 						'type'     => 'string',
 						'enum'     => array( self::PLATFORM_WC, self::PLATFORM_EDD ),
 					),
+					// Bounded, so an oversized value is refused before any lookup
+					// (#539). The token takes no character pattern: a filtered order
+					// key or an admin-typed EDD payment key may hold any character.
 					'order'    => array(
-						'required' => true,
-						'type'     => 'string',
+						'required'  => true,
+						'type'      => 'string',
+						'pattern'   => '^[0-9]{1,20}$',
+						'maxLength' => 20,
 					),
 					'token'    => array(
-						'required' => true,
-						'type'     => 'string',
+						'required'  => true,
+						'type'      => 'string',
+						'maxLength' => 128,
 					),
 				),
 			)

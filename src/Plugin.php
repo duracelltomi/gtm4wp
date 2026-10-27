@@ -124,9 +124,11 @@ final class Plugin {
 					new Modules\GoogleDataManager\DestinationHealth()
 				) )->register_routes();
 
-				// Guest-facing, so it exists only while capture runs. Gated on the
+				// Guest-facing, so it exists only while capture runs and has a
+				// destination to capture for (#538, as CaptureHooks). Gated on the
 				// options alone: the callback resolves the platform per request.
-				if ( Modules\GoogleDataManager\GoogleDataManagerModule::capture_enabled( $this->options ) ) {
+				if ( Modules\GoogleDataManager\GoogleDataManagerModule::capture_enabled( $this->options )
+					&& array() !== Modules\GoogleDataManager\DestinationRows::rows( $this->options ) ) {
 					( new Modules\GoogleDataManager\BackfillEndpoint() )->register_routes();
 				}
 

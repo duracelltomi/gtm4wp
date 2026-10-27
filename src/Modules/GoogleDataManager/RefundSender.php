@@ -354,8 +354,9 @@ final class RefundSender {
 
 		$delay = SendQueue::retry_delay( $attempt );
 
-		// A retry that could not be scheduled is no retry: the refund is done
-		// for the marker, and its retrying rows turn replayable once overdue (#473).
+		// A retry that could not be scheduled is no retry: the refund is done for
+		// the marker, and each destination gets a not_queued row, replayable at
+		// once instead of a "retrying" row that turns replayable when overdue (#550).
 		$retrying = array() !== $retry && null !== $delay
 			&& SendQueue::schedule(
 				SendQueue::HOOK_SEND,
@@ -371,6 +372,12 @@ final class RefundSender {
 
 		// Who took it, always (a retry may never reach the others, #394); and,
 		// once no retry is coming, that the refund is done - in one write.
+		if ( array() !== $retry && null !== $delay && ! $retrying ) {
+			foreach ( array_unique( $retry ) as $measurement ) {
+				$this->not_queued( $refund->reference(), $attempt + 1, $measurement );
+			}
+		}
+
 		if ( array() !== $accepted ) {
 			$source->mark_accepted( $refund->refund_id, $accepted, $retrying ? null : $request_id );
 		}
@@ -604,17 +611,21 @@ final class RefundSender {
 
 	/**
 	 * Records a job that could not be scheduled as failed, so it is not lost
-	 * silently and a replay can queue it (#473).
+	 * silently and a replay can queue it (#473): for the whole refund, or for
+	 * one destination whose retry could not be queued (#550), which a replay
+	 * then sends to that destination alone.
 	 *
-	 * @param string $reference The refund reference.
-	 * @param int    $attempt   The attempt that could not be scheduled.
+	 * @param string $reference   The refund reference.
+	 * @param int    $attempt     The attempt that could not be scheduled.
+	 * @param string $destination The destination, or '' for the whole refund.
 	 * @return void
 	 */
-	private function not_queued( string $reference, int $attempt ): void {
+	private function not_queued( string $reference, int $attempt, string $destination = '' ): void {
 		$this->log->record(
 			array(
 				'feature'     => SendLog::FEATURE_REFUND,
 				'reference'   => $reference,
+				'destination' => $destination,
 				'attempt'     => $attempt,
 				'outcome'     => SendLog::OUTCOME_FAILED,
 				'reason'      => self::REASON_NOT_QUEUED,

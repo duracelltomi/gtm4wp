@@ -333,13 +333,45 @@ final class PluginRestWiringTest extends TestCase {
 	 */
 	public function test_the_backfill_route_is_registered_only_while_capture_is_on(): void {
 		$this->run_rest_api_init(
-			$this->boot_and_capture_rest_api_init( array( GTM4WP_OPTION_GDM_SEND_REFUNDS => true ) )
+			$this->boot_and_capture_rest_api_init(
+				array(
+					GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+					GTM4WP_OPTION_GDM_DESTINATIONS => array(
+						array(
+							\GTM4WP\Modules\GoogleDataManager\DestinationRows::COLUMN_ACCOUNT     => 'sa_0123456789ab',
+							\GTM4WP\Modules\GoogleDataManager\DestinationRows::COLUMN_TYPE        => \GTM4WP\Modules\GoogleDataManager\DestinationRows::TYPE_GA4,
+							\GTM4WP\Modules\GoogleDataManager\DestinationRows::COLUMN_PROPERTY    => '123456789',
+							\GTM4WP\Modules\GoogleDataManager\DestinationRows::COLUMN_MEASUREMENT => 'G-ABC123',
+						),
+					),
+				)
+			)
 		);
 
 		$this->assertNotSame(
 			array(),
 			$this->callbacks_of_controller( \GTM4WP\Modules\GoogleDataManager\BackfillEndpoint::class ),
 			'With capture on the route exists, behind its own permission callback.'
+		);
+	}
+
+	/**
+	 * #538: a lane left on after its last destination was deleted has nothing to
+	 * capture for, so the guest route does not exist (as CaptureHooks refuses).
+	 */
+	public function test_no_backfill_route_while_no_destination_exists(): void {
+		$this->run_rest_api_init(
+			$this->boot_and_capture_rest_api_init(
+				array(
+					GTM4WP_OPTION_GDM_SEND_REFUNDS => true,
+					GTM4WP_OPTION_GDM_DESTINATIONS => array(),
+				)
+			)
+		);
+
+		$this->assertSame(
+			array(),
+			$this->callbacks_of_controller( \GTM4WP\Modules\GoogleDataManager\BackfillEndpoint::class )
 		);
 	}
 

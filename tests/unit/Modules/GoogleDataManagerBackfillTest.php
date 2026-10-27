@@ -261,6 +261,16 @@ final class GoogleDataManagerBackfillTest extends TestCase {
 		foreach ( array( 'platform', 'order', 'token' ) as $required ) {
 			$this->assertTrue( $args['args'][ $required ]['required'], $required . ' is not optional.' );
 		}
+
+		// #539: bounded before any lookup. The order is digits (the receipt page
+		// prints an int); the token takes no pattern (filtered keys).
+		$this->assertSame( 128, $args['args']['token']['maxLength'] );
+		$this->assertArrayNotHasKey( 'pattern', $args['args']['token'] );
+		$this->assertSame( 20, $args['args']['order']['maxLength'] );
+		$pattern = '#' . $args['args']['order']['pattern'] . '#u';
+		$this->assertSame( 1, preg_match( $pattern, '42' ) );
+		$this->assertSame( 0, preg_match( $pattern, '42abc' ) );
+		$this->assertSame( 0, preg_match( $pattern, '' ) );
 	}
 
 	// ---- Control 1: the origin gate ----------------------------------------

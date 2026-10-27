@@ -865,6 +865,16 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$this->assertSame( array( 34 => 'req-ok' ), $source->sent );
 		$this->assertSame( array( 34 => array( 'G-AAA' ) ), $source->accepted );
+
+		// #550: the destination whose retry was never queued says so at once,
+		// as a failed row a replay sends to it alone; the marker cannot block it.
+		$newest = array();
+		foreach ( $this->log->all() as $entry ) {
+			$newest[ $entry['destination'] ] = $entry;
+		}
+		$this->assertSame( SendLog::OUTCOME_FAILED, $newest['G-BBB']['outcome'] );
+		$this->assertSame( RefundSender::REASON_NOT_QUEUED, $newest['G-BBB']['reason'] );
+		$this->assertSame( array( 'G-BBB' ), $this->log->replay_plan()['woocommerce:12:34']['only'] ?? null );
 	}
 
 	/**

@@ -1185,8 +1185,8 @@ report.
 | 535 | Low | fixed (R54 fix session: one capture pass shared by both stores) | — | Data Manager `CaptureHooks` (EDD) | EDD resumed orders have none of the #481 handling |
 | 536 | Low | fixed (R54 fix session, maintainer decision 2026-10-22: the later observed consent wins per signal; an id group the pass resolved replaces the stored group; threat model updated) | A0/A1 data | Data Manager `CaptureHooks` (WC) | Consent recorded on a resumed order; WC and EDD answer differently |
 | 537 | Low | fixed (R54 fix session: a rescue only of an order whose marker reads uncaptured) | — | `CaptureStats::record_rescue()` | Rescue also counts orders that were never counted |
-| 538 | Low | open | A0 key holder | Data Manager backfill route | Writes while no destination exists (#484 sibling) |
-| 539 | Low | open | A0 | Data Manager backfill route | Route arguments carry no length bound |
+| 538 | Low | fixed (R54 fix session: the guest route is registered only while a destination row exists, as the capture hooks refuse) | A0 key holder | Data Manager backfill route | Writes while no destination exists (#484 sibling) |
+| 539 | Low | fixed (R54 fix session: token maxLength 128 without a pattern, order digits up to 20) | A0 | Data Manager backfill route | Route arguments carry no length bound |
 | 540 | Low | open (unverified) | A0 | `ReceiptPage`, EDD receipt gate | A second EDD receipt filter is not mirrored |
 | 541 | Low | open (unverified) | A0 | WC + EDD reliable-purchase page lane | Cache-related exposure; detail in the local report |
 | 542 | Low | open | — | EDD `DownloadData` status gate | Unpaid statuses pass the unconfirmed lane with an empty list |
@@ -1197,7 +1197,7 @@ report.
 | 547 | Low | open | site code | EDD checkout rows | Synthesized line lacks content-details keys |
 | 548 | Low | fixed (R54 fix session: Ecommerce\Helpers::purchase_rule_value() is the one rule for both stores, moved out of WooCommerce ProductData; 7 call sites; equivalent, suites unchanged) | — | EDD `DownloadData`, `EddRefunds` | Exclude-tax rule written five times; RI-43 claim half true |
 | 549 | Low | open | — | Data Manager `RefundSender`, send-log panel | A replayed refund on an inactive platform leaves no row (RI-40 ledger is 2) |
-| 550 | Low | open | — | Data Manager `RefundSender::deliver()` | A failed retry schedule keeps reading "retrying" |
+| 550 | Low | fixed (R54 fix session: a failed retry schedule writes one failed not_queued row per destination, replayable at once) | — | Data Manager `RefundSender::deliver()` | A failed retry schedule keeps reading "retrying" |
 | 551 | Low | fixed (R54 upkeep: wording) | — | Data Manager `RefundReplay` | Class doc and 400 message overstate the check |
 | 552 | Low | open (needs design) | A4 | Data Manager `SendLog` replay plan | An overdue retry is replayable while still scheduled (inside #474) |
 | 553 | Low | fixed (R54 upkeep: entry dropped, a failed row stays replayable, guard test; merge note for the 2.2 branch) | — | `SendLog::REPLAYABLE_SKIPS` | Lists a reason never written as a skip |
