@@ -117,7 +117,9 @@ final class RestController {
 	}
 
 	/**
-	 * Validates the POST 'values' argument against the per-field schema.
+	 * Validates the POST 'values' argument against the per-field schema. Core
+	 * runs this before permission_callback, so a caller without the capability
+	 * passes through to that check instead of a 400 naming option keys (#613).
 	 *
 	 * @param mixed  $value   The submitted argument.
 	 * @param mixed  $request The REST request (unused).
@@ -126,11 +128,16 @@ final class RestController {
 	 */
 	public function validate_values( $value, $request, string $param ) {
 		unset( $request );
+		if ( ! $this->can_manage() ) {
+			return true;
+		}
+
 		return rest_validate_value_from_schema( $value, $this->values_schema(), $param );
 	}
 
 	/**
-	 * Sanitizes the POST 'values' argument against the per-field schema.
+	 * Sanitizes the POST 'values' argument against the per-field schema; like
+	 * validate_values(), untouched for a caller the permission check refuses.
 	 *
 	 * @param mixed  $value   The submitted argument.
 	 * @param mixed  $request The REST request (unused).
@@ -139,6 +146,10 @@ final class RestController {
 	 */
 	public function sanitize_values( $value, $request, string $param ) {
 		unset( $request );
+		if ( ! $this->can_manage() ) {
+			return $value;
+		}
+
 		return rest_sanitize_value_from_schema( $value, $this->values_schema(), $param );
 	}
 

@@ -143,6 +143,7 @@ final class RestControllerTest extends TestCase {
 	 * still hand core the full per-field schema and return core's answer.
 	 */
 	public function test_values_are_validated_and_sanitized_against_the_full_field_schema(): void {
+		Functions\when( 'current_user_can' )->justReturn( true );
 		$controller = $this->make_controller();
 		$expected   = array(
 			'type'       => 'object',
@@ -172,6 +173,39 @@ final class RestControllerTest extends TestCase {
 		$this->assertSame( array( 'sanitized' => true ), $controller->sanitize_values( $submitted, $request, 'values' ) );
 		$this->assertSame( array( $submitted, $expected, 'values' ), $seen['validate'] );
 		$this->assertSame( array( $submitted, $expected, 'values' ), $seen['sanitize'] );
+	}
+
+	/**
+	 * #613: core runs argument validation before permission_callback, so for a
+	 * caller without the capability both callbacks pass the value through
+	 * untouched: the request then meets the permission check (401/403) instead
+	 * of a 400 naming option keys, and never walks the field schema.
+	 */
+	public function test_a_caller_without_the_capability_skips_validation_and_reaches_the_permission_check(): void {
+		Functions\when( 'current_user_can' )->justReturn( false );
+		$controller = $this->make_controller();
+
+		$walked = false;
+		Functions\when( 'rest_validate_value_from_schema' )->alias(
+			static function () use ( &$walked ) {
+				$walked = true;
+				return new \WP_Error( 'rest_invalid_type', 'values[x] is not of type boolean.' );
+			}
+		);
+		Functions\when( 'rest_sanitize_value_from_schema' )->alias(
+			static function () use ( &$walked ) {
+				$walked = true;
+				return array();
+			}
+		);
+
+		$submitted = array( GTM4WP_OPTION_INCLUDE_LOGGEDIN => 'not a boolean' );
+		$request   = new \WP_REST_Request();
+
+		$this->assertTrue( $controller->validate_values( $submitted, $request, 'values' ) );
+		$this->assertSame( $submitted, $controller->sanitize_values( $submitted, $request, 'values' ) );
+		$this->assertFalse( $walked, 'No schema is built or applied for an unauthorized caller.' );
+		$this->assertFalse( $controller->can_manage(), 'The permission check still refuses the caller.' );
 	}
 
 	public function test_saving_container_rows_syncs_legacy_mirror_options(): void {

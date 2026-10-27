@@ -1196,7 +1196,7 @@ time) and the R55 fix-session commit after it (14 more); claims that changed sha
 | 610 | Low | fixed (R55 fix session, maintainer decision 2026-10-27: refunded and revoked keep counting under an empty list, as in WooCommerce; description and U195 "paid" corrected) | — | EDD `AdminSchema`, U195 | Status text vs refunded/revoked counting |
 | 611 | Low | fixed (R55 fix session: description; guest behaviour of the page-level keys unverified) | — | WC `AdminSchema` | Customer-data text omits two fields |
 | 612 | Low | fixed (R55 fix session: raw item_price, fees array, comment narrowed) | site code | EDD `ListTracking` | Synthesized checkout line values differ from EDD's |
-| 613 | Low | open | A0 | Settings REST route | Validation answers before the permission check |
+| 613 | Low | fixed (R55 fix session: validate and sanitize pass a caller without the capability through to the permission check; core 6.9 dispatch probed 400 -> 401) | A0 | Settings REST route | Validation answers before the permission check |
 | 614 | Low | fixed (this ledger update; the `.upstream` row is for `/upstream-review`) | — | checklist, patterns RI-39 | Four ledger claims the tree contradicts |
 | 615 | Low | open | — | `CaptureHooks`, `BackfillEndpoint` | Marker format in two files |
 | 616 | Low | deferred (with #574) | — | `CaptureHooks::pass()` | Over 50 lines |
