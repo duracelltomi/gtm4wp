@@ -80,7 +80,7 @@ final class ListTracking {
 			'productlist'
 		);
 
-		if ( false === $eec_product_array ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			return;
 		}
 
@@ -120,7 +120,7 @@ final class ListTracking {
 			'addtocartsingle'
 		);
 
-		if ( false === $eec_product_array ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			return;
 		}
 
@@ -166,7 +166,7 @@ final class ListTracking {
 			DownloadData::cart_item_price_id( $line )
 		);
 
-		if ( false === $eec_product_array ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			return;
 		}
 

@@ -273,6 +273,49 @@ final class EddListTrackingTest extends TestCase {
 		$this->assertSame( '', $this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 3 ) ) );
 	}
 
+	/**
+	 * #593 (the rest of #529): every item site of this class prints nothing for
+	 * an item the item filter did not return as a non-empty array, with and
+	 * without variable prices. Warnings and deprecations are promoted.
+	 */
+	public function test_an_item_filter_returning_no_item_prints_nothing_at_every_site(): void {
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+		list( $row, $details ) = self::cart_row( 3, 2, 19.98 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+
+		$return = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$return ) {
+				return $return;
+			}
+		);
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( 'fixed price', 'variable prices' ) as $pricing ) {
+				if ( 'variable prices' === $pricing ) {
+					$this->stub_variable_prices();
+				}
+
+				foreach ( array( true, 1, 'x', null, false, array() ) as $return ) {
+					$label         = $pricing . ', ' . var_export( $return, true ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+					$list_tracking = $this->make_list_tracking();
+
+					$this->assertSame( '', $this->capture_output( array( $list_tracking, 'after_download_shortcode_item' ) ), $label . ': list span' );
+					$this->assertSame( '', $this->capture_output( fn () => $list_tracking->purchase_link_data( 55, array() ) ), $label . ': buy button' );
+					$this->assertSame( '', $this->capture_output( fn () => $list_tracking->checkout_cart_item_data( $row, 3 ) ), $label . ': checkout row' );
+				}
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
 	public function test_checkout_cart_row_span_uses_its_own_class_and_carries_the_cart_key(): void {
 		list( $row, $details ) = self::cart_row( 3, 2, 19.98 );
 		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );

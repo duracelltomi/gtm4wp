@@ -125,6 +125,10 @@ final class ListTracking {
 			'addtocartsingle'
 		);
 
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
+			return;
+		}
+
 		echo '<span class="gtm4wp_single_productdata" style="display:none; visibility:hidden;" data-gtm4wp_product_data="' . esc_attr( wp_json_encode( $eec_product_array ) ) . '"></span>' . "\n";
 	}
 
@@ -160,7 +164,7 @@ final class ListTracking {
 			'shortcodeaddtocart'
 		);
 
-		if ( ! is_array( $eec_product_array ) ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			return $link;
 		}
 
@@ -229,7 +233,7 @@ final class ListTracking {
 			return $remove_from_cart_link;
 		}
 
-		if ( ! is_array( $gtm4wp_cart_item_proddata ) ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $gtm4wp_cart_item_proddata ) ) {
 			return $remove_from_cart_link;
 		}
 
@@ -551,7 +555,7 @@ final class ListTracking {
 			'productlist'
 		);
 
-		if ( false === $eec_product_array ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			return false;
 		}
 
@@ -650,6 +654,10 @@ final class ListTracking {
 				default:
 					$data_layer['productIsVariable'] = 0;
 
+					if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
+						break;
+					}
+
 					$gtm4wp_currency = get_woocommerce_currency();
 
 					$data_layer['ecommerce'] = array(
@@ -690,7 +698,12 @@ final class ListTracking {
 			'groupedproductlist'
 		);
 
+		// After the increment, so the rows below keep their displayed position.
 		++$GLOBALS['gtm4wp_grouped_product_ix'];
+
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
+			return $labelvalue;
+		}
 
 		if ( ! isset( $eec_product_array['item_brand'] ) ) {
 			$eec_product_array['item_brand'] = '';

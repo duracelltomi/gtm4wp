@@ -90,7 +90,7 @@ final class StoreApiData {
 		$item = $this->product_data->process_product( $product, array(), 'block' );
 
 		return array(
-			'item' => ( false === $item ) ? null : $item,
+			'item' => \GTM4WP\Ecommerce\Helpers::is_item( $item ) ? $item : null,
 		);
 	}
 
@@ -119,7 +119,7 @@ final class StoreApiData {
 		);
 
 		return array(
-			'item' => ( false === $item ) ? '' : (string) wp_json_encode( $item ),
+			'item' => \GTM4WP\Ecommerce\Helpers::is_item( $item ) ? (string) wp_json_encode( $item ) : '',
 		);
 	}
 

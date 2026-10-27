@@ -943,4 +943,16 @@ final class HelpersTest extends TestCase {
 			)
 		);
 	}
+
+	/**
+	 * #529/#593: an item filter's return counts as an item only when it is a
+	 * non-empty array; `array()` prints the same junk item `null` does.
+	 */
+	public function test_is_item_accepts_only_a_non_empty_array(): void {
+		$this->assertTrue( \GTM4WP\Ecommerce\Helpers::is_item( array( 'item_id' => '7' ) ) );
+
+		foreach ( array( true, 1, 'x', null, false, array(), new \stdClass() ) as $value ) {
+			$this->assertFalse( \GTM4WP\Ecommerce\Helpers::is_item( $value ), gettype( $value ) );
+		}
+	}
 }

@@ -3153,8 +3153,10 @@ final class PageDataLayerTest extends TestCase {
 			'is_checkout' => 'begin_checkout',
 		);
 		$drops = array(
-			'false' => false,
-			'null'  => null,
+			'false'       => false,
+			'null'        => null,
+			// #593: an empty array is no item either.
+			'empty array' => array(),
 		);
 
 		foreach ( $pages as $page => $event ) {
@@ -3177,6 +3179,7 @@ final class PageDataLayerTest extends TestCase {
 				$this->assertStringNotContainsString( 'Mug', $this->inline_js, $event . ', ' . $label . ': the dropped line is gone.' );
 				$this->assertStringNotContainsString( '[null', $this->inline_js, $event . ', ' . $label );
 				$this->assertStringNotContainsString( '[false', $this->inline_js, $event . ', ' . $label );
+				$this->assertStringNotContainsString( '[[]', $this->inline_js, $event . ', ' . $label );
 			}
 		}
 	}
@@ -3186,21 +3189,30 @@ final class PageDataLayerTest extends TestCase {
 	 * still clears the marker, and the one-shot resolver answers null.
 	 */
 	public function test_an_item_filter_that_drops_a_readded_item_fires_nothing(): void {
-		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturn( false );
+		$drop = false;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$drop ) {
+				return $drop;
+			}
+		);
 		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
 
-		$session = $this->stub_wc_readded( 'hash-1', $product );
-		$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
-			->add_datalayer_data( array() );
+		// #593: an empty array is no item either.
+		foreach ( array( false, array() ) as $drop ) {
+			$this->inline_js = '';
+			$session         = $this->stub_wc_readded( 'hash-1', $product );
+			$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+				->add_datalayer_data( array() );
 
-		$this->assertStringNotContainsString( '"event":"add_to_cart"', $this->inline_js );
-		$this->assertArrayHasKey( 'gtm4wp_product_readded_to_cart', $session->sets, 'The marker is still cleared, so the drop is not retried.' );
-		$this->assertNull( $session->sets['gtm4wp_product_readded_to_cart'] );
+			$this->assertStringNotContainsString( '"event":"add_to_cart"', $this->inline_js );
+			$this->assertArrayHasKey( 'gtm4wp_product_readded_to_cart', $session->sets, 'The marker is still cleared, so the drop is not retried.' );
+			$this->assertNull( $session->sets['gtm4wp_product_readded_to_cart'] );
 
-		$this->stub_wc_readded( 'hash-1', $product );
-		$this->assertNull(
-			$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )->resolve_readded_to_cart()
-		);
+			$this->stub_wc_readded( 'hash-1', $product );
+			$this->assertNull(
+				$this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )->resolve_readded_to_cart()
+			);
+		}
 	}
 
 	/**
@@ -3208,23 +3220,33 @@ final class PageDataLayerTest extends TestCase {
 	 * skips the view_item push and the cartContent line; the product keys stay.
 	 */
 	public function test_an_item_filter_that_drops_the_product_skips_only_its_item(): void {
-		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturn( 'dropped' );
+		$drop = 'dropped';
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$drop ) {
+				return $drop;
+			}
+		);
 		Functions\when( 'is_product' )->justReturn( true );
 		Functions\when( 'get_the_ID' )->justReturn( 7 );
 		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
 		Functions\when( 'wc_get_product' )->justReturn( $product );
-		$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 1 ) ) ); // phpcs:ignore
 
-		$result = $this->make_page_datalayer(
-			array(
-				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
-				GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
-			)
-		)->add_datalayer_data( array() );
+		// #593: an empty array is no item either.
+		foreach ( array( 'dropped', array() ) as $drop ) {
+			$this->inline_js = '';
+			$this->stub_wc( array( 'item-1' => array( 'data' => $product, 'quantity' => 1 ) ) ); // phpcs:ignore
 
-		$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_js );
-		$this->assertArrayHasKey( 'productType', $result, 'The page-level product keys stay.' );
-		$this->assertSame( array(), $result['cartContent']['items'] ?? array(), 'No dropped line in cartContent.' );
+			$result = $this->make_page_datalayer(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+					GTM4WP_OPTION_INTEGRATE_WCEINCLUDECARTINDL => true,
+				)
+			)->add_datalayer_data( array() );
+
+			$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_js );
+			$this->assertArrayHasKey( 'productType', $result, 'The page-level product keys stay.' );
+			$this->assertSame( array(), $result['cartContent']['items'] ?? array(), 'No dropped line in cartContent.' );
+		}
 	}
 
 	public function test_cart_page_fires_view_cart_event(): void {

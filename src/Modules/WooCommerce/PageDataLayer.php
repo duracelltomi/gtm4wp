@@ -281,7 +281,7 @@ final class PageDataLayer {
 			);
 
 			// An item filter can drop the line (false) or return nothing (#529).
-			if ( ! is_array( $eec_product_array ) ) {
+			if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 				continue;
 			}
 
@@ -323,7 +323,7 @@ final class PageDataLayer {
 		);
 
 		// An item filter that drops the product skips only the view_item push (#529).
-		$has_item = is_array( $eec_product_array );
+		$has_item = \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array );
 
 		$data_layer['productRatingCounts']  = $product->get_rating_counts();
 		$data_layer['productAverageRating'] = (float) $product->get_average_rating();
@@ -450,7 +450,7 @@ final class PageDataLayer {
 				$cart_item_data
 			);
 
-			if ( ! is_array( $eec_product_array ) ) {
+			if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 				continue;
 			}
 
@@ -505,7 +505,7 @@ final class PageDataLayer {
 		);
 
 		// The marker is cleared below either way, so a dropped item is not retried.
-		if ( is_array( $eec_product_array ) ) {
+		if ( \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			$gtm4wp_currency = get_woocommerce_currency();
 			unset( $eec_product_array['internal_id'] );
 
@@ -569,7 +569,7 @@ final class PageDataLayer {
 				$cart_item_data
 			);
 
-			if ( ! is_array( $eec_product_array ) ) {
+			if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 				continue;
 			}
 
@@ -1322,7 +1322,7 @@ final class PageDataLayer {
 			$cart_item
 		);
 
-		if ( ! is_array( $eec_product_array ) ) {
+		if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
 			return null;
 		}
 

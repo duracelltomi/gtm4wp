@@ -81,6 +81,19 @@ final class Helpers {
 	public const PURCHASE_BASIS_META = '_gtm4wp_purchase_basis';
 
 	/**
+	 * Whether an item filter's return (gtm4wp_eec_item_with_source and friends)
+	 * is an item: a non-empty array. Every item site asks this before using the
+	 * return as an array, so a filter's scalar is no fatal and `array()` is no
+	 * junk item (#529, #593).
+	 *
+	 * @param mixed $item The filtered item.
+	 * @return bool
+	 */
+	public static function is_item( $item ): bool {
+		return is_array( $item ) && array() !== $item;
+	}
+
+	/**
 	 * Price times quantity of an item array that came out of a site filter
 	 * (gtm4wp_eec_item_with_source and friends): a non-numeric value counts
 	 * as 0 instead of a TypeError on the cart or checkout page (#415, #515).

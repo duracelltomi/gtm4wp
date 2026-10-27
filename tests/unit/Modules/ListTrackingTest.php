@@ -847,6 +847,60 @@ final class ListTrackingTest extends TestCase {
 		$this->assertSame( $link, $this->make_list_tracking()->cart_item_remove_link_filter( $link ) );
 	}
 
+	/**
+	 * #593 (the rest of #529): every item site of this class leaves out an item
+	 * the item filter did not return as a non-empty array. Warnings and
+	 * deprecations are promoted, so a junk span or a PHP notice fails too.
+	 */
+	public function test_an_item_filter_returning_no_item_leaves_the_item_out_at_every_site(): void {
+		$return = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$return ) {
+				return $return;
+			}
+		);
+		Functions\when( 'doing_action' )->justReturn( false );
+		Functions\when( 'get_permalink' )->justReturn( 'https://example.com/p' );
+		$this->stub_quick_view_env( $this->make_product() );
+
+		$link = '<a href="?add-to-cart=123">Add to cart</a>';
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( true, 1, 'x', null, false, array() ) as $return ) {
+				$label         = var_export( $return, true ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+				$list_tracking = $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+				$GLOBALS['product'] = $this->make_product();
+				ob_start();
+				$list_tracking->single_add_to_cart_tracking();
+				$this->assertSame( '', ob_get_clean(), $label . ': single product span' );
+
+				$this->assertSame( $link, $list_tracking->add_to_cart_link_filter( $link, $this->make_product() ), $label . ': shortcode button' );
+
+				$list_tracking->cart_item_product_filter( $this->make_product(), array( 'quantity' => 1 ) );
+				$this->assertSame( $link, $list_tracking->cart_item_remove_link_filter( $link ), $label . ': cart remove link' );
+
+				$this->assertFalse( $list_tracking->get_product_list_item_extra_tag( $this->make_product(), 'Shop', 1, 'https://x' ), $label . ': list span' );
+
+				ob_start();
+				$list_tracking->quick_view_before_single_product();
+				$this->assertStringNotContainsString( 'ecommerce', ob_get_clean(), $label . ': quick view' );
+
+				$GLOBALS['gtm4wp_grouped_product_ix'] = 1;
+				$this->assertSame( 'Label', $list_tracking->grouped_product_list_column_label( 'Label', $this->make_product() ), $label . ': grouped list' );
+				$this->assertSame( 2, $GLOBALS['gtm4wp_grouped_product_ix'], $label . ': a skipped row still takes its position.' );
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
 	public function test_single_add_to_cart_tracking_outputs_hidden_span_when_enabled(): void {
 		$GLOBALS['product'] = $this->make_product();
 

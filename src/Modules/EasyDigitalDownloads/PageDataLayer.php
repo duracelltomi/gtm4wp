@@ -282,7 +282,7 @@ final class PageDataLayer {
 			);
 
 			// An item filter can drop the line (false) or return nothing (#529).
-			if ( ! $eec_product_array || ! is_array( $eec_product_array ) ) {
+			if ( ! EcommerceHelpers::is_item( $eec_product_array ) ) {
 				continue;
 			}
 
@@ -349,7 +349,7 @@ final class PageDataLayer {
 			'productdetail'
 		);
 
-		if ( ! $eec_product_array || ! is_array( $eec_product_array ) ) {
+		if ( ! EcommerceHelpers::is_item( $eec_product_array ) ) {
 			return $data_layer;
 		}
 

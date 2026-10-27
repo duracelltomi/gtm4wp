@@ -121,6 +121,35 @@ final class StoreApiDataTest extends TestCase {
 		$this->assertSame( array( 'item' => '' ), $data );
 	}
 
+	/**
+	 * #593: an item the item filter did not return as a non-empty array is not
+	 * exposed; the block tracker then drops the product or line.
+	 */
+	public function test_an_item_filter_returning_no_item_exposes_no_item(): void {
+		$return = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$return ) {
+				return $return;
+			}
+		);
+
+		foreach ( array( true, 1, 'x', null, false, array() ) as $return ) {
+			$label = var_export( $return, true ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+
+			$this->assertSame( array( 'item' => null ), $this->make_store_api_data()->extend_product_data( $this->make_product() ), $label );
+			$this->assertSame(
+				array( 'item' => '' ),
+				$this->make_store_api_data()->extend_cart_item_data(
+					array(
+						'data'     => $this->make_product(),
+						'quantity' => 3,
+					)
+				),
+				$label
+			);
+		}
+	}
+
 	public function test_extend_cart_item_data_returns_empty_string_for_a_bad_line(): void {
 		$data = $this->make_store_api_data()->extend_cart_item_data( array() );
 

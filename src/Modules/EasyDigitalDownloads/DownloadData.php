@@ -515,7 +515,7 @@ final class DownloadData {
 				is_numeric( $price_id ) ? (int) $price_id : null
 			);
 
-			if ( ! $eec_product_array ) {
+			if ( ! Helpers::is_item( $eec_product_array ) ) {
 				continue;
 			}
 

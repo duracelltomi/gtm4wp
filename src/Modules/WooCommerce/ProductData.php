@@ -455,11 +455,13 @@ final class ProductData {
 					$order_item
 				);
 
+				if ( ! \GTM4WP\Ecommerce\Helpers::is_item( $eec_product_array ) ) {
+					continue;
+				}
+
 				unset( $eec_product_array['internal_id'] );
 
-				if ( $eec_product_array ) {
-					$order_data[] = $eec_product_array;
-				}
+				$order_data[] = $eec_product_array;
 			}
 		}
 

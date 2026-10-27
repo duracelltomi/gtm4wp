@@ -1286,6 +1286,52 @@ final class ProductDataTest extends TestCase {
 		$this->assertSame( $order_item, $captured, 'The new filter must receive the exact WC_Order_Item as its source on the purchase path.' );
 	}
 
+	/**
+	 * #593: a purchase line the item filter did not return as a non-empty array
+	 * is left out; it used to stop the order-received page (true, a string) or
+	 * raise a deprecation (false). Warnings and deprecations are promoted.
+	 */
+	public function test_a_purchase_line_the_item_filter_returns_no_item_for_is_left_out(): void {
+		$order_item = new class( $this->make_product() ) {
+			public function __construct( private $product ) {}
+			public function get_product() {
+				return $this->product;
+			}
+			public function get_quantity() {
+				return 1;
+			}
+			public function get_subtotal() {
+				return 0.0;
+			}
+			public function get_total() {
+				return 0.0;
+			}
+		};
+		$order      = new \WC_Order( array( 'items' => array( $order_item ) ) );
+
+		$return = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$return ) {
+				return $return;
+			}
+		);
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( true, 1, 'x', null, false, array() ) as $return ) {
+				$label = var_export( $return, true ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+				$this->assertSame( array(), $this->make_product_data()->process_order_items( $order ), $label );
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
 	public function test_source_item_is_not_merged_into_the_item_array(): void {
 		// #324 (b): the whole point of the new approach - the raw source object must
 		// NOT leak into the GA4 item array (which would bloat every event). A callback

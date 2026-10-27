@@ -596,6 +596,34 @@ final class DownloadDataTest extends TestCase {
 		$this->assertSame( array(), $this->make_download_data()->process_order_items( $this->make_order() ) );
 	}
 
+	/**
+	 * #593: a purchase line the item filter did not return as a non-empty array
+	 * is left out; true or a string used to stop the page. Warnings promoted.
+	 */
+	public function test_a_purchase_line_the_item_filter_returns_no_item_for_is_left_out(): void {
+		$return = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function () use ( &$return ) {
+				return $return;
+			}
+		);
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( true, 1, 'x', null, false, array() ) as $return ) {
+				$label = var_export( $return, true ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+				$this->assertSame( array(), $this->make_download_data()->process_order_items( $this->make_order() ), $label );
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
 	public function test_purchase_datalayer_core_fields(): void {
 		$data_layer = $this->make_download_data(
 			array( GTM4WP_OPTION_INTEGRATE_EDDTRANSACTIONIDPREFIX => 'store1-' )
