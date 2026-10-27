@@ -169,6 +169,21 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	/**
+	 * Runs add_admin_page() with add_options_page() answering the given screen
+	 * ID, the way WordPress does on admin_menu.
+	 *
+	 * @param SettingsPage $page   The page under test.
+	 * @param string|false $suffix What add_options_page() returns.
+	 * @return SettingsPage
+	 */
+	private function register_page( SettingsPage $page, $suffix = 'settings_page_' . GTM4WP_ADMINSLUG ): SettingsPage {
+		Functions\when( 'add_options_page' )->justReturn( $suffix );
+		$page->add_admin_page();
+
+		return $page;
+	}
+
+	/**
 	 * Returns the JSON-encoded form of a scalar without the surrounding quotes.
 	 *
 	 * @param string $value Raw value.
@@ -196,7 +211,7 @@ final class SettingsPageTest extends TestCase {
 	 * aa377c165c6b87664fc2deacf28cbe53. Registry row U98.
 	 */
 	public function test_admin_app_script_path_and_text_domain_stay_pinned_for_translations(): void {
-		$page = $this->make_settings_page( array() );
+		$page = $this->register_page( $this->make_settings_page( array() ) );
 
 		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
 
@@ -232,6 +247,7 @@ final class SettingsPageTest extends TestCase {
 				),
 			)
 		);
+		$this->register_page( $page );
 
 		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
 
@@ -351,12 +367,50 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	public function test_enqueue_assets_does_nothing_outside_the_settings_page(): void {
-		$page = $this->make_settings_page( array() );
+		$page = $this->register_page( $this->make_settings_page( array() ) );
 
 		$page->enqueue_assets( 'plugins.php' );
+		$page->enqueue_assets( 'admin_page_' . GTM4WP_ADMINSLUG );
 
 		$this->assertCount( 0, $this->inline_scripts, 'The app is loaded on the settings page only.' );
 		$this->assertCount( 0, $this->inline_styles, 'The fallback reveal CSS is registered on the settings page only.' );
+	}
+
+	/**
+	 * A role given the page through gtm4wp_admin_page_capability but lacking
+	 * manage_options cannot open Settings, so WordPress names the screen
+	 * admin_page_* instead of settings_page_*. The app must load on whatever ID
+	 * add_options_page() returned, or the delegated user sees only the
+	 * boot-failure notice.
+	 */
+	public function test_enqueue_assets_loads_the_app_on_the_screen_id_a_delegated_role_gets(): void {
+		$page = $this->register_page( $this->make_settings_page( array() ), 'admin_page_' . GTM4WP_ADMINSLUG );
+
+		$page->enqueue_assets( 'admin_page_' . GTM4WP_ADMINSLUG );
+
+		$this->assertContains( 'gtm4wp-admin-app', array_column( $this->enqueued_scripts, 'handle' ), 'The admin app loads for the delegated role.' );
+		$this->assertCount( 1, $this->inline_scripts, 'The bootstrap data is printed for the delegated role.' );
+
+		$this->enqueued_scripts = array();
+		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
+		$this->assertCount( 0, $this->enqueued_scripts, 'Only the registered screen ID matches, not a hardcoded one.' );
+	}
+
+	/**
+	 * Without a registered page no screen matches, not even one with an empty
+	 * hook suffix: before admin_menu, or after add_options_page() returned false
+	 * for a user who lacks the capability.
+	 */
+	public function test_enqueue_assets_does_nothing_when_the_page_was_not_registered(): void {
+		$unregistered = $this->make_settings_page( array() );
+		$unregistered->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
+		$unregistered->enqueue_assets( '' );
+
+		$denied = $this->register_page( $this->make_settings_page( array() ), false );
+		$denied->enqueue_assets( '' );
+
+		$this->assertCount( 0, $this->enqueued_scripts, 'No admin app without a registered page.' );
+		$this->assertCount( 0, $this->inline_scripts );
 	}
 
 	/**
@@ -404,7 +458,7 @@ final class SettingsPageTest extends TestCase {
 	 * visibility flip delayed rather than immediate.
 	 */
 	public function test_fallback_reveal_css_is_attached_to_a_core_handle(): void {
-		$page = $this->make_settings_page( array() );
+		$page = $this->register_page( $this->make_settings_page( array() ) );
 
 		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
 

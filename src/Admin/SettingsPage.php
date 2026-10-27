@@ -43,6 +43,15 @@ final class SettingsPage {
 	public const BOOT_FALLBACK_REVEAL_DELAY = 3;
 
 	/**
+	 * Screen ID WordPress assigned the page in add_admin_page(); '' until then.
+	 * Not always settings_page_*: a user with a filtered capability but without
+	 * manage_options gets admin_page_*, since Settings itself is closed to them.
+	 *
+	 * @var string
+	 */
+	private string $hook_suffix = '';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Registry      $registry The module registry.
@@ -95,7 +104,7 @@ final class SettingsPage {
 	public function add_admin_page(): void {
 		$capability = Capability::settings();
 
-		add_options_page(
+		$this->hook_suffix = (string) add_options_page(
 			esc_html__( 'Google Tag Manager for WordPress settings', 'duracelltomi-google-tag-manager' ),
 			esc_html__( 'Google Tag Manager', 'duracelltomi-google-tag-manager' ),
 			$capability,
@@ -133,7 +142,7 @@ final class SettingsPage {
 	 * @return void
 	 */
 	public function enqueue_assets( $hook ): void {
-		if ( 'settings_page_' . GTM4WP_ADMINSLUG !== $hook ) {
+		if ( '' === $this->hook_suffix || $this->hook_suffix !== $hook ) {
 			return;
 		}
 
