@@ -27,6 +27,9 @@ final class EddListTrackingTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// The synthesized checkout line names its download (#547).
+		Functions\when( 'get_the_title' )->justReturn( '' );
+
 		// TS-16 / UC-3: stubbed in this file's own setUp, and no more permissive
 		// than the real function. WordPress encodes a term name with
 		// _wp_specialchars() when it is saved, and wp_specialchars_decode() with
@@ -316,6 +319,36 @@ final class EddListTrackingTest extends TestCase {
 		$markup = $this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 0 ) );
 
 		$this->assertStringContainsString( '&quot;price&quot;:12.5', $markup );
+	}
+
+	/**
+	 * #547: the synthesized line hands the cart-item filter EDD's content-details
+	 * keys, and no tax key (it carries no tax split; 0 would be a false claim).
+	 */
+	public function test_a_synthesized_checkout_line_carries_the_content_details_keys(): void {
+		$this->stub_variable_prices();
+		list( $row, $details )                = self::cart_row( 0, 1, 9.99, array( 'price_id' => 2 ) );
+		$details[0]['item_number']['options'] = array( 'price_id' => 1 );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( $details );
+		Functions\when( 'edd_get_cart_item_price' )->justReturn( 12.5 );
+		Functions\when( 'get_the_title' )->justReturn( 'My eBook' );
+
+		$seen = null;
+		\Brain\Monkey\Filters\expectApplied( GTM4WP_WPFILTER_EEC_EDD_CART_ITEM )->andReturnUsing(
+			static function ( $keep, $line ) use ( &$seen ) {
+				$seen = $line;
+				return $keep;
+			}
+		);
+
+		$this->capture_output( fn () => $this->make_list_tracking()->checkout_cart_item_data( $row, 0 ) );
+
+		$this->assertIsArray( $seen );
+		$this->assertSame( 'My eBook', $seen['name'] );
+		$this->assertSame( 12.5, $seen['item_price'] );
+		$this->assertSame( 12.5, $seen['subtotal'] );
+		$this->assertSame( 0.0, $seen['discount'] );
+		$this->assertArrayNotHasKey( 'tax', $seen );
 	}
 
 	/**

@@ -141,6 +141,12 @@ final class PurchaseTracking {
 
 			$this->script_tag->print_script_block( $script_tag );
 
+			// Flag only a purchase that was really printed: a filter can drop the
+			// event, and a flagged order is suppressed for good (#412, #592).
+			if ( null === \GTM4WP\Ecommerce\Helpers::purchase_event( $data_layer ) ) {
+				return;
+			}
+
 			$this->product_data->flag_order_tracked( $order );
 
 			// Mark the purchase handled for THIS request: remember_order() runs on

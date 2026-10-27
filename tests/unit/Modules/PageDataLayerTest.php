@@ -1170,6 +1170,25 @@ final class PageDataLayerTest extends TestCase {
 		$this->assertSame( array(), $state->session->sets, 'Loading the session must not make the GET write to it.' );
 	}
 
+	/**
+	 * #592: a purchase filter that drops the event leaves the one-shot with
+	 * nothing to push, so the browser pushes nothing and its beacon flags nothing.
+	 */
+	public function test_pending_purchase_without_an_event_resolves_to_nothing(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_rest_without_session( 1001 );
+		Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )->andReturnUsing( static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ) );
+
+		$payload = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+			)
+		)->resolve_pending_purchase();
+
+		$this->assertNull( $payload );
+	}
+
 	public function test_session_is_not_loaded_before_woocommerce_has_initialized(): void {
 		// wc_load_cart() before before_woocommerce_init is unsafe, so the guard must
 		// hold even though the helper exists. Also proves the resolver degrades to

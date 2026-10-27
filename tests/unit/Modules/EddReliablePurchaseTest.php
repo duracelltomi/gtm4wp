@@ -285,6 +285,16 @@ final class EddReliablePurchaseTest extends TestCase {
 	}
 
 	/**
+	 * #592: a purchase filter that drops the event leaves nothing to push or flag.
+	 */
+	public function test_resolver_returns_nothing_for_a_purchase_without_an_event(): void {
+		$_COOKIE[ ReliablePurchase::EVENT_COOKIE ] = '1';
+		\Brain\Monkey\Filters\expectApplied( GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER )->andReturnUsing( static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ) );
+
+		$this->assertNull( $this->make()->resolve_pending_purchase() );
+	}
+
+	/**
 	 * Defense in depth behind the declaration gate: the resolver itself refuses
 	 * while the feature is off, before it reads the session (T137c).
 	 *

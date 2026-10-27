@@ -96,6 +96,21 @@ final class Helpers {
 	}
 
 	/**
+	 * The event name of a filtered purchase payload, or null when a filter left
+	 * none: tested, never cast, so an object or array is no fatal and no push
+	 * (RI-39). Every path that prints or flags a purchase asks this first, so a
+	 * dropped event never flags the order for good (#412, #530, #592).
+	 *
+	 * @param array<string, mixed> $data_layer The purchase payload.
+	 * @return string|null
+	 */
+	public static function purchase_event( array $data_layer ): ?string {
+		$event = $data_layer['event'] ?? null;
+
+		return is_string( $event ) && '' !== $event ? $event : null;
+	}
+
+	/**
 	 * The purchase value rule: a total, less tax and shipping when the exclude
 	 * options say so. The one definition the purchase event, its items and the
 	 * refund value share in both stores (RI-43, #548); EDD passes no shipping.

@@ -427,8 +427,9 @@ final class ProductData {
 
 				$product = $order_item->get_product();
 
-				// Item price on the same tax basis as the transaction value, so GA4
-				// item revenue reconciles with the total (#176).
+				// Item price on the item basis (item_prices_include_tax()): with
+				// "Exclude tax" it matches the transaction value, so GA4 item revenue
+				// reconciles (#176); without it it follows the shop display (#575).
 				$product_price = round( (float) $order->get_item_total( $order_item, $this->item_prices_include_tax() ), 2 );
 
 				$item_attributes = array(

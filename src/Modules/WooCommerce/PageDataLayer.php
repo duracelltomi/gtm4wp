@@ -1021,9 +1021,8 @@ final class PageDataLayer {
 		// Flag only a purchase that will really be printed: a filter can drop
 		// `event` or inject an unencodable value, and a flagged order is
 		// suppressed for good (#412).
-		// `event` is tested, never cast: an object would be fatal (RI-39, #530).
-		$event  = $purchase_data_layer['event'] ?? null;
-		$queued = is_string( $event ) && '' !== $event
+		$event  = \GTM4WP\Ecommerce\Helpers::purchase_event( $purchase_data_layer );
+		$queued = null !== $event
 			&& DataLayer::encodes( $purchase_data_layer )
 			&& $this->datalayer->queue_push(
 				$event,
@@ -1396,6 +1395,11 @@ final class PageDataLayer {
 			$this->product_data->get_purchase_datalayer( $order ),
 			$this->product_data->customer_signals( $order )
 		);
+
+		// No purchase event, nothing to push or for the beacon to flag (#592).
+		if ( null === \GTM4WP\Ecommerce\Helpers::purchase_event( $purchase_data_layer ) ) {
+			return null;
+		}
 
 		// Whether the client consults/records the browser guard; off under "Do not
 		// flag orders as being tracked", matching the page path (#369).

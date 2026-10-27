@@ -713,9 +713,8 @@ final class PageDataLayer {
 		}
 
 		// Flag only a purchase that will really be printed (#514, the #412 sibling).
-		// `event` is tested, never cast: an object would be fatal (RI-39, #530).
-		$event  = $purchase_data_layer['event'] ?? null;
-		$queued = is_string( $event ) && '' !== $event
+		$event  = EcommerceHelpers::purchase_event( $purchase_data_layer );
+		$queued = null !== $event
 			&& DataLayer::encodes( $purchase_data_layer )
 			&& $this->datalayer->queue_push(
 				$event,

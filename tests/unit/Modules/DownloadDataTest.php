@@ -199,6 +199,27 @@ final class DownloadDataTest extends TestCase {
 		$this->assertEqualsWithDelta( 9090.91, $data->basis_price( 10000.0, 7 ), 0.0001 );
 	}
 
+	/**
+	 * #545: the store base rate is resolved once per instance, not per amount
+	 * (EDD looks the user's customer record up on every edd_get_tax_rate()).
+	 */
+	public function test_basis_price_resolves_the_tax_rate_once(): void {
+		$this->stub_taxes( false );
+		$calls = 0;
+		Functions\when( 'edd_get_tax_rate' )->alias(
+			static function () use ( &$calls ) {
+				++$calls;
+				return 0.2;
+			}
+		);
+
+		$data = $this->make_download_data();
+
+		$this->assertEqualsWithDelta( 12.0, $data->basis_price( 10.0, 7 ), 0.0001 );
+		$this->assertEqualsWithDelta( 24.0, $data->basis_price( 20.0, 8 ), 0.0001 );
+		$this->assertSame( 1, $calls );
+	}
+
 	public function test_basis_price_leaves_the_amount_without_taxes_or_for_a_tax_exempt_download(): void {
 		$this->stub_taxes( false );
 		$data = $this->make_download_data();

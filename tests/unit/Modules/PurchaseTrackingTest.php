@@ -246,6 +246,21 @@ final class PurchaseTrackingTest extends TestCase {
 		$this->assertStringContainsString( '"event":"purchase"', $output );
 	}
 
+	/**
+	 * #592 (#412 on this path): a purchase filter that drops the event still
+	 * prints the data layer, but the order is not flagged, so the purchase is
+	 * not suppressed for good.
+	 */
+	public function test_a_purchase_without_an_event_does_not_flag_the_order(): void {
+		Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )->andReturnUsing( static fn ( $dl ) => array_diff_key( $dl, array( 'event' => 1 ) ) );
+		$order = $this->make_order();
+
+		$output = $this->run_thankyou( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ), $order );
+
+		$this->assertStringNotContainsString( '"event":"purchase"', $output );
+		$this->assertArrayNotHasKey( '_ga_tracked', $order->saved_meta );
+	}
+
 	public function test_order_data_branch_hex_encodes_hostile_billing_and_coupon(): void {
 		// \x3C < , \x3E > , \x22 " , \x26 &
 		$order = $this->make_order(

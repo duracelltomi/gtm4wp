@@ -1192,9 +1192,9 @@ report.
 | 542 | Low | open | — | EDD `DownloadData` status gate | Unpaid statuses pass the unconfirmed lane with an empty list |
 | 543 | Low | open | — | EDD + WC customer-data descriptions | Descriptions omit fields the code emits (RI-15) |
 | 544 | Low | open | — | EDD reliable-purchase description | Example names the case #471 now refuses |
-| 545 | Low | open | A1 | EDD `DownloadData` | Tax rate resolved per price call |
+| 545 | Low | fixed (R54 fix session: the store base rate memoized per DownloadData instance) | A1 | EDD `DownloadData` | Tax rate resolved per price call |
 | 546 | Low | fixed (R54 upkeep: default false, parameter renamed; the default test asserts both) | — | EDD `is_order_status_trackable()` | Permissive default argument |
-| 547 | Low | open | site code | EDD checkout rows | Synthesized line lacks content-details keys |
+| 547 | Low | fixed (R54 fix session: name, item_price, subtotal and discount added; tax left absent on purpose) | site code | EDD checkout rows | Synthesized line lacks content-details keys |
 | 548 | Low | fixed (R54 fix session: Ecommerce\Helpers::purchase_rule_value() is the one rule for both stores, moved out of WooCommerce ProductData; 7 call sites; equivalent, suites unchanged) | — | EDD `DownloadData`, `EddRefunds` | Exclude-tax rule written five times; RI-43 claim half true |
 | 549 | Low | open | — | Data Manager `RefundSender`, send-log panel | A replayed refund on an inactive platform leaves no row (RI-40 ledger is 2) |
 | 550 | Low | fixed (R54 fix session: a failed retry schedule writes one failed not_queued row per destination, replayable at once) | — | Data Manager `RefundSender::deliver()` | A failed retry schedule keeps reading "retrying" |
@@ -1222,7 +1222,7 @@ report.
 | 572 | Low | fixed (R54 fix session: export and import descriptions name the inactive-module case) | A4 | `SettingsStore` export/import | Inactive third-party module settings dropped |
 | 573 | Low | open | — | `BackfillEndpoint` writers | Duplicated write loop |
 | 574 | Low | open | — | four methods | Crossed 50 lines in range |
-| 575 | Low | open (maintainer decision) | — | WC `ProductData` | Item vs value tax basis in one option cell; comment wrong (pre-existing) |
+| 575 | Low | open (maintainer decision on the basis; the comment is narrowed to what the code does) | — | WC `ProductData` | Item vs value tax basis in one option cell; comment wrong (pre-existing) |
 | 576 | Low | open | — | WC cart vs purchase | Pre- vs post-discount unit price (pre-existing) |
 | 577 | Low | fixed (RI-25 count in this ledger update; U192 registered) | — | RI-25 ledger, `.upstream` | Ledger read 14, tree has 17; three hook couplings unregistered |
 | 578 | Low | fixed (R54 upkeep: wrapper removed, docblock moved, three pointers) | — | `WooCommerceModule` | Forward-only wrapper |
@@ -1239,7 +1239,7 @@ report.
 | 589 | Low | open | D1 → third party | Plugin diagnostics skill | Can publish transcript-derived text |
 | 590 | Low | fixed (ledger corrected; `code-review.md` wording) | — | `code-review.md` PA-19 text, toolchain ledger | Pin wording contradicts itself; two ledger figures wrong |
 | 591 | Low | fixed (this ledger update) | A4 | Public Surface Inventory, matrix labels | Replace-key route unlisted; backfill row text stale |
-| 592 | Low | open | site code | WC `PurchaseTracking`, WC + EDD one-shot purchase resolvers | Purchase payload printed or flagged without checking `event` (#412 sibling; found by the #529 fix) |
+| 592 | Low | fixed (R54 fix session: Ecommerce\Helpers::purchase_event() on every purchase path; the thank-you page prints but does not flag, the one-shot resolvers answer nothing; the #412 bullet names the paths) | site code | WC `PurchaseTracking`, WC + EDD one-shot purchase resolvers | Purchase payload printed or flagged without checking `event` (#412 sibling; found by the #529 fix) |
 
 ### Report 53: `.security/code-review-report-2026-10-19-1004.md`
 

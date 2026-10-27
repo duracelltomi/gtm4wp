@@ -210,10 +210,16 @@ final class ListTracking {
 		// No tax key, so cart_line_attributes() keeps this already-based price (#519).
 		$unit = $this->download_data->basis_price( $unit, (int) $item['id'] );
 
+		// The content-details keys a cart-item filter reads, in EDD's own shape;
+		// `tax` stays absent on purpose: this line carries no tax split (#547).
 		return array(
+			'name'        => function_exists( 'get_the_title' ) ? (string) get_the_title( (int) $item['id'] ) : '',
 			'id'          => (int) $item['id'],
 			'item_number' => $item,
+			'item_price'  => $unit,
 			'quantity'    => $quantity,
+			'discount'    => 0.0,
+			'subtotal'    => $unit * $quantity,
 			'price'       => $unit * $quantity,
 		);
 	}

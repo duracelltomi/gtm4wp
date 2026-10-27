@@ -157,11 +157,18 @@ final class ReliablePurchase {
 			return $this->download_data->may_become_trackable( $order ) ? array( 'pending' => true ) : null;
 		}
 
+		$push = array_merge(
+			$this->download_data->get_purchase_datalayer( $order ),
+			$this->download_data->customer_signals( $order )
+		);
+
+		// No purchase event, nothing to push or for the beacon to flag (#592).
+		if ( null === EcommerceHelpers::purchase_event( $push ) ) {
+			return null;
+		}
+
 		return array(
-			'push'        => array_merge(
-				$this->download_data->get_purchase_datalayer( $order ),
-				$this->download_data->customer_signals( $order )
-			),
+			'push'        => $push,
 			'orderNumber' => (string) $order->get_number(),
 			'flag'        => true,
 			'clear'       => (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_EDDCLEARECOMMERCEDL ),

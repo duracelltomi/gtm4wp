@@ -61,6 +61,15 @@ final class DownloadData {
 	private ?array $list_attribution_map = null;
 
 	/**
+	 * The store base tax rate, resolved once per instance: edd_get_tax_rate()
+	 * looks the logged-in user's customer record up on every call, uncached
+	 * when there is none, and a download grid prices dozens of amounts (#545).
+	 *
+	 * @var float|null
+	 */
+	private ?float $base_tax_rate = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options $options The plugin options service.
@@ -338,8 +347,9 @@ final class DownloadData {
 			return $amount;
 		}
 
-		$rate = edd_get_tax_rate( edd_get_shop_country(), edd_get_shop_state(), false );
-		$tax  = self::round_like_the_cart( (float) edd_calculate_tax( $amount, '', '', false, $rate ) );
+		$this->base_tax_rate ??= (float) edd_get_tax_rate( edd_get_shop_country(), edd_get_shop_state(), false );
+
+		$tax = self::round_like_the_cart( (float) edd_calculate_tax( $amount, '', '', false, $this->base_tax_rate ) );
 
 		if ( edd_prices_include_tax() ) {
 			return $this->item_prices_include_tax() ? $amount : $amount - $tax;
