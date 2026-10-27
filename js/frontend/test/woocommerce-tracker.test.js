@@ -1778,8 +1778,8 @@ describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {
 		);
 		expect( call ).toBeDefined();
 		expect( call[ 1 ] ).toHaveLength( 2 );
-		// 2 * 10 + 3 * 5 = 35, formatted to two decimals by the source.
-		expect( call[ 2 ].value ).toBe( '35.00' );
+		// 2 * 10 + 3 * 5 = 35, a number like every other push (#582).
+		expect( call[ 2 ].value ).toBe( 35 );
 		// internal_id is stripped from every grouped item before the push.
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
 		expect( call[ 1 ][ 1 ] ).not.toHaveProperty( 'internal_id' );
@@ -1908,8 +1908,8 @@ describe( 'gtm4wp-woocommerce single add_to_cart branches (T24)', () => {
 		expect( call[ 1 ][ 0 ] ).toEqual(
 			expect.objectContaining( { item_id: 456, quantity: 2 } )
 		);
-		// value = variation price (9.99) * quantity (2), two decimals.
-		expect( call[ 2 ].value ).toBe( '19.98' );
+		// value = variation price (9.99) * quantity (2), as a number (#582).
+		expect( call[ 2 ].value ).toBe( 19.98 );
 	} );
 } );
 
@@ -2661,6 +2661,7 @@ describe( 'gtm4wp-woocommerce Interactivity API variable product', () => {
 		window.gtm4wp_store_api_cart_url = CART_URL;
 
 		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_make_sure_is_float = ( v ) => parseFloat( v ) || 0;
 		global.gtm4wp_read_from_json = ( json ) => JSON.parse( json );
 		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
 			const raw = el && el.dataset && el.dataset[ key ];
@@ -2759,8 +2760,44 @@ describe( 'gtm4wp-woocommerce Interactivity API variable product', () => {
 		expect( calls[ 0 ][ 1 ][ 0 ] ).not.toHaveProperty( 'internal_id' );
 		expect( calls[ 0 ][ 1 ][ 0 ].item_id ).not.toBe( PRODUCT_DATA.item_id );
 		expect( calls[ 0 ][ 2 ] ).toEqual(
-			expect.objectContaining( { currency: 'EUR', value: '48.00' } )
+			expect.objectContaining( { currency: 'EUR', value: 48 } )
 		);
+	} );
+
+	it( 'reports a text cart-line price as a number (#583)', async () => {
+		window.fetch = jest.fn( () =>
+			Promise.resolve( {
+				ok: true,
+				json: () =>
+					Promise.resolve( {
+						items: [
+							{
+								key: 'abc',
+								id: 71,
+								quantity: 3,
+								extensions: {
+									gtm4wp: {
+										item: JSON.stringify( {
+											...VARIATION_ITEM,
+											price: '16.50',
+										} ),
+									},
+								},
+							},
+						],
+					} ),
+			} )
+		);
+		boot();
+
+		clickAdd();
+		confirmAdd();
+		await settle();
+
+		const calls = addToCartCalls();
+		expect( calls ).toHaveLength( 1 );
+		expect( calls[ 0 ][ 1 ][ 0 ].price ).toBe( 16.5 );
+		expect( calls[ 0 ][ 2 ].value ).toBe( 49.5 );
 	} );
 
 	it( 'reports nothing when the variation has no cart line', async () => {

@@ -1229,8 +1229,8 @@ report.
 | 579 | Low | open | — | WC `PageDataLayer` | Cloned cart/checkout loops |
 | 580 | Low | fixed (R54 upkeep: four methods private; `order_discount_codes()` kept public for the 2.2 branch) | — | WC `ProductData`, EDD `DownloadData` | Public methods with own-class callers only |
 | 581 | Low | open | — | WC + EDD `purchase_basis()` | Duplicated parse |
-| 582 | Low | open (GA4 unverified) | — | WC tracker JS | String `value` on three pushes |
-| 583 | Low | open | site code | WC tracker JS, blocks cart diff | Unguarded price on one Store API path |
+| 582 | Low | fixed (GA4 effect unverified) | — | WC tracker JS | String `value` on three pushes |
+| 583 | Low | fixed | site code | WC tracker JS, blocks cart diff | Unguarded price on one Store API path |
 | 584 | Low | fixed (R54 upkeep: docblock) | — | `BackfillEndpoint::within_window()` | Docblock wording |
 | 585 | Low | open (unverified) | D0 → D1 | Plugin hook (maintainer machine) | Interpreter resolved by bare name; detail in the local report |
 | 586 | Low | open | publisher → D1 | Plugin marketplaces | No content pin for three plugins; official marketplace auto-updates |

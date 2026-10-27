@@ -32,6 +32,15 @@ describe( 'gtm4wp-ecommerce-generic', () => {
 			expect( window.gtm4wp_make_sure_is_float( null ) ).toBe( 0 );
 			expect( window.gtm4wp_make_sure_is_float( {} ) ).toBe( 0 );
 		} );
+
+		// #583: a NaN or Infinity number (text price times quantity) is no price.
+		it( 'returns 0 for a non-finite number', () => {
+			expect( window.gtm4wp_make_sure_is_float( NaN ) ).toBe( 0 );
+			expect( window.gtm4wp_make_sure_is_float( Infinity ) ).toBe( 0 );
+			expect(
+				window.gtm4wp_make_sure_is_float( 'call for price' * 2 )
+			).toBe( 0 );
+		} );
 	} );
 
 	describe( 'gtm4wp_read_from_json', () => {

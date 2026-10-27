@@ -292,10 +292,11 @@ function gtm4wp_track_single_add_to_cart(
 
 			emit( 'add_to_cart', [ gtm4wp_last_selected_product_variation ], {
 				currency: gtm4wp_currency,
-				value: (
+				// A number, as every other push sends it (#582).
+				value: gtm4wp_make_sure_is_float(
 					gtm4wp_last_selected_product_variation.price *
-					gtm4wp_last_selected_product_variation.quantity
-				).toFixed( 2 ),
+						gtm4wp_last_selected_product_variation.quantity
+				),
 			} );
 		}
 	} else if ( product_is_grouped ) {
@@ -355,7 +356,7 @@ function gtm4wp_track_single_add_to_cart(
 
 		emit( 'add_to_cart', products, {
 			currency: gtm4wp_currency,
-			value: sum_value.toFixed( 2 ),
+			value: gtm4wp_make_sure_is_float( sum_value ),
 		} );
 	} else {
 		// The hidden span is the current markup: an input inside the form flips
@@ -593,11 +594,14 @@ function gtm4wp_flush_pending_block_add_to_cart() {
 			}
 
 			item.quantity = pending.lookup.quantity;
+			// The Store API item comes from a bare JSON.parse, so a filtered
+			// price may be text: normalized like the page-read items (#583).
+			item.price = gtm4wp_make_sure_is_float( item.price );
 			delete item.internal_id;
 
 			gtm4wp_push_ecommerce( 'add_to_cart', [ item ], {
 				currency: gtm4wp_currency,
-				value: ( item.price * item.quantity ).toFixed( 2 ),
+				value: gtm4wp_make_sure_is_float( item.price * item.quantity ),
 			} );
 		}
 	);

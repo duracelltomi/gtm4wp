@@ -22,7 +22,8 @@ function gtm4wp_make_sure_is_float( probably_float ) {
 	}
 	will_be_float = parseFloat( will_be_float.toFixed( 2 ) );
 
-	return will_be_float;
+	// A NaN or Infinity number (a product of a text price) is no price (#583).
+	return isFinite( will_be_float ) ? will_be_float : 0;
 }
 
 function gtm4wp_push_ecommerce(
