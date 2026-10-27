@@ -1193,7 +1193,7 @@ time) and the R55 fix-session commit after it (14 more); claims that changed sha
 | 607 | Low | fixed (R55 fix session: description) | — | EDD `AdminSchema` | Max-order-age scope understated |
 | 608 | Low | fixed (R55 fix session: description) | — | EDD `AdminSchema` | Customer-data text places user_data in customerData |
 | 609 | Low | fixed (R55 fix session: both descriptions; WC widened to the fallback page) | — | EDD + WC `AdminSchema` | Order-data descriptions omit what orderData carries |
-| 610 | Low | open (decision) | — | EDD `AdminSchema`, U195 | Status text vs refunded/revoked counting |
+| 610 | Low | fixed (R55 fix session, maintainer decision 2026-10-27: refunded and revoked keep counting under an empty list, as in WooCommerce; description and U195 "paid" corrected) | — | EDD `AdminSchema`, U195 | Status text vs refunded/revoked counting |
 | 611 | Low | fixed (R55 fix session: description; guest behaviour of the page-level keys unverified) | — | WC `AdminSchema` | Customer-data text omits two fields |
 | 612 | Low | fixed (R55 fix session: raw item_price, fees array, comment narrowed) | site code | EDD `ListTracking` | Synthesized checkout line values differ from EDD's |
 | 613 | Low | open | A0 | Settings REST route | Validation answers before the permission check |

@@ -897,7 +897,9 @@ final class DownloadData {
 	 * an empty list tracks any order that did not fail. Pending counts only
 	 * when the buyer reached the confirmation page: the fallback lanes run when
 	 * they did not, e.g. an abandoned PayPal redirect (#471), and there an
-	 * empty list counts only EDD's complete statuses (#542, U195).
+	 * empty list counts only EDD's complete statuses, refunded and revoked
+	 * included: a purchase that happened, which a refund then offsets (#542,
+	 * #610, U195).
 	 *
 	 * @param \EDD\Orders\Order $order     The order to check.
 	 * @param bool              $confirmed Whether the buyer reached the confirmation page; false counts no pending order.
