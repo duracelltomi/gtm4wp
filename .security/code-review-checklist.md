@@ -1172,7 +1172,7 @@ Adjudication: 36 drafts, 3 cross-store pairs merged, 1 duplicate of #352 dropped
 premise, #567 for the replay ability, U195 "paid", R54's toolchain row, an unrecorded #529 precedent, the HEAD commit's
 premise). Snapshots clean, HEAD unchanged. **Suite (no production change):** PHP 3676 / 21449, JS 1072 / 41, `phpcs` 0.
 Detail for every open item stays in the local report. **Fixes:** `116febc` (#593, recorded at commit
-time) and the R55 fix-session commit after it (14 more); claims that changed shape: 2; #598 accepted by the maintainer the same day. **The base for the next review is `116febc`.**
+time) and the R55 fix-session commit after it (14 more); claims that changed shape: 2; one new Low, #626, found by the #604 design verifier and fixed; #598 accepted by the maintainer the same day. **The base for the next review is `116febc`.**
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
@@ -1187,7 +1187,7 @@ time) and the R55 fix-session commit after it (14 more); claims that changed sha
 | 601 | Low | fixed (R55 fix session: plan side, option b; #396 test reaches its state another way) | A4 reads | `RefundSender`, `SendLog` | Refund-level exit during a destination replay yields a false "already received" |
 | 602 | Low | fixed (R55 fix session: a third variant for a rejected constant) | A4 reads | `KeyNotice` | Remedy text wrong for a rejected encryption-key constant |
 | 603 | Low | fixed (R55 fix session: description and comment; behaviour unchanged) | — | WC `PurchaseTracking`, `AdminSchema` | Thank-you hook drops orderData the description promises |
-| 604 | Low | open | site code | WC one-shot resolvers | Marker left on a null answer; late push possible |
+| 604 | Low | accepted (maintainer decision 2026-10-27: a late push of a real purchase, bounded by the WC max order age (30 min default) and the session; the page lane late-pushes too when its marker is WC's order_awaiting_payment; B and C evaluated and refuted by a verifier) | site code | WC one-shot resolvers | Marker left on a null answer; late push possible |
 | 605 | Low | open | — | `SettingsPage`, `CHANGELOG.md`, `readme.txt` | The HEAD fix's stated cause does not occur on stock WordPress |
 | 606 | Low | fixed (R55 fix session: message per ability; import keeps the transport sentence) | A4 delegate | `Abilities\Registrar` | Confirm refusal text names a transport limit the replay ability does not have |
 | 607 | Low | fixed (R55 fix session: description) | — | EDD `AdminSchema` | Max-order-age scope understated |
@@ -1209,6 +1209,7 @@ time) and the R55 fix-session commit after it (14 more); claims that changed sha
 | 623 | Low | open | — | EDD `PageDataLayer` | Trap default on `$on_confirmation_page` |
 | 624 | Low | open | — | four comments | Stale `fields()` cost comments |
 | 625 | Low | open | — | `Abilities\Input` | Test-only fallback branch |
+| 626 | Low | fixed (R55 fix session: the cache-safe purchase fallback is off without the tracked flag, as in EDD; shipped in 2.0, `Fixed:` bullet) | — | WC `PageDataLayer` cache-safe purchase fallback | Under "Do not flag orders" the same purchase could be pushed again on later pages (found by the #604 design verifier) |
 
 ### Report 54: `.security/code-review-report-2026-10-21-1603.md`
 

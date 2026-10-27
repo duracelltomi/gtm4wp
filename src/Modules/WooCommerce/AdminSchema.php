@@ -343,7 +343,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Do not flag orders as being tracked', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Turn this on to prevent the plugin from flagging orders as being already tracked. Leaving this unchecked ensures that no order data will be tracked multiple times in any ad or measurement system. Please only turn this feature on if you really need it!', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Stops flagging orders as tracked, so a purchase can be reported more than once in your ad and measurement tools. With the cache-safe data layer on, "Reliable purchase tracking" then has no effect. Turn it on only if you really need it.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				doc: self::DOC_REFERENCE
 			),

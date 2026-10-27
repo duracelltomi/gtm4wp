@@ -1268,7 +1268,7 @@ final class PageDataLayer {
 			rest_url( VisitorDataEndpoint::REST_NAMESPACE . self::REST_ROUTE_CONFIRM_READD )
 		);
 
-		if ( true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+		if ( $this->cache_safe_purchase_fallback() ) {
 			$fields[] = new VisitorField(
 				'pendingPurchase',
 				VisitorField::TIER_ACTION,
@@ -1347,6 +1347,19 @@ final class PageDataLayer {
 	}
 
 	/**
+	 * Whether the reliable-purchase fallback rides the session endpoint: the
+	 * option on and the tracked flag in use. Without the flag the client fires
+	 * no beacon, the marker is never consumed and the event would repeat on
+	 * every one-shot fetch (#626, as EDD's ReliablePurchase::is_enabled()).
+	 *
+	 * @return bool
+	 */
+	private function cache_safe_purchase_fallback(): bool {
+		return true === $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE )
+			&& ! (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG );
+	}
+
+	/**
 	 * Session-endpoint resolver for the reliable-purchase fallback one-shot: mirrors
 	 * maybe_add_pending_purchase()/add_purchase_for_order() but RETURNS the purchase
 	 * payload, with the order NUMBER so the client de-dupes against the same
@@ -1362,7 +1375,7 @@ final class PageDataLayer {
 	 * @return array<string, mixed>|null
 	 */
 	public function resolve_pending_purchase(): ?array {
-		if ( true !== $this->options->get( GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE ) ) {
+		if ( ! $this->cache_safe_purchase_fallback() ) {
 			return null;
 		}
 
@@ -1405,14 +1418,12 @@ final class PageDataLayer {
 			return null;
 		}
 
-		// Whether the client consults/records the browser guard; off under "Do not
-		// flag orders as being tracked", matching the page path (#369).
-		$flag = ! (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG );
-
 		return array(
 			'push'        => $purchase_data_layer,
 			'orderNumber' => (string) $order->get_order_number(),
-			'flag'        => $flag,
+			// The client checks and records its guard: this lane runs only with
+			// the tracked flag in use (#369, #626).
+			'flag'        => true,
 			'clear'       => (bool) $this->options->get( GTM4WP_OPTION_INTEGRATE_WCCLEARECOMMERCEDL ),
 		);
 	}

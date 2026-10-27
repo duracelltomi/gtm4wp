@@ -1171,6 +1171,30 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * #626: under "Do not flag orders as being tracked" the client fires no
+	 * beacon, so the marker would never be consumed and every later one-shot
+	 * fetch re-pushes the purchase. The cache-safe fallback is off then, as in
+	 * EDD (ReliablePurchase::is_enabled()).
+	 */
+	public function test_the_cache_safe_purchase_fallback_is_off_without_the_tracked_flag(): void {
+		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+		$this->stub_wc_rest_without_session( 1001 );
+
+		$page_datalayer = $this->make_page_datalayer(
+			array(
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER       => true,
+				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true,
+			)
+		);
+
+		$this->assertNull( $page_datalayer->resolve_pending_purchase() );
+		$keys = array_map( static fn ( $field ) => $field->key, $page_datalayer->declare_visitor_scoped_fields( array() ) );
+		$this->assertSame( array( 'readdedToCart' ), $keys, 'No pendingPurchase field without the tracked flag; the re-add stays.' );
+	}
+
+	/**
 	 * #592: a purchase filter that drops the event leaves the one-shot with
 	 * nothing to push, so the browser pushes nothing and its beacon flags nothing.
 	 */
@@ -3866,9 +3890,9 @@ final class PageDataLayerTest extends TestCase {
 		);
 	}
 
-	public function test_resolve_pending_purchase_flag_false_under_no_tracked_flag_option(): void {
-		// #369: with "Do not flag orders as being tracked" on, the client must write no
-		// browser guard either - the payload flag is false.
+	public function test_resolve_pending_purchase_tells_the_client_to_use_its_guard(): void {
+		// #369/#626: the fallback only runs with the tracked flag in use, so a
+		// delivered purchase always asks the client to write and check its guard.
 		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
 		$this->stub_wc_pending( 1001 );
 
@@ -3876,12 +3900,11 @@ final class PageDataLayerTest extends TestCase {
 			array(
 				GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
 				GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
-				GTM4WP_OPTION_INTEGRATE_WCNOORDERTRACKEDFLAG => true,
 			)
 		)->resolve_pending_purchase();
 
 		$this->assertIsArray( $payload );
-		$this->assertFalse( $payload['flag'], 'No browser order-tracked state may be written when the tracked flag is disabled.' );
+		$this->assertTrue( $payload['flag'] );
 	}
 
 	public function test_resolve_pending_purchase_null_when_option_disabled(): void {
@@ -4301,9 +4324,9 @@ final class PageDataLayerTest extends TestCase {
 	}
 
 	public function test_do_not_flag_option_confirm_writes_no_meta(): void {
-		// "Do not flag orders as being tracked" ON, end to end (#398 / #369): resolve
-		// returns flag:false without touching the session, and even if the beacon fires
-		// it writes no _ga_tracked (flag_order_tracked() no-ops under the option).
+		// "Do not flag orders as being tracked" ON, end to end (#398 / #369 / #626):
+		// resolve delivers nothing without touching the session, and even if the
+		// beacon fires it writes no _ga_tracked (flag_order_tracked() no-ops).
 		$order = $this->make_recent_order();
 		Functions\when( 'wc_get_order' )->justReturn( $order );
 		$session = $this->stub_wc_stateful( array( ProductData::PENDING_PURCHASE_SESSION_KEY => 1001 ) );
@@ -4316,8 +4339,7 @@ final class PageDataLayerTest extends TestCase {
 			)
 		);
 
-		$payload = $page->resolve_pending_purchase();
-		$this->assertFalse( $payload['flag'], 'flag:false tells the client to send no beacon.' );
+		$this->assertNull( $page->resolve_pending_purchase(), 'The cache-safe fallback is off without the tracked flag (#626).' );
 		$this->assertSame( array(), $session->sets, 'The read-only GET writes no session state, flagging on or off.' );
 
 		// If the beacon fires anyway, the write still no-ops under the option.
