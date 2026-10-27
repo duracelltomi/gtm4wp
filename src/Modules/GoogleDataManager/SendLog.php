@@ -402,9 +402,12 @@ final class SendLog {
 	 * What a replay would queue, one job per refund. The ring holds a row per
 	 * destination per attempt, so only the NEWEST row per destination counts,
 	 * and the job names exactly the destinations still failing in `only`, so a
-	 * destination that already took the event is never sent it twice. A refund
-	 * whose newest word is a replayable skip is queued whole; one whose newest
-	 * word is a queued job that has not run yet is left alone.
+	 * destination that already took the event is never sent it twice. While a
+	 * destination is a retry target the job stays scoped to those, even when a
+	 * refund-level row is newer: a whole job would meet the sent marker of a
+	 * partial accept and answer already_sent unsent (#601). Only with no such
+	 * destination does a refund whose newest word is a replayable skip (or a
+	 * stale whole queued job) go whole. A job not yet run is left alone.
 	 *
 	 * @param string[] $references Limit to these references; empty means every replayable refund.
 	 * @return array<string, array{platform: string, order_id: int, refund_id: int, only: string[]}> Keyed by reference.
@@ -454,8 +457,14 @@ final class SendLog {
 				}
 			}
 
-			// The refund-level row (a skip carries no destination) wins only
-			// when it is the newest word about the refund.
+			if ( array() !== $only ) {
+				$plan[ $reference ] = $parsed + array( 'only' => $only );
+
+				continue;
+			}
+
+			// The refund-level row (a skip carries no destination) decides only
+			// when it is the newest word and no destination is a retry target.
 			$whole = $by_destination[''] ?? null;
 
 			if ( null !== $whole
@@ -463,12 +472,6 @@ final class SendLog {
 				&& ( self::is_replayable( $whole ) || self::OUTCOME_QUEUED === (string) ( $whole['outcome'] ?? '' ) )
 			) {
 				$plan[ $reference ] = $parsed + array( 'only' => array() );
-
-				continue;
-			}
-
-			if ( array() !== $only ) {
-				$plan[ $reference ] = $parsed + array( 'only' => $only );
 			}
 		}
 

@@ -395,6 +395,51 @@ final class EddListTrackingTest extends TestCase {
 	}
 
 	/**
+	 * #612: with tax on, the synthesized line's item_price is EDD's raw price
+	 * while price and subtotal are on the purchase basis; fees is an array.
+	 */
+	public function test_a_synthesized_checkout_line_keeps_the_raw_item_price_with_tax_on(): void {
+		Functions\when( 'edd_has_variable_prices' )->justReturn( false );
+		Functions\when( 'edd_get_cart_content_details' )->justReturn( array() );
+		Functions\when( 'edd_get_cart_item_price' )->justReturn( 12.0 );
+		Functions\when( 'edd_use_taxes' )->justReturn( true );
+		Functions\when( 'edd_download_is_tax_exclusive' )->justReturn( false );
+		Functions\when( 'edd_get_shop_country' )->justReturn( 'DE' );
+		Functions\when( 'edd_get_shop_state' )->justReturn( '' );
+		Functions\when( 'edd_get_tax_rate' )->justReturn( 0.2 );
+		Functions\when( 'edd_prices_include_tax' )->justReturn( true );
+		// Both cart roundings (#533), as in the purchase-basis test above.
+		Functions\when( 'edd_currency_decimal_filter' )->justReturn( 2 );
+		Functions\when( 'edd_format_amount' )->alias( static fn ( $amount ) => number_format( round( (float) $amount, 2 ), 2, '.', '' ) );
+		// The tax inside a tax-inclusive amount.
+		Functions\when( 'edd_calculate_tax' )->alias( static fn ( $amount, $c, $r, $f, $rate ) => $amount - $amount / ( 1 + $rate ) );
+
+		$seen = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_EDD_CART_ITEM )->andReturnUsing(
+			static function ( $keep, $line ) use ( &$seen ) {
+				$seen = $line;
+				return $keep;
+			}
+		);
+
+		$row = array(
+			'id'       => 55,
+			'options'  => array(),
+			'quantity' => 2,
+		);
+		$this->capture_output(
+			fn () => $this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_EDDEXCLUDETAX => true ) )->checkout_cart_item_data( $row, 0 )
+		);
+
+		$this->assertIsArray( $seen );
+		$this->assertSame( 12.0, $seen['item_price'], 'EDD\'s raw item price.' );
+		$this->assertSame( 20.0, $seen['price'], 'The purchase basis: net of tax, times quantity.' );
+		$this->assertSame( 20.0, $seen['subtotal'] );
+		$this->assertSame( array(), $seen['fees'] );
+		$this->assertArrayNotHasKey( 'tax', $seen );
+	}
+
+	/**
 	 * #470: a details line under the same key and price id but for another
 	 * download is not this row's line.
 	 */

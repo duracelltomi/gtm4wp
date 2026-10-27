@@ -1378,6 +1378,44 @@ final class PageDataLayerTest extends TestCase {
 		}
 	}
 
+	/**
+	 * #597: the buyer signals ride only a purchase that is really queued, so a
+	 * refused push leaves none on an ordinary (cacheable) page.
+	 */
+	public function test_a_refused_fallback_purchase_leaves_no_buyer_signals(): void {
+		$drop = true;
+		Filters\expectApplied( GTM4WP_WPFILTER_ECC_PURCHASE_DATALAYER )->andReturnUsing(
+			static function ( $dl ) use ( &$drop ) {
+				return $drop ? array_diff_key( $dl, array( 'event' => 1 ) ) : $dl;
+			}
+		);
+
+		foreach ( array( true, false ) as $drop ) {
+			Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
+			$this->stub_wc_pending( 1001 );
+			$this->inline_js = '';
+			unset( $GLOBALS['gtm4wp_woocommerce_purchase_data_pushed'] );
+
+			$result = $this->make_page_datalayer(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true,
+					GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+					GTM4WP_OPTION_INTEGRATE_WCORDERDATA => false,
+				)
+			)->add_datalayer_data( array() );
+
+			if ( $drop ) {
+				$this->assertStringNotContainsString( '"transaction_id"', $this->inline_js, 'Precondition: nothing printed.' );
+				$this->assertArrayNotHasKey( 'new_customer', $result );
+				$this->assertArrayNotHasKey( 'customer_type', $result );
+			} else {
+				$this->assertStringContainsString( '"event":"purchase"', $this->inline_js );
+				$this->assertArrayHasKey( 'new_customer', $result, 'A queued purchase still carries the signals.' );
+				$this->assertArrayHasKey( 'customer_type', $result );
+			}
+		}
+	}
+
 	public function test_pending_purchase_fallback_ignored_when_option_disabled(): void {
 		Functions\when( 'wc_get_order' )->justReturn( $this->make_recent_order() );
 		$this->stub_wc_pending( 1001 );
@@ -3246,6 +3284,51 @@ final class PageDataLayerTest extends TestCase {
 			$this->assertStringNotContainsString( '"event":"view_item"', $this->inline_js );
 			$this->assertArrayHasKey( 'productType', $result, 'The page-level product keys stay.' );
 			$this->assertSame( array(), $result['cartContent']['items'] ?? array(), 'No dropped line in cartContent.' );
+		}
+	}
+
+	/**
+	 * #594: view_item `value` on a simple product and a variable parent is a
+	 * number even when a filter drops the price or makes it text.
+	 */
+	public function test_view_item_value_is_a_number_whatever_the_filter_does_to_the_price(): void {
+		$price = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function ( $item ) use ( &$price ) {
+				unset( $item['price'] );
+				return null === $price ? $item : array( 'price' => $price ) + $item;
+			}
+		);
+		Functions\when( 'is_product' )->justReturn( true );
+		Functions\when( 'get_the_ID' )->justReturn( 7 );
+		$this->stub_wc();
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( 'simple', 'variable' ) as $type ) {
+				$product = new \WC_Product( array( 'id' => 7, 'type' => $type, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+				Functions\when( 'wc_get_product' )->justReturn( $product );
+
+				foreach ( array( array( null, '0' ), array( '12,50', '0' ), array( '12.5', '12.5' ) ) as list( $price, $expected ) ) {
+					$this->inline_js = '';
+					$this->make_page_datalayer(
+						array(
+							GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE   => true,
+							GTM4WP_OPTION_INTEGRATE_WCVIEWITEMONPARENT => true,
+						)
+					)->add_datalayer_data( array() );
+
+					$this->assertStringContainsString( '"event":"view_item"', $this->inline_js, $type );
+					$this->assertStringContainsString( '"value":' . $expected . ',', $this->inline_js, $type . ' / ' . var_export( $price, true ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+				}
+			}
+		} finally {
+			restore_error_handler();
 		}
 	}
 

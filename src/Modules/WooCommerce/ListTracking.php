@@ -662,7 +662,7 @@ final class ListTracking {
 
 					$data_layer['ecommerce'] = array(
 						'currency' => $gtm4wp_currency,
-						'value'    => $eec_product_array['price'],
+						'value'    => \GTM4WP\Ecommerce\Helpers::price_value( $eec_product_array ),
 						'item'     => $eec_product_array,
 					);
 			}

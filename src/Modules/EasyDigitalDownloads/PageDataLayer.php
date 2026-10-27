@@ -373,7 +373,7 @@ final class PageDataLayer {
 			array(
 				'ecommerce' => array(
 					'currency' => edd_get_currency(),
-					'value'    => $eec_product_array['price'],
+					'value'    => EcommerceHelpers::price_value( $eec_product_array ),
 					'items'    => array( $eec_product_array ),
 				),
 			),
@@ -692,12 +692,6 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		// new_customer / customer_type describe the BUYER: withheld with the
-		// identity block, omitted rather than emitted falsy (RI-13).
-		if ( ! $withhold_customer_data ) {
-			$data_layer = array_merge( $data_layer, $this->download_data->customer_signals( $order ) );
-		}
-
 		$purchase_data_layer = $this->download_data->get_purchase_datalayer( $order, $order_items );
 
 		// user_data is the purchase event's own copy of the customer identity.
@@ -731,6 +725,13 @@ final class PageDataLayer {
 		// Any page on the fallback lane, not only the confirmation page (#541).
 		EcommerceHelpers::keep_out_of_page_caches();
 		$this->download_data->flag_order_tracked( $order );
+
+		// new_customer / customer_type describe the BUYER: withheld with the
+		// identity block, omitted rather than emitted falsy (RI-13). Only beside a
+		// queued push, which keeps the page out of caches (#597).
+		if ( ! $withhold_customer_data ) {
+			$data_layer = array_merge( $data_layer, $this->download_data->customer_signals( $order ) );
+		}
 
 		return $data_layer;
 	}

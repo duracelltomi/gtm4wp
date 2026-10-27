@@ -597,6 +597,41 @@ final class EddPageDataLayerTest extends TestCase {
 	}
 
 	/**
+	 * #594: view_item `value` is a number even when a filter drops the price
+	 * or makes it text.
+	 */
+	public function test_view_item_value_is_a_number_whatever_the_filter_does_to_the_price(): void {
+		$price = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function ( $item ) use ( &$price ) {
+				unset( $item['price'] );
+				return null === $price ? $item : array( 'price' => $price ) + $item;
+			}
+		);
+		Functions\when( 'is_singular' )->alias( static fn ( $type = '' ) => 'download' === $type );
+		Functions\when( 'get_the_ID' )->justReturn( 55 );
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( array( null, '0' ), array( '12,50', '0' ), array( '12.5', '12.5' ) ) as list( $price, $expected ) ) {
+				$this->inline_scripts = array();
+				$this->make_page_datalayer()->add_datalayer_data( array() );
+
+				$pushed = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+				$this->assertStringContainsString( '"event":"view_item"', $pushed );
+				$this->assertStringContainsString( '"value":' . $expected . ',', $pushed, var_export( $price, true ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
+	/**
 	 * #529: an item filter returning a truthy non-array drops the line on the
 	 * cart page and the view_item on the download page instead of stopping them.
 	 */
@@ -872,6 +907,40 @@ final class EddPageDataLayerTest extends TestCase {
 			$this->assertNotContains( EcommerceHelpers::ORDER_TRACKED_META, $writes, $label );
 			$this->assertStringNotContainsString( 'gtm4wp_orderid_tracked', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), $label . ': no browser guard either.' );
 			$this->assertStringNotContainsString( '"transaction_id"', $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' ), $label . ': nothing printed.' );
+		}
+	}
+
+	/**
+	 * #597: the buyer signals ride only a purchase that is really queued, so a
+	 * refused push leaves none on an ordinary (cacheable) page.
+	 */
+	public function test_a_refused_missed_purchase_leaves_no_buyer_signals(): void {
+		$drop = true;
+		Filters\expectApplied( GTM4WP_WPFILTER_EDD_PURCHASE_DATALAYER )->andReturnUsing(
+			static function ( $dl ) use ( &$drop ) {
+				return $drop ? array_diff_key( $dl, array( 'event' => 1 ) ) : $dl;
+			}
+		);
+		Functions\when( 'edd_get_purchase_session' )->justReturn( array( 'purchase_key' => 'pk_super_secret_key' ) );
+		Functions\when( 'edd_get_order_by' )->justReturn( $this->make_order() );
+		Functions\when( 'edd_update_order_meta' )->justReturn( true );
+
+		foreach ( array( true, false ) as $drop ) {
+			$this->inline_scripts = array();
+
+			$data_layer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDTRACKONANYPAGE => true ) )
+				->add_datalayer_data( array() );
+			$pushed     = $this->inline_script_output( 'gtm4wp-additional-datalayer-pushes' );
+
+			if ( $drop ) {
+				$this->assertStringNotContainsString( '"transaction_id"', $pushed, 'Precondition: nothing printed.' );
+				$this->assertArrayNotHasKey( 'new_customer', $data_layer );
+				$this->assertArrayNotHasKey( 'customer_type', $data_layer );
+			} else {
+				$this->assertStringContainsString( '"event":"purchase"', $pushed );
+				$this->assertTrue( $data_layer['new_customer'], 'A queued purchase still carries the signals.' );
+				$this->assertSame( 'new', $data_layer['customer_type'] );
+			}
 		}
 	}
 

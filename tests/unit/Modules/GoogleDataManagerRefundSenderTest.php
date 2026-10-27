@@ -1283,14 +1283,14 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 	 * A refund accepted before the per-refund marker existed is known only
 	 * from the ring. The targeted job's own skip row supersedes that accepted
 	 * row, so the marker must take the answer over at once, or a later whole
-	 * replay sends the refund to that destination a second time (#396).
+	 * replay sends the refund to that destination a second time (#396). G-BBB
+	 * was added later and has no row, so the next plan is a whole job (#601).
 	 */
 	public function test_a_ring_only_acceptance_moves_to_the_marker_before_its_own_skip_row_hides_it(): void {
 		$rows   = $this->two_account_rows();
 		$denied = self::refund( array( 'consent_state' => array( 'signals' => array( 'analytics_storage' => 'denied' ) ) ) );
 		$source = $this->source( $denied );
 		$this->ring_row( 'G-AAA', SendLog::OUTCOME_ACCEPTED );
-		$this->ring_row( 'G-BBB', SendLog::OUTCOME_FAILED, 'UNAVAILABLE' );
 
 		// Two replays queued for both destinations; consent refuses the refund.
 		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run(
@@ -1304,7 +1304,7 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 
 		$this->assertSame( array( 34 => array( 'G-AAA' ) ), $source->accepted, 'The ring-only answer is written to the marker.' );
 		$this->assertFalse( $this->log->latest_is_accepted( 'woocommerce:12:34', 'G-AAA' ), 'Precondition: the skip row now hides the ring answer.' );
-		$this->assertSame( array(), $this->log->replay_plan()['woocommerce:12:34']['only'], 'Precondition: the refund-level skip makes the next replay a whole job.' );
+		$this->assertSame( array(), $this->log->replay_plan()['woocommerce:12:34']['only'], 'Precondition: a refund-level skip with no retry-target destination makes the next replay a whole job.' );
 
 		// The owner allows sending and replays the whole refund.
 		$this->queue_send( 200, array( 'requestId' => 'req-b2' ) );
@@ -1321,6 +1321,64 @@ final class GoogleDataManagerRefundSenderTest extends TestCase {
 			array_filter( $this->log->all(), fn ( array $row ): bool => SendLog::OUTCOME_ACCEPTED === $row['outcome'] )
 		);
 		$this->assertSame( array( 'G-AAA', 'G-BBB' ), array_column( $accepted_rows, 'destination' ), 'G-AAA is not sent the refund a second time.' );
+	}
+
+	/**
+	 * #601: a refund-level skip during a destination-scoped replay must not turn
+	 * the next plan into a whole job: the sent marker would answer it with a
+	 * refund-level already_sent while G-BBB still lacks the event.
+	 */
+	public function test_a_refund_level_skip_in_a_scoped_replay_keeps_the_next_plan_scoped(): void {
+		$rows   = $this->two_account_rows();
+		$source = $this->source( self::refund() );
+
+		$this->queue_send( 200, array( 'requestId' => 'req-a' ) );
+		$this->queue_send( 400, array( 'error' => array( 'status' => 'INVALID_ARGUMENT' ) ) );
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run( self::job() );
+
+		$this->assertNotSame( array(), $source->sent, 'Precondition: the partial accept set the sent marker.' );
+		$this->assertSame( array( 'G-BBB' ), $this->log->replay_plan()['woocommerce:12:34']['only'] );
+
+		// The scoped replay is vetoed: a refund-level skip row.
+		$calls = 0;
+		Filters\expectApplied( GTM4WP_WPFILTER_GDM_REFUND_EVENT )->andReturnUsing(
+			static function ( $event ) use ( &$calls ) {
+				return 1 === ++$calls ? array() : $event;
+			}
+		);
+		$this->log->record_queued( 'woocommerce:12:34', array( 'G-BBB' ) );
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run(
+			self::job(
+				array(
+					'only'   => array( 'G-BBB' ),
+					'replay' => true,
+				)
+			)
+		);
+		$this->assertSame( '', $this->newest_row()['destination'] );
+		$this->assertSame( RefundSender::REASON_VETOED, $this->newest_row()['reason'] );
+
+		$plan = $this->log->replay_plan()['woocommerce:12:34'] ?? null;
+		$this->assertIsArray( $plan );
+		$this->assertSame( array( 'G-BBB' ), $plan['only'], 'The destination still missing the event stays the target.' );
+
+		// That plan's job reaches G-BBB instead of answering already_sent.
+		$this->log->record_queued( 'woocommerce:12:34', $plan['only'] );
+		$before = count( $this->transport->requests );
+		$this->queue_send( 200, array( 'requestId' => 'req-b' ) );
+		$this->sender( $source, array( GTM4WP_OPTION_GDM_DESTINATIONS => $rows ) )->run(
+			self::job(
+				array(
+					'only'   => $plan['only'],
+					'replay' => true,
+				)
+			)
+		);
+
+		$this->assertSame( 2, count( $this->transport->requests ) - $before, 'One token exchange and one send, for G-BBB.' );
+		$this->assertNotSame( RefundSender::REASON_ALREADY_SENT, $this->newest_row()['reason'] );
+		$this->assertSame( 'G-BBB', $this->newest_row()['destination'] );
+		$this->assertSame( SendLog::OUTCOME_ACCEPTED, $this->newest_row()['outcome'] );
 	}
 
 	/**

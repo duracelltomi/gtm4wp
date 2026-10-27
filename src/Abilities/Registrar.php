@@ -164,24 +164,30 @@ final class Registrar {
 
 	/**
 	 * The refusal for a `confirm` input that is not the JSON boolean true, or
-	 * null when it is. A text "true" or "1" still refuses (the check stays
-	 * strict, #525) but says why: a client repeating the call as told would
-	 * loop, and on WordPress 6.9/7.0 the REST route can only send text (#567).
+	 * null when it is. A text "true" or a number 1 still refuses (the check
+	 * stays strict, #525) but says why: a client repeating the call as told
+	 * would loop. Only a route whose input travels in the query string (a
+	 * DELETE: destructive + idempotent) sends text on WordPress 6.9/7.0 (#567,
+	 * #606); a POST route delivers the boolean as one.
 	 *
-	 * @param mixed $confirm The confirm input.
+	 * @param mixed $confirm         The confirm input.
+	 * @param bool  $rest_sends_text Whether this ability's REST route can only send text.
 	 * @return \WP_Error|null
 	 */
-	public static function confirmation_error( $confirm ): ?\WP_Error {
+	public static function confirmation_error( $confirm, bool $rest_sends_text = false ): ?\WP_Error {
 		if ( true === $confirm ) {
 			return null;
 		}
 
 		if ( is_string( $confirm ) || is_int( $confirm ) ) {
-			return new \WP_Error(
-				'gtm4wp_confirm_not_boolean',
-				__( 'confirm arrived as text, not as the JSON boolean true. The WordPress REST route of this ability can only send text before WordPress 7.1: call it through an MCP client or WP-CLI, with confirm set to true.', 'duracelltomi-google-tag-manager' ),
-				array( 'status' => 400 )
-			);
+			$arrived = is_int( $confirm )
+				? __( 'confirm arrived as a number, not as the JSON boolean true.', 'duracelltomi-google-tag-manager' )
+				: __( 'confirm arrived as text, not as the JSON boolean true.', 'duracelltomi-google-tag-manager' );
+			$remedy  = $rest_sends_text
+				? __( 'The WordPress REST route of this ability can only send text before WordPress 7.1: call it through an MCP client or WP-CLI, with confirm set to true.', 'duracelltomi-google-tag-manager' )
+				: __( 'Repeat the call with confirm set to the JSON boolean true.', 'duracelltomi-google-tag-manager' );
+
+			return new \WP_Error( 'gtm4wp_confirm_not_boolean', $arrived . ' ' . $remedy, array( 'status' => 400 ) );
 		}
 
 		return self::confirmation_required_error();

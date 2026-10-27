@@ -945,6 +945,18 @@ final class HelpersTest extends TestCase {
 	}
 
 	/**
+	 * #594: the view_item value of a filtered item; a missing or non-numeric
+	 * price counts as 0, and a missing quantity does not zero it.
+	 */
+	public function test_price_value_survives_non_numeric_filter_output(): void {
+		$this->assertSame( 12.5, \GTM4WP\Ecommerce\Helpers::price_value( array( 'price' => '12.5' ) ) );
+		$this->assertSame( 9.99, \GTM4WP\Ecommerce\Helpers::price_value( array( 'price' => 9.99 ) ), 'No quantity needed.' );
+		$this->assertSame( 0.0, \GTM4WP\Ecommerce\Helpers::price_value( array( 'price' => '12,50' ) ) );
+		$this->assertSame( 0.0, \GTM4WP\Ecommerce\Helpers::price_value( array() ), 'A dropped price.' );
+		$this->assertSame( 0.0, \GTM4WP\Ecommerce\Helpers::price_value( array( 'price' => array( 1 ) ) ) );
+	}
+
+	/**
 	 * #529/#593: an item filter's return counts as an item only when it is a
 	 * non-empty array; `array()` prints the same junk item `null` does.
 	 */

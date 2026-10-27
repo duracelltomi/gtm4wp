@@ -561,6 +561,35 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( array(), $this->transport->requests, 'Nothing left the site.' );
 	}
 
+	/**
+	 * #606: the replay goes over POST, where a boolean arrives as one, so its
+	 * refusal names no transport limit.
+	 *
+	 * @return array<string, array{0: mixed, 1: string}>
+	 */
+	public static function non_boolean_confirms(): array {
+		return array(
+			'text'   => array( 'true', 'confirm arrived as text, not as the JSON boolean true. Repeat the call with confirm set to the JSON boolean true.' ),
+			'number' => array( 1, 'confirm arrived as a number, not as the JSON boolean true. Repeat the call with confirm set to the JSON boolean true.' ),
+		);
+	}
+
+	/**
+	 * The replay's non-boolean refusal, word for word.
+	 *
+	 * @param mixed  $confirm  The confirm input.
+	 * @param string $expected The message.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'non_boolean_confirms' )]
+	public function test_a_replay_refusal_names_no_transport_limit( $confirm, string $expected ): void {
+		$result = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => $confirm ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_confirm_not_boolean', $result->get_error_code() );
+		$this->assertSame( $expected, $result->get_error_message() );
+		$this->assertStringNotContainsString( 'REST', $result->get_error_message() );
+	}
+
 	public function test_a_confirmed_replay_queues_each_replayable_refund_once(): void {
 		$this->store_destination( $this->store_account() );
 		$this->record( 'woocommerce:12:13', SendLog::OUTCOME_FAILED );

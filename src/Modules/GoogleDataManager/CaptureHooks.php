@@ -150,8 +150,10 @@ final class CaptureHooks {
 	 * pass's ids and the stored ones. An id group this pass resolved replaces
 	 * the stored group whole, so a new client id never sits beside the old
 	 * client's sessions; a group it did not resolve is kept, so an empty pass
-	 * changes nothing. The order is counted once, a later first client id as a
-	 * rescue (META_COUNTED); orders stored before the marker count as counted.
+	 * changes nothing, and session ids without a client id never displace a
+	 * stored client id (#599). The order is counted once, a later first client
+	 * id as a rescue (META_COUNTED); orders stored before the marker count as
+	 * counted.
 	 *
 	 * @param callable $get             Reads a meta value: fn( string $key ): mixed.
 	 * @param callable $set             Writes one: fn( string $key, mixed $value ): void.
@@ -178,6 +180,11 @@ final class CaptureHooks {
 
 		unset( $meta[ AttributionCapture::META_CONSENT_STATE ] );
 		$meta = AttributionCapture::apply_consent_gate( $meta, $consent );
+
+		// Sessions alone may be another browser's: never beside a stored client id.
+		if ( ! isset( $meta[ AttributionCapture::META_CLIENT_ID ] ) && isset( $stored[ AttributionCapture::META_CLIENT_ID ] ) ) {
+			unset( $meta[ AttributionCapture::META_SESSION_IDS ] );
+		}
 
 		$kept = $stored;
 		unset( $kept[ AttributionCapture::META_CONSENT_STATE ] );

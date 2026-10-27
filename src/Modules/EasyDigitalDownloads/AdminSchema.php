@@ -275,7 +275,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds the logged-in customer\'s name, email and its hash, order count and total value to the data layer, and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event. With the cache-safe data layer on, they arrive in gtm4wp.customerData.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the logged-in customer\'s name, email and its hash, order count and total value to the data layer (with the cache-safe data layer on, in gtm4wp.customerData), and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -285,7 +285,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds every order attribute to the data layer on the purchase confirmation page, even when the purchase event is not sent again. Needs "Track e-commerce"; the payment key of the order is never included.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds orderData to the data layer on the purchase confirmation page: every order attribute, including the buyer\'s plain name, email, phone and address, also for an order already tracked, up to the maximum order age. Needs "Track e-commerce"; the payment key is never included.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				phase: Field::PHASE_BETA,
 				doc: self::DOC_REFERENCE
@@ -295,7 +295,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_INTEGER,
 				default_value: 30,
 				label: __( 'Only track orders younger than', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Orders older than this many minutes are not tracked when their confirmation page is viewed again, so a revisited receipt does not count the purchase twice.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Orders created more than this many minutes ago are not tracked, on their confirmation page (first view included) or by "Reliable purchase tracking", so a revisited receipt is not counted twice and a pending order paid after this limit is never counted.', 'duracelltomi-google-tag-manager' ),
 				group: 'purchase',
 				phase: Field::PHASE_EXPERIMENTAL,
 				doc: self::DOC_REFERENCE

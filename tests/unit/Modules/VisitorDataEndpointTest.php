@@ -271,4 +271,67 @@ final class VisitorDataEndpointTest extends TestCase {
 
 		$this->assertStringContainsString( '"visitorCountry":"caf', $body['payload'] );
 	}
+
+	/**
+	 * #596: a field no encoder can write (NAN/INF from a filter) is dropped on
+	 * its own; the rest of the map is still delivered. The per-field check goes
+	 * through wp_json_encode(), so a field core's UTF-8 repair saves survives.
+	 */
+	public function test_a_field_that_does_not_encode_is_dropped_and_the_rest_delivered(): void {
+		Functions\when( 'wp_json_encode' )->alias( array( WpJsonEncodeWithRepair::class, 'encode' ) );
+
+		$this->stub_declared_fields(
+			array(
+				new VisitorField( 'visitorIP', VisitorField::TIER_SESSION, '', static fn () => '8.8.8.8' ),
+				new VisitorField( 'visitorLifetimeValue', VisitorField::TIER_SESSION, '', static fn () => NAN ),
+				new VisitorField( 'visitorCountry', VisitorField::TIER_SESSION, '', static fn () => "caf\xE9" ),
+				new VisitorField( 'visitorTotal', VisitorField::TIER_ACTION, '', static fn () => INF, 'gtm4wp_login' ),
+			)
+		);
+
+		$body = ( new VisitorDataEndpoint() )->get_visitor_data()->get_data();
+
+		$this->assertNotSame( '', $body['payload'], 'One bad field must not blank the whole response.' );
+		$data = json_decode( $body['payload'], true );
+		$this->assertIsArray( $data );
+		$this->assertSame( '8.8.8.8', $data['visitorIP'] );
+		$this->assertArrayHasKey( 'visitorCountry', $data, 'A field the UTF-8 repair saves is kept.' );
+		$this->assertArrayNotHasKey( 'visitorLifetimeValue', $data );
+		$this->assertArrayNotHasKey( 'visitorTotal', $data );
+	}
+
+	/**
+	 * #596: a map that encodes is encoded once, unchanged; the per-field path
+	 * only runs after the whole-map encode failed.
+	 */
+	public function test_a_map_that_encodes_is_encoded_once_and_unchanged(): void {
+		$calls = 0;
+		Functions\when( 'wp_json_encode' )->alias(
+			static function ( $data, $options = 0, $depth = 512 ) use ( &$calls ) {
+				++$calls;
+				return json_encode( $data, $options, $depth ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+			}
+		);
+
+		$this->stub_declared_fields(
+			array(
+				new VisitorField( 'visitorIP', VisitorField::TIER_SESSION, '', static fn () => '8.8.8.8' ),
+				new VisitorField( 'visitorLifetimeValue', VisitorField::TIER_SESSION, '', static fn () => 12.5 ),
+			)
+		);
+
+		$body = ( new VisitorDataEndpoint() )->get_visitor_data()->get_data();
+
+		$this->assertSame( 1, $calls );
+		$this->assertSame(
+			json_encode( // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+				array(
+					'visitorIP'            => '8.8.8.8',
+					'visitorLifetimeValue' => 12.5,
+				),
+				JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
+			),
+			$body['payload']
+		);
+	}
 }

@@ -206,21 +206,22 @@ final class ListTracking {
 
 		$quantity = max( 1, (int) ( $item['quantity'] ?? 1 ) );
 		$options  = is_array( $item['options'] ?? null ) ? $item['options'] : array();
-		$unit     = function_exists( 'edd_get_cart_item_price' ) ? (float) edd_get_cart_item_price( (int) $item['id'], $options ) : 0.0;
+		$raw      = function_exists( 'edd_get_cart_item_price' ) ? (float) edd_get_cart_item_price( (int) $item['id'], $options ) : 0.0;
 		// No tax key, so cart_line_attributes() keeps this already-based price (#519).
-		$unit = $this->download_data->basis_price( $unit, (int) $item['id'] );
+		$unit = $this->download_data->basis_price( $raw, (int) $item['id'] );
 
-		// The content-details keys a cart-item filter reads, in EDD's own shape;
-		// `tax` stays absent on purpose: this line carries no tax split (#547).
+		// EDD's content-details keys; price and subtotal on the purchase basis
+		// (#519); no tax key (#547).
 		return array(
 			'name'        => function_exists( 'get_the_title' ) ? (string) get_the_title( (int) $item['id'] ) : '',
 			'id'          => (int) $item['id'],
 			'item_number' => $item,
-			'item_price'  => $unit,
+			'item_price'  => $raw,
 			'quantity'    => $quantity,
 			'discount'    => 0.0,
 			'subtotal'    => $unit * $quantity,
 			'price'       => $unit * $quantity,
+			'fees'        => array(),
 		);
 	}
 

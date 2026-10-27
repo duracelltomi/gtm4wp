@@ -356,7 +356,7 @@ final class PageDataLayer {
 						array(
 							'ecommerce' => array(
 								'currency' => $gtm4wp_currency,
-								'value'    => $eec_product_array['price'],
+								'value'    => \GTM4WP\Ecommerce\Helpers::price_value( $eec_product_array ),
 								'items'    => array(
 									$eec_product_array,
 								),
@@ -391,7 +391,7 @@ final class PageDataLayer {
 					array(
 						'ecommerce' => array(
 							'currency' => $gtm4wp_currency,
-							'value'    => $eec_product_array['price'],
+							'value'    => \GTM4WP\Ecommerce\Helpers::price_value( $eec_product_array ),
 							'items'    => array(
 								$eec_product_array,
 							),
@@ -994,14 +994,6 @@ final class PageDataLayer {
 			return $data_layer;
 		}
 
-		// new_customer / customer_type describe the BUYER, so they are withheld with
-		// 'customer' and user_data - omitted, not emitted falsy (RI-13, #121). Not
-		// gated in resolve_pending_purchase() (the order comes from the visitor's own
-		// session) or PurchaseTracking::on_thankyou() (the hook's caller owns the gate).
-		if ( ! $withhold_customer_data ) {
-			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
-		}
-
 		$purchase_data_layer = $this->product_data->get_purchase_datalayer( $order, $order_items );
 
 		// user_data is the purchase event's own copy of the customer identity, so it
@@ -1040,6 +1032,15 @@ final class PageDataLayer {
 		\GTM4WP\Ecommerce\Helpers::keep_out_of_page_caches();
 		$this->product_data->flag_order_tracked( $order );
 		$this->clear_pending_session_order();
+
+		// new_customer / customer_type describe the BUYER, so they are withheld with
+		// 'customer' and user_data - omitted, not emitted falsy (RI-13, #121). Not
+		// gated in resolve_pending_purchase() (the order comes from the visitor's own
+		// session) or PurchaseTracking::on_thankyou() (the hook's caller owns the gate).
+		// Only beside a queued push, which keeps the page out of caches (#597).
+		if ( ! $withhold_customer_data ) {
+			$data_layer = array_merge( $data_layer, $this->product_data->customer_signals( $order ) );
+		}
 
 		return $data_layer;
 	}

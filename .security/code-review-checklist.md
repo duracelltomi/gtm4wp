@@ -1172,30 +1172,30 @@ Adjudication: 36 drafts, 3 cross-store pairs merged, 1 duplicate of #352 dropped
 premise, #567 for the replay ability, U195 "paid", R54's toolchain row, an unrecorded #529 precedent, the HEAD commit's
 premise). Snapshots clean, HEAD unchanged. **Suite (no production change):** PHP 3676 / 21449, JS 1072 / 41, `phpcs` 0.
 Detail for every open item stays in the local report. **Fixes:** `116febc` (#593, recorded at commit
-time); #598 accepted by the maintainer the same day. **The base for the next review is `116febc`.**
+time) and the R55 fix-session commit after it (14 more); claims that changed shape: 2; #598 accepted by the maintainer the same day. **The base for the next review is `116febc`.**
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
 | 593 | Low | fixed (R55 fix session: one predicate `Ecommerce\Helpers::is_item()`, a non-empty array, at all 21 store-side builder calls in both stores, `array()` included; 6 tests red before the fix; the #415 bullet names the empty item) | site code | WC `ProductData`, `ListTracking`, `StoreApiData`; EDD `ListTracking`, `DownloadData` | Item sites outside `PageDataLayer` still take a filtered item without `is_array()` (#529 incomplete) |
-| 594 | Low | open | site code | WC + EDD `view_item` value sites | Filtered `price` read raw into `value` |
-| 595 | Low | open | site code | WC tracker JS | Six pushes send `value` unnormalised |
-| 596 | Low | open | site code | `VisitorDataEndpoint`, WC + EDD one-shot resolvers | An unencodable one-shot blanks the visitor-data response |
-| 597 | Low | open | A0 reads, site code triggers | WC + EDD `PageDataLayer` fallback lane | Buyer signals printed when the purchase is not queued (#541 sibling) |
+| 594 | Low | fixed (R55 fix session: `Ecommerce\Helpers::price_value()` at 4 sites; the verified expression still read the missing key, corrected) | site code | WC + EDD `view_item` value sites | Filtered `price` read raw into `value` |
+| 595 | Low | fixed (R55 fix session: six pushes through `gtm4wp_make_sure_is_float`; jest stubs match the real helper) | site code | WC tracker JS | Six pushes send `value` unnormalised |
+| 596 | Low | fixed (R55 fix session: whole map encoded first, a field that does not encode dropped on failure) | site code | `VisitorDataEndpoint`, WC + EDD one-shot resolvers | An unencodable one-shot blanks the visitor-data response |
+| 597 | Low | fixed (R55 fix session: signals merged only beside a queued push, both stores) | A0 reads, site code triggers | WC + EDD `PageDataLayer` fallback lane | Buyer signals printed when the purchase is not queued (#541 sibling) |
 | 598 | Low | accepted (maintainer decision 2026-10-27: whoever pays the order counts as the buyer; threat model and `CaptureHooks` docblock reworded) | A0 key holder | Data Manager `CaptureHooks`, threat model | Capture-pass premise does not hold for every route that fires the hook |
-| 599 | Low | open | — | Data Manager `CaptureHooks` | A sessions-only pass drops a stored client id |
+| 599 | Low | fixed (R55 fix session: a pass without a client id keeps the stored analytics group) | — | Data Manager `CaptureHooks` | A sessions-only pass drops a stored client id |
 | 600 | Low | open (accept proposed) | — | `CaptureHooks`, `BackfillEndpoint` | Pre-marker orders counted twice / not rescued (pre-release only) |
-| 601 | Low | open | A4 reads | `RefundSender`, `SendLog` | Refund-level exit during a destination replay yields a false "already received" |
-| 602 | Low | open | A4 reads | `KeyNotice` | Remedy text wrong for a rejected encryption-key constant |
-| 603 | Low | open | — | WC `PurchaseTracking`, `AdminSchema` | Thank-you hook drops orderData the description promises |
+| 601 | Low | fixed (R55 fix session: plan side, option b; #396 test reaches its state another way) | A4 reads | `RefundSender`, `SendLog` | Refund-level exit during a destination replay yields a false "already received" |
+| 602 | Low | fixed (R55 fix session: a third variant for a rejected constant) | A4 reads | `KeyNotice` | Remedy text wrong for a rejected encryption-key constant |
+| 603 | Low | fixed (R55 fix session: description and comment; behaviour unchanged) | — | WC `PurchaseTracking`, `AdminSchema` | Thank-you hook drops orderData the description promises |
 | 604 | Low | open | site code | WC one-shot resolvers | Marker left on a null answer; late push possible |
 | 605 | Low | open | — | `SettingsPage`, `CHANGELOG.md`, `readme.txt` | The HEAD fix's stated cause does not occur on stock WordPress |
-| 606 | Low | open | A4 delegate | `Abilities\Registrar` | Confirm refusal text names a transport limit the replay ability does not have |
-| 607 | Low | open | — | EDD `AdminSchema` | Max-order-age scope understated |
-| 608 | Low | open | — | EDD `AdminSchema` | Customer-data text places user_data in customerData |
-| 609 | Low | open | — | EDD + WC `AdminSchema` | Order-data descriptions omit what orderData carries |
+| 606 | Low | fixed (R55 fix session: message per ability; import keeps the transport sentence) | A4 delegate | `Abilities\Registrar` | Confirm refusal text names a transport limit the replay ability does not have |
+| 607 | Low | fixed (R55 fix session: description) | — | EDD `AdminSchema` | Max-order-age scope understated |
+| 608 | Low | fixed (R55 fix session: description) | — | EDD `AdminSchema` | Customer-data text places user_data in customerData |
+| 609 | Low | fixed (R55 fix session: both descriptions; WC widened to the fallback page) | — | EDD + WC `AdminSchema` | Order-data descriptions omit what orderData carries |
 | 610 | Low | open (decision) | — | EDD `AdminSchema`, U195 | Status text vs refunded/revoked counting |
-| 611 | Low | open | — | WC `AdminSchema` | Customer-data text omits two fields |
-| 612 | Low | open | site code | EDD `ListTracking` | Synthesized checkout line values differ from EDD's |
+| 611 | Low | fixed (R55 fix session: description; guest behaviour of the page-level keys unverified) | — | WC `AdminSchema` | Customer-data text omits two fields |
+| 612 | Low | fixed (R55 fix session: raw item_price, fees array, comment narrowed) | site code | EDD `ListTracking` | Synthesized checkout line values differ from EDD's |
 | 613 | Low | open | A0 | Settings REST route | Validation answers before the permission check |
 | 614 | Low | fixed (this ledger update; the `.upstream` row is for `/upstream-review`) | — | checklist, patterns RI-39 | Four ledger claims the tree contradicts |
 | 615 | Low | open | — | `CaptureHooks`, `BackfillEndpoint` | Marker format in two files |

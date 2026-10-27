@@ -659,6 +659,42 @@ final class ListTrackingTest extends TestCase {
 		$this->assertStringContainsString( 'view_item', $out );
 	}
 
+	/**
+	 * #594: the quick view `value` is a number even when a filter drops the
+	 * price or makes it text.
+	 */
+	public function test_quick_view_value_is_a_number_whatever_the_filter_does_to_the_price(): void {
+		$price = null;
+		Filters\expectApplied( GTM4WP_WPFILTER_EEC_ITEM_WITH_SOURCE )->andReturnUsing(
+			static function ( $item ) use ( &$price ) {
+				unset( $item['price'] );
+				return null === $price ? $item : array( 'price' => $price ) + $item;
+			}
+		);
+		$this->stub_quick_view_env( $this->make_product() );
+
+		set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+			static function ( int $errno, string $errstr ): bool {
+				throw new \ErrorException( $errstr, 0, $errno ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			foreach ( array( array( null, 0 ), array( '12,50', 0 ), array( '12.5', 12.5 ) ) as list( $price, $expected ) ) {
+				ob_start();
+				$this->make_list_tracking( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) )
+					->quick_view_before_single_product();
+				$out = (string) ob_get_clean();
+
+				$this->assertSame( 1, preg_match( '/data-gtm4wp_datalayer="([^"]*)"/', $out, $m ) );
+				$pushed = json_decode( html_entity_decode( $m[1], ENT_QUOTES ), true );
+				$this->assertSame( $expected, $pushed['ecommerce']['value'], var_export( $price, true ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+			}
+		} finally {
+			restore_error_handler();
+		}
+	}
+
 	public function test_quick_view_variable_product_sets_flag_without_ecommerce(): void {
 		$this->stub_quick_view_env( $this->make_product( array( 'type' => 'variable' ) ) );
 

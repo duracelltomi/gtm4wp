@@ -288,7 +288,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds the customer\'s billing and shipping data, order count and total order value to the data layer, and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds the logged-in customer\'s account name, billing and shipping data, hashed billing email, order count and total order value to the data layer as customer* variables, and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				doc: self::DOC_REFERENCE
 			),
@@ -297,7 +297,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Enable this to add all order attributes into the data layer on the order received page, even when the purchase event itself is not sent, for example because the order was already tracked. Requires "Track e-commerce" to be on.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds orderData, every order attribute including the buyer\'s plain name, email, phone and address, wherever the purchase is tracked (not on theme or builder thank-you pages), also for an already tracked order younger than the maximum order age. Requires "Track e-commerce".', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				doc: self::DOC_REFERENCE
 			),

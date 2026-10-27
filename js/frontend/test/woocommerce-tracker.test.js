@@ -58,6 +58,22 @@ afterEach( () => {
 	capturedDocListeners = [];
 } );
 
+// Same semantics as gtm4wp_make_sure_is_float in gtm4wp-ecommerce-generic.js
+// (two decimals, non-finite is 0): a `parseFloat( v ) || 0` stand-in would hide #595.
+const makeSureIsFloat = ( v ) => {
+	let f = v;
+	if ( 'string' === typeof f ) {
+		f = parseFloat( f );
+		if ( isNaN( f ) ) {
+			f = 0;
+		}
+	} else if ( 'number' !== typeof f ) {
+		f = 0;
+	}
+	f = parseFloat( f.toFixed( 2 ) );
+	return isFinite( f ) ? f : 0;
+};
+
 const PRODUCT_DATA = {
 	item_id: 42,
 	item_name: 'PC Product',
@@ -169,6 +185,7 @@ describe( 'gtm4wp-woocommerce PDP add_to_cart validation guard (#274)', () => {
 		window.google_tag_manager = { 'GTM-TEST': {} };
 
 		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_make_sure_is_float = makeSureIsFloat;
 		global.gtm4wp_read_from_json = ( json ) => {
 			const parsed = JSON.parse( json );
 			delete parsed.productlink;
@@ -232,6 +249,22 @@ describe( 'gtm4wp-woocommerce PDP add_to_cart validation guard (#274)', () => {
 			expect.objectContaining( { item_id: 42 } )
 		);
 	} );
+
+	// #595: price times quantity is rounded, and a missing price is 0.
+	it.each( [
+		[ 0.1, 0.3 ],
+		[ undefined, 0 ],
+	] )(
+		'pushes value as a rounded number for price %p',
+		( price, expected ) => {
+			document.body.innerHTML = buildForm( false );
+			document.querySelector( '[name=quantity]' ).value = '3';
+			document.querySelector( '[name=gtm4wp_product_data]' ).value =
+				JSON.stringify( { ...PRODUCT_DATA, price } );
+
+			expect( clickAddToCart()[ 2 ].value ).toBe( expected );
+		}
+	);
 } );
 
 describe( 'gtm4wp-woocommerce shortcode add_to_cart button (#110)', () => {
@@ -268,6 +301,7 @@ describe( 'gtm4wp-woocommerce shortcode add_to_cart button (#110)', () => {
 		window.google_tag_manager = { 'GTM-TEST': {} };
 
 		global.gtm4wp_push_ecommerce = jest.fn();
+		global.gtm4wp_make_sure_is_float = makeSureIsFloat;
 		global.gtm4wp_read_json_from_node = ( el, key, exclude = [] ) => {
 			const raw = el && el.dataset && el.dataset[ key ];
 			if ( ! raw ) {
@@ -309,6 +343,33 @@ describe( 'gtm4wp-woocommerce shortcode add_to_cart button (#110)', () => {
 			expect.objectContaining( { item_id: 42 } )
 		);
 		expect( call[ 1 ][ 0 ] ).toHaveProperty( 'quantity', 1 );
+	} );
+
+	// #595: the value is a number, also for a text or missing price.
+	it.each( [
+		[ '12.50', 12.5 ],
+		[ undefined, 0 ],
+	] )( 'pushes value as a number for price %p', ( price, expected ) => {
+		document
+			.querySelector( '.add_to_cart_button' )
+			.setAttribute(
+				'data-gtm4wp_product_data',
+				JSON.stringify( { ...SHORTCODE_DATA, price } )
+			);
+		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
+		jest.runAllTimers();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		document
+			.querySelector( '.add_to_cart_button' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( call[ 2 ].value ).toBe( expected );
 	} );
 } );
 
@@ -1315,6 +1376,7 @@ const applyWooGlobals = () => {
 	window.google_tag_manager = { 'GTM-TEST': {} };
 
 	global.gtm4wp_push_ecommerce = jest.fn();
+	global.gtm4wp_make_sure_is_float = makeSureIsFloat;
 	global.gtm4wp_read_from_json = (
 		json,
 		exclude = [ 'productlink', 'internal_id' ]
@@ -1354,12 +1416,12 @@ describe( 'gtm4wp-woocommerce cart page quantity change (T25)', () => {
 	// A classic cart row: the qty input's HTML value attribute is the baseline
 	// (defaultValue) the handler compares against; the .remove cell carries the
 	// product JSON.
-	const cartFixture = ( defaultQty ) =>
+	const cartFixture = ( defaultQty, product = CART_PRODUCT ) =>
 		'<form class="woocommerce-cart-form"><table><tbody>' +
 		'<tr class="cart_item">' +
 		'<td class="product-remove">' +
 		'<a href="#" class="remove" data-gtm4wp_product_data=\'' +
-		JSON.stringify( CART_PRODUCT ) +
+		JSON.stringify( product ) +
 		"'>x</a></td>" +
 		'<td class="product-quantity">' +
 		'<input type="number" class="qty" value="' +
@@ -1433,6 +1495,20 @@ describe( 'gtm4wp-woocommerce cart page quantity change (T25)', () => {
 			calls.filter( ( c ) => c[ 0 ] === 'add_to_cart' )
 		).toHaveLength( 0 );
 	} );
+
+	// #595: the delta value is rounded in both directions.
+	it.each( [
+		[ 1, 4, 'add_to_cart' ],
+		[ 4, 1, 'remove_from_cart' ],
+	] )( 'pushes a rounded value for %p -> %p (%s)', ( from, to, event ) => {
+		document.body.innerHTML = cartFixture( from, {
+			...CART_PRODUCT,
+			price: 0.1,
+		} );
+		const calls = clickUpdateCart( to ).filter( ( c ) => c[ 0 ] === event );
+		expect( calls ).toHaveLength( 1 );
+		expect( calls[ 0 ][ 2 ].value ).toBe( 0.3 );
+	} );
 } );
 
 describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
@@ -1486,6 +1562,25 @@ describe( 'gtm4wp-woocommerce remove-from-cart links (T25)', () => {
 		expect( call[ 2 ] ).toEqual(
 			expect.objectContaining( { currency: 'EUR', value: 24 } )
 		);
+	} );
+
+	// #595: a line without a price is removed with value 0, not NaN.
+	it( 'pushes value 0 for a line without a price', () => {
+		document.body.innerHTML =
+			'<table><tbody><tr class="cart_item">' +
+			'<td class="product-remove">' +
+			'<a href="#" class="remove" data-gtm4wp_product_data=\'' +
+			JSON.stringify( { item_id: 55, item_name: 'Removed' } ) +
+			"'>x</a></td>" +
+			'<td class="product-quantity">' +
+			'<input type="number" class="qty" value="3" /></td>' +
+			'</tr></tbody></table>';
+
+		const removes = clickRemove().filter(
+			( c ) => c[ 0 ] === 'remove_from_cart'
+		);
+		expect( removes ).toHaveLength( 1 );
+		expect( removes[ 0 ][ 2 ].value ).toBe( 0 );
 	} );
 
 	it( 'reads the removed quantity from the mini-cart .quantity text', () => {
@@ -1693,6 +1788,23 @@ describe( 'gtm4wp-woocommerce classic cart Undo', () => {
 				( c ) => c[ 0 ] === 'add_to_cart'
 			)
 		).toHaveLength( 1 );
+	} );
+
+	// #595: the re-add value is rounded like every other push.
+	it( 'pushes a rounded value for the re-added line', () => {
+		document.body.innerHTML =
+			'<table><tbody><tr class="cart_item">' +
+			'<td class="product-remove">' +
+			'<a href="/cart/?remove_item=key-1&amp;_wpnonce=n" class="remove" data-gtm4wp_product_data=\'' +
+			JSON.stringify( { ...LINE, price: 0.1 } ) +
+			"'>x</a></td>" +
+			'<td class="product-quantity">' +
+			'<input type="number" class="qty" value="3" /></td>' +
+			'</tr></tbody></table>';
+
+		const adds = removeThenUndo( '/cart/?undo_item=key-1&_wpnonce=n' );
+		expect( adds ).toHaveLength( 1 );
+		expect( adds[ 0 ][ 2 ].value ).toBe( 0.3 );
 	} );
 
 	it( 'ignores an Undo for a line this page did not see removed', () => {

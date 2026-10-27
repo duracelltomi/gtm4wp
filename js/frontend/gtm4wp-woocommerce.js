@@ -111,7 +111,9 @@ function gtm4wp_woocommerce_handle_cart_qty_change() {
 
 					gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
 						currency: gtm4wp_currency, // ga4 version
-						value: productdata.price * productdata.quantity,
+						value: gtm4wp_make_sure_is_float(
+							productdata.price * productdata.quantity
+						),
 					} );
 				} else {
 					// no => handle remove from cart event
@@ -122,7 +124,9 @@ function gtm4wp_woocommerce_handle_cart_qty_change() {
 						[ productdata ],
 						{
 							currency: gtm4wp_currency,
-							value: productdata.price * productdata.quantity,
+							value: gtm4wp_make_sure_is_float(
+								productdata.price * productdata.quantity
+							),
 						}
 					);
 				}
@@ -400,7 +404,9 @@ function gtm4wp_track_single_add_to_cart(
 
 		emit( 'add_to_cart', [ productdata ], {
 			currency: gtm4wp_currency,
-			value: productdata.price * productdata.quantity,
+			value: gtm4wp_make_sure_is_float(
+				productdata.price * productdata.quantity
+			),
 		} );
 	}
 
@@ -664,7 +670,7 @@ function gtm4wp_track_list_add_to_cart( trigger_element ) {
 
 	gtm4wp_push_ecommerce( 'add_to_cart', [ productdata ], {
 		currency: gtm4wp_currency,
-		value: productdata.price,
+		value: gtm4wp_make_sure_is_float( productdata.price ),
 	} );
 
 	return true;
@@ -928,7 +934,9 @@ function gtm4wp_woocommerce_process_pages() {
 
 				gtm4wp_push_ecommerce( 'remove_from_cart', [ productdata ], {
 					currency: gtm4wp_currency,
-					value: productdata.price * productdata.quantity,
+					value: gtm4wp_make_sure_is_float(
+						productdata.price * productdata.quantity
+					),
 				} );
 
 				const removed_key = gtm4wp_cart_item_key_from_url(
@@ -1279,7 +1287,9 @@ function gtm4wp_woocommerce_process_pages() {
 			gtm4wp_run_isolated( function () {
 				gtm4wp_push_ecommerce( 'add_to_cart', [ restored ], {
 					currency: gtm4wp_currency,
-					value: restored.price * restored.quantity,
+					value: gtm4wp_make_sure_is_float(
+						restored.price * restored.quantity
+					),
 				} );
 			} );
 			return;

@@ -498,7 +498,8 @@ final class SettingsAbilities implements ProviderInterface {
 
 		$input = is_array( $input ) ? $input : array();
 
-		$refused = Registrar::confirmation_error( $input['confirm'] ?? null );
+		// A DELETE route: its REST input is the query string, so text only (#606).
+		$refused = Registrar::confirmation_error( $input['confirm'] ?? null, true );
 
 		if ( null !== $refused ) {
 			return $refused;

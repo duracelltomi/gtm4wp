@@ -427,6 +427,66 @@ final class GoogleDataManagerCaptureHooksTest extends TestCase {
 	}
 
 	/**
+	 * #599: a pass that resolved session ids but no client id cannot drop the
+	 * stored client id; the stored analytics group stays whole and the pass's
+	 * sessions are not stored beside it.
+	 */
+	public function test_sessions_without_a_client_id_keep_the_stored_analytics_group(): void {
+		self::set_cookies( array( 'sessions' => array( 'G-ABC123' => '1799999999' ) ), array( 'analytics_storage' => 'granted' ) );
+		$order = self::deletable_order(
+			array(
+				AttributionCapture::META_CLIENT_ID   => '111.222',
+				AttributionCapture::META_SESSION_IDS => array( 'G-ABC123' => '1788522496' ),
+			)
+		);
+
+		$this->hooks()->capture_woocommerce_order( $order );
+
+		$this->assertSame( '111.222', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( array( 'G-ABC123' => '1788522496' ), $order->get_meta( AttributionCapture::META_SESSION_IDS, true ) );
+		$this->assertNotContains( AttributionCapture::META_CLIENT_ID, $order->deleted );
+		$this->assertNotContains( AttributionCapture::META_SESSION_IDS, $order->deleted );
+	}
+
+	/**
+	 * #599: with no stored client id, a sessions-only pass still stores its
+	 * session ids.
+	 */
+	public function test_sessions_without_a_client_id_are_stored_when_none_is_stored(): void {
+		self::set_cookies( array( 'sessions' => array( 'G-ABC123' => '1799999999' ) ), array( 'analytics_storage' => 'granted' ) );
+		$order = self::deletable_order();
+
+		$this->hooks()->capture_woocommerce_order( $order );
+
+		$this->assertSame( array( 'G-ABC123' => '1799999999' ), $order->get_meta( AttributionCapture::META_SESSION_IDS, true ) );
+	}
+
+	/**
+	 * #599: a pass with a new client id and sessions still replaces the stored
+	 * analytics group whole.
+	 */
+	public function test_a_new_client_id_with_sessions_replaces_the_stored_group(): void {
+		self::set_cookies(
+			array(
+				'client_id' => '333.444',
+				'sessions'  => array( 'G-ABC123' => '1799999999' ),
+			),
+			array( 'analytics_storage' => 'granted' )
+		);
+		$order = self::deletable_order(
+			array(
+				AttributionCapture::META_CLIENT_ID   => '111.222',
+				AttributionCapture::META_SESSION_IDS => array( 'G-ABC123' => '1788522496' ),
+			)
+		);
+
+		$this->hooks()->capture_woocommerce_order( $order );
+
+		$this->assertSame( '333.444', $order->get_meta( AttributionCapture::META_CLIENT_ID, true ) );
+		$this->assertSame( array( 'G-ABC123' => '1799999999' ), $order->get_meta( AttributionCapture::META_SESSION_IDS, true ) );
+	}
+
+	/**
 	 * #535: the EDD resume mirrors the WooCommerce one: counted once, and a
 	 * newer ad denial removes the stored click id.
 	 */

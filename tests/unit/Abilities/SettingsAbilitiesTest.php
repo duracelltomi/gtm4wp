@@ -643,6 +643,40 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	}
 
 	/**
+	 * #606: the import goes over DELETE (query string), so its refusal keeps the
+	 * transport sentence; a number is called a number, not text.
+	 *
+	 * @return array<string, array{0: mixed, 1: string}>
+	 */
+	public static function non_boolean_confirms(): array {
+		return array(
+			'text'   => array( 'true', 'confirm arrived as text, not as the JSON boolean true. The WordPress REST route of this ability can only send text before WordPress 7.1: call it through an MCP client or WP-CLI, with confirm set to true.' ),
+			'number' => array( 1, 'confirm arrived as a number, not as the JSON boolean true. The WordPress REST route of this ability can only send text before WordPress 7.1: call it through an MCP client or WP-CLI, with confirm set to true.' ),
+		);
+	}
+
+	/**
+	 * The import's non-boolean refusal, word for word.
+	 *
+	 * @param mixed  $confirm  The confirm input.
+	 * @param string $expected The message.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'non_boolean_confirms' )]
+	public function test_an_import_names_the_rest_transport_when_confirm_is_not_boolean( $confirm, string $expected ): void {
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ),
+				'confirm' => $confirm,
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'gtm4wp_confirm_not_boolean', $result->get_error_code() );
+		$this->assertSame( $expected, $result->get_error_message() );
+	}
+
+	/**
 	 * Payloads the store refuses, each with the code that names the problem.
 	 *
 	 * @return array<string, array{0: mixed, 1: string}>

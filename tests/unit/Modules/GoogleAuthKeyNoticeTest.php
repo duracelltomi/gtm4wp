@@ -189,21 +189,23 @@ final class GoogleAuthKeyNoticeTest extends TestCase {
 	/**
 	 * #562: a salts-sealed key that went unreadable before it moved to the
 	 * constant gets no advice to define the constant once it is defined.
+	 * #602: with the constant refused no key ever moves, and Replace key alone
+	 * seals under the salts again, so the constant is fixed first.
 	 */
 	public function test_the_salts_remedy_does_not_advise_a_constant_already_defined(): void {
 		$this->store_unreadable( 'Production' );
 
 		$this->assertStringContainsString( 'defining GTM4WP_ENCRYPTION_KEY prevents this', $this->render(), 'Undefined: the advice stands.' );
 
-		foreach ( array(
-			'in use'  => self::CONSTANT,
-			'refused' => 'too-short',
-		) as $label => $constant ) {
-			$html = $this->render( self::ROTATED, $constant );
+		$in_use = $this->render( self::ROTATED, self::CONSTANT );
+		$this->assertStringContainsString( 'service account Production can no longer be decrypted, usually because the security keys in wp-config.php changed before it moved to the encryption key.', $in_use );
+		$this->assertStringNotContainsString( 'prevents this', $in_use );
 
-			$this->assertStringContainsString( 'service account Production can no longer be decrypted, usually because the security keys in wp-config.php changed before it moved to the encryption key.', $html, $label );
-			$this->assertStringNotContainsString( 'prevents this', $html, $label );
-		}
+		$refused = $this->render( self::ROTATED, 'too-short' );
+		$this->assertStringContainsString( 'service account Production can no longer be decrypted, usually because the security keys in wp-config.php changed. First correct GTM4WP_ENCRYPTION_KEY in wp-config.php as the notice above says, then use <a href=', $refused );
+		$this->assertStringContainsString( '>Replace key</a> on the account with its key file.', $refused );
+		$this->assertStringNotContainsString( 'moved to the encryption key', $refused, 'With the constant refused, no key ever moves.' );
+		$this->assertStringNotContainsString( 'prevents this', $refused );
 	}
 
 	public function test_a_refused_constant_is_named_even_without_an_account(): void {

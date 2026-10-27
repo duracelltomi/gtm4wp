@@ -109,6 +109,20 @@ final class Helpers {
 	}
 
 	/**
+	 * The price of a filtered item as the view_item value, 0 when a filter
+	 * dropped it or made it non-numeric (#594). Not line_value(): a missing
+	 * quantity must not zero it.
+	 *
+	 * @param array<string, mixed> $item An item with a price.
+	 * @return float
+	 */
+	public static function price_value( array $item ): float {
+		$price = $item['price'] ?? 0;
+
+		return is_numeric( $price ) ? (float) $price : 0.0;
+	}
+
+	/**
 	 * The event name of a filtered purchase payload, or null when a filter left
 	 * none: tested, never cast, so an object or array is no fatal and no push
 	 * (RI-39). Every path that prints or flags a purchase asks this first, so a

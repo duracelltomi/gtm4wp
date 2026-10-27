@@ -79,7 +79,8 @@ final class PurchaseTracking {
 
 		$order_items = null;
 
-		// Raw order data will be output regardless of whether the purchase has been already tracked previously, since this data is not meant to track using GA.
+		// Printed only with the purchase below: an already tracked or not yet
+		// trackable order gets no orderData on this hook (#603).
 		if ( isset( $order ) && $this->options->get( GTM4WP_OPTION_INTEGRATE_WCORDERDATA ) ) {
 			$order_items = $this->product_data->process_order_items( $order );
 			$order_data  = $this->product_data->get_raw_order_datalayer( $order, $order_items );

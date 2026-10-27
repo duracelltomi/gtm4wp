@@ -82,12 +82,7 @@ final class VisitorDataEndpoint {
 
 		$response = new \WP_REST_Response(
 			array(
-				// Hex-flagged (RI-2), parsed back by the client; json_object() so an
-				// empty map serializes as {} not [].
-				'payload' => (string) wp_json_encode(
-					ScriptTag::json_object( $data ),
-					JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS
-				),
+				'payload' => $this->payload( $data ),
 				// FRESH nonce for the confirm beacons: the config nonce baked into a
 				// cached page goes stale after a tick and would 403 the beacon.
 				'nonce'   => wp_create_nonce( 'wp_rest' ),
@@ -101,6 +96,32 @@ final class VisitorDataEndpoint {
 		$response->header( 'Cache-Control', 'no-store, max-age=0' );
 
 		return $response;
+	}
+
+	/**
+	 * Encodes the map hex-flagged (RI-2); json_object() so an empty map is {}
+	 * not []. A field that does not encode (NAN/INF from a filter) is dropped
+	 * alone, like a null field, instead of blanking the whole payload (#596).
+	 * The per-field check uses wp_json_encode() so its UTF-8 repair still applies.
+	 *
+	 * @param array<string, mixed> $data The resolved visitor data map.
+	 * @return string
+	 */
+	private function payload( array $data ): string {
+		$flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS;
+		$json  = wp_json_encode( ScriptTag::json_object( $data ), $flags );
+
+		if ( false !== $json ) {
+			return $json;
+		}
+
+		foreach ( $data as $key => $value ) {
+			if ( false === wp_json_encode( array( $key => $value ), $flags ) ) {
+				unset( $data[ $key ] );
+			}
+		}
+
+		return (string) wp_json_encode( ScriptTag::json_object( $data ), $flags );
 	}
 
 	/**
