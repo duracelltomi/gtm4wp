@@ -73,7 +73,7 @@ Three semantics worth stating, because each is easy to invert:
   driven by a cache-safe per-request config baked in by `VisitorDataModule`. Each
   Tier 1 source is a *producer* in that file.
   - `siteSearchTerm` ← `location.search` (`?s=`)
-  - `siteSearchFrom` ← `document.referrer` (normalized like the 1.x value)
+  - `siteSearchFrom` ← `document.referrer` (encoded like the classic value; `''` without a referrer, #316, #648)
   - Moving these off the server also removes their reflected-XSS surface.
 - When the option is **on**, the server stops rendering the server-only
   visitor/session fields into the cacheable HTML — they are simply **omitted**
@@ -82,6 +82,13 @@ Three semantics worth stating, because each is easy to invert:
     `visitorEmailHash`, `visitorRegistrationDate`, `visitorUsername`, `visitorId`,
     `visitorIP`, `geoCloudflareCountryCode`, and the server copies of
     `siteSearchTerm` / `siteSearchFrom` (moved to the client push).
+  - One exception (#647): an **anonymous** render still prints
+    `visitorLoginState: 'logged-out'` and `visitorType: 'visitor-logged-out'`,
+    each with its own option. They are the same constant for every anonymous
+    visitor, printed only when both `is_user_logged_in()` and the current user
+    id say "anonymous", so a cached copy carries nothing user-specific; a
+    logged-in render prints neither, and the Tier 3 resolvers stay `null` for
+    anonymous requests.
   - `WooCommerce\PageDataLayer`: `add_customer_data`, `add_cart_content`,
     `maybe_add_readded_to_cart`, `maybe_add_pending_purchase`.
   - Untouched: content/URL/site data, and the content-driven ecommerce events

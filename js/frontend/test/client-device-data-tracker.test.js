@@ -17,12 +17,17 @@
  * Overrides navigator.userAgent and navigator.userAgentData for the current
  * test. Both are redefined every call so no state leaks between tests (TS-7).
  *
- * @param {Object}      options               Navigator overrides.
- * @param {string}      options.userAgent     navigator.userAgent value.
- * @param {Object|void} options.userAgentData navigator.userAgentData value.
+ * @param {Object}      options                Navigator overrides.
+ * @param {string}      options.userAgent      navigator.userAgent value.
+ * @param {Object|void} options.userAgentData  navigator.userAgentData value.
+ * @param {number}      options.maxTouchPoints navigator.maxTouchPoints value.
  * @return {void}
  */
-function setNavigator( { userAgent, userAgentData } ) {
+function setNavigator( { userAgent, userAgentData, maxTouchPoints = 0 } ) {
+	Object.defineProperty( window.navigator, 'maxTouchPoints', {
+		value: maxTouchPoints,
+		configurable: true,
+	} );
 	Object.defineProperty( window.navigator, 'userAgent', {
 		value: userAgent,
 		configurable: true,
@@ -117,7 +122,7 @@ describe( 'gtm4wp-client-device-data', () => {
 		const cases = [
 			[ 'CriOS/126.0.6478.153', 'Chrome', '126.0.6478.153' ],
 			[ 'FxiOS/127.0', 'Firefox', '127.0' ],
-			[ 'EdgiOS/126.0.2592.80', 'Microsoft Edge', '126.0.2592.80' ],
+			[ 'EdgiOS/126.0.2592.80', 'Edge', '126.0.2592.80' ],
 		];
 
 		cases.forEach( ( [ token, name, version ] ) => {
@@ -221,11 +226,104 @@ describe( 'gtm4wp-client-device-data', () => {
 			event: 'gtm4wp.deviceData',
 			deviceType: 'desktop',
 			osName: 'Windows',
-			osVersion: '15.0.0',
-			// The high-entropy full version wins over the low-entropy "120".
-			browserName: 'Google Chrome',
+			// platformVersion 13+ is Windows 11 (Microsoft's UA-CH mapping, #653).
+			osVersion: '11.0',
+			// The high-entropy full version wins over the low-entropy "120";
+			// the brand reads as 1.x and the UA fallback name it (#653).
+			browserName: 'Chrome',
 			browserVersion: '120.0.6099.109',
 		} );
+	} );
+
+	// #653: Windows reports its UniversalApiContract version through Client
+	// Hints; Microsoft maps 13+ to Windows 11, 1-10 to Windows 10, 0 to older.
+	it.each( [
+		[ '15.0.0', '11.0' ],
+		[ '10.0.0', '10.0' ],
+		[ '0.0.0', undefined ],
+	] )(
+		'maps the Windows platformVersion %s to %s',
+		async ( platformVersion, expected ) => {
+			setNavigator( {
+				userAgent: 'ignored',
+				userAgentData: {
+					mobile: false,
+					platform: 'Windows',
+					brands: [ { brand: 'Microsoft Edge', version: '126' } ],
+					getHighEntropyValues: () =>
+						Promise.resolve( { platformVersion } ),
+				},
+			} );
+
+			loadTracker();
+			await flushAsync();
+
+			expect( deviceEvents()[ 0 ].osVersion ).toBe( expected );
+			expect( deviceEvents()[ 0 ].browserName ).toBe( 'Edge' );
+		}
+	);
+
+	// #653: a tablet is reported as one, as 1.x did.
+	it.each( [
+		[
+			'an Android tablet via Client Hints',
+			'ignored',
+			{
+				mobile: false,
+				platform: 'Android',
+				brands: [],
+				getHighEntropyValues: () => Promise.resolve( {} ),
+			},
+			0,
+		],
+		[
+			'a legacy iPad UA',
+			'Mozilla/5.0 (iPad; CPU OS 12_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.2 Mobile/15E148 Safari/604.1',
+			undefined,
+			0,
+		],
+		[
+			'an Android tablet UA',
+			'Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+			undefined,
+			0,
+		],
+		[
+			'iPadOS in desktop mode',
+			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+			undefined,
+			5,
+		],
+	] )(
+		'reports %s as a tablet',
+		async ( label, userAgent, userAgentData, maxTouchPoints ) => {
+			setNavigator( { userAgent, userAgentData, maxTouchPoints } );
+
+			loadTracker();
+			await flushAsync();
+
+			expect( deviceEvents()[ 0 ].deviceType ).toBe( 'tablet' );
+		}
+	);
+
+	it( 'keeps a Mac without touch and an Android phone as before', () => {
+		setNavigator( {
+			userAgent:
+				'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+			userAgentData: undefined,
+		} );
+		loadTracker();
+		expect( deviceEvents()[ 0 ].deviceType ).toBe( 'desktop' );
+
+		delete window.gtm4wp_clientdevice_inited;
+		window.dataLayer = [];
+		setNavigator( {
+			userAgent:
+				'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
+			userAgentData: undefined,
+		} );
+		loadTracker();
+		expect( deviceEvents()[ 0 ].deviceType ).toBe( 'mobile' );
 	} );
 
 	it( 'still pushes the low-entropy data when getHighEntropyValues rejects', async () => {
@@ -247,7 +345,7 @@ describe( 'gtm4wp-client-device-data', () => {
 		expect( deviceEvents()[ 0 ] ).toMatchObject( {
 			deviceType: 'mobile',
 			osName: 'Android',
-			browserName: 'Google Chrome',
+			browserName: 'Chrome',
 			browserVersion: '120',
 		} );
 	} );

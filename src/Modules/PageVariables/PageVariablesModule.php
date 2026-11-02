@@ -212,17 +212,45 @@ final class PageVariablesModule extends AbstractModule {
 	}
 
 	/**
+	 * The visitor variables the cache-safe tier still prints (#647).
+	 *
+	 * @param array<string, mixed> $data_layer The data layer so far.
+	 * @return array<string, mixed>
+	 */
+	private function add_anonymous_visitor_defaults( array $data_layer ): array {
+		// Under cache-safe only the logged-out pair is printed, and only on an
+		// anonymous render: the same constant for every anonymous visitor, so a
+		// cached copy carries nothing user-specific (#647). Both signals must
+		// agree (is_user_logged_in() is pluggable); the Tier 3 resolvers stay
+		// null for anonymous requests, which include the #291 anonymous retry.
+		if ( is_user_logged_in() || 0 !== (int) wp_get_current_user()->ID ) {
+			return $data_layer;
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_LOGGEDIN ) ) {
+			$data_layer['visitorLoginState'] = 'logged-out';
+		}
+
+		if ( $this->opt( GTM4WP_OPTION_INCLUDE_USERROLE ) ) {
+			$data_layer['visitorType'] = 'visitor-logged-out';
+		}
+
+		return $data_layer;
+	}
+
+	/**
 	 * The visitor variables of the classic (non cache-safe) data layer: login
 	 * state, roles, the identity variables, user id and IP. The identity
 	 * variables and the IP are OMITTED for a visitor who is not logged in or
 	 * has no value, exactly as the cache-safe tier omits them (#277, #312).
+	 * Under cache-safe only add_anonymous_visitor_defaults() runs.
 	 *
 	 * @param array<string, mixed> $data_layer The data layer so far.
 	 * @return array<string, mixed>
 	 */
 	private function add_visitor_variables( array $data_layer ): array {
 		if ( $this->cache_safe() ) {
-			return $data_layer;
+			return $this->add_anonymous_visitor_defaults( $data_layer );
 		}
 
 		if ( $this->opt( GTM4WP_OPTION_INCLUDE_LOGGEDIN ) ) {

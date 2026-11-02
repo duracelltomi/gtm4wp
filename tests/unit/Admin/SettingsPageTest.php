@@ -422,6 +422,41 @@ final class SettingsPageTest extends TestCase {
 	 * every load; no notice would restore the silent blank page this exists to
 	 * replace.
 	 */
+	/**
+	 * #663: a stored value JSON cannot carry (INF from an out-of-band option
+	 * write or a third-party module) leaves the app without settings, so the
+	 * screen names that cause at once instead of blaming an ad blocker.
+	 */
+	public function test_an_unencodable_bootstrap_shows_its_own_notice_not_the_blocker_one(): void {
+		$page = $this->register_page( $this->make_settings_page( array() ) );
+		// Only the plugin's own row carries the value; other options stay unset.
+		Functions\when( 'get_option' )->alias(
+			static fn ( $key, $default_value = false ) => ( GTM4WP_OPTIONS === $key ) ? array( GTM4WP_OPTION_DATALAYER_NAME => INF ) : $default_value
+		);
+		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
+
+		ob_start();
+		$page->render();
+		$output = (string) ob_get_clean();
+
+		$this->assertSame( 'var gtm4wpSettings = null;', $this->inline_scripts[0]['code'] );
+		$this->assertStringContainsString( SettingsPage::BOOTSTRAP_ERROR_CLASS, $output );
+		$this->assertStringContainsString( 'Inf and NaN cannot be JSON encoded', $output );
+		$this->assertStringNotContainsString( SettingsPage::BOOT_FALLBACK_CLASS, $output );
+	}
+
+	public function test_an_encodable_bootstrap_keeps_the_blocker_fallback(): void {
+		$page = $this->register_page( $this->make_settings_page( array() ) );
+		$page->enqueue_assets( 'settings_page_' . GTM4WP_ADMINSLUG );
+
+		ob_start();
+		$page->render();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( SettingsPage::BOOT_FALLBACK_CLASS, $output );
+		$this->assertStringNotContainsString( 'gtm4wp-admin-app-bootstrap-error', $output );
+	}
+
 	public function test_render_prints_the_boot_fallback_inside_the_app_container(): void {
 		$page = $this->make_settings_page( array() );
 

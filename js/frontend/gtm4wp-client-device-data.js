@@ -55,15 +55,38 @@
 		return result;
 	}
 
+	// Client Hints brands under the names 1.x and the UA fallback report (#653).
+	const brandNames = {
+		'Google Chrome': 'Chrome',
+		'Microsoft Edge': 'Edge',
+	};
+
+	function browserName( brand ) {
+		return brandNames[ brand ] || brand;
+	}
+
+	// Windows' platformVersion is its UniversalApiContract version: 13+ is
+	// Windows 11, 1-10 is Windows 10, 0 is older (Microsoft's mapping, U69).
+	function windowsVersion( platformVersion ) {
+		const major = parseInt( platformVersion, 10 );
+		if ( major >= 13 ) {
+			return '11.0';
+		}
+		return major >= 1 ? '10.0' : '';
+	}
+
 	function detectWithClientHints( uaData ) {
 		const data = {
-			deviceType: uaData.mobile ? 'mobile' : 'desktop',
+			// Android without mobile is a tablet (#653).
+			deviceType: uaData.mobile
+				? 'mobile'
+				: ( 'Android' === uaData.platform && 'tablet' ) || 'desktop',
 			osName: uaData.platform || '',
 		};
 
 		const brand = significantBrand( uaData.brands );
 		if ( brand ) {
-			data.browserName = brand.brand;
+			data.browserName = browserName( brand.brand );
 			data.browserVersion = brand.version;
 		}
 
@@ -87,7 +110,10 @@
 			.getHighEntropyValues( wanted )
 			.then( function ( highEntropy ) {
 				if ( highEntropy.platformVersion ) {
-					data.osVersion = highEntropy.platformVersion;
+					data.osVersion =
+						'Windows' === uaData.platform
+							? windowsVersion( highEntropy.platformVersion )
+							: highEntropy.platformVersion;
 				}
 
 				if ( highEntropy.model ) {
@@ -98,7 +124,7 @@
 					highEntropy.fullVersionList
 				);
 				if ( fullBrand ) {
-					data.browserName = fullBrand.brand;
+					data.browserName = browserName( fullBrand.brand );
 					data.browserVersion = fullBrand.version;
 				}
 
@@ -110,19 +136,27 @@
 	}
 
 	function detectWithUserAgent( userAgent ) {
-		const data = {
-			deviceType: /Mobi|Android|iPhone|iPad|iPod/i.test( userAgent )
-				? 'mobile'
-				: 'desktop',
-		};
+		// Tablets first (#653): an iPad, Android without "Mobile", and iPadOS
+		// in desktop mode (a Mac UA with a touch screen).
+		const isTablet =
+			/iPad/.test( userAgent ) ||
+			( /Android/i.test( userAgent ) && ! /Mobi/i.test( userAgent ) ) ||
+			( /Macintosh/.test( userAgent ) && navigator.maxTouchPoints > 1 );
+		let deviceType = /Mobi|iPhone|iPod/i.test( userAgent )
+			? 'mobile'
+			: 'desktop';
+		if ( isTablet ) {
+			deviceType = 'tablet';
+		}
+		const data = { deviceType };
 
 		// iOS browsers name themselves with their own tokens and no Version/.
 		const browserMatchers = [
 			[ /CriOS\/([0-9.]+)/, 'Chrome' ],
 			[ /FxiOS\/([0-9.]+)/, 'Firefox' ],
-			[ /EdgiOS\/([0-9.]+)/, 'Microsoft Edge' ],
+			[ /EdgiOS\/([0-9.]+)/, 'Edge' ],
 			[ /Firefox\/([0-9.]+)/, 'Firefox' ],
-			[ /Edg[a-z]*\/([0-9.]+)/, 'Microsoft Edge' ],
+			[ /Edg[a-z]*\/([0-9.]+)/, 'Edge' ],
 			[ /OPR\/([0-9.]+)/, 'Opera' ],
 			[ /Chrome\/([0-9.]+)/, 'Chrome' ],
 			[ /Version\/([0-9.]+).*Safari/, 'Safari' ],

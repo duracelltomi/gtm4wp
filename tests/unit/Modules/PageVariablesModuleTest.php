@@ -604,6 +604,44 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * #647: under cache-safe an anonymous visitor still gets the logged-out
+	 * pair the classic tier reports - a constant for every anonymous visitor,
+	 * printed only on an anonymous render, each only with its own option. A
+	 * logged-in render, or one whose two login signals disagree, gets nothing.
+	 */
+	public function test_cache_safe_anonymous_render_carries_the_logged_out_pair(): void {
+		$options = array(
+			GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+			GTM4WP_OPTION_INCLUDE_LOGGEDIN     => true,
+			GTM4WP_OPTION_INCLUDE_USERROLE     => true,
+			GTM4WP_OPTION_INCLUDE_USEREMAIL    => true,
+		);
+		$keys    = array( 'visitorLoginState', 'visitorType', 'visitorEmail', 'visitorEmailHash' );
+		$visitor = static fn ( array $data_layer ) => array_intersect_key( $data_layer, array_flip( $keys ) );
+
+		Functions\when( 'is_user_logged_in' )->justReturn( false );
+		Functions\when( 'wp_get_current_user' )->justReturn( (object) array( 'ID' => 0, 'roles' => array() ) ); // phpcs:ignore
+		$this->assertSame(
+			array(
+				'visitorLoginState' => 'logged-out',
+				'visitorType'       => 'visitor-logged-out',
+			),
+			$visitor( $this->make_module( $options )->add_datalayer_data( array() ) )
+		);
+		$this->assertSame(
+			array( 'visitorLoginState' => 'logged-out' ),
+			$visitor( $this->make_module( array( GTM4WP_OPTION_INCLUDE_USERROLE => false ) + $options )->add_datalayer_data( array() ) )
+		);
+
+		// The two signals disagree (a pluggable is_user_logged_in()): nothing.
+		Functions\when( 'wp_get_current_user' )->justReturn( (object) array( 'ID' => 3, 'roles' => array( 'editor' ) ) ); // phpcs:ignore
+		$this->assertSame( array(), $visitor( $this->make_module( $options )->add_datalayer_data( array() ) ) );
+
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		$this->assertSame( array(), $visitor( $this->make_module( $options )->add_datalayer_data( array() ) ) );
+	}
+
+	/**
 	 * #650 (decision: kept, documented in the field description): search
 	 * results and 404 pages report their page type even with the option off,
 	 * the only 404 signal in the data layer since 1.15.

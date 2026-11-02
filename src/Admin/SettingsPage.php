@@ -52,6 +52,19 @@ final class SettingsPage {
 	private string $hook_suffix = '';
 
 	/**
+	 * Class of the notice shown when the screen's settings could not be encoded.
+	 */
+	public const BOOTSTRAP_ERROR_CLASS = 'gtm4wp-admin-app-bootstrap-error';
+
+	/**
+	 * The json_last_error_msg() of a bootstrap that could not be encoded; '' when
+	 * it could. Set in enqueue_assets(), which core runs before render().
+	 *
+	 * @var string
+	 */
+	private string $bootstrap_error = '';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Registry      $registry The module registry.
@@ -126,6 +139,20 @@ final class SettingsPage {
 		echo '<div class="wrap">';
 		echo '<h1 class="screen-reader-text">' . esc_html__( 'Google Tag Manager for WordPress options', 'duracelltomi-google-tag-manager' ) . '</h1>';
 		echo '<div id="gtm4wp-admin-app">';
+
+		// The app cannot start without its settings, and the cause is known:
+		// say so at once instead of blaming a blocker (#663).
+		if ( '' !== $this->bootstrap_error ) {
+			echo '<div class="' . esc_attr( self::BOOTSTRAP_ERROR_CLASS ) . ' notice notice-error inline"><p>';
+			printf(
+				/* translators: %s: the PHP JSON encoder's error message, in English. */
+				esc_html__( 'The GTM4WP settings could not be prepared for this screen: a stored option, or a module added by another plugin, holds a value that cannot be sent to the browser (%s).', 'duracelltomi-google-tag-manager' ),
+				esc_html( $this->bootstrap_error )
+			);
+			echo '</p></div></div></div>';
+			return;
+		}
+
 		echo '<div class="' . esc_attr( self::BOOT_FALLBACK_CLASS ) . ' notice notice-warning inline">';
 		echo '<p><strong>' . esc_html__( 'The GTM4WP settings screen could not start.', 'duracelltomi-google-tag-manager' ) . '</strong></p>';
 		echo '<p>' . esc_html__( 'This screen is built in the browser by a JavaScript file loaded from the plugin folder (build/admin.js), and that file did not run. The most likely cause is an ad or privacy blocker: some filter lists block everything under the folder of this plugin, and that also blocks the file this screen is built from.', 'duracelltomi-google-tag-manager' ) . '</p>';
@@ -186,9 +213,16 @@ final class SettingsPage {
 			wp_style_add_data( 'gtm4wp-admin-app', 'rtl', 'replace' );
 		}
 
+		// bootstrap_data() is always an array, so 'null' means it failed to encode
+		// (INF/NAN from an out-of-band write or a third-party module, #663).
+		$bootstrap = ScriptTag::json_literal( $this->bootstrap_data(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS );
+		if ( 'null' === $bootstrap ) {
+			$this->bootstrap_error = json_last_error_msg();
+		}
+
 		wp_add_inline_script(
 			'gtm4wp-admin-app',
-			'var gtm4wpSettings = ' . ScriptTag::json_literal( $this->bootstrap_data(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS ) . ';',
+			'var gtm4wpSettings = ' . $bootstrap . ';',
 			'before'
 		);
 	}
