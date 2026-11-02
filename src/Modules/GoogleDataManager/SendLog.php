@@ -68,8 +68,8 @@ final class SendLog {
 	 * destination it sends, skips or finds already sent. One older than
 	 * QUEUED_STALE_AFTER with nothing newer was not processed - a stalled
 	 * queue, or "Send refunds to Google Analytics" switched off before the job
-	 * ran (deliberately rowless, so it stays replayable) - and may be queued
-	 * again (#388).
+	 * ran (no handler is hooked then, so the job is dropped rowless and stays
+	 * replayable) - and may be queued again (#388).
 	 */
 	public const OUTCOME_QUEUED = 'queued';
 
@@ -636,6 +636,16 @@ final class SendLog {
 
 			// A queued job the queue never ran needs a look, unlike a waiting one.
 			if ( self::OUTCOME_QUEUED === (string) ( $entry['outcome'] ?? '' ) && $entry['replayable'] ) {
+				$entry['tone'] = self::TONE_WARN;
+			}
+
+			// Polling ended without a final answer (sending switched off, still
+			// processing at the cap, no status reply), so pending would never
+			// resolve (#640). One poll interval of grace for a late cron run.
+			$entry['status_unknown'] = self::OUTCOME_ACCEPTED === (string) ( $entry['outcome'] ?? '' )
+				&& self::TONE_PENDING === $entry['tone']
+				&& ( $now - (int) ( $entry['time'] ?? $now ) ) > StatusPoller::MAX_ELAPSED + StatusPoller::MAX_INTERVAL;
+			if ( $entry['status_unknown'] ) {
 				$entry['tone'] = self::TONE_WARN;
 			}
 

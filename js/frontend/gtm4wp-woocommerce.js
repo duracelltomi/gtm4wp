@@ -1186,10 +1186,6 @@ function gtm4wp_woocommerce_process_pages() {
 					return true;
 				}
 
-				current_product_detail_data.price = gtm4wp_make_sure_is_float(
-					current_product_detail_data.price
-				);
-
 				current_product_detail_data.item_group_id =
 					current_product_detail_data.id;
 				// Re-apply the remarketing product-id prefix to the variation id the

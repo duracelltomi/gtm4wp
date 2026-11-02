@@ -1,7 +1,7 @@
 /**
  * GTM4WP shared first-party cookie helpers, the one copy for the frontend
  * bundles. A second copy of the byte format (raw value, ';expires=<UTC>;path=/')
- * lives in PHP-emitted JS, PageDataLayer::purchase_dedupe_guard(), which
+ * lives in PHP-emitted JS, Ecommerce\Helpers::purchase_dedupe_guard(), which
  * cannot import this module: change the two together.
  */
 

@@ -95,7 +95,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: true,
 				label: __( 'Posttype of current post/archive', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the type of the current post or archive page (post, page or any custom post type).', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the type of the current post or archive page (post, page or any custom post type) in pagePostType. Search results and 404 pages report search-results and 404-error even when this is off.', 'duracelltomi-google-tag-manager' ),
 				group: 'post',
 				doc: self::DOC_POST
 			),
@@ -399,7 +399,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Logged in user creation date', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Check this option to include the date of creation (registration) of the logged in user.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Check this option to include the registration date of the logged in user, as a Unix timestamp in visitorRegistrationDate.', 'duracelltomi-google-tag-manager' ),
 				group: 'visitor',
 				doc: self::DOC_VISITOR
 			),
@@ -464,7 +464,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Site ID', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'ID of the current site in a WordPress Multisite environment', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'ID of the current site in siteID: the site ID in a WordPress Multisite network, 1 on a single site.', 'duracelltomi-google-tag-manager' ),
 				group: 'site',
 				doc: self::DOC_MULTISITE
 			),
@@ -473,7 +473,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Site name', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Name of the current site in a WordPress Multisite environment', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Name of the current site in siteName, on a single site and in a WordPress Multisite network.', 'duracelltomi-google-tag-manager' ),
 				group: 'site',
 				doc: self::DOC_MULTISITE
 			),

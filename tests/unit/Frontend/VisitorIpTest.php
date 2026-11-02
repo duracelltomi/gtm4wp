@@ -52,6 +52,30 @@ final class VisitorIpTest extends TestCase {
 		parent::tearDown();
 	}
 
+	/**
+	 * #657: a dual-stack listener reports IPv4 peers as ::ffff:a.b.c.d. That is
+	 * IPv4, so it must match an IPv4 trusted range and count as public when the
+	 * IPv4 address is; a range already listed in mapped form keeps matching.
+	 */
+	public function test_an_ipv4_mapped_peer_is_read_as_ipv4(): void {
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.9';
+
+		foreach ( array( '::ffff:10.0.0.5', '0:0:0:0:0:ffff:a00:5' ) as $peer ) {
+			$_SERVER['REMOTE_ADDR'] = $peer;
+			$this->assertSame( '203.0.113.9', VisitorIp::get( 'X-Forwarded-For', '10.0.0.0/8' ), $peer );
+			$this->assertSame( '203.0.113.9', VisitorIp::get( 'X-Forwarded-For', '::ffff:10.0.0.0/104' ), "$peer, mapped-form range" );
+			$this->assertTrue( VisitorIp::request_via_trusted_proxy( array( '10.0.0.5' ) ), $peer );
+		}
+
+		unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+		$_SERVER['REMOTE_ADDR'] = '::ffff:203.0.113.9';
+		$this->assertSame( '203.0.113.9', VisitorIp::get(), 'A mapped public peer is a public IPv4 visitor.' );
+
+		$_SERVER['REMOTE_ADDR'] = '::ffff:10.0.0.5';
+		$this->assertSame( '', VisitorIp::get(), 'A mapped private peer is still private.' );
+		$this->assertFalse( VisitorIp::request_via_trusted_proxy( array( '10.1.0.0/16' ) ), 'Outside the range stays outside.' );
+	}
+
 	public function test_returns_remote_addr_when_no_custom_header_configured(): void {
 		$_SERVER['REMOTE_ADDR'] = '8.8.8.8';
 

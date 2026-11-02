@@ -146,11 +146,7 @@ final class EasyDigitalDownloadsModule extends AbstractModule {
 			return;
 		}
 
-		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page-cache plugins read (U141), not ours to prefix.
-			define( 'DONOTCACHEPAGE', true );
-		}
-
+		\GTM4WP\Ecommerce\Helpers::keep_out_of_page_caches();
 		nocache_headers();
 	}
 

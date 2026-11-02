@@ -39,6 +39,22 @@ if ( ! class_exists( 'WP_Term' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_Post' ) ) {
+	// Loaded for every test, not only the EDD ones, so an instanceof check
+	// cannot pass or fail on test order (TS-16).
+	class WP_Post {
+		public $ID           = 0;
+		public $post_title   = '';
+		public $post_content = '';
+
+		public function __construct( array $fields = array() ) {
+			foreach ( $fields as $key => $value ) {
+				$this->$key = $value;
+			}
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		private array $headers = array();

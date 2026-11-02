@@ -191,7 +191,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				default_value: ConsentPolicy::POLICY_EEA_ONLY,
 				label: __( 'Require consent before sending', 'duracelltomi-google-tag-manager' ),
 				description: esc_html__(
-					'Which orders need analytics storage granted before anything about them is sent to Google, decided by the billing country. Choose Never only if you have your own lawful basis for the transfer.',
+					'Which orders need analytics storage granted before anything about them is sent to Google, decided by the billing country; an order without one counts as outside these regions. Choose Never only if you have your own lawful basis for the transfer.',
 					'duracelltomi-google-tag-manager'
 				),
 				group: self::GROUP_SENDING,

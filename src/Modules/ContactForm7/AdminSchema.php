@@ -125,8 +125,8 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	}
 
 	/**
-	 * The Contact Form 7 module is always available; the tracker script is
-	 * simply inactive without the CF7 plugin.
+	 * The Contact Form 7 module is always available; without the CF7 plugin
+	 * the tracker script is not enqueued (#281).
 	 *
 	 * @return string
 	 */
@@ -137,8 +137,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 	 * {@inheritDoc}
 	 *
 	 * The master switch is the integration option; the host is Contact Form 7,
-	 * reported from its version constant. Present says nothing about the
-	 * version floor, which the module's is_available() enforces.
+	 * reported from its version constant. The module sets no version floor.
 	 *
 	 * @param Options $options The plugin options service.
 	 * @return array<string, mixed>

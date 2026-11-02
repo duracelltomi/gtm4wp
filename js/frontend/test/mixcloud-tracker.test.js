@@ -83,6 +83,19 @@ describe( 'gtm4wp-mixcloud', () => {
 		return widget;
 	}
 
+	it( 'reports an oEmbed embed (full-URL feed) like its share-dialog twin (#643)', async () => {
+		document.body.innerHTML =
+			'<iframe src="https://www.mixcloud.com/widget/iframe/?feed=https%3A%2F%2Fwww.mixcloud.com%2Fspartacus%2F%C3%A9t%C3%A9-mix%2F&hide_cover=1"></iframe>';
+		await loadTracker();
+
+		expect( window.dataLayer[ 0 ].mediaData.id ).toBe(
+			'/spartacus/été-mix/'
+		);
+		expect( window.dataLayer[ 0 ][ 'gtm.videoUrl' ] ).toBe(
+			'https://www.mixcloud.com/spartacus/été-mix/'
+		);
+	} );
+
 	it( 'pushes mediaPlayerReady with the feed-derived id, url and title once ready', async () => {
 		await loadTracker();
 

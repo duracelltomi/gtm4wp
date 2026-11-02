@@ -378,7 +378,8 @@ final class StatusAbilities implements ProviderInterface {
 
 		return array(
 			'active'  => ! empty( $integration['active'] ),
-			'version' => isset( $integration['version'] ) ? (string) $integration['version'] : null,
+			// A third-party value: a cast fatals on an object and writes "Array" (#642, RI-39).
+			'version' => is_scalar( $integration['version'] ?? null ) ? (string) $integration['version'] : null,
 		);
 	}
 

@@ -19,7 +19,8 @@
  *     (both verbs work; nothing declares a tracker as a dependency);
  *   - block `gtm4wp-media-gate` (this file): stops every provider's request
  *     while the trackers still report players already on the page. Blocking
- *     ONLY: every tracker depends on this handle, so WordPress prints it
+ *     ONLY: every SDK-fetching tracker depends on this handle (#143), so
+ *     WordPress prints it
  *     whether or not it was dequeued;
  *   - the `gtm4wp_media_sdk_blocked` PHP filter: the same, decided
  *     server-side.

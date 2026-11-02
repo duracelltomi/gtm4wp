@@ -604,9 +604,88 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	/**
+	 * #650 (decision: kept, documented in the field description): search
+	 * results and 404 pages report their page type even with the option off,
+	 * the only 404 signal in the data layer since 1.15.
+	 */
+	public function test_search_and_404_report_their_page_type_with_the_posttype_option_off(): void {
+		Functions\when( 'get_search_query' )->justReturn( '' );
+		Functions\when( 'esc_url_raw' )->returnArg();
+		Functions\when( 'wp_unslash' )->returnArg();
+		$module = $this->make_module( array( GTM4WP_OPTION_INCLUDE_POSTTYPE => false ) );
+
+		Functions\when( 'is_search' )->justReturn( true );
+		$this->assertSame( 'search-results', $module->add_datalayer_data( array() )['pagePostType'] ?? null );
+
+		Functions\when( 'is_search' )->justReturn( false );
+		Functions\when( 'is_404' )->justReturn( true );
+		$this->assertSame( '404-error', $module->add_datalayer_data( array() )['pagePostType'] ?? null );
+	}
+
+	/**
+	 * #649 (decision: kept, 1.x behaviour, both tiers agree): a logged-in user
+	 * with no role on this site reports an empty visitorType on both tiers.
+	 */
+	public function test_a_logged_in_user_with_no_role_reports_an_empty_visitor_type_on_both_tiers(): void {
+		Functions\when( 'is_user_logged_in' )->justReturn( true );
+		Functions\when( 'wp_get_current_user' )->justReturn(
+			(object) array(
+				'ID'    => 5,
+				'roles' => array(),
+			)
+		);
+
+		$classic = $this->make_module( array( GTM4WP_OPTION_INCLUDE_USERROLE => true ) )->add_datalayer_data( array() );
+		$this->assertSame( '', $classic['visitorType'] ?? null );
+
+		$cache_safe = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_USERROLE     => true,
+				GTM4WP_OPTION_CACHE_SAFE_DATALAYER => true,
+			)
+		);
+		$this->assertSame( '', $cache_safe->resolve_visitor_type() );
+	}
+
+	/**
+	 * #655: a stored primary id that is no longer one of the post's categories
+	 * (deleted, or unassigned) is skipped, as Yoast's own reader does, and the
+	 * next source is used instead of omitting both keys.
+	 */
+	public function test_a_primary_category_id_the_post_no_longer_has_falls_through(): void {
+		Functions\when( 'is_singular' )->justReturn( true );
+		$GLOBALS['post'] = (object) array( 'ID' => 42 );
+		Functions\when( 'get_the_ID' )->justReturn( 42 );
+		Functions\when( 'get_post_meta' )->alias(
+			static fn ( $id, $key ) => array(
+				'_yoast_wpseo_primary_category' => '99',
+				'rank_math_primary_category'    => '7',
+			)[ $key ] ?? ''
+		);
+		Functions\when( 'has_term' )->alias( static fn ( $term ) => 3 === (int) $term );
+		Functions\when( 'get_the_category' )->justReturn( array( (object) array( 'term_id' => 3 ) ) );
+		Functions\when( 'get_term' )->alias(
+			static fn ( $term_id ) => 3 === (int) $term_id ? new \WP_Term( array( 'term_id' => 3, 'slug' => 'first', 'name' => 'First' ) ) : null // phpcs:ignore
+		);
+
+		$data_layer = $this->make_module(
+			array(
+				GTM4WP_OPTION_INCLUDE_POSTTYPE        => false,
+				GTM4WP_OPTION_INCLUDE_CATEGORIES      => false,
+				GTM4WP_OPTION_INCLUDE_TAGS            => false,
+				GTM4WP_OPTION_INCLUDE_AUTHOR          => false,
+				GTM4WP_OPTION_INCLUDE_PRIMARYCATEGORY => true,
+			)
+		)->add_datalayer_data( array() );
+
+		$this->assertSame( 'first', $data_layer['pagePrimaryCategory'] ?? null );
+	}
+
+	/**
 	 * T123f: Rank Math's primary category is used when Yoast has none.
 	 */
 	public function test_primary_category_from_rank_math_meta(): void {
+		Functions\when( 'has_term' )->justReturn( true ); // The stored primary term is still assigned (#655).
 		Functions\when( 'is_singular' )->justReturn( true );
 		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
@@ -2144,6 +2223,7 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	public function test_primary_category_from_yoast_meta(): void {
+		Functions\when( 'has_term' )->justReturn( true ); // The stored primary term is still assigned (#655).
 		Functions\when( 'is_singular' )->justReturn( true );
 		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
@@ -2179,6 +2259,7 @@ final class PageVariablesModuleTest extends TestCase {
 	}
 
 	public function test_primary_category_name_arrives_as_typed_not_as_stored(): void {
+		Functions\when( 'has_term' )->justReturn( true ); // The stored primary term is still assigned (#655).
 		Functions\when( 'is_singular' )->justReturn( true );
 		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
@@ -2290,8 +2371,9 @@ final class PageVariablesModuleTest extends TestCase {
 		Functions\when( 'get_post_type' )->justReturn( 'post' );
 		Functions\when( 'wp_title' )->justReturn( 'CURRENT_TITLE' );
 		Functions\when( 'wp_strip_all_tags' )->returnArg();
-		Functions\when( 'get_the_title' )->alias(
-			static fn ( $id ): string => 8 === (int) $id ? 'Master title' : 'UNEXPECTED'
+		// #651: the master title is read from the master post itself.
+		Functions\when( 'get_post' )->alias(
+			static fn ( $id = null ) => 8 === (int) $id ? new \WP_Post( array( 'ID' => 8, 'post_title' => 'Master title' ) ) : ( $GLOBALS['post'] ?? null ) // phpcs:ignore
 		);
 		Functions\when( 'get_the_category' )->justReturn(
 			array(
@@ -2443,7 +2525,7 @@ final class PageVariablesModuleTest extends TestCase {
 		$module     = $this->make_module( $this->master_language_options( true ) );
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( 'Master title', $data_layer['pageTitle'] );
+		$this->assertSame( 'Master title | ', $data_layer['pageTitle'], 'The wp_title() shape of the default path (#651).' );
 		$this->assertSame( array( 'cat-master' ), $data_layer['pageCategory'] );
 		$this->assertSame( array( 'tag-master' ), $data_layer['pageAttributes'] );
 	}
@@ -2454,6 +2536,7 @@ final class PageVariablesModuleTest extends TestCase {
 	 * broadening). WPML here maps the current primary term 30 to master term 3.
 	 */
 	public function test_master_language_resolves_primary_category(): void {
+		Functions\when( 'has_term' )->justReturn( true ); // The stored primary term is still assigned (#655).
 		Functions\when( 'is_singular' )->justReturn( true );
 		// The primary-category sink is null-gated on get_post() (RI-13).
 		$GLOBALS['post'] = (object) array( 'ID' => 42 );
@@ -2513,6 +2596,7 @@ final class PageVariablesModuleTest extends TestCase {
 	 * /code-review as an observation.
 	 */
 	public function test_master_language_primary_category_is_omitted_when_the_master_term_is_gone(): void {
+		Functions\when( 'has_term' )->justReturn( true ); // The stored primary term is still assigned (#655).
 		Functions\when( 'is_singular' )->justReturn( true );
 		$GLOBALS['post'] = (object) array( 'ID' => 42 );
 		Functions\when( 'get_the_ID' )->justReturn( 42 );
@@ -2604,6 +2688,35 @@ final class PageVariablesModuleTest extends TestCase {
 	 * case stubs pll_default_language to false explicitly. Verified under
 	 * --order-by=random.
 	 */
+	/**
+	 * #651: the master title is built like wp_title() builds a singular title,
+	 * so get_the_title()'s "Protected:"/"Private:" prefixes never appear, a
+	 * front page keeps wp_title() (it is empty there), and a master post that
+	 * cannot be loaded leaves the default value (RI-13).
+	 */
+	public function test_master_language_title_keeps_the_wp_title_shape_and_its_fallbacks(): void {
+		$this->stub_master_language_singular();
+		add_filter( 'wpml_current_language', static fn () => 'de' );
+		Filters\expectApplied( 'wpml_default_language' )->zeroOrMoreTimes()->andReturn( 'en' );
+		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing( static fn ( $id ) => 42 === (int) $id ? 8 : $id );
+		Functions\when( 'get_the_title' )->justReturn( 'Protected: Master title' );
+
+		$module = $this->make_module( $this->master_language_options( true ) );
+		$this->assertSame( 'Master title | ', $module->add_datalayer_data( array() )['pageTitle'] );
+
+		Functions\when( 'is_front_page' )->justReturn( true );
+		$this->assertSame( 'CURRENT_TITLE', $module->add_datalayer_data( array() )['pageTitle'] );
+
+		Functions\when( 'is_front_page' )->justReturn( false );
+		// The master post cannot be loaded; the current post still can.
+		Functions\when( 'get_post' )->alias(
+			static function ( $id = null ) {
+				return null === $id ? ( $GLOBALS['post'] ?? null ) : null;
+			}
+		);
+		$this->assertSame( 'CURRENT_TITLE', $module->add_datalayer_data( array() )['pageTitle'] );
+	}
+
 	public function test_master_language_outputs_polylang_default_language_values(): void {
 		$this->stub_master_language_singular();
 
@@ -2651,7 +2764,7 @@ final class PageVariablesModuleTest extends TestCase {
 		$module     = $this->make_module( $options );
 		$data_layer = $module->add_datalayer_data( array() );
 
-		$this->assertSame( 'Master title', $data_layer['pageTitle'] );
+		$this->assertSame( 'Master title | ', $data_layer['pageTitle'], 'The wp_title() shape of the default path (#651).' );
 		$this->assertSame( array( 'cat-master' ), $data_layer['pageCategory'] );
 		$this->assertSame( array( 'tag-master' ), $data_layer['pageAttributes'] );
 		// Custom taxonomy term names are resolved to the default language too.
@@ -2959,6 +3072,19 @@ final class PageVariablesModuleTest extends TestCase {
 	 * The Tier 1 search fields are handed to the client runtime (under their
 	 * existing data layer names) on a search page when cache-safe mode is on.
 	 */
+	/**
+	 * #634/#635 (RI-39): an earlier callback on either filter that forgets to
+	 * return hands this module a null; the typed helpers must not fatal.
+	 */
+	public function test_filter_entry_points_reset_a_non_array_from_an_earlier_callback(): void {
+		$module = $this->make_module();
+
+		foreach ( array( null, new \stdClass() ) as $bad ) {
+			$this->assertSame( $module->add_datalayer_data( array() ), $module->add_datalayer_data( $bad ) );
+			$this->assertSame( array(), $module->declare_visitor_scoped_fields( $bad ) );
+		}
+	}
+
 	public function test_declare_visitor_scoped_fields_moves_search_fields_client_side(): void {
 		Functions\when( 'is_search' )->justReturn( true );
 

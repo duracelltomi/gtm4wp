@@ -93,7 +93,7 @@ final class ListTracking {
 
 		$include_tax = $this->product_data->item_prices_include_tax();
 
-		if ( ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) ) === $include_tax ) {
+		if ( ProductData::shop_displays_prices_incl_tax() === $include_tax ) {
 			return $data;
 		}
 
@@ -194,7 +194,8 @@ final class ListTracking {
 		}
 
 		$attributes = array(
-			'productlink' => apply_filters( 'the_permalink', get_permalink(), 0 ),
+			// The product's own link; the bare get_permalink() of 1.x gave the cart page.
+			'productlink' => apply_filters( 'the_permalink', $product instanceof \WC_Product ? $product->get_permalink() : '', 0 ),
 		);
 
 		if ( is_array( $cart_item ) ) {

@@ -230,6 +230,13 @@ final class EddReliablePurchaseTest extends TestCase {
 		Functions\when( 'esc_url_raw' )->alias( static fn ( $value ) => (string) $value );
 	}
 
+	public function test_declare_visitor_scoped_fields_resets_a_non_array_from_an_earlier_callback(): void {
+		// #635 (RI-39): an earlier callback that forgot to return passes null.
+		foreach ( array( null, new \stdClass() ) as $bad ) {
+			$this->assertEquals( $this->make()->declare_visitor_scoped_fields( array() ), $this->make()->declare_visitor_scoped_fields( $bad ) );
+		}
+	}
+
 	public function test_declares_one_cookie_gated_one_shot_with_its_confirm_beacon(): void {
 		$fields = $this->make()->declare_visitor_scoped_fields( array() );
 

@@ -95,6 +95,69 @@ final class KeyVaultTest extends TestCase {
 	}
 
 	/**
+	 * #639: every parameter that carries the PEM, the key object or the sealed
+	 * blob is marked, so PHP 8.2+ redacts it in exception and backtrace frames.
+	 */
+	public function test_key_material_parameters_are_marked_sensitive(): void {
+		$expected = array(
+			array( KeyVault::class, 'add', 'key' ),
+			array( KeyVault::class, 'replace_key', 'key' ),
+			array( KeyVault::class, 'trial', 'account' ),
+			array( KeyVault::class, 'migrate', 'unsealed' ),
+			array( KeyVault::class, 'migrate', 'opened' ),
+			array( KeyVault::class, 'seal', 'pem' ),
+			array( KeyVault::class, 'unseal', 'sealed' ),
+			array( ServiceAccountKey::class, 'from_json', 'json' ),
+			array( ServiceAccountKey::class, 'string_field', 'data' ),
+			array( ServiceAccountKey::class, 'is_rsa_private_key', 'pem' ),
+			array( \GTM4WP\Google\TokenService::class, 'sign_assertion', 'key' ),
+		);
+
+		foreach ( $expected as list( $class, $method, $param ) ) {
+			$found = null;
+			foreach ( ( new \ReflectionMethod( $class, $method ) )->getParameters() as $parameter ) {
+				if ( $param === $parameter->getName() ) {
+					$found = array_map( static fn ( $attribute ) => $attribute->getName(), $parameter->getAttributes() );
+				}
+			}
+			$this->assertSame( array( 'SensitiveParameter' ), $found, "$class::$method \$$param" );
+		}
+	}
+
+	/**
+	 * #639: with argument capture on, a collaborator throwing under seal()
+	 * leaves no key material in any frame. CI loads php.ini-production, which
+	 * hides arguments anyway, so the test switches capture on itself.
+	 */
+	#[\PHPUnit\Framework\Attributes\RequiresPhp( '>= 8.2' )]
+	public function test_no_frame_carries_the_key_when_a_collaborator_throws(): void {
+		$previous = ini_set( 'zend.exception_ignore_args', '0' ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- restored below; the test needs argument capture.
+		Functions\when( 'wp_salt' )->alias(
+			static function () {
+				throw new \RuntimeException( 'salt filter failed' );
+			}
+		);
+
+		try {
+			( new KeyVault( null, null, '' ) )->add( KeyFileFixture::parse(), 'Production' );
+			$this->fail( 'The throwing salt filter must surface.' );
+		} catch ( \RuntimeException $e ) {
+			$seal = null;
+			foreach ( $e->getTrace() as $frame ) {
+				foreach ( $frame['args'] ?? array() as $arg ) {
+					$this->assertStringNotContainsString( 'PRIVATE KEY', var_export( $arg, true ), $frame['function'] ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export -- the dump under test.
+				}
+				if ( 'seal' === $frame['function'] ) {
+					$seal = $frame['args'][0] ?? null;
+				}
+			}
+			$this->assertInstanceOf( \SensitiveParameterValue::class, $seal, 'The seal frame was captured with its PEM redacted.' );
+		} finally {
+			ini_set( 'zend.exception_ignore_args', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- restores the setting changed above.
+		}
+	}
+
+	/**
 	 * #560: a vault reading the real salts never keeps them on the object, so
 	 * no dump of it (or of a class holding it) prints the salt material.
 	 */

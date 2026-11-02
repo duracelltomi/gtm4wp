@@ -7,9 +7,9 @@
  * third party plugins and themes use them to read plugin options and to hook
  * into the data layer. All values must stay unchanged forever.
  *
- * Constants of features removed in 2.0 (WP e-Commerce, weather and geo data,
- * scroll tracking) are also kept so that third party code referencing them
- * does not fatal.
+ * Constants of removed features (2.0: WP e-Commerce, weather and geo data,
+ * scroll tracking; 2.1: WebToffee GDPR, YouTube events) are also kept so that
+ * third party code referencing them does not fatal.
  *
  * @package GTM4WP
  * @author Thomas Geiger

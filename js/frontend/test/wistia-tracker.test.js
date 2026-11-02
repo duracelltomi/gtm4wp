@@ -221,11 +221,11 @@ describe( 'gtm4wp-wistia', () => {
 		} );
 	} );
 
-	it( 'emits mediaPlaybackPercentage milestones from percentwatchedchanged', () => {
+	it( 'emits mediaPlaybackPercentage milestones from the playhead position (#645)', () => {
 		loadTracker();
 		video._time = 30; // 25% of 120s
 
-		video.emit( 'percentwatchedchanged', 0.25, 0.2 );
+		video.emit( 'timechange', 30 );
 
 		const marks = window.dataLayer.filter(
 			( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
@@ -239,6 +239,29 @@ describe( 'gtm4wp-wistia', () => {
 			'gtm.videoPercent': 20,
 			'gtm.videoCurrentTime': 30,
 		} );
+
+		// A seek to 90% fires the marks it passed, as every sibling tracker
+		// does; "percent watched" would have stayed at 20. A mark fires once the
+		// position is past it, so 91% (110s) reaches the 90 mark.
+		video._time = 110;
+		video.emit( 'timechange', 110 );
+		expect( lastPush() ).toMatchObject( {
+			mediaPercentage: 90,
+			'gtm.videoCurrentTime': 110,
+		} );
+	} );
+
+	it( 'emits no milestone before the duration is known', () => {
+		loadTracker();
+		video._duration = 0;
+
+		video.emit( 'timechange', 0.5 );
+
+		expect(
+			window.dataLayer.filter(
+				( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
+			)
+		).toHaveLength( 0 );
 	} );
 
 	it( 'tracks playbackratechange as a player event carrying the new rate', () => {

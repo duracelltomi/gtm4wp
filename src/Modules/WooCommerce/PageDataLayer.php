@@ -78,6 +78,9 @@ final class PageDataLayer {
 	 * @return array Extended data layer content with WooCommerce data added.
 	 */
 	public function add_datalayer_data( $data_layer ) {
+		// An earlier callback that forgot to return hands over null (#634, RI-39).
+		$data_layer = is_array( $data_layer ) ? $data_layer : array();
+
 		if ( Helpers::is_xhr_request() ) {
 			return $data_layer;
 		}
@@ -497,8 +500,9 @@ final class PageDataLayer {
 
 		$cart_item = $woo->cart->get_cart_item( $cart_readded_hash );
 
+		// The cart filter, like the remove link this pairs with (#659).
 		$eec_product_array = empty( $cart_item ) ? null : $this->product_data->process_product(
-			$cart_item['data'],
+			apply_filters( 'woocommerce_cart_item_product', $cart_item['data'], $cart_item, $cart_readded_hash ),
 			$this->cart_line_attributes( $cart_item ),
 			'readdedtocart',
 			$cart_item
@@ -965,8 +969,8 @@ final class PageDataLayer {
 			// its own key survives this. The line is IDENTITY, not sensitivity: only
 			// 'customer' is withheld. Do NOT extend the unset to 'attributes' or
 			// 'totals' - the purchase event does not duplicate them, and
-			// orderData.attributes.order_number is named in readme.txt as a variable
-			// containers read.
+			// orderData.attributes.order_number is named in CHANGELOG.md (2.0) as a
+			// variable containers read.
 			if ( $withhold_customer_data ) {
 				unset( $data_layer['orderData']['customer'] );
 			}
@@ -1247,10 +1251,12 @@ final class PageDataLayer {
 	 * than the one that queued the event; a resolver returns null when nothing is
 	 * pending. Hooked to GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS.
 	 *
-	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
+	 * @param array<int, VisitorField>|mixed $fields Visitor-scoped fields declared so far; not typed, an earlier callback may return null (#635).
 	 * @return array<int, VisitorField>
 	 */
-	public function declare_visitor_scoped_fields( array $fields ): array {
+	public function declare_visitor_scoped_fields( $fields ): array {
+		$fields = is_array( $fields ) ? $fields : array();
+
 		if ( ! (bool) $this->options->get( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) ) {
 			return $fields;
 		}
@@ -1314,7 +1320,8 @@ final class PageDataLayer {
 			return null;
 		}
 
-		$product = $cart_item['data'];
+		// The cart filter, like the remove link this pairs with (#659).
+		$product = apply_filters( 'woocommerce_cart_item_product', $cart_item['data'], $cart_item, $cart_readded_hash );
 
 		$eec_product_array = $this->product_data->process_product(
 			$product,

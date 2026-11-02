@@ -218,6 +218,19 @@ final class EddPageDataLayerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * #634 (RI-39): a null or object from an earlier compile-filter callback is
+	 * reset instead of reaching the typed add_customer_data().
+	 */
+	public function test_add_datalayer_data_resets_a_non_array_from_an_earlier_callback(): void {
+		Functions\when( 'get_current_user_id' )->justReturn( 0 );
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_EDDCUSTOMERDATA => true ) );
+
+		foreach ( array( null, new \stdClass() ) as $bad ) {
+			$this->assertSame( $page_datalayer->add_datalayer_data( array() ), $page_datalayer->add_datalayer_data( $bad ) );
+		}
+	}
+
 	public function test_ajax_requests_are_skipped(): void {
 		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
 		Functions\when( 'get_current_user_id' )->justReturn( 5 );

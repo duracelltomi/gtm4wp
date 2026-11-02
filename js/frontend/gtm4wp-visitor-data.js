@@ -57,6 +57,78 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 	// events, never merged into the visitor push.
 	const blockKeys = Array.isArray( config.blocks ) ? config.blocks : [];
 
+	// wp_allowed_protocols(), core's default list (registry row U198, #648).
+	const allowedProtocols = [
+		'http',
+		'https',
+		'ftp',
+		'ftps',
+		'mailto',
+		'news',
+		'irc',
+		'irc6',
+		'ircs',
+		'gopher',
+		'nntp',
+		'feed',
+		'telnet',
+		'mms',
+		'rtsp',
+		'sms',
+		'svn',
+		'tel',
+		'fax',
+		'xmpp',
+		'webcal',
+		'urn',
+	];
+
+	/**
+	 * The steps of core's esc_url_raw() that apply to a browser-sent referrer,
+	 * so the classic and cache-safe tiers report one value (#648).
+	 *
+	 * @param {string} url The raw URL.
+	 * @return {string} The cleaned URL, or '' when its protocol is not allowed.
+	 */
+	function escUrlRaw( url ) {
+		let clean = url
+			.replace( /^\s+/, '' )
+			.replace( / /g, '%20' )
+			.replace(
+				/[^a-z0-9\-~+_.?#=!&;,/:%@$|*'()[\]\u0080-\uffff]/gi,
+				''
+			);
+
+		if ( ! /^mailto:/i.test( clean ) ) {
+			while ( /%0[da]/i.test( clean ) ) {
+				clean = clean.replace( /%0[da]/gi, '' );
+			}
+		}
+		clean = clean.replace( /;\/\//g, '://' );
+
+		// esc_url() percent-encodes [ ] after scheme://authority, with
+		// str_replace() semantics; browsers send them raw (?filter_color[]=).
+		if ( /[[\]]/.test( clean ) ) {
+			const front = ( /^[^:/?#]+:\/\/[^/?#]*/.exec( clean ) || [
+				'',
+			] )[ 0 ];
+			const dirty =
+				'' === front ? clean : clean.split( front ).join( '' );
+			const fixed = dirty.replace( /\[/g, '%5B' ).replace( /]/g, '%5D' );
+			clean = '' === dirty ? clean : clean.split( dirty ).join( fixed );
+		}
+
+		const scheme = /^([^:/?#]+):/.exec( clean );
+		if (
+			scheme &&
+			allowedProtocols.indexOf( scheme[ 1 ].toLowerCase() ) === -1
+		) {
+			return '';
+		}
+
+		return clean;
+	}
+
 	/**
 	 * Resolves one data layer event name from the config. After an update the
 	 * realistic state is NEW script + OLD cached config, hence the chain: the
@@ -202,14 +274,15 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 		},
 
 		/**
-		 * The referring page URL, normalized like the 1.x siteSearchFrom value:
-		 * the part before the query string, and — when a query string is present —
-		 * the query re-appended URL-encoded so it stays a single opaque token.
+		 * The referring page URL as the classic tier reports it (#648):
+		 * esc_url_raw(), then the part before the query string and, when one
+		 * is present, the query re-appended through a rawurlencode()
+		 * equivalent, so it stays a single opaque token.
 		 *
 		 * @return {string} The normalized referrer, or '' when there is none.
 		 */
 		searchReferrer() {
-			const ref = document.referrer || '';
+			const ref = escUrlRaw( document.referrer || '' );
 			if ( '' === ref ) {
 				return '';
 			}
@@ -219,7 +292,15 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 				return ref;
 			}
 
-			return parts[ 0 ] + '?' + encodeURIComponent( parts[ 1 ] );
+			return (
+				parts[ 0 ] +
+				'?' +
+				encodeURIComponent( parts[ 1 ] ).replace(
+					/[!'()*]/g,
+					( char ) =>
+						'%' + char.charCodeAt( 0 ).toString( 16 ).toUpperCase()
+				)
+			);
 		},
 	};
 
@@ -236,7 +317,14 @@ import { GTM4WP_VISITOR_REFRESH_EVENT } from './lib/gtm4wp-visitor-refresh';
 			}
 
 			const value = producer();
-			if ( '' !== value && undefined !== value && null !== value ) {
+			// The referrer keeps '': siteSearchFrom is declared only on a search
+			// page, where the classic tier reports '' without one (#316).
+			const keepEmpty = 'searchReferrer' === fields[ key ];
+			if (
+				( '' !== value || keepEmpty ) &&
+				undefined !== value &&
+				null !== value
+			) {
 				collected[ key ] = value;
 			}
 		} );

@@ -50,7 +50,8 @@ final class OrderDataKeys {
 	);
 
 	/**
-	 * WooCommerce only: EDD has no shipping, company, order key or tax breakdown.
+	 * WooCommerce only: EDD has no shipping, company or tax breakdown, and does not
+	 * print its payment_key.
 	 */
 	public const WOOCOMMERCE_ONLY = array(
 		'attributes.order_key',

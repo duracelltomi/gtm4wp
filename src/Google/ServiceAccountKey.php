@@ -104,7 +104,7 @@ final class ServiceAccountKey {
 	 * @param string $json Raw contents of the uploaded key file.
 	 * @return self|\WP_Error
 	 */
-	public static function from_json( string $json ): self|\WP_Error {
+	public static function from_json( #[\SensitiveParameter] string $json ): self|\WP_Error {
 		if ( ! function_exists( 'openssl_pkey_get_private' ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_key_no_openssl',
@@ -160,7 +160,7 @@ final class ServiceAccountKey {
 	 * @param string               $key  Field name.
 	 * @return string
 	 */
-	private static function string_field( array $data, string $key ): string {
+	private static function string_field( #[\SensitiveParameter] array $data, string $key ): string {
 		$value = $data[ $key ] ?? '';
 
 		return is_string( $value ) ? trim( $value ) : '';
@@ -173,7 +173,7 @@ final class ServiceAccountKey {
 	 * @param string $pem PEM encoded key.
 	 * @return bool
 	 */
-	private static function is_rsa_private_key( string $pem ): bool {
+	private static function is_rsa_private_key( #[\SensitiveParameter] string $pem ): bool {
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a malformed PEM makes OpenSSL emit a warning while it fails; the false return is the answer, the warning is not.
 		$key = @openssl_pkey_get_private( $pem );
 		if ( false === $key ) {

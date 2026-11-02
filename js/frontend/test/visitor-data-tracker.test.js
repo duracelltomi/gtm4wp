@@ -227,7 +227,7 @@ describe( 'gtm4wp-visitor-data', () => {
 	it( 'passes a hostile search term/referrer through raw (structured sink, TC-11)', () => {
 		const hostileTerm = '</script><img src=x onerror=alert(1)>';
 		setSearch( 's=' + encodeURIComponent( hostileTerm ) );
-		// A referrer with no query string is returned verbatim.
+		// A referrer with no query string keeps its path, cleaned like the classic tier.
 		setReferrer( 'https://evil.example/"><script>' );
 
 		loadTracker();
@@ -236,21 +236,71 @@ describe( 'gtm4wp-visitor-data', () => {
 		// The raw value reaches the object untouched — no HTML-entity encoding at
 		// the push site (the GTM tag that writes it to the DOM owns escaping).
 		expect( push.siteSearchTerm ).toBe( hostileTerm );
-		expect( push.siteSearchFrom ).toBe( 'https://evil.example/"><script>' );
+		// The referrer carries the classic tier's value (#648): esc_url_raw()
+		// drops the characters outside its set, never entity-encodes them.
+		expect( push.siteSearchFrom ).toBe( 'https://evil.example/script' );
 	} );
 
-	it( 'omits a field whose producer yields nothing (empty search / no referrer)', () => {
-		// No ?s= in the URL and no referrer: both producers return '' so neither
-		// key is pushed — but there is nothing to push at all, so no event fires.
+	// #648: the same referrer must give the classic (PHP) tier's value:
+	// esc_url_raw() then rawurlencode() of the query, the 1.x contract.
+	it.each( [
+		[
+			"rawurlencode reserves !*'() too",
+			'https://ref.example/p/?a=1&b=it%27s(x)!*~&c=%20%20z',
+			'https://ref.example/p/?a%3D1%26b%3Dit%2527s%28x%29%21%2A~%26c%3D%2520%2520z',
+		],
+		[
+			'esc_url_raw drops characters outside its set',
+			'https://ref.example/p/?f={a}^b!(c)*',
+			'https://ref.example/p/?f%3Dab%21%28c%29%2A',
+		],
+		[
+			'esc_url_raw strips encoded line breaks',
+			'https://ref.example/p%0d%0A%0D%0aX',
+			'https://ref.example/pX',
+		],
+		[
+			'a protocol esc_url_raw does not allow empties the value',
+			'android-app://com.google.android.gm/',
+			'',
+		],
+		[
+			'esc_url encodes brackets after the host (query; browsers send them raw)',
+			'https://shop.example/?filter_color[]=red',
+			'https://shop.example/?filter_color%255B%255D%3Dred',
+		],
+		[
+			'esc_url encodes brackets after the host (path)',
+			'https://ref.example/a[1]/b',
+			'https://ref.example/a%5B1%5D/b',
+		],
+	] )(
+		'normalizes siteSearchFrom like the classic tier: %s',
+		( label, referrer, expected ) => {
+			setSearch( 's=hats' );
+			setReferrer( referrer );
+
+			loadTracker();
+
+			expect( visitorEvents()[ 0 ].siteSearchFrom ).toBe( expected );
+		}
+	);
+
+	it( 'omits an empty search term but keeps the empty referrer (#316)', () => {
+		// No ?s= in the URL and no referrer. The server declares siteSearchFrom
+		// only on a search results page, where the classic data layer reports
+		// '' without a referrer (the 1.x contract), so '' is pushed here too.
 		setSearch( '' );
 		setReferrer( '' );
 
 		loadTracker();
 
-		expect( visitorEvents() ).toHaveLength( 0 );
+		expect( visitorEvents() ).toHaveLength( 1 );
+		expect( visitorEvents()[ 0 ].siteSearchFrom ).toBe( '' );
+		expect( visitorEvents()[ 0 ] ).not.toHaveProperty( 'siteSearchTerm' );
 	} );
 
-	it( 'pushes only the search term when the referrer is absent', () => {
+	it( 'reports an empty siteSearchFrom without a referrer, as the classic tier does (#316)', () => {
 		setSearch( 's=hats' );
 		setReferrer( '' );
 
@@ -258,7 +308,7 @@ describe( 'gtm4wp-visitor-data', () => {
 
 		const push = visitorEvents()[ 0 ];
 		expect( push.siteSearchTerm ).toBe( 'hats' );
-		expect( push ).not.toHaveProperty( 'siteSearchFrom' );
+		expect( push.siteSearchFrom ).toBe( '' );
 	} );
 
 	it( 'computes only the fields the config lists', () => {
@@ -844,7 +894,7 @@ describe( 'gtm4wp-visitor-data — WooCommerce cart fragment', () => {
 		expect( cartEvents()[ 1 ].cartContent.items[ 0 ].quantity ).toBe( 2 );
 		expect( customerEvents() ).toHaveLength( 1 );
 
-		// Now the reverse: the customer half changes (a billing field on checkout).
+		// Now the reverse: the customer half changes (the stored account data, e.g. a new order).
 		replaceCartFragment( {
 			customer: { customerTotalOrders: 4 },
 			cart: {

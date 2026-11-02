@@ -76,6 +76,10 @@ final class UserEventsModuleTest extends TestCase {
 		Functions\stubEscapeFunctions();
 		Functions\when( 'wp_unslash' )->returnArg();
 		Functions\when( 'current_theme_supports' )->justReturn( true );
+		foreach ( array( 'is_robots', 'is_favicon', 'is_feed', 'is_trackback' ) as $request_type ) {
+			Functions\when( $request_type )->justReturn( false );
+		}
+		Functions\when( 'sanitize_text_field' )->returnArg();
 		Functions\when( 'plugins_url' )->alias( static fn ( $path, $plugin ) => 'https://example.com/' . $path );
 		// A realistic wp_kses(): ScriptTag::print_script_block() restores the
 		// ampersand entity afterwards, and an identity stub would make every
@@ -466,6 +470,29 @@ final class UserEventsModuleTest extends TestCase {
 
 		$this->assertCount( 1, $this->cookie_writes );
 		$this->assertSame( 'gtm4wp_user_registered', $this->cookie_writes[0][0] );
+	}
+
+	/**
+	 * #654: template_redirect also runs for a HEAD request and for core's
+	 * robots, favicon, feed and trackback handlers, which never print the
+	 * footer; clearing there would lose the event before any page shows it.
+	 */
+	public function test_clear_event_cookies_keeps_the_cookies_on_a_request_that_prints_no_page(): void {
+		$_COOKIE['gtm4wp_user_logged_in'] = '1';
+		$server_backup                    = $_SERVER;
+
+		$_SERVER['REQUEST_METHOD'] = 'HEAD';
+		$this->make_module()->clear_event_cookies();
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+
+		Functions\when( 'is_favicon' )->justReturn( true );
+		$this->make_module()->clear_event_cookies();
+		Functions\when( 'is_favicon' )->justReturn( false );
+		Functions\when( 'is_feed' )->justReturn( true );
+		$this->make_module()->clear_event_cookies();
+
+		$_SERVER = $server_backup;
+		$this->assertSame( array(), $this->cookie_writes );
 	}
 
 	public function test_clear_event_cookies_writes_nothing_without_the_cookies(): void {

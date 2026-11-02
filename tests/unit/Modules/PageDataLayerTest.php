@@ -334,6 +334,20 @@ final class PageDataLayerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * #634/#635 (RI-39): a null or object from an earlier callback on either
+	 * filter is reset instead of reaching a typed helper.
+	 */
+	public function test_filter_entry_points_reset_a_non_array_from_an_earlier_callback(): void {
+		$this->stub_wc();
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+
+		foreach ( array( null, new \stdClass() ) as $bad ) {
+			$this->assertIsArray( $page_datalayer->add_datalayer_data( $bad ) );
+			$this->assertSame( array(), $page_datalayer->declare_visitor_scoped_fields( $bad ) );
+		}
+	}
+
 	public function test_returns_early_on_ajax_request(): void {
 		$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
 		$this->stub_wc();
@@ -2135,6 +2149,23 @@ final class PageDataLayerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * #637 (decision, PA-23): WooCommerce links no admin screen to the order
+	 * received page; staff reach it by paying a guest's order (phone/MOTO),
+	 * where staff IS the payer. The purchase fires and is flagged once - an
+	 * EDD-style staff gate (#512) would lose that sale, so none is added.
+	 */
+	public function test_order_received_staff_paid_guest_order_tracks_once_from_the_staff_browser(): void {
+		Functions\when( 'current_user_can' )->alias( static fn ( $cap ) => 'read_private_shop_orders' === $cap );
+		Functions\when( 'get_current_user_id' )->justReturn( 99 );
+		$order = $this->stub_order_received_request( array( 'customer_id' => 0 ) );
+
+		$this->make_order_received_datalayer()->add_datalayer_data( array() );
+
+		$this->assertSame( 1, substr_count( $this->inline_js, '"event":"purchase"' ) );
+		$this->assertSame( 1, $order->saved_meta['_ga_tracked'] ?? null );
+	}
+
 	public function test_order_received_withholds_customer_data_when_woocommerce_would_require_login(): void {
 		// WooCommerce 8.4.0: an order that belongs to a registered customer is only
 		// rendered to that customer; anyone else - a forwarded URL, a shared
@@ -2156,7 +2187,7 @@ final class PageDataLayerTest extends TestCase {
 		// The exact key set, not a subset: three of these are values this visitor
 		// demonstrably already holds (order_key came from their own URL, order_number is
 		// printed beside this block by the duplicate guard, coupons is in the purchase
-		// event), and orderData.attributes.order_number is named in readme.txt as a
+		// event), and orderData.attributes.order_number is named in CHANGELOG.md as a
 		// variable containers read - so a future "tighten this too" would break a
 		// documented consumer silently.
 		$this->assertArrayHasKey( 'attributes', $result['orderData'], 'The order description survives the gate; without this guard the key-set assertion below fails as a TypeError instead of saying what broke.' );
@@ -3988,6 +4019,24 @@ final class PageDataLayerTest extends TestCase {
 
 		$this->assertStringContainsString( trim( $expected, '"' ), $encoded, 'The prefix angle brackets must be hex-encoded (JSON_HEX_TAG).' );
 		$this->assertStringNotContainsString( '</script>', $encoded, 'No raw </script> may survive in the endpoint payload.' );
+	}
+
+	/**
+	 * #659: both re-add lanes report the product WooCommerce's own cart filter
+	 * shows, like the remove link they pair with, not the raw cart data.
+	 */
+	public function test_readded_to_cart_reports_the_product_the_cart_filter_shows(): void {
+		$product = new \WC_Product( array( 'id' => 7, 'title' => 'Mug', 'sku' => 'SKU-7' ) ); // phpcs:ignore
+		$shown   = new \WC_Product( array( 'id' => 8, 'title' => 'Mug bundle', 'sku' => 'SKU-8' ) ); // phpcs:ignore
+		$this->stub_wc_readded( 'hash-1', $product );
+		Filters\expectApplied( 'woocommerce_cart_item_product' )->twice()->with( $product, \Mockery::type( 'array' ), 'hash-1' )->andReturn( $shown );
+
+		$page_datalayer = $this->make_page_datalayer( array( GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE => true ) );
+		$payload        = $page_datalayer->resolve_readded_to_cart();
+		$page_datalayer->add_datalayer_data( array() );
+
+		$this->assertSame( 'Mug bundle', $payload['push']['ecommerce']['items'][0]['item_name'] );
+		$this->assertStringContainsString( '"item_name":"Mug bundle"', $this->inline_js );
 	}
 
 	public function test_resolve_readded_to_cart_returns_payload_without_mutating_state(): void {

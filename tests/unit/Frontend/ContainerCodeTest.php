@@ -674,6 +674,37 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringNotContainsString( 'gtm.js?id=', $output );
 	}
 
+	public function test_header_begin_writes_the_data_layer_with_placement_off_and_no_container_id(): void {
+		// #636: Off is the "data layer only" setup and needs no container ID, so
+		// the data layer must not depend on a container row there.
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->once()->andReturn( array( 'pagePostType' => 'post' ) );
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_OFF ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringContainsString( 'var dataLayer_content = {"pagePostType":"post"};', $output );
+		$this->assertStringContainsString( 'dataLayer.push( dataLayer_content );', $output );
+		$this->assertSame( array( 'pagePostType' => 'post' ), $GLOBALS['gtm4wp_datalayer_data'] ?? null );
+		$this->assertStringNotContainsString( 'gtm.js?id=', $output );
+	}
+
+	public function test_header_begin_writes_no_data_layer_without_a_container_id_when_placement_is_not_off(): void {
+		// Guard, green before and after #636: an unconfigured plugin on any other
+		// placement still compiles nothing.
+		Filters\expectApplied( GTM4WP_WPFILTER_COMPILE_DATALAYER )->never();
+
+		$container = $this->make_container( array( GTM4WP_OPTION_GTM_PLACEMENT => GTM4WP_PLACEMENT_FOOTER ) );
+
+		ob_start();
+		$container->header_begin();
+		$output = ob_get_clean();
+
+		$this->assertStringNotContainsString( 'dataLayer_content', $output );
+	}
+
 	public function test_header_begin_omits_loader_for_disabled_role(): void {
 		Functions\when( 'wp_get_current_user' )->justReturn(
 			(object) array( 'roles' => array( 'editor' ) )

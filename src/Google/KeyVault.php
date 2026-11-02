@@ -176,7 +176,7 @@ final class KeyVault {
 	 * @param string            $label Admin-chosen label; the account e-mail when empty.
 	 * @return string|\WP_Error The new account id.
 	 */
-	public function add( ServiceAccountKey $key, string $label ): string|\WP_Error {
+	public function add( #[\SensitiveParameter] ServiceAccountKey $key, string $label ): string|\WP_Error {
 		$accounts = $this->read( true );
 		$id       = $this->new_id( $accounts );
 
@@ -293,7 +293,7 @@ final class KeyVault {
 	 * @param ServiceAccountKey $key The parsed key file.
 	 * @return array<string, mixed>|\WP_Error The account's refreshed public view.
 	 */
-	public function replace_key( string $id, ServiceAccountKey $key ): array|\WP_Error {
+	public function replace_key( string $id, #[\SensitiveParameter] ServiceAccountKey $key ): array|\WP_Error {
 		$accounts = $this->read( true );
 
 		if ( ! isset( $accounts[ $id ] ) ) {
@@ -435,7 +435,7 @@ final class KeyVault {
 	 * @param array<string, mixed> $account Stored account.
 	 * @return string
 	 */
-	private function trial( string $id, array $account ): string {
+	private function trial( string $id, #[\SensitiveParameter] array $account ): string {
 		if ( ! function_exists( 'openssl_decrypt' ) ) {
 			return 'unknown';
 		}
@@ -464,7 +464,7 @@ final class KeyVault {
 	 * @param mixed                              $opened   The stored blob it was opened from.
 	 * @return void
 	 */
-	private function migrate( string $id, array $unsealed, $opened ): void {
+	private function migrate( string $id, #[\SensitiveParameter] array $unsealed, #[\SensitiveParameter] $opened ): void {
 		if ( self::SECRET_SALTS !== $unsealed['secret'] || null === $this->constant_secret() ) {
 			return;
 		}
@@ -718,7 +718,7 @@ final class KeyVault {
 	 * @param string $id  Account id the blob belongs to.
 	 * @return array{iv: string, tag: string, ciphertext: string, secret: string}|\WP_Error Base64 fields, and the secret used.
 	 */
-	private function seal( string $pem, string $id ): array|\WP_Error {
+	private function seal( #[\SensitiveParameter] string $pem, string $id ): array|\WP_Error {
 		if ( ! function_exists( 'openssl_encrypt' ) || ! in_array( self::CIPHER, openssl_get_cipher_methods(), true ) ) {
 			return new \WP_Error(
 				'gtm4wp_google_key_no_openssl',
@@ -757,7 +757,7 @@ final class KeyVault {
 	 * @param string $id     Account id the blob must belong to.
 	 * @return array{pem: string, secret: string}|null
 	 */
-	private function unseal( $sealed, string $id ): ?array {
+	private function unseal( #[\SensitiveParameter] $sealed, string $id ): ?array {
 		if ( ! is_array( $sealed ) || ! function_exists( 'openssl_decrypt' ) ) {
 			return null;
 		}

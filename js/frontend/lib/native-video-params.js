@@ -410,8 +410,8 @@ export function gtm4wpObserveMedia( selector, wireElement, isReady, sdk ) {
 		// 2. the gate script (gtm4wp-media-gate.js), a real enqueued <script
 		//    src> a consent manager can block by rewriting/removing its tag;
 		//    a gate that never ran leaves gtm4wp_media_sdk_allowed unset. (Not
-		//    wp_dequeue_script(): every tracker depends on that handle, so WP
-		//    prints it regardless.)
+		//    wp_dequeue_script(): every SDK-fetching tracker depends on that
+		//    handle (#143), so WP prints it regardless.)
 		// The check needing NO configuration is the caller: every SDK-fetching
 		// tracker selects on the embed's own vendor domain, so a consent-blocked
 		// embed (src -> data-src, placeholder) already withholds the request.

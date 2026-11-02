@@ -288,7 +288,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Customer data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds the logged-in customer\'s account name, billing and shipping data, hashed billing email, order count and total order value to the data layer as customer* variables, and the Enhanced Conversions user_data block (hashed email, phone and name; plain address) to the purchase event.', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds customer* variables to the data layer: the logged-in customer\'s account name, billing and shipping data, hashed billing email, order count and total order value; guests get them empty. Adds the Enhanced Conversions user_data block (hashed email, phone, name; plain address) to the purchase event.', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				doc: self::DOC_REFERENCE
 			),

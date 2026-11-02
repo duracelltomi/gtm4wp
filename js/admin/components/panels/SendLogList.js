@@ -144,6 +144,14 @@ function reasonLabel( reason ) {
  * @return {string} Text to show, empty while nothing is known yet.
  */
 function resultLabel( entry ) {
+	// Polling ended without a final answer (#640).
+	if ( entry.status_unknown ) {
+		return __(
+			'Google sent no final result within 24 hours of the send',
+			'duracelltomi-google-tag-manager'
+		);
+	}
+
 	if ( ! entry.result ) {
 		return '';
 	}

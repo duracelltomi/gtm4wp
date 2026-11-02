@@ -99,8 +99,17 @@ function gtm4wp_initWistiaTracking() {
 				} );
 			};
 
-			const gtm4wp_onWistiaPercentageChange = function ( percent ) {
-				const videoPercentage = Math.floor( percent * 100 );
+			// Playhead position, as every sibling tracker measures (#645):
+			// percentwatchedchanged is unique seconds watched, which a seek never
+			// advances. duration() is 0 until the media has loaded (#20).
+			const gtm4wp_onWistiaTimeChange = function ( seconds ) {
+				const duration = video.duration();
+				if ( ! duration ) {
+					return;
+				}
+				const videoPercentage = Math.floor(
+					( seconds / duration ) * 100
+				);
 
 				gtm4wpMediaMilestones(
 					gtm4wp_wistia_percentage_tracking_marks,
@@ -162,8 +171,10 @@ function gtm4wp_initWistiaTracking() {
 				gtm4wp_onWistiaPlayerStateChange( 'seeked' );
 			} );
 
-			video.bind( 'percentwatchedchanged', function ( percent ) {
-				gtm4wp_onWistiaPercentageChange( percent );
+			video.bind( 'timechange', function ( seconds ) {
+				gtm4wp_onWistiaTimeChange(
+					'number' === typeof seconds ? seconds : video.time()
+				);
 			} );
 
 			video.bind( 'playbackratechange', function ( rate ) {

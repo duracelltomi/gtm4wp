@@ -84,17 +84,14 @@ final class EventsIngest {
 	);
 
 	/**
-	 * RequestStatus values (U136). Google's reference says FAILED, its
-	 * diagnostics guide FAILURE, so both are accepted; anything neither
-	 * PROCESSING nor the unknown placeholder is terminal, so a status Google
-	 * adds later ends the polling instead of looping to the 24 hour cap.
+	 * RequestStatus values the code reads (U136). Anything neither PROCESSING
+	 * nor the unknown placeholder is terminal - PARTIAL_SUCCESS, and FAILED
+	 * (FAILURE in Google's diagnostics guide) - so a status Google adds later
+	 * ends the polling instead of looping to the 24 hour cap.
 	 */
-	public const STATUS_SUCCESS         = 'SUCCESS';
-	public const STATUS_PARTIAL_SUCCESS = 'PARTIAL_SUCCESS';
-	public const STATUS_FAILED          = 'FAILED';
-	public const STATUS_FAILURE         = 'FAILURE';
-	public const STATUS_PROCESSING      = 'PROCESSING';
-	public const STATUS_UNKNOWN         = 'REQUEST_STATUS_UNKNOWN';
+	public const STATUS_SUCCESS    = 'SUCCESS';
+	public const STATUS_PROCESSING = 'PROCESSING';
+	public const STATUS_UNKNOWN    = 'REQUEST_STATUS_UNKNOWN';
 
 	/**
 	 * Reason class of a failure that happened before any request was made -

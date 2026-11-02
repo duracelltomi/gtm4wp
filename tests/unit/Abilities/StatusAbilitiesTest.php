@@ -285,6 +285,55 @@ final class StatusAbilitiesTest extends AbilitiesTestCase {
 	}
 
 	/**
+	 * #642: an integration version that is not a scalar degrades to null
+	 * instead of failing get-status (object) or reporting "Array".
+	 */
+	public function test_an_integration_version_that_is_not_scalar_degrades_to_null(): void {
+		$integration = new \ReflectionMethod( StatusAbilities::class, 'integration' );
+		$integration->setAccessible( true );
+
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => null,
+			),
+			$integration->invoke(
+				null,
+				array(
+					'active'  => true,
+					'version' => new \stdClass(),
+				)
+			)
+		);
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => null,
+			),
+			$integration->invoke(
+				null,
+				array(
+					'active'  => true,
+					'version' => array( '9.9' ),
+				)
+			)
+		);
+		$this->assertSame(
+			array(
+				'active'  => true,
+				'version' => '9.9.0',
+			),
+			$integration->invoke(
+				null,
+				array(
+					'active'  => true,
+					'version' => '9.9.0',
+				)
+			)
+		);
+	}
+
+	/**
 	 * A module naming a schema class that does not exist (a third party that
 	 * renamed it) still gets a row, titled by its id, with both facts unknown.
 	 */

@@ -24,7 +24,8 @@ const gtm4wp_spotify_titles = Object.create( null );
 // every locale since core keeps an existing title attribute (U104).
 const gtm4wp_spotify_title_prefix = 'Spotify Embed: ';
 
-// Public oEmbed endpoint, used only when an embed carries no title attribute.
+// Public oEmbed endpoint, used when an embed carries no title attribute and
+// once for each further track a playlist or album plays.
 // Answers with access-control-allow-origin: * (U105).
 const gtm4wp_spotify_oembed_endpoint = 'https://open.spotify.com/oembed?url=';
 

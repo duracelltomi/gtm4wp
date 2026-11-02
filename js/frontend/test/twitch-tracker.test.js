@@ -221,6 +221,25 @@ describe( 'gtm4wp-twitch', () => {
 		}
 	} );
 
+	it( 'stops polling once the player is removed from the page (#660)', () => {
+		jest.useFakeTimers();
+		try {
+			loadTracker();
+			player._duration = 3600;
+			player._currentTime = 900;
+			player.emit( Ctor.PLAY );
+
+			// A lightbox closing or an AJAX swap removes the player while it
+			// plays: no PAUSE or ENDED ever arrives.
+			document.body.innerHTML = '';
+			jest.advanceTimersByTime( 1000 );
+
+			expect( jest.getTimerCount() ).toBe( 0 );
+		} finally {
+			jest.useRealTimers();
+		}
+	} );
+
 	it( 'does not throw or push anything when the Twitch Embed API is missing', () => {
 		delete global.Twitch;
 

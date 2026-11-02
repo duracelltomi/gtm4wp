@@ -120,7 +120,10 @@ final class ContactForm7Module extends AbstractModule {
 				$form_id   = (int) $form->id();
 				$master_id = DefaultLanguage::post_id( $form_id, 'wpcf7_contact_form' );
 				if ( $master_id > 0 && $master_id !== $form_id ) {
-					$master_title = (string) get_the_title( $master_id );
+					// The raw title, like $form->title(): the_title texturizes, so one form
+					// would report two names (#646). Not WPCF7_ContactForm::get_instance(),
+					// which replaces CF7's current form while its tags are still to render.
+					$master_title = (string) get_post_field( 'post_title', $master_id, 'raw' );
 					if ( '' !== $master_title ) {
 						$form_name = $master_title;
 					}

@@ -1020,6 +1020,34 @@ final class GoogleDataManagerSendLogTest extends TestCase {
 	 * (R48 #391). Warnings are made fatal here so the assertion is the absence
 	 * of one, not a log line.
 	 */
+	/**
+	 * #640: polling can end without a final answer (sending switched off, still
+	 * PROCESSING at the cap, no status reply); past the window plus one poll
+	 * interval of grace the row is flagged instead of pending for ever, and it
+	 * stays non-replayable - Google did accept it (#394).
+	 */
+	public function test_an_accepted_row_with_no_final_answer_past_the_poll_window_is_flagged(): void {
+		$cutoff = \GTM4WP\Modules\GoogleDataManager\StatusPoller::MAX_ELAPSED + \GTM4WP\Modules\GoogleDataManager\StatusPoller::MAX_INTERVAL;
+
+		foreach ( array( '', 'PROCESSING' ) as $result ) {
+			$this->options[ SendLog::OPTION_NAME ] = array( self::entry( array( 'time' => self::NOW - $cutoff - 1, 'result' => $result ) ) ); // phpcs:ignore
+			$late                                  = $this->log()->entries_for_display()[0];
+
+			$this->assertTrue( $late['status_unknown'], $result );
+			$this->assertSame( SendLog::TONE_WARN, $late['tone'], $result );
+			$this->assertFalse( $late['replayable'], $result );
+
+			$this->options[ SendLog::OPTION_NAME ] = array( self::entry( array( 'time' => self::NOW - $cutoff, 'result' => $result ) ) ); // phpcs:ignore
+			$within                                = $this->log()->entries_for_display()[0];
+
+			$this->assertFalse( $within['status_unknown'], $result );
+			$this->assertSame( SendLog::TONE_PENDING, $within['tone'], $result );
+		}
+
+		$this->options[ SendLog::OPTION_NAME ] = array( self::entry( array( 'time' => self::NOW - $cutoff - 1, 'result' => 'SUCCESS' ) ) ); // phpcs:ignore
+		$this->assertFalse( $this->log()->entries_for_display()[0]['status_unknown'], 'A final answer is never unknown.' );
+	}
+
 	public function test_a_stored_row_without_an_outcome_displays_without_a_warning(): void {
 		$this->options[ SendLog::OPTION_NAME ] = array(
 			array(

@@ -156,6 +156,14 @@ final class UserEventsModule extends AbstractModule {
 	 * @return void
 	 */
 	public function clear_event_cookies(): void {
+		// Core runs template_redirect before its HEAD exit and its robots,
+		// favicon, feed and trackback handlers, none of which prints the footer
+		// (#654); clearing there would lose the event.
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '';
+		if ( 'HEAD' === $method || is_robots() || is_favicon() || is_feed() || is_trackback() ) {
+			return;
+		}
+
 		if ( array_key_exists( 'gtm4wp_user_logged_in', $_COOKIE ) ) {
 			setcookie(
 				'gtm4wp_user_logged_in',

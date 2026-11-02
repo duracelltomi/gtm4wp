@@ -978,6 +978,16 @@ final class ProductData {
 			return false;
 		}
 
+		return self::shop_displays_prices_incl_tax();
+	}
+
+	/**
+	 * Whether the shop displays prices with tax (WooCommerce's own setting,
+	 * before the "Exclude tax" option is applied).
+	 *
+	 * @return bool
+	 */
+	public static function shop_displays_prices_incl_tax(): bool {
 		return 'incl' === get_option( 'woocommerce_tax_display_shop' );
 	}
 

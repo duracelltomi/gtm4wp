@@ -67,7 +67,21 @@
 			data.browserVersion = brand.version;
 		}
 
-		const wanted = [ 'platformVersion', 'model', 'fullVersionList' ];
+		// Only the high-entropy hints an enabled option reports (#653).
+		const wanted = [];
+		if ( config.os ) {
+			wanted.push( 'platformVersion' );
+		}
+		if ( config.device ) {
+			wanted.push( 'model' );
+		}
+		if ( config.browser ) {
+			wanted.push( 'fullVersionList' );
+		}
+		if ( ! wanted.length ) {
+			pushDeviceData( data );
+			return;
+		}
 
 		uaData
 			.getHighEntropyValues( wanted )
@@ -102,7 +116,11 @@
 				: 'desktop',
 		};
 
+		// iOS browsers name themselves with their own tokens and no Version/.
 		const browserMatchers = [
+			[ /CriOS\/([0-9.]+)/, 'Chrome' ],
+			[ /FxiOS\/([0-9.]+)/, 'Firefox' ],
+			[ /EdgiOS\/([0-9.]+)/, 'Microsoft Edge' ],
 			[ /Firefox\/([0-9.]+)/, 'Firefox' ],
 			[ /Edg[a-z]*\/([0-9.]+)/, 'Microsoft Edge' ],
 			[ /OPR\/([0-9.]+)/, 'Opera' ],

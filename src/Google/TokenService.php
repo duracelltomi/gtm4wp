@@ -239,7 +239,7 @@ final class TokenService {
 	 * @param string            $scope OAuth scope.
 	 * @return string|\WP_Error Compact serialised JWT.
 	 */
-	private function sign_assertion( ServiceAccountKey $key, string $scope ): string|\WP_Error {
+	private function sign_assertion( #[\SensitiveParameter] ServiceAccountKey $key, string $scope ): string|\WP_Error {
 		$now = is_callable( $this->clock ) ? (int) call_user_func( $this->clock ) : time();
 
 		$header = array(

@@ -118,10 +118,12 @@ final class VisitorCart {
 	 * Declares the block as a Tier 3 field gated on STATE_COOKIE. Hooked to
 	 * GTM4WP_WPFILTER_VISITOR_SCOPED_FIELDS.
 	 *
-	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
+	 * @param array<int, VisitorField>|mixed $fields Visitor-scoped fields declared so far; not typed, an earlier callback may return null (#635).
 	 * @return array<int, VisitorField>
 	 */
-	public function declare_visitor_scoped_fields( array $fields ): array {
+	public function declare_visitor_scoped_fields( $fields ): array {
+		$fields = is_array( $fields ) ? $fields : array();
+
 		if ( ! self::is_enabled( $this->options ) ) {
 			return $fields;
 		}

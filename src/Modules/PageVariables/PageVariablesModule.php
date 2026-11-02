@@ -113,6 +113,9 @@ final class PageVariablesModule extends AbstractModule {
 	 * @return array
 	 */
 	public function add_datalayer_data( $data_layer ) {
+		// An earlier callback that forgot to return hands over null (#634, RI-39).
+		$data_layer = is_array( $data_layer ) ? $data_layer : array();
+
 		// One private method per variable group (#294); each is gated on its own
 		// options and hands the array back. Key order is the 1.x order.
 		$data_layer = $this->add_site_variables( $data_layer );
@@ -356,14 +359,18 @@ final class PageVariablesModule extends AbstractModule {
 		$page_title = wp_title( '|', false, 'right' );
 
 		// Master language: overridden only when a distinct master post exists,
-		// so an untranslated post keeps the wp_title() output.
-		if ( $this->master_language() && is_singular() ) {
+		// so an untranslated post keeps the wp_title() output. Built the way
+		// wp_title() builds a singular title (single_post_title chain, separator
+		// right), so both language versions report one shape (#651); not
+		// get_the_title(), which adds "Protected:"/"Private:".
+		if ( $this->master_language() && is_singular() && ! is_front_page() ) {
 			$_post_id        = (int) get_the_ID();
 			$_master_post_id = DefaultLanguage::post_id( $_post_id, (string) get_post_type() );
-			if ( $_master_post_id > 0 && $_master_post_id !== $_post_id ) {
-				$_master_title = (string) get_the_title( $_master_post_id );
+			$_master_post    = ( $_master_post_id > 0 && $_master_post_id !== $_post_id ) ? get_post( $_master_post_id ) : null;
+			if ( $_master_post instanceof \WP_Post ) {
+				$_master_title = (string) apply_filters( 'single_post_title', $_master_post->post_title, $_master_post );
 				if ( '' !== $_master_title ) {
-					$page_title = $_master_title;
+					$page_title = $_master_title . ' | ';
 				}
 			}
 		}
@@ -824,17 +831,15 @@ final class PageVariablesModule extends AbstractModule {
 
 		$primary_category_id = 0;
 
-		// Yoast SEO stores the chosen primary category id in post meta.
-		$yoast_primary = get_post_meta( get_the_ID(), '_yoast_wpseo_primary_category', true );
-		if ( '' !== $yoast_primary ) {
-			$primary_category_id = (int) $yoast_primary;
-		}
-
-		// Rank Math stores the chosen primary term id in post meta.
-		if ( 0 === $primary_category_id ) {
-			$rankmath_primary = get_post_meta( get_the_ID(), 'rank_math_primary_category', true );
-			if ( '' !== $rankmath_primary ) {
-				$primary_category_id = (int) $rankmath_primary;
+		// Yoast SEO and Rank Math store the chosen primary category id in post
+		// meta. A stored id counts only while it is still one of the post's
+		// categories, as Yoast's own reader requires: the meta outlives a deleted
+		// or unassigned term (#655).
+		foreach ( array( '_yoast_wpseo_primary_category', 'rank_math_primary_category' ) as $meta_key ) {
+			$stored_id = (int) get_post_meta( get_the_ID(), $meta_key, true );
+			if ( $stored_id > 0 && has_term( $stored_id, 'category', get_the_ID() ) ) {
+				$primary_category_id = $stored_id;
+				break;
 			}
 		}
 
@@ -1131,11 +1136,13 @@ final class PageVariablesModule extends AbstractModule {
 	 * (visitor IP, Cloudflare country, logged-in-user fields) independent of the
 	 * page type, because the session endpoint has no page context.
 	 *
-	 * @param array<int, VisitorField> $fields Visitor-scoped fields declared so far.
+	 * @param array<int, VisitorField>|mixed $fields Visitor-scoped fields declared so far; not typed, an earlier callback may return null (#635).
 	 * @return array<int, VisitorField>
 	 */
-	public function declare_visitor_scoped_fields( array $fields ): array {
-		if ( ! $this->opt( GTM4WP_OPTION_CACHE_SAFE_DATALAYER ) ) {
+	public function declare_visitor_scoped_fields( $fields ): array {
+		$fields = is_array( $fields ) ? $fields : array();
+
+		if ( ! $this->cache_safe() ) {
 			return $fields;
 		}
 
@@ -1360,7 +1367,7 @@ final class PageVariablesModule extends AbstractModule {
 	 */
 	private function build_category_slugs( array $categories ): array {
 		$include_parents = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_PARENTCATEGORIES );
-		$use_master      = (bool) $this->opt( GTM4WP_OPTION_INCLUDE_MASTERLANGUAGE );
+		$use_master      = $this->master_language();
 
 		$slugs = array();
 		foreach ( $categories as $one_cat ) {

@@ -70,7 +70,7 @@ final class VisitorIp {
 		if ( 'HTTP_X_FORWARDED_FOR' === $header_name ) {
 			// Comma+space separated: trim, or every entry after the first fails filter_var().
 			foreach ( explode( ',', $header_value ) as $entry ) {
-				$entry = trim( $entry );
+				$entry = self::unmap( trim( $entry ) );
 
 				if ( self::is_public_ip( $entry ) ) {
 					return $entry;
@@ -79,6 +79,8 @@ final class VisitorIp {
 
 			return '';
 		}
+
+		$header_value = self::unmap( $header_value );
 
 		return self::is_public_ip( $header_value ) ? $header_value : '';
 	}
@@ -112,7 +114,7 @@ final class VisitorIp {
 		}
 
 		if ( 'HTTP_X_FORWARDED_FOR' === $header_name ) {
-			$entries = array_map( 'trim', explode( ',', $header_value ) );
+			$entries = array_map( static fn ( $entry ) => self::unmap( trim( $entry ) ), explode( ',', $header_value ) );
 
 			for ( $i = count( $entries ) - 1; $i >= 0; $i-- ) {
 				if ( self::ip_in_any_range( $entries[ $i ], $trusted ) ) {
@@ -127,6 +129,8 @@ final class VisitorIp {
 			// Every entry was one of our own proxies (a purely internal request).
 			return '';
 		}
+
+		$header_value = self::unmap( $header_value );
 
 		return self::is_public_ip( $header_value ) ? $header_value : '';
 	}
@@ -230,15 +234,54 @@ final class VisitorIp {
 	}
 
 	/**
+	 * An IPv4-mapped IPv6 address (::ffff:a.b.c.d, any notation) as the IPv4
+	 * address it is (#657): a dual-stack listener reports IPv4 peers that way.
+	 * Anything else is returned unchanged.
+	 *
+	 * @param string $ip A candidate address.
+	 * @return string
+	 */
+	private static function unmap( string $ip ): string {
+		$bin = ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) ? inet_pton( $ip ) : false;
+
+		if ( is_string( $bin ) && 16 === strlen( $bin ) && str_repeat( "\0", 10 ) . "\xff\xff" === substr( $bin, 0, 12 ) ) {
+			return (string) inet_ntop( substr( $bin, 12 ) );
+		}
+
+		return $ip;
+	}
+
+	/**
+	 * A trusted range listed in IPv4-mapped form as its IPv4 equivalent, so it
+	 * keeps matching a peer unmap() has already folded (prefix 96+ only).
+	 *
+	 * @param string $range A validated IP address or CIDR range.
+	 * @return string
+	 */
+	private static function unmap_range( string $range ): string {
+		if ( false === strpos( $range, '/' ) ) {
+			return self::unmap( $range );
+		}
+
+		list( $subnet, $prefix ) = explode( '/', $range, 2 );
+		$folded                  = self::unmap( $subnet );
+
+		return ( $folded !== $subnet && (int) $prefix >= 96 ) ? $folded . '/' . ( (int) $prefix - 96 ) : $range;
+	}
+
+	/**
 	 * Whether an IP address falls inside one IP address or CIDR range. Compares
-	 * packed binary forms (one path for IPv4 and IPv6; different families never
-	 * match).
+	 * packed binary forms after folding IPv4-mapped addresses to IPv4 on both
+	 * sides (otherwise different families never match).
 	 *
 	 * @param string $ip    The address to test. Must already be a valid IP.
 	 * @param string $range A validated IP address or CIDR range.
 	 * @return bool
 	 */
 	private static function ip_in_range( string $ip, string $range ): bool {
+		$ip    = self::unmap( $ip );
+		$range = self::unmap_range( $range );
+
 		if ( false === filter_var( $ip, FILTER_VALIDATE_IP ) ) {
 			return false;
 		}
@@ -295,11 +338,9 @@ final class VisitorIp {
 	 * @return string
 	 */
 	private static function remote_addr(): string {
-		if ( isset( $_SERVER['REMOTE_ADDR'] ) ) {
-			return (string) filter_var( wp_unslash( $_SERVER['REMOTE_ADDR'] ), FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
-		}
+		$ip = self::remote_addr_any();
 
-		return '';
+		return self::is_public_ip( $ip ) ? $ip : '';
 	}
 
 	/**
@@ -316,6 +357,6 @@ final class VisitorIp {
 
 		$ip = filter_var( wp_unslash( $_SERVER['REMOTE_ADDR'] ), FILTER_VALIDATE_IP );
 
-		return ( false === $ip ) ? '' : (string) $ip;
+		return ( false === $ip ) ? '' : self::unmap( (string) $ip );
 	}
 }

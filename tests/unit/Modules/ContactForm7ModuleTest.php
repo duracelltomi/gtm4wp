@@ -189,7 +189,9 @@ final class ContactForm7ModuleTest extends TestCase {
 		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
 			static fn ( $id ) => 12 === (int) $id ? 5 : $id
 		);
-		Functions\when( 'get_the_title' )->alias( static fn ( $id ) => 5 === (int) $id ? 'Quote request' : 'WRONG' );
+		Functions\when( 'get_post_field' )->alias( static fn ( $field, $id ) => 5 === (int) $id ? 'Quote request' : 'WRONG' );
+		// #646: the_title texturizes; the master title must not come through it.
+		Functions\when( 'get_the_title' )->justReturn( 'Quote&#8217;s request' );
 
 		$module = $this->make_module(
 			array(
@@ -208,7 +210,7 @@ final class ContactForm7ModuleTest extends TestCase {
 
 	/**
 	 * TS-11 sibling of the raw-passthrough case above, on the MASTER path: the
-	 * master form's title comes from get_the_title() instead of the CF7 object,
+	 * master form's raw post_title (get_post_field) instead of the CF7 object,
 	 * and it must leave the module just as raw - CF7's own esc_attr downstream
 	 * is the single escaper for this attribute.
 	 */
@@ -220,7 +222,7 @@ final class ContactForm7ModuleTest extends TestCase {
 		);
 
 		$hostile = '"><script>alert(1)</script>';
-		Functions\when( 'get_the_title' )->alias( static fn ( $id ) => 5 === (int) $id ? $hostile : 'WRONG' );
+		Functions\when( 'get_post_field' )->alias( static fn ( $field, $id ) => 5 === (int) $id ? $hostile : 'WRONG' );
 
 		$module = $this->make_module(
 			array(
@@ -245,7 +247,7 @@ final class ContactForm7ModuleTest extends TestCase {
 		Filters\expectApplied( 'wpml_object_id' )->zeroOrMoreTimes()->andReturnUsing(
 			static fn ( $id ) => 12 === (int) $id ? 5 : $id
 		);
-		Functions\when( 'get_the_title' )->justReturn( 'Quote request' );
+		Functions\when( 'get_post_field' )->justReturn( 'Quote request' );
 
 		$module = $this->make_module( array( GTM4WP_OPTION_INTEGRATE_WPCF7 => true ) );
 

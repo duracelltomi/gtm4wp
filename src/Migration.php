@@ -15,11 +15,12 @@ use GTM4WP\Modules\Container\ContainerRows;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Cleans up stored options of features removed in 2.0 and seeds the
- * per-container row option from the flat 1.x container options. Runs at
- * most once per plugin version, only in the admin, and never touches
- * options of features that still exist - a downgrade to 1.x therefore
- * stays possible except for the removed features themselves.
+ * Cleans up stored options of features removed since 1.x and seeds the
+ * per-container row and post meta options, only in the admin. Seeding runs
+ * on every admin request and writes only what is missing; the cleanup runs
+ * once per plugin version. Options of features that still exist are kept,
+ * except retired values inside them (the "ua" blacklist entry), so a
+ * downgrade stays possible except for the removed features themselves.
  */
 final class Migration {
 

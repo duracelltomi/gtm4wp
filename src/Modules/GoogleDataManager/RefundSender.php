@@ -121,8 +121,10 @@ final class RefundSender {
 	}
 
 	/**
-	 * Registers the queue handler and the refund hook of every active platform;
-	 * run() re-checks the option for a job queued before it was turned off.
+	 * Registers the queue handler and the refund hook of every active platform.
+	 * Plugin::boot() calls this only while sending is on, so a job queued before
+	 * the switch went off finds no handler and the queue drops it unrun (Action
+	 * Scheduler 3.5+ marks it failed); run()'s own option check is a test seam.
 	 *
 	 * @return void
 	 */

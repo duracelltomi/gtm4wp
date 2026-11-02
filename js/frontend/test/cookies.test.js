@@ -3,7 +3,7 @@
  * (js/frontend/lib/gtm4wp-cookies.js).
  *
  * The write format is contract, not implementation detail: the PHP-emitted
- * order-tracked guard (PageDataLayer::purchase_dedupe_guard()) writes the same
+ * order-tracked guard (Ecommerce\Helpers::purchase_dedupe_guard()) writes the same
  * cookie with the same byte format and cannot import this lib, so the format
  * test below pins the two copies together.
  */

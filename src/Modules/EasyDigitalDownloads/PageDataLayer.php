@@ -56,6 +56,9 @@ final class PageDataLayer {
 	 * @return array Extended data layer content with EDD data added.
 	 */
 	public function add_datalayer_data( $data_layer ) {
+		// An earlier callback that forgot to return hands over null (#634, RI-39).
+		$data_layer = is_array( $data_layer ) ? $data_layer : array();
+
 		if ( EcommerceHelpers::is_xhr_request() ) {
 			return $data_layer;
 		}

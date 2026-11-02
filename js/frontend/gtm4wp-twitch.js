@@ -95,6 +95,13 @@ function gtm4wp_bindTwitchPlayer(
 	// No periodic time event: milestones are polled while playing. Live
 	// streams report no duration, so nothing fires for them.
 	const gtm4wp_onTwitchPercentageChange = function () {
+		// A player removed while playing (lightbox, AJAX swap) sends no PAUSE
+		// or ENDED, so the poller stops itself (#660).
+		if ( ! container.isConnected ) {
+			gtm4wp_stopTwitchPercentageTracking();
+			return;
+		}
+
 		const videoDuration = gtm4wp_twitchDuration();
 		if ( ! videoDuration ) {
 			return;

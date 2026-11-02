@@ -317,7 +317,9 @@ final class ContainerCode {
 <!-- Google Tag Manager for WordPress by gtm4wp.com -->
 <!-- GTM Container placement set to ' . esc_html( $this->placement_string() ) . ' -->';
 
-		if ( array() !== $containers ) {
+		// Placement Off is the "data layer only" setup, which needs no container
+		// row (#636); every other placement still compiles nothing unconfigured.
+		if ( array() !== $containers || GTM4WP_PLACEMENT_OFF === $this->options->get( GTM4WP_OPTION_GTM_PLACEMENT ) ) {
 			$gtm4wp_datalayer_data = $this->datalayer->compile();
 
 			// The hex flags encode <, >, &, " and ' as \uXXXX so the JSON can never

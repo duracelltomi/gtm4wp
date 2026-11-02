@@ -587,7 +587,8 @@ final class DownloadData {
 		$timestamp    = '' !== $date_created ? strtotime( $date_created . ' UTC' ) : false;
 
 		// Same key names as the WooCommerce orderData, so one GTM container serves
-		// both stores; EDD has no shipping, company or order key to map. Values are
+		// both stores; EDD has no shipping or company to map, and its payment_key
+		// (the order key's counterpart) is deliberately not printed. Values are
 		// passed raw: the sink escapes with wp_json_encode() + hex flags.
 		$order_data = array(
 			'attributes' => array(

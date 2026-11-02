@@ -113,6 +113,58 @@ describe( 'gtm4wp-client-device-data', () => {
 		} );
 	} );
 
+	it( 'names Chrome, Firefox and Edge on iOS, whose UAs carry no Version/ token (#653)', () => {
+		const cases = [
+			[ 'CriOS/126.0.6478.153', 'Chrome', '126.0.6478.153' ],
+			[ 'FxiOS/127.0', 'Firefox', '127.0' ],
+			[ 'EdgiOS/126.0.2592.80', 'Microsoft Edge', '126.0.2592.80' ],
+		];
+
+		cases.forEach( ( [ token, name, version ] ) => {
+			delete window.gtm4wp_clientdevice_inited;
+			window.dataLayer = [];
+			setNavigator( {
+				userAgent: `Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) ${ token } Mobile/15E148 Safari/604.1`,
+				userAgentData: undefined,
+			} );
+
+			loadTracker();
+
+			expect( deviceEvents()[ 0 ] ).toMatchObject( {
+				browserName: name,
+				browserVersion: version,
+				osName: 'iOS',
+			} );
+		} );
+	} );
+
+	it( 'asks Client Hints only for what the enabled options report (#653)', async () => {
+		window.gtm4wp_clientdevice_config = {
+			browser: true,
+			os: false,
+			device: false,
+		};
+		const asked = [];
+		setNavigator( {
+			userAgent: 'ignored',
+			userAgentData: {
+				mobile: false,
+				platform: 'Windows',
+				brands: [ { brand: 'Google Chrome', version: '126' } ],
+				getHighEntropyValues: ( hints ) => {
+					asked.push( ...hints );
+					return Promise.resolve( {} );
+				},
+			},
+		} );
+
+		loadTracker();
+		await flushAsync();
+
+		expect( asked ).toEqual( [ 'fullVersionList' ] );
+		expect( deviceEvents() ).toHaveLength( 1 );
+	} );
+
 	it( 'omits os and device signals when the config disables them', () => {
 		window.gtm4wp_clientdevice_config = {
 			browser: true,

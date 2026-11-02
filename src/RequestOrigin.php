@@ -78,11 +78,42 @@ final class RequestOrigin {
 			return false;
 		}
 
-		if ( strtolower( (string) $parts['host'] ) !== strtolower( (string) $site['host'] ) ) {
+		$site_host = self::ascii_host( (string) $site['host'] );
+		if ( null === $site_host || strtolower( (string) $parts['host'] ) !== $site_host ) {
 			return false;
 		}
 
 		return self::normalized_port( $parts ) === self::normalized_port( $site );
+	}
+
+	/**
+	 * The home host as browsers send it: WordPress keeps a Unicode home host as
+	 * typed, Origin and Referer carry it in punycode (#656). Null when it cannot
+	 * be encoded, which the caller treats as no match (fail closed).
+	 *
+	 * @param string $host The home_url() host.
+	 * @return string|null
+	 */
+	private static function ascii_host( string $host ): ?string {
+		if ( ! preg_match( '/[^\x00-\x7F]/', $host ) ) {
+			return strtolower( $host );
+		}
+
+		try {
+			// UTS #46 non-transitional is what browsers use (ß stays ß); the
+			// default idn_to_ascii() flags and Requests' encoder differ from it.
+			if ( function_exists( 'idn_to_ascii' ) && defined( 'INTL_IDNA_VARIANT_UTS46' ) ) {
+				$ascii = idn_to_ascii( $host, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46 );
+			} elseif ( class_exists( '\WpOrg\Requests\IdnaEncoder' ) && function_exists( 'mb_strtolower' ) ) {
+				$ascii = \WpOrg\Requests\IdnaEncoder::encode( mb_strtolower( $host, 'UTF-8' ) );
+			} else {
+				return null;
+			}
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		return is_string( $ascii ) && '' !== $ascii ? strtolower( $ascii ) : null;
 	}
 
 	/**

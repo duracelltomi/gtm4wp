@@ -228,6 +228,13 @@ final class EddVisitorCartTest extends TestCase {
 		);
 	}
 
+	public function test_declare_visitor_scoped_fields_resets_a_non_array_from_an_earlier_callback(): void {
+		// #635 (RI-39): an earlier callback that forgot to return passes null.
+		foreach ( array( null, new \stdClass() ) as $bad ) {
+			$this->assertEquals( $this->make()->declare_visitor_scoped_fields( array() ), $this->make()->declare_visitor_scoped_fields( $bad ) );
+		}
+	}
+
 	public function test_declares_one_gated_block_field_under_cache_safe_mode(): void {
 		$fields = $this->make()->declare_visitor_scoped_fields( array() );
 

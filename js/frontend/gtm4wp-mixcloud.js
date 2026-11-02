@@ -4,11 +4,31 @@ import {
 	gtm4wpMediaMilestones,
 	gtm4wpOnReady,
 	gtm4wpObserveMedia,
+	gtm4wpMediaSrcUrl,
 } from './lib/native-video-params';
 
 const gtm4wp_mixcloud_percentage_tracking = 10;
 // Keyed by a provider-reported id, so a null prototype (`__proto__` key).
 const gtm4wp_mixcloud_percentage_tracking_marks = Object.create( null );
+
+/**
+ * The show path of a `feed` value: the share dialog sends a path, WordPress's
+ * oEmbed provider the full show URL (#643), so one show gets one id.
+ *
+ * @param {string} feed The decoded `feed` query parameter.
+ * @return {string} The decoded show path, or the value as given.
+ */
+function gtm4wp_mixcloudShowPath( feed ) {
+	try {
+		const show = new URL( feed );
+		if ( /(^|\.)mixcloud\.com$/i.test( show.hostname ) ) {
+			return decodeURIComponent( show.pathname );
+		}
+	} catch ( e ) {
+		// Not an absolute URL: already the path form.
+	}
+	return feed;
+}
 
 function gtm4wp_initMixcloudTracking() {
 	// The Widget API (the largest SDK of the family) is handed to
@@ -18,17 +38,18 @@ function gtm4wp_initMixcloudTracking() {
 		const widget = Mixcloud.PlayerWidget( mixcloud_frame );
 
 		// No metadata getter: the show is the `feed` query parameter of the
-		// embed URL, reused as the title; no author.
+		// embed URL, reused as the title; no author. The id keeps the raw src
+		// when there is no feed: milestones are keyed by it.
 		let mediaid = mixcloud_frame.getAttribute( 'src' );
-		let mediaurl = mediaid;
+		let mediaurl = gtm4wpMediaSrcUrl( mixcloud_frame ) || mediaid;
 		try {
 			const feed = new URL(
 				mixcloud_frame.getAttribute( 'src' ),
 				window.location.href
 			).searchParams.get( 'feed' );
 			if ( feed ) {
-				mediaid = feed;
-				mediaurl = 'https://www.mixcloud.com' + feed;
+				mediaid = gtm4wp_mixcloudShowPath( feed );
+				mediaurl = 'https://www.mixcloud.com' + mediaid;
 			}
 		} catch ( e ) {
 			// Malformed src: fall back to the raw attribute set above.
