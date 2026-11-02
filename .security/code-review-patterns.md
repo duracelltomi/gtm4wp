@@ -65,6 +65,7 @@ Scan this first. Each row is `ID — one-line litmus`. Jump to the full entry on
 - **RI-41** — when PHP stands down because "the JS reports this", the PHP skip must be no wider than the JS match condition; a request header says some script asked, never which one (#387).
 - **RI-43** — a value promised to mirror another builder's number (refund amount ↔ purchase value) needs one shared rule, a test asserting the two agree for every option combination, and an input that carries the subtracted fields for every way the source record is created (a no-line refund carries none).
 - **RI-44** — a callback on a third-party hook is reached by every route that fires it; grep each `do_action` site and its permission check before writing "runs in the buyer's own request" (#598).
+- **RI-45** — a diagnostic that says "X is emitted" must be derived from the gate that emits X, not from a sibling emitter's gate; when two outputs are gated differently, a notice aligned with one says nothing about the other (#636).
 - **RI-42** — a send-or-not guard must read a durable per-record marker, never a diagnostics ring: the ring is trimmed (routine rows first) and the guard's own skip rows supersede the evidence. If a ring fallback must stay, backfill the marker the first time it answers (#396).
 - **RI-39** — never "fix" a filtered getter under a new `: string` with a `(string)` cast: it is still fatal on an object and emits `"Array"`; guard with `is_string()` (#362).
 - **RI-34** — a pattern/exclusion list we hand to a third party that names a literal we used to hardcode is a second reader of it: when the literal becomes an option (RI-14), the list is silently narrowed on every non-default site (#325). Grep the literal as a string in every list we emit; prefer a fixed plugin-owned token over the user value.
@@ -999,6 +1000,12 @@ Adding `: string` over a value that has passed through somebody's filter (`get_*
   `PageDataLayer` files. Fixed in the R55 session with one predicate, `Ecommerce\Helpers::is_item()` (a non-empty
   array: a bare `is_array()` passes `array()`, which prints the same junk item `null` does). Ledger: **21**
   store-side builder calls, **21** `is_item()` guards in 7 files; the 2 refund adapters keep their own guard.
+- **R57 (#634, #635): a filter CALLBACK is an entry point too.** The ledger above counts item sites; it never counted
+  callbacks that receive a filter's running value. A callback that passes that value into a typed parameter fatals on
+  a `null` from an earlier callback (the "forgot `return`" bug), and an untyped entry that forwards it does the same.
+  Ledger at R57: 3 `gtm4wp_compile_datalayer` entry points (PageVariables, WC, EDD) and 4 visitor-scoped-fields
+  callbacks, all guarded in the R57 fix session. Guard once at the entry with `is_array( $v ) ? $v : array()`, never an `(array)` cast (it wraps
+  scalars). Re-derive: `grep -rn "add_filter( GTM4WP_WPFILTER_" src` and read each callback's first use of its argument.
 
 ### RI-40: A diagnostic that reads the ABSENCE of a row as a cause must enumerate every consumer exit that writes no row
 "Nothing newer than the queued row after N seconds, so the queue never ran" holds only if every path the job takes after it runs leaves a newer row. Data Manager's `RefundSender::run()` had at least three silent exits (sending switched off, a destination in `only` removed from settings, a whole-refund job for an already-sent refund), so the label blamed the queue for jobs that had run, and the replay it offered fed the `is_sent` exit and looped (#388).
@@ -1073,6 +1080,16 @@ registry already listed a second caller of the same hook when the premise was wr
   read each caller's permission check. Where the registry row lists the callers, that list is the input.
 - A replace-or-merge rule is safe only for the weakest of those callers; a fill-only rule is the conservative default.
 - Record the caller list beside the premise (threat model or docblock), so a new caller upstream invalidates it visibly.
+
+### RI-45: A diagnostic aligned with one emitter's gate says nothing about a sibling emitter
+**Found:** R57, #636 (open; detail in the local report). A commit made a notice agree with "the code that emits the
+container", and the notice then reported a healthy state for an output gated on a different condition.
+- **The check:** for every status line, Site Health verdict, ability field or settings label that asserts something
+  is emitted, find the exact `if` that emits it and compare conditions. A shared word ("data layer", "tracking") is
+  not a shared gate.
+- **Test both directions:** a regression test that pins the emitter's behaviour in the state the diagnostic calls
+  healthy; a green suite under both the old and the fixed gate means nothing pins it.
+- Same family as **RI-40** (a diagnostic reading an absence) and **RI-15** (a description is a contract).
 
 ## Project-Specific Anti-Patterns
 
@@ -1230,7 +1247,10 @@ by design, so "this visitor may see the receipt" is a wider set than "this visit
 - Same family as **RI-26** (a borrowed predicate moves with the site) and **PA-10** (record ownership).
 - Ledger at R54: **4** consumers of a receipt-visibility gate: `ReceiptPage` WC and EDD (staff rule since the R54
   fix, #528); EDD `PageDataLayer` purchase render (staff rule since #512); WC `PageDataLayer` purchase render
-  (staff rule unexamined). One staff rule per store: `WooCommerce\PageDataLayer::is_staff_viewing_order()`,
+  (R57, #637: no staff rule, by decision - WooCommerce links no admin screen to order received, the only admin path
+  is staff paying a guest order, where staff is the payer, and a forwarded URL is the accepted key-alone case; pinned
+  by `test_order_received_staff_paid_guest_order_tracks_once_from_the_staff_browser`; reopen if WooCommerce adds an
+  admin "view confirmation" link). One staff rule per store: `WooCommerce\PageDataLayer::is_staff_viewing_order()`,
   `EasyDigitalDownloads\PageDataLayer::is_staff_viewing_receipt()`. Orders staff create need no gate: the
   capture hooks fire only on customer-facing checkout (U193); a POS plugin using the checkout class is accepted.
   Re-derive with `grep -rn "edd_can_view_receipt\|woocommerce_hides_order_from_visitor(\|is_staff_viewing_receipt" src`.
@@ -1856,6 +1876,8 @@ Carries a `phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped`. The b
   - **This entry carried "16, in `ContainerCode`, `Axeptio`, `UserEvents`, `ProductData` and `PurchaseTracking`" from 2026-08-04 to 2026-08-10 (#132), and it was wrong three ways at once**: the figure counted *grep hits* rather than calls, `Axeptio` and `ProductData` are not callers at all (each only mentions the sink in a comment), and the real caller `PageDataLayer` was missing. **The raw grep returns 18 and the answer is 12** — which is exactly why the counting rule now sits beside the number.
   - **It survived because the same measurement lived in two of our own files and only one was corrected.** #115 fixed this figure in the checklist's Whole-Repo Sweeps row (17 → 12) and left this copy untouched. That is UC-6's *prefer one definition over two*, applied to the review system's own bookkeeping: when a count appears in both the sweep table and a pattern entry, fix both in the same edit or have one point at the other.
 - Read this alongside **RI-2**: this entry is why the hex flags are load-bearing rather than belt-and-braces, and the ampersand restore is why `JSON_HEX_AMP` specifically is.
+- **Re-derived 2026-11-02 (R57)** (rotation, oldest since R52): caller ledger **13**, same distribution; every
+  data-bearing value hex-encoded or validated at the sink. Holds.
 - **Re-derived 2026-10-09 (R52)** (rotation; the PurchaseTracking caller is in range): caller ledger **13**, same distribution as R48 (ContainerCode 8 / UserEvents 2 / WC PageDataLayer 1 / PurchaseTracking 1 / EDD PageDataLayer 1). The changed caller hex-encodes its payload; its `esc_js( $datalayer_name )` is identifier-validated at read (`ContainerRows::datalayer_name()`). Holds.
 - **Re-derived 2026-10-07 (R48)** (rotation; two callers in range): caller ledger **13**: ContainerCode 8 / UserEvents 2 / WC PageDataLayer 1 / PurchaseTracking 1 / **EDD PageDataLayer 1** (`print_deferred_js()`, added `8c74878` 2026-10-02: 12 at `8c74878~1`, 13 at `8c74878`). The precondition holds at the 13th: it prints only `json_literal()` with the hex set, `number_literal()` and a constant. R45 read the new caller and moved neither copy of the figure, and R46 recorded "re-derived" with no number (#392). **This entry is the one copy of the count**; the Duplication sweep row and RI-3 point here.
 - **Re-derived 2026-09-22 (R34)** (rotation; `ScriptTag.php` in range for comment compaction only, verified code-identical): caller ledger **12**, same distribution (ContainerCode 8 / UserEvents 2 / PageDataLayer 1 / PurchaseTracking 1), identical at the base sha. **Counting trap, now stated:** `ContainerCode::the_tag()` calls `print_markup_block(` with its argument on the NEXT line, so a single-line regex such as `print_(script|markup)_block\(\s*[^)]` returns **11** — the 12th is real. Grep the bare call name and subtract the two definitions and the prose mentions instead.
@@ -2010,3 +2032,4 @@ Running both store integrations on one site is an **unsupported setup** (maintai
 | 2026-10-19 (Review 53) | Targeted whole-surface read of the four surfaces new in 2.1 (Data Manager, Google client + GoogleAuth, Abilities + Site Health, EDD) at `a742bf4`, as the 2.1.0 final gate. **6 Medium (#466–#471), 54 Low, 0 Critical/High; nothing reachable by an attacker above Low.** Added **PA-22** (a server-side platform event hooked only from the frontend boot misses admin-ajax/REST, where gateways build orders; the sibling had been moved and this one not, #467; ledger 4 sites) and **RI-43** (a value promised to mirror another builder's number needs one rule, a side-by-side test for every option combination, and inputs that carry the subtracted fields for every way the record is created, #466). Extended **RI-25** with the argument-SHAPE half for actions we listen to (#470: signature right, item shape assumed from a lookalike array, and the tests built from the assumption). **FP-6 re-derived** (rotation): holds. Adjudication: 9 verifiers, 15 recommendations refuted or revised (four of the six Mediums), six recorded premises failed, including R51's "EDD sibling of #460 not reachable" and the threat model's "salts change when the admin changes them" (Defender rotates them every 60 days by default, #469). |
 | 2026-10-21 (Review 54) | Reviewed `a742bf4..5f36a40` (R53's fix session) as the 2.1.0-rc2 gate: 1 Medium (#528), 63 Low (#529–#591). New **PA-23** (a visibility predicate is not an ownership predicate). RI-39 recurrence as a guard and as a typed parameter (#529, #530). Ledgers re-derived: RI-25 14 → 17, RI-40 1 → 2, RI-43 EDD half. FP-2 re-derived (holds). |
 | 2026-10-27 (Review 55) | Reviewed `5f36a40..75dcb71` (R54's whole fix session) as the 2.1.0 final gate: 0 Critical/High/Medium, 33 Low (#593–#625; 21 defects, 12 upkeep). New **RI-44** (a third-party hook's actor is every route that fires it; #598). RI-39 corrected: R54's "all guarded" counted the fix diff, not the sink; the 11 remaining item sites fixed the same day with one predicate (#593). FP-5 and FP-4 re-derived: hold. Adjudication: 11 recommendations refuted or revised, 7 recorded premises failed. |
+| 2026-11-02 (Review 57) | Empty-diff escalation at `1574d98` (2.1.0-rc2): whole plugin re-read in six slices, all sweeps re-run. 1 Medium (#636), 45 Low (#634–#679; 30 defects, 16 upkeep), #316 re-opened; no security finding reachable by A0–A3. New **RI-45** (a diagnostic aligned with a sibling emitter's gate). RI-39 widened to filter-callback entry points (#634, #635). PA-23 ledger: WC purchase render examined (#637). FP-1 re-derived (13, holds). Adjudication: 21 recommendations refuted or revised, 8 recorded premises failed. |
