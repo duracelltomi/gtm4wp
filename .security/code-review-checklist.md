@@ -1170,7 +1170,7 @@ Toolchain: no diff, all four plugin digests reproduce.
 re-opened.** No security finding reachable by A0–A3 against another person. Adjudication: 51 drafts, 15 verifiers;
 0 mechanisms refuted, 7 corrected, 1 draft dropped, **21 recommendations refuted or revised**, 1 disposition refuted
 (#316), 8 recorded premises failed. Snapshots clean, HEAD unchanged. Detail stays in the local report.
-**Fixes:** `3d9e670` (fix sessions 1 and 2, one commit; #316 by maintainer decision). Designs ready, decisions pending: #647, #653 (brand names, tablets), #661, #662, #663. #638 deferred to 2.2 (remove before the beta). **The base for the next review is `3d9e670`.**
+**Fixes:** `3d9e670` (fix sessions 1 and 2, one commit; #316 by maintainer decision). Maintainer decisions 2026-11-02: #647, #653, #663 fixed in the follow-up commit; #661, #662 deferred to 2.2. #638 deferred to 2.2 (remove before the beta). **The base for the next review is `3d9e670`.**
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
@@ -1188,13 +1188,13 @@ re-opened.** No security finding reachable by A0–A3 against another person. Ad
 | 644 | Low | fixed (R57 fix session: description and comment) | — | MediaEvents `AdminSchema`, Spotify tracker | Spotify description understates title lookups |
 | 645 | Low | fixed (R57 fix session: playhead milestones; Changed: bullet; U66) | — | Wistia tracker | Milestones measure watched coverage, not position |
 | 646 | Low | fixed (R57 fix session: raw master title) | — | CF7 module | Master-language form name differs from the default-language name |
-| 647 | Low | open (decision; design ready: anonymous-only default, contradicts a recorded cache-safe decision) | — | PageVariables / VisitorData texts | Cache-safe texts overstate which login values anonymous visitors get |
+| 647 | Low | fixed (R57 fix session, maintainer decision 2026-11-02: anonymous-only logged-out pair under cache-safe; design doc updated) | — | PageVariables / VisitorData texts | Cache-safe texts overstate which login values anonymous visitors get |
 | 648 | Low | fixed (R57 fix session: JS mirrors the classic encoding; bracket step added after a fix-design verifier; U198) | — | PageVariables, visitor-data JS | One variable encoded differently per tier |
 | 649 | Low | accepted (R57 design verifier: kept, both tiers agree; pinned by a test) | — | PageVariables | Empty visitor type for a role-less user |
 | 650 | Low | accepted (R57 design verifier: kept, documented in the description; pinned by a test) | — | PageVariables | Two post-type values ignore their option |
 | 651 | Low | fixed (R57 fix session: master branch builds the wp_title() shape) | — | PageVariables | Page title shape differs between the two 2.1 branches |
 | 652 | Low | fixed (R57 fix session: three descriptions) | — | PageVariables `AdminSchema` | Three option descriptions misstate their output |
-| 653 | Low | partly fixed (R57 fix session: iOS browsers, hints minimised); brand names and tablets open (decision; design ready) | — | client device data JS | Browser/device detection gaps; more hints requested than needed |
+| 653 | Low | fixed (R57 fix session: iOS browsers, hint minimisation; brand names, Windows version and tablets by maintainer decision 2026-11-02, Changed: bullet, U69) | — | client device data JS | Browser/device detection gaps; more hints requested than needed |
 | 654 | Low | fixed (R57 fix session: no clear on non-page requests; admin-login wording open) | — | UserEvents | Event cookie can be consumed by a request that prints nothing |
 | 655 | Low | fixed (R57 fix session: source candidates validated) | — | PageVariables | Primary category source not validated |
 | 656 | Low | fixed (R57 fix session: home host normalised) | — | `RequestOrigin` | Same-origin check does not normalise an internationalised home host |
@@ -1202,9 +1202,9 @@ re-opened.** No security finding reachable by A0–A3 against another person. Ad
 | 658 | Low | fixed (R57 fix session: description kept the shape; 2.0 changelog sentence corrected) | — | WC `PageDataLayer`, `AdminSchema` | Guest customer variables and their description |
 | 659 | Low | fixed (R57 fix session) | — | WC `PageDataLayer` | Re-add builders skip a WooCommerce cart filter |
 | 660 | Low | fixed (R57 fix session) | — | Twitch tracker | Poller not stopped when the player is removed |
-| 661 | Low | open (decision; premise refuted for native media; design ready: Cloudflare to playing, Vimeo comment) | — | media trackers | `play` means different things per provider |
-| 662 | Low | open (confirmed by design verifier; fixes prototyped) | — | HTML5 / Spotify trackers | Possible double tracking; bootstrap order |
-| 663 | Low | open (confirmed by design verifier; fix designed) | — | settings page boot | Boot-failure notice can name the wrong cause |
+| 661 | Low | deferred (maintainer decision 2026-11-02: to 2.2; design ready) | — | media trackers | `play` means different things per provider |
+| 662 | Low | deferred (maintainer decision 2026-11-02: to 2.2; confirmed, fixes prototyped) | — | HTML5 / Spotify trackers | Possible double tracking; bootstrap order |
+| 663 | Low | fixed (R57 fix session, maintainer decision 2026-11-02: distinct notice) | — | settings page boot | Boot-failure notice can name the wrong cause |
 | 664 | Low | fixed (R57 fix session) | — | `Migration`, `compat/constants.php` | Stale docblocks |
 | 665 | Low | fixed (R57 fix session) | — | PageVariables | Option reads bypass the module helpers |
 | 666 | Low | fixed (R57 fix session) | — | media gate comments | Stale since #143 |
