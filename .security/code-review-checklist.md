@@ -1170,7 +1170,7 @@ Toolchain: no diff, all four plugin digests reproduce.
 re-opened.** No security finding reachable by A0–A3 against another person. Adjudication: 51 drafts, 15 verifiers;
 0 mechanisms refuted, 7 corrected, 1 draft dropped, **21 recommendations refuted or revised**, 1 disposition refuted
 (#316), 8 recorded premises failed. Snapshots clean, HEAD unchanged. Detail stays in the local report.
-**Fixes:** `3d9e670` (fix sessions 1 and 2, one commit; #316 by maintainer decision). Designs ready, decisions pending: #638, #647, #653 (brand names, tablets), #661, #662, #663. **The base for the next review is `3d9e670`.**
+**Fixes:** `3d9e670` (fix sessions 1 and 2, one commit; #316 by maintainer decision). Designs ready, decisions pending: #647, #653 (brand names, tablets), #661, #662, #663. #638 deferred to 2.2 (remove before the beta). **The base for the next review is `3d9e670`.**
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
@@ -1179,7 +1179,7 @@ re-opened.** No security finding reachable by A0–A3 against another person. Ad
 | 635 | Low | fixed (R57 fix session: the four callbacks untyped and normalised; tests red before) | site code | four visitor-scoped-fields callbacks | Same class on the visitor-scoped-fields filter |
 | 636 | Medium | fixed (R57 fix session: placement Off compiles without a container row; shipped in 2.0, `Fixed:` bullet) | — (A4 config) | `ContainerCode`, Site Health, configuration checks, Container `AdminSchema` | Placement Off without a container ID does not emit the page data layer, while every status surface says it does |
 | 637 | Low | accepted (R57 design verifier: no admin route; staff paying a guest order is the payer; pinned by a test; PA-23, U199) | A3 unintended | WC `PageDataLayer` | Staff rule for the order-received purchase render (PA-23) |
-| 638 | Low | open (decision; design ready: drop the attribute in 2.1 with a Removed: bullet) | buyer's own browser | WC `ProductData` | An order-data attribute scope decision |
+| 638 | Low | deferred (maintainer decision 2026-11-02: kept in 2.1, removed before the 2.2 beta; least privilege, no attack path) | buyer's own browser | WC `ProductData` | An order-data attribute scope decision |
 | 639 | Low | fixed (R57 fix session: key-custody parameters marked; positive test) | site owner's tooling | Google client | Key-custody hardening gap |
 | 640 | Low | fixed (R57 fix session: flagged after the poll window; not replayable) | — | GDM `SendLog`, `StatusPoller`, send-log UI | An accepted row can show as pending indefinitely |
 | 641 | Low | fixed (R57 fix session: description) | — | GDM consent policy text | Consent-region description omits one case |
