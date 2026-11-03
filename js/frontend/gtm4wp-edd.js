@@ -303,7 +303,10 @@ if ( ! window.gtm4wp_edd_inited ) {
 			[ productdata ],
 			{
 				currency: gtm4wp_currency,
-				value: productdata.price * productdata.quantity,
+				// Rounded to cents like every other push (#628).
+				value: gtm4wp_make_sure_is_float(
+					productdata.price * productdata.quantity
+				),
 			}
 		);
 
@@ -433,9 +436,10 @@ if ( ! window.gtm4wp_edd_inited ) {
 						[ productdata ],
 						{
 							currency: gtm4wp_currency,
-							value:
+							value: gtm4wp_make_sure_is_float(
 								productdata.price *
-								( productdata.quantity || 1 ),
+									( productdata.quantity || 1 )
+							),
 						}
 					);
 

@@ -297,7 +297,7 @@ final class AdminSchema implements AdminSchemaInterface, DocumentedSchemaInterfa
 				type: Field::TYPE_CHECKBOX,
 				default_value: false,
 				label: __( 'Order data in data layer', 'duracelltomi-google-tag-manager' ),
-				description: esc_html__( 'Adds orderData, every order attribute including the buyer\'s plain name, email, phone and address, wherever the purchase is tracked (not on theme or builder thank-you pages), also for an already tracked order younger than the maximum order age. Requires "Track e-commerce".', 'duracelltomi-google-tag-manager' ),
+				description: esc_html__( 'Adds orderData, with the buyer\'s plain name, email, phone and address, up to the maximum order age: on the order received page even if tracked, on the next page of the non-cache-safe purchase fallback, and with the purchase on theme thank-you pages. Needs "Track e-commerce".', 'duracelltomi-google-tag-manager' ),
 				group: 'datalayer',
 				doc: self::DOC_REFERENCE
 			),

@@ -99,7 +99,11 @@ final class SettingsStore {
 	 * @return string 32 hex characters.
 	 */
 	public function values_hash(): string {
-		return md5( (string) wp_json_encode( $this->stored_row() ) );
+		$row  = $this->stored_row();
+		$json = wp_json_encode( $row );
+
+		// INF/NAN make the encode fail, and md5('') would match every such row (#685).
+		return md5( false !== $json ? $json : serialize( $row ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- hashed, never stored or unserialized.
 	}
 
 	/**

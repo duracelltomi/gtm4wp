@@ -277,4 +277,30 @@ final class SettingsStoreTest extends TestCase {
 			'An intentionally emptied table must not be repopulated from stale legacy keys.'
 		);
 	}
+
+	public function test_values_hash_of_an_encodable_row_is_the_md5_of_its_json(): void {
+		$row                             = array( GTM4WP_OPTION_DATALAYER_NAME => 'dl' );
+		$this->options[ GTM4WP_OPTIONS ] = $row;
+
+		$this->assertSame( md5( (string) json_encode( $row ) ), $this->store()->values_hash() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+	}
+
+	public function test_values_hash_tells_two_unencodable_rows_apart_and_stays_stable(): void {
+		// INF/NAN written out of band or by a third-party module (#685).
+		$this->options[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_DATALAYER_NAME => 'a',
+			'third-party-key'            => INF,
+		);
+		$first                           = $this->store()->values_hash();
+
+		$this->assertSame( $first, $this->store()->values_hash(), 'The same row hashes the same, or every guarded write would be refused.' );
+
+		$this->options[ GTM4WP_OPTIONS ] = array(
+			GTM4WP_OPTION_DATALAYER_NAME => 'b',
+			'third-party-key'            => INF,
+		);
+
+		$this->assertNotSame( $first, $this->store()->values_hash() );
+		$this->assertNotSame( md5( '' ), $first );
+	}
 }

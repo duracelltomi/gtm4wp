@@ -426,6 +426,36 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 0, $this->settings_writes(), 'Refused before the store is asked to write anything.' );
 	}
 
+	public function test_a_stale_expected_hash_is_refused_while_the_row_holds_an_unencodable_value(): void {
+		// #685: an INF in a key get-settings does not return leaves its answer encodable.
+		$this->store_settings(
+			array(
+				GTM4WP_OPTION_DATALAYER_NAME => 'original',
+				'third-party-key'            => INF,
+			)
+		);
+		$read = $this->execute( SettingsAbilities::GET_SETTINGS )['values_hash'];
+
+		$this->store_settings(
+			array(
+				GTM4WP_OPTION_DATALAYER_NAME => 'theirs',
+				'third-party-key'            => INF,
+			)
+		);
+
+		$result = $this->execute(
+			SettingsAbilities::UPDATE_SETTINGS,
+			array(
+				'values'        => array( GTM4WP_OPTION_DATALAYER_NAME => 'mine' ),
+				'expected_hash' => $read,
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
+		$this->assertSame( 'theirs', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
+	}
+
 	public function test_an_empty_patch_is_refused_before_anything_is_written(): void {
 		$result = $this->execute( SettingsAbilities::UPDATE_SETTINGS, array( 'values' => array() ) );
 

@@ -47,7 +47,7 @@
 		let result = null;
 
 		( brands || [] ).forEach( function ( oneBrand ) {
-			if ( ! /not.?a.?brand|chromium/i.test( oneBrand.brand ) ) {
+			if ( ! /not.?a.?brand|chromium|yowser/i.test( oneBrand.brand ) ) {
 				result = oneBrand;
 			}
 		} );
@@ -59,6 +59,7 @@
 	const brandNames = {
 		'Google Chrome': 'Chrome',
 		'Microsoft Edge': 'Edge',
+		YaBrowser: 'Yandex Browser',
 	};
 
 	function browserName( brand ) {
@@ -156,8 +157,13 @@
 			[ /FxiOS\/([0-9.]+)/, 'Firefox' ],
 			[ /EdgiOS\/([0-9.]+)/, 'Edge' ],
 			[ /Firefox\/([0-9.]+)/, 'Firefox' ],
-			[ /Edg[a-z]*\/([0-9.]+)/, 'Edge' ],
+			[ /Edg(?:e|A)?\/([0-9.]+)/, 'Edge' ],
 			[ /OPR\/([0-9.]+)/, 'Opera' ],
+			// Chromium browsers whose UA also carries Chrome/, named as their
+			// Client Hints brand (#684).
+			[ /SamsungBrowser\/([0-9.]+)/, 'Samsung Internet' ],
+			[ /Silk\/([0-9.]+)/, 'Silk' ],
+			[ /YaBrowser\/([0-9.]+)/, 'Yandex Browser' ],
 			[ /Chrome\/([0-9.]+)/, 'Chrome' ],
 			[ /Version\/([0-9.]+).*Safari/, 'Safari' ],
 		];
@@ -177,6 +183,8 @@
 			[ /Android ([0-9.]+)/, 'Android' ],
 			[ /(iPhone|iPad|iPod).+OS ([0-9_]+)/, 'iOS', 2 ],
 			[ /Mac OS X ([0-9_.]+)/, 'macOS' ],
+			// No version: reduced UAs freeze it at 14541.0.0 (U69).
+			[ /CrOS/, 'Chrome OS' ],
 			[ /Linux/, 'Linux' ],
 		];
 

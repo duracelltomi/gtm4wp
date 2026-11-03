@@ -118,11 +118,15 @@ function gtm4wp_blocks_to_item( entry ) {
  * @return {number} The total value.
  */
 function gtm4wp_blocks_value( list ) {
-	return list.reduce(
+	const total = list.reduce(
 		( sum, entry ) =>
 			sum + ( parseFloat( entry.item.price ) || 0 ) * entry.quantity,
 		0
 	);
+
+	// Rounded to cents like gtm4wp_make_sure_is_float(), which this bundle
+	// does not load: 4.35 * 3 is 13.049999999999999 (#631).
+	return isFinite( total ) ? parseFloat( total.toFixed( 2 ) ) : 0;
 }
 
 /**

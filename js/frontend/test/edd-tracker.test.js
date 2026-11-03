@@ -91,12 +91,12 @@ function purchase_form_fixture( item, price_options ) {
 	);
 }
 
-function checkout_cart_fixture() {
+function checkout_cart_fixture( price = 9.99, quantity = 2 ) {
 	const cart_item = {
 		item_id: '55',
 		item_name: 'My eBook',
-		price: 9.99,
-		quantity: 2,
+		price,
+		quantity,
 		cart_key: 0,
 	};
 
@@ -145,9 +145,13 @@ describe( 'gtm4wp-edd tracker', () => {
 		global.gtm4wp_apply_stored_item_list = jest.fn( ( item ) => item );
 
 		global.gtm4wp_push_ecommerce = jest.fn();
+		// Mirrors gtm4wp-ecommerce-generic.js, isFinite step included (#628).
 		global.gtm4wp_make_sure_is_float = ( value ) => {
 			const parsed = parseFloat( value );
-			return isNaN( parsed ) ? 0 : parseFloat( parsed.toFixed( 2 ) );
+			const rounded = isNaN( parsed )
+				? 0
+				: parseFloat( parsed.toFixed( 2 ) );
+			return isFinite( rounded ) ? rounded : 0;
 		};
 		global.gtm4wp_read_from_json = (
 			raw,
@@ -529,6 +533,40 @@ describe( 'gtm4wp-edd tracker', () => {
 		);
 		expect( call[ 1 ][ 0 ] ).not.toHaveProperty( 'cart_key' );
 		expect( call[ 2 ].value ).toBeCloseTo( 19.98 );
+	} );
+
+	it( 'reports remove_from_cart and quantity edits rounded to cents (#628)', () => {
+		// 4.35 * 3 is 13.049999999999999 in floating point.
+		document.body.innerHTML =
+			checkout_cart_fixture( 4.35, 3 ) +
+			'<input type="number" class="edd-input edd-item-quantity" value="3" />';
+		document
+			.querySelector( '.edd_cart_item td' )
+			.appendChild( document.querySelector( '.edd-item-quantity' ) );
+
+		boot_tracker();
+		global.gtm4wp_push_ecommerce.mockClear();
+
+		const qty_el = document.querySelector( '.edd-item-quantity' );
+		qty_el.value = '6';
+		qty_el.dispatchEvent( new window.Event( 'change', { bubbles: true } ) );
+
+		const add_call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'add_to_cart'
+		);
+		expect( add_call[ 2 ].value ).toBe( 13.05 );
+
+		global.gtm4wp_push_ecommerce.mockClear();
+		document
+			.querySelector( '.edd_cart_remove_item_btn' )
+			.dispatchEvent(
+				new window.MouseEvent( 'click', { bubbles: true } )
+			);
+
+		const remove_call = global.gtm4wp_push_ecommerce.mock.calls.find(
+			( c ) => c[ 0 ] === 'remove_from_cart'
+		);
+		expect( remove_call[ 2 ].value ).toBe( 13.05 );
 	} );
 
 	it( 'fires remove_from_cart from the cart block div rows', () => {

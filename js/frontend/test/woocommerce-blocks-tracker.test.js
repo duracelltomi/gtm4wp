@@ -144,6 +144,24 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		);
 	} );
 
+	it( 'reports value rounded to cents, as every other path does (#631)', () => {
+		const subscriber = loadTracker();
+		subscriber(); // baseline: empty cart
+
+		// 4.35 * 3 is 13.049999999999999 in floating point.
+		mockCartData = {
+			items: [ cartLine( 'A', 3, { item_id: 7, price: '4.35' } ) ],
+			totals: { currency_code: 'EUR' },
+		};
+		subscriber();
+
+		expect( window.gtm4wp_push_ecommerce ).toHaveBeenCalledWith(
+			'add_to_cart',
+			expect.anything(),
+			expect.objectContaining( { value: 13.05 } )
+		);
+	} );
+
 	it( 'fires remove_from_cart when a line quantity drops', () => {
 		mockCartData = {
 			items: [ cartLine( 'A', 3, { item_id: 7, price: 10 } ) ],

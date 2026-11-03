@@ -426,6 +426,36 @@ final class PluginRestWiringTest extends TestCase {
 	 * refund hooks through the shim so the WC/EDD parity is asserted at the
 	 * attachment as well.
 	 */
+	/**
+	 * #680: WooCommerce loads the cart session on admin-ajax, so a staff order
+	 * action (the orders list "Complete" button, a bulk action, an order edit
+	 * save) runs with a live, persisting session. remember_order() has no
+	 * requester check of its own: it stays safe only because its hooks are
+	 * registered on the frontend branch alone (PA-22 ledger). Pinned on an
+	 * admin boot with WooCommerce available and reliable purchase tracking on.
+	 */
+	public function test_boot_never_wires_remember_order_on_an_admin_request(): void {
+		$GLOBALS['gtm4wp_test_forced_functions'] = array( 'WC' => true );
+		$GLOBALS['woocommerce']                  = new \stdClass();
+		Functions\when( 'WC' )->justReturn( (object) array( 'version' => '11.2.0' ) );
+
+		try {
+			$this->boot_and_capture_rest_api_init(
+				array(
+					GTM4WP_OPTION_INTEGRATE_WCTRACKECOMMERCE    => true,
+					GTM4WP_OPTION_INTEGRATE_WCPURCHASEONANYPAGE => true,
+				)
+			);
+
+			foreach ( array( 'woocommerce_order_status_changed', 'woocommerce_payment_complete', 'woocommerce_thankyou' ) as $hook ) {
+				$this->assertFalse( has_action( $hook, 'GTM4WP\Modules\WooCommerce\PurchaseTracking->remember_order()' ), $hook );
+			}
+		} finally {
+			$GLOBALS['gtm4wp_test_forced_functions'] = array();
+			unset( $GLOBALS['woocommerce'] );
+		}
+	}
+
 	public function test_boot_wires_the_refund_send_lane_while_sending_is_on(): void {
 		$GLOBALS['gtm4wp_test_forced_functions'] = array(
 			'WC'            => true,

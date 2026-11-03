@@ -306,6 +306,105 @@ describe( 'gtm4wp-client-device-data', () => {
 		}
 	);
 
+	// #684: the UA fallback names a Chromium browser as its Client Hints brand
+	// does, not as Chrome; ChromeOS gets an OS name but no (frozen) version.
+	it.each( [
+		[
+			'Samsung Internet',
+			'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36',
+			{
+				browserName: 'Samsung Internet',
+				browserVersion: '26.0',
+				osName: 'Android',
+			},
+		],
+		[
+			'Amazon Silk',
+			'Mozilla/5.0 (Linux; Android 9; KFTRWI) AppleWebKit/537.36 (KHTML, like Gecko) Silk/126.4.1 like Chrome/126.0.6478.126 Safari/537.36',
+			{
+				browserName: 'Silk',
+				browserVersion: '126.4.1',
+				osName: 'Android',
+			},
+		],
+		[
+			'Yandex Browser',
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 YaBrowser/24.6.0.0 Safari/537.36',
+			{
+				browserName: 'Yandex Browser',
+				browserVersion: '24.6.0.0',
+				osName: 'Windows',
+			},
+		],
+		[
+			'Edge on Android',
+			'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 EdgA/126.0.0.0',
+			{
+				browserName: 'Edge',
+				browserVersion: '126.0.0.0',
+				osName: 'Android',
+			},
+		],
+		[
+			'Chrome on ChromeOS',
+			'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+			{
+				browserName: 'Chrome',
+				browserVersion: '126.0.0.0',
+				osName: 'Chrome OS',
+			},
+		],
+	] )(
+		'names %s from the userAgent fallback (#684)',
+		( label, userAgent, expected ) => {
+			setNavigator( { userAgent, userAgentData: undefined } );
+
+			loadTracker();
+
+			expect( deviceEvents()[ 0 ] ).toMatchObject( expected );
+		}
+	);
+
+	it( 'reports no frozen ChromeOS version from the userAgent fallback (#684)', () => {
+		setNavigator( {
+			userAgent:
+				'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+			userAgentData: undefined,
+		} );
+
+		loadTracker();
+
+		expect( deviceEvents()[ 0 ] ).not.toHaveProperty( 'osVersion' );
+	} );
+
+	it( 'names Yandex from YaBrowser, not its Yowser brand, via Client Hints (#684)', async () => {
+		// Brand list as Yandex sends it (ua-parser-js UA-CH fixture).
+		const brands = [
+			{ brand: 'Chromium', version: '130' },
+			{ brand: 'YaBrowser', version: '24.12' },
+			{ brand: 'Not?A_Brand', version: '99' },
+			{ brand: 'Yowser', version: '2.5' },
+		];
+		setNavigator( {
+			userAgent: 'ignored',
+			userAgentData: {
+				mobile: false,
+				platform: 'Windows',
+				brands,
+				getHighEntropyValues: () =>
+					Promise.resolve( { fullVersionList: brands } ),
+			},
+		} );
+
+		loadTracker();
+		await flushAsync();
+
+		expect( deviceEvents()[ 0 ] ).toMatchObject( {
+			browserName: 'Yandex Browser',
+			browserVersion: '24.12',
+		} );
+	} );
+
 	it( 'keeps a Mac without touch and an Android phone as before', () => {
 		setNavigator( {
 			userAgent:
