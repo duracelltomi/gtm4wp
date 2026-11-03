@@ -1167,7 +1167,7 @@ first) plus all nine sweeps against an R54 snapshot. No new surface. **FP-1 re-d
 Toolchain: no diff, all four plugin digests reproduce.
 
 **0 Critical / High, 1 Medium, 45 Low: 30 behaviour defects (#634–#663) and 16 upkeep items (#664–#679); #316
-re-opened.** No security finding reachable by A0–A3 against another person. Adjudication: 51 drafts, 15 verifiers;
+re-opened.** Six more Low items (#680–#685), found by the design verifiers, were logged after the fix sessions. No security finding reachable by A0–A3 against another person. Adjudication: 51 drafts, 15 verifiers;
 0 mechanisms refuted, 7 corrected, 1 draft dropped, **21 recommendations refuted or revised**, 1 disposition refuted
 (#316), 8 recorded premises failed. Snapshots clean, HEAD unchanged. Detail stays in the local report.
 **Fixes:** `3d9e670` (fix sessions 1 and 2, one commit; #316 by maintainer decision). Maintainer decisions 2026-11-02: #647, #653, #663 fixed in the follow-up commit; #661, #662 deferred to 2.2. #638 deferred to 2.2 (remove before the beta). **The base for the next review is `3d9e670`.**
@@ -1221,6 +1221,12 @@ re-opened.** No security finding reachable by A0–A3 against another person. Ad
 | 677 | Low | fixed (this ledger update) | — | this checklist | Row labels and inventory line references drifted |
 | 678 | Low | fixed (R57 fix session) | — | WC, EDD, cookie lib | Stale comments and pointers |
 | 679 | Low | fixed (R57 fix session) | — | GDM `RefundSender`, `SendLog` | Docblocks describe the wrong off-switch mechanism |
+| 680 | Low | not reproducible (R57 design verifier: the hooks are wired on the frontend branch only; pinned by a test, PA-22 note) | A3 unintended | WC reliable purchase, admin order actions | A staff session may be seeded with a buyer's order |
+| 681 | Low | deferred (maintainer decision 2026-11-03: to 2.2; the term stays out of cacheable HTML, client-side design verified) | — | visitor-data JS, PageVariables | Search term differs between tiers on permalink and empty searches |
+| 682 | Low | deferred (maintainer decision 2026-11-03: to 2.2; fixes built and probed against the real players) | — | JW Player and Wistia trackers | Some embed setups are not tracked |
+| 683 | Low | deferred (maintainer decision 2026-11-03: to 2.2; family-wide design built and probed) | — | HTML5 tracker | A seek during playback reports a new start |
+| 684 | Low | fixed (R57 follow-up: fallback names match Client Hints; ChromeOS without its frozen version; U69) | — | client device data JS | UA fallback misnames some browsers and ChromeOS |
+| 685 | Low | fixed (R57 follow-up: serialize() fallback when the row cannot be JSON-encoded) | — | `SettingsStore` | Lost-update hash is constant for an unencodable row |
 
 ### Report 56: `.security/code-review-report-2026-10-27-2008.md`
 
@@ -1236,13 +1242,13 @@ reclassified to upkeep, 3 collateral items promoted. Snapshots clean, HEAD uncha
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
-| 627 | Low | open | — | WC `AdminSchema` | Order-data description misstates where orderData appears |
-| 628 | Low | open | site code | EDD tracker JS | Two pushes send `value` unnormalised (#595 sibling) |
-| 629 | Low | open (needs design) | A4 config | Data Manager `SendLog` replay plan | A destination added after a failure is never sent the refund on replay |
-| 630 | Low | open (decision) | buyer's own session | WC `PageDataLayer` fallback lane | orderData scope on the fallback page lane differs from EDD |
-| 631 | Low | open | site code | WC blocks tracker JS | Blocks value sum not rounded (#595 family) |
-| 632 | Low | open | — | WC `PageDataLayer` | Confirm-purchase route gate not migrated with #626 |
-| 633 | Low | open | — | WC `ProductData`, a test | Two stale claims about the no-flag basis write |
+| 627 | Low | fixed (R57 follow-up: description and its 2.1 bullet describe the current orderData lanes; #630 kept) | — | WC `AdminSchema` | Order-data description misstates where orderData appears |
+| 628 | Low | fixed (R57 follow-up: both pushes rounded through the helper; exact-value test, stub matches the helper) | site code | EDD tracker JS | Two pushes send `value` unnormalised (#595 sibling) |
+| 629 | Low | deferred (maintainer decision 2026-11-03: to 2.2; needs design) | A4 config | Data Manager `SendLog` replay plan | A destination added after a failure is never sent the refund on replay |
+| 630 | Low | deferred (maintainer decision 2026-11-03: kept in 2.1, decided in 2.2 together with #638) | buyer's own session | WC `PageDataLayer` fallback lane | orderData scope on the fallback page lane differs from EDD |
+| 631 | Low | fixed (R57 follow-up: value rounded to cents, which the 2.1 bullet already promises for the block path) | site code | WC blocks tracker JS | Blocks value sum not rounded (#595 family) |
+| 632 | Low | deferred (maintainer decision 2026-11-03: to 2.2, with #633) | — | WC `PageDataLayer` | Confirm-purchase route gate not migrated with #626 |
+| 633 | Low | deferred (maintainer decision 2026-11-03: to 2.2, with #632) | — | WC `ProductData`, a test | Two stale claims about the no-flag basis write |
 
 ### Report 55: `.security/code-review-report-2026-10-27-1554.md`
 

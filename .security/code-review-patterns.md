@@ -1237,6 +1237,11 @@ vendor source, and check `Plugin::boot()` reaches the registration in each.
 - **After the R53 fix:** **3** sites (the WC trio above); `edd_built_order` capture moved to `boot()` via
   `CaptureHooks::register_for()`, pinned on an `is_admin()` boot by `PluginRestWiringTest` and against a second
   registration from the module by `GoogleDataManagerModuleTest`.
+- **R57 (#680): the WooCommerce `remember_order` trio is the exception, and its frontend-only registration is
+  load-bearing.** WooCommerce loads a live, persisting session on admin-ajax, so a staff order action (orders list
+  status button, bulk action, order edit save) wired to `remember_order()` would seed the buyer's order into the
+  staff member's session. Do not move it to `boot()`; catching the back-compat admin-ajax checkout needs a
+  requester gate first. Pinned by `PluginRestWiringTest::test_boot_never_wires_remember_order_on_an_admin_request`.
 
 ### PA-23: A platform's "may see it" predicate is not an "is the owner" predicate
 **Found:** R54, #528 (Medium, open; detail in the local report). Store platforms let staff view a customer's receipt
