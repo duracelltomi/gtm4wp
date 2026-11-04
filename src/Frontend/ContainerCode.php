@@ -547,9 +547,9 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 		add_filter( 'safe_style_css', array( self::class, 'allow_iframe_hiding_styles' ) );
 
 		try {
-			// print_markup_block(), not bare wp_kses(): the block mixes the iframe
-			// (whose src must keep &amp;) with console-warning <script> blocks, where
-			// an encoded && is a SyntaxError. Only script bodies get the & back.
+			// print_markup_block(), not bare wp_kses(): a part is the iframe (whose
+			// src must keep &amp;) or a console-warning <script> block, where an
+			// encoded && is a SyntaxError. Only script bodies get the & back.
 			$rules = array_merge(
 				ScriptTag::sanitize_rules(),
 				array(

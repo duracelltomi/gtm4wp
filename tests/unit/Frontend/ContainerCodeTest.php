@@ -1721,7 +1721,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( '<!-- End Google Tag Manager (noscript) -->', $output );
 	}
 
-	public function test_the_tag_wraps_get_tag_through_kses_with_iframe_rules(): void {
+	public function test_the_tag_passes_its_parts_through_kses_with_iframe_rules(): void {
 		$captured_rules = null;
 		Functions\when( 'wp_kses' )->alias(
 			static function ( $content, $allowed_html ) use ( &$captured_rules ) {
