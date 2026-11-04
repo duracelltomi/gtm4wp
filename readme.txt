@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 6.3
 Requires PHP: 8.0
 Tested up to: 7.1
-Stable tag: 2.0.6
+Stable tag: 2.1.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -307,7 +307,7 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changelog
 
-= 2.1 =
+= 2.1.0 =
 
 * Changed: for developers, `ContainerCode::header_top()` always prints its block; the never-used argument that made it return the block instead is gone.
 * Changed: the container loader requests `gtm.js` over `https://` instead of the protocol-relative `//` form the plugin has emitted since 1.x, matching the snippet Google publishes today. Only a site still served over plain http sees a difference; the `<noscript>` iframe already used `https://`.

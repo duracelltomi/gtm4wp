@@ -26,11 +26,11 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Key | Value |
 |---|---|
-| Released stable version | 2.0.6 |
-| Released stable branch | `2.0` |
-| wordpress.org Stable tag | 2.0.6 |
+| Released stable version | 2.1.0 |
+| Released stable branch | `2.1` |
+| wordpress.org Stable tag | 2.1.0 |
 | Development branch | `master` |
-| Development target | 2.1 |
+| Development target | 2.2 |
 | Frozen line | `1.x` (last release 1.22.5) |
 | Frozen line policy | unmaintained — ONLY a fix for a reported security issue lands there |
 | PHP floor | 8.0 |
