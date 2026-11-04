@@ -1003,7 +1003,7 @@ Adding `: string` over a value that has passed through somebody's filter (`get_*
 - **R57 (#634, #635): a filter CALLBACK is an entry point too.** The ledger above counts item sites; it never counted
   callbacks that receive a filter's running value. A callback that passes that value into a typed parameter fatals on
   a `null` from an earlier callback (the "forgot `return`" bug), and an untyped entry that forwards it does the same.
-  Ledger at R58: 4 `gtm4wp_compile_datalayer` callbacks, Blacklist the unguarded fourth (#686). Ledger at R57: 3 `gtm4wp_compile_datalayer` entry points (PageVariables, WC, EDD) and 4 visitor-scoped-fields
+  Ledger at R58: 4 `gtm4wp_compile_datalayer` callbacks, all guarded (Blacklist added, #686). Ledger at R57: 3 `gtm4wp_compile_datalayer` entry points (PageVariables, WC, EDD) and 4 visitor-scoped-fields
   callbacks, all guarded in the R57 fix session. Guard once at the entry with `is_array( $v ) ? $v : array()`, never an `(array)` cast (it wraps
   scalars). Re-derive: `grep -rn "add_filter( GTM4WP_WPFILTER_" src` and read each callback's first use of its argument.
 

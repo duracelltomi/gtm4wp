@@ -1170,17 +1170,17 @@ file in range, #656 widens nothing), **FP-2 re-derived** (rotation). Sweeps not 
 items (#690, #692).** Adjudication: 5 drafts, 5 verifiers, 1 draft dropped before dispatch; 1 mechanism corrected, 2
 narrowed, **3 recommendations refuted**, 2 left PLAUSIBLE; 4 rows came from verifier collateral. Snapshots clean, HEAD
 unchanged. Detail stays in the local report.
-**Fixes:** pending. **The base for the next review is `bdc063f`** until a fix commit is recorded here.
+**Fixes:** `7781a58`. Maintainer decisions 2026-11-04: #686, #687, #690, #692 fixed; #688 accepted (code kept, texts corrected). **The base for the next review is `7781a58`.**
 
 | # | Sev | Status | Actor | Where | Summary |
 |---|---|---|---|---|---|
-| 686 | Low | open | site code | Blacklist module | One compile-filter callback without the #634 guard |
-| 687 | Low | open | — | `readme.txt` | Cache-safe text claims more than the code does |
-| 688 | Low | open (needs a maintainer decision) | — | PageVariables, changelog bullet, public docs | Login values on a cached anonymous copy; detail in the local report |
+| 686 | Low | fixed (R58 fix session, maintainer decision: guard added, test red before) | site code | Blacklist module | One compile-filter callback without the #634 guard |
+| 687 | Low | fixed (R58 fix session: both readme copies narrowed to the data layer variables) | — | `readme.txt` | Cache-safe text claims more than the code does |
+| 688 | Low | accepted (maintainer decision 2026-11-04: #647 kept, changelog, readme and design doc corrected; public docs page to follow) | — | PageVariables, changelog bullet, public docs | Login values on a cached anonymous copy; the mode assumes caches bypass logged-in visitors |
 | 689 | Low | open (reach unverified) | A2 | Mixcloud tracker | Hand-written embed value; detail in the local report |
-| 690 | Low | open | — | GDM `SendLog` and siblings | Stale derived-field docblocks |
+| 690 | Low | fixed (R58 fix session) | — | GDM `SendLog` and siblings | Stale derived-field docblocks |
 | 691 | Low | open (reach unverified) | A0 | `ContainerCode` | One output path on a cached render; detail in the local report |
-| 692 | Low | open | — | `docs/dev/`, `VisitorDataEndpoint` | Stale design text |
+| 692 | Low | fixed (R58 fix session) | — | `docs/dev/`, `VisitorDataEndpoint` | Stale design text |
 | 693 | Low | open | site code | Compile filter, Blacklist | Late callback effect; detail in the local report |
 | 694 | Low | open (unverified) | — | Mixcloud tracker | Id normalisation question; detail in the local report |
 
