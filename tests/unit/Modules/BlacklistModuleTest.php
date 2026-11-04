@@ -62,6 +62,41 @@ final class BlacklistModuleTest extends TestCase {
 		$this->assertSame( count( $valid ), count( array_unique( $valid ) ) );
 	}
 
+	/**
+	 * #686 (RI-39): a string, object or scalar from an earlier compile-filter
+	 * callback is an Error on the key write. Null proves nothing here: PHP turns
+	 * it into an array on its own.
+	 */
+	public function test_a_non_array_from_an_earlier_callback_does_not_fatal(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'html',
+			)
+		);
+
+		foreach ( array( 'text', new \stdClass(), true, 5, null ) as $earlier ) {
+			$this->assertSame( array( 'gtm.blocklist' => array( 'html' ) ), $module->add_datalayer_data( $earlier ) );
+		}
+	}
+
+	public function test_an_array_from_an_earlier_callback_keeps_its_keys(): void {
+		$module = $this->make_module(
+			array(
+				GTM4WP_OPTION_BLACKLIST_ENABLE => 1,
+				GTM4WP_OPTION_BLACKLIST_STATUS => 'html',
+			)
+		);
+
+		$this->assertSame(
+			array(
+				'pagePostType'  => 'post',
+				'gtm.blocklist' => array( 'html' ),
+			),
+			$module->add_datalayer_data( array( 'pagePostType' => 'post' ) )
+		);
+	}
+
 	public function test_blacklist_mode_populates_gtm_blocklist(): void {
 		$module = $this->make_module(
 			array(

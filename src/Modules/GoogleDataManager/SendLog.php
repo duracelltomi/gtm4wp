@@ -604,13 +604,16 @@ final class SendLog {
 
 	/**
 	 * The ring as a reader wants it: newest first, as stored (what may be in
-	 * it is decided where it is written), plus three derived fields - `tone`,
-	 * how much attention the row deserves, `replayable`, whether a replay
-	 * would act on it, and `waiting`, a queued row with nothing newer about its
-	 * refund yet (the settings screen refreshes itself while one is). The second is answered from the replay plan rather than
-	 * from the row alone, so a failure a later success has overtaken does not
-	 * offer a replay that would queue nothing. The one shaping shared by the
-	 * settings screen's REST route and the ability.
+	 * it is decided where it is written), plus the derived fields: `tone`, how
+	 * much attention the row deserves, raised to warn for a queued job the
+	 * queue never ran and for `status_unknown`; `replayable`, whether a replay
+	 * would act on it; `waiting`, a queued row with nothing newer about its
+	 * refund yet (the settings screen refreshes itself while one is); and
+	 * `status_unknown`, an accepted row past the poll window with no final
+	 * answer. `replayable` comes from the replay plan rather than from the row
+	 * alone, so a failure a later success has overtaken does not offer a replay
+	 * that would queue nothing. The one shaping shared by the settings screen's
+	 * REST route and the ability.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */

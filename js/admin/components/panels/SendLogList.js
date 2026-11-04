@@ -138,10 +138,11 @@ function reasonLabel( reason ) {
 }
 
 /**
- * What Google reported once it had finished processing an accepted request.
+ * What Google reported once it had finished processing an accepted request,
+ * or that no final answer came.
  *
  * @param {Object} entry Stored entry.
- * @return {string} Text to show, empty while nothing is known yet.
+ * @return {string} Text to show, empty while polling may still bring an answer.
  */
 function resultLabel( entry ) {
 	// Polling ended without a final answer (#640).

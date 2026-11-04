@@ -269,6 +269,9 @@ final class BlacklistModule extends AbstractModule {
 	 * @return array
 	 */
 	public function add_datalayer_data( $data_layer ) {
+		// The key write below is an Error on a string, object or scalar (#686, RI-39).
+		$data_layer = is_array( $data_layer ) ? $data_layer : array();
+
 		$_gtmrestrictlistitems = self::restriction_items( $this->opt( GTM4WP_OPTION_BLACKLIST_STATUS ) );
 
 		// gtm.allowlist / gtm.blocklist are the documented key names (the legacy

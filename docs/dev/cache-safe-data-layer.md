@@ -88,7 +88,10 @@ Three semantics worth stating, because each is easy to invert:
     visitor, printed only when both `is_user_logged_in()` and the current user
     id say "anonymous", so a cached copy carries nothing user-specific; a
     logged-in render prints neither, and the Tier 3 resolvers stay `null` for
-    anonymous requests.
+    anonymous requests. The mode assumes caches bypass logged-in visitors: one
+    served an anonymous copy reads the logged-out pair, and `gtm4wp.visitorData`
+    corrects it only when the tab already holds a login entry, because the
+    baked nonce is refused and the #291 retry is anonymous.
   - `WooCommerce\PageDataLayer`: `add_customer_data`, `add_cart_content`,
     `maybe_add_readded_to_cart`, `maybe_add_pending_purchase`.
   - Untouched: content/URL/site data, and the content-driven ecommerce events
@@ -123,8 +126,9 @@ same `gtm4wp-visitor-data` runtime, with **no** new per-page request. The
      username, id): fetched only when the **login gate cookie changed**. Because JS
      cannot read the HttpOnly WordPress auth cookie, `VisitorDataModule` maintains a
      JS-readable companion cookie (`gtm4wp_login`, an opaque per-session token via
-     `wp_hash()`) — set on login, cleared on logout, refreshed opportunistically on
-     `init`. An anonymous visitor never has it, so it never fetches user data.
+     `wp_hash()`) — written on `init`, so set on the first uncached front-end or
+     REST request after login and cleared after logout. An anonymous visitor never
+     has it, so it never fetches user data.
 2. **WooCommerce customer & cart** ride the existing **cart-fragments** response
    (`woocommerce_add_to_cart_fragments`), so GTM4WP adds no request of its own — the
    fragment AJAX already fires on cart mutation and re-applies from its
@@ -202,8 +206,8 @@ delivering nothing without throwing, and the config-name fallbacks).
 The two WooCommerce one-shot events — `maybe_add_readded_to_cart` (an `add_to_cart`
 after the cart "Undo") and `maybe_add_pending_purchase` (the reliable-tracking
 `purchase` fallback) — are now **delivered client-side** too, so with the mode on
-**no** visitor/session value is rendered into cacheable HTML at all. The epic is
-complete.
+no visitor-specific data layer variable is rendered into cacheable HTML (the #647
+constants aside). The epic is complete.
 
 Unlike the customer/cart block, a one-shot must fire **exactly once**, and the
 `purchase` fallback carries revenue where a double-count is costly. So they are

@@ -26,7 +26,7 @@ use GTM4WP\Tests\unit\Google\KeyFileFixture;
 /**
  * The gtm4wp/get-google-data-manager-log ability hands over the same rows the settings
  * screen lists, through the one shaping SendLog owns. Pinned: the order, the
- * three derived fields, the problems filter, the cap, the queue summary, and -
+ * derived fields, the problems filter, the cap, the queue summary, and -
  * the property that matters most for a transcript - that a row carries the
  * stored allow-list of members and nothing else. Plus the hand-over: the
  * module's admin schema is how the Registrar finds this provider.

@@ -159,8 +159,9 @@ to everyone else as well. Any visitor specific value written into the data layer
 classic example being a page cached while an editor was logged in, then served to anonymous visitors with that editor's email
 address and role still in the data layer.
 
-When this option is enabled, no visitor or session data is written into cacheable HTML at all. Those values are delivered in the
-browser instead, under the same data layer variable names, so your existing Google Tag Manager setup keeps working.
+When this option is enabled, the visitor-specific data layer variables (IP address, logged-in user, store customer and cart) are
+left out of cacheable HTML and delivered in the browser instead, under the same names, so your existing Google Tag Manager setup
+keeps working. An anonymous page keeps the fixed logged-out values of visitorLoginState and visitorType.
 
 = Export & import your settings =
 
@@ -279,8 +280,8 @@ Yes, this is a real risk with any full page cache, and it is not specific to thi
 stored and served to everyone else. If visitor specific values (email address, user role, IP address) are written into the data
 layer, the cached copy will contain the values of whoever happened to trigger the caching.
 
-Turn on the "Cache-safe data layer" option to avoid this. With it enabled, no visitor or session data is written into cacheable
-HTML; those values are delivered in the browser instead, under the same data layer variable names.
+Turn on the "Cache-safe data layer" option to avoid this. With it enabled, the visitor-specific data layer variables are left out
+of cacheable HTML and delivered in the browser instead, under the same names.
 
 = Why does the plugin load several separate JavaScript files instead of one? =
 
@@ -327,7 +328,7 @@ The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changel
 * Fixed: page-caching issues in WooCommerce purchase tracking. Details are withheld until the fix reaches every supported version.
 * Fixed: with the cache-safe data layer on, a site filter putting a value JSON cannot encode (such as `NAN`) into one visitor data field no longer empties the whole response; only that field is left out.
 * Fixed: a site filter returning a non-numeric product price, or something other than an item, order data or purchase array, no longer stops WooCommerce pages with a PHP error or adds an empty item to the data layer. A non-numeric price counts as zero; anything else leaves that item, `orderData` or purchase out.
-* Fixed: a `gtm4wp_compile_datalayer` or `gtm4wp_visitor_scoped_fields` filter callback that returns nothing instead of the array no longer stops WooCommerce pages, or every page with the cache-safe data layer on, with a PHP error.
+* Fixed: a `gtm4wp_compile_datalayer` or `gtm4wp_visitor_scoped_fields` filter callback that returns something other than an array no longer stops WooCommerce pages, pages with tag restrictions, or every page with the cache-safe data layer on, with a PHP error.
 * Fixed: on a site whose address uses non-Latin characters (an internationalised domain), the WooCommerce and Easy Digital Downloads purchase and re-add confirmations from the browser were refused, so orders could be counted again on another device.
 * Fixed: behind a server that reports visitors' IPv4 addresses in IPv6 form (`::ffff:…`), `visitorIP` was left out and the trusted proxy list and the Cloudflare country code did not match.
 * Fixed: the WooCommerce `add_to_cart` for an item restored with "Undo" now reports the product the cart shows, as the matching `remove_from_cart` does, for bundle and composite products.
@@ -339,7 +340,7 @@ The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changel
 * Fixed: with the cache-safe data layer on, `siteSearchFrom` is cleaned and encoded exactly like the classic data layer, and is empty instead of missing on a search with no referring page, so both report the same value.
 * Fixed: the descriptions of the **"Post type"**, **"Logged in user creation date"**, **"Site ID"**, **"Site name"** and **"Spotify events"** settings now say what they report.
 * Changed: Wistia percentage milestones follow the playhead, like every other video provider, instead of the share of the video watched, so seeking ahead now fires the milestones passed.
-* Fixed: with the cache-safe data layer on, an anonymous visitor gets `visitorLoginState` `logged-out` and `visitorType` `visitor-logged-out` again, in the page's first data layer push, as with the classic data layer. Logged-in visitors still get theirs from `gtm4wp.visitorData`.
+* Fixed: with the cache-safe data layer on, an anonymous visitor gets `visitorLoginState` `logged-out` and `visitorType` `visitor-logged-out` again, in the page's first data layer push, as with the classic data layer. Logged-in visitors get theirs from `gtm4wp.visitorData`, so keep them out of anonymous cached pages, where the logged-out values can stay.
 * Changed: device data reports `Chrome` and `Edge` instead of `Google Chrome` and `Microsoft Edge`, Windows `osVersion` as `10.0` or `11.0`, `tablet` as a `deviceType` again, and Samsung Internet, Silk, Yandex Browser and `Chrome OS` by name instead of as Chrome or nothing, as 1.x did. Update GTM triggers that match the old values.
 * Fixed: when a stored option or another plugin's module holds a value the settings screen cannot send to the browser, the screen now says so instead of blaming an ad blocker.
 * Fixed: the WooCommerce **"Order statuses that trigger the purchase event"** description now says that an empty list counts every order except failed ones.
@@ -445,6 +446,9 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 Older releases are listed in the full changelog: https://gtm4wp.com/changelog/1-x
 
 == Upgrade Notice ==
+
+= 2.1.0 =
+Adds Easy Digital Downloads tracking. Device data now reports Chrome and Edge under shorter names and tablets as tablet, and Wistia milestones follow the playhead, so update GTM triggers that match the old values.
 
 = 2.0.0 =
 Major rewrite: requires PHP 8.0 and WordPress 6.3. Weather/geo data, scroll tracking and the bundled WhichBrowser library were removed. Public API (template functions, hooks, options) is unchanged.

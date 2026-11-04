@@ -639,7 +639,7 @@ final class GoogleDataManagerRestControllerTest extends TestCase {
 		$this->assertSame(
 			array( 'time', 'feature', 'reference', 'destination', 'outcome', 'attempt', 'status', 'request_id', 'reason', 'result', 'error_class', 'errors', 'warnings', 'tone', 'replayable', 'waiting', 'status_unknown' ),
 			array_keys( $entries[0] ),
-			'The route adds exactly three derived fields to what the ring stores, and nothing else joins it.'
+			'The route adds only the derived fields to what the ring stores, and nothing else joins it.'
 		);
 	}
 

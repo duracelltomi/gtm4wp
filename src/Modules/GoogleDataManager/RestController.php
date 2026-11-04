@@ -173,8 +173,8 @@ final class RestController {
 
 	/**
 	 * GET handler: the diagnostics ring as the settings screen shows it -
-	 * newest first, with `tone` and `replayable` derived per row. The shaping
-	 * lives in SendLog, shared with the gtm4wp/get-google-data-manager-log
+	 * newest first, with SendLog::entries_for_display()'s derived fields. The
+	 * shaping lives in SendLog, shared with the gtm4wp/get-google-data-manager-log
 	 * ability.
 	 *
 	 * @return \WP_REST_Response

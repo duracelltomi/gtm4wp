@@ -28,8 +28,10 @@ defined( 'ABSPATH' ) || exit;
  *   (PageDataLayer's confirm_* routes). A mutating GET could be fired by a
  *   cross-site navigation carrying SameSite=Lax cookies.
  * - A logged-in caller sends the wp_rest nonce so the user fields resolve (a
- *   logged-in page is never cached, so it is fresh); an anonymous caller sends
- *   none, so a stale nonce in a cached page never 403s the read.
+ *   logged-in render is never cached, so it is fresh; an anonymous copy served
+ *   to a logged-in visitor gets a 403 and the #291 anonymous retry); an
+ *   anonymous caller sends none, so a stale nonce in a cached page never 403s
+ *   the read.
  * - The response carries a FRESH wp_rest nonce for the beacons. For a guest it
  *   is a site-wide constant per tick: it filters junk and authenticates nobody;
  *   the beacons' CSRF gate is the Origin check (#78).
