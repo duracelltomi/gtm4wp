@@ -311,6 +311,7 @@ The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changel
 
 * Changed: for developers, `ContainerCode::header_top()` always prints its block; the never-used argument that made it return the block instead is gone.
 * Changed: the container loader requests `gtm.js` over `https://` instead of the protocol-relative `//` form the plugin has emitted since 1.x, matching the snippet Google publishes today. Only a site still served over plain http sees a difference; the `<noscript>` iframe already used `https://`.
+* Fixed: the `<noscript>` part of the container code stays on the page on WordPress 7.2, whose new HTML filter would have removed it. Sites verified in Search Console through Tag Manager rely on this part.
 * Fixed: with the container code placement set to **"Off"** and no container ID entered, the data layer and the server-side WooCommerce events, purchase included, were not written. "Off" is the data-layer-only setup and needs no container ID, so these sites now get the full data layer.
 * Fixed: the plugin no longer buffers every WooCommerce template part on every page. That buffering only fed the classic "Products" widget, whose tracking had been dead since 2017. If a GTM trigger filters on an `item_list_name` ending in "(widget)", remove that condition.
 * Fixed: the description of the WooCommerce **"Order data in data layer"** setting now says it needs "Track e-commerce" and where `orderData` appears: the order received page, even for a tracked order, the next page of the reliable purchase fallback without the cache-safe data layer, and theme or builder thank-you pages with the purchase.
@@ -420,13 +421,9 @@ The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changel
 * Fixed: the data layer initialisation block no longer contains the word `gtag`. Since 2.0.3, a JavaScript delay plugin with `gtag` on its keyword list, such as Flying Scripts, delayed the whole block and the browser console showed `dataLayer is not defined`. The Google tag developer ID is still set.
 * Fixed: a page with no data layer variables to report no longer pushes an empty array into the data layer; `dataLayer_content` is then an empty object and is not pushed. Content that is pushed is always an object, never an array, which GTM would read as a command.
 
-= 2.0.4 =
+= 2.0.1 to 2.0.4 =
 
-* Fixed: on the classic WooCommerce checkout, an error in the plugin's checkout step tracking could stop the order from being submitted the normal way, so a gateway that adds card details in the browser, such as Stripe, rejected it. Tracking errors can no longer interrupt the checkout or a variation selection, and still show in the browser console. (#472)
-
-= 2.0.1 to 2.0.3 =
-
-Bug fix releases of the 2.0 line. Their changes are listed in the full changelog: https://gtm4wp.com/changelog#v2-0-3
+Bug fix releases of the 2.0 line. Their changes are listed in the full changelog: https://gtm4wp.com/changelog#v2-0-4
 
 = 2.0.0 =
 

@@ -60,6 +60,12 @@ final class ContainerCode {
 	public const DEVELOPER_ID = 'dNGJiYT';
 
 	/**
+	 * The two tag_parts() elements the_tag() prints as they are: from 7.2 wp_kses()
+	 * cuts the string at an opening <noscript>, whatever the rule set allows.
+	 */
+	private const NOSCRIPT_TAGS = array( '<noscript>', '</noscript>' );
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Options         $options    The plugin options service.
@@ -449,6 +455,16 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 	 * @return string The HTML code that includes the noscript/iframe part of the GTM container code.
 	 */
 	public function get_tag(): string {
+		return implode( '', $this->tag_parts() );
+	}
+
+	/**
+	 * The markup of get_tag() as a list, each noscript tag its own element, so
+	 * the_tag() can tell our two literals from sanitized markup without parsing.
+	 *
+	 * @return string[]
+	 */
+	private function tag_parts(): array {
 		$no_console_log = (bool) $this->options->get( GTM4WP_OPTION_NOCONSOLELOG );
 		$containers     = $this->containers();
 		$excluded_role  = $this->excluded_user_role();
@@ -483,6 +499,8 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			}
 		}
 
+		$parts = array( $_gtm_tag );
+
 		if ( ( array() !== $containers ) && ( ! ( $GLOBALS['gtm4wp_container_code_written'] ?? false ) ) ) {
 			foreach ( $containers as $one_container ) {
 				$one_gtm_id = (string) ( $one_container[ ContainerRows::COLUMN_ID ] ?? '' );
@@ -494,19 +512,24 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 				// form) and gtm4wp_get_the_gtm_tag() returns this string as public
 				// 1.x API (RI-4).
 				if ( preg_match( ContainerRows::GTM_ID_PATTERN, $one_gtm_id ) ) {
-					$_gtm_tag .= '
-				<noscript><iframe src="https://' . esc_attr( $this->container_domain( $one_container ) ) . '/ns.html?id=' . esc_attr( $one_gtm_id ) . $this->container_environment( $one_container ) . '"
-				height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe></noscript>';
+					array_push(
+						$parts,
+						"\n\t\t\t\t",
+						self::NOSCRIPT_TAGS[0],
+						'<iframe src="https://' . esc_attr( $this->container_domain( $one_container ) ) . '/ns.html?id=' . esc_attr( $one_gtm_id ) . $this->container_environment( $one_container ) . '"
+				height="0" width="0" style="display:none;visibility:hidden" aria-hidden="true"></iframe>',
+						self::NOSCRIPT_TAGS[1]
+					);
 				}
 			}
 
-			$_gtm_tag .= '
+			$parts[] = '
 <!-- End Google Tag Manager (noscript) -->';
 
 			$GLOBALS['gtm4wp_container_code_written'] = true;
 		}
 
-		return $_gtm_tag;
+		return $parts;
 	}
 
 	/**
@@ -527,22 +550,26 @@ j=d.createElement(s),dl=l!=\'dataLayer\'?\'&l=\'+l:\'\';j.async=true;j.src=
 			// print_markup_block(), not bare wp_kses(): the block mixes the iframe
 			// (whose src must keep &amp;) with console-warning <script> blocks, where
 			// an encoded && is a SyntaxError. Only script bodies get the & back.
-			$this->script_tag->print_markup_block(
-				$this->get_tag(),
-				array_merge(
-					ScriptTag::sanitize_rules(),
-					array(
-						'noscript' => array(),
-						'iframe'   => array(
-							'src'         => array(),
-							'height'      => array(),
-							'width'       => array(),
-							'style'       => array(),
-							'aria-hidden' => array(),
-						),
-					)
+			$rules = array_merge(
+				ScriptTag::sanitize_rules(),
+				array(
+					'iframe' => array(
+						'src'         => array(),
+						'height'      => array(),
+						'width'       => array(),
+						'style'       => array(),
+						'aria-hidden' => array(),
+					),
 				)
 			);
+
+			foreach ( $this->tag_parts() as $part ) {
+				if ( in_array( $part, self::NOSCRIPT_TAGS, true ) ) {
+					echo $part; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- one of the two NOSCRIPT_TAGS literals.
+				} else {
+					$this->script_tag->print_markup_block( $part, $rules );
+				}
+			}
 		} finally {
 			// So an exception in the sink cannot leave the allow-list widened.
 			remove_filter( 'safe_style_css', array( self::class, 'allow_iframe_hiding_styles' ) );

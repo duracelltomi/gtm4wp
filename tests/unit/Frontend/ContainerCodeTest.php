@@ -1685,6 +1685,42 @@ final class ContainerCodeTest extends FrontendTestCase {
 		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123&amp;gtm_auth=authtoken', $output );
 	}
 
+	/**
+	 * From WordPress 7.2 wp_kses() keeps nothing after an opening <noscript>, even
+	 * when the rule set allows it, and drops any tag outside the rule set (UC-3).
+	 */
+	public function test_the_tag_keeps_the_iframe_on_a_kses_that_cuts_at_noscript(): void {
+		Functions\when( 'wp_kses' )->alias(
+			static function ( $content, $allowed_html ) {
+				$kept = preg_split( '/<noscript\b/i', (string) $content, 2 )[0];
+				$kept = preg_replace_callback(
+					'#</?([a-z]+)\b[^>]*>#i',
+					static fn( array $tag ): string => isset( $allowed_html[ strtolower( $tag[1] ) ] ) ? $tag[0] : '',
+					$kept
+				);
+
+				return str_replace( '&', '&amp;', $kept );
+			}
+		);
+
+		$container = $this->make_container(
+			array(
+				GTM4WP_OPTION_GTM_CODE        => 'GTM-ABC123,GTM-DEF456',
+				GTM4WP_OPTION_ENV_GTM_AUTH    => 'authtoken',
+				GTM4WP_OPTION_ENV_GTM_PREVIEW => 'env-2',
+			)
+		);
+
+		ob_start();
+		$container->the_tag();
+		$output = ob_get_clean();
+
+		$this->assertSame( 2, substr_count( $output, '<noscript><iframe ' ) );
+		$this->assertSame( 2, substr_count( $output, '</iframe></noscript>' ) );
+		$this->assertStringContainsString( 'src="https://www.googletagmanager.com/ns.html?id=GTM-DEF456&amp;gtm_auth=authtoken&amp;gtm_preview=env-2&amp;gtm_cookies_win=x"', $output );
+		$this->assertStringContainsString( '<!-- End Google Tag Manager (noscript) -->', $output );
+	}
+
 	public function test_the_tag_wraps_get_tag_through_kses_with_iframe_rules(): void {
 		$captured_rules = null;
 		Functions\when( 'wp_kses' )->alias(
@@ -1702,7 +1738,7 @@ final class ContainerCodeTest extends FrontendTestCase {
 
 		$this->assertStringContainsString( 'ns.html?id=GTM-ABC123', $output );
 		$this->assertArrayHasKey( 'script', $captured_rules );
-		$this->assertArrayHasKey( 'noscript', $captured_rules, 'the_tag() must allow the noscript wrapper through wp_kses().' );
+		$this->assertArrayNotHasKey( 'noscript', $captured_rules, 'The noscript wrapper is printed by the_tag() itself and must not reach wp_kses().' );
 		$this->assertArrayHasKey( 'iframe', $captured_rules, 'the_tag() must allow the container iframe through wp_kses().' );
 	}
 
