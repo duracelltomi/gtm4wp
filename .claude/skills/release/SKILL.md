@@ -130,13 +130,32 @@ e. **`.support/forum-answers.md`** (git-ignored): add/refresh the epoch banner
 f. Re-run `vendor/bin/phpunit` — the consistency test is the final agreement
    check.
 
-## 7. External checklist — print it for the maintainer, these are manual
+## 7. wordpress.org SVN release, then the external checklist
 
-- **wordpress.org SVN push** (separate SVN working copy on the maintainer's PC;
-  the release ZIP's layout is SVN-ready). After the push, verify: plugins-API
-  version, `svn ls` of `tags/X.Y.Z` and `trunk` (the shipped items incl. `build/`),
-  `Stable tag` in BOTH readmes, and a per-file hash compare of the wp.org-built
-  ZIP against the local one.
+Claude runs the SVN release with the `svn` CLI (maintainer's request, 2026-11-05),
+from the SVN working copy on the maintainer's PC, whose path is in project memory.
+The maintainer picks the moment: the update API opens about 6 hours after the commit
+and a blocked release only emails the committer, so push when they can watch.
+The release ZIP's layout is SVN-ready. Stop at the first check that fails.
+
+1. `svn update`; `svn status` must be empty.
+2. Delete everything under `trunk/` and extract the ZIP's top folder into it.
+   `svn commit` carries only versioned files, so stage both directions:
+   `svn add --force trunk`, then `svn rm` every path `svn status` marks `!`.
+3. **Gate:** `svn status` shows no `?` and no `!`, and `trunk` equals the ZIP per
+   file, same count and same hashes. 2.1.0 shipped 75 files short without this: the
+   2.0.x patches added no files, and the package fatalled at boot until `trunk` and
+   the tag were corrected.
+4. `svn commit trunk`, then a server-side
+   `svn copy <repo>/trunk <repo>/tags/X.Y.Z`. To correct a tag later, edit it in
+   place, so its creation date (§7a) stays.
+5. Verify: plugins-API version, `tags/X.Y.Z` and `trunk` exported and compared per
+   file, `Stable tag` in BOTH readmes, and the wp.org ZIP compared per file, **file
+   count first** (a compare of common files alone passes on a short package). Use
+   the plain download URL: a query string bypasses the CDN and reports the rebuilt
+   package while installs still get the stale one.
+
+Then, for the maintainer:
 - **Changelog page and post** - see §7a; it runs after the SVN verification.
 - **Screenshots/banners** if the UI changed — images to SVN `/assets`, caption
   edits to `tags/X.Y.Z/readme.txt` + `trunk` + git `readme.txt`.

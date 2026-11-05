@@ -142,7 +142,7 @@ recorded rather than assumed good.
 Run the skill's [fix-status resolver](../skills/wporg-forum-triage/SKILL.md) **once per
 sweep**, not once per topic: read `.claude/RELEASE-STATE.md` for the branch map, pull
 the published version from the wordpress.org API, read the released stable branch's
-changelog for the released fixes (`git show 2.0:CHANGELOG.md` <!-- release-coupled -->)
+changelog for the released fixes (`git show 2.1:CHANGELOG.md` <!-- release-coupled -->)
 and the frozen line's for what it ever received (`git show 1.x:CHANGELOG.md`). Hold both
 lists in mind while classifying.
 

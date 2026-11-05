@@ -21,6 +21,7 @@ Rules:
 -->
 
 Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
+Epoch: **2026-11-05** — 2.1.0 became the wordpress.org stable; `2.0` frozen like `1.x`.
 
 ## Facts
 
@@ -33,6 +34,7 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 | Development target | 2.2 |
 | Frozen line | `1.x` (last release 1.22.5) |
 | Frozen line policy | unmaintained — ONLY a fix for a reported security issue lands there |
+| Also frozen | `2.0` (last release 2.0.6), same policy |
 | PHP floor | 8.0 |
 | WP floor | 6.3 |
 | WP tested up to | 7.1 |
@@ -42,12 +44,12 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 ## Branch and bugfix flow
 
 - A bugfix to the released stable lands on BOTH `master` and the released
-  stable branch, and ships as a patch release (2.0.x) cut from that branch.
+  stable branch, and ships as a patch release (2.1.x) cut from that branch.
 - New feature work lands on `master` only.
 - At each new minor/major release the /release skill creates a maintenance
   branch at the release commit. What happens to the *previous* stable branch is
   a maintainer decision made at that release — record it here when made (the
-  1.x precedent: frozen, reported-security-fixes only).
+  1.x precedent: frozen, reported-security-fixes only; `2.0` the same at 2.1.0).
 
 ## Support consequences (for the triage skills and sweeps)
 
@@ -62,6 +64,7 @@ Epoch: **2026-09-01** — 2.0.0 became the wordpress.org stable.
 
 | Date | Event |
 |---|---|
+| 2026-11-05 | 2.1.0 stable released from `master` (release commit `514fe74`, `2.1` branch created there; GitHub 2026-11-04, asset SHA256-verified, 207 entries, 180 files; gate: reviews 58 and 59 no blocker, 81 open rows re-evaluated, none met the bar; upstream drift check no blockers; readme changelog 3,971 words); `2.0` frozen, reported-security-fixes only. wordpress.org SVN 2026-11-05: r3785522/r3785527 carried only modified files, corrected by r3785560 ten minutes later (`trunk` and `tags/2.1.0` then 180 files per-file identical); the update API still held 2.0.6 throughout |
 | 2026-10-27 | 2.1.0-rc2 (GitHub pre-release from `master`, release commit `7219f82`; asset SHA256-verified, header + `GTM4WP_VERSION` 2.1.0-rc2, single slug top folder, 207 entries; `Stable tag` stays 2.0.6; gate: review 56 covers the review 55 fix session through `821758a` (no blocker; 7 Low open for 2.1.0 final), upstream drift check no blockers (WP 7.1.3 / 7.2-beta2, WC 11.2.1 / 11.3.0-beta.1, CF7 6.2.3, EDD 3.7.2); readme changelog 3,428 words) |
 | 2026-10-12 | 2.1.0-rc1 (GitHub pre-release from `master`, release commit `f7f4580`; feature freeze for 2.1.0; asset SHA256-verified, header + `GTM4WP_VERSION` 2.1.0-rc1, single slug top folder, 206 entries; `Stable tag` stays 2.0.6; gate: review 52 covers `master` through `d376348`, later `src/` change `60798ce` comment-only; upstream drift check no blockers (WC 11.2.1, CF7 6.2.2, EDD 3.7.1.1 reach no coupling); readme changelog 4,238 words, trim below ~4,000 before 2.1.0) |
 | 2026-10-12 | 2.0.6 patch released, cut from `2.0` (release commit `b005451`; GitHub asset SHA256-verified, header + `GTM4WP_VERSION` 2.0.6, single slug top folder, 108 files; gate: review 52 covers `2.0` through `ebb8e19`, its fix `041fc08` comment-only in `src/`; upstream drift check no blockers); 18 bullets incl. #477 and #474, all also on `master`; wordpress.org SVN 2026-10-12 09:33 CEST (r3740725), verified: `tags/2.0.6` zip 108 files per-file identical, SVN `trunk` export identical, `tags/2.0.6` + `trunk` carry `build/` and `Stable tag: 2.0.6`, plugins API 2.0.6 the same minute (update-check still in the review cooldown) |

@@ -128,8 +128,8 @@ curl -s "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&r
   | python -c "import sys,json; d=json.load(sys.stdin); print(d['version'], d['last_updated'])"
 
 # 2. Fixed in the released stable line?  (authoritative — the released branch, not master, not the working tree)
-git show 2.0:CHANGELOG.md | sed -n '/^## 2.0/,/^## 1.21.1/p'      # release-coupled
-git show 2.0:readme.txt | grep -i "stable tag"                     # release-coupled
+git show 2.1:CHANGELOG.md | sed -n '/^## 2.1/,/^## 1.21.1/p'      # release-coupled
+git show 2.1:readme.txt | grep -i "stable tag"                     # release-coupled
 
 # 3. Reporter pinned to the frozen line (site below the WP/PHP floors)? What their line ever received:
 git show 1.x:CHANGELOG.md | sed -n '/^## 1.22.5/,/^## 1.21.1/p'   # release-coupled
@@ -243,7 +243,7 @@ So, before a claim goes into a draft:
 
 - **Naming a setting?** Confirm the exact label exists in the branch the reporter runs
   (default: the released stable branch per `.claude/RELEASE-STATE.md` — **not** `master`,
-  which carries unreleased work, and not whatever is checked out). `git show 2.0:<path>`
+  which carries unreleased work, and not whatever is checked out). `git show 2.1:<path>`
   rather than a working-tree read; `git show 1.x:<path>` when the reporter says they are
   on the frozen line. <!-- release-coupled -->
   Never describe a toggle from memory or by analogy.
@@ -337,7 +337,7 @@ Scaffolds, not fixed text — rewrite every time. `{…}` are fill-ins.
 <!-- release-coupled: line names and floors below come from RELEASE-STATE.md -->
 > Hi @{reporter},
 >
-> This is fixed in GTM4WP {released version}, which is already released. The 2.0 line
+> This is fixed in GTM4WP {released version}, which is already released. GTM4WP 2.x
 > requires WordPress 6.3 and PHP 8.0, so your site needs those updates first to receive
 > it. The 1.x line does not receive bugfixes anymore, only security fixes, so I cannot
 > offer a fix for {their 1.22.x version} itself. {If a workaround exists, give it here,

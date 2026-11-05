@@ -97,7 +97,7 @@ gh issue list --state all --search "<key terms>" --limit 20 \
 - Search `CHANGELOG.md` and recent commits for the symptom — many open issues filed
   against an older line are fixed in the released stable. "Released" means the released
   stable branch per `.claude/RELEASE-STATE.md`
-  (`git show 2.0:CHANGELOG.md` <!-- release-coupled -->); `master` carries unreleased
+  (`git show 2.1:CHANGELOG.md` <!-- release-coupled -->); `master` carries unreleased
   work. Use `git log --oneline --all --grep=<term>` and `Grep` over `CHANGELOG.md`.
 - If it duplicates another issue → outcome **duplicate** (link the canonical one).
 - If it's fixed but unreleased → draft a comment naming the fixing commit/PR and
@@ -165,7 +165,7 @@ be quoted back. Before a claim goes into a comment:
 
 - **Naming a setting?** Confirm the exact label exists in the branch the reporter runs. An
   issue filed against the current released version means the released stable branch per
-  `.claude/RELEASE-STATE.md` (`git show 2.0:<path>` <!-- release-coupled -->); one filed
+  `.claude/RELEASE-STATE.md` (`git show 2.1:<path>` <!-- release-coupled -->); one filed
   against the frozen line means that line's branch — **not** `master`, which carries
   unreleased work, and not whatever is checked out. The settings screen was reorganised
   in 2.0, so the *location* differs even where the label does not.

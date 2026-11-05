@@ -50,7 +50,7 @@ previous major, and not against last week's working tree. Two consequences:
   right below the unreleased one, so they stay informed either way.
 
 Before writing "previously…", "the last version did…", or "no longer…", confirm the
-claim against the released code (`git grep <symbol> 2.0` <!-- release-coupled: the
+claim against the released code (`git grep <symbol> 2.1` <!-- release-coupled: the
 released stable branch -->). A bullet whose "previously" only ever existed on the
 development branch describes nothing the reader lived through.
 
