@@ -5,7 +5,7 @@ Tags: google tag manager, tag manager, gtm, google ads, google analytics
 Requires at least: 6.3
 Requires PHP: 8.0
 Tested up to: 7.1
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl.html
 
@@ -307,6 +307,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changelog
 
+= 2.1.1 =
+
+* Fixed: some sites received an incomplete 2.1.0 package and stopped with a fatal error naming `EasyDigitalDownloadsModule`. 2.1.1 is the same code as a complete package. A site already showing the error needs the plugin folder removed and the plugin installed again.
+
 = 2.1.0 =
 
 * Changed: for developers, `ContainerCode::header_top()` always prints its block; the never-used argument that made it return the block instead is gone.
@@ -443,6 +447,9 @@ Major rewrite of the plugin. Please read the announcement post on gtm4wp.com bef
 Older releases are listed in the full changelog: https://gtm4wp.com/changelog/1-x
 
 == Upgrade Notice ==
+
+= 2.1.1 =
+Same code as 2.1.0 in a complete package, for sites that received an incomplete 2.1.0.
 
 = 2.1.0 =
 Adds Easy Digital Downloads tracking. Device data now reports Chrome and Edge under shorter names and tablets as tablet, and Wistia milestones follow the playhead, so update GTM triggers that match the old values.

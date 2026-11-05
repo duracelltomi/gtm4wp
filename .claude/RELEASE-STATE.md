@@ -27,9 +27,9 @@ Epoch: **2026-11-05** — 2.1.0 became the wordpress.org stable; `2.0` frozen li
 
 | Key | Value |
 |---|---|
-| Released stable version | 2.1.0 |
+| Released stable version | 2.1.1 |
 | Released stable branch | `2.1` |
-| wordpress.org Stable tag | 2.1.0 |
+| wordpress.org Stable tag | 2.1.1 |
 | Development branch | `master` |
 | Development target | 2.2 |
 | Frozen line | `1.x` (last release 1.22.5) |
