@@ -1,6 +1,6 @@
 # Full changelog for GTM4WP
 
-## 2.1.1
+## 2.1.1 (2026-11-05)
 
 * Fixed: some sites received an incomplete 2.1.0 package and stopped with a fatal error naming `EasyDigitalDownloadsModule`. 2.1.1 is the same code as a complete package. A site already showing the error needs the plugin folder removed and the plugin installed again.
 
