@@ -1159,6 +1159,16 @@ Deep-pass re-audit of the oldest `[x]` rows (MediaEvents 07-13, ContactForm7 07-
 ConsentMode 07-14/15, Module Framework 07-10) produced #112 and nothing else; the
 ConsentMode bridges interpolate only the validated data-layer identifier.
 
+### Issue sweep: 2026-11-05 (no `/code-review` run)
+
+Found at `83192d6` while answering an issue; read from code, not run, not adjudicated. Queued for a deeper review.
+Detail in the local `.security/code-review-report-2026-11-05-2013.md`. This entry records no `Reviewed at:`, so **the
+base for the next review stays `6b1a97b`.**
+
+| # | Sev | Status | Actor | Where | Summary |
+|---|---|---|---|---|---|
+| 697 | Low (provisional) | open (unverified; needs a live check) | — | `src/Modules/WooCommerce/ProductData.php`, `src/Ecommerce/Helpers.php` | Reliable purchase tracking may not recover a still-pending order under the cache-safe data layer on some servers |
+
 ### Report 59: `.security/code-review-report-2026-11-04-1330.md`
 
 **Reviewed at:** `ac7e619` (`master`) · **Base:** `1a3a6df` plus `7781a58` (R58's fix session, read deliberately), so the
