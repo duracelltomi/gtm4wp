@@ -88,6 +88,8 @@
 * Added: the plugin registers **abilities** with the WordPress Abilities API (WordPress 6.9+; nothing changes below that), so an AI assistant connected through the WordPress MCP Adapter or another client can read the configuration, help work out why tracking is not firing, and change a setting once you have confirmed it. Eleven abilities, six of them read-only, all requiring the settings capability and returning no keys and no visitor data. `gtm4wp_abilities_enabled` and `gtm4wp_abilities_allow_write` switch the surface off or keep it read-only. **Experimental.**
 * Changed: the admin notices about a missing container ID, an incomplete environment configuration, a malformed `GTM4WP_HARDCODED_*` constant, a visitor IP header with no trusted proxies and an unusable data layer variable name now carry a separate "Open the setting" link after the message. The same checks feed `gtm4wp/get-status`, so an assistant and the screen report the same problems.
 
+Release post: [What's new in GTM4WP 2.1: Easy Digital Downloads tracking, GA4 refunds and AI assistants](https://gtm4wp.com/announcements/whats-new-in-gtm4wp-2-1.html)
+
 ## 2.0.6 (2026-10-12)
 
 * Fixed: visitors browsing in the in-app browser of an Android app such as Facebook or Instagram got no WooCommerce data layer, so their `purchase` and other e-commerce events were missing. Thanks to @sw33tr for the report (#477).
