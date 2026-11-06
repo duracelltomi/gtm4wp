@@ -105,7 +105,8 @@ Track users' interactions with any embedded media:
 * Twitch
 
 You can choose to fire data layer events when the media player loads, when the media is played, when it is paused or stopped,
-and optionally when the user reaches 10, 20, 30, ..., 90, 100% of the media duration. Each event also populates Google Tag
+and optionally when the user reaches 0, 10, 20, ..., 90% of the media duration. Completion is reported by the `ended` state,
+not by a 100% mark. Each event also populates Google Tag
 Manager's built-in Video variables (Video Status, Video URL, Video Title, Video Provider, Video Duration, Video Current Time,
 Video Percent, Video Visible).
 
