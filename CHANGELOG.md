@@ -12,6 +12,8 @@
 
 * Fixed: some sites received an incomplete 2.1.0 package and stopped with a fatal error naming `EasyDigitalDownloadsModule`. 2.1.1 is the same code as a complete package. A site already showing the error needs the plugin folder removed and the plugin installed again.
 
+Release post: [GTM4WP 2.1.1 fixes the fatal error some sites got with 2.1.0](https://gtm4wp.com/announcements/gtm4wp-2-1-1-is-out.html)
+
 ## 2.1 (2026-11-05)
 
 * Changed: for developers, `ContainerCode::header_top()` always prints its block; the never-used argument that made it return the block instead is gone.
