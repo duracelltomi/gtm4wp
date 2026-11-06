@@ -1,5 +1,9 @@
 # Full changelog for GTM4WP
 
+## 2.1.2
+
+* Fixed: when files are missing from the plugin folder, for example after an incomplete update or upload, the site no longer stops with a fatal error. The plugin stays inactive, and an admin notice and a critical Site Health item explain how to install it again. (#488)
+
 ## 2.1.1 (2026-11-05)
 
 * Fixed: some sites received an incomplete 2.1.0 package and stopped with a fatal error naming `EasyDigitalDownloadsModule`. 2.1.1 is the same code as a complete package. A site already showing the error needs the plugin folder removed and the plugin installed again.

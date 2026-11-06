@@ -56,6 +56,21 @@ final class Registry {
 	);
 
 	/**
+	 * Built-in module classes that cannot be loaded, which means files are
+	 * missing from the plugin folder.
+	 *
+	 * @return string[]
+	 */
+	public static function missing_builtin_modules(): array {
+		return array_values(
+			array_filter(
+				self::BUILTIN_MODULES,
+				static fn ( string $module_class ): bool => ! class_exists( $module_class )
+			)
+		);
+	}
+
+	/**
 	 * Creates a registry with all built-in modules and applies the
 	 * 'gtm4wp_register_modules' extension point.
 	 *

@@ -308,6 +308,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 
 The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changelog
 
+= 2.1.2 =
+
+* Fixed: when files are missing from the plugin folder, for example after an incomplete update or upload, the site no longer stops with a fatal error. The plugin stays inactive, and an admin notice and a critical Site Health item explain how to install it again. (#488)
+
 = 2.1.1 =
 
 * Fixed: some sites received an incomplete 2.1.0 package and stopped with a fatal error naming `EasyDigitalDownloadsModule`. 2.1.1 is the same code as a complete package. A site already showing the error needs the plugin folder removed and the plugin installed again.
