@@ -221,9 +221,10 @@ export function gtm4wpNativeVideoParams( {
 }
 
 /**
- * Fires each `step`-sized mark (0, 10, 20, …) the current `percentage` has
+ * Fires each `step`-sized mark (10, 20, … 90) the current `percentage` has
  * newly crossed, once per media item: the shared milestone bookkeeping of
- * every media tracker.
+ * every media tracker. No 0 or 100 mark: the `play` and `ended` states report
+ * those moments (#455).
  *
  * Callers must guard a zero/absent duration before computing `percentage`:
  * `time / 0` is `Infinity` and would fire every mark.
@@ -253,7 +254,7 @@ export function gtm4wpMediaMilestones(
 		marks[ key ] = fired;
 	}
 
-	for ( let i = 0; i < 100; i += step ) {
+	for ( let i = step; i < 100; i += step ) {
 		if ( percentage > i && fired.indexOf( i ) === -1 ) {
 			fired.push( i );
 			onMilestone( i );

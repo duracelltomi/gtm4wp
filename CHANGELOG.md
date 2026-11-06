@@ -1,5 +1,9 @@
 # Full changelog for GTM4WP
 
+## 2.2
+
+* Changed: media progress events now start at 10%. The `mediaPercentage` 0 event is gone, since the `play` state of `gtm4wp.mediaPlayerStateChange` reports the start. If a GTM trigger uses `mediaPercentage` equal to 0, move it to that state. (#455)
+
 ## 2.1.1 (2026-11-05)
 
 * Fixed: some sites received an incomplete 2.1.0 package and stopped with a fatal error naming `EasyDigitalDownloadsModule`. 2.1.1 is the same code as a complete package. A site already showing the error needs the plugin folder removed and the plugin installed again.

@@ -487,13 +487,13 @@ describe( 'gtm4wpMediaMilestones', () => {
 		const marks = {};
 		const fired = [];
 
-		// 25% crosses the 0, 10 and 20 marks in one tick.
+		// 25% crosses the 10 and 20 marks in one tick.
 		gtm4wpMediaMilestones( marks, 'vid1', 25, 10, ( i ) =>
 			fired.push( i )
 		);
 
-		expect( fired ).toEqual( [ 0, 10, 20 ] );
-		expect( marks.vid1 ).toEqual( [ 0, 10, 20 ] );
+		expect( fired ).toEqual( [ 10, 20 ] );
+		expect( marks.vid1 ).toEqual( [ 10, 20 ] );
 	} );
 
 	it( 'does not re-fire marks already recorded on a later tick', () => {
@@ -510,7 +510,7 @@ describe( 'gtm4wpMediaMilestones', () => {
 		);
 
 		expect( fired ).toEqual( [ 30, 40 ] );
-		expect( marks.vid1 ).toEqual( [ 0, 10, 20, 30, 40 ] );
+		expect( marks.vid1 ).toEqual( [ 10, 20, 30, 40 ] );
 	} );
 
 	it( 'keeps marks independent per key', () => {
@@ -523,9 +523,9 @@ describe( 'gtm4wpMediaMilestones', () => {
 		);
 
 		// 'b' is a fresh key: its 0 and 10 marks fire even though 'a' passed them.
-		expect( firedForB ).toEqual( [ 0, 10 ] );
-		expect( marks.a ).toEqual( [ 0, 10, 20 ] );
-		expect( marks.b ).toEqual( [ 0, 10 ] );
+		expect( firedForB ).toEqual( [ 10 ] );
+		expect( marks.a ).toEqual( [ 10, 20 ] );
+		expect( marks.b ).toEqual( [ 10 ] );
 	} );
 
 	it( 'fires nothing below the first mark', () => {
@@ -539,6 +539,20 @@ describe( 'gtm4wpMediaMilestones', () => {
 		expect( marks.v ).toEqual( [] );
 	} );
 
+	it( 'has no 0 mark: the play state already reports the start (#455)', () => {
+		const marks = {};
+		const fired = [];
+
+		gtm4wpMediaMilestones( marks, 'v', 1, 10, ( i ) => fired.push( i ) );
+		gtm4wpMediaMilestones( marks, 'v', 10, 10, ( i ) => fired.push( i ) );
+
+		expect( fired ).toEqual( [] );
+
+		gtm4wpMediaMilestones( marks, 'v', 11, 10, ( i ) => fired.push( i ) );
+
+		expect( fired ).toEqual( [ 10 ] );
+	} );
+
 	it( 'fires every mark for a non-finite percentage (why callers must guard duration)', () => {
 		const marks = {};
 		const fired = [];
@@ -549,7 +563,7 @@ describe( 'gtm4wpMediaMilestones', () => {
 			fired.push( i )
 		);
 
-		expect( fired ).toEqual( [ 0, 10, 20, 30, 40, 50, 60, 70, 80, 90 ] );
+		expect( fired ).toEqual( [ 10, 20, 30, 40, 50, 60, 70, 80, 90 ] );
 	} );
 
 	// The key is a media id the provider reports, so it is not necessarily an
@@ -565,8 +579,8 @@ describe( 'gtm4wpMediaMilestones', () => {
 				fired.push( i )
 			);
 
-			expect( fired ).toEqual( [ 0, 10, 20 ] );
-			expect( marks.__proto__ ).toEqual( [ 0, 10, 20 ] );
+			expect( fired ).toEqual( [ 10, 20 ] );
+			expect( marks.__proto__ ).toEqual( [ 10, 20 ] );
 		} );
 
 		it( 'still fires them on a plain-object store, and pollutes nothing', () => {
@@ -579,7 +593,7 @@ describe( 'gtm4wpMediaMilestones', () => {
 				fired.push( i )
 			);
 
-			expect( fired ).toEqual( [ 0, 10, 20 ] );
+			expect( fired ).toEqual( [ 10, 20 ] );
 			expect( Object.prototype ).not.toHaveProperty( 'indexOf' );
 			expect( {} ).not.toHaveProperty( '0' );
 		} );

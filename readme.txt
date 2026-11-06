@@ -105,7 +105,8 @@ Track users' interactions with any embedded media:
 * Twitch
 
 You can choose to fire data layer events when the media player loads, when the media is played, when it is paused or stopped,
-and optionally when the user reaches 10, 20, 30, ..., 90, 100% of the media duration. Each event also populates Google Tag
+and optionally when the user reaches 10, 20, 30, ..., 90% of the media duration. Completion is reported by the `ended` state,
+not by a 100% mark. Each event also populates Google Tag
 Manager's built-in Video variables (Video Status, Video URL, Video Title, Video Provider, Video Duration, Video Current Time,
 Video Percent, Video Visible).
 
@@ -306,6 +307,10 @@ file. (1.x combined its own scripts; 2.0 delegates this.)
 == Changelog ==
 
 The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changelog
+
+= 2.2 =
+
+* Changed: media progress events now start at 10%. The `mediaPercentage` 0 event is gone, since the `play` state of `gtm4wp.mediaPlayerStateChange` reports the start. If a GTM trigger uses `mediaPercentage` equal to 0, move it to that state. (#455)
 
 = 2.1.1 =
 

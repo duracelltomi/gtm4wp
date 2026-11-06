@@ -212,7 +212,7 @@ describe( 'gtm4wp-twitch', () => {
 				( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
 			);
 			expect( marks.map( ( entry ) => entry.mediaPercentage ) ).toEqual( [
-				0, 10, 20,
+				10, 20,
 			] );
 
 			player.emit( Ctor.PAUSE ); // clears the interval

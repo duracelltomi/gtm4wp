@@ -177,7 +177,7 @@ describe( 'gtm4wp-jwplayer', () => {
 			( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
 		);
 		expect( marks.map( ( entry ) => entry.mediaPercentage ) ).toEqual( [
-			0, 10, 20,
+			10, 20,
 		] );
 		expect( lastPush() ).toMatchObject( {
 			mediaPercentage: 20,

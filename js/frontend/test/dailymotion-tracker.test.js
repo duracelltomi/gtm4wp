@@ -435,7 +435,7 @@ describe( 'gtm4wp-dailymotion', () => {
 				pushesOf( 'gtm4wp.mediaPlaybackPercentage' ).map(
 					( entry ) => entry.mediaPercentage
 				)
-			).toEqual( [ 0, 10, 20 ] );
+			).toEqual( [ 10, 20 ] );
 			expect( lastPush()[ 'gtm.videoStatus' ] ).toBe( 'progress' );
 		} );
 

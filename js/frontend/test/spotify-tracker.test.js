@@ -343,7 +343,7 @@ describe( 'gtm4wp-spotify', () => {
 			( entry ) => entry.event === 'gtm4wp.mediaPlaybackPercentage'
 		);
 		expect( marks.map( ( entry ) => entry.mediaPercentage ) ).toEqual( [
-			0, 10, 20,
+			10, 20,
 		] );
 	} );
 
