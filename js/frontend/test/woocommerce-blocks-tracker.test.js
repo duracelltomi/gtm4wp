@@ -13,8 +13,13 @@ let mockHasCartStore;
 let mockCartData;
 let mockActivePaymentMethod;
 let mockHasPaymentStore;
+let mockPaymentStore;
+let mockPaymentStatus;
 let mockHasFinishedResolution;
 let mockSubscribeCount;
+let mockCheckoutStore;
+let mockValidationStore;
+let mockValidationSelectCount;
 
 // The tracker reads window.wp.data at run time (U182: PHP omits the wp-data
 // dependency for the Interactivity API Mini-Cart), so the stand-in lives there.
@@ -27,9 +32,14 @@ const mockWpData = {
 			};
 		}
 		if ( name === 'wc/store/payment' && mockHasPaymentStore ) {
-			return {
-				getActivePaymentMethod: () => mockActivePaymentMethod,
-			};
+			return mockPaymentStore;
+		}
+		if ( name === 'wc/store/checkout' ) {
+			return mockCheckoutStore;
+		}
+		if ( name === 'wc/store/validation' ) {
+			mockValidationSelectCount++;
+			return mockValidationStore;
 		}
 		return null;
 	},
@@ -106,8 +116,16 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		mockCartData = { items: [], totals: { currency_code: 'EUR' } };
 		mockActivePaymentMethod = '';
 		mockHasPaymentStore = false;
+		mockPaymentStatus = 'idle';
+		mockPaymentStore = {
+			getActivePaymentMethod: () => mockActivePaymentMethod,
+			isPaymentReady: () => mockPaymentStatus === 'ready',
+		};
 		mockHasFinishedResolution = true;
 		mockSubscribeCount = 0;
+		mockCheckoutStore = { isProcessing: () => false };
+		mockValidationStore = { hasValidationErrors: () => false };
+		mockValidationSelectCount = 0;
 		window.gtm4wp_woocommerce_blocks_inited = false;
 		window.gtm4wp_blocks_context = undefined;
 		window.gtm4wp_push_ecommerce = jest.fn();
@@ -218,7 +236,7 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		expect( events ).not.toContain( 'add_payment_info' );
 	} );
 
-	it( 'legacy cartcheckout default: fires add_shipping_info and add_payment_info once when the payment store is present', () => {
+	it( 'legacy cartcheckout default: fires shipping on resolution and payment once on submission', () => {
 		mockHasPaymentStore = true;
 		mockActivePaymentMethod = 'stripe';
 		mockCartData = {
@@ -233,6 +251,13 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 			],
 		};
 		const subscriber = loadTracker();
+		subscriber();
+
+		expect(
+			window.gtm4wp_push_ecommerce.mock.calls.map( ( c ) => c[ 0 ] )
+		).not.toContain( 'add_payment_info' );
+		mockPaymentStatus = 'ready';
+		mockCheckoutStore.isProcessing = () => true;
 		subscriber();
 
 		const calls = window.gtm4wp_push_ecommerce.mock.calls;
@@ -287,8 +312,8 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 	} );
 
 	// The positive half of the #463 split (TS-2 both directions): the same store
-	// state that must stay silent on the Cart page fires both steps on Checkout.
-	it( 'checkout context: fires add_shipping_info and add_payment_info', () => {
+	// state reports shipping on Checkout; payment waits for submission.
+	it( 'checkout context: reports shipping but ignores the preselected payment method (#492)', () => {
 		window.gtm4wp_blocks_context = 'checkout';
 		mockHasPaymentStore = true;
 		mockActivePaymentMethod = 'stripe';
@@ -306,7 +331,343 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 			( call ) => call[ 0 ]
 		);
 		expect( events ).toContain( 'add_shipping_info' );
-		expect( events ).toContain( 'add_payment_info' );
+		expect( events ).not.toContain( 'add_payment_info' );
+	} );
+
+	// Drive selected checkout/payment transitions and assert the tracker output.
+	describe( 'payment confirmation (#492)', () => {
+		const paymentCalls = () =>
+			window.gtm4wp_push_ecommerce.mock.calls.filter(
+				( call ) => call[ 0 ] === 'add_payment_info'
+			);
+
+		// Model checkout processing followed by client-side payment setup readiness.
+		const submit = ( subscriber ) => {
+			mockCheckoutStore.isProcessing = () => true;
+			mockPaymentStatus = 'processing';
+			subscriber();
+			mockPaymentStatus = 'ready';
+			subscriber();
+		};
+
+		beforeEach( () => {
+			window.gtm4wp_blocks_context = 'checkout';
+			mockHasPaymentStore = true;
+			mockActivePaymentMethod = 'stripe';
+			mockCartData = {
+				items: [ cartLine( 'A', 2, { item_id: 7, price: 4.35 } ) ],
+				totals: { currency_code: 'EUR' },
+			};
+		} );
+
+		it( 'ignores the preselected method on load', () => {
+			const subscriber = loadTracker();
+			subscriber();
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+		} );
+
+		it( 'ignores delayed preselection and method switches until the order is submitted', () => {
+			mockActivePaymentMethod = '';
+			const subscriber = loadTracker();
+			subscriber();
+			mockActivePaymentMethod = 'stripe';
+			subscriber();
+			mockActivePaymentMethod = 'bacs';
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+
+			submit( subscriber );
+			expect( paymentCalls() ).toEqual( [
+				[
+					'add_payment_info',
+					[ { item_id: 7, price: 4.35, quantity: 2 } ],
+					{ currency: 'EUR', payment_type: 'bacs', value: 8.7 },
+				],
+			] );
+		} );
+
+		it.each( [ 'idle', 'before-processing', 'after-processing' ] )(
+			'waits for checkout processing when payment is ready during %s',
+			( status ) => {
+				let checkout_status = status;
+				mockCheckoutStore = {
+					isProcessing: () => checkout_status === 'processing',
+					isBeforeProcessing: () =>
+						checkout_status === 'before-processing',
+					isAfterProcessing: () =>
+						checkout_status === 'after-processing',
+				};
+				mockPaymentStatus = 'ready';
+				const subscriber = loadTracker();
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 0 );
+				checkout_status = 'processing';
+				subscriber();
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 1 );
+			}
+		);
+
+		it( 'reports only at ready after each payment setup transition during processing', () => {
+			const subscriber = loadTracker();
+			mockCheckoutStore.isProcessing = () => true;
+			subscriber(); // payment idle
+			expect( paymentCalls() ).toHaveLength( 0 );
+			mockPaymentStatus = 'processing';
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+			mockPaymentStatus = 'ready';
+			subscriber();
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 1 );
+		} );
+
+		it( 'does not report an empty form returning from before-processing to idle without readiness', () => {
+			let checkout_status = 'before-processing';
+			mockCheckoutStore = {
+				isProcessing: () => checkout_status === 'processing',
+				isBeforeProcessing: () =>
+					checkout_status === 'before-processing',
+			};
+			const subscriber = loadTracker();
+			subscriber();
+			checkout_status = 'idle';
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+		} );
+
+		it( 'keeps one event after a server failure and another-method retry', () => {
+			const subscriber = loadTracker();
+			submit( subscriber );
+			expect( paymentCalls() ).toHaveLength( 1 );
+			mockCheckoutStore.hasError = () => true; // order request failed after setup
+			mockPaymentStatus = 'error';
+			subscriber();
+			mockCheckoutStore.isProcessing = () => false;
+			mockPaymentStatus = 'idle';
+			subscriber();
+			mockCheckoutStore.hasError = () => false;
+			mockActivePaymentMethod = 'bacs';
+			submit( subscriber );
+			expect( paymentCalls() ).toHaveLength( 1 );
+			expect( paymentCalls()[ 0 ][ 2 ].payment_type ).toBe( 'stripe' );
+		} );
+
+		it.each( [ 'isPaymentSuccess', 'getCurrentStatus' ] )(
+			'waits for setup after a failed attempt with legacy %s',
+			( selector ) => {
+				delete mockPaymentStore.isPaymentReady;
+				mockPaymentStore[ selector ] =
+					selector === 'isPaymentSuccess'
+						? () => mockPaymentStatus === 'ready'
+						: () => ( {
+								isSuccessful: mockPaymentStatus === 'ready',
+						  } );
+				const subscriber = loadTracker();
+				mockCheckoutStore.isProcessing = () => true;
+				subscriber();
+				mockPaymentStatus = 'processing';
+				subscriber();
+				mockPaymentStatus = 'error';
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 0 );
+				mockCheckoutStore.isProcessing = () => false;
+				mockPaymentStatus = 'idle';
+				subscriber();
+				submit( subscriber );
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 1 );
+			}
+		);
+
+		it.each( [ null, undefined, {} ] )(
+			'guards an unavailable legacy status value (%s)',
+			( status ) => {
+				delete mockPaymentStore.isPaymentReady;
+				mockPaymentStore.getCurrentStatus = () => status;
+				mockCheckoutStore.isProcessing = () => true;
+				const subscriber = loadTracker();
+				expect( subscriber ).not.toThrow();
+				expect( paymentCalls() ).toHaveLength( 0 );
+				mockPaymentStore.getCurrentStatus = () => ( {
+					isSuccessful: true,
+				} );
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 1 );
+			}
+		);
+
+		it.each( [ 'isPaymentReady', 'isPaymentSuccess' ] )(
+			'prefers %s over older readiness selectors',
+			( selector ) => {
+				delete mockPaymentStore.isPaymentReady;
+				mockPaymentStore.isPaymentSuccess = jest.fn( () => true );
+				mockPaymentStore.getCurrentStatus = jest.fn( () => ( {
+					isSuccessful: true,
+				} ) );
+				mockPaymentStore[ selector ] = () => false;
+				mockCheckoutStore.isProcessing = () => true;
+				const subscriber = loadTracker();
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 0 );
+				expect(
+					mockPaymentStore.getCurrentStatus
+				).not.toHaveBeenCalled();
+
+				mockPaymentStore[ selector ] = () => true;
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 1 );
+			}
+		);
+
+		it.each( [ 'idle', 'processing', 'error' ] )(
+			'does not report checkout processing while payment is %s, and keeps the event for a later ready submission',
+			( status ) => {
+				const subscriber = loadTracker();
+				subscriber();
+				mockCheckoutStore.isProcessing = () => true;
+				mockPaymentStatus = status;
+				subscriber();
+				subscriber();
+				mockCheckoutStore.isProcessing = () => false;
+				mockPaymentStatus = 'idle';
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 0 );
+
+				mockActivePaymentMethod = 'bacs';
+				submit( subscriber );
+				subscriber();
+				expect( paymentCalls() ).toHaveLength( 1 );
+				expect( paymentCalls()[ 0 ][ 2 ].payment_type ).toBe( 'bacs' );
+			}
+		);
+
+		it( 'keeps the one-shot guard available after client-side setup rejects incomplete payment data', () => {
+			const subscriber = loadTracker();
+			subscriber();
+			mockCheckoutStore.isProcessing = () => true;
+			subscriber(); // payment idle
+			mockPaymentStatus = 'processing';
+			subscriber();
+			mockPaymentStatus = 'error';
+			subscriber(); // client-side payment setup rejected the card
+			mockCheckoutStore.isProcessing = () => false;
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+
+			submit( subscriber );
+			subscriber();
+			mockCheckoutStore.isProcessing = () => false;
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 1 );
+			expect( paymentCalls()[ 0 ][ 2 ].payment_type ).toBe( 'stripe' );
+		} );
+
+		it( 'reports processing when the payment-ready selector is unavailable', () => {
+			delete mockPaymentStore.isPaymentReady;
+			const subscriber = loadTracker();
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+			mockCheckoutStore.isProcessing = () => true;
+			subscriber();
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 1 );
+			expect( paymentCalls()[ 0 ][ 2 ].payment_type ).toBe( 'stripe' );
+		} );
+
+		it( 'reports the unchanged default once across submissions and later changes', () => {
+			const subscriber = loadTracker();
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+			submit( subscriber );
+			subscriber();
+			mockCheckoutStore.isProcessing = () => false;
+			mockPaymentStatus = 'idle';
+			subscriber();
+			mockActivePaymentMethod = 'bacs';
+			submit( subscriber );
+			expect( paymentCalls() ).toHaveLength( 1 );
+			expect( paymentCalls()[ 0 ][ 2 ].payment_type ).toBe( 'stripe' );
+		} );
+
+		it( 'reports an express method using the Blocks submission flow despite form validation errors', () => {
+			const subscriber = loadTracker();
+			subscriber();
+			// Ordinary form validation must not gate a Blocks express submission.
+			mockValidationStore = { hasValidationErrors: () => true };
+			mockActivePaymentMethod = 'express';
+			mockCartData.items[ 0 ].quantity = 3;
+			mockCartData.totals.currency_code = 'USD';
+			submit( subscriber );
+			expect( paymentCalls() ).toEqual( [
+				[
+					'add_payment_info',
+					[ { item_id: 7, price: 4.35, quantity: 3 } ],
+					{ currency: 'USD', payment_type: 'express', value: 13.05 },
+				],
+			] );
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 1 );
+			expect( mockValidationSelectCount ).toBe( 0 );
+		} );
+
+		it.each( [ 'cart', 'minicart' ] )(
+			'never reports payment in %s context, even during submission',
+			( context ) => {
+				window.gtm4wp_blocks_context = context;
+				const subscriber = loadTracker();
+				subscriber();
+				submit( subscriber );
+				expect( paymentCalls() ).toHaveLength( 0 );
+			}
+		);
+
+		// Without isPaymentReady, the checkout store alone decides, so a missing
+		// store or selector must not be read as processing.
+		it.each( [ null, {} ] )(
+			'safely ignores an unavailable checkout store or selectors (%s)',
+			( store ) => {
+				mockCheckoutStore = store;
+				delete mockPaymentStore.isPaymentReady;
+				const subscriber = loadTracker();
+				expect( subscriber ).not.toThrow();
+				expect( subscriber ).not.toThrow();
+				expect( paymentCalls() ).toHaveLength( 0 );
+			}
+		);
+
+		it( 'waits for late stores, resolved cart data and an active payment method', () => {
+			mockCheckoutStore = null;
+			mockHasPaymentStore = false;
+			mockHasFinishedResolution = false;
+			const subscriber = loadTracker();
+			subscriber();
+			mockCheckoutStore = { isProcessing: () => true };
+			mockPaymentStatus = 'ready';
+			subscriber();
+			mockHasPaymentStore = true;
+			mockActivePaymentMethod = '';
+			subscriber();
+			mockHasFinishedResolution = true;
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 0 );
+			mockActivePaymentMethod = 'stripe';
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 1 );
+		} );
+
+		it( 'does not consume the one-shot guard for an empty cart', () => {
+			const items = mockCartData.items;
+			mockCartData.items = [];
+			const subscriber = loadTracker();
+			subscriber();
+			submit( subscriber );
+			expect( paymentCalls() ).toHaveLength( 0 );
+			mockCartData.items = items;
+			subscriber();
+			expect( paymentCalls() ).toHaveLength( 1 );
+		} );
 	} );
 
 	// The cart context must keep owning the cart events after the split - losing

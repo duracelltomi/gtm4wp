@@ -315,6 +315,7 @@ The full changelog of every version is on gtm4wp.com: https://gtm4wp.com/changel
 = 2.1.2 =
 
 * Fixed: when files are missing from the plugin folder, for example after an incomplete update or upload, the site no longer stops with a fatal error. The plugin stays inactive, and an admin notice and a critical Site Health item explain how to install it again. (#488)
+* Fixed: WooCommerce block Checkout reports `add_payment_info` when the customer submits payment information, instead of on page load. The event remains limited to once per checkout page. (#492)
 
 = 2.1.1 =
 

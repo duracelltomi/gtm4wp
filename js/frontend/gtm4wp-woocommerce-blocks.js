@@ -27,6 +27,7 @@ import { gtm4wp_read_cookie } from './lib/gtm4wp-cookies';
 
 const CART_STORE = 'wc/store/cart';
 const PAYMENT_STORE = 'wc/store/payment';
+const CHECKOUT_STORE = 'wc/store/checkout';
 
 // Dispatched on window after every Interactivity API cart change; drives the
 // fallback below.
@@ -83,6 +84,26 @@ function gtm4wp_safe_select( wp_data, store_name ) {
 	} catch ( e ) {
 		return null;
 	}
+}
+
+/**
+ * Reads client-side payment setup readiness across Blocks versions.
+ *
+ * @param {Object} payment_store The payment store's selectors.
+ * @return {boolean} Whether setup is ready, or no readiness API exists.
+ */
+function gtm4wp_blocks_payment_ready( payment_store ) {
+	if ( typeof payment_store.isPaymentReady === 'function' ) {
+		return payment_store.isPaymentReady();
+	}
+	if ( typeof payment_store.isPaymentSuccess === 'function' ) {
+		return payment_store.isPaymentSuccess();
+	}
+	if ( typeof payment_store.getCurrentStatus === 'function' ) {
+		const status = payment_store.getCurrentStatus();
+		return !! ( status && status.isSuccessful );
+	}
+	return true;
 }
 
 /**
@@ -512,8 +533,20 @@ function gtm4wp_blocks_init() {
 			}
 		}
 
+		// Blocks preselect a method on load (#492). Report once per checkout page
+		// when checkout is processing and client-side payment setup is ready,
+		// including unchanged defaults (#314). Later server failures do not
+		// retract the event or rearm it for another method on retry.
+		const checkout_store = gtm4wp_safe_select( wp_data, CHECKOUT_STORE );
+		const is_submitting =
+			checkout_store &&
+			typeof checkout_store.isProcessing === 'function' &&
+			checkout_store.isProcessing() &&
+			gtm4wp_blocks_payment_ready( payment_store );
+
 		if (
 			! payment_fired &&
+			is_submitting &&
 			typeof payment_store.getActivePaymentMethod === 'function'
 		) {
 			const payment_type = payment_store.getActivePaymentMethod();
