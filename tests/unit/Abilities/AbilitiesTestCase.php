@@ -165,14 +165,50 @@ abstract class AbilitiesTestCase extends TestCase {
 	}
 
 	/**
-	 * A registered ability's execute callback, run with the given input.
+	 * Core 7.2 on every path (and REST on 7.1): validate, then cast to the schema types.
+	 */
+	public const CORE_7_2 = '7.2';
+
+	/**
+	 * MCP, CLI and PHP callers on 6.9–7.1: validated, passed on raw.
+	 */
+	public const CORE_6_9 = '6.9';
+
+	/**
+	 * No pipeline: only for a defence-in-depth case with input core refuses (T159).
+	 */
+	public const CORE_RAW = 'raw';
+
+	/**
+	 * A registered ability's execute callback, run with the given input after
+	 * core's input pipeline as CoreInputDouble models it (T158): a refusal is
+	 * core's ability_invalid_input, and the callback never runs.
 	 *
 	 * @param string $name  Ability name.
 	 * @param mixed  $input The input.
+	 * @param string $core  self::CORE_7_2, self::CORE_6_9 or self::CORE_RAW.
 	 * @return mixed
 	 */
-	protected function execute( string $name, $input = array() ) {
+	protected function execute( string $name, $input = array(), string $core = self::CORE_7_2 ) {
 		$this->assertArrayHasKey( $name, $this->registered, "$name must be registered." );
+
+		if ( self::CORE_RAW !== $core ) {
+			$schema = (array) ( $this->registered[ $name ]['input_schema'] ?? array() );
+
+			if ( null === $input && array_key_exists( 'default', $schema ) ) {
+				$input = $schema['default'];
+			}
+
+			$valid = CoreInputDouble::validate( $input, $schema );
+
+			if ( true !== $valid ) {
+				return new \WP_Error( 'ability_invalid_input', $valid );
+			}
+
+			if ( self::CORE_7_2 === $core ) {
+				$input = CoreInputDouble::cast( $input, $schema );
+			}
+		}
 
 		$result = call_user_func( $this->registered[ $name ]['execute_callback'], $input );
 

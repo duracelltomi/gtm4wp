@@ -393,8 +393,8 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	public function test_a_limit_outside_the_schema_is_clamped_rather_than_trusted(): void {
 		$this->record( 'woocommerce:10:11', SendLog::OUTCOME_ACCEPTED );
 
-		$this->assertCount( 1, $this->execute( Abilities::GET_LOG, array( 'limit' => 0 ) )['entries'] );
-		$this->assertCount( 1, $this->execute( Abilities::GET_LOG, array( 'limit' => 10_000 ) )['entries'] );
+		$this->assertCount( 1, $this->execute( Abilities::GET_LOG, array( 'limit' => 0 ), self::CORE_RAW )['entries'] );
+		$this->assertCount( 1, $this->execute( Abilities::GET_LOG, array( 'limit' => 10_000 ), self::CORE_RAW )['entries'] );
 		$this->assertSame( SendLog::MAX_ENTRIES, Abilities::MAX_LIMIT, 'The cap is the ring size; a larger limit could never return more.' );
 	}
 
@@ -457,10 +457,10 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 			'well-formed but not stored' => array( array( 'measurement_id' => 'G-NOTSTORED' ) ),
 			'hostile'                    => array( array( 'measurement_id' => 'G-"</script>' ) ),
 			// Defence in depth (T159): core refuses this input first.
-			'not a string'               => array( array( 'measurement_id' => array( self::MEASUREMENT ) ) ),
+			'not a string'               => array( array( 'measurement_id' => array( self::MEASUREMENT ) ), self::CORE_RAW ),
 			'empty'                      => array( array( 'measurement_id' => '' ) ),
 			// Defence in depth (T159): core refuses this input first.
-			'missing'                    => array( array() ),
+			'missing'                    => array( array(), self::CORE_RAW ),
 		);
 	}
 
@@ -468,12 +468,13 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	 * An unknown measurement id is 404 and sends nothing.
 	 *
 	 * @param array<string, mixed> $input The input.
+	 * @param string $core Which core input path (AbilitiesTestCase::CORE_*).
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'unknown_destinations' )]
-	public function test_an_unknown_measurement_id_is_refused_with_404_before_any_request( array $input ): void {
+	public function test_an_unknown_measurement_id_is_refused_with_404_before_any_request( array $input, string $core = self::CORE_7_2 ): void {
 		$this->store_destination( $this->store_account() );
 
-		$result = $this->execute( Abilities::TEST_DESTINATION, $input );
+		$result = $this->execute( Abilities::TEST_DESTINATION, $input, $core );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_gdm_destination_unknown', $result->get_error_code() );
@@ -539,14 +540,14 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	public static function unconfirmed_calls(): array {
 		return array(
 			// Defence in depth (T159): core refuses this input first.
-			'confirm missing' => array( array(), 'gtm4wp_confirmation_required' ),
+			'confirm missing' => array( array(), 'gtm4wp_confirmation_required', self::CORE_RAW ),
 			'confirm false'   => array( array( 'confirm' => false ), 'gtm4wp_confirmation_required' ),
 			// Defence in depth (T159): core refuses this input first.
-			'confirm null'    => array( array( 'confirm' => null ), 'gtm4wp_confirmation_required' ),
+			'confirm null'    => array( array( 'confirm' => null ), 'gtm4wp_confirmation_required', self::CORE_RAW ),
 			// #567: raw text is refused, with the reason; core 7.2 casts it to
 			// true before the callback (#698), never seen here.
-			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean' ),
-			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean' ),
+			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean', self::CORE_6_9 ),
+			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean', self::CORE_6_9 ),
 		);
 	}
 
@@ -555,13 +556,14 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	 *
 	 * @param array<string, mixed> $input The input.
 	 * @param string               $code  The refusal's error code.
+	 * @param string $core Which core input path (AbilitiesTestCase::CORE_*).
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'unconfirmed_calls' )]
-	public function test_a_replay_without_confirm_true_is_refused_before_anything_runs( array $input, string $code ): void {
+	public function test_a_replay_without_confirm_true_is_refused_before_anything_runs( array $input, string $code, string $core = self::CORE_7_2 ): void {
 		$this->store_destination( $this->store_account() );
 		$this->record( 'woocommerce:12:13', SendLog::OUTCOME_FAILED );
 
-		$result = $this->execute( Abilities::REPLAY_REFUNDS, $input );
+		$result = $this->execute( Abilities::REPLAY_REFUNDS, $input, $core );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( $code, $result->get_error_code() );
@@ -591,12 +593,55 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'non_boolean_confirms' )]
 	public function test_a_replay_refusal_names_no_transport_limit( $confirm, string $expected ): void {
-		$result = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => $confirm ) );
+		$result = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => $confirm ), self::CORE_6_9 );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_confirm_not_boolean', $result->get_error_code() );
 		$this->assertSame( $expected, $result->get_error_message() );
 		$this->assertStringNotContainsString( 'REST', $result->get_error_message() );
+	}
+
+	/**
+	 * #698: core 7.2 casts a text or number confirm to true before the callback.
+	 *
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function affirmative_confirms(): array {
+		return array(
+			'text'   => array( 'true' ),
+			'text 1' => array( '1' ),
+			'number' => array( 1 ),
+		);
+	}
+
+	/**
+	 * The replay runs on 7.2 when confirm is core's affirmative text or number.
+	 *
+	 * @param mixed $confirm The confirm input.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'affirmative_confirms' )]
+	public function test_core_7_2_casts_an_affirmative_confirm_and_the_replay_runs( $confirm ): void {
+		$this->store_destination( $this->store_account() );
+		$this->record( 'woocommerce:12:13', SendLog::OUTCOME_FAILED );
+
+		$result = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => $confirm ) );
+
+		$this->assertSame( 1, $result['queued'] );
+		$this->assertCount( 1, $this->scheduled );
+	}
+
+	public function test_a_confirm_core_cannot_read_as_boolean_is_refused_before_the_replay_on_every_core(): void {
+		$this->store_destination( $this->store_account() );
+		$this->record( 'woocommerce:12:13', SendLog::OUTCOME_FAILED );
+
+		foreach ( array( self::CORE_6_9, self::CORE_7_2 ) as $core ) {
+			$refused = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => 'yes' ), $core );
+
+			$this->assertInstanceOf( \WP_Error::class, $refused, $core );
+			$this->assertSame( 'ability_invalid_input', $refused->get_error_code(), $core );
+		}
+
+		$this->assertSame( array(), $this->scheduled, '"yes" queued nothing.' );
 	}
 
 	public function test_a_confirmed_replay_queues_each_replayable_refund_once(): void {
@@ -659,7 +704,8 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 			array(
 				'confirm'    => true,
 				'references' => array( 'woocommerce:3:4', 'not a reference', 42 ),
-			)
+			),
+			self::CORE_RAW
 		);
 
 		$this->assertSame( array( 'woocommerce:3:4' ), $result['references'] );
@@ -722,7 +768,8 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 			array(
 				'confirm'    => true,
 				'references' => $references,
-			)
+			),
+			self::CORE_RAW
 		);
 
 		$this->assertInstanceOf( \WP_Error::class, $refused );

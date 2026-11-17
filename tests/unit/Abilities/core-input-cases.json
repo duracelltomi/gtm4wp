@@ -1,0 +1,3568 @@
+{
+	"generated_by": "tools/generate-core-input-cases.php",
+	"wp_version": "7.2-RC1",
+	"schemas": {
+		"boolean": {
+			"type": "boolean"
+		},
+		"integer": {
+			"type": "integer"
+		},
+		"integer range": {
+			"type": "integer",
+			"minimum": 1,
+			"maximum": 50
+		},
+		"number": {
+			"type": "number"
+		},
+		"string": {
+			"type": "string",
+			"description": "annotation only"
+		},
+		"string pattern": {
+			"type": "string",
+			"pattern": "^[^:]+:[0-9]+:[0-9]+$"
+		},
+		"string enum": {
+			"type": "string",
+			"enum": [
+				"a",
+				"container"
+			]
+		},
+		"string|integer": {
+			"type": [
+				"string",
+				"integer"
+			]
+		},
+		"boolean|null": {
+			"type": [
+				"boolean",
+				"null"
+			]
+		},
+		"array": {
+			"type": "array"
+		},
+		"array of refs": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "string",
+				"pattern": "^[^:]+:[0-9]+:[0-9]+$"
+			}
+		},
+		"array of ints": {
+			"type": "array",
+			"items": {
+				"type": "integer"
+			}
+		},
+		"array of enum": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"enum": [
+					"a",
+					"container"
+				]
+			}
+		},
+		"object": {
+			"type": "object"
+		},
+		"object, strict": {
+			"type": "object",
+			"default": [],
+			"required": [
+				"flag"
+			],
+			"minProperties": 1,
+			"additionalProperties": false,
+			"properties": {
+				"flag": {
+					"type": "boolean"
+				},
+				"n": {
+					"type": "integer"
+				}
+			}
+		}
+	},
+	"cases": [
+		{
+			"schema": "boolean",
+			"value": true,
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean",
+			"value": false,
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean",
+			"value": "true",
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean",
+			"value": "false",
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean",
+			"value": "TRUE",
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean",
+			"value": "1",
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean",
+			"value": "0",
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean",
+			"value": 1,
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean",
+			"value": 0,
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "1",
+			"valid": true,
+			"cast": 1
+		},
+		{
+			"schema": "integer",
+			"value": "0",
+			"valid": true,
+			"cast": 0
+		},
+		{
+			"schema": "integer",
+			"value": 1,
+			"valid": true,
+			"cast": 1
+		},
+		{
+			"schema": "integer",
+			"value": 0,
+			"valid": true,
+			"cast": 0
+		},
+		{
+			"schema": "integer",
+			"value": 2,
+			"valid": true,
+			"cast": 2
+		},
+		{
+			"schema": "integer",
+			"value": -1,
+			"valid": true,
+			"cast": -1
+		},
+		{
+			"schema": "integer",
+			"value": 51,
+			"valid": true,
+			"cast": 51
+		},
+		{
+			"schema": "integer",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "5",
+			"valid": true,
+			"cast": 5
+		},
+		{
+			"schema": "integer",
+			"value": "5.0",
+			"valid": true,
+			"cast": 5
+		},
+		{
+			"schema": "integer",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "1e2",
+			"valid": true,
+			"cast": 100
+		},
+		{
+			"schema": "integer",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "1",
+			"valid": true,
+			"cast": 1
+		},
+		{
+			"schema": "integer range",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": 1,
+			"valid": true,
+			"cast": 1
+		},
+		{
+			"schema": "integer range",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": 2,
+			"valid": true,
+			"cast": 2
+		},
+		{
+			"schema": "integer range",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "5",
+			"valid": true,
+			"cast": 5
+		},
+		{
+			"schema": "integer range",
+			"value": "5.0",
+			"valid": true,
+			"cast": 5
+		},
+		{
+			"schema": "integer range",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "integer range",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "1",
+			"valid": true,
+			"cast": 1.0
+		},
+		{
+			"schema": "number",
+			"value": "0",
+			"valid": true,
+			"cast": 0.0
+		},
+		{
+			"schema": "number",
+			"value": 1,
+			"valid": true,
+			"cast": 1.0
+		},
+		{
+			"schema": "number",
+			"value": 0,
+			"valid": true,
+			"cast": 0.0
+		},
+		{
+			"schema": "number",
+			"value": 2,
+			"valid": true,
+			"cast": 2.0
+		},
+		{
+			"schema": "number",
+			"value": -1,
+			"valid": true,
+			"cast": -1.0
+		},
+		{
+			"schema": "number",
+			"value": 51,
+			"valid": true,
+			"cast": 51.0
+		},
+		{
+			"schema": "number",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "5",
+			"valid": true,
+			"cast": 5.0
+		},
+		{
+			"schema": "number",
+			"value": "5.0",
+			"valid": true,
+			"cast": 5.0
+		},
+		{
+			"schema": "number",
+			"value": 5.5,
+			"valid": true,
+			"cast": 5.5
+		},
+		{
+			"schema": "number",
+			"value": "1e2",
+			"valid": true,
+			"cast": 100.0
+		},
+		{
+			"schema": "number",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "number",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": "true",
+			"valid": true,
+			"cast": "true"
+		},
+		{
+			"schema": "string",
+			"value": "false",
+			"valid": true,
+			"cast": "false"
+		},
+		{
+			"schema": "string",
+			"value": "TRUE",
+			"valid": true,
+			"cast": "TRUE"
+		},
+		{
+			"schema": "string",
+			"value": "1",
+			"valid": true,
+			"cast": "1"
+		},
+		{
+			"schema": "string",
+			"value": "0",
+			"valid": true,
+			"cast": "0"
+		},
+		{
+			"schema": "string",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": "yes",
+			"valid": true,
+			"cast": "yes"
+		},
+		{
+			"schema": "string",
+			"value": "",
+			"valid": true,
+			"cast": ""
+		},
+		{
+			"schema": "string",
+			"value": " ",
+			"valid": true,
+			"cast": " "
+		},
+		{
+			"schema": "string",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": "5",
+			"valid": true,
+			"cast": "5"
+		},
+		{
+			"schema": "string",
+			"value": "5.0",
+			"valid": true,
+			"cast": "5.0"
+		},
+		{
+			"schema": "string",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": "1e2",
+			"valid": true,
+			"cast": "1e2"
+		},
+		{
+			"schema": "string",
+			"value": "abc",
+			"valid": true,
+			"cast": "abc"
+		},
+		{
+			"schema": "string",
+			"value": "a",
+			"valid": true,
+			"cast": "a"
+		},
+		{
+			"schema": "string",
+			"value": "container",
+			"valid": true,
+			"cast": "container"
+		},
+		{
+			"schema": "string",
+			"value": "a,b",
+			"valid": true,
+			"cast": "a,b"
+		},
+		{
+			"schema": "string",
+			"value": "a, container",
+			"valid": true,
+			"cast": "a, container"
+		},
+		{
+			"schema": "string",
+			"value": "w:1:2",
+			"valid": true,
+			"cast": "w:1:2"
+		},
+		{
+			"schema": "string",
+			"value": "w:1:2,w:3:4",
+			"valid": true,
+			"cast": "w:1:2,w:3:4"
+		},
+		{
+			"schema": "string",
+			"value": "typo:x:y",
+			"valid": true,
+			"cast": "typo:x:y"
+		},
+		{
+			"schema": "string",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "string",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "1",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "w:1:2",
+			"valid": true,
+			"cast": "w:1:2"
+		},
+		{
+			"schema": "string pattern",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "string pattern",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "1",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "a",
+			"valid": true,
+			"cast": "a"
+		},
+		{
+			"schema": "string enum",
+			"value": "container",
+			"valid": true,
+			"cast": "container"
+		},
+		{
+			"schema": "string enum",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "string enum",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": "true",
+			"valid": true,
+			"cast": "true"
+		},
+		{
+			"schema": "string|integer",
+			"value": "false",
+			"valid": true,
+			"cast": "false"
+		},
+		{
+			"schema": "string|integer",
+			"value": "TRUE",
+			"valid": true,
+			"cast": "TRUE"
+		},
+		{
+			"schema": "string|integer",
+			"value": "1",
+			"valid": true,
+			"cast": "1"
+		},
+		{
+			"schema": "string|integer",
+			"value": "0",
+			"valid": true,
+			"cast": "0"
+		},
+		{
+			"schema": "string|integer",
+			"value": 1,
+			"valid": true,
+			"cast": 1
+		},
+		{
+			"schema": "string|integer",
+			"value": 0,
+			"valid": true,
+			"cast": 0
+		},
+		{
+			"schema": "string|integer",
+			"value": 2,
+			"valid": true,
+			"cast": 2
+		},
+		{
+			"schema": "string|integer",
+			"value": -1,
+			"valid": true,
+			"cast": -1
+		},
+		{
+			"schema": "string|integer",
+			"value": 51,
+			"valid": true,
+			"cast": 51
+		},
+		{
+			"schema": "string|integer",
+			"value": "yes",
+			"valid": true,
+			"cast": "yes"
+		},
+		{
+			"schema": "string|integer",
+			"value": "",
+			"valid": true,
+			"cast": ""
+		},
+		{
+			"schema": "string|integer",
+			"value": " ",
+			"valid": true,
+			"cast": " "
+		},
+		{
+			"schema": "string|integer",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": "5",
+			"valid": true,
+			"cast": "5"
+		},
+		{
+			"schema": "string|integer",
+			"value": "5.0",
+			"valid": true,
+			"cast": "5.0"
+		},
+		{
+			"schema": "string|integer",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": "1e2",
+			"valid": true,
+			"cast": "1e2"
+		},
+		{
+			"schema": "string|integer",
+			"value": "abc",
+			"valid": true,
+			"cast": "abc"
+		},
+		{
+			"schema": "string|integer",
+			"value": "a",
+			"valid": true,
+			"cast": "a"
+		},
+		{
+			"schema": "string|integer",
+			"value": "container",
+			"valid": true,
+			"cast": "container"
+		},
+		{
+			"schema": "string|integer",
+			"value": "a,b",
+			"valid": true,
+			"cast": "a,b"
+		},
+		{
+			"schema": "string|integer",
+			"value": "a, container",
+			"valid": true,
+			"cast": "a, container"
+		},
+		{
+			"schema": "string|integer",
+			"value": "w:1:2",
+			"valid": true,
+			"cast": "w:1:2"
+		},
+		{
+			"schema": "string|integer",
+			"value": "w:1:2,w:3:4",
+			"valid": true,
+			"cast": "w:1:2,w:3:4"
+		},
+		{
+			"schema": "string|integer",
+			"value": "typo:x:y",
+			"valid": true,
+			"cast": "typo:x:y"
+		},
+		{
+			"schema": "string|integer",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "string|integer",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": true,
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean|null",
+			"value": false,
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "true",
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean|null",
+			"value": "false",
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "TRUE",
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean|null",
+			"value": "1",
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean|null",
+			"value": "0",
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": 1,
+			"valid": true,
+			"cast": true
+		},
+		{
+			"schema": "boolean|null",
+			"value": 0,
+			"valid": true,
+			"cast": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": null,
+			"valid": true,
+			"cast": null
+		},
+		{
+			"schema": "boolean|null",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "boolean|null",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array",
+			"value": true,
+			"valid": true,
+			"cast": [
+				"1"
+			]
+		},
+		{
+			"schema": "array",
+			"value": false,
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array",
+			"value": "true",
+			"valid": true,
+			"cast": [
+				"true"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "false",
+			"valid": true,
+			"cast": [
+				"false"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "TRUE",
+			"valid": true,
+			"cast": [
+				"TRUE"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "1",
+			"valid": true,
+			"cast": [
+				"1"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "0",
+			"valid": true,
+			"cast": [
+				"0"
+			]
+		},
+		{
+			"schema": "array",
+			"value": 1,
+			"valid": true,
+			"cast": [
+				"1"
+			]
+		},
+		{
+			"schema": "array",
+			"value": 0,
+			"valid": true,
+			"cast": [
+				"0"
+			]
+		},
+		{
+			"schema": "array",
+			"value": 2,
+			"valid": true,
+			"cast": [
+				"2"
+			]
+		},
+		{
+			"schema": "array",
+			"value": -1,
+			"valid": true,
+			"cast": [
+				"-1"
+			]
+		},
+		{
+			"schema": "array",
+			"value": 51,
+			"valid": true,
+			"cast": [
+				"51"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "yes",
+			"valid": true,
+			"cast": [
+				"yes"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array",
+			"value": " ",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "array",
+			"value": "5",
+			"valid": true,
+			"cast": [
+				"5"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "5.0",
+			"valid": true,
+			"cast": [
+				"5.0"
+			]
+		},
+		{
+			"schema": "array",
+			"value": 5.5,
+			"valid": true,
+			"cast": [
+				"5.5"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "1e2",
+			"valid": true,
+			"cast": [
+				"1e2"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "abc",
+			"valid": true,
+			"cast": [
+				"abc"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "a",
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "container",
+			"valid": true,
+			"cast": [
+				"container"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "a,b",
+			"valid": true,
+			"cast": [
+				"a",
+				"b"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "a, container",
+			"valid": true,
+			"cast": [
+				"a",
+				"container"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "w:1:2",
+			"valid": true,
+			"cast": [
+				"w:1:2"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "w:1:2,w:3:4",
+			"valid": true,
+			"cast": [
+				"w:1:2",
+				"w:3:4"
+			]
+		},
+		{
+			"schema": "array",
+			"value": "typo:x:y",
+			"valid": true,
+			"cast": [
+				"typo:x:y"
+			]
+		},
+		{
+			"schema": "array",
+			"value": [],
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array",
+			"value": [
+				"a"
+			],
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "array",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": true,
+			"cast": [
+				"w:1:2",
+				42
+			]
+		},
+		{
+			"schema": "array",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": true,
+			"cast": [
+				"1",
+				"2"
+			]
+		},
+		{
+			"schema": "array",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array",
+			"value": {
+				"1": "a"
+			},
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "array",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "array",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "array",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "array",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "1",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": "w:1:2",
+			"valid": true,
+			"cast": [
+				"w:1:2"
+			]
+		},
+		{
+			"schema": "array of refs",
+			"value": "w:1:2,w:3:4",
+			"valid": true,
+			"cast": [
+				"w:1:2",
+				"w:3:4"
+			]
+		},
+		{
+			"schema": "array of refs",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of refs",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": true,
+			"valid": true,
+			"cast": [
+				1
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": false,
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of ints",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "1",
+			"valid": true,
+			"cast": [
+				1
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": "0",
+			"valid": true,
+			"cast": [
+				0
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": 1,
+			"valid": true,
+			"cast": [
+				1
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": 0,
+			"valid": true,
+			"cast": [
+				0
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": 2,
+			"valid": true,
+			"cast": [
+				2
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": -1,
+			"valid": true,
+			"cast": [
+				-1
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": 51,
+			"valid": true,
+			"cast": [
+				51
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of ints",
+			"value": " ",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of ints",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "5",
+			"valid": true,
+			"cast": [
+				5
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": "5.0",
+			"valid": true,
+			"cast": [
+				5
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "1e2",
+			"valid": true,
+			"cast": [
+				100
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": [],
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of ints",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": true,
+			"cast": [
+				1,
+				2
+			]
+		},
+		{
+			"schema": "array of ints",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of ints",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": false,
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of enum",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "1",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of enum",
+			"value": " ",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of enum",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "a",
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "array of enum",
+			"value": "container",
+			"valid": true,
+			"cast": [
+				"container"
+			]
+		},
+		{
+			"schema": "array of enum",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "a, container",
+			"valid": true,
+			"cast": [
+				"a",
+				"container"
+			]
+		},
+		{
+			"schema": "array of enum",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": [],
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "array of enum",
+			"value": [
+				"a"
+			],
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "array of enum",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": {
+				"1": "a"
+			},
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "array of enum",
+			"value": {
+				"flag": true
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "array of enum",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "1",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "",
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "object",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "object",
+			"value": [],
+			"valid": true,
+			"cast": []
+		},
+		{
+			"schema": "object",
+			"value": [
+				"a"
+			],
+			"valid": true,
+			"cast": [
+				"a"
+			]
+		},
+		{
+			"schema": "object",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": true,
+			"cast": [
+				"w:1:2",
+				42
+			]
+		},
+		{
+			"schema": "object",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": true,
+			"cast": [
+				"1",
+				"2"
+			]
+		},
+		{
+			"schema": "object",
+			"value": {
+				"x": 1
+			},
+			"valid": true,
+			"cast": {
+				"x": 1
+			}
+		},
+		{
+			"schema": "object",
+			"value": {
+				"1": "a"
+			},
+			"valid": true,
+			"cast": {
+				"1": "a"
+			}
+		},
+		{
+			"schema": "object",
+			"value": {
+				"flag": true
+			},
+			"valid": true,
+			"cast": {
+				"flag": true
+			}
+		},
+		{
+			"schema": "object",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": true,
+			"cast": {
+				"flag": "1",
+				"n": "5"
+			}
+		},
+		{
+			"schema": "object",
+			"value": {
+				"n": 5
+			},
+			"valid": true,
+			"cast": {
+				"n": 5
+			}
+		},
+		{
+			"schema": "object",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": true,
+			"cast": {
+				"flag": true,
+				"extra": 1
+			}
+		},
+		{
+			"schema": "object, strict",
+			"value": true,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": false,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "true",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "false",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "TRUE",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "1",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "0",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": 1,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": 0,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": 2,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": -1,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": 51,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "yes",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": " ",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": null,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "5",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "5.0",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": 5.5,
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "1e2",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "abc",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "a",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "container",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "a,b",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "a, container",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "w:1:2",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "w:1:2,w:3:4",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": "typo:x:y",
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": [],
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": [
+				"a"
+			],
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": [
+				"w:1:2",
+				42
+			],
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": [
+				"1",
+				"2"
+			],
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": {
+				"x": 1
+			},
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": {
+				"1": "a"
+			},
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": {
+				"flag": true
+			},
+			"valid": true,
+			"cast": {
+				"flag": true
+			}
+		},
+		{
+			"schema": "object, strict",
+			"value": {
+				"flag": "1",
+				"n": "5"
+			},
+			"valid": true,
+			"cast": {
+				"flag": true,
+				"n": 5
+			}
+		},
+		{
+			"schema": "object, strict",
+			"value": {
+				"n": 5
+			},
+			"valid": false
+		},
+		{
+			"schema": "object, strict",
+			"value": {
+				"flag": true,
+				"extra": 1
+			},
+			"valid": false
+		}
+	]
+}

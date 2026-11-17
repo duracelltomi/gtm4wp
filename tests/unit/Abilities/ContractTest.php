@@ -242,6 +242,37 @@ final class ContractTest extends AbilitiesTestCase {
 	}
 
 	/**
+	 * The ability tests run input through CoreInputDouble, which models only
+	 * the keywords it lists (T158). A schema using another one (`format`,
+	 * `uniqueItems`, `oneOf`) would pass the double while core treats it
+	 * differently: teach the double and regenerate its fixture first.
+	 */
+	public function test_every_input_schema_uses_only_keywords_the_core_double_models(): void {
+		$used = array();
+		$walk = static function ( array $schema, string $path ) use ( &$walk, &$used ): void {
+			foreach ( $schema as $keyword => $member ) {
+				$used[ $keyword ][] = $path;
+				if ( 'properties' === $keyword ) {
+					foreach ( (array) $member as $property => $sub ) {
+						$walk( (array) $sub, "$path.$property" );
+					}
+				} elseif ( 'items' === $keyword || ( 'additionalProperties' === $keyword && is_array( $member ) ) ) {
+					$walk( (array) $member, "$path.$keyword" );
+				}
+			}
+		};
+
+		foreach ( $this->registered as $name => $args ) {
+			$walk( (array) $args['input_schema'], $name );
+		}
+
+		$unmodelled = array_diff_key( $used, array_flip( CoreInputDouble::KEYWORDS ) );
+
+		$this->assertNotEmpty( $used['type'] ?? array(), 'The walk reached the schemas.' );
+		$this->assertSame( array(), $unmodelled, 'Keywords CoreInputDouble does not model, by schema path.' );
+	}
+
+	/**
 	 * Asserts a schema and every schema nested under it carries a `type`
 	 * (or an anyOf/oneOf alternative list).
 	 *

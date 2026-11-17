@@ -258,11 +258,11 @@ final class GoogleAuthAbilitiesTest extends AbilitiesTestCase {
 		return array(
 			'well-formed but unknown' => array( array( 'id' => 'sa_ffffffffffff' ) ),
 			// Defence in depth (T159): core refuses this input first.
-			'malformed'               => array( array( 'id' => '../etc/passwd' ) ),
+			'malformed'               => array( array( 'id' => '../etc/passwd' ), self::CORE_RAW ),
 			// Defence in depth (T159): core refuses this input first.
-			'not a string'            => array( array( 'id' => array( 'sa_ffffffffffff' ) ) ),
+			'not a string'            => array( array( 'id' => array( 'sa_ffffffffffff' ) ), self::CORE_RAW ),
 			// Defence in depth (T159): core refuses this input first.
-			'missing'                 => array( array() ),
+			'missing'                 => array( array(), self::CORE_RAW ),
 		);
 	}
 
@@ -270,12 +270,13 @@ final class GoogleAuthAbilitiesTest extends AbilitiesTestCase {
 	 * An unknown id is 404 and sends nothing.
 	 *
 	 * @param array<string, mixed> $input The input.
+	 * @param string $core Which core input path (AbilitiesTestCase::CORE_*).
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'unknown_ids' )]
-	public function test_an_unknown_account_is_refused_with_404_and_no_request( array $input ): void {
+	public function test_an_unknown_account_is_refused_with_404_and_no_request( array $input, string $core = self::CORE_7_2 ): void {
 		$this->store_account();
 
-		$result = $this->execute( Abilities::TEST_ACCOUNT, $input );
+		$result = $this->execute( Abilities::TEST_ACCOUNT, $input, $core );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_google_account_unknown', $result->get_error_code() );

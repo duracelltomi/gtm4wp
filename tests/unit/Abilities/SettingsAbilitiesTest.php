@@ -92,7 +92,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 * this pins the callback's own guard.
 	 */
 	public function test_an_unknown_module_is_refused_by_name(): void {
-		$result = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'modules' => array( 'container', 'no-such-module' ) ) );
+		$result = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'modules' => array( 'container', 'no-such-module' ) ), self::CORE_RAW );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_unknown_module', $result->get_error_code() );
@@ -105,7 +105,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 * this pins the callback's own guard.
 	 */
 	public function test_an_unknown_option_is_refused_by_name(): void {
-		$result = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'keys' => array( 'third-party-key' ) ) );
+		$result = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'keys' => array( 'third-party-key' ) ), self::CORE_RAW );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_unknown_option', $result->get_error_code() );
@@ -407,7 +407,8 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 					'not-a-field'           => 'injected',
 					GTM4WP_OPTION_LOADEARLY => true,
 				),
-			)
+			),
+			self::CORE_RAW
 		);
 
 		$this->assertTrue( $result['saved'] );
@@ -474,7 +475,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 * this pins the callback's own guard.
 	 */
 	public function test_an_empty_patch_is_refused_before_anything_is_written(): void {
-		$result = $this->execute( SettingsAbilities::UPDATE_SETTINGS, array( 'values' => array() ) );
+		$result = $this->execute( SettingsAbilities::UPDATE_SETTINGS, array( 'values' => array() ), self::CORE_RAW );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_settings_invalid', $result->get_error_code() );
@@ -664,12 +665,12 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	public static function unconfirmed_imports(): array {
 		return array(
 			// Defence in depth (T159): core refuses this input first.
-			'confirm missing' => array( array(), 'gtm4wp_confirmation_required' ),
+			'confirm missing' => array( array(), 'gtm4wp_confirmation_required', self::CORE_RAW ),
 			'confirm false'   => array( array( 'confirm' => false ), 'gtm4wp_confirmation_required' ),
 			// #567: raw text is refused, with the reason (6.9/7.0 REST sends text);
 			// core 7.2 casts it to true before the callback (#698), never seen here.
-			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean' ),
-			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean' ),
+			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean', self::CORE_6_9 ),
+			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean', self::CORE_6_9 ),
 		);
 	}
 
@@ -679,14 +680,16 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 *
 	 * @param array<string, mixed> $confirm The confirm member, or none.
 	 * @param string               $code    The refusal's error code.
+	 * @param string $core Which core input path (AbilitiesTestCase::CORE_*).
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'unconfirmed_imports' )]
-	public function test_an_import_without_confirm_true_is_refused_before_anything_runs( array $confirm, string $code ): void {
+	public function test_an_import_without_confirm_true_is_refused_before_anything_runs( array $confirm, string $code, string $core = self::CORE_7_2 ): void {
 		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
 
 		$result = $this->execute(
 			SettingsAbilities::IMPORT_SETTINGS,
-			array_merge( array( 'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ) ), $confirm )
+			array_merge( array( 'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ) ), $confirm ),
+			$core
 		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
@@ -722,12 +725,69 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 			array(
 				'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ),
 				'confirm' => $confirm,
-			)
+			),
+			self::CORE_6_9
 		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'gtm4wp_confirm_not_boolean', $result->get_error_code() );
 		$this->assertSame( $expected, $result->get_error_message() );
+	}
+
+	/**
+	 * #698: core 7.2 casts a text or number confirm to true before the
+	 * callback, so the import runs; anything else core refuses on every path.
+	 *
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function affirmative_confirms(): array {
+		return array(
+			'text'       => array( 'true' ),
+			'upper text' => array( 'TRUE' ),
+			'text 1'     => array( '1' ),
+			'number'     => array( 1 ),
+		);
+	}
+
+	/**
+	 * The import runs on 7.2 when confirm is core's affirmative text or number.
+	 *
+	 * @param mixed $confirm The confirm input.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'affirmative_confirms' )]
+	public function test_core_7_2_casts_an_affirmative_confirm_and_the_import_runs( $confirm ): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
+
+		$result = $this->execute(
+			SettingsAbilities::IMPORT_SETTINGS,
+			array(
+				'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ),
+				'confirm' => $confirm,
+			)
+		);
+
+		$this->assertTrue( $result['imported'] );
+		$this->assertSame( 'imported', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
+	}
+
+	public function test_a_confirm_core_cannot_read_as_boolean_is_refused_before_the_import_on_every_core(): void {
+		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
+
+		foreach ( array( self::CORE_6_9, self::CORE_7_2 ) as $core ) {
+			$result = $this->execute(
+				SettingsAbilities::IMPORT_SETTINGS,
+				array(
+					'payload' => self::envelope( array( GTM4WP_OPTION_DATALAYER_NAME => 'imported' ) ),
+					'confirm' => 'yes',
+				),
+				$core
+			);
+
+			$this->assertInstanceOf( \WP_Error::class, $result, $core );
+			$this->assertSame( 'ability_invalid_input', $result->get_error_code(), $core );
+		}
+
+		$this->assertSame( 'keep', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
 	}
 
 	/**
@@ -743,7 +803,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 			'not JSON'                  => array( 'gtm-datalayer-variable-name=x', 'gtm4wp_import_invalid' ),
 			'empty'                     => array( '', 'gtm4wp_import_empty' ),
 			// Defence in depth (T159): core refuses this input first.
-			'not a string'              => array( array( 'type' => SettingsStore::EXPORT_TYPE ), 'gtm4wp_import_empty' ),
+			'not a string'              => array( array( 'type' => SettingsStore::EXPORT_TYPE ), 'gtm4wp_import_empty', self::CORE_RAW ),
 			'over the size cap'         => array( '{' . str_repeat( ' ', SettingsStore::IMPORT_MAX_BYTES ) . '}', 'gtm4wp_import_too_large' ),
 			// Seventeen levels with the envelope's own two, one past the cap of
 			// sixteen: json_decode() answers null at the cap, so the envelope is
@@ -762,9 +822,10 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 *
 	 * @param mixed  $payload The payload.
 	 * @param string $code    Expected error code.
+	 * @param string $core Which core input path (AbilitiesTestCase::CORE_*).
 	 */
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'refused_payloads' )]
-	public function test_a_payload_that_is_not_an_export_is_refused_with_400_and_stores_nothing( $payload, string $code ): void {
+	public function test_a_payload_that_is_not_an_export_is_refused_with_400_and_stores_nothing( $payload, string $code, string $core = self::CORE_7_2 ): void {
 		$this->store_settings( array( GTM4WP_OPTION_DATALAYER_NAME => 'keep' ) );
 
 		$result = $this->execute(
@@ -772,7 +833,8 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 			array(
 				'payload' => $payload,
 				'confirm' => true,
-			)
+			),
+			$core
 		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
