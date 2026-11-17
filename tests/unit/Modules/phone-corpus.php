@@ -4,7 +4,7 @@
  *
  * Regenerate with: composer generate:phone-table
  * Source: Google libphonenumber, resources/PhoneNumberMetadata.xml
- * Generated: 2026-11-04
+ * Generated: 2026-11-12
  *
  * Every territory's own example number in TWO spellings, against the E.164 the
  * numbering plan says it is. 972 cases.
@@ -1004,8 +1004,8 @@ return array(
 	'ZM fixedLine intl-no-plus' => array( 'ZM', '260211234567', '+260211234567' ),
 	'ZM mobile national'        => array( 'ZM', '0955123456', '+260955123456' ),
 	'ZM mobile intl-no-plus'    => array( 'ZM', '260955123456', '+260955123456' ),
-	'ZW fixedLine national'     => array( 'ZW', '01312345', '+2631312345' ),
-	'ZW fixedLine intl-no-plus' => array( 'ZW', '2631312345', '+2631312345' ),
+	'ZW fixedLine national'     => array( 'ZW', '0202012345', '+263202012345' ),
+	'ZW fixedLine intl-no-plus' => array( 'ZW', '263202012345', '+263202012345' ),
 	'ZW mobile national'        => array( 'ZW', '0712345678', '+263712345678' ),
 	'ZW mobile intl-no-plus'    => array( 'ZW', '263712345678', '+263712345678' ),
 );
