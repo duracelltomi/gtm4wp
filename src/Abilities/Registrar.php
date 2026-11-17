@@ -164,11 +164,11 @@ final class Registrar {
 
 	/**
 	 * The refusal for a `confirm` input that is not the JSON boolean true, or
-	 * null when it is. A text "true" or a number 1 still refuses (the check
-	 * stays strict, #525) but says why: a client repeating the call as told
-	 * would loop. Only a route whose input travels in the query string (a
-	 * DELETE: destructive + idempotent) sends text on WordPress 6.9/7.0 (#567,
-	 * #606); a POST route delivers the boolean as one.
+	 * null when it is. A text "true" or a number 1 refuses with the reason (a
+	 * client repeating the call as told would loop) wherever core passes the
+	 * raw value: MCP, CLI and PHP callers on 6.9–7.1, and the query-string
+	 * (DELETE) REST route on 6.9/7.0 (#567, #606). REST on 7.1 and every path
+	 * on 7.2 cast "true", "1" and 1 to true before this runs (#698, U155).
 	 *
 	 * @param mixed $confirm         The confirm input.
 	 * @param bool  $rest_sends_text Whether this ability's REST route can only send text.

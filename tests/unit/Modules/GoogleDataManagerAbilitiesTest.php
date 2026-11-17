@@ -70,6 +70,10 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		Functions\when( 'get_transient' )->justReturn( false );
 		Functions\when( 'set_transient' )->justReturn( true );
 		Functions\when( 'delete_transient' )->justReturn( true );
+		// Core's wp_parse_list() (TS-16): a string splits on commas and whitespace.
+		Functions\when( 'wp_parse_list' )->alias(
+			static fn ( $input_list ) => is_array( $input_list ) ? $input_list : preg_split( '/[\s,]+/', (string) $input_list, -1, PREG_SPLIT_NO_EMPTY )
+		);
 
 		$this->scheduled = array();
 		Functions\when( 'as_schedule_single_action' )->alias(
@@ -452,8 +456,10 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 		return array(
 			'well-formed but not stored' => array( array( 'measurement_id' => 'G-NOTSTORED' ) ),
 			'hostile'                    => array( array( 'measurement_id' => 'G-"</script>' ) ),
+			// Defence in depth (T159): core refuses this input first.
 			'not a string'               => array( array( 'measurement_id' => array( self::MEASUREMENT ) ) ),
 			'empty'                      => array( array( 'measurement_id' => '' ) ),
+			// Defence in depth (T159): core refuses this input first.
 			'missing'                    => array( array() ),
 		);
 	}
@@ -532,10 +538,13 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	 */
 	public static function unconfirmed_calls(): array {
 		return array(
+			// Defence in depth (T159): core refuses this input first.
 			'confirm missing' => array( array(), 'gtm4wp_confirmation_required' ),
 			'confirm false'   => array( array( 'confirm' => false ), 'gtm4wp_confirmation_required' ),
+			// Defence in depth (T159): core refuses this input first.
 			'confirm null'    => array( array( 'confirm' => null ), 'gtm4wp_confirmation_required' ),
-			// #567: text is refused too, with the reason.
+			// #567: raw text is refused, with the reason; core 7.2 casts it to
+			// true before the callback (#698), never seen here.
 			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean' ),
 			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean' ),
 		);
@@ -629,6 +638,26 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 			Abilities::REPLAY_REFUNDS,
 			array(
 				'confirm'    => true,
+				'references' => array( 'woocommerce:3:4', 'woocommerce:99:99' ),
+			)
+		);
+
+		$this->assertSame( array( 'woocommerce:3:4' ), $result['references'], 'A well-formed reference the log does not hold queues nothing.' );
+		$this->assertCount( 1, $this->scheduled );
+	}
+
+	/**
+	 * Defence in depth (T159): core's item pattern refuses this input before
+	 * the callback; this pins the callback's own guard.
+	 */
+	public function test_references_core_refuses_are_dropped_by_the_callback_too(): void {
+		$this->store_destination( $this->store_account() );
+		$this->record( 'woocommerce:3:4', SendLog::OUTCOME_FAILED );
+
+		$result = $this->execute(
+			Abilities::REPLAY_REFUNDS,
+			array(
+				'confirm'    => true,
 				'references' => array( 'woocommerce:3:4', 'not a reference', 42 ),
 			)
 		);
@@ -638,28 +667,106 @@ final class GoogleDataManagerAbilitiesTest extends AbilitiesTestCase {
 	}
 
 	/**
-	 * #501: references given but naming no refund are refused with nothing
-	 * queued; omitted, every replayable refund is queued.
+	 * #501: a list naming no logged refund queues nothing, never every
+	 * refund; omitted, every replayable refund is queued.
 	 */
-	public function test_a_replay_naming_no_refund_is_refused_and_an_omitted_list_means_all(): void {
+	public function test_a_replay_naming_no_logged_refund_queues_nothing_and_an_omitted_list_means_all(): void {
 		$this->store_destination( $this->store_account() );
 		$this->record( 'woocommerce:1:2', SendLog::OUTCOME_FAILED );
 		$this->record( 'woocommerce:3:4', SendLog::OUTCOME_FAILED );
 
-		$refused = $this->execute(
+		$none = $this->execute(
 			Abilities::REPLAY_REFUNDS,
 			array(
 				'confirm'    => true,
-				'references' => array( 'typo:x:y' ),
+				'references' => array( 'woocommerce:99:99' ),
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $refused );
+		$this->assertSame( 0, $none['queued'] );
 		$this->assertSame( array(), $this->scheduled );
 
 		$all = $this->execute( Abilities::REPLAY_REFUNDS, array( 'confirm' => true ) );
 
 		$this->assertSame( 2, $all['queued'] );
+	}
+
+	/**
+	 * #501, defence in depth (T159): core refuses these before the callback
+	 * (pattern, minItems); the callback refuses them too, never reading them
+	 * as "all".
+	 *
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function references_naming_no_refund(): array {
+		return array(
+			'typo in a list'    => array( array( 'typo:x:y' ) ),
+			'typos in a string' => array( 'typo:x:y,nope' ),
+			'separators only'   => array( ',' ),
+			'empty string'      => array( '' ),
+		);
+	}
+
+	/**
+	 * Nothing named, nothing queued: refused, never read as every refund.
+	 *
+	 * @param mixed $references The references input.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'references_naming_no_refund' )]
+	public function test_references_naming_no_refund_are_refused( $references ): void {
+		$this->store_destination( $this->store_account() );
+		$this->record( 'woocommerce:1:2', SendLog::OUTCOME_FAILED );
+
+		$refused = $this->execute(
+			Abilities::REPLAY_REFUNDS,
+			array(
+				'confirm'    => true,
+				'references' => $references,
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $refused );
+		$this->assertSame( 'gtm4wp_gdm_no_references', $refused->get_error_code() );
+		$this->assertSame( array(), $this->scheduled );
+	}
+
+	/**
+	 * #699: a string is a list, read the way core 7.2 casts it, so every
+	 * WordPress version names the same refunds.
+	 *
+	 * @return array<string, array{0: mixed, 1: string[]}>
+	 */
+	public static function reference_lists(): array {
+		return array(
+			'comma'           => array( 'woocommerce:1:2,woocommerce:3:4', array( 'woocommerce:1:2', 'woocommerce:3:4' ) ),
+			'comma and space' => array( 'woocommerce:1:2, woocommerce:3:4', array( 'woocommerce:1:2', 'woocommerce:3:4' ) ),
+			'single string'   => array( 'woocommerce:3:4', array( 'woocommerce:3:4' ) ),
+			'list'            => array( array( 'woocommerce:1:2', 'woocommerce:3:4' ), array( 'woocommerce:1:2', 'woocommerce:3:4' ) ),
+		);
+	}
+
+	/**
+	 * The same refunds are queued whichever form the list takes.
+	 *
+	 * @param mixed    $references The references input.
+	 * @param string[] $expected   The references queued.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'reference_lists' )]
+	public function test_a_reference_string_names_the_same_refunds_as_a_list( $references, array $expected ): void {
+		$this->store_destination( $this->store_account() );
+		$this->record( 'woocommerce:1:2', SendLog::OUTCOME_FAILED );
+		$this->record( 'woocommerce:3:4', SendLog::OUTCOME_FAILED );
+
+		$result = $this->execute(
+			Abilities::REPLAY_REFUNDS,
+			array(
+				'confirm'    => true,
+				'references' => $references,
+			)
+		);
+
+		$this->assertSame( $expected, $result['references'] );
+		$this->assertCount( count( $expected ), $this->scheduled );
 	}
 
 	public function test_a_replay_is_refused_while_sending_is_off(): void {

@@ -1159,6 +1159,21 @@ Deep-pass re-audit of the oldest `[x]` rows (MediaEvents 07-13, ContactForm7 07-
 ConsentMode 07-14/15, Module Framework 07-10) produced #112 and nothing else; the
 ConsentMode bridges interpolate only the validated data-layer identifier.
 
+### Report 60 (scoped): `.security/code-review-report-2026-11-17-2017.md`
+
+**Reviewed at:** `e2f653d`, scoped to one upstream handover (`.upstream` U155 / D59: WordPress 7.2 sanitizes ability
+input inside `WP_Ability::execute()` for every caller). **Scoped: the base for the next full review stays `6b1a97b`.**
+Read `src/Abilities/`, both module `Abilities.php` files, and the option value schema, against RC1 and 7.1.4 core.
+**0 security findings, 2 Low defects (#698, #699), 1 upkeep (#700).** Adjudication: 1 verifier; mechanism and reach
+confirmed by trace on core's real `execute()`; 1 recommendation refuted (an `enum` alternative fails, and a stricter
+option's REST cost was missing); #699 from verifier collateral. Snapshots clean, HEAD unchanged.
+
+| # | Sev | Status | Actor | Where | Summary |
+|---|---|---|---|---|---|
+| 698 | Low | fixed (R60 fix session, maintainer chose option a: core's cast accepted, docblocks and test comments say where the refusal still fires; no code change) | A4 delegate | `Abilities\Registrar::confirmation_error()` | Strict `confirm` check (#525) differs by WordPress version; core 7.2 coerces first (U155) |
+| 699 | Low | fixed (R60 fix session: a string is split like core's list cast; tests red on the released code, green after; 2.1.2, owed on `2.1` too) | A4 delegate | GDM `replay-refunds` `references` | Input accepted on 7.2 that 6.9–7.1 refused outside REST (U155) |
+| 700 | Low | fixed (with #698) | — | `Abilities\Input`, `Registrar` | Docblocks state a strictness 7.2 no longer has |
+
 ### Issue sweep: 2026-11-05 (no `/code-review` run)
 
 Found at `83192d6` while answering an issue; read from code, not run, not adjudicated. Queued for a deeper review.

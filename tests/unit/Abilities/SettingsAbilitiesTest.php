@@ -87,6 +87,10 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( array( GTM4WP_OPTION_GTM_PLACEMENT, GTM4WP_OPTION_DATALAYER_NAME ), array_keys( $values ), 'Registry order, not request order.' );
 	}
 
+	/**
+	 * Defence in depth (T159): core refuses this input before the callback;
+	 * this pins the callback's own guard.
+	 */
 	public function test_an_unknown_module_is_refused_by_name(): void {
 		$result = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'modules' => array( 'container', 'no-such-module' ) ) );
 
@@ -96,6 +100,10 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertStringContainsString( 'no-such-module', $result->get_error_message() );
 	}
 
+	/**
+	 * Defence in depth (T159): core refuses this input before the callback;
+	 * this pins the callback's own guard.
+	 */
 	public function test_an_unknown_option_is_refused_by_name(): void {
 		$result = $this->execute( SettingsAbilities::GET_SETTINGS, array( 'keys' => array( 'third-party-key' ) ) );
 
@@ -304,7 +312,8 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 			array(
 				'values'        => array(
 					GTM4WP_OPTION_DATALAYER_NAME => 'myLayer',
-					GTM4WP_OPTION_LOADEARLY      => 'yes',
+					// Text core lets through raw before 7.2 (T159: "yes" never reaches the callback).
+					GTM4WP_OPTION_LOADEARLY      => '1',
 				),
 				'expected_hash' => $before,
 			)
@@ -383,6 +392,10 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( array( GTM4WP_OPTION_LOADEARLY => true ), (array) $result['changed'] );
 	}
 
+	/**
+	 * Defence in depth (T159): core refuses this input before the callback;
+	 * this pins the callback's own guard.
+	 */
 	public function test_an_unknown_option_key_reaching_the_store_is_ignored_not_stored(): void {
 		// Core refuses the key by schema first (additionalProperties false, pinned
 		// above); this is the store's own guard for a caller that reaches the
@@ -456,6 +469,10 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 		$this->assertSame( 'theirs', $this->stored_settings()[ GTM4WP_OPTION_DATALAYER_NAME ] );
 	}
 
+	/**
+	 * Defence in depth (T159): core refuses this input before the callback;
+	 * this pins the callback's own guard.
+	 */
 	public function test_an_empty_patch_is_refused_before_anything_is_written(): void {
 		$result = $this->execute( SettingsAbilities::UPDATE_SETTINGS, array( 'values' => array() ) );
 
@@ -646,9 +663,11 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 	 */
 	public static function unconfirmed_imports(): array {
 		return array(
+			// Defence in depth (T159): core refuses this input first.
 			'confirm missing' => array( array(), 'gtm4wp_confirmation_required' ),
 			'confirm false'   => array( array( 'confirm' => false ), 'gtm4wp_confirmation_required' ),
-			// #567: text is refused too, with the reason (6.9/7.0 REST sends text).
+			// #567: raw text is refused, with the reason (6.9/7.0 REST sends text);
+			// core 7.2 casts it to true before the callback (#698), never seen here.
 			'confirm string'  => array( array( 'confirm' => 'true' ), 'gtm4wp_confirm_not_boolean' ),
 			'confirm 1'       => array( array( 'confirm' => 1 ), 'gtm4wp_confirm_not_boolean' ),
 		);
@@ -723,6 +742,7 @@ final class SettingsAbilitiesTest extends AbilitiesTestCase {
 			'options not an object'     => array( '{"type":"' . SettingsStore::EXPORT_TYPE . '","options":"x"}', 'gtm4wp_import_invalid' ),
 			'not JSON'                  => array( 'gtm-datalayer-variable-name=x', 'gtm4wp_import_invalid' ),
 			'empty'                     => array( '', 'gtm4wp_import_empty' ),
+			// Defence in depth (T159): core refuses this input first.
 			'not a string'              => array( array( 'type' => SettingsStore::EXPORT_TYPE ), 'gtm4wp_import_empty' ),
 			'over the size cap'         => array( '{' . str_repeat( ' ', SettingsStore::IMPORT_MAX_BYTES ) . '}', 'gtm4wp_import_too_large' ),
 			// Seventeen levels with the envelope's own two, one past the cap of

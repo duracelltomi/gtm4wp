@@ -53,6 +53,7 @@ on every review before anything else.
 - **TS-22** — a stub that collapses two outputs the code must keep distinct: an identity translator (`__` returning its input) makes a translated `value` and its English `debug` twin identical, so a module handing the translated string as `debug` stays green; a mock that returns the same thing on both legs of a branch hides which leg ran. Make the double *mark* what it touches (`'[' . $text . ']'`) and assert the mark is absent where the raw form is required.
 - **TS-23** ⭐ — a multi-leg fix is pinned on the leg the finding was written about: the regression test reproduces the reported path (WC route, FAILED row, view_cart call site) while the same fix's sibling legs (EDD route, RETRYING row, checkout call site) ship revertible green. Enumerate the fix's legs from its diff, not from the finding text, and probe each.
 - **TS-24** ⭐ — only the seam's test branch runs: an optional constructor dependency (`$encryption_key`, `$options = null`) whose test default takes a bypass branch means the production branch is executed by no test, however many tests the class has. Find each `?? <production read>` / `null === $this->x ||` and require one test that leaves the seam unset.
+- **TS-25** — a harness that calls the callback directly skips core's input pipeline (validate, then the 7.2 cast): label raw-callback cases as defence-in-depth, and measure by replaying the inputs through real core.
 - **TS-5** — happy-path only: no error / empty / boundary / invalid-input branch (a valid custom value tested, the fallback path not).
 - **TS-7** — state leakage: a test reads/writes `$_SERVER`, `$GLOBALS`, statics or singletons without snapshotting and resetting them in `setUp`/`tearDown`.
 - **TS-8** — non-determinism: reliance on real time, randomness, or test-execution order.
@@ -790,6 +791,19 @@ EDD half (the same `null` default in `CaptureHooks` — T155).
 - A shared test factory with the bypass default is the root cause: give it no default,
   so each test chooses the branch on purpose.
 
+### TS-25: A harness that calls the callback directly skips the framework's own input pipeline
+TS-13 for the dispatcher rather than a collaborator. When tests reach an ability's `execute_callback` (or a REST
+handler, past its `args`) directly, they skip what core does first: validation against the schema and, from
+WordPress 7.2, a cast to the schema types for every caller (U155). The suite then mixes cases core can deliver with
+cases it refuses, and cannot see a cast at all. Measured 2026-11-17 (Run 18): of 129 ability calls, 18 used input
+core refuses and 10 input the 7.2 cast changes; R60 #698 and #699 were both invisible (T158–T161).
+- **Measure it:** log each call's input and schema in a throwaway copy of the harness, then replay them through the
+  real core functions of the version in question. Counts, not guesses.
+- **Label the two kinds:** a case modelling what core delivers vs. a deliberate defence-in-depth case for input core
+  refuses. Only the second may call the callback raw, and it says so.
+- Do not reuse an output-side validator that is "stricter than core" for inputs: strict is safe for output and wrong
+  for input (it refuses `"true"` for a boolean, which core accepts).
+
 ## Project-Specific Test Conventions
 
 ### TC-1: A security-relevant change ships a regression test
@@ -1107,6 +1121,7 @@ coverage-chasing junk.
 
 | Date | Action |
 |---|---|
+| 2026-11-17 (Run 18, scoped) | Handover from `.upstream` U155/D59 and `.security` R60 #698/#699. Added **TS-25** (a harness that calls the callback directly skips the framework's input pipeline; measured by replaying the suite's 129 ability inputs through core 7.2-RC1: 18 refused by core, 10 changed by the cast). Gaps T158–T161. |
 | 2026-10-20 (Run 17 — gaps closed) | Closed T138–T157 with three parallel agents split by test-file ownership (no shared file, each probe restoring its own source). **One production change:** T141, the #497 token-path fix, red before the fix. **PHP 3577/20211 → 3629/20825; JS 1063 → 1068**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean; `build/` byte-identical. **All 43 original survivors re-probed red.** TS-15 caught a pin the review itself had called solid (T157: an `expectApplied()` loop re-ran its first case), so a new TS-15 bullet was added. TS-24's recipe in practice: real `Options` instances and a `define()` in a separate process reach the production branches. |
 | 2026-10-20 (Run 17 — reviews 46–53 pass, report only) | Reviewed `ff09e37..7c1bc34` (64 commits; findings #365–#526, the R53 fix session, 2.1.0-rc1) with 3 parallel read-only deep-reads, PCOV (97.98% lines) and **46 serial probes (43 survived → T138–T156, 3 controls red)**; no tests written. **All 40 PHP survivors applied together leave the full suite green at the unchanged 3577/20211** — the combined run is the cheap way to confirm survivors suite-wide. Added **TS-23** (a multi-leg fix pinned on the leg the finding describes — six findings) and **TS-24** (only the seam's test branch runs — #469 / #485 / #484). One latent bug from a scratch test outside the repo: #497 half-fixed, the token path still records no-OpenSSL as a damaged key (T141 → `/code-review`); the test-file comment claiming the leg cannot run in-process was false — the Run 10 namespaced-shadow + `RunInSeparateProcess` recipe reaches `function_exists` too. |
 | 2026-10-05 (Run 16 — gaps closed) | Closed T124–T137 (one fork: T132 pinned as-is, stub made faithful to `WC_DateTime::date()`). **PHP 3360/18478 → 3393/18945; JS 1008 → 1009**; declaration + 4 seeds identical; `phpcs` exit 0; `lint:js` clean. **31/31 survivors re-probed red.** Two reusable shapes: a cross-store contract lives in ONE test-support list both suites assert against (`OrderDataKeys`), and a public-constant table pins values with a completeness guard over the `define()`s, so a new constant cannot land unpinned. |

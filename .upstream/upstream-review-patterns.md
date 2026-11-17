@@ -36,6 +36,7 @@ Each row is `ID — one-line litmus`.
 | UD-22 ⭐ | Registry ids are assigned from `max(id on master)+1` at the moment of writing, and a merge touching a ledger re-runs the duplicate-id check first; when it has happened, the earliest row keeps its id and every cross-reference is re-pointed by meaning. |
 | UD-23 | A behaviour whose spec page sunset is a coupling with no source: the row records the nearest documented cousin plus a measurement recipe, and is rated as drifted until the measurement has run. |
 | UD-24 ⭐ | A drift sensor is itself coupled to our file layout: a scheduled diff over a path that no longer exists exits clean forever. Audit a sensor by running its generator once and diffing **what it actually writes**, never by reading its last green run. |
+| UD-26 | Upstream moving its own coercion ahead of our validator neuters the validator without a diff here: a strict check that sees only already-normalised input never fires. When a pipeline we plug into gains a sanitize/coerce step, re-ask what each of our checks can still observe. |
 | UD-25 | A comment justifying a dependency by upstream's implementation technology ("React-only") is an unregistered coupling: upstream rewrites the implementation, the dependency keeps loading. Register it and re-check at each release. |
 | UD-2 ⭐ | Silent failure needs a canary, not a comment. A code comment recording the last manual sync does not fire when the sync goes stale. |
 | UD-3 | A documentation page is a spec with no version and no changelog; diff the *claim*, never the page. |
@@ -252,6 +253,11 @@ the constructor renamed. Verify the **symbol the tracker calls** in the fetched 
 or the **heading the docblock cites** — and treat "still 200, section gone" as drift,
 not a pass.
 
+**Corollary (S9, 2026-11-17): a moved repository answers with an empty list, not a 404.**
+`takayukister/contact-form-7` still answers, with no tags, since the project moved to
+`rocklobster-in/contact-form-7`; an empty tag list compared against "no new release" is a
+green cell built on two nothings. Assert the newest tag you already know is in the answer.
+
 ### UD-13: A number copied is a number already wrong
 
 Every count in the ledger — how many entity ids, how many overrides pins, how many
@@ -309,6 +315,11 @@ and grep the heading ids (`<h3 id="view_item_list">`), which carries the sentine
 fetch, and is diffable run to run. Prefer that transport for every ordered reference page
 (GA4 events, the restrict page, any parameter table): a summariser is for judgement, a grep is
 for tokens.
+
+**Third corollary (S9, 2026-11-17): an API list with a cap is a truncated transport too.** A
+GitHub compare returns at most 300 files, so "our function's file is not in the diff" proves
+nothing on a large release (EDD 3.7.1.1 → 3.7.3 hit the cap). Diff the two packages instead and
+compare the bodies of the functions we call.
 
 ### UD-15: One finding per upstream ⭐
 
@@ -588,6 +599,18 @@ dependency keeps loading as dead weight, where a third-party optimizer can then 
 enqueue dependency or a mode switch, register each as a claim, and re-check it at every
 release of that upstream.
 
+### UD-26: Upstream coercion moved ahead of our validator neuters the validator
+
+A strict check that refuses near-miss input (a text `"true"` where a boolean is required)
+only works while it sees the raw value. WordPress 7.2 moves ability input sanitization out
+of the REST route into `WP_Ability::prepare_input()`, run for every caller, so the value
+reaches our callback already coerced and the refusal can never fire (D59, U155). Nothing on
+our side changes and no test fails: the stand-ins deliver raw input (UC-3).
+
+**Litmus:** when a release note says an upstream pipeline now sanitizes, normalizes or
+coerces earlier or for more callers, list the checks of ours downstream of it and ask what
+input each one can still observe. Route the answer to `/code-review`; the claim is ours.
+
 ### UC-1: A version floor written in N places drifts ⭐
 
 The PHP floor appears in the plugin header, the runtime `version_compare` gate, and
@@ -813,6 +836,7 @@ and that is what the registry row tracks.
 
 | Date | Action |
 |------|--------|
+| 2026-11-17 (S9) | Added **UD-26** (upstream coercion moved ahead of our validator neuters it; D59 on U155 at WP 7.2-RC1). Amended **UD-12** (a moved repository answers with an empty list, not a 404: the CF7 repo) and **UD-14** (an API list with a cap, the 300-file GitHub compare, is a truncated transport; diff packages instead). Sweep 9 itself: escalation on WP 7.2-RC1 day and WC 11.3.0; section A and the deprecation audit clean at RC1, the noscript fix holds; WC claim one minor behind (D57); a WC 11.3 form-class change (D58) and EDD `on_hold` (D60); five unrowed families from the review 53/57 fixes registered (U202–U207); `npm audit` 63 dev-only (D68). |
 | 2026-10-09 (S8) | Amended **UD-7** (the RC → GA step is not a formality: WC 11.2.0 added eight fixes over rc.1 and shipped a day late; diff the packages before carrying a pre-release verdict, bump at the tag). Sweep 8 itself: WC-scoped, 11.2.0 GA, section B clean at GA, one declaration finding (D56). |
 | 2026-10-06 (S7) | Amended **UD-20** (second example: a site-level cart/checkout setting read as the presence of the Mini-Cart block; probe co-occurrence, not existence — D50). Added **UD-25** (a rationale naming upstream's implementation technology is a coupling). Sweep 7 itself: WC 11.2 GA not tagged on its calendar day; the 11.1.2 → 11.2.0-rc.1 diff of the coupled files is clean, so the claim stays 11.1.2 until the tag. CF7 6.2.0 and WP 7.1.3 shipped the same day, both clean. Four unrowed couplings registered (U182–U185); `npm audit` back to 80 dev-only (D51). |
 | 2026-09-28 (S6) | Added **UD-24** (⭐ a drift sensor that diffs a moved path is green forever; audit a sensor by running its generator, not by reading its last run) after finding `upstream-drift.yml` diffing the pre-`36a0c83` phone-table path (D44) and, by regenerating in a scratch copy, the table two territories behind libphonenumber while the corpus it could still see was unchanged (D45). UD-9 corollary: try the other shell's transport before `fetch-failed`. Sweep 6 itself: WC 11.2.0-beta.2 package grepped whole — no anchor moved; `is_returning_customer()` changes two edge cases in the corrective direction (D46); the #472/#328 fixes' dependence on `triggerHandler` recorded on U25 (D47); Gutenberg 24.1.0-rc.1 deprecates the `@wordpress/scripts` Jest tooling (D48); `npm audit` run for the first time (0). ⭐ tier now UD-1, UD-2, UD-7, UD-11, UD-14, UD-15, UD-16, UD-18, UD-19, UD-20, UD-24, UC-1, UC-3, UC-8. |

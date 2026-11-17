@@ -257,8 +257,11 @@ final class GoogleAuthAbilitiesTest extends AbilitiesTestCase {
 	public static function unknown_ids(): array {
 		return array(
 			'well-formed but unknown' => array( array( 'id' => 'sa_ffffffffffff' ) ),
+			// Defence in depth (T159): core refuses this input first.
 			'malformed'               => array( array( 'id' => '../etc/passwd' ) ),
+			// Defence in depth (T159): core refuses this input first.
 			'not a string'            => array( array( 'id' => array( 'sa_ffffffffffff' ) ) ),
+			// Defence in depth (T159): core refuses this input first.
 			'missing'                 => array( array() ),
 		);
 	}

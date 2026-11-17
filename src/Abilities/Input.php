@@ -15,7 +15,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Before WordPress 7.1 the GET/DELETE REST transports pass every input as a
  * query string, validated but not coerced (#502); flags and lists are read
- * through these. A `confirm` stays strictly true.
+ * through these. From 7.2 core casts every input to its schema type first
+ * (U155), so these see the cast value there.
  */
 final class Input {
 
