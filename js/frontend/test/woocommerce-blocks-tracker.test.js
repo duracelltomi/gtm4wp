@@ -15,6 +15,8 @@ let mockActivePaymentMethod;
 let mockHasPaymentStore;
 let mockHasFinishedResolution;
 let mockSubscribeCount;
+let mockHasCheckoutStore;
+let mockCheckoutStatus;
 
 // The tracker reads window.wp.data at run time (U182: PHP omits the wp-data
 // dependency for the Interactivity API Mini-Cart), so the stand-in lives there.
@@ -29,6 +31,14 @@ const mockWpData = {
 		if ( name === 'wc/store/payment' && mockHasPaymentStore ) {
 			return {
 				getActivePaymentMethod: () => mockActivePaymentMethod,
+			};
+		}
+		// The status selectors of WooCommerce's public-api checkout store (U23).
+		if ( name === 'wc/store/checkout' && mockHasCheckoutStore ) {
+			return {
+				isBeforeProcessing: () =>
+					mockCheckoutStatus === 'before_processing',
+				isProcessing: () => mockCheckoutStatus === 'processing',
 			};
 		}
 		return null;
@@ -108,6 +118,8 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		mockHasPaymentStore = false;
 		mockHasFinishedResolution = true;
 		mockSubscribeCount = 0;
+		mockHasCheckoutStore = true;
+		mockCheckoutStatus = 'idle';
 		window.gtm4wp_woocommerce_blocks_inited = false;
 		window.gtm4wp_blocks_context = undefined;
 		window.gtm4wp_push_ecommerce = jest.fn();
@@ -199,40 +211,47 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 		expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 	} );
 
+	/**
+	 * A one-line cart with the named shipping rate selected.
+	 *
+	 * @param {string} rate_name The selected rate's name; '' for no rate.
+	 * @return {Object} The getCartData() payload.
+	 */
+	const checkoutCart = ( rate_name ) => ( {
+		items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
+		totals: { currency_code: 'EUR' },
+		shippingRates: rate_name
+			? [ { shipping_rates: [ { name: rate_name, selected: true } ] } ]
+			: [],
+	} );
+
+	const pushedNames = () =>
+		window.gtm4wp_push_ecommerce.mock.calls.map( ( call ) => call[ 0 ] );
+
 	it( 'legacy cartcheckout default: does not fire checkout events when the payment store is absent', () => {
 		mockHasPaymentStore = false;
-		mockCartData = {
-			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
-			totals: { currency_code: 'EUR' },
-			shippingRates: [
-				{ shipping_rates: [ { name: 'Flat rate', selected: true } ] },
-			],
-		};
+		mockCartData = checkoutCart( 'Flat rate' );
 		const subscriber = loadTracker();
 		subscriber();
 
-		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
-			( call ) => call[ 0 ]
-		);
-		expect( events ).not.toContain( 'add_shipping_info' );
-		expect( events ).not.toContain( 'add_payment_info' );
+		// A change and a submit would both report a step with the store present.
+		mockCartData = checkoutCart( 'Express' );
+		subscriber();
+		mockCheckoutStatus = 'before_processing';
+		subscriber();
+
+		expect( pushedNames() ).not.toContain( 'add_shipping_info' );
+		expect( pushedNames() ).not.toContain( 'add_payment_info' );
 	} );
 
 	it( 'legacy cartcheckout default: fires add_shipping_info and add_payment_info once when the payment store is present', () => {
 		mockHasPaymentStore = true;
 		mockActivePaymentMethod = 'stripe';
-		mockCartData = {
-			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
-			totals: { currency_code: 'EUR' },
-			shippingRates: [
-				{
-					shipping_rates: [
-						{ name: 'Free shipping', selected: true },
-					],
-				},
-			],
-		};
+		mockCartData = checkoutCart( 'Free shipping' );
 		const subscriber = loadTracker();
+		subscriber();
+
+		mockCheckoutStatus = 'before_processing';
 		subscriber();
 
 		const calls = window.gtm4wp_push_ecommerce.mock.calls;
@@ -265,48 +284,187 @@ describe( 'gtm4wp-woocommerce-blocks', () => {
 	// with no interaction, then again on Checkout. The earlier cart-page test
 	// mocked the store as ABSENT, which is why the suite never caught it (UC-3:
 	// the double was more permissive than the real collaborator).
+	// Since #492 the first snapshot never fires, so this case also drives a
+	// change and a submit: without them it would pass with the gate removed.
 	it( 'cart context: does not fire checkout events even when the payment store is registered (#463)', () => {
 		window.gtm4wp_blocks_context = 'cart';
 		mockHasPaymentStore = true;
 		mockActivePaymentMethod = 'stripe';
-		mockCartData = {
-			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
-			totals: { currency_code: 'EUR' },
-			shippingRates: [
-				{ shipping_rates: [ { name: 'Flat rate', selected: true } ] },
-			],
-		};
+		mockCartData = checkoutCart( 'Flat rate' );
 		const subscriber = loadTracker();
 		subscriber();
 
-		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
-			( call ) => call[ 0 ]
-		);
-		expect( events ).not.toContain( 'add_shipping_info' );
-		expect( events ).not.toContain( 'add_payment_info' );
+		mockCartData = checkoutCart( 'Express' );
+		mockActivePaymentMethod = 'paypal';
+		subscriber();
+		mockCheckoutStatus = 'before_processing';
+		subscriber();
+
+		expect( pushedNames() ).not.toContain( 'add_shipping_info' );
+		expect( pushedNames() ).not.toContain( 'add_payment_info' );
 	} );
 
-	// The positive half of the #463 split (TS-2 both directions): the same store
-	// state that must stay silent on the Cart page fires both steps on Checkout.
-	it( 'checkout context: fires add_shipping_info and add_payment_info', () => {
-		window.gtm4wp_blocks_context = 'checkout';
-		mockHasPaymentStore = true;
-		mockActivePaymentMethod = 'stripe';
-		mockCartData = {
-			items: [ cartLine( 'A', 1, { item_id: 7, price: 10 } ) ],
-			totals: { currency_code: 'EUR' },
-			shippingRates: [
-				{ shipping_rates: [ { name: 'Flat rate', selected: true } ] },
-			],
-		};
-		const subscriber = loadTracker();
-		subscriber();
+	describe( 'checkout context steps (#492)', () => {
+		beforeEach( () => {
+			window.gtm4wp_blocks_context = 'checkout';
+			mockHasPaymentStore = true;
+			mockActivePaymentMethod = 'stripe';
+			mockCartData = checkoutCart( 'Flat rate' );
+		} );
 
-		const events = window.gtm4wp_push_ecommerce.mock.calls.map(
-			( call ) => call[ 0 ]
+		// The reported defect: WooCommerce preselects both, and the page load
+		// alone pushed both steps for every visitor.
+		it( 'does not fire either step for the preselected rate and method on load', () => {
+			const subscriber = loadTracker();
+			subscriber();
+			subscriber(); // a later unrelated store change
+
+			expect( pushedNames() ).not.toContain( 'add_shipping_info' );
+			expect( pushedNames() ).not.toContain( 'add_payment_info' );
+		} );
+
+		it( 'fires add_payment_info once when the shopper changes the payment method', () => {
+			const subscriber = loadTracker();
+			subscriber();
+
+			mockActivePaymentMethod = 'paypal';
+			subscriber();
+			mockActivePaymentMethod = 'cod';
+			subscriber();
+
+			const payment = window.gtm4wp_push_ecommerce.mock.calls.filter(
+				( c ) => c[ 0 ] === 'add_payment_info'
+			);
+			expect( payment ).toHaveLength( 1 );
+			expect( payment[ 0 ][ 2 ] ).toEqual(
+				expect.objectContaining( {
+					currency: 'EUR',
+					payment_type: 'paypal',
+					value: 10,
+				} )
+			);
+			expect( pushedNames() ).not.toContain( 'add_shipping_info' );
+		} );
+
+		it( 'fires add_shipping_info once when the shopper changes the shipping rate', () => {
+			const subscriber = loadTracker();
+			subscriber();
+
+			mockCartData = checkoutCart( 'Express' );
+			subscriber();
+			mockCartData = checkoutCart( 'Pickup' );
+			subscriber();
+
+			const shipping = window.gtm4wp_push_ecommerce.mock.calls.filter(
+				( c ) => c[ 0 ] === 'add_shipping_info'
+			);
+			expect( shipping ).toHaveLength( 1 );
+			expect( shipping[ 0 ][ 2 ] ).toEqual(
+				expect.objectContaining( { shipping_tier: 'Express' } )
+			);
+			expect( pushedNames() ).not.toContain( 'add_payment_info' );
+		} );
+
+		it.each( [ 'before_processing', 'processing' ] )(
+			'fires both unreported steps with the kept selections when the order is placed (%s)',
+			( status ) => {
+				const subscriber = loadTracker();
+				subscriber();
+
+				mockCheckoutStatus = status;
+				subscriber();
+				subscriber(); // still processing: nothing repeats
+
+				const calls = window.gtm4wp_push_ecommerce.mock.calls;
+				expect( pushedNames() ).toEqual( [
+					'add_shipping_info',
+					'add_payment_info',
+				] );
+				expect( calls[ 0 ][ 2 ] ).toEqual(
+					expect.objectContaining( { shipping_tier: 'Flat rate' } )
+				);
+				expect( calls[ 1 ][ 2 ] ).toEqual(
+					expect.objectContaining( { payment_type: 'stripe' } )
+				);
+			}
 		);
-		expect( events ).toContain( 'add_shipping_info' );
-		expect( events ).toContain( 'add_payment_info' );
+
+		it( 'reports at submission only the step the shopper had not changed', () => {
+			const subscriber = loadTracker();
+			subscriber();
+
+			mockActivePaymentMethod = 'paypal';
+			subscriber(); // add_payment_info
+
+			mockCheckoutStatus = 'before_processing';
+			subscriber();
+
+			expect( pushedNames() ).toEqual( [
+				'add_payment_info',
+				'add_shipping_info',
+			] );
+		} );
+
+		// Rates are recalculated after an address edit; the store may hold no
+		// selected rate for a moment and then the same one again.
+		it( 'does not count the same rate coming back after a recalculation as a change', () => {
+			const subscriber = loadTracker();
+			subscriber();
+
+			mockCartData = checkoutCart( '' );
+			subscriber();
+			mockCartData = checkoutCart( 'Flat rate' );
+			subscriber();
+
+			expect( pushedNames() ).not.toContain( 'add_shipping_info' );
+		} );
+
+		it( 'does not fire for a rate that first appears after load (no rates until an address)', () => {
+			mockCartData = checkoutCart( '' );
+			const subscriber = loadTracker();
+			subscriber();
+
+			mockCartData = checkoutCart( 'Flat rate' );
+			subscriber();
+
+			expect( pushedNames() ).not.toContain( 'add_shipping_info' );
+		} );
+
+		// Older WooCommerce without wc/store/checkout: a change still reports,
+		// and the missing store never reads as a submission.
+		it( 'still reports a change when the checkout store is missing', () => {
+			mockHasCheckoutStore = false;
+			const subscriber = loadTracker();
+			subscriber();
+			subscriber();
+			expect( window.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
+
+			mockActivePaymentMethod = 'paypal';
+			subscriber();
+
+			expect( pushedNames() ).toEqual( [ 'add_payment_info' ] );
+		} );
+
+		// RI-35: the subscriber runs inside WooCommerce's dispatch, the order
+		// submission included; a throw must not unwind into it.
+		it( 'does not throw out of the subscriber, and still surfaces the error', () => {
+			jest.useFakeTimers();
+			const subscriber = loadTracker();
+			subscriber();
+
+			window.gtm4wp_push_ecommerce = jest.fn( () => {
+				throw new Error( 'tracking failed' );
+			} );
+			mockCheckoutStatus = 'before_processing';
+
+			expect( () => subscriber() ).not.toThrow();
+			expect( window.gtm4wp_push_ecommerce ).toHaveBeenCalled();
+			expect( () => jest.runOnlyPendingTimers() ).toThrow(
+				'tracking failed'
+			);
+
+			jest.useRealTimers();
+		} );
 	} );
 
 	// The cart context must keep owning the cart events after the split - losing
