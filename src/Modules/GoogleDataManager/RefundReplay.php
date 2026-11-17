@@ -40,15 +40,18 @@ final class RefundReplay {
 	 * The references of a raw list that name a refund: strings in the
 	 * platform:order:refund form the log writes. Anything else is dropped
 	 * rather than refused, so a client naming one bad reference next to a
-	 * good one still gets the good one queued.
+	 * good one still gets the good one queued. A string is split the way
+	 * core splits a list input, so every WordPress version reads it alike
+	 * (#699, U155).
 	 *
 	 * @param mixed $raw The list as submitted.
 	 * @return string[]
 	 */
 	public static function references( $raw ): array {
 		$references = array();
+		$raw        = is_string( $raw ) ? wp_parse_list( $raw ) : (array) $raw;
 
-		foreach ( (array) $raw as $reference ) {
+		foreach ( $raw as $reference ) {
 			if ( is_string( $reference ) && null !== SendLog::parse_reference( $reference ) ) {
 				$references[] = $reference;
 			}
