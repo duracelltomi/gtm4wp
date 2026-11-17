@@ -15,6 +15,10 @@
  *     add_to_cart;
  *   - "cartcheckout": the merged 2.0.0 value, honored for cached pages, with
  *     the old payment-store heuristic for the checkout steps.
+ *
+ * The checkout steps follow the classic checkout (#492): WooCommerce preselects
+ * a shipping rate and a payment method, so a step fires when the shopper
+ * changes one, or at order submission for a step still unreported.
  */
 
 import {
@@ -24,9 +28,11 @@ import {
 	gtm4wp_selected_shipping_tier,
 } from './lib/gtm4wp-blocks-cart-diff';
 import { gtm4wp_read_cookie } from './lib/gtm4wp-cookies';
+import { gtm4wp_run_isolated } from './lib/gtm4wp-isolate';
 
 const CART_STORE = 'wc/store/cart';
 const PAYMENT_STORE = 'wc/store/payment';
+const CHECKOUT_STORE = 'wc/store/checkout';
 
 // Dispatched on window after every Interactivity API cart change; drives the
 // fallback below.
@@ -83,6 +89,29 @@ function gtm4wp_safe_select( wp_data, store_name ) {
 	} catch ( e ) {
 		return null;
 	}
+}
+
+/**
+ * Whether the shopper is placing the order: the checkout store's
+ * before_processing / processing status (U23), the block equivalent of the
+ * classic checkout_place_order. False where the store or a selector is
+ * missing (older WooCommerce), so only a change reports a step there.
+ *
+ * @param {Object} wp_data The wp.data module.
+ * @return {boolean} Whether the order is being submitted.
+ */
+function gtm4wp_blocks_is_submitting( wp_data ) {
+	const checkout_store = gtm4wp_safe_select( wp_data, CHECKOUT_STORE );
+	if ( ! checkout_store ) {
+		return false;
+	}
+
+	return (
+		( typeof checkout_store.isBeforeProcessing === 'function' &&
+			!! checkout_store.isBeforeProcessing() ) ||
+		( typeof checkout_store.isProcessing === 'function' &&
+			!! checkout_store.isProcessing() )
+	);
 }
 
 /**
@@ -397,6 +426,10 @@ function gtm4wp_blocks_init() {
 	let cart_baseline = null;
 	let shipping_fired = false;
 	let payment_fired = false;
+	// The last non-empty rate / method seen. The first one is WooCommerce's
+	// preselection, not a step (#492); '' while the store has none.
+	let shipping_seen = '';
+	let payment_seen = '';
 
 	// Latest normalized cross-sells (for the click listener); view_item_list
 	// once per page.
@@ -424,7 +457,9 @@ function gtm4wp_blocks_init() {
 		return;
 	}
 
-	wp_data.subscribe( () => {
+	// Isolated (RI-35): subscribers run inside WooCommerce's own dispatch, the
+	// order submission included, so a throw here would break its code.
+	const on_store_change = () => {
 		const cart_store = gtm4wp_safe_select( wp_data, CART_STORE );
 		if ( ! cart_store || typeof cart_store.getCartData !== 'function' ) {
 			return;
@@ -499,10 +534,16 @@ function gtm4wp_blocks_init() {
 		}
 
 		const value = gtm4wp_blocks_value( current );
+		const submitting = gtm4wp_blocks_is_submitting( wp_data );
 
-		if ( ! shipping_fired ) {
-			const shipping_tier = gtm4wp_selected_shipping_tier( cart_data );
-			if ( shipping_tier ) {
+		const shipping_tier = gtm4wp_selected_shipping_tier( cart_data );
+		if ( shipping_tier ) {
+			if (
+				! shipping_fired &&
+				( submitting ||
+					( '' !== shipping_seen &&
+						shipping_tier !== shipping_seen ) )
+			) {
 				shipping_fired = true;
 				gtm4wp_blocks_push(
 					'add_shipping_info',
@@ -510,14 +551,19 @@ function gtm4wp_blocks_init() {
 					{ currency, shipping_tier, value }
 				);
 			}
+			shipping_seen = shipping_tier;
 		}
 
-		if (
-			! payment_fired &&
+		const payment_type =
 			typeof payment_store.getActivePaymentMethod === 'function'
-		) {
-			const payment_type = payment_store.getActivePaymentMethod();
-			if ( payment_type ) {
+				? payment_store.getActivePaymentMethod() || ''
+				: '';
+		if ( payment_type ) {
+			if (
+				! payment_fired &&
+				( submitting ||
+					( '' !== payment_seen && payment_type !== payment_seen ) )
+			) {
 				payment_fired = true;
 				gtm4wp_blocks_push(
 					'add_payment_info',
@@ -525,8 +571,11 @@ function gtm4wp_blocks_init() {
 					{ currency, payment_type, value }
 				);
 			}
+			payment_seen = payment_type;
 		}
-	} );
+	};
+
+	wp_data.subscribe( () => gtm4wp_run_isolated( on_store_change ) );
 }
 
 gtm4wp_blocks_init();

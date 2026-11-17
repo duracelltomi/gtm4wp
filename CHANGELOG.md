@@ -3,6 +3,7 @@
 ## 2.1.2
 
 * Fixed: when files are missing from the plugin folder, for example after an incomplete update or upload, the site no longer stops with a fatal error. The plugin stays inactive, and an admin notice and a critical Site Health item explain how to install it again. (#488)
+* Fixed: on the block Checkout page, `add_shipping_info` and `add_payment_info` no longer fire as soon as the page loads. As on the classic checkout, they fire when the shopper changes the shipping or payment method, or when the order is placed, so expect fewer of both (#492). Thanks to @rodolphedecroix-design for the report.
 
 ## 2.1.1 (2026-11-05)
 
