@@ -39,7 +39,7 @@ Epoch: **2026-11-05** — 2.1.0 became the wordpress.org stable; `2.0` frozen li
 | WP floor | 6.3 |
 | WP tested up to | 7.1 |
 | WC floor | 5.0 |
-| WC tested up to | 11.2.0 |
+| WC tested up to | 11.3.0 |
 
 ## Branch and bugfix flow
 
