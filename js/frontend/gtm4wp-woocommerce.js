@@ -203,30 +203,17 @@ function gtm4wp_woocommerce_handle_shipping_method_change() {
 }
 
 /**
- * Reads the step identifier from a CheckoutWC cfw_step_changed event (#385). The
- * payload shape is not verified against a live install, so the likely places
- * (string detail, or detail.step / current / to / name) are tried.
+ * Normalizes the step identifier CheckoutWC passes to cfw_step_changed (#385).
+ * CheckoutWC fires the event with jQuery, jQuery( document.body ).trigger(
+ * 'cfw_step_changed', step ), so the step is the second argument of the jQuery
+ * handler (not event.detail): the id of the destination tab without its "cfw-"
+ * prefix, i.e. customer-info, shipping-method or payment-method.
  *
- * @param {Event} e The cfw_step_changed event.
+ * @param {*} step The second argument of the jQuery handler.
  * @return {string} The lowercased step identifier, or '' if unknown.
  */
-function gtm4wp_woocommerce_checkoutwc_step( e ) {
-	let step = '';
-
-	if ( e && e.detail ) {
-		if ( typeof e.detail === 'string' ) {
-			step = e.detail;
-		} else {
-			step =
-				e.detail.step ||
-				e.detail.current ||
-				e.detail.to ||
-				e.detail.name ||
-				'';
-		}
-	}
-
-	return ( '' + step ).toLowerCase();
+function gtm4wp_woocommerce_checkoutwc_step( step ) {
+	return 'string' === typeof step ? step.toLowerCase() : '';
 }
 
 /**
@@ -1472,32 +1459,44 @@ function gtm4wp_woocommerce_process_pages() {
 		window.gtm4wp_checkout_products_ga4 =
 			window.gtm4wp_checkout_products_ga4 || [];
 
-		document.addEventListener( 'cfw_step_changed', function ( e ) {
-			const checkoutwc_step = gtm4wp_woocommerce_checkoutwc_step( e );
+		// CheckoutWC fires cfw_step_changed with jQuery, which never reaches an
+		// addEventListener() listener, so bind with jQuery. Isolated: CheckoutWC
+		// triggers the event inside the try block that then selects the next tab,
+		// so a throw here would stop the shopper from moving to the next step.
+		jQuery( document.body ).on( 'cfw_step_changed', function ( e, step ) {
+			gtm4wp_run_isolated( function () {
+				const checkoutwc_step =
+					gtm4wp_woocommerce_checkoutwc_step( step );
 
-			// Reaching the payment (or final review) step means the shipping
-			// selection is behind the visitor, so report both.
-			if (
-				checkoutwc_step.indexOf( 'payment' ) > -1 ||
-				checkoutwc_step.indexOf( 'review' ) > -1
-			) {
-				gtm4wp_woocommerce_handle_shipping_method_change();
-				gtm4wp_woocommerce_handle_payment_method_change();
-			} else if ( checkoutwc_step.indexOf( 'shipping' ) > -1 ) {
-				gtm4wp_woocommerce_handle_shipping_method_change();
-			}
+				// Reaching the payment (or final review) step means the shipping
+				// selection is behind the visitor, so report both.
+				if (
+					checkoutwc_step.indexOf( 'payment' ) > -1 ||
+					checkoutwc_step.indexOf( 'review' ) > -1
+				) {
+					gtm4wp_woocommerce_handle_shipping_method_change();
+					gtm4wp_woocommerce_handle_payment_method_change();
+				} else if ( checkoutwc_step.indexOf( 'shipping' ) > -1 ) {
+					gtm4wp_woocommerce_handle_shipping_method_change();
+				}
+			} );
 		} );
 
 		// Fallback: report any step not yet fired when the order is submitted, so
 		// a pre-selected/skipped step (or an unrecognized step name) is not lost.
-		// Not checkout_place_order (#328): WooCommerce fires it with a non-bubbling
-		// triggerHandler() on the form, so it never reaches body.
-		jQuery( document.body ).on( 'cfw_before_submit', function () {
-			gtm4wp_run_isolated( function () {
-				gtm4wp_woocommerce_handle_shipping_method_change();
-				gtm4wp_woocommerce_handle_payment_method_change();
+		// CheckoutWC submits through a non-bubbling triggerHandler(
+		// 'checkout_place_order' ) on the checkout form (#328), so bind on the
+		// form, not on body. With body.woocommerce-checkout the classic handler
+		// above already does this, so it is only needed where that class is
+		// missing.
+		if ( ! gtm4wp_is_checkout ) {
+			jQuery( 'form.checkout' ).on( 'checkout_place_order', function () {
+				gtm4wp_run_isolated( function () {
+					gtm4wp_woocommerce_handle_shipping_method_change();
+					gtm4wp_woocommerce_handle_payment_method_change();
+				} );
 			} );
-		} );
+		}
 	}
 }
 
