@@ -2,6 +2,7 @@
 
 ## 2.2
 
+* Fixed: with the **CheckoutWC compatibility** option on, `add_shipping_info` and `add_payment_info` now fire when the shopper moves to the next CheckoutWC step. CheckoutWC announces a step change with a jQuery event that carries the step as an argument, which the plugin's listener never received, and its submit fallback waited for an event CheckoutWC does not have. The fallback now uses CheckoutWC's `checkout_place_order` form event, and a failure while reporting a step can no longer stop the shopper from reaching the next step.
 * Changed: media progress events now start at 10%. The `mediaPercentage` 0 event is gone, since the `play` state of `gtm4wp.mediaPlayerStateChange` reports the start. If a GTM trigger uses `mediaPercentage` equal to 0, move it to that state. (#455)
 
 ## 2.1.2

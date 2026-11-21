@@ -345,11 +345,34 @@ describe( 'gtm4wp_checkoutwc is read as a lexical global, not off window', () =>
 		window.gtm4wp_checkout_value = 50;
 		setLexicalGlobal( 'gtm4wp_checkoutwc', 1, 0 );
 
+		// CheckoutWC fires cfw_step_changed with jQuery( document.body ).trigger(
+		// 'cfw_step_changed', step ); record the handler bound on body and call it
+		// the way jQuery does (event, step).
+		const bodyHandlers = [];
+		global.jQuery = jest.fn( ( target ) => {
+			const jq = {
+				on: ( events, fn ) => {
+					if (
+						target === document.body &&
+						'cfw_step_changed' === events
+					) {
+						bodyHandlers.push( fn );
+					}
+					return jq;
+				},
+				trigger: () => jq,
+				ajaxSuccess: () => jq,
+			};
+			return jq;
+		} );
+
 		bootClassic();
-		document.dispatchEvent(
-			new window.CustomEvent( 'cfw_step_changed', {
-				detail: { step: 'payment' },
-			} )
+		bodyHandlers.forEach( ( fn ) =>
+			fn.call(
+				document.body,
+				{ type: 'cfw_step_changed' },
+				'payment-method'
+			)
 		);
 
 		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );

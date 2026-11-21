@@ -1022,46 +1022,73 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 			return parsed;
 		};
 
-		const jq = { on: () => jq, trigger: () => jq, ajaxSuccess: () => jq };
-		global.jQuery = jest.fn( () => jq );
+		// CheckoutWC fires its events with jQuery, so the stand-in records every
+		// handler together with its target. It is no more permissive than jQuery:
+		// a handler only runs through jQuery's own call shape (event, extra args),
+		// and a native addEventListener() listener is never reached by it.
+		jqBound = [];
+		const make = ( selector ) => {
+			const target =
+				'string' === typeof selector
+					? document.querySelector( selector )
+					: selector;
+			const jq = {
+				on: ( events, fn ) => {
+					String( events )
+						.split( ' ' )
+						.forEach( ( evt ) =>
+							jqBound.push( [ target, evt, fn ] )
+						);
+					return jq;
+				},
+				trigger: () => jq,
+				ajaxSuccess: () => jq,
+			};
+			return jq;
+		};
+		global.jQuery = jest.fn( make );
 
 		jest.useFakeTimers();
 	};
 
 	// A CheckoutWC checkout page: no body.woocommerce-checkout, but the standard
-	// WooCommerce shipping/payment method inputs (which CheckoutWC keeps).
+	// WooCommerce shipping/payment method inputs (which CheckoutWC keeps) and its
+	// form.checkout.
 	const CHECKOUT_DOM =
+		'<form class="checkout">' +
 		'<input type="radio" name="shipping_method[0]" value="flat_rate:1" checked />' +
 		'<div class="payment_methods">' +
 		'<input type="radio" name="payment_method" value="cod" checked />' +
-		'</div>';
+		'</div>' +
+		'</form>';
 
-	// jsdom's document is shared across the tests in this file and isolateModules
-	// does not detach listeners, so capture the cfw_step_changed listener this
-	// test binds and remove it in afterEach - otherwise a prior test's listener
-	// would fire in the option-off test (TS-7 leak) and make it order-dependent.
-	let boundStepListeners = [];
+	let jqBound = [];
 
 	const boot = () => {
-		boundStepListeners = [];
-		const originalAdd = document.addEventListener;
-		document.addEventListener = function ( type, fn, opts ) {
-			if ( 'cfw_step_changed' === type ) {
-				boundStepListeners.push( fn );
-			}
-			return originalAdd.call( this, type, fn, opts );
-		};
-
 		jest.isolateModules( () => require( '../gtm4wp-woocommerce' ) );
-		jest.runAllTimers(); // binds the cfw_step_changed listener in process_pages()
-
-		document.addEventListener = originalAdd;
+		jest.runAllTimers(); // binds the CheckoutWC handlers in process_pages()
 	};
 
+	const bound = ( target, evt ) =>
+		jqBound.filter( ( b ) => b[ 0 ] === target && b[ 1 ] === evt );
+
+	// What CheckoutWC does on a step change (checkout.js):
+	//   jQuery( document.body ).trigger( 'cfw_step_changed', 'payment-method' )
+	// i.e. the step is the second handler argument, never event.detail.
 	const dispatchStep = ( step ) =>
-		document.dispatchEvent(
-			new window.CustomEvent( 'cfw_step_changed', { detail: { step } } )
+		bound( document.body, 'cfw_step_changed' ).forEach( ( b ) =>
+			b[ 2 ].call( document.body, { type: 'cfw_step_changed' }, step )
 		);
+
+	// What CheckoutWC does on submit: triggerHandler( 'checkout_place_order' ) on
+	// the form, which reaches only handlers bound on the form itself (#328).
+	const placeOrder = () =>
+		bound(
+			document.querySelector( 'form.checkout' ),
+			'checkout_place_order'
+		)
+			.slice( 0 )
+			.forEach( ( b ) => b[ 2 ]() );
 
 	const calls = ( event ) =>
 		global.gtm4wp_push_ecommerce.mock.calls.filter(
@@ -1069,10 +1096,7 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 		);
 
 	afterEach( () => {
-		boundStepListeners.forEach( ( fn ) =>
-			document.removeEventListener( 'cfw_step_changed', fn )
-		);
-		boundStepListeners = [];
+		jqBound = [];
 
 		jest.useRealTimers();
 		delete window.google_tag_manager;
@@ -1089,7 +1113,7 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 		window.gtm4wp_checkoutwc = 1; // opt-in ON
 
 		boot();
-		dispatchStep( 'payment' );
+		dispatchStep( 'payment-method' );
 
 		const shipping = calls( 'add_shipping_info' );
 		const payment = calls( 'add_payment_info' );
@@ -1107,6 +1131,52 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 		);
 	} );
 
+	it( 'listens to the jQuery cfw_step_changed event on body, not a native event', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+
+		const addEventListener = jest.spyOn( document, 'addEventListener' );
+		boot();
+		const nativeBinds = addEventListener.mock.calls.filter(
+			( c ) => 'cfw_step_changed' === c[ 0 ]
+		);
+		addEventListener.mockRestore();
+
+		// CheckoutWC fires it with jQuery, which never reaches a native listener.
+		expect( nativeBinds ).toHaveLength( 0 );
+		expect( bound( document.body, 'cfw_step_changed' ) ).toHaveLength( 1 );
+	} );
+
+	it( 'fires only add_shipping_info when the shipping step opens', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+
+		boot();
+		dispatchStep( 'shipping-method' );
+
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'ignores a step change with an unknown or missing step', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+
+		boot();
+		dispatchStep( 'customer-info' );
+		dispatchStep( undefined );
+		dispatchStep( { step: 'payment-method' } );
+
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 0 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 0 );
+	} );
+
 	it( 'does not fire the same step twice across repeated step changes', () => {
 		document.body.className = '';
 		document.body.innerHTML = CHECKOUT_DOM;
@@ -1114,23 +1184,69 @@ describe( 'gtm4wp-woocommerce CheckoutWC compatibility (#385)', () => {
 		window.gtm4wp_checkoutwc = 1;
 
 		boot();
-		dispatchStep( 'shipping' ); // add_shipping_info
-		dispatchStep( 'payment' ); // add_payment_info (shipping already fired)
-		dispatchStep( 'payment' ); // nothing new
+		dispatchStep( 'shipping-method' ); // add_shipping_info
+		dispatchStep( 'payment-method' ); // add_payment_info (shipping already fired)
+		dispatchStep( 'payment-method' ); // nothing new
 
 		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
 		expect( calls( 'add_payment_info' ) ).toHaveLength( 1 );
 	} );
 
-	it( 'does not bind the CheckoutWC listener when the option is off', () => {
+	it( 'reports the missing steps once when the order is submitted', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+
+		boot();
+		// CheckoutWC calls triggerHandler( 'checkout_place_order' ) on the form, so
+		// the fallback has to be bound on the form (CheckoutWC has no
+		// cfw_before_submit event).
+		expect(
+			bound(
+				document.querySelector( 'form.checkout' ),
+				'checkout_place_order'
+			).length
+		).toBeGreaterThan( 0 );
+		expect( bound( document.body, 'cfw_before_submit' ) ).toHaveLength( 0 );
+
+		placeOrder();
+		placeOrder();
+
+		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
+		expect( calls( 'add_payment_info' ) ).toHaveLength( 1 );
+	} );
+
+	it( 'never throws into CheckoutWC when reporting a step fails', () => {
+		document.body.className = '';
+		document.body.innerHTML = CHECKOUT_DOM;
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+		global.gtm4wp_push_ecommerce = jest.fn( () => {
+			throw new Error( 'push failed' );
+		} );
+
+		boot();
+
+		// CheckoutWC triggers the event inside the try block that then selects the
+		// next tab, so a throw here would keep the shopper on the current step.
+		expect( () => dispatchStep( 'payment-method' ) ).not.toThrow();
+		expect( () => placeOrder() ).not.toThrow();
+		// Not swallowed: the error surfaces on a timer instead (gtm4wp_run_isolated).
+		expect( () => jest.runOnlyPendingTimers() ).toThrow( 'push failed' );
+	} );
+
+	it( 'does not bind the CheckoutWC handlers when the option is off', () => {
 		document.body.className = '';
 		document.body.innerHTML = CHECKOUT_DOM;
 		setGlobals();
 		window.gtm4wp_checkoutwc = 0; // opt-in OFF
 
 		boot();
-		dispatchStep( 'payment' );
+		dispatchStep( 'payment-method' );
+		placeOrder();
 
+		expect( bound( document.body, 'cfw_step_changed' ) ).toHaveLength( 0 );
 		expect( calls( 'add_shipping_info' ) ).toHaveLength( 0 );
 		expect( calls( 'add_payment_info' ) ).toHaveLength( 0 );
 	} );
@@ -1245,7 +1361,7 @@ describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () =
 		window.gtm4wp_checkoutwc = 1;
 		boot( '' );
 
-		jqHandlers.cfw_before_submit();
+		jqHandlers.checkout_place_order();
 
 		expect( calls( 'add_shipping_info' ) ).toHaveLength( 1 );
 		expect( calls( 'add_payment_info' ) ).toHaveLength( 1 );
@@ -1257,7 +1373,7 @@ describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () =
 		boot( '' );
 		delete global.gtm4wp_currency;
 
-		expect( () => jqHandlers.cfw_before_submit() ).not.toThrow();
+		expect( () => jqHandlers.checkout_place_order() ).not.toThrow();
 		// The handler did run and fail: nothing pushed, the error deferred.
 		expect( global.gtm4wp_push_ecommerce ).not.toHaveBeenCalled();
 		expect( () => jest.runOnlyPendingTimers() ).toThrow( ReferenceError );
@@ -1275,7 +1391,19 @@ describe( 'gtm4wp-woocommerce checkout submit handlers never throw (#472)', () =
 		expect( bound( document.body, 'checkout_place_order' ) ).toHaveLength(
 			0
 		);
-		expect( bound( document.body, 'cfw_before_submit' ) ).toHaveLength( 1 );
+		// CheckoutWC has no cfw_before_submit event; nothing may wait for it.
+		expect( bound( document.body, 'cfw_before_submit' ) ).toHaveLength( 0 );
+	} );
+
+	it( 'binds the CheckoutWC submit fallback on the form when the body class is missing', () => {
+		setGlobals();
+		window.gtm4wp_checkoutwc = 1;
+		boot( '' );
+
+		expect( bound( 'form.checkout', 'checkout_place_order' ) ).toHaveLength(
+			1
+		);
+		expect( bound( document.body, 'cfw_before_submit' ) ).toHaveLength( 0 );
 	} );
 } );
 
